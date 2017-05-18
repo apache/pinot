@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
@@ -168,7 +168,7 @@ public class PinotTableIdealStateBuilder {
   }
 
   public static IdealState buildInitialHighLevelRealtimeIdealStateFor(String realtimeTableName,
-      AbstractTableConfig realtimeTableConfig, HelixAdmin helixAdmin, String helixClusterName,
+      TableConfig realtimeTableConfig, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
     String realtimeServerTenant =
         ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
@@ -185,8 +185,8 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  public static void buildLowLevelRealtimeIdealStateFor(String realtimeTableName,
-      AbstractTableConfig realtimeTableConfig, HelixAdmin helixAdmin, String helixClusterName, IdealState idealState) {
+  public static void buildLowLevelRealtimeIdealStateFor(String realtimeTableName, TableConfig realtimeTableConfig,
+      HelixAdmin helixAdmin, String helixClusterName, IdealState idealState) {
     String realtimeServerTenant =
         ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
     final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,

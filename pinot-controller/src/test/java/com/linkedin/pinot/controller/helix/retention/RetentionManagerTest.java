@@ -16,7 +16,7 @@
 package com.linkedin.pinot.controller.helix.retention;
 
 import com.alibaba.fastjson.JSONObject;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -111,7 +111,7 @@ public class RetentionManagerTest {
 
     String OfflineTableConfigJson =
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(_testTableName, null, null, 2).toString();
-    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+    TableConfig offlineTableConfig = TableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
     _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, HELIX_CLUSTER_NAME);
   }
@@ -429,9 +429,9 @@ public class RetentionManagerTest {
     tableConfig.put("metadata", tenants);
 
     // Set the propertystore entry for table.
-    AbstractTableConfig abstractTableConfig = AbstractTableConfig.init(tableConfig.toJSONString());
+    TableConfig abstractTableConfig = TableConfig.init(tableConfig.toJSONString());
     ZKMetadataProvider
-        .setRealtimeTableConfig(_propertyStore, realtimeTableName, AbstractTableConfig.toZnRecord(abstractTableConfig));
+        .setRealtimeTableConfig(_propertyStore, realtimeTableName, TableConfig.toZnRecord(abstractTableConfig));
   }
 
   private void registerSegmentMetadata(SegmentMetadata segmentMetadata) {

@@ -20,7 +20,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -570,7 +570,7 @@ public class PinotLLCRealtimeSegmentManager {
   // TODO: Would be good to cache table config fields which are repeatedly checked
 
   protected int getRealtimeTableFlushSizeForTable(String tableName) {
-    AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    TableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
     return getRealtimeTableFlushSize(tableConfig);
   }
 
@@ -579,7 +579,7 @@ public class PinotLLCRealtimeSegmentManager {
     if (_propertyStore == null) {
       return commitTimeoutMS;
     }
-    AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    TableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
     final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
     if (streamConfigs != null && streamConfigs.containsKey(
         CommonConstants.Helix.DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
@@ -595,7 +595,7 @@ public class PinotLLCRealtimeSegmentManager {
     return commitTimeoutMS;
   }
 
-  public static int getRealtimeTableFlushSize(AbstractTableConfig tableConfig) {
+  public static int getRealtimeTableFlushSize(TableConfig tableConfig) {
     final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
     if (streamConfigs != null && streamConfigs.containsKey(
         CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
@@ -774,7 +774,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param llcSegments is a list of segment names in the ideal state as was observed last.
    */
   public void createConsumingSegment(final String realtimeTableName, final Set<Integer> nonConsumingPartitions,
-      final List<String> llcSegments, final AbstractTableConfig tableConfig) {
+      final List<String> llcSegments, final TableConfig tableConfig) {
     final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
     final HashMap<Integer, LLCSegmentName> ncPartitionToLatestSegment = new HashMap<>(nonConsumingPartitions.size());
@@ -922,7 +922,7 @@ public class PinotLLCRealtimeSegmentManager {
    * Mark the state of the segment to be OFFLINE in idealstate.
    * When all replicas of this segment are marked offline, the ValidationManager, in its next
    * run, will auto-create a new segment with the appropriate offset.
-   * See {@link #createConsumingSegment(String, Set, List, AbstractTableConfig)}
+   * See {@link #createConsumingSegment(String, Set, List, TableConfig)}
   */
   public void segmentStoppedConsuming(final LLCSegmentName segmentName, final String instance) {
     String rawTableName = segmentName.getTableName();
@@ -955,7 +955,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param realtimeTableName name of the realtime table
    * @param tableConfig tableConfig from propertystore
    */
-  public void updateKafkaPartitionsIfNecessary(String realtimeTableName, AbstractTableConfig tableConfig) {
+  public void updateKafkaPartitionsIfNecessary(String realtimeTableName, TableConfig tableConfig) {
     final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
     final Map<String, List<String>> partitionToServersMap = partitionAssignment.getListFields();
     final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());

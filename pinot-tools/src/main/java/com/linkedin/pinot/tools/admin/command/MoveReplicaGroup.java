@@ -21,7 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
@@ -420,13 +420,13 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return getTableConfig(tableName).getTenantConfig().getServer();
   }
 
-  private AbstractTableConfig getTableConfig(String tableName)
+  private TableConfig getTableConfig(String tableName)
       throws IOException, JSONException {
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, zkPath);
     ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<>(zkHost, serializer, path);
     ZNRecord tcZnRecord = propertyStore.get("/CONFIGS/TABLE/" + tableName, null, 0);
-    AbstractTableConfig tableConfig = AbstractTableConfig.fromZnRecord(tcZnRecord);
+    TableConfig tableConfig = TableConfig.fromZnRecord(tcZnRecord);
     LOGGER.debug("Loaded table config");
     return tableConfig;
   }

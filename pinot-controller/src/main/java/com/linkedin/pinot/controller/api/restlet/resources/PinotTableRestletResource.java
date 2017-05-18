@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -69,7 +69,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   public Representation post(Representation entity) {
     try {
       String jsonRequest = entity.getText();
-      AbstractTableConfig config = AbstractTableConfig.init(jsonRequest);
+      TableConfig config = TableConfig.init(jsonRequest);
       try {
         addTable(config);
       } catch (Exception e) {
@@ -100,13 +100,13 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Summary("Adds a table")
   @Tags({ "table" })
   @Paths({ "/tables", "/tables/" })
-  private void addTable(AbstractTableConfig config) throws IOException {
+  private void addTable(TableConfig config) throws IOException {
     ensureMinReplicas(config);
 
     _pinotHelixResourceManager.addTable(config);
   }
 
-  private void ensureMinReplicas(AbstractTableConfig config) {
+  private void ensureMinReplicas(TableConfig config) {
     // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
     // of table configuration value
     SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
@@ -238,13 +238,13 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
 
     if ((tableType == null || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      AbstractTableConfig config = _pinotHelixResourceManager.getTableConfig(tableName, TableType.OFFLINE);
+      TableConfig config = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       ret.put(TableType.OFFLINE.name(), config.toJSON());
     }
 
     if ((tableType == null || TableType.REALTIME.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      AbstractTableConfig config = _pinotHelixResourceManager.getTableConfig(tableName, TableType.REALTIME);
+      TableConfig config = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
       ret.put(TableType.REALTIME.name(), config.toJSON());
     }
 
@@ -394,9 +394,9 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Paths({"/tables/{tableName}"})
   public Representation updateTableConfig(@Parameter(name = "tableName", in = "path",
       description = "Table name (without type)") String tableName, Representation entity) {
-    AbstractTableConfig tableConfig;
+    TableConfig tableConfig;
     try {
-      tableConfig = AbstractTableConfig.init(entity.getText());
+      tableConfig = TableConfig.init(entity.getText());
     } catch (JSONException e) {
       return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST, "Invalid json in table configuration");
     } catch (IOException e) {

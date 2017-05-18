@@ -16,7 +16,7 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.data.Schema;
@@ -118,7 +118,7 @@ public class SegmentFetcherAndLoader {
             if (!isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck, segmentId, tableName)) {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentId,
                   tableName, localSegmentMetadata.getCrc());
-              AbstractTableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+              TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
               _dataManager.addSegment(localSegmentMetadata, tableConfig, schema);
               // TODO Update zk metadata with CRC for this instance
               return;
@@ -161,7 +161,7 @@ public class SegmentFetcherAndLoader {
         for (retryCount = 0; retryCount < maxRetryCount; ++retryCount) {
           long attemptStartTime = System.currentTimeMillis();
           try {
-            AbstractTableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+            TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
             final String uri = offlineSegmentZKMetadata.getDownloadUrl();
             final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
             final SegmentMetadata segmentMetadata =
@@ -293,13 +293,13 @@ public class SegmentFetcherAndLoader {
     }
     switch (tableType) {
       case OFFLINE:
-        AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+        TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
         // For OFFLINE table, try to get schema for default columns
         Schema schema = ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
         _dataManager.reloadSegment(segmentMetadata, tableType, offlineTableConfig, schema);
         break;
       case REALTIME:
-        AbstractTableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+        TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
         // For REALTIME table, ignore schema for default columns
         _dataManager.reloadSegment(segmentMetadata, tableType, realtimeTableConfig, null);
         break;

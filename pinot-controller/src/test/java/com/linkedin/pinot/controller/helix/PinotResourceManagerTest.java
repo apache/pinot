@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -88,7 +88,7 @@ public class PinotResourceManagerTest {
     // Adding table
     String OfflineTableConfigJson =
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, null, null, 1).toString();
-    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+    TableConfig offlineTableConfig = TableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
 
   }

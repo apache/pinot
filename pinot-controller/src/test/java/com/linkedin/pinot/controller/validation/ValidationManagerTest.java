@@ -15,9 +15,33 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +49,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -39,33 +64,10 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
-import javax.annotation.Nullable;
+
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -87,7 +89,7 @@ public class ValidationManagerTest {
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private PinotLLCRealtimeSegmentManager _segmentManager;
-  private AbstractTableConfig _offlineTableConfig;
+  private TableConfig _offlineTableConfig;
   private HelixManager _helixManager;
 
   @BeforeClass
@@ -105,7 +107,7 @@ public class ValidationManagerTest {
 
     String OfflineTableConfigJson = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TEST_TABLE_NAME, null, null,
         "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
-    _offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+    _offlineTableConfig = TableConfig.init(OfflineTableConfigJson);
 
     final String instanceId = "localhost_helixController";
     _helixManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, ZK_STR, instanceId, /*isUpdateStateModel=*/false);
@@ -116,7 +118,7 @@ public class ValidationManagerTest {
   private void makeMockPinotLLCRealtimeSegmentManager(ZNRecord kafkaPartitionAssignment) {
     _segmentManager = mock(PinotLLCRealtimeSegmentManager.class);
     Mockito.doNothing().when(_segmentManager).updateKafkaPartitionsIfNecessary(Mockito.any(String.class),
-        Mockito.any(AbstractTableConfig.class));
+        Mockito.any(TableConfig.class));
     when(_segmentManager.getKafkaPartitionAssignment(anyString())).thenReturn(kafkaPartitionAssignment);
   }
 
@@ -135,7 +137,7 @@ public class ValidationManagerTest {
     // Add another table that needs to be rebuilt
     String offlineTableTwoConfigJson =
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TEST_TABLE_TWO, null, null, 1).toString();
-    AbstractTableConfig offlineTableConfigTwo = AbstractTableConfig.init(offlineTableTwoConfigJson);
+    TableConfig offlineTableConfigTwo = TableConfig.init(offlineTableTwoConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfigTwo);
     String partitionNameTwo = offlineTableConfigTwo.getTableName();
 
@@ -439,7 +441,7 @@ public class ValidationManagerTest {
     Field autoCreateOnError = ValidationManager.class.getDeclaredField("_autoCreateOnError");
     autoCreateOnError.setAccessible(true);
     autoCreateOnError.setBoolean(validationManager, false);
-    AbstractTableConfig tableConfig = mock(AbstractTableConfig.class);
+    TableConfig tableConfig = mock(TableConfig.class);
     IndexingConfig indexingConfig = mock(IndexingConfig.class);
     when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);
     when(indexingConfig.getStreamConfigs()).thenReturn(streamConfigs);

@@ -17,8 +17,8 @@ package com.linkedin.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -267,7 +267,7 @@ public class PerfBenchmarkDriver {
     String jsonString =
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, _serverTenantName, _brokerTenantName,
             _numReplicas, _segmentAssignmentStrategy).toString();
-    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
+    TableConfig offlineTableConfig = TableConfig.init(jsonString);
     offlineTableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     offlineTableConfig.getValidationConfig().setRetentionTimeValue("");
     IndexingConfig indexingConfig = offlineTableConfig.getIndexingConfig();

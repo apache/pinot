@@ -23,7 +23,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class AbstractTableConfigTest {
+public class TableConfigTest {
 
   @Test
   public void testInit()
@@ -32,7 +32,7 @@ public class AbstractTableConfigTest {
       // with quota
       String tableConfigStr =
           "{\"tableName\":\"myTable\",\"quota\":{\"storage\":\"30G\"},\"segmentsConfig\":{\"retentionTimeUnit\":\"DAYS\",\"retentionTimeValue\":\"60\",\"segmentPushFrequency\":\"daily\",\"segmentPushType\":\"APPEND\",\"replication\":\"2\",\"schemaName\":\"\",\"timeColumnName\":\"\",\"timeType\":\"\",\"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\"},\"tableIndexConfig\":{\"invertedIndexColumns\":[],\"loadMode\":\"HEAP\",\"lazyLoad\":\"false\"},\"tenants\":{\"broker\":\"colocated\",\"server\":\"myServer\"},\"tableType\":\"OFFLINE\",\"metadata\":{\"customConfigs\":{\"loadBalancer\":\"myLoadBalancer\"}}}";
-      AbstractTableConfig tableConfig = AbstractTableConfig.init(tableConfigStr);
+      TableConfig tableConfig = TableConfig.init(tableConfigStr);
 
       Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
       Assert.assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
@@ -40,7 +40,7 @@ public class AbstractTableConfigTest {
       Assert.assertNotNull(tableConfig.getQuotaConfig());
       Assert.assertEquals(tableConfig.getQuotaConfig().getStorage(), "30G");
       String tcFromJson = tableConfig.toJSON().toString();
-      AbstractTableConfig validator = AbstractTableConfig.init(tcFromJson);
+      TableConfig validator = TableConfig.init(tcFromJson);
       QuotaConfig quotaConfig = validator.getQuotaConfig();
       Assert.assertNotNull(quotaConfig);
       Assert.assertEquals(quotaConfig.getStorage(), tableConfig.getQuotaConfig().getStorage());
@@ -50,14 +50,14 @@ public class AbstractTableConfigTest {
       // no quota
       String tableConfigStr =
           "{\"tableName\":\"myTable\",\"segmentsConfig\":{\"retentionTimeUnit\":\"DAYS\",\"retentionTimeValue\":\"60\",\"segmentPushFrequency\":\"daily\",\"segmentPushType\":\"APPEND\",\"replication\":\"2\",\"schemaName\":\"\",\"timeColumnName\":\"\",\"timeType\":\"\",\"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\"},\"tableIndexConfig\":{\"invertedIndexColumns\":[],\"loadMode\":\"HEAP\",\"lazyLoad\":\"false\"},\"tenants\":{\"broker\":\"colocated\",\"server\":\"myServer\"},\"tableType\":\"OFFLINE\",\"metadata\":{\"customConfigs\":{\"loadBalancer\":\"myLoadBalancer\"}}}";
-      AbstractTableConfig tableConfig = AbstractTableConfig.init(tableConfigStr);
+      TableConfig tableConfig = TableConfig.init(tableConfigStr);
 
       Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
       Assert.assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
       Assert.assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
       Assert.assertNull(tableConfig.getQuotaConfig());
       String tcFromJson = tableConfig.toJSON().toString();
-      AbstractTableConfig validator = AbstractTableConfig.init(tcFromJson);
+      TableConfig validator = TableConfig.init(tcFromJson);
       Assert.assertNull(validator.getQuotaConfig());
       Assert.assertEquals(validator.getTableName(), tableConfig.getTableName());
     }

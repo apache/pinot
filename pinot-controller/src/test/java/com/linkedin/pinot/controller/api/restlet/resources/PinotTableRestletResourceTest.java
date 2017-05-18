@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.QuotaConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
@@ -130,7 +130,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
     // table creation should succeed
-    AbstractTableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
+    TableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
     Assert.assertEquals(tableConfig.getValidationConfig().getReplicationNumber(),
         Math.max(tableReplication, TABLE_MIN_REPLICATION));
 
@@ -157,12 +157,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 //    Assert.assertEquals(replicasPerPartition, Math.max(tableReplication, TABLE_MIN_REPLICATION));
   }
 
-  private AbstractTableConfig getTableConfig(String tableName, String type)
+  private TableConfig getTableConfig(String tableName, String type)
       throws IOException, JSONException {
     String tableConfigStr = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableGet(tableName));
     JSONObject json = new JSONObject(tableConfigStr);
     String offlineString = json.getJSONObject(type).toString();
-    return AbstractTableConfig.init(offlineString);
+    return TableConfig.init(offlineString);
   }
 
   @Test
@@ -175,7 +175,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     ControllerRequestURLBuilder controllerUrlBuilder = ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
     sendPostRequest(controllerUrlBuilder.forTableCreate(), request.toString());
     // table creation should succeed
-    AbstractTableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
+    TableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
     Assert.assertEquals(tableConfig.getValidationConfig().getRetentionTimeValue(), "5");
     Assert.assertEquals(tableConfig.getValidationConfig().getRetentionTimeUnit(), "DAYS");
 
@@ -188,7 +188,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     Assert.assertTrue(jsonResponse.has("status"));
     Assert.assertEquals(jsonResponse.getString("status"), "Success");
 
-    AbstractTableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
+    TableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
     Assert.assertEquals(modifiedConfig.getValidationConfig().getRetentionTimeUnit(), "HOURS");
     Assert.assertEquals(modifiedConfig.getValidationConfig().getRetentionTimeValue(), "10");
 

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
@@ -81,7 +81,7 @@ public class PinotHelixResourceManagerTest {
 
   @Test
   public void testRebuildBrokerResourceFromHelixTags() throws Exception {
-    AbstractTableConfig tableConfig = AbstractTableConfig.init(
+    TableConfig tableConfig = TableConfig.init(
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON("faketable", "serverTenant", "brokerTenant", 3)
             .toString());
 

@@ -15,6 +15,26 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Function;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,26 +58,6 @@ import org.apache.zookeeper.data.Stat;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Function;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.core.query.utils.Pair;
 
 
 /**
@@ -122,7 +122,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
 
     for (String resource : _pinotHelixResourceManager.getAllRealtimeTables()) {
       final String tableName = TableNameBuilder.extractRawTableName(resource);
-      AbstractTableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName, TableType.REALTIME);
+      TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
       KafkaStreamMetadata metadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
       if (metadata.hasHighLevelKafkaConsumerType()) {
         idealStateMap.put(resource, _pinotHelixResourceManager.getHelixAdmin()
@@ -320,10 +320,10 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       try {
         String znRecordId = tableConfigZnRecord.getId();
         if (TableNameBuilder.getTableTypeFromTableName(znRecordId) == TableType.REALTIME) {
-          AbstractTableConfig abstractTableConfig = AbstractTableConfig.fromZnRecord(tableConfigZnRecord);
-          KafkaStreamMetadata metadata = new KafkaStreamMetadata(abstractTableConfig.getIndexingConfig().getStreamConfigs());
+          TableConfig tableConfig = TableConfig.fromZnRecord(tableConfigZnRecord);
+          KafkaStreamMetadata metadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
           if (metadata.hasHighLevelKafkaConsumerType()) {
-            String realtimeTable = abstractTableConfig.getTableName();
+            String realtimeTable = tableConfig.getTableName();
             String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTable;
 
             LOGGER.info("Setting data/child changes watch for real-time table '{}'", realtimeTable);
@@ -339,9 +339,9 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
                   continue;
                 }
                 String segmentPath = realtimeSegmentsPathForTable + "/" + segmentName;
-                RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
-                    .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-                        abstractTableConfig.getTableName(), segmentName);
+                RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+                    ZKMetadataProvider.getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+                        tableConfig.getTableName(), segmentName);
                 if (realtimeSegmentZKMetadata == null) {
                   // The segment got deleted by retention manager
                   continue;

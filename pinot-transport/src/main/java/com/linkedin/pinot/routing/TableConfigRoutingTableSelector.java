@@ -17,7 +17,7 @@
 package com.linkedin.pinot.routing;
 
 import com.google.common.base.Splitter;
-import com.linkedin.pinot.common.config.RealtimeTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import java.util.List;
 import java.util.Map;
@@ -54,15 +54,14 @@ public class TableConfigRoutingTableSelector implements RoutingTableSelector, IZ
   }
 
   private float getLlcRatio(String realtimeTableName) {
-    RealtimeTableConfig tableConfig =
-        (RealtimeTableConfig) ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, realtimeTableName);
+    TableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, realtimeTableName);
 
     if (tableConfig == null) {
       LOGGER.warn("Failed to fetch table config for table {}", realtimeTableName);
       return 0.0f;
     }
 
-    Map<String, String> customConfigs = tableConfig.getCustomConfigs().getCustomConfigs();
+    Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
     if (customConfigs.containsKey(LLC_ROUTING_PERCENTAGE_CONFIG_KEY)) {
       String routingPercentageString = customConfigs.get(LLC_ROUTING_PERCENTAGE_CONFIG_KEY);
       float routingPercentage;

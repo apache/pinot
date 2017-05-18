@@ -16,9 +16,9 @@
 
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.controller.api.restlet.resources.TableSizeReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
 
 public class StorageQuotaCheckerTest {
   TableSizeReader tableSizeReader;
-  AbstractTableConfig tableConfig;
+  TableConfig tableConfig;
   private QuotaConfig quotaConfig;
   private SegmentsValidationAndRetentionConfig validationConfig;
   private final File TEST_DIR = new File(StorageQuotaCheckerTest.class.getName());
@@ -46,7 +46,7 @@ public class StorageQuotaCheckerTest {
   @BeforeClass
   public void setUp() {
     tableSizeReader = mock(TableSizeReader.class);
-    tableConfig = mock(AbstractTableConfig.class);
+    tableConfig = mock(TableConfig.class);
     quotaConfig = mock(QuotaConfig.class);
     validationConfig = mock(SegmentsValidationAndRetentionConfig.class);
     when(tableConfig.getValidationConfig()).thenReturn(validationConfig);

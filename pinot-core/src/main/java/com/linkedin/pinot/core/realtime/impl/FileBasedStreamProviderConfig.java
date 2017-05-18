@@ -15,13 +15,12 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
-import java.util.Map;
-
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import java.util.Map;
 
 
 public class FileBasedStreamProviderConfig implements StreamProviderConfig {
@@ -68,7 +67,7 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
   }
 
   @Override
-  public void init(AbstractTableConfig resourceMetdata, InstanceZKMetadata instanceMetadata, Schema schema) {
+  public void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
   }
 
   @Override

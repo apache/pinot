@@ -15,29 +15,28 @@
  */
 package com.linkedin.pinot.core.realtime;
 
-import java.util.Map;
-
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import java.util.Map;
 
 
 public interface StreamProviderConfig {
 
-  public void init(Map<String, String> properties, Schema schema);
+  void init(Map<String, String> properties, Schema schema);
 
-  public void init(AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema);
+  void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema);
 
   String getStreamProviderClass();
 
   Schema getSchema();
-  
-  public int getSizeThresholdToFlushSegment();
-  
-  public long getTimeThresholdToFlushSegment();
+
+  int getSizeThresholdToFlushSegment();
+
+  long getTimeThresholdToFlushSegment();
 
   /**
    * @return Name of this stream. May return null if called before init() is called.
    */
-  public String getStreamName();
+  String getStreamName();
 }

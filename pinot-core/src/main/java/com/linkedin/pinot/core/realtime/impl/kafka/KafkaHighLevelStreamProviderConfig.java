@@ -15,24 +15,25 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import org.joda.time.Duration;
-import org.joda.time.Period;
-import org.joda.time.format.PeriodFormatter;
-import org.joda.time.format.PeriodFormatterBuilder;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
+import kafka.consumer.ConsumerConfig;
+import org.joda.time.Duration;
+import org.joda.time.Period;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
+
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-import kafka.consumer.ConsumerConfig;
 
 
 public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig {
@@ -185,7 +186,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   }
 
   @Override
-  public void init(AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
+  public void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
     this.indexingSchema = schema;
     if (instanceMetadata != null) {
       // For LL segments, instanceZkMetadata will be null

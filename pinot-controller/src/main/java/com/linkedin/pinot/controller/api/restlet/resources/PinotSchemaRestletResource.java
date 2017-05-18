@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -26,7 +26,6 @@ import com.linkedin.pinot.common.restlet.swagger.Response;
 import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import java.io.File;
 import java.io.IOException;
@@ -359,7 +358,7 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
     // If the schema is associated with a table, we should not delete it.
     List<String> tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
     for (String tableName : tableNames) {
-      AbstractTableConfig config = _pinotHelixResourceManager.getTableConfig(tableName, CommonConstants.Helix.TableType.REALTIME);
+      TableConfig config = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
       String tableSchema = config.getValidationConfig().getSchemaName();
 
       if (schemaName.equals(tableSchema)) {

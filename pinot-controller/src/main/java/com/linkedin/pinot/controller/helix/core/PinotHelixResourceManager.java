@@ -20,11 +20,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.OfflineTableConfig;
-import com.linkedin.pinot.common.config.RealtimeTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
@@ -277,11 +275,11 @@ public class PinotHelixResourceManager {
   @Nonnull
   public List<String> getBrokerInstancesFor(@Nonnull String tableName) {
     String brokerTenantName = null;
-    AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
     if (offlineTableConfig != null) {
       brokerTenantName = offlineTableConfig.getTenantConfig().getBroker();
     } else {
-      AbstractTableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+      TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
       if (realtimeTableConfig != null) {
         brokerTenantName = realtimeTableConfig.getTenantConfig().getBroker();
       }
@@ -565,7 +563,7 @@ public class PinotHelixResourceManager {
 
     try {
       final TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      AbstractTableConfig tableConfig;
+      TableConfig tableConfig;
       if (tableType == TableType.OFFLINE) {
         tableConfig = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName);
       } else if (tableType == TableType.REALTIME) {
@@ -1058,7 +1056,7 @@ public class PinotHelixResourceManager {
    * @throws InvalidTableConfigException
    * @throws TableAlreadyExistsException for offline tables only if the table already exists
    */
-  public void addTable(AbstractTableConfig config)
+  public void addTable(TableConfig config)
       throws IOException {
     TableType type = config.getTableType();
 
@@ -1105,8 +1103,7 @@ public class PinotHelixResourceManager {
         LOGGER.info("successfully added the table : " + offlineTableName + " to the cluster");
 
         // lets add table configs
-        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName,
-            AbstractTableConfig.toZnRecord(config));
+        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName, TableConfig.toZnRecord(config));
 
         _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(offlineTableName), new ZNRecord(
             offlineTableName), AccessOption.PERSISTENT);
@@ -1115,7 +1112,7 @@ public class PinotHelixResourceManager {
         final String realtimeTableName = config.getTableName();
         // lets add table configs
 
-        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, realtimeTableName, AbstractTableConfig.toZnRecord(config));
+        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, realtimeTableName, TableConfig.toZnRecord(config));
         /*
          * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
          * it expects the INSTANCE path in propertystore to be set up so that it can get the kafka group ID and
@@ -1162,7 +1159,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void ensureRealtimeClusterIsSetUp(AbstractTableConfig config, String realtimeTableName,
+  private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
     KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
@@ -1201,7 +1198,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void createHelixEntriesForHighLevelConsumer(AbstractTableConfig config, String realtimeTableName,
+  private void createHelixEntriesForHighLevelConsumer(TableConfig config, String realtimeTableName,
       IdealState idealState) {
     if (idealState == null) {
       idealState = PinotTableIdealStateBuilder
@@ -1221,19 +1218,16 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void setExistingTableConfig(AbstractTableConfig config, String tableNameWithType, TableType type)
+  public void setExistingTableConfig(TableConfig config, String tableNameWithType, TableType type)
       throws IOException {
     if (type == TableType.REALTIME) {
-      ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType,
-          AbstractTableConfig.toZnRecord(config));
+      ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, TableConfig.toZnRecord(config));
       ensureRealtimeClusterIsSetUp(config, tableNameWithType, config.getIndexingConfig());
     } else if (type == TableType.OFFLINE) {
-      ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType,
-          AbstractTableConfig.toZnRecord(config));
+      ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, TableConfig.toZnRecord(config));
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
       final String configReplication = config.getValidationConfig().getReplication();
-      if (configReplication != null && !config.getValidationConfig()
-          .getReplication()
+      if (configReplication != null && !config.getValidationConfig().getReplication()
           .equals(idealState.getReplicas())) {
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, new Function<IdealState, IdealState>() {
           @Nullable
@@ -1250,7 +1244,7 @@ public class PinotHelixResourceManager {
   public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs)
       throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    AbstractTableConfig config;
+    TableConfig config;
     if (type == TableType.REALTIME) {
       config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableNameWithType);
     } else {
@@ -1259,7 +1253,7 @@ public class PinotHelixResourceManager {
     if (config == null) {
       throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
     }
-    config.setCustomConfigs(newConfigs);
+    config.setCustomConfig(newConfigs);
     setExistingTableConfig(config, tableNameWithType, type);
   }
 
@@ -1267,7 +1261,7 @@ public class PinotHelixResourceManager {
       SegmentsValidationAndRetentionConfig newConfigs)
       throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    AbstractTableConfig config;
+    TableConfig config;
     if (type == TableType.REALTIME) {
       config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableNameWithType);
     } else {
@@ -1284,7 +1278,7 @@ public class PinotHelixResourceManager {
   public void updateIndexingConfigFor(String tableName, TableType type, IndexingConfig newConfigs)
       throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    AbstractTableConfig config;
+    TableConfig config;
     if (type == TableType.REALTIME) {
       config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableNameWithType);
       if (config != null) {
@@ -1307,7 +1301,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void handleBrokerResource(AbstractTableConfig tableConfig) {
+  private void handleBrokerResource(TableConfig tableConfig) {
     try {
       final String brokerTenant =
           ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
@@ -1535,8 +1529,8 @@ public class PinotHelixResourceManager {
   // Check to see if the table has been explicitly configured to NOT use messageBasedRefresh.
   private boolean shouldSendMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
     final String rawTableName = segmentZKMetadata.getTableName();
-    AbstractTableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
-    TableCustomConfig customConfig = tableConfig.getCustomConfigs();
+    TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
+    TableCustomConfig customConfig = tableConfig.getCustomConfig();
     if (customConfig != null) {
       Map<String, String> customConfigMap = customConfig.getCustomConfigs();
       if (customConfigMap != null) {
@@ -1604,9 +1598,9 @@ public class PinotHelixResourceManager {
    * @throws JSONException
    * @throws IOException
    */
-  private void addNewOfflineSegment(final SegmentMetadata segmentMetadata) throws JsonParseException,
-      JsonMappingException, JsonProcessingException, JSONException, IOException {
-    final AbstractTableConfig offlineTableConfig =
+  private void addNewOfflineSegment(final SegmentMetadata segmentMetadata)
+      throws JSONException, IOException {
+    final TableConfig offlineTableConfig =
         ZKMetadataProvider.getOfflineTableConfig(_propertyStore, segmentMetadata.getTableName());
 
     final String segmentName = segmentMetadata.getName();
@@ -1840,7 +1834,7 @@ public class PinotHelixResourceManager {
    * @return Table config
    */
   @Nullable
-  public AbstractTableConfig getOfflineTableConfig(@Nonnull String tableName) {
+  public TableConfig getOfflineTableConfig(@Nonnull String tableName) {
     return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
   }
 
@@ -1851,7 +1845,7 @@ public class PinotHelixResourceManager {
    * @return Table config
    */
   @Nullable
-  public AbstractTableConfig getRealtimeTableConfig(@Nonnull String tableName) {
+  public TableConfig getRealtimeTableConfig(@Nonnull String tableName) {
     return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
   }
 
@@ -1862,7 +1856,7 @@ public class PinotHelixResourceManager {
    * @return Table config
    */
   @Nullable
-  public AbstractTableConfig getTableConfig(@Nonnull String tableName, @Nonnull TableType tableType) {
+  public TableConfig getTableConfig(@Nonnull String tableName, @Nonnull TableType tableType) {
     if (tableType == TableType.OFFLINE) {
       return getOfflineTableConfig(tableName);
     } else {
@@ -1877,13 +1871,13 @@ public class PinotHelixResourceManager {
    * @return Table config
    */
   @Nullable
-  public AbstractTableConfig getTableConfig(@Nonnull String tableNameWithType) {
+  public TableConfig getTableConfig(@Nonnull String tableNameWithType) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     return getTableConfig(tableNameWithType, tableType);
   }
 
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
-    AbstractTableConfig tableConfig = getTableConfig(tableName, tableType);
+    TableConfig tableConfig = getTableConfig(tableName, tableType);
     String serverTenantName =
         ControllerTenantNameBuilder.getTenantName(tableConfig.getTenantConfig().getServer(), tableType.getServerType());
     List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenantName);
@@ -1891,7 +1885,7 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getBrokerInstancesForTable(String tableName, TableType tableType) {
-    AbstractTableConfig tableConfig = getTableConfig(tableName, tableType);
+    TableConfig tableConfig = getTableConfig(tableName, tableType);
     String brokerTenantName =
         ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
     List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);

@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
@@ -73,9 +73,8 @@ public class PinotFileUploadTest extends ControllerTest {
     String OfflineTableConfigJson =
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TABLE_NAME, null, null, 2, "RandomAssignmentStrategy")
             .toString();
-    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+    TableConfig offlineTableConfig = TableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
-
   }
 
   @AfterClass

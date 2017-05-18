@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
@@ -83,12 +83,12 @@ public class PinotTableMetadataConfigs extends BasePinotControllerRestletResourc
       "/tables/{tableName}/metadataConfigs"
   })
   private Representation updateTableMetadata(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the metadata configuration", required = true)
-      String tableName, Representation entity)
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the metadata configuration", required = true) String tableName,
+      Representation entity)
       throws Exception {
-    AbstractTableConfig config = AbstractTableConfig.init(entity.getText());
+    TableConfig config = TableConfig.init(entity.getText());
     _pinotHelixResourceManager.updateMetadataConfigFor(config.getTableName(), config.getTableType(),
-        config.getCustomConfigs());
+        config.getCustomConfig());
     return new StringRepresentation("done");
   }
 }

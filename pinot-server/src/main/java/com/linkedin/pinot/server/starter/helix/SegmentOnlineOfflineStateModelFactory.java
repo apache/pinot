@@ -17,7 +17,7 @@ package com.linkedin.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -195,10 +195,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       SegmentZKMetadata realtimeSegmentZKMetadata =
           ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentId);
       // InstanceZKMetadata can be null for LL segments
-      InstanceZKMetadata instanceZKMetadata =
-          ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
-      AbstractTableConfig tableConfig =
-          ZKMetadataProvider.getRealtimeTableConfig(propertyStore, tableName);
+      InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
+      TableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(propertyStore, tableName);
 
       Preconditions.checkNotNull(tableConfig);
       Preconditions.checkNotNull(realtimeSegmentZKMetadata);

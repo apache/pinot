@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import javax.annotation.Nonnull;
@@ -79,7 +79,7 @@ public class TableDataManagerConfig {
     return new TableDataManagerConfig(defaultConfig);
   }
 
-  public void overrideConfigs(@Nonnull AbstractTableConfig tableConfig) {
+  public void overrideConfigs(@Nonnull TableConfig tableConfig) {
     // Override table level configs
 
     // Currently we do not override any table level configs into TableDataManagerConfig

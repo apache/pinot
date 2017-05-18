@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -182,8 +182,8 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void addSegment(@Nonnull SegmentMetadata segmentMetadata,
-      @Nullable AbstractTableConfig tableConfig, @Nullable Schema schema)
+  public synchronized void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nullable TableConfig tableConfig,
+      @Nullable Schema schema)
       throws Exception {
     String segmentName = segmentMetadata.getName();
     String tableName = segmentMetadata.getTableName();
@@ -202,8 +202,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   @Override
   public void reloadSegment(@Nonnull SegmentMetadata segmentMetadata,
-      @Nonnull CommonConstants.Helix.TableType tableType, @Nullable AbstractTableConfig tableConfig,
-      @Nullable Schema schema) {
+      @Nonnull CommonConstants.Helix.TableType tableType, @Nullable TableConfig tableConfig, @Nullable Schema schema) {
     throw new UnsupportedOperationException("Unsupported reloading segment in FileBasedInstanceDataManager");
   }
 
@@ -233,9 +232,10 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull AbstractTableConfig tableConfig,
+  public void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull TableConfig tableConfig,
       @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
-      @Nonnull String serverInstance) throws Exception {
+      @Nonnull String serverInstance)
+      throws Exception {
     throw new UnsupportedOperationException(
         "Unsupported adding segment to REALTIME table in FileBasedInstanceDataManager");
   }

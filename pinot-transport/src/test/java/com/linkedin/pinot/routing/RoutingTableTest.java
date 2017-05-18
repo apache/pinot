@@ -15,10 +15,18 @@
  */
 package com.linkedin.pinot.routing;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
+import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
+import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -42,14 +50,6 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 public class RoutingTableTest {
@@ -505,9 +505,9 @@ public class RoutingTableTest {
         + "          },\n" + "          \"tableType\":\"REALTIME\",\n" + "          \"metadata\": {\n" + "              \"customConfigs\": {\n" + "                  \"routing.llc.percentage\": \"50.0\"\n"
         + "               }\n" + "          }\n" + "    }\n" + "}";
 
-    AbstractTableConfig tableConfig = AbstractTableConfig.init(propertyStoreEntry);
+    TableConfig tableConfig = TableConfig.init(propertyStoreEntry);
 
-    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
+    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", TableConfig.toZnRecord(tableConfig));
 
     tableConfigRoutingTableSelector.registerTable("fakeTable_REALTIME");
 
@@ -520,8 +520,8 @@ public class RoutingTableTest {
 
     Assert.assertTrue(4500 <= llcCount && llcCount <= 5500, "Expected approximately 50% probability of picking LLC, got " + llcCount / 100.0 + " %");
 
-    tableConfig.getCustomConfigs().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "0"));
-    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
+    tableConfig.getCustomConfig().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "0"));
+    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", TableConfig.toZnRecord(tableConfig));
 
     llcCount = 0;
     for (int i = 0; i < 10000; ++i) {
@@ -532,8 +532,8 @@ public class RoutingTableTest {
 
     Assert.assertEquals(llcCount, 0, "Expected 0% probability of picking LLC, got " + llcCount / 100.0 + " %");
 
-    tableConfig.getCustomConfigs().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "100"));
-    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
+    tableConfig.getCustomConfig().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "100"));
+    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", TableConfig.toZnRecord(tableConfig));
 
     llcCount = 0;
     for (int i = 0; i < 10000; ++i) {

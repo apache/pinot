@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.server.integration.realtime;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
@@ -61,7 +61,7 @@ public class RealtimeTableDataManagerTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeTableDataManagerTest.class);
 
-  private static AbstractTableConfig tableConfig;
+  private static TableConfig tableConfig;
 
   private static InstanceZKMetadata instanceZKMetadata;
   private static RealtimeSegmentZKMetadata realtimeSegmentZKMetadata;
@@ -108,7 +108,7 @@ public class RealtimeTableDataManagerTest {
     request.put("segmentsConfig", new JSONObject());
     request.put("tenants", new JSONObject());
     request.put("metadata", new JSONObject());
-    tableConfig = AbstractTableConfig.init(request.toString());
+    tableConfig = TableConfig.init(request.toString());
   }
 
   private static TableDataManagerConfig getTableDataManagerConfig() throws ConfigurationException {

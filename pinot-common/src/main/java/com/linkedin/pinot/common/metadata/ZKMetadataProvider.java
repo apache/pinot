@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.common.metadata;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -165,7 +165,7 @@ public class ZKMetadataProvider {
   }
 
   @Nullable
-  public static AbstractTableConfig getOfflineTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public static TableConfig getOfflineTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
       @Nonnull String tableName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     ZNRecord znRecord =
@@ -174,7 +174,7 @@ public class ZKMetadataProvider {
       return null;
     }
     try {
-      return AbstractTableConfig.fromZnRecord(znRecord);
+      return TableConfig.fromZnRecord(znRecord);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting offline table configuration for table: {}", tableName, e);
       return null;
@@ -182,7 +182,7 @@ public class ZKMetadataProvider {
   }
 
   @Nullable
-  public static AbstractTableConfig getRealtimeTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public static TableConfig getRealtimeTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
       @Nonnull String tableName) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(realtimeTableName), null,
@@ -191,7 +191,7 @@ public class ZKMetadataProvider {
       return null;
     }
     try {
-      return AbstractTableConfig.fromZnRecord(znRecord);
+      return TableConfig.fromZnRecord(znRecord);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting realtime table configuration for table: {}", tableName, e);
       return null;
@@ -236,7 +236,7 @@ public class ZKMetadataProvider {
 
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     try {
-      AbstractTableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, realtimeTableName);
+      TableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, realtimeTableName);
       if (realtimeTableConfig == null) {
         return null;
       }

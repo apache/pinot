@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.transport.common;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -159,9 +159,9 @@ public class TimeBoundaryServiceTest {
     customConfigs.put("d2Name", "xlntBetaPinot");
     metadata.put("customConfigs", customConfigs);
     offlineTableConfigJson.put("metadata", metadata);
-    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(offlineTableConfigJson.toString());
+    TableConfig offlineTableConfig = TableConfig.init(offlineTableConfigJson.toString());
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName,
-        AbstractTableConfig.toZnRecord(offlineTableConfig));
+        TableConfig.toZnRecord(offlineTableConfig));
   }
 }
