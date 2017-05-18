@@ -3,7 +3,17 @@
     <span class="panel-title">Anomalies</span>
     <span class="pull-right">
     Showing <strong>{{this.numAnomaliesOnPage}} </strong> anomalies of <strong> {{this.totalAnomalies}}</strong>
-    <span>
+    </span>
+    <div class="filter-list">
+      <div>Selected Filters:</div>
+      <span class="filter-list__item">
+      {{#if appliedFilters}}
+        {{appliedFilters}}
+      {{else}}
+        N/A
+      {{/if}}
+      </span>
+    </div>
   </div>
   <div class="anomaly-cards-wrapper padding-all">
     {{#each this.anomalyDetailsList as |anomalyData anomalyIndex|}}

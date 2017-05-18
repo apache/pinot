@@ -31,13 +31,15 @@ AnomalyResultController.prototype = {
     // has none
     if (!hasSearchMode) { return; }
     if (hasSameParams) {
+      const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
+      const totalAnomalies = this.anomalyFilterController.getTotalAnomalies();
+      const appliedFilters = this.anomalyFilterController.getSelectedFilters();
+      this.anomalyResultModel.setParams({
+        pageNumber,
+        totalAnomalies,
+        appliedFilters
+       });
       if (hasSearchFilters) {
-        const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
-        const totalAnomalies = this.anomalyFilterController.getTotalAnomalies();
-        this.anomalyResultModel.setParams({
-          pageNumber,
-          totalAnomalies
-         });
         this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
       } else {
         this.anomalyResultModel.setParams({ pageNumber });
@@ -49,15 +51,19 @@ AnomalyResultController.prototype = {
         // if (hasSameSearchFilters) {
 
         // }
-        this.anomalyResultView.renderDatePickers();
         this.anomalyResultView.destroy();
         this.anomalyResultModel.reset();
         this.anomalyResultModel.setParams(params);
+        this.anomalyResultView.renderDatePickers();
         this.anomalyResultModel.getSearchFilters((filter) => {
           filter.selectedFilters = params.searchFilters;
+          this.anomalyFilterController.resetModel();
           this.anomalyFilterController.handleAppEvent(filter);
+          const appliedFilters = this.anomalyFilterController.getSelectedFilters();
+          const totalAnomalies = this.anomalyFilterController.getTotalAnomalies();
           this.anomalyResultModel.setParams({
-            totalAnomalies: filter.totalAnomalies,
+            totalAnomalies,
+            appliedFilters
           });
           if (hasSearchFilters) {
             const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
@@ -91,6 +97,7 @@ AnomalyResultController.prototype = {
 
   // new search, should trigger new filters
   searchButtonEventHandler(sender, args = {}) {
+    this.anomalyResultModel.reset();
     HASH_SERVICE.clear();
     HASH_SERVICE.set('tab', 'anomalies');
     HASH_SERVICE.update(args);
@@ -186,6 +193,10 @@ AnomalyResultController.prototype = {
 
   changedTimeEventHandler(sender, args ={}) {
     // reload filters
+    this.anomalyResultModel.reset();
+    this.anomalyFilterController.anomalyFilterModel.resetSelection();
+    this.anomalyFilterController.anomalyFilterModel.clear();
+    HASH_SERVICE.set('tab', 'anomalies');
     HASH_SERVICE.update(args);
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
     HASH_SERVICE.routeTo('anomalies');

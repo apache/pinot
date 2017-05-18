@@ -705,6 +705,7 @@ text {
   flex-shrink: 0;
 }
 
+
 .filter-item__label {
   overflow: hidden;
   vertical-align: bottom;
@@ -715,7 +716,8 @@ text {
   margin: 0 4px;
 }
 
-.filter-item__count {
+.filter-list__item {
+  font-weight: 300;
 }
 
 .filter-footer {

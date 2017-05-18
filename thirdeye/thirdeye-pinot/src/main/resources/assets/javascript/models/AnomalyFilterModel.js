@@ -39,6 +39,12 @@ AnomalyFilterModel.prototype = {
     this.viewFilters = null;
   },
 
+  reset() {
+    this.clear();
+    this.pageNumber = 1;
+    this.allAnomalyIds = [];
+  },
+
   filtersIterator(obj, func, formatter = false) {
     let acc = {};
     Object.keys(obj).forEach((key) => {

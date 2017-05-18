@@ -34,9 +34,17 @@ AnomalyFilterController.prototype = {
     this.anomalyFilterModel.updatefilterSection(filter);
   },
 
+  resetModel() {
+    this.anomalyFilterModel.reset();
+  },
+
   clearEventHandler(sender) {
     this.anomalyFilterModel.clear();
     this.anomalyFilterView.render();
+  },
+
+  getSelectedFilters() {
+    return [...this.anomalyFilterModel.selectedAnomalies.keys()].join(', ');
   },
 
   getSelectedAnomalies(pageNumber = 1) {

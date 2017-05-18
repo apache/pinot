@@ -141,13 +141,13 @@ function AnomalyResultView(anomalyResultModel) {
 
 AnomalyResultView.prototype = {
   init() {
-    var self = this;
     $('#anomalies-search-mode').select2({
       minimumResultsForSearch : -1,
       theme : "bootstrap"
-    }).on("change", (e) => {
+    }).on('change', (e) => {
+      this.anomalyResultModel.reset();
       this.showSearchBarBasedOnMode();
-      this.destroyFilter();
+      this.destroy();
     });
 
     this.setupSearchBar();
@@ -307,7 +307,8 @@ AnomalyResultView.prototype = {
       debugger;
       this.changedTimeEvent.notify({
         startDate: start,
-        endDate: end
+        endDate: end,
+        searchFilters: null
       })
     }
     $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, changeDate.bind(this));

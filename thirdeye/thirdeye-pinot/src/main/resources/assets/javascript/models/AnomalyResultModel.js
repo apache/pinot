@@ -28,11 +28,12 @@ function AnomalyResultModel() {
   this.totalAnomalies = 0;
   this.ajaxCall = null;
   this.searchFilters = null;
+  this.appliedFilters = null;
   this.hiddenFilters = ['statusFilterMap'];
   this.spinner = 'anomaly-spin-area';
 
   this.renderViewEvent = new Event();
-  this.updateModelAndNotifyView = this.updateModelAndNotifyView.bind(this)
+  this.updateModelAndNotifyView = this.updateModelAndNotifyView.bind(this);
 }
 
 AnomalyResultModel.prototype = {
@@ -51,7 +52,8 @@ AnomalyResultModel.prototype = {
     });
   },
 
-  reset : function() {
+  reset() {
+    // this.anomaliesSearchMode = null;
     this.metricIds = null;
     this.dashboardId = null;
     this.anomalyIds = null;
@@ -59,7 +61,8 @@ AnomalyResultModel.prototype = {
     this.functionName = null;
     this.pageNumber = 1;
     this.totalAnomalies = 0;
-
+    this.startDate = moment().subtract(1, 'days').startOf('day');
+    this.endDate = moment().subtract(0, 'days').startOf('day');
   },
   // Call setParams every time there is a change to the model
   setParams : function(params) {
@@ -98,6 +101,7 @@ AnomalyResultModel.prototype = {
       }
       this.searchFilters = params.searchFilters ? Object.assign({}, params.searchFilters) : this.searchFilters;
       this.totalAnomalies = params.totalAnomalies || this.totalAnomalies;
+      this.appliedFilters = params.appliedFilters;
     }
   },
   // Call rebuild every time new anomalies are to be loaded with new model
@@ -246,7 +250,8 @@ AnomalyResultModel.prototype = {
   },
   getAnomaliesWrapper() {
     return Object.assign(this.anomaliesWrapper, {
-      totalAnomalies: this.totalAnomalies
+      totalAnomalies: this.totalAnomalies,
+      appliedFilters: this.appliedFilters
     });
   },
 
