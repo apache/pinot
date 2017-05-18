@@ -1,13 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.google.common.primitives.Floats;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.format.ISODateTimeFormat;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +12,6 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 import java.util.ArrayList;
@@ -47,13 +41,13 @@ public class OnboardResource {
 
   public OnboardResource(AnomalyFunctionManager anomalyFunctionManager,
       MergedAnomalyResultManager mergedAnomalyResultManager,
-      RawAnomalyResultManager rawAnomalyResultManager){
+      RawAnomalyResultManager rawAnomalyResultManager) {
     this.anomalyFunctionDAO = anomalyFunctionManager;
     this.mergedAnomalyResultDAO = mergedAnomalyResultManager;
     this.rawAnomalyResultDAO = rawAnomalyResultManager;
   }
 
-  // endpoint clone function Ids to append a name defined in nameTags
+ // Useful end points to check for function information
 
   @GET
   @Path("function/{id}")
@@ -61,6 +55,51 @@ public class OnboardResource {
     return anomalyFunctionDAO.findById(id);
   }
 
+  @POST
+  @Path("function/activate")
+  public String activateFunction(@QueryParam("functionIds") String functionIds) {
+    toggleFunctions(functionIds, true);
+    return functionIds;
+  }
+
+  @POST
+  @Path("function/deactivate")
+  public String deactivateFunction(@QueryParam("functionIds") String functionIds) {
+    toggleFunctions(functionIds, false);
+    return functionIds;
+  }
+
+  /**
+   * toggle anomaly functions to active and inactive
+   *
+   * @param functionIds string comma separated function ids, ALL meaning all functions
+   * @param isActive boolean true or false, set function as true or false
+   */
+  private void toggleFunctions(String functionIds, boolean isActive) {
+    List<Long> functionIdsList = new ArrayList<>();
+    if (functionIds.equals("ALLDEMONS")) {
+      for (AnomalyFunctionDTO dto: anomalyFunctionDAO.findAll()) {
+        dto.setActive(isActive);
+        anomalyFunctionDAO.update(dto);
+      }
+      return;  // early return
+    }
+
+    if (StringUtils.isNotBlank(functionIds)) {
+      String[] tokens = functionIds.split(",");
+      for (String token : tokens) {
+        functionIdsList.add(Long.valueOf(token));  // unhandled exception is expected
+      }
+    }
+
+    for (long id : functionIdsList) {
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
+      anomalyFunction.setActive(isActive);
+      anomalyFunctionDAO.update(anomalyFunction);
+    }
+  }
+
+  // endpoints that clone function Ids to append a name tag in tail as defined in nameTags
   // clone functions in batch
   @POST
   @Path("function/clone")
@@ -260,7 +299,7 @@ public class OnboardResource {
       @QueryParam("end") long monitoringWindowEndTime) {
     long functionId = Long.valueOf(id);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    if(anomalyFunction == null){
+    if (anomalyFunction == null) {
       LOG.info("Anomaly functionId {} is not found", functionId);
       return null;
     }
@@ -288,7 +327,7 @@ public class OnboardResource {
     int rawAnomaliesDeleted = 0;
     List<RawAnomalyResultDTO> rawResults =
         rawAnomalyResultDAO.findAllByTimeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
-    if (CollectionUtils.isNotEmpty(rawResults)){
+    if (CollectionUtils.isNotEmpty(rawResults)) {
       rawAnomaliesDeleted = deleteRawResults(rawResults);
     }
     returnInfo.put("rawAnomaliesDeleted", rawAnomaliesDeleted);
@@ -315,7 +354,7 @@ public class OnboardResource {
 
     long functionId = Long.valueOf(id);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    if(anomalyFunction == null){
+    if (anomalyFunction == null) {
       LOG.info("Anomaly functionId {} is not found", functionId);
       return rawResults;
     }
@@ -342,7 +381,7 @@ public class OnboardResource {
 
     long functionId = Long.valueOf(id);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    if(anomalyFunction == null){
+    if (anomalyFunction == null) {
       LOG.info("Anomaly functionId {} is not found", functionId);
       return mergedResults;
     }
@@ -368,10 +407,10 @@ public class OnboardResource {
   }
 
   // Delete raw anomaly results from rawResultDAO
-  private int deleteRawResults(List<RawAnomalyResultDTO> rawResults){
+  private int deleteRawResults(List<RawAnomalyResultDTO> rawResults) {
     LOG.info("Deleting raw anomaly results...");
     int rawAnomaliesDeleted = 0;
-    for(RawAnomalyResultDTO rawResult : rawResults){
+    for (RawAnomalyResultDTO rawResult : rawResults) {
       LOG.info("...Deleting raw anomaly result id {} for functionId {}", rawResult.getId(), rawResult.getFunctionId());
       rawAnomalyResultDAO.delete(rawResult);
       rawAnomaliesDeleted++;

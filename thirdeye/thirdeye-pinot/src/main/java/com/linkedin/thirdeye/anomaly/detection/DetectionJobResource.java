@@ -756,23 +756,26 @@ public class DetectionJobResource {
    * Either functionId or autotuneId should be not null to provide function information, if functionId is not aligned with autotuneId's function, use all function information from autotuneId
    * @param replayStartTimeIso replay start time in ISO format, e.g. 2017-02-27T00:00:00.000Z, replay start time inclusive
    * @param replayEndTimeIso replay end time, e.g. 2017-02-27T00:00:00.000Z, replay end time exclusive
+   * @param speedup boolean to determine should we speed up the replay process (by maximizing detection window size)
    * @return cloned function Id
    */
   @POST
   @Path("/replay/singlefunction")
   public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") Long functionId,
       @QueryParam("autotuneId") Long autotuneId,
-      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull  String replayEndTimeIso)
-       {
+      @QueryParam("start") @NotNull String replayStartTimeIso,
+      @QueryParam("end") @NotNull  String replayEndTimeIso,
+      @QueryParam("speedup") @DefaultValue("true") boolean speedup) {
+
     if (functionId == null && autotuneId == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     DateTime replayStart;
     DateTime replayEnd;
-    try{
+    try {
       replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
       replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
-    } catch (IllegalArgumentException e){
+    } catch (IllegalArgumentException e) {
       return Response.status(Response.Status.BAD_REQUEST).entity("Input start and end time illegal! ").build();
     }
 
@@ -784,13 +787,8 @@ public class DetectionJobResource {
     } else {
       functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, new HashMap<String, String>(), functionId, replayStart, replayEnd, false);
     }
-    Thread thread = new Thread(functionReplayRunnable);
-    thread.start();
-    try{
-      thread.join();
-    } catch (InterruptedException e){
-      return Response.status(Response.Status.EXPECTATION_FAILED).entity("Threading is interrupted").build();
-    }
+    functionReplayRunnable.setSpeedUp(speedup);
+    functionReplayRunnable.run();
 
     Map<String, String> responseMessages = new HashMap<>();
     responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getLastClonedFunctionId()));
