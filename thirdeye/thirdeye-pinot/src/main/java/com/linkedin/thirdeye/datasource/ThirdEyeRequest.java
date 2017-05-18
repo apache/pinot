@@ -248,8 +248,9 @@ public class ThirdEyeRequest {
     }
 
 
-    public void setDataSource(String dataSource) {
+    public ThirdEyeRequestBuilder setDataSource(String dataSource) {
       this.dataSource = dataSource;
+      return this;
     }
 
     public ThirdEyeRequest build(String requestReference) {
