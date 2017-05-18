@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +35,7 @@ public class RCAFrameworkLoader {
 
     RCAConfiguration rcaConfiguration = OBJECT_MAPPER.readValue(rcaConfig, RCAConfiguration.class);
     Map<String, List<PipelineConfiguration>> rcaPipelinesConfiguration = rcaConfiguration.getFrameworks();
-    if (!isEmpty(rcaPipelinesConfiguration)) {
+    if (!MapUtils.isEmpty(rcaPipelinesConfiguration)) {
       if(!rcaPipelinesConfiguration.containsKey(frameworkName))
         throw new IllegalArgumentException(String.format("Framework '%s' does not exist", frameworkName));
 
@@ -67,11 +68,4 @@ public class RCAFrameworkLoader {
     }
     return properties;
   }
-
-  private static boolean isEmpty(Map<?, ?> map) {
-    if(map == null)
-      return true;
-    return map.isEmpty();
-  }
-
 }
