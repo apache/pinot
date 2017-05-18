@@ -11,30 +11,35 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * PipelineLoader creates Pipeline instances based on a YAML config file. It expects the Pipeline
+ * RCAFrameworkLoader creates Pipeline instances based on a YAML config file. It expects the Pipeline
  * implementation to support a constructor that takes (name, inputs, properties map) as arguments.
  * It further augments certain properties with additional information, e.g. the {@code PROP_PATH}
  * property with absolute path information.
  */
-public class PipelineLoader {
+public class RCAFrameworkLoader {
   public static final String PROP_PATH = "path";
 
-  private static final Logger LOG = LoggerFactory.getLogger(PipelineLoader.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RCAFrameworkLoader.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
-  public static List<Pipeline> getPipelinesFromConfig(File rcaConfig) throws Exception {
+  public static List<Pipeline> getPipelinesFromConfig(File rcaConfig, String frameworkName) throws Exception {
     List<Pipeline> pipelines = new ArrayList<>();
 
+    LOG.info("Loading framework '{}' from '{}'", frameworkName, rcaConfig);
+
     RCAConfiguration rcaConfiguration = OBJECT_MAPPER.readValue(rcaConfig, RCAConfiguration.class);
-    List<PipelineConfiguration> rcaPipelinesConfiguration = rcaConfiguration.getRcaPipelinesConfiguration();
-    if (CollectionUtils.isNotEmpty(rcaPipelinesConfiguration)) {
-      for (PipelineConfiguration pipelineConfig : rcaPipelinesConfiguration) {
+    Map<String, List<PipelineConfiguration>> rcaPipelinesConfiguration = rcaConfiguration.getFrameworks();
+    if (!MapUtils.isEmpty(rcaPipelinesConfiguration)) {
+      if(!rcaPipelinesConfiguration.containsKey(frameworkName))
+        throw new IllegalArgumentException(String.format("Framework '%s' does not exist", frameworkName));
+
+      for (PipelineConfiguration pipelineConfig : rcaPipelinesConfiguration.get(frameworkName)) {
         String outputName = pipelineConfig.getOutputName();
         Set<String> inputNames = new HashSet<>(pipelineConfig.getInputNames());
         String className = pipelineConfig.getClassName();
@@ -63,5 +68,4 @@ public class PipelineLoader {
     }
     return properties;
   }
-
 }

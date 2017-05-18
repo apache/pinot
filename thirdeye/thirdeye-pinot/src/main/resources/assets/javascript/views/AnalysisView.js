@@ -176,8 +176,7 @@ AnalysisView.prototype = {
           },
           {
             title: 'Score',
-            data: 'score',
-            visible: false
+            data: 'score'
           }
         ],
         order: [[ 2, 'desc' ], [ 0, 'asc' ], [ 1, 'asc' ]],

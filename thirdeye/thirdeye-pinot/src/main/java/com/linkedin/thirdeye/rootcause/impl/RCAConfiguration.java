@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderConfiguration;
 import java.util.List;
+import java.util.Map;
+
 
 /**
  * Config class for RCA's yml config
@@ -10,24 +12,24 @@ import java.util.List;
  */
 public class RCAConfiguration {
 
-  private List<EventDataProviderConfiguration> eventDataProvidersConfiguration;
-  private List<PipelineConfiguration> rcaPipelinesConfiguration;
+  private List<EventDataProviderConfiguration> eventDataProviders;
+  private Map<String, List<PipelineConfiguration>> frameworks;
 
-  public List<EventDataProviderConfiguration> getEventDataProvidersConfiguration() {
-    return eventDataProvidersConfiguration;
+  public List<EventDataProviderConfiguration> getEventDataProviders() {
+    return eventDataProviders;
   }
 
-  public void setEventDataProvidersConfiguration(
-      List<EventDataProviderConfiguration> eventDataProvidersConfiguration) {
-    this.eventDataProvidersConfiguration = eventDataProvidersConfiguration;
+  public void setEventDataProviders(
+      List<EventDataProviderConfiguration> eventDataProviders) {
+    this.eventDataProviders = eventDataProviders;
   }
 
-  public List<PipelineConfiguration> getRcaPipelinesConfiguration() {
-    return rcaPipelinesConfiguration;
+  public Map<String, List<PipelineConfiguration>> getFrameworks() {
+    return frameworks;
   }
 
-  public void setRcaPipelinesConfiguration(List<PipelineConfiguration> rcaPipelinesConfiguration) {
-    this.rcaPipelinesConfiguration = rcaPipelinesConfiguration;
+  public void setFrameworks(Map<String, List<PipelineConfiguration>> frameworks) {
+    this.frameworks = frameworks;
   }
 
 }

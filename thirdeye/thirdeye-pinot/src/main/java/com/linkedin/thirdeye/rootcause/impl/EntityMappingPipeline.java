@@ -62,7 +62,7 @@ public class EntityMappingPipeline extends Pipeline {
   }
 
   /**
-   * Alternate constructor for use by PipelineLoader
+   * Alternate constructor for use by RCAFrameworkLoader
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
