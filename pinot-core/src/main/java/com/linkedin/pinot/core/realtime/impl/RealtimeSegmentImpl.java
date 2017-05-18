@@ -56,6 +56,7 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.DimensionInvertertedI
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.StarTree;
 
@@ -186,16 +187,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private int getColWidth(FieldSpec.DataType dataType) {
     switch (dataType) {
-      case SHORT:
-        return Short.SIZE/8;
       case INT:
-        return Integer.SIZE/8;
+        return V1Constants.Numbers.INTEGER_SIZE;
       case LONG:
-        return Long.SIZE/8;
+        return V1Constants.Numbers.LONG_SIZE;
       case FLOAT:
-        return Float.SIZE/8;
+        return V1Constants.Numbers.FLOAT_SIZE;
       case DOUBLE:
-        return Double.SIZE/8;
+        return V1Constants.Numbers.DOUBLE_SIZE;
       default:
         throw new UnsupportedOperationException("Unknown width for datatype " + dataType.toString());
     }

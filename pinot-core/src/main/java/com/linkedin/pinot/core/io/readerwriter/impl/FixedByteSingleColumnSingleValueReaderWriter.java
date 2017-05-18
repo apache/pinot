@@ -250,9 +250,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     if (readers.size() == 1) {
       readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
       return;
-    }
-    else
-    {
+    } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos;
           rowIter < rowStartPos + rowSize;
           rowIter++, valueIter++) {
@@ -267,9 +265,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     if (readers.size() == 1) {
       readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
       return;
-    }
-    else
-    {
+    } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos;
           rowIter < rowStartPos + rowSize;
           rowIter++, valueIter++) {
@@ -284,9 +280,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     if (readers.size() == 1) {
       readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
       return;
-    }
-    else
-    {
+    } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos;
           rowIter < rowStartPos + rowSize;
           rowIter++, valueIter++) {
