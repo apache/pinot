@@ -533,6 +533,24 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     });
   }
 
+  public DoubleSeries pow(Series other) {
+    return map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return Math.pow(values[0], values[1]);
+      }
+    }, this, other);
+  }
+
+  public DoubleSeries pow(final double constant) {
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return Math.pow(values[0], constant);
+      }
+    });
+  }
+
   public BooleanSeries eq(Series other) {
     return map(new DoubleConditional() {
       @Override

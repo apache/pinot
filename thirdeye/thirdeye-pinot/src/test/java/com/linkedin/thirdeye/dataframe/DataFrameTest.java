@@ -1741,6 +1741,7 @@ public class DataFrameTest {
     assertEquals(base.subtract(mod), DNULL, -1, 0, 1.5, DNULL);
     assertEquals(base.multiply(mod), DNULL, 0, 1, 0, DNULL);
     assertEquals(base.divide(mod.replace(0, 1)), DNULL, 0, 1, 1.5, DNULL);
+    assertEquals(base.pow(mod), DNULL, 0, 1, 1, DNULL);
     assertEquals(base.eq(mod), BNULL, FALSE, TRUE, FALSE, BNULL);
 
     try {
@@ -1833,6 +1834,15 @@ public class DataFrameTest {
     } catch(ArithmeticException expected) {
       // left blank
     }
+  }
+
+  @Test
+  public void testDoubleOperationPowConstant() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 0, 1, 1.5, 0.003);
+    assertEquals(base.pow(1), DNULL, 0, 1, 1.5, 0.003);
+    assertEquals(base.pow(0), DNULL, 1, 1, 1, 1);
+    assertEquals(base.pow(-1), DNULL, DoubleSeries.INFINITY, 1, 1 / 1.5, 1 / 0.003);
+    assertEquals(base.pow(DNULL), DoubleSeries.nulls(5));
   }
 
   @Test
