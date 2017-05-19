@@ -46,6 +46,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricCorrelationRankingPipeline.class);
 
   private static final String PROP_TARGET_INPUT = "targetInput";
+  private static final String PROP_STRATEGY = "strategy";
 
   private static final String PRE_CURRENT = "current:";
   private static final String PRE_BASELINE = "baseline:";
@@ -54,10 +55,14 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final String COL_VALUE = "value";
   private static final String COL_REL_DIFF = "rel_diff";
 
+  private static final String STRATEGY_CORRELATION = "correlation";
+  private static final String STRATEGY_EUCLIDEAN = "euclidean";
+
   private final QueryCache cache;
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final String targetInput;
+  private final ScoringStrategy strategy;
 
   /**
    * Constructor for dependency injection
@@ -65,16 +70,18 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
    * @param targetInput input pipeline name for target metrics
+   * @param strategy scoring strategy for differences
    * @param cache query cache
    * @param metricDAO metric config DAO
    * @param datasetDAO datset config DAO
    */
-  public MetricCorrelationRankingPipeline(String outputName, Set<String> inputNames, String targetInput, QueryCache cache, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
+  public MetricCorrelationRankingPipeline(String outputName, Set<String> inputNames, String targetInput, ScoringStrategy strategy, QueryCache cache, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     super(outputName, inputNames);
     this.targetInput = targetInput;
     this.cache = cache;
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
+    this.strategy = strategy;
   }
 
   /**
@@ -93,6 +100,11 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     if(!properties.containsKey(PROP_TARGET_INPUT))
       throw new IllegalArgumentException(String.format("Property '%s' required, but not found.", PROP_TARGET_INPUT));
     this.targetInput = properties.get(PROP_TARGET_INPUT);
+
+    String propStrategy = STRATEGY_CORRELATION;
+    if(properties.containsKey(PROP_STRATEGY))
+      propStrategy = properties.get(PROP_STRATEGY);
+    this.strategy = parseStrategy(propStrategy);
   }
 
   @Override
@@ -368,6 +380,17 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     return df;
   }
 
+  private static ScoringStrategy parseStrategy(String strategy) {
+    switch(strategy) {
+      case STRATEGY_CORRELATION:
+        return new CorrelationStrategy();
+      case STRATEGY_EUCLIDEAN:
+        return new EuclideanStrategy();
+      default:
+        throw new IllegalArgumentException(String.format("Unknown strategy '%s'", strategy));
+    }
+  }
+
   private static class RequestContainer {
     final ThirdEyeRequest request;
     final List<MetricExpression> expressions;
@@ -375,6 +398,26 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     RequestContainer(ThirdEyeRequest request, List<MetricExpression> expressions) {
       this.request = request;
       this.expressions = expressions;
+    }
+  }
+
+  private interface ScoringStrategy {
+    double score(DoubleSeries target, DoubleSeries candidate);
+  }
+
+  private static class CorrelationStrategy implements ScoringStrategy {
+    @Override
+    public double score(DoubleSeries target, DoubleSeries candidate) {
+      // NOTE: higher correlation is better (positive and negative)
+      return Math.abs(candidate.corr(target));
+    }
+  }
+
+  private static class EuclideanStrategy implements ScoringStrategy {
+    @Override
+    public double score(DoubleSeries target, DoubleSeries candidate) {
+      // NOTE: closer is better
+      return 1.0 / Math.sqrt(candidate.subtract(target).pow(2).sum());
     }
   }
 }
