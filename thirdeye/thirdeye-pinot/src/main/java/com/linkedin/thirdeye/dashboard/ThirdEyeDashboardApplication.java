@@ -124,23 +124,48 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
-    env.jersey().register(new RootCauseResource(makeRootCauseFramework(config), makeRelatedMetricsFramework(config), makeRCAFormatters(config)));
+
+    if(config.getRootCause() != null) {
+      env.jersey().register(makeRootCauseResource(config));
+    }
   }
 
-  private static RCAFramework makeRootCauseFramework(ThirdEyeDashboardConfiguration config) throws Exception {
-    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(getRCAConfigFile(config), config.getRcaRootCauseFramework());
-    return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getRcaParallelism()));
+  private static RootCauseResource makeRootCauseResource(ThirdEyeDashboardConfiguration config) throws Exception {
+    File definitionsFile = getRootCauseDefinitionsFile(config);
+    if(!definitionsFile.exists())
+      throw new IllegalArgumentException(String.format("Could not find definitions file '%s'", definitionsFile));
+
+    RootCauseConfiguration rcConfig = config.getRootCause();
+    return new RootCauseResource(
+        makeRootCauseFramework(rcConfig, definitionsFile),
+        makeRelatedMetricsFramework(rcConfig, definitionsFile),
+        makeRootCauseFormatters(rcConfig));
   }
 
-  private static RCAFramework makeRelatedMetricsFramework(ThirdEyeDashboardConfiguration config) throws Exception {
-    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(getRCAConfigFile(config), config.getRcaRelatedMetricsFramework());
-    return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getRcaParallelism()));
+  private static RCAFramework makeRootCauseFramework(RootCauseConfiguration config, File definitionsFile) throws Exception {
+    String rootCause = config.getRootCauseFramework();
+    if(rootCause == null) {
+      LOG.warn("Configuration for 'rootCauseFramework' not found. Skipping.");
+      return null;
+    }
+    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(definitionsFile, rootCause);
+    return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getParallelism()));
   }
 
-  private static List<RootCauseEntityFormatter> makeRCAFormatters(ThirdEyeDashboardConfiguration config) throws Exception {
+  private static RCAFramework makeRelatedMetricsFramework(RootCauseConfiguration config, File definitionsFile) throws Exception {
+    String relatedMetrics = config.getRelatedMetricsFramework();
+    if(relatedMetrics == null) {
+      LOG.warn("Configuration for 'relatedMetricsFramework' not found. Skipping.");
+      return null;
+    }
+    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(definitionsFile, relatedMetrics);
+    return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getParallelism()));
+  }
+
+  private static List<RootCauseEntityFormatter> makeRootCauseFormatters(RootCauseConfiguration config) throws Exception {
     List<RootCauseEntityFormatter> formatters = new ArrayList<>();
-    if(config.getRcaFormatters() != null) {
-      for(String className : config.getRcaFormatters()) {
+    if(config.getFormatters() != null) {
+      for(String className : config.getFormatters()) {
         try {
           formatters.add(FormatterLoader.fromClassName(className));
         } catch(ClassNotFoundException e) {
@@ -152,10 +177,10 @@ public class ThirdEyeDashboardApplication
     return formatters;
   }
 
-  private static File getRCAConfigFile(ThirdEyeDashboardConfiguration config) {
-    if(config.getRcaConfigPath() == null)
-      throw new IllegalArgumentException("rcaConfigPath must not be null");
-    File rcaConfigFile = new File(config.getRcaConfigPath());
+  private static File getRootCauseDefinitionsFile(ThirdEyeDashboardConfiguration config) {
+    if(config.getRootCause().getDefinitionsPath() == null)
+      throw new IllegalArgumentException("definitionsPath must not be null");
+    File rcaConfigFile = new File(config.getRootCause().getDefinitionsPath());
     if(!rcaConfigFile.isAbsolute())
       return new File(config.getRootDir() + File.separator + rcaConfigFile);
     return rcaConfigFile;

@@ -41,8 +41,6 @@ import org.slf4j.LoggerFactory;
 public class RootCauseResource {
   private static final Logger LOG = LoggerFactory.getLogger(RootCauseResource.class);
 
-  private static final String OUTPUT = RCAFramework.OUTPUT;
-
   private final List<RootCauseEntityFormatter> formatters;
 
   private final RCAFramework rootCauseFramework;
@@ -52,6 +50,12 @@ public class RootCauseResource {
     this.rootCauseFramework = rootCauseFramework;
     this.relatedMetricsFramework = relatedMetricsFramework;
     this.formatters = formatters;
+
+    if(this.rootCauseFramework == null)
+      LOG.info("RootCauseFramework not configured. Disabling '/queryRootCause' endpoint.");
+
+    if(this.relatedMetricsFramework == null)
+      LOG.info("RelatedMetricsFramework not configured. Disabling '/queryRelatedMetrics' endpoint.");
   }
 
   @GET
@@ -61,6 +65,10 @@ public class RootCauseResource {
       @QueryParam("baseline") Long baseline,
       @QueryParam("windowSize") Long windowSize,
       @QueryParam("urn") List<String> urns) throws Exception {
+
+    // configuration validation
+    if(this.rootCauseFramework == null)
+      throw new IllegalStateException("RootCauseFramework not configured. Endpoint disabled.");
 
     // input validation
     if(current == null)
@@ -95,6 +103,11 @@ public class RootCauseResource {
       @QueryParam("windowSize") Long windowSize,
       @QueryParam("metricUrn") String metricUrn) throws Exception {
 
+    // configuration validation
+    if(this.relatedMetricsFramework == null)
+      throw new IllegalStateException("RelatedMetricsFramework not configured. Endpoint disabled.");
+
+    // input validation
     if(current == null)
       throw new IllegalArgumentException("Must provide current timestamp (in milliseconds)");
 
@@ -116,7 +129,7 @@ public class RootCauseResource {
     input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baseline - windowSize, baseline));
     input.add(EntityUtils.parseURN(metricUrn, 1.0));
 
-    // run root-cause analysis
+    // run related metrics analysis
     RCAFrameworkExecutionResult result = this.relatedMetricsFramework.run(input);
 
     // apply formatters
