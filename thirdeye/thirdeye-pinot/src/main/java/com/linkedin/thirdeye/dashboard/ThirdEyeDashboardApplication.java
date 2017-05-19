@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.dashboard.resources.IngraphDashboardConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.IngraphMetricConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.JobResource;
 import com.linkedin.thirdeye.dashboard.resources.MetricConfigResource;
+import com.linkedin.thirdeye.dashboard.resources.OnboardDatasetMetricResource;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.OverrideConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
@@ -117,6 +118,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new RootCauseResource(makeRCAFramework(config), makeRCAFormatters(config)));
+    env.jersey().register(new OnboardDatasetMetricResource());
   }
 
   private static RCAFramework makeRCAFramework(ThirdEyeDashboardConfiguration config) throws Exception {

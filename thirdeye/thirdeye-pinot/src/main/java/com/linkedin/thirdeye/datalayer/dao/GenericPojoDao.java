@@ -55,6 +55,7 @@ import com.linkedin.thirdeye.datalayer.entity.IngraphMetricConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.JobIndex;
 import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.OnboardDatasetMetricIndex;
 import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
@@ -71,6 +72,7 @@ import com.linkedin.thirdeye.datalayer.pojo.IngraphMetricConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.JobBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.OnboardDatasetMetricBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
@@ -129,6 +131,8 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, EntityToEntityMappingIndex.class));
     pojoInfoMap.put(GroupedAnomalyResultsBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, GroupedAnomalyResultsIndex.class));
+    pojoInfoMap.put(OnboardDatasetMetricBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, OnboardDatasetMetricIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,

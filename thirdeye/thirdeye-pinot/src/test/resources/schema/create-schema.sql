@@ -326,3 +326,18 @@ create table if not exists grouped_anomaly_results_index (
     version int(10)
 ) ENGINE=InnoDB;
 create index grouped_anomaly_results_alert_config_id on grouped_anomaly_results_index(alert_config_id);
+
+create table if not exists onboard_dataset_metric_index (
+  dataset_name varchar(200) not null,
+  metric_name varchar(500),
+  data_source varchar(500) not null,
+  onboarded boolean,
+  base_id bigint(20) not null,
+  create_time timestamp,
+  update_time timestamp default current_timestamp,
+  version int(10)
+) ENGINE=InnoDB;
+create index onboard_dataset_idx on onboard_dataset_metric_index(dataset_name);
+create index onboard_metric_idx on onboard_dataset_metric_index(metric_name);
+create index onboard_datasource_idx on onboard_dataset_metric_index(data_source);
+create index onboard_onboarded_idx on onboard_dataset_metric_index(onboarded);
