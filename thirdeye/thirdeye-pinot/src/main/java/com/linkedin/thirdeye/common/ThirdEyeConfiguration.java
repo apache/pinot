@@ -73,6 +73,10 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     return getRootDir() + "/detector-config/anomaly-functions/alertFilterAutotune.properties";
   }
 
+  public String getAlertGroupRecipientProviderConfigPath() {
+    return getRootDir() + "/detector-config/anomaly-functions/alertGroupRecipientProvider.properties";
+  }
+
   public String getSmtpHost() {
     return smtpHost;
   }
