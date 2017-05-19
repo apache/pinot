@@ -117,17 +117,17 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new EventResource(config));
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
     env.jersey().register(new EntityMappingResource());
-    env.jersey().register(new RootCauseResource(makeRCAFramework(config), makeRCAFormatters(config)));
     env.jersey().register(new OnboardDatasetMetricResource());
+    env.jersey().register(new RootCauseResource(makeRootCauseFramework(config), makeRelatedMetricsFramework(config), makeRCAFormatters(config)));
   }
 
-  private static RCAFramework makeRCAFramework(ThirdEyeDashboardConfiguration config) throws Exception {
-    if(config.getRcaConfigPath() == null)
-      throw new IllegalArgumentException("rcaConfigPath must not be null");
-    File rcaConfigFile = new File(config.getRcaConfigPath());
-    if(!rcaConfigFile.isAbsolute())
-      rcaConfigFile = new File(config.getRootDir() + File.separator + rcaConfigFile);
-    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(rcaConfigFile, config.getRcaDefaultFramework());
+  private static RCAFramework makeRootCauseFramework(ThirdEyeDashboardConfiguration config) throws Exception {
+    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(getRCAConfigFile(config), config.getRcaRootCauseFramework());
+    return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getRcaParallelism()));
+  }
+
+  private static RCAFramework makeRelatedMetricsFramework(ThirdEyeDashboardConfiguration config) throws Exception {
+    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(getRCAConfigFile(config), config.getRcaRelatedMetricsFramework());
     return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getRcaParallelism()));
   }
 
@@ -144,6 +144,15 @@ public class ThirdEyeDashboardApplication
     }
     formatters.add(new DefaultEntityFormatter());
     return formatters;
+  }
+
+  private static File getRCAConfigFile(ThirdEyeDashboardConfiguration config) {
+    if(config.getRcaConfigPath() == null)
+      throw new IllegalArgumentException("rcaConfigPath must not be null");
+    File rcaConfigFile = new File(config.getRcaConfigPath());
+    if(!rcaConfigFile.isAbsolute())
+      return new File(config.getRootDir() + File.separator + rcaConfigFile);
+    return rcaConfigFile;
   }
 
   public static void main(String[] args) throws Exception {

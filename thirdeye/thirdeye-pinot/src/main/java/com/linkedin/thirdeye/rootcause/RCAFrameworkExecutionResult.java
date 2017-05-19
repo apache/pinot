@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.rootcause;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -27,6 +30,18 @@ public final class RCAFrameworkExecutionResult {
    */
   public Set<Entity> getResults() {
     return results;
+  }
+
+  /**
+   * Returns the flattened results of a framework execution (i.e. the results of the
+   * {@code RCAFramework.OUTPUT} pipeline) in order of descending score.
+   *
+   * @return sorted flattened framework execution results
+   */
+  public List<Entity> getResultsSorted() {
+    List<Entity> entities = new ArrayList<>(this.results);
+    Collections.sort(entities, Entity.HIGHEST_SCORE_FIRST);
+    return entities;
   }
 
   /**

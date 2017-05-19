@@ -11,10 +11,12 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
 import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -39,56 +41,36 @@ import org.slf4j.LoggerFactory;
 public class RootCauseResource {
   private static final Logger LOG = LoggerFactory.getLogger(RootCauseResource.class);
 
-  private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
+  private static final String OUTPUT = RCAFramework.OUTPUT;
 
   private final List<RootCauseEntityFormatter> formatters;
 
-  private static final long HOUR_IN_MS = 60 * 60 * 1000;
-  private static final long DAY_IN_MS = 24 * HOUR_IN_MS;
+  private final RCAFramework rootCauseFramework;
+  private final RCAFramework relatedMetricsFramework;
 
-  private final RCAFramework rca;
-
-  public RootCauseResource(RCAFramework rca, List<RootCauseEntityFormatter> formatters) {
-    this.rca = rca;
+  public RootCauseResource(RCAFramework rootCauseFramework, RCAFramework relatedMetricsFramework, List<RootCauseEntityFormatter> formatters) {
+    this.rootCauseFramework = rootCauseFramework;
+    this.relatedMetricsFramework = relatedMetricsFramework;
     this.formatters = formatters;
   }
 
   @GET
-  @Path("/query")
+  @Path("/queryRootCause")
   public List<RootCauseEntity> queryRootCause(
       @QueryParam("current") Long current,
-      @QueryParam("currentDate") String currentDate,
       @QueryParam("baseline") Long baseline,
-      @QueryParam("baselineDate") String baselineDate,
       @QueryParam("windowSize") Long windowSize,
-      @QueryParam("windowSizeInHours") Long windowSizeInHours,
-      @QueryParam("windowSizeInDays") Long windowSizeInDays,
-      @QueryParam("urn") List<String> urns,
-      @QueryParam("pipeline") @DefaultValue("OUTPUT") String pipeline) throws Exception {
+      @QueryParam("urn") List<String> urns) throws Exception {
 
     // input validation
-    if((current == null && currentDate == null) ||
-        (current != null && currentDate != null))
-      throw new IllegalArgumentException("Must provide either currentDate or current");
+    if(current == null)
+      throw new IllegalArgumentException("Must provide current timestamp (in milliseconds)");
 
-    if((baseline == null && baselineDate == null) ||
-        (baseline != null && baselineDate != null))
-      throw new IllegalArgumentException("Must provide baselineDate or baseline");
+    if(baseline == null)
+      throw new IllegalArgumentException("Must provide baseline timestamp (in milliseconds)");
 
-    // TODO check exclusive use
-    if(windowSize == null && windowSizeInHours == null && windowSizeInDays == null)
-      throw new IllegalArgumentException("Must provide either windowSize, windowSizeInHours, or windowSizeInDays");
-
-    if(currentDate != null)
-      current = ISO8601.parseMillis(currentDate);
-
-    if(baselineDate != null)
-      baseline = ISO8601.parseMillis(baselineDate);
-
-    if(windowSizeInHours != null)
-      windowSize = windowSizeInHours * HOUR_IN_MS;
-    if(windowSizeInDays != null)
-      windowSize = windowSizeInDays * DAY_IN_MS;
+    if(windowSize == null)
+      throw new IllegalArgumentException("Must provide windowSize (in milliseconds)");
 
     // format input
     Set<Entity> input = new HashSet<>();
@@ -99,27 +81,57 @@ public class RootCauseResource {
     }
 
     // run root-cause analysis
-    RCAFrameworkExecutionResult result = this.rca.run(input);
+    RCAFrameworkExecutionResult result = this.rootCauseFramework.run(input);
 
-    // format output
-    if(!result.getPipelineResults().containsKey(pipeline))
-      throw new IllegalArgumentException(String.format("Could not find pipeline '%s'", pipeline));
+    // apply formatters
+    return applyFormatters(result.getResultsSorted());
+  }
 
+  @GET
+  @Path("/queryRelatedMetrics")
+  public List<RootCauseEntity> queryRelatedMetrics(
+      @QueryParam("current") Long current,
+      @QueryParam("baseline") Long baseline,
+      @QueryParam("windowSize") Long windowSize,
+      @QueryParam("metricUrn") String metricUrn) throws Exception {
+
+    if(current == null)
+      throw new IllegalArgumentException("Must provide current timestamp (in milliseconds)");
+
+    if(baseline == null)
+      throw new IllegalArgumentException("Must provide baseline timestamp (in milliseconds)");
+
+    if(windowSize == null)
+      throw new IllegalArgumentException("Must provide windowSize (in milliseconds)");
+
+    if(metricUrn == null)
+      throw new IllegalArgumentException("Must provide metricUrn");
+
+    if(!MetricEntity.TYPE.isType(metricUrn))
+      throw new IllegalArgumentException(String.format("URN '%s' is not a MetricEntity", metricUrn));
+
+    // format input
+    Set<Entity> input = new HashSet<>();
+    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, current - windowSize, current));
+    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baseline - windowSize, baseline));
+    input.add(EntityUtils.parseURN(metricUrn, 1.0));
+
+    // run root-cause analysis
+    RCAFrameworkExecutionResult result = this.relatedMetricsFramework.run(input);
+
+    // apply formatters
+    return applyFormatters(result.getResultsSorted());
+  }
+
+  private List<RootCauseEntity> applyFormatters(Iterable<Entity> entities) {
     List<RootCauseEntity> output = new ArrayList<>();
-    for(Entity e : result.getPipelineResults().get(pipeline).getEntities()) {
+    for(Entity e : entities) {
       output.add(applyFormatters(e));
     }
-    Collections.sort(output, new Comparator<RootCauseEntity>() {
-      @Override
-      public int compare(RootCauseEntity o1, RootCauseEntity o2) {
-        return -1 * Double.compare(o1.getScore(), o2.getScore());
-      }
-    });
-
     return output;
   }
 
-  RootCauseEntity applyFormatters(Entity e) {
+  private RootCauseEntity applyFormatters(Entity e) {
     for(RootCauseEntityFormatter formatter : this.formatters) {
       if(formatter.applies(e)) {
         try {
