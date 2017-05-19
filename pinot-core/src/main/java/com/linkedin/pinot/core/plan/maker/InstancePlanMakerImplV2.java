@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.core.plan.maker;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
@@ -23,9 +25,11 @@ import com.linkedin.pinot.core.plan.AggregationPlanNode;
 import com.linkedin.pinot.core.plan.CombinePlanNode;
 import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
 import com.linkedin.pinot.core.plan.InstanceResponsePlanNode;
+import com.linkedin.pinot.core.plan.MetadataBasedAggregationPlanNode;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.SelectionPlanNode;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,8 +80,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         // Aggregation group-by query.
         return new AggregationGroupByPlanNode(indexSegment, brokerRequest, _numAggrGroupsLimit);
       } else {
-        // Aggregation only query.
-        return new AggregationPlanNode(indexSegment, brokerRequest);
+          // Aggregation only query.
+        if (isFitForMetadataBasedPlan(brokerRequest)) {
+          return new MetadataBasedAggregationPlanNode(indexSegment, brokerRequest.getAggregationsInfo());
+        } else {
+          return new AggregationPlanNode(indexSegment, brokerRequest);
+        }
       }
     }
 
@@ -106,5 +114,31 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, brokerRequest, executorService, timeOutMs);
 
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
+  }
+
+  /**
+   * Helper method to identify if query is fit to be be served purely based on metadata.
+   * Currently only count(*) queries without any filters are supported.
+   *
+   * TODO: Add support for queries other than count(*)
+   *
+   * @param brokerRequest Broker request
+   * @return True if query can be served using metadata, false otherwise.
+   */
+  private boolean isFitForMetadataBasedPlan(BrokerRequest brokerRequest) {
+    FilterQuery filterQuery = brokerRequest.getFilterQuery();
+    if (filterQuery != null) {
+      return false;
+    }
+
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo != null && aggregationsInfo.size() == 1 && !brokerRequest.isSetGroupBy()) {
+      if (aggregationsInfo.get(0)
+          .getAggregationType()
+          .equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        return true;
+      }
+    }
+    return false;
   }
 }
