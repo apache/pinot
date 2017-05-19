@@ -77,6 +77,7 @@ public final class RealtimeSingleValueIterator extends BlockSingleValIterator {
     }
 
     long ret = reader.getLong(counter);
+    counter++;
     return ret;
   }
 
@@ -87,6 +88,7 @@ public final class RealtimeSingleValueIterator extends BlockSingleValIterator {
     }
 
     float ret = reader.getFloat(counter);
+    counter++;
     return ret;
   }
 
@@ -97,6 +99,7 @@ public final class RealtimeSingleValueIterator extends BlockSingleValIterator {
     }
 
     double ret = reader.getDouble(counter);
+    counter++;
     return ret;
   }
 

@@ -15,21 +15,11 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.base.Function;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
-import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -38,7 +28,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.HelixManagerFactory;
@@ -52,6 +41,18 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.google.common.base.Function;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import com.linkedin.pinot.util.TestUtils;
+import kafka.server.KafkaServerStartable;
 
 
 /**
@@ -124,11 +125,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestWith
     addSchema(schemaFile, schema.getSchemaName());
     final List<String> invertedIndexColumns = makeInvertedIndexColumns();
     final String sortedColumn = makeSortedColumn();
+    List<String> noDictionaryColumns = Arrays.asList("NASDelay", "ArrDelayMinutes", "DepDelayMinutes");
 
     // Create Pinot table
     addHybridTable(tableName, "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
         schema.getSchemaName(), TENANT_NAME, TENANT_NAME, avroFiles.get(0), sortedColumn, invertedIndexColumns, null,
-        false);
+        false, noDictionaryColumns);
     LOGGER.info("Running with Sorted column=" + sortedColumn + " and inverted index columns = " + invertedIndexColumns);
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)

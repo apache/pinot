@@ -19,6 +19,7 @@ import java.io.File;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,9 +51,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestWi
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
-    // TODO Uncomment the line below when segment generation code for no-dictionary column works right.
-//    List<String> noDictionaryColumns = Collections.singletonList("NASDelay");
-    List<String> noDictionaryColumns = new ArrayList<>();
+    List<String> noDictionaryColumns = Arrays.asList("NASDelay", "ArrDelayMinutes", "DepDelayMinutes");
     addRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
         null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", new ArrayList<String>(), null, noDictionaryColumns);
   }

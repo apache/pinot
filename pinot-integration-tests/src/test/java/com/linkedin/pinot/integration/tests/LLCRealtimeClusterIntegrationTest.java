@@ -15,19 +15,19 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ZkStarter;
 import java.io.File;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.util.List;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 
 
 /**
@@ -41,9 +41,10 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
+    List<String> noDictionaryColumns = Arrays.asList("NASDelay", "ArrDelayMinutes", "DepDelayMinutes");
     addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schema.getSchemaName(),
         null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", Collections.<String>emptyList(), "mmap",
-        null, null);
+        noDictionaryColumns, null);
   }
 
   protected void createKafkaTopic(String kafkaTopic, String zkStr) {

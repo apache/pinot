@@ -128,7 +128,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP", shouldUseLlc());
+        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP", shouldUseLlc(), null);
   }
 
   @Override

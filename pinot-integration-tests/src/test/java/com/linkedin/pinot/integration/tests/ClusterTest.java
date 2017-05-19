@@ -328,7 +328,8 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void addHybridTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile,
-      String sortedColumn, List<String> invertedIndexColumns, String loadMode, boolean useLlc) throws Exception {
+      String sortedColumn, List<String> invertedIndexColumns, String loadMode, boolean useLlc,
+      List<String> noDictionaryColumns) throws Exception {
     int retentionDays = -1;
     String retentionTimeUnit = "";
     if (useLlc) {
@@ -338,7 +339,7 @@ public abstract class ClusterTest extends ControllerTest {
     } else {
       addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
           kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(useLlc),
-          sortedColumn, invertedIndexColumns, loadMode, null);
+          sortedColumn, invertedIndexColumns, loadMode, noDictionaryColumns);
     }
     addOfflineTable(timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant,
         invertedIndexColumns, loadMode, tableName, SegmentVersion.v1);
