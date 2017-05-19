@@ -1487,41 +1487,57 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  public int reloadAllSegments(String tableName) {
-    int numMessagesSent = 0;
+  public int reloadAllSegments(@Nonnull String tableNameWithType) {
+    LOGGER.info("Sending reload message for table: {}", tableNameWithType);
 
-    List<String> segments = getSegmentsFor(tableName);
+    // TODO: Remove this part after all servers get updated
+    int numMessagesSent = 0;
+    List<String> segments = getSegmentsFor(tableNameWithType);
     for (String segmentName : segments) {
-      numMessagesSent += sendSegmentReloadMessage(tableName, segmentName);
+      numMessagesSent += reloadSegment(tableNameWithType, segmentName);
     }
 
-    return numMessagesSent;
-  }
-
-  public int reloadSegment(String tableName, String segmentName) {
-    return sendSegmentReloadMessage(tableName, segmentName);
-  }
-
-  private int sendSegmentReloadMessage(String tableName, String segmentName) {
-    LOGGER.info("Sending reload message for segment: {} in table: {}", segmentName, tableName);
+    /* TODO: uncomment this part after all servers get updated
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(tableNameWithType);
+    recipientCriteria.setSessionSpecific(true);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, null);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
     // Infinite timeout on the recipient
     int timeoutMs = -1;
+    int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, timeoutMs);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} reload messages for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No reload message sent for table: {}", tableNameWithType);
+    }
+    */
+    return numMessagesSent;
+  }
+
+  public int reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
+    LOGGER.info("Sending reload message for segment: {} in table: {}", segmentName, tableNameWithType);
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
-    recipientCriteria.setResource(tableName);
+    recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);
-    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableName, segmentName);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segmentName);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
+    // Infinite timeout on the recipient
+    int timeoutMs = -1;
     int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, timeoutMs);
     if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} reload messages for segment: {} in table: {}", numMessagesSent, segmentName, tableName);
+      LOGGER.info("Sent {} reload messages for segment: {} in table: {}", numMessagesSent, segmentName,
+          tableNameWithType);
     } else {
-      LOGGER.warn("No reload message sent for segment: {} in table: {}", numMessagesSent, segmentName, tableName);
+      LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
     return numMessagesSent;
   }

@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -221,14 +222,17 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     return _segmentMetadataLoader;
   }
 
+  @Nonnull
   @Override
-  public SegmentMetadata getSegmentMetadata(String table, String segmentName) {
-    if (_tableDataManagerMap.containsKey(table)) {
-      if (_tableDataManagerMap.get(table).acquireSegment(segmentName) != null) {
-        return _tableDataManagerMap.get(table).acquireSegment(segmentName).getSegment().getSegmentMetadata();
-      }
-    }
-    return null;
+  public List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType) {
+    throw new UnsupportedOperationException(
+        "Unsupported getting all segments' metadata in FileBasedInstanceDataManager");
+  }
+
+  @Nullable
+  @Override
+  public SegmentMetadata getSegmentMetadata(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
+    throw new UnsupportedOperationException("Unsupported getting segment metadata in FileBasedInstanceDataManager");
   }
 
   @Override

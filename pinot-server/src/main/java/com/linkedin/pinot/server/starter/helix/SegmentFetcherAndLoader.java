@@ -31,7 +31,9 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
@@ -272,13 +274,39 @@ public class SegmentFetcherAndLoader {
     return _dataManager.getSegmentDataDirectory() + "/" + tableName + "/" + segmentId;
   }
 
-  public void reloadSegment(String tableName, String segmentName)
+  public void reloadAllSegments(@Nonnull String tableNameWithType)
       throws Exception {
-    SegmentMetadata segmentMetadata = _dataManager.getSegmentMetadata(tableName, segmentName);
-    if (segmentMetadata == null) {
-      LOGGER.warn("Cannot locate segment: {} in table: {]", segmentName, tableName);
+    List<SegmentMetadata> allSegmentsMetadata = _dataManager.getAllSegmentsMetadata(tableNameWithType);
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == null) {
+      LOGGER.error("Invalid table name: {}, neither OFFLINE or REALTIME table", tableNameWithType);
       return;
     }
+    for (SegmentMetadata segmentMetadata : allSegmentsMetadata) {
+      reloadSegment(segmentMetadata, tableType);
+    }
+  }
+
+  public void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)
+      throws Exception {
+    SegmentMetadata segmentMetadata = _dataManager.getSegmentMetadata(tableNameWithType, segmentName);
+    if (segmentMetadata == null) {
+      LOGGER.warn("Cannot locate segment: {} in table: {]", segmentName, tableNameWithType);
+      return;
+    }
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == null) {
+      LOGGER.error("Invalid table name: {}, neither OFFLINE or REALTIME table", tableNameWithType);
+      return;
+    }
+    reloadSegment(segmentMetadata, tableType);
+  }
+
+  private void reloadSegment(@Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull CommonConstants.Helix.TableType tableType)
+      throws Exception {
+    String segmentName = segmentMetadata.getName();
+    String tableName = segmentMetadata.getTableName();
 
     String indexDir = segmentMetadata.getIndexDir();
     if (indexDir == null) {
@@ -286,26 +314,15 @@ public class SegmentFetcherAndLoader {
       return;
     }
 
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType == null) {
-      LOGGER.error("Invalid table name: {}, neither OFFLINE or REALTIME table", tableName);
-      return;
-    }
-    switch (tableType) {
-      case OFFLINE:
-        TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-        // For OFFLINE table, try to get schema for default columns
-        Schema schema = ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
-        _dataManager.reloadSegment(segmentMetadata, tableType, offlineTableConfig, schema);
-        break;
-      case REALTIME:
-        TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
-        // For REALTIME table, ignore schema for default columns
-        _dataManager.reloadSegment(segmentMetadata, tableType, realtimeTableConfig, null);
-        break;
-      default:
-        LOGGER.error("Invalid table name: {}, neither OFFLINE or REALTIME table", tableName);
-        break;
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      // For OFFLINE table, try to get schema for default columns
+      TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+      Schema schema = ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
+      _dataManager.reloadSegment(segmentMetadata, tableType, offlineTableConfig, schema);
+    } else {
+      // For REALTIME table, ignore schema for default columns
+      TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+      _dataManager.reloadSegment(segmentMetadata, tableType, realtimeTableConfig, null);
     }
   }
 }

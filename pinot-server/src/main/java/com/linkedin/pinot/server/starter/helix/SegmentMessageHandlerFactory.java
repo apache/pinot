@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -25,7 +26,6 @@ import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 
 
 public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
@@ -107,14 +107,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentReloadMessageHandler extends MessageHandler {
     private final String _segmentName;
-    private final String _tableName;
+    private final String _tableNameWithType;
     private final Logger _logger;
 
     public SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, NotificationContext context) {
       super(segmentReloadMessage, context);
       _segmentName = segmentReloadMessage.getPartitionName();
-      _tableName = segmentReloadMessage.getResourceName();
-      _logger = LoggerFactory.getLogger(_tableName + "-" + SegmentReloadMessageHandler.class);
+      _tableNameWithType = segmentReloadMessage.getResourceName();
+      _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + SegmentReloadMessageHandler.class);
     }
 
     @Override
@@ -124,15 +124,25 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling message: {}", _message);
       try {
         long startTime = System.currentTimeMillis();
-        _logger.info("Waiting for lock to reload segment: {}", _segmentName);
-        _lock.lock();
-        _logger.info("Acquired lock to reload segment: {} (lock-time={}ms)", _segmentName,
-            System.currentTimeMillis() - startTime);
-        _fetcherAndLoader.reloadSegment(_tableName, _segmentName);
+        if (_segmentName.equals("")) {
+          // Reload all segments
+          _logger.info("Waiting for lock to reload table: {}", _tableNameWithType);
+          _lock.lock();
+          _logger.info("Acquired lock to reload table: {} (lock-time={}ms)", _tableNameWithType,
+              System.currentTimeMillis() - startTime);
+          _fetcherAndLoader.reloadAllSegments(_tableNameWithType);
+        } else {
+          // Reload one segment
+          _logger.info("Waiting for lock to reload segment: {}", _segmentName);
+          _lock.lock();
+          _logger.info("Acquired lock to reload segment: {} (lock-time={}ms)", _segmentName,
+              System.currentTimeMillis() - startTime);
+          _fetcherAndLoader.reloadSegment(_tableNameWithType, _segmentName);
+        }
         helixTaskResult.setSuccess(true);
       } catch (Exception e) {
         throw new RuntimeException(
-            "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableName, e);
+            "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableNameWithType, e);
       } finally {
         _lock.unlock();
       }
