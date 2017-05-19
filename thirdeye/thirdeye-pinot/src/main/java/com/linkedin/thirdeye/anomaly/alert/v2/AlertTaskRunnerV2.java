@@ -74,6 +74,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   private AlertConfigDTO alertConfig;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
   private AlertFilterFactory alertFilterFactory;
+  private AlertGroupRecipientProviderFactory alertGroupRecipientProviderFactory;
   private final String MAX_ALLOWED_MERGE_GAP_KEY = "maxAllowedMergeGap";
   private final long DEFAULT_MAX_ALLOWED_MERGE_GAP = 14400000L;
 
@@ -92,6 +93,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     alertConfig = alertTaskInfo.getAlertConfigDTO();
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
     alertFilterFactory = new AlertFilterFactory(thirdeyeConfig.getAlertFilterConfigPath());
+    alertGroupRecipientProviderFactory =
+        new AlertGroupRecipientProviderFactory(thirdeyeConfig.getAlertGroupRecipientProviderConfigPath());
 
     try {
       LOG.info("Begin executing task {}", taskInfo);
@@ -177,7 +180,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           String recipientsForThisGroup = alertConfig.getRecipients();
           //   Get auxiliary email recipient from provider
           AlertGroupRecipientProvider recipientProvider =
-            AlertGroupRecipientProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
+              alertGroupRecipientProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
           String auxiliaryRecipients = recipientProvider.getAlertGroupRecipients(dimensions);
           if (StringUtils.isNotBlank(auxiliaryRecipients)) {
             recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
