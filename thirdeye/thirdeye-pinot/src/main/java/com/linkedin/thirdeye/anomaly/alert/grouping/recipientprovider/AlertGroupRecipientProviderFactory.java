@@ -40,14 +40,14 @@ public class AlertGroupRecipientProviderFactory {
    * The constructor that instantiates a factory that has the configuration file to external classes. The configuration
    * file is given by its path.
    */
-  public AlertGroupRecipientProviderFactory(String AlertGroupRecipientProviderConfigPath) {
+  public AlertGroupRecipientProviderFactory(String alertGroupRecipientProviderConfigPath) {
     try {
-      InputStream input = new FileInputStream(AlertGroupRecipientProviderConfigPath);
+      InputStream input = new FileInputStream(alertGroupRecipientProviderConfigPath);
       loadPropertiesFromInputStream(input);
     } catch (FileNotFoundException e) {
       LOG.warn(
           "Property file ({}) to external recipient provider is not found; Only internal implementations will be available in this factory.",
-          AlertGroupRecipientProviderConfigPath, e);
+          alertGroupRecipientProviderConfigPath, e);
     }
   }
 
