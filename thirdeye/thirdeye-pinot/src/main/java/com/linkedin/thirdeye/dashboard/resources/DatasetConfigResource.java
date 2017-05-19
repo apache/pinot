@@ -182,7 +182,7 @@ public class DatasetConfigResource {
 
   @POST
   @Path("/create/payload")
-  public Long createDatasetConfig(@QueryParam("payload") String payload) {
+  public Long createDatasetConfig(String payload) {
     Long id = null;
     try {
       DatasetConfigDTO datasetConfig = OBJECT_MAPPER.readValue(payload, DatasetConfigDTO.class);

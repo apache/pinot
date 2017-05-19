@@ -196,7 +196,7 @@ public class MetricConfigResource {
 
   @POST
   @Path("/create/payload")
-  public Long createMetricConfig(@QueryParam("payload") String payload) {
+  public Long createMetricConfig(String payload) {
     Long id = null;
     try {
       MetricConfigDTO metricConfig = OBJECT_MAPPER.readValue(payload, MetricConfigDTO.class);

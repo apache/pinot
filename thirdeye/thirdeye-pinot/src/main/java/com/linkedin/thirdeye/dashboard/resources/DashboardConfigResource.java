@@ -58,7 +58,7 @@ public class DashboardConfigResource {
 
   @POST
   @Path("/create/payload")
-  public Long createDashboardConfig(@QueryParam("payload") String payload) {
+  public Long createDashboardConfig(String payload) {
     Long id = null;
     try {
       DashboardConfigDTO dashboardConfig = OBJECT_MAPPER.readValue(payload, DashboardConfigDTO.class);
