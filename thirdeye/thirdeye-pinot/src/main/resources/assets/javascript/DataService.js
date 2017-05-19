@@ -120,7 +120,7 @@ DataService.prototype = {
           if (!anomalyIds || !anomalyIds.length) return;
           return this.fetchAnomaliesForAnomalyIds(startDate, endDate, pageNumber, anomalyIds, functionName, filterOnly, updateModelAndNotifyView, spinner);
         case constants.MODE_GROUPID:
-          if (!anomalyGroupIds || !!anomalyGroupIds.length) return;
+          if (!anomalyGroupIds || !anomalyGroupIds.length) return;
           return this.fetchAnomaliesforGroupIds(startDate, endDate, pageNumber, anomalyGroupIds, functionName, filterOnly, updateModelAndNotifyView, spinner);
         default:
           return;
@@ -140,8 +140,8 @@ DataService.prototype = {
     fetchAnomaliesForDashboardId : function(startTime, endTime, pageNumber, dashboardId, functionName, filterOnly, callback, spinner) {
       const url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       const data = {
-        dashboardId : dashboardId,
-        functionName : functionName,
+        dashboardId,
+        functionName,
         filterOnly
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
@@ -158,10 +158,12 @@ DataService.prototype = {
     },
 
     // Fetch anomalies for group ids in array
-    fetchAnomaliesforGroupIds(startTime, endTime, pageNumber, anomalyGroupIds, functionName, callback) {
+    fetchAnomaliesforGroupIds(startTime, endTime, pageNumber, anomalyGroupIds, functionName, filterOnly, callback, spinner) {
       const url = constants.SEARCH_ANOMALIES_GROUPIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
-        anomalyGroupIds
+        anomalyGroupIds,
+        functionName,
+        filterOnly
       };
       this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },

@@ -142,6 +142,7 @@ AnomalyResultController.prototype = {
   pageClickEventHandler(sender, pageNumber) {
     HASH_SERVICE.update({ pageNumber });
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
+    HASH_SERVICE.routeTo('anomalies');
   },
 
   initFilters() {
