@@ -155,4 +155,12 @@ public class OnboardDatasetMetricResource {
     return response;
   }
 
+  @POST
+  @Path("update/{id}/{onboarded}")
+  public void toggleOnboarded(@PathParam("id") Long id, @PathParam("onboarded") boolean onboarded) {
+    OnboardDatasetMetricDTO onboardConfig = onboardDatasetMetricDAO.findById(id);
+    onboardConfig.setOnboarded(onboarded);
+    onboardDatasetMetricDAO.update(onboardConfig);
+  }
+
 }
