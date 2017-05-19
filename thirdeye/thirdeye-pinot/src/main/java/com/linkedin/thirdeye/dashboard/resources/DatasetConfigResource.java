@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -19,6 +21,8 @@ import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang.NullArgumentException;
 import org.codehaus.jackson.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -31,11 +35,13 @@ import com.linkedin.thirdeye.util.JsonResponseUtil;
 public class DatasetConfigResource {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final Logger LOG = LoggerFactory.getLogger(DatasetConfigResource.class);
 
-  private DatasetConfigManager datasetConfigDao;
+  private DatasetConfigManager datasetConfigDAO;
 
   public DatasetConfigResource() {
-    this.datasetConfigDao = DAO_REGISTRY.getDatasetConfigDAO();
+    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   @GET
@@ -68,7 +74,7 @@ public class DatasetConfigResource {
       datasetConfigDTO.setTimeFormat(timeFormat);
       datasetConfigDTO.setTimeUnit(timeUnit);
       datasetConfigDTO.setTimezone(timezone);
-      Long id = datasetConfigDao.save(datasetConfigDTO);
+      Long id = datasetConfigDAO.save(datasetConfigDTO);
       datasetConfigDTO.setId(id);
       return JsonResponseUtil.buildResponseJSON(datasetConfigDTO).toString();
     } catch (Exception e) {
@@ -96,7 +102,7 @@ public class DatasetConfigResource {
       @QueryParam("timeDuration") Integer timeDuration, @QueryParam("timeFormat") String timeFormat, @QueryParam("timezone") TimeUnit timeUnit,
       @QueryParam("timezone") String timezone) {
     try {
-      DatasetConfigDTO datasetConfigDTO = datasetConfigDao.findById(datasetConfigId);
+      DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findById(datasetConfigId);
       datasetConfigDTO.setDataset(dataset);
       datasetConfigDTO.setDimensions(toList(dimensions));
       datasetConfigDTO.setDimensionsHaveNoPreAggregation(toList(dimensionsHaveNoPreAggregation));
@@ -112,7 +118,7 @@ public class DatasetConfigResource {
       datasetConfigDTO.setTimeFormat(timeFormat);
       datasetConfigDTO.setTimeUnit(timeUnit);
       datasetConfigDTO.setTimezone(timezone);
-      int numRowsUpdated = datasetConfigDao.update(datasetConfigDTO);
+      int numRowsUpdated = datasetConfigDAO.update(datasetConfigDTO);
       if (numRowsUpdated == 1) {
         return JsonResponseUtil.buildResponseJSON(datasetConfigDTO).toString();
       } else {
@@ -139,18 +145,18 @@ public class DatasetConfigResource {
   }
 
   private void toggleRequiresCompletenessCheck(String dataset, boolean state) {
-    DatasetConfigDTO datasetConfig = datasetConfigDao.findByDataset(dataset);
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     if(datasetConfig == null) {
       throw new NullArgumentException("dataset config spec not found");
     }
     datasetConfig.setRequiresCompletenessCheck(state);
-    datasetConfigDao.update(datasetConfig);
+    datasetConfigDAO.update(datasetConfig);
   }
 
   @GET
   @Path("/delete")
   public String deleteDatasetConfig(@NotNull @QueryParam("id") Long datasetConfigId) {
-    datasetConfigDao.deleteById(datasetConfigId);
+    datasetConfigDAO.deleteById(datasetConfigId);
     return JsonResponseUtil.buildSuccessResponseJSON("Successully deleted dataset id: " + datasetConfigId).toString();
   }
 
@@ -159,14 +165,41 @@ public class DatasetConfigResource {
   @Produces(MediaType.APPLICATION_JSON)
   public String viewDatsetConfig(@DefaultValue("0") @QueryParam("jtStartIndex") int jtStartIndex,
       @DefaultValue("100") @QueryParam("jtPageSize") int jtPageSize) {
-    List<DatasetConfigDTO> datasetConfigDTOs = datasetConfigDao.findAll();
+    List<DatasetConfigDTO> datasetConfigDTOs = datasetConfigDAO.findAll();
     List<DatasetConfigDTO> subList = Utils.sublist(datasetConfigDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
   }
 
+  @GET
+  @Path("/view/{dataset}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public DatasetConfigDTO viewByDataset(@PathParam("dataset") String dataset) {
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
+    return datasetConfig;
+  }
 
 
+  @POST
+  @Path("/create/payload")
+  public Long createDatasetConfig(@QueryParam("payload") String payload) {
+    Long id = null;
+    try {
+      DatasetConfigDTO datasetConfig = OBJECT_MAPPER.readValue(payload, DatasetConfigDTO.class);
+      id = datasetConfigDAO.save(datasetConfig);
+    } catch (IOException e) {
+      LOG.error("Exception in creating dataset config with payload {}", payload);
+    }
+    return id;
+  }
 
+  public Long createDatasetConfig(DatasetConfigDTO datasetConfig) {
+    Long id = datasetConfigDAO.save(datasetConfig);
+    return id;
+  }
+
+  public void updateDatasetConfig(DatasetConfigDTO datasetConfig) {
+    datasetConfigDAO.update(datasetConfig);
+  }
 
 }
