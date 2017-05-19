@@ -56,6 +56,7 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.DimensionInvertertedI
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.StarTree;
 
@@ -96,6 +97,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final String tableAndStreamName;
   private StarTreeIndexSpec starTreeIndexSpec = null;
   private SegmentPartitionConfig segmentPartitionConfig = null;
+  private final List<String> consumingNoDictionaryColumns = new ArrayList<>();
 
   // TODO Dynamcally adjust these variables, maybe on a per column basis
 
@@ -104,8 +106,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
 
   public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName,
-      ServerMetrics serverMetrics, List<String> invertedIndexColumns, int avgMultiValueCount)
-      {
+      ServerMetrics serverMetrics, List<String> invertedIndexColumns, int avgMultiValueCount,
+      List<String> noDictionaryColumns)
+  {
     // initial variable setup
     this.segmentName = segmentName;
     this.serverMetrics = serverMetrics;
@@ -114,6 +117,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     dictionaryMap = new HashMap<String, BaseOnHeapMutableDictionary>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
     outgoingTimeColumnName = dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName();
+
+    for (final String column : noDictionaryColumns) {
+      if (canBeNoDictionaryColumnInConsumingSegment(column, invertedIndexColumns)) {
+        consumingNoDictionaryColumns.add(column);
+      }
+    }
     this.capacity = capacity;
 
     for (FieldSpec col : dataSchema.getAllFieldSpecs()) {
@@ -129,8 +138,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         dataSchema.getFieldSpecFor(outgoingTimeColumnName).getDataType()));
 
     for (String metric : dataSchema.getMetricNames()) {
-      dictionaryMap.put(metric,
-          MutableDictionaryFactory.getMutableDictionary(dataSchema.getFieldSpecFor(metric).getDataType()));
+      if (!consumingNoDictionaryColumns.contains(metric)) {
+        dictionaryMap.put(metric, MutableDictionaryFactory.getMutableDictionary(dataSchema.getFieldSpecFor(metric).getDataType()));
+      }
     }
 
     // docId generator and time granularity converter
@@ -149,12 +159,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
       if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
         columnIndexReaderWriterMap.put(dimension,
-            new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
+            new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE));
       } else {
         // TODO Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
         columnIndexReaderWriterMap.put(dimension,
             new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgMultiValueCount,
-                capacity, Integer.SIZE/8));
+                capacity, V1Constants.Numbers.INTEGER_SIZE));
       }
     }
 
@@ -162,17 +172,58 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       if (invertedIndexColumns.contains(metric)) {
         invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
       }
+      int colSize = V1Constants.Numbers.INTEGER_SIZE;
+      if (consumingNoDictionaryColumns.contains(metric)) {
+        colSize = getColWidth(schema.getFieldSpecFor(metric).getDataType());
+      }
       columnIndexReaderWriterMap.put(metric,
-          new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
+          new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize));
     }
 
     if (invertedIndexColumns.contains(outgoingTimeColumnName)) {
       invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
     }
     columnIndexReaderWriterMap.put(outgoingTimeColumnName,
-        new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
+        new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE));
 
     tableAndStreamName = tableName + "-" + streamName;
+  }
+
+  private boolean canBeNoDictionaryColumnInConsumingSegment(final String column,
+      final List<String> invertedIndexColumns) {
+    if (invertedIndexColumns.contains(column)) {
+      return false;
+    }
+    FieldSpec fieldSpec = dataSchema.getFieldSpecFor(column);
+    FieldSpec.DataType dataType = fieldSpec.getDataType();
+    // For now, we only support metric columns in consuming segment
+    if (!fieldSpec.getFieldType().equals(FieldType.METRIC)) {
+      return false;
+    }
+    switch (dataType) {
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private int getColWidth(FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return V1Constants.Numbers.INTEGER_SIZE;
+      case LONG:
+        return V1Constants.Numbers.LONG_SIZE;
+      case FLOAT:
+        return V1Constants.Numbers.FLOAT_SIZE;
+      case DOUBLE:
+        return V1Constants.Numbers.DOUBLE_SIZE;
+      default:
+        throw new UnsupportedOperationException("Unknown width for datatype " + dataType.toString());
+    }
   }
 
   @Override
@@ -248,7 +299,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     for (String metric : dataSchema.getMetricNames()) {
-      dictionaryMap.get(metric).index(row.getValue(metric));
+      if (!consumingNoDictionaryColumns.contains(metric)) {
+        dictionaryMap.get(metric).index(row.getValue(metric));
+      }
     }
 
     // Conversion already happens in PlainFieldExtractor
@@ -300,9 +353,29 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     for (String metric : dataSchema.getMetricNames()) {
       FixedByteSingleColumnSingleValueReaderWriter readerWriter =
           (FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric);
-      int dicId = dictionaryMap.get(metric).indexOf(row.getValue(metric));
-      readerWriter.setInt(docId, dicId);
-      rawRowToDicIdMap.put(metric, dicId);
+      if (consumingNoDictionaryColumns.contains(metric)) {
+        switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
+          case SHORT:
+            readerWriter.setShort(docId, (short)row.getValue(metric));
+            break;
+          case INT:
+            readerWriter.setInt(docId, (int)row.getValue(metric));
+            break;
+          case LONG:
+            readerWriter.setLong(docId, (long)row.getValue(metric));
+            break;
+          case FLOAT:
+            readerWriter.setFloat(docId, (float)row.getValue(metric));
+            break;
+          case DOUBLE:
+            readerWriter.setDouble(docId, (double)row.getValue(metric));
+            break;
+        }
+      } else {
+        int dicId = dictionaryMap.get(metric).indexOf(row.getValue(metric));
+        readerWriter.setInt(docId, dicId);
+        rawRowToDicIdMap.put(metric, dicId);
+      }
     }
 
     int timeDicId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
@@ -398,6 +471,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     throw new UnsupportedOperationException("Not support method: getRecordReader() in RealtimeSegmentImpl");
   }
 
+  // Called only by realtime record reader
   @Override
   public int getAggregateDocumentCount() {
     return docIdGenerator.get() + 1;
@@ -551,6 +625,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   /**
    * Returns the docIds to use for iteration when the data is sorted by <code>columnToSortOn</code>
+   * Called only by realtime record reader
    * @param columnToSortOn The column to use for sorting
    * @return The docIds to use for iteration
    */
@@ -598,6 +673,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     return docIds;
   }
 
+  // Called by record reader.
   @Override
   public GenericRow getRawValueRowAt(int docId, GenericRow row) {
     for (String dimension : dataSchema.getDimensionNames()) {
@@ -620,27 +696,53 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     for (String metric : dataSchema.getMetricNames()) {
-      final int dicId =
-          ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getInt(docId);
-      switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
-        case INT:
-          int intValue = dictionaryMap.get(metric).getIntValue(dicId);
-          row.putField(metric, intValue);
-          break;
-        case FLOAT:
-          float floatValue = dictionaryMap.get(metric).getFloatValue(dicId);
-          row.putField(metric, floatValue);
-          break;
-        case LONG:
-          long longValue = dictionaryMap.get(metric).getLongValue(dicId);
-          row.putField(metric, longValue);
-          break;
-        case DOUBLE:
-          double doubleValue = dictionaryMap.get(metric).getDoubleValue(dicId);
-          row.putField(metric, doubleValue);
-          break;
-        default:
-          throw new UnsupportedOperationException("unsopported metric data type");
+      final FieldSpec.DataType dataType = dataSchema.getFieldSpecFor(metric).getDataType();
+      if (consumingNoDictionaryColumns.contains(metric)) {
+        switch (dataType) {
+          case INT:
+            int intValue = ((FixedByteSingleColumnSingleValueReaderWriter)columnIndexReaderWriterMap.get(metric)).getInt(docId);
+            row.putField(metric, intValue);
+            break;
+          case LONG:
+            long longValue = ((FixedByteSingleColumnSingleValueReaderWriter)columnIndexReaderWriterMap.get(metric)).getLong(
+                docId);
+            row.putField(metric, longValue);
+            break;
+          case FLOAT:
+            float floatValue = ((FixedByteSingleColumnSingleValueReaderWriter)columnIndexReaderWriterMap.get(metric)).getFloat(
+                docId);
+            row.putField(metric, floatValue);
+            break;
+          case DOUBLE:
+            double doubleValue = ((FixedByteSingleColumnSingleValueReaderWriter)columnIndexReaderWriterMap.get(metric)).getDouble(
+                docId);
+            row.putField(metric, doubleValue);
+            break;
+          default:
+            throw new UnsupportedOperationException("unsopported metric data type");
+        }
+      } else {
+        final int dicId = ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getInt(docId);
+        switch (dataType) {
+          case INT:
+            int intValue = dictionaryMap.get(metric).getIntValue(dicId);
+            row.putField(metric, intValue);
+            break;
+          case FLOAT:
+            float floatValue = dictionaryMap.get(metric).getFloatValue(dicId);
+            row.putField(metric, floatValue);
+            break;
+          case LONG:
+            long longValue = dictionaryMap.get(metric).getLongValue(dicId);
+            row.putField(metric, longValue);
+            break;
+          case DOUBLE:
+            double doubleValue = dictionaryMap.get(metric).getDoubleValue(dicId);
+            row.putField(metric, doubleValue);
+            break;
+          default:
+            throw new UnsupportedOperationException("unsopported metric data type");
+        }
       }
     }
 

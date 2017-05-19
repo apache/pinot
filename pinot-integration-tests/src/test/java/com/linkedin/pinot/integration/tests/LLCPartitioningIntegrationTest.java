@@ -15,14 +15,9 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.client.ConnectionFactory;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import java.io.File;
+import java.util.Arrays;
 import java.util.Collections;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +29,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 
 
 /**
@@ -53,9 +53,10 @@ public class LLCPartitioningIntegrationTest extends RealtimeClusterIntegrationTe
     map.put(KAFKA_PARTITIONING_KEY, PartitionFunctionFactory.PartitionFunctionType.ByteArray.toString());
     timeColumnName = "Date";
     timeColumnType = "MILLISECONDS";
+    List<String> noDictionaryColumns = Arrays.asList("NASDelay", "ArrDelayMinutes", "DepDelayMinutes");
     addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schema.getSchemaName(),
         null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", Collections.<String>emptyList(), "mmap",
-        null, map);
+        noDictionaryColumns, map);
   }
 
   protected void createKafkaTopic(String kafkaTopic, String zkStr) {

@@ -16,7 +16,6 @@
 package com.linkedin.pinot.integration.tests;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -129,7 +128,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP", shouldUseLlc());
+        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP", shouldUseLlc(), null);
   }
 
   @Override
@@ -461,7 +460,8 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     // Recreate the realtime table
     addRealtimeTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 900, "Days", KafkaStarterUtils.DEFAULT_ZK_STR,
         KAFKA_TOPIC, _schema.getSchemaName(), "TestTenant", "TestTenant",
-        _realtimeAvroToSegmentMap.keySet().iterator().next(), 1000000, getSortedColumn(), new ArrayList<String>(), null);
+        _realtimeAvroToSegmentMap.keySet().iterator().next(), 1000000, getSortedColumn(), new ArrayList<String>(), null,
+        null);
   }
 
   @Override

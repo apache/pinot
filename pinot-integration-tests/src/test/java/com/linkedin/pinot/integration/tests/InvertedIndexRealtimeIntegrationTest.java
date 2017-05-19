@@ -16,24 +16,24 @@
 package com.linkedin.pinot.integration.tests;
 
 import java.io.File;
-
+import java.util.List;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.data.Schema;
 /**
  * enables indexes on a bunch of columns 
  *
  */
 @Test
-public class InvertedIndexRealtimeIntegrationTest extends RealtimeClusterIntegrationTest{
+public class InvertedIndexRealtimeIntegrationTest extends RealtimeClusterIntegrationTest {
 
   @Override
   protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
       String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic, String schemaName, String serverTenant,
-      String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn) throws Exception {
+      String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
+      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns) throws Exception {
     Schema schema = Schema.fromFile(getSchemaFile());
     super.addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
         kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, realtimeSegmentFlushSize, sortedColumn,
-        schema.getDimensionNames(), null);
+        schema.getDimensionNames(), null, null);
   }
 }

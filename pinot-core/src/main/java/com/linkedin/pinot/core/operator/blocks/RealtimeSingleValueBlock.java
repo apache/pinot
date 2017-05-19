@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
@@ -25,10 +26,10 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.operator.docvalsets.RealtimeFixedWidthRawValueSet;
 import com.linkedin.pinot.core.operator.docvalsets.RealtimeSingleValueSet;
 import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class RealtimeSingleValueBlock implements Block {
@@ -71,6 +72,9 @@ public class RealtimeSingleValueBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
+    if (dictionary == null) {
+      return new RealtimeFixedWidthRawValueSet(reader, docIdSearchableOffset + 1, spec.getDataType(), spec.getName());
+    }
     return new RealtimeSingleValueSet(reader, docIdSearchableOffset + 1, spec.getDataType());
   }
 
@@ -118,7 +122,7 @@ public class RealtimeSingleValueBlock implements Block {
 
       @Override
       public boolean hasDictionary() {
-        return true;
+        return dictionary != null;
       }
 
       @Override

@@ -15,15 +15,15 @@
  */
 package com.linkedin.pinot.common.request.helper;
 
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.utils.TenantRole;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
+import com.linkedin.pinot.common.utils.TenantRole;
 
 
 public class ControllerRequestBuilder {
@@ -99,16 +99,6 @@ public class ControllerRequestBuilder {
 
   public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
-      String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, String sortedColumn)
-      throws JSONException {
-    List<String> invertedIndexColumns = Collections.emptyList();
-    return buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType, retentionTimeUnit,
-        retentionTimeValue, numReplicas, segmentAssignmentStrategy, streamConfigs, schemaName, sortedColumn,
-        invertedIndexColumns, null, true, null);
-  }
-
-  public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
-      String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
       String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, String sortedColumn,
       List<String> invertedIndexColumns, String loadMode, boolean isHighLevel)
           throws JSONException {
@@ -124,7 +114,7 @@ public class ControllerRequestBuilder {
       throws JSONException {
     return buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType,
         retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy, streamConfigs, schemaName,
-        sortedColumn, invertedIndexColumns, loadMode, isHighLevel, null, null);
+        sortedColumn, invertedIndexColumns, loadMode, isHighLevel, noDictionaryColumns, null);
   }
 
   public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
