@@ -40,7 +40,6 @@ public class RealtimeFixedWidthRawValueSet extends BaseBlockValSet {
 
   @Override
   public BlockValIterator iterator() {
-    // throw unimplemented?
     return new RealtimeSingleValueIterator(reader, length, dataType);
   }
 

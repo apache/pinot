@@ -107,20 +107,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
       return reader.getShort(row - startRowId, 0);
     }
 
-    public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
-      reader.readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
-    }
-
-    public void readValues(int[] rows, int rowStartPos, int rowSize, long[] values, int valuesStartPos) {
-      reader.readLongValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
-    }
-
-    public void readValues(int[] rows, int rowStartPos, int rowSize, float[] values, int valuesStartPos) {
-      reader.readFloatValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
-    }
-
-    public void readValues(int[] rows, int rowStartPos, int rowSize, double[] values, int valuesStartPos) {
-      reader.readDoubleValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+    public FixedByteSingleValueMultiColReader getReader() {
+      return reader;
     }
   }
 
@@ -248,7 +236,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
      * increase the number of rows.
      */
     if (readers.size() == 1) {
-      readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
+      readers.get(0).getReader().readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
       return;
     } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos;
@@ -263,7 +251,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
 
   public void readValues(int[] rows, int rowStartPos, int rowSize, long[] values, int valuesStartPos) {
     if (readers.size() == 1) {
-      readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
+      readers.get(0).getReader().readLongValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
       return;
     } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos;
@@ -278,7 +266,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
 
   public void readValues(int[] rows, int rowStartPos, int rowSize, float[] values, int valuesStartPos) {
     if (readers.size() == 1) {
-      readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
+      readers.get(0).getReader().readFloatValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
       return;
     } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos;
@@ -293,7 +281,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
 
   public void readValues(int[] rows, int rowStartPos, int rowSize, double[] values, int valuesStartPos) {
     if (readers.size() == 1) {
-      readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
+      readers.get(0).getReader().readDoubleValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
       return;
     } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos; rowIter < rowStartPos + rowSize;
