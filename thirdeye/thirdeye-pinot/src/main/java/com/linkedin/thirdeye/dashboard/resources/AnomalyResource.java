@@ -476,7 +476,7 @@ public class AnomalyResource {
     AnomalyFunctionDTO targetFunction = originalFunction;
 
     // clone anomaly function and its anomaly results if requested
-    if(isCloneFunction) {
+    if (isCloneFunction) {
       OnboardResource
           onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
       long cloneId;
@@ -504,7 +504,7 @@ public class AnomalyResource {
     anomalyFunctionDAO.update(targetFunction);
 
     // Deactivate original function
-    if(isCloneFunction) {
+    if (isCloneFunction) {
       originalFunction.setActive(false);
       anomalyFunctionDAO.update(originalFunction);
     }
@@ -553,14 +553,57 @@ public class AnomalyResource {
   // Activate anomaly function
   @POST
   @Path("/anomaly-function/activate")
-  public Response activateAnomalyFunction(@NotNull @QueryParam("functionId") Long id){
+  public Response activateAnomalyFunction(@NotNull @QueryParam("functionId") Long id) {
     if (id == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
-    anomalyFunctionSpec.setActive(true);
-    anomalyFunctionDAO.update(anomalyFunctionSpec);
+    toggleFunctionById(id, true);
     return Response.ok(id).build();
+  }
+
+  // batch activate and deactivate anomaly functions
+  @POST
+  @Path("/anomaly-functions/activate")
+  public String activateFunction(@QueryParam("functionIds") String functionIds) {
+    toggleFunctions(functionIds, true);
+    return functionIds;
+  }
+
+  @POST
+  @Path("/anomaly-functions/deactivate")
+  public String deactivateFunction(@QueryParam("functionIds") String functionIds) {
+    toggleFunctions(functionIds, false);
+    return functionIds;
+  }
+
+  /**
+   * toggle anomaly functions to active and inactive
+   *
+   * @param functionIds string comma separated function ids, ALL meaning all functions
+   * @param isActive boolean true or false, set function as true or false
+   */
+  private void toggleFunctions(String functionIds, boolean isActive) {
+    List<Long> functionIdsList = new ArrayList<>();
+
+    // can add tokens here to activate and deactivate all functions for example
+    // functionIds == {SPECIAL TOKENS} --> functionIdsList = anomalyFunctionDAO.findAll()
+
+    if (StringUtils.isNotBlank(functionIds)) {
+      String[] tokens = functionIds.split(",");
+      for (String token : tokens) {
+        functionIdsList.add(Long.valueOf(token));  // unhandled exception is expected
+      }
+    }
+
+    for (long id : functionIdsList) {
+      toggleFunctionById(id, isActive);
+    }
+  }
+
+  private void toggleFunctionById(long id, boolean isActive) {
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    anomalyFunctionSpec.setActive(isActive);
+    anomalyFunctionDAO.update(anomalyFunctionSpec);
   }
 
   // Delete anomaly function

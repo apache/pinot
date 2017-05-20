@@ -55,50 +55,6 @@ public class OnboardResource {
     return anomalyFunctionDAO.findById(id);
   }
 
-  @POST
-  @Path("function/activate")
-  public String activateFunction(@QueryParam("functionIds") String functionIds) {
-    toggleFunctions(functionIds, true);
-    return functionIds;
-  }
-
-  @POST
-  @Path("function/deactivate")
-  public String deactivateFunction(@QueryParam("functionIds") String functionIds) {
-    toggleFunctions(functionIds, false);
-    return functionIds;
-  }
-
-  /**
-   * toggle anomaly functions to active and inactive
-   *
-   * @param functionIds string comma separated function ids, ALL meaning all functions
-   * @param isActive boolean true or false, set function as true or false
-   */
-  private void toggleFunctions(String functionIds, boolean isActive) {
-    List<Long> functionIdsList = new ArrayList<>();
-    if (functionIds.equals("ALLDEMONS")) {
-      for (AnomalyFunctionDTO dto: anomalyFunctionDAO.findAll()) {
-        dto.setActive(isActive);
-        anomalyFunctionDAO.update(dto);
-      }
-      return;  // early return
-    }
-
-    if (StringUtils.isNotBlank(functionIds)) {
-      String[] tokens = functionIds.split(",");
-      for (String token : tokens) {
-        functionIdsList.add(Long.valueOf(token));  // unhandled exception is expected
-      }
-    }
-
-    for (long id : functionIdsList) {
-      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
-      anomalyFunction.setActive(isActive);
-      anomalyFunctionDAO.update(anomalyFunction);
-    }
-  }
-
   // endpoints that clone function Ids to append a name tag in tail as defined in nameTags
   // clone functions in batch
   @POST
