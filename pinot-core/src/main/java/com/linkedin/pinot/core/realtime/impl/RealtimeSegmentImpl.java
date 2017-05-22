@@ -119,6 +119,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     outgoingTimeColumnName = dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName();
 
     for (final String column : noDictionaryColumns) {
+      // Not all no-dictionary columns can be so while the segment is being consumed.
+      // However, after consumption completes and the segment is built, these columns
+      // can be no-dictionary columns in the built (immutable) segment. We check below
+      // to make sure that the columns that are configured as no-dictionary can still
+      // be so during consumption, and populate consumingNoDictionaryColummns accordingly.
+      // This is so that we can do faster lookups during indexing of rows.
       if (canBeNoDictionaryColumnInConsumingSegment(column, invertedIndexColumns)) {
         consumingNoDictionaryColumns.add(column);
       }
@@ -189,6 +195,16 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     tableAndStreamName = tableName + "-" + streamName;
   }
 
+  /**
+   * Check whether a given column can be a no-dictionary column in consuming segment.
+   *
+   * No-dictionary column and inverted index are not supported in combination.
+   * Also, for now, we only support no-dictionary columns for metrics.
+   *
+   * @param column is the column name to check
+   * @param invertedIndexColumns has a list of columns that have inverted indexes
+   * @return true if column can be a no-dictionary column for consuming segments
+   */
   private boolean canBeNoDictionaryColumnInConsumingSegment(final String column,
       final List<String> invertedIndexColumns) {
     if (invertedIndexColumns.contains(column)) {
