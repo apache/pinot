@@ -16,13 +16,14 @@
 
 package com.linkedin.pinot.core.realtime.converter.stats;
 
+import java.util.HashMap;
+import java.util.Map;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
-import java.util.HashMap;
-import java.util.Map;
 
 
 /**
@@ -41,9 +42,14 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
 
     // Create all column statistics
     for (String columnName : realtimeSegment.getColumnNames()) {
-      _columnStatisticsMap.put(columnName, new RealtimeColumnStatistics(realtimeSegment.getDataSource(columnName),
-          _realtimeSegmentRecordReader.getSortedDocIdIterationOrder(),
-          (segmentPartitionConfig == null) ? null : segmentPartitionConfig.getColumnPartitionMap().get(columnName)));
+      RealtimeColumnDataSource dataSource = realtimeSegment.getDataSource(columnName);
+      if (dataSource.getDataSourceMetadata().hasDictionary()) {
+        _columnStatisticsMap.put(columnName, new RealtimeColumnStatistics(realtimeSegment.getDataSource(columnName),
+            _realtimeSegmentRecordReader.getSortedDocIdIterationOrder(),
+            (segmentPartitionConfig == null) ? null : segmentPartitionConfig.getColumnPartitionMap().get(columnName)));
+      } else {
+        _columnStatisticsMap.put(columnName, new RealtimeNoDictionaryColStatistics(dataSource));
+      }
     }
   }
 

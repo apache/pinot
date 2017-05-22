@@ -35,7 +35,6 @@ import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 
 /**
  * Column statistics for a column coming from an in-memory realtime segment.
- * TODO Fix this class after we re-factor segment generation code to get some of the stats later on while going through the values
  */
 public class RealtimeColumnStatistics implements ColumnStatistics {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeColumnStatistics.class);
@@ -68,64 +67,21 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
   @Override
   public Object getMinValue() {
-    if (_dictionaryReader == null) {
-      switch (_dataSource.getDataSourceMetadata().getDataType()) {
-        case LONG:
-          return Long.MIN_VALUE;
-        case FLOAT:
-          return Float.MIN_VALUE;
-        case DOUBLE:
-          return Double.MIN_VALUE;
-        case INT:
-        default:
-          return Integer.MIN_VALUE;
-      }
-    }
     return _dictionaryReader.getMinVal();
   }
 
   @Override
   public Object getMaxValue() {
-    if (_dictionaryReader == null) {
-      switch (_dataSource.getDataSourceMetadata().getDataType()) {
-        case LONG:
-          return Long.MAX_VALUE;
-        case FLOAT:
-          return Float.MAX_VALUE;
-        case DOUBLE:
-          return Double.MAX_VALUE;
-        case INT:
-        default:
-          return Integer.MAX_VALUE;
-      }
-    }
     return _dictionaryReader.getMaxVal();
   }
 
   @Override
   public Object getUniqueValuesSet() {
-    if (_dictionaryReader == null) {
-      switch (_dataSource.getDataSourceMetadata().getDataType()) {
-        case LONG:
-          return new long[]{Long.MAX_VALUE};
-        case FLOAT:
-          return new float[]{Float.MAX_VALUE};
-        case DOUBLE:
-          return new double[]{Double.MAX_VALUE};
-        case INT:
-          return new int[]{Integer.MAX_VALUE};
-        default:
-          return new String[]{""};
-      }
-    }
     return _dictionaryReader.getSortedValues();
   }
 
   @Override
   public int getCardinality() {
-    if (_dictionaryReader == null) {
-      return 0;
-    }
     return _dictionaryReader.length();
   }
 
@@ -147,9 +103,6 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
   @Override
   public boolean isSorted() {
-    if (_dictionaryReader == null) {
-      return false;
-    }
     // Multivalue columns can't be in sorted order
     if (!_block.getMetadata().isSingleValue()) {
       return false;

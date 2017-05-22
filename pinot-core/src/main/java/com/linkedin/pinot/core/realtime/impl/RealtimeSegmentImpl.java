@@ -355,9 +355,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
           (FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric);
       if (consumingNoDictionaryColumns.contains(metric)) {
         switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
-          case SHORT:
-            readerWriter.setShort(docId, (short)row.getValue(metric));
-            break;
           case INT:
             readerWriter.setInt(docId, (int)row.getValue(metric));
             break;
