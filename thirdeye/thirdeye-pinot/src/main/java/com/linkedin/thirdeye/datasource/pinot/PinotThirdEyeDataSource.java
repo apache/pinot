@@ -43,6 +43,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private final HttpHost controllerHost;
   private final CloseableHttpClient controllerClient;
   public static final String DATA_SOURCE_NAME = PinotThirdEyeDataSource.class.getSimpleName();
+  private PinotDataSourceMaxTime pinotDataSourceMaxTime;
 
   public PinotThirdEyeDataSource(Map<String, String> properties) {
     if (!isValidProperties(properties)) {
@@ -58,12 +59,14 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     this.controllerHost = new HttpHost(host, port);
     this.controllerClient = HttpClients.createDefault();
 
+    pinotDataSourceMaxTime = new PinotDataSourceMaxTime();
     LOG.info("Created PinotThirdEyeDataSource with controller {}", controllerHost);
   }
 
   protected PinotThirdEyeDataSource(String host, int port) {
     this.controllerHost = new HttpHost(host, port);
     this.controllerClient = HttpClients.createDefault();
+    pinotDataSourceMaxTime = new PinotDataSourceMaxTime();
     LOG.info("Created PinotThirdEyeDataSource with controller {}", controllerHost);
   }
 
@@ -246,8 +249,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
 
   @Override
-  public long getMaxDataTime(String collection) throws Exception {
-    return CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache().get(collection);
+  public long getMaxDataTime(String dataset) throws Exception {
+    return pinotDataSourceMaxTime.getMaxDateTime(dataset);
   }
 
   @Override

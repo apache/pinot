@@ -137,15 +137,30 @@ public class ThirdEyeCacheRegistry {
     cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
     LOGGER.info("Max bucket number for ResultSetGroup cache is set to {}", maxBucketNumber);
 
-    // CollectionMaxDataTime Cache
-    LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
-        .refreshAfterWrite(5, TimeUnit.MINUTES)
-        .build(new CollectionMaxDataTimeCacheLoader(resultSetGroupCache, datasetConfigDAO));
-    cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
+    // DatasetConfig cache
+    LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CacheBuilder.newBuilder()
+        .build(new DatasetConfigCacheLoader(datasetConfigDAO));
+    cacheRegistry.registerDatasetConfigCache(datasetConfigCache);
+
+    // MetricConfig cache
+    LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache = CacheBuilder.newBuilder()
+        .build(new MetricConfigCacheLoader(metricConfigDAO));
+    cacheRegistry.registerMetricConfigCache(metricConfigCache);
+
+    // DashboardConfigs cache
+    LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache = CacheBuilder.newBuilder()
+        .build(new DashboardConfigCacheLoader(dashboardConfigDAO));
+    cacheRegistry.registerDashboardConfigsCache(dashboardConfigsCache);
 
     // Query Cache
     QueryCache queryCache = new QueryCache(thirdEyeDataSourcesMap, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(queryCache);
+
+    // CollectionMaxDataTime Cache
+    LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
+        .refreshAfterWrite(5, TimeUnit.MINUTES)
+        .build(new CollectionMaxDataTimeCacheLoader(queryCache, datasetConfigDAO));
+    cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
 
     // Dimension Filter cache
     LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
@@ -161,20 +176,7 @@ public class ThirdEyeCacheRegistry {
     CollectionsCache collectionsCache = new CollectionsCache(datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerCollectionsCache(collectionsCache);
 
-    // DatasetConfig cache
-    LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CacheBuilder.newBuilder()
-        .build(new DatasetConfigCacheLoader(datasetConfigDAO));
-    cacheRegistry.registerDatasetConfigCache(datasetConfigCache);
 
-    // MetricConfig cache
-    LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache = CacheBuilder.newBuilder()
-        .build(new MetricConfigCacheLoader(metricConfigDAO));
-    cacheRegistry.registerMetricConfigCache(metricConfigCache);
-
-    // DashboardConfigs cache
-    LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache = CacheBuilder.newBuilder()
-        .build(new DashboardConfigCacheLoader(dashboardConfigDAO));
-    cacheRegistry.registerDashboardConfigsCache(dashboardConfigsCache);
   }
 
   private static void initPeriodicCacheRefresh() {
