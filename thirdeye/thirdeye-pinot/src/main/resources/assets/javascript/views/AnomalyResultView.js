@@ -127,8 +127,6 @@ function AnomalyResultView(anomalyResultModel) {
   // events
   this.applyButtonEvent = new Event(this);
   this.searchButtonEvent = new Event(this);
-  this.checkedFilterEvent = new Event(this);
-  this.filterButtonEvent = new Event(this);
   this.resetButtonEvent = new Event(this);
   this.investigateButtonClickEvent = new Event(this);
   this.showDetailsLinkClickEvent = new Event(this);
@@ -154,14 +152,13 @@ AnomalyResultView.prototype = {
     this.showSearchBarBasedOnMode();
     this.setupSearchListener();
   },
-  // *** should send data here to handle conditional rendering?
+
   renderViewEventHandler : function() {
     this.render();
   },
 
   render() {
     this.renderAnomaliesTab();
-    // this.renderSearchFilters();
     this.showSearchBarBasedOnMode();
     this.renderPagination();
 
@@ -173,14 +170,21 @@ AnomalyResultView.prototype = {
     });
   },
 
+  /**
+   * destroys filters and anomaly results
+   */
   destroy() {
     this.destroyFilter();
     $('#anomaly-results-place-holder').children().remove();
   },
 
+  /**
+   * Destroys the datepickers and the filters wrapper
+   */
   destroyFilter() {
     this.destroyDatePickers();
     $('#anomaly-filters-wrapper-place-holder').children().remove();
+
   },
 
   destroyDatePickers() {
@@ -221,7 +225,10 @@ AnomalyResultView.prototype = {
     });
   },
 
-  renderAnomaliesTab : function() {
+  /**
+   * Renders all anomaly results and generates c3 graphs
+   */
+  renderAnomaliesTab() {
     const anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
     const anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomaliesWrapper);
     $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
@@ -286,6 +293,9 @@ AnomalyResultView.prototype = {
     })
   },
 
+  /**
+   * render Date pickers and set up listeners
+   */
   renderDatePickers() {
     this.destroyDatePickers();
     $('#anomaly-filters-wrapper-place-holder').children().remove();
@@ -303,8 +313,6 @@ AnomalyResultView.prototype = {
     }
     const changeDate = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
       formatDate(start, end);
-      console.log("changed time")
-      debugger;
       this.changedTimeEvent.notify({
         startDate: start,
         endDate: end,
@@ -317,15 +325,16 @@ AnomalyResultView.prototype = {
       $('#anomalies-time-range-start').click();
     });
 
-    // $('#anomalies-time-range-end').daterangepicker(this.timeRangeConfig, cb);
     formatDate(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
     this.setupFilterListener();
-
-    // APPLY BUTTON
   },
 
+  /**
+   * render paginations at the bottom of the page
+   */
   renderPagination() {
-    // const anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
+    // removes children to delete event listeners
+    $('#pagination').children().remove();
     const totalAnomalies = this.anomalyResultModel.totalAnomalies;
     const pageSize = this.anomalyResultModel.pageSize;
     const pageNumber = this.anomalyResultModel.pageNumber;
@@ -359,15 +368,16 @@ AnomalyResultView.prototype = {
     }
   },
 
+  /**
+   * Gather relevant params for search
+   * @return {Object} Massaged params for search
+   */
   getSearchParams() {
     var anomaliesSearchMode = $('#anomalies-search-mode').val();
     var metricIds = undefined;
     var dashboardId = undefined;
     var anomalyIds = undefined;
     var functionName = $('#anomaly-function-dropdown').val();
-
-    // const $anomalyDatePicker = $('#anomalies-time-range-start');
-    // const dateRangeData = $anomalyDatePicker.data('daterangepicker');
 
     // uses default startDate and endDate
     const startDate = this.anomalyResultModel.startDate;
@@ -398,6 +408,9 @@ AnomalyResultView.prototype = {
     return anomaliesParams;
   },
 
+  /**
+   * Event Listener for the search button
+   */
   setupSearchListener() {
     $('#search-button').click(() => {
       this.searchFilters = null;
@@ -407,6 +420,9 @@ AnomalyResultView.prototype = {
     })
   },
 
+  /**
+   * Event Listener for the filter apply button
+   */
   setupFilterListener() {
     // search with filters
     $('#apply-button').click(() => {
@@ -415,7 +431,10 @@ AnomalyResultView.prototype = {
     })
   },
 
-  setupListenersOnAnomaly : function(idx, anomaly) {
+  /**
+   * Event Listener for each anomaly results
+   */
+  setupListenersOnAnomaly(idx, anomaly) {
     const investigateParams = {
       anomalyId : anomaly.anomalyId,
     }

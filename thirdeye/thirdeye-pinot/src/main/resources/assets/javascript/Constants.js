@@ -42,7 +42,6 @@ function Constants() {
   this.MODE_GROUPID = 'groupId'
   this.MODE_TIME = 'time';
 
-
   this.DASHBOARD_MODE_METRIC_SUMMARY = 'MetricSummary';
   this.DASHBOARD_MODE_ANOMALY_SUMMARY = 'AnomalySummary';
   this.DASHBOARD_MODE_WOW_SUMMARY = 'WowSummary';

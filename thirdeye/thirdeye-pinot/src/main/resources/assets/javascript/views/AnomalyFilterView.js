@@ -9,47 +9,24 @@ function AnomalyFilterView(anomalyFilterModel) {
 }
 
 AnomalyFilterView.prototype = {
-  // destroyDatePickers() {
-  //   const $currentRangePicker = $('#current-range');
-  //   const $baselineRangePicker = $('#baseline-range');
-  //   $currentRangePicker.length && $currentRangePicker.data('daterangepicker').remove();
-  //   $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
-  // },
 
+  /**
+   * renders the filters and set up event listeners
+   */
   render() {
-    // if (this.anomalyFilterModel.searchFilters) return;
-
     const anomaliesFilters = this.anomalyFilterModel.getAnomaliesFilters();
     const anomaly_filters_compiled = this.anomaly_filters_template_compiled({ anomaliesFilters });
-    // this.destroyDatePickers();
     $('#anomaly-filters-place-holder').children().remove();
     $('#anomaly-filters-place-holder').html(anomaly_filters_compiled);
-     // TIME RANGE SELECTION
-    //  this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
-    //  this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
 
-    //  const $anomalyTimeRangeStart = $('#anomalies-time-range-start span');
-    //  const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
-
-    //  function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
-    //   $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_TIME_RANGE_FORMAT));
-    //   $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_TIME_RANGE_FORMAT));
-    //   console.log("changed")
-    // }
-    // $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
-
-    // $('#anomalies-time-range-end').on('click', () => {
-    //   $('#anomalies-time-range-start').click();
-    // });
-
-    // cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
     this.setupFilterListener();
     this.checkSelectedFilters();
 
-    // APPLY BUTTON
   },
-  // parse through checkSelected filters and check them in the front end
-  // To do implement this with hash params
+
+  /**
+   * Parses through selected Filters and checks then in the UI
+   */
   checkSelectedFilters() {
     const selectedFilters = this.anomalyFilterModel.getSelectedFilters();
     selectedFilters.forEach((filter) => {
@@ -58,6 +35,12 @@ AnomalyFilterView.prototype = {
     });
   },
 
+  /**
+   * Setup listeners on filters:
+   * Expand/Close section on click
+   * Add filter on selection
+   * Clears Filter
+   */
   setupFilterListener() {
     // show hide filter sections
     $('.filter-section').on('click', '.filter-title', (event) => {

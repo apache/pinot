@@ -8,8 +8,6 @@ function AnomalyResultController(parentController) {
   this.anomalyResultView.applyButtonEvent.attach(this.applyButtonEventHandler.bind(this));
   this.anomalyResultView.investigateButtonClickEvent.attach(this.investigateButtonClickEventHandler.bind(this));
   this.anomalyResultView.pageClickEvent.attach(this.pageClickEventHandler.bind(this));
-  this.anomalyResultView.filterButtonEvent.attach(this.filterEventHandler.bind(this));
-  this.anomalyResultView.checkedFilterEvent.attach(this.checkedFilterEventHandler.bind(this));
   this.anomalyResultView.changedTimeEvent.attach(this.changedTimeEventHandler.bind(this));
 
   this.anomalyResultView.init();
@@ -18,84 +16,68 @@ function AnomalyResultController(parentController) {
 // To do : use total Anomaly from filter
 
 AnomalyResultController.prototype = {
-  handleAppEvent: function () {
+  handleAppEvent() {
     const params = HASH_SERVICE.getParams();
     const hasSameParams = this.anomalyResultModel.hasSameParams(params);
     const hasSearchMode = !!params.anomaliesSearchMode;
     const hasSearchFilters = !!params.searchFilters && Object.keys(params.searchFilters).length;
     const pageNumber = params.pageNumber || 1;
-    // const hasSearchFilters =
-    // if same search dont' rebuild filter
-    // has searchFilters and same
-    // has search filters not same
-    // has none
+
+    // returns early if no earch mode
     if (!hasSearchMode) { return; }
+
     if (hasSameParams) {
-      const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
-      const totalAnomalies = this.anomalyFilterController.getTotalAnomalies();
-      const appliedFilters = this.anomalyFilterController.getSelectedFilters();
-      this.anomalyResultModel.setParams({
-        pageNumber,
-        totalAnomalies,
-        appliedFilters
-       });
-      if (hasSearchFilters) {
-        this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
-      } else {
-        this.anomalyResultModel.setParams({ pageNumber });
-        this.anomalyResultModel.rebuild();
-      }
+      this.updateFilters(hasSearchFilters, pageNumber);
     } else {
-      // if (hasSearchFilters) {
-        // load search filters first
-        // if (hasSameSearchFilters) {
-
-        // }
-        this.anomalyResultView.destroy();
-        this.anomalyResultModel.reset();
-        this.anomalyResultModel.setParams(params);
-        this.anomalyResultView.renderDatePickers();
-        this.anomalyResultModel.getSearchFilters((filter) => {
-          filter.selectedFilters = params.searchFilters;
-          this.anomalyFilterController.resetModel();
-          this.anomalyFilterController.handleAppEvent(filter);
-          const appliedFilters = this.anomalyFilterController.getSelectedFilters();
-          const totalAnomalies = this.anomalyFilterController.getTotalAnomalies();
-          this.anomalyResultModel.setParams({
-            totalAnomalies,
-            appliedFilters
-          });
-          if (hasSearchFilters) {
-            const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
-            this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
-          } else {
-            this.anomalyResultModel.rebuild();
-          }
-        });
-      }
-    //   else {
-    //     this.anomalyResultView.renderDatePickers();
-    //     this.anomalyResultView.destroy();
-    //     this.anomalyResultModel.reset();
-    //     this.anomalyResultModel.setParams(params);
-    //     // need to add conditional redendering for date pickers
-    //     // if has searchMode
-    //     this.anomalyResultModel.getSearchFilters((filter) => {
-    //       filter.selectedFilters = params.searchFilters;
-    //       debugger;
-    //       this.anomalyResultModel.setParams({ totalAnomalies: filter.totalAnomalies });
-    //       this.anomalyFilterController.handleAppEvent(filter);
-    //     });
-    //     this.anomalyResultModel.rebuild();
-    //   }
-    // }
-
-    // if () {
-
-    // }
+      this.clearViewAndUpdateFilters(params, hasSearchFilters);
+    }
   },
 
-  // new search, should trigger new filters
+  /**
+   * Update filters depending on search Params
+   * @param  {Boolean} hasSearchFilters Does search filters exist
+   * @param  {Number}  pageNumber       Current page Number
+   */
+  updateFilters(hasSearchFilters, pageNumber=1) {
+    const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
+    const totalAnomalies = this.anomalyFilterController.getTotalAnomalies();
+    const appliedFilters = this.anomalyFilterController.getSelectedFilters();
+    this.anomalyResultModel.setParams({
+      pageNumber,
+      totalAnomalies,
+      appliedFilters
+     });
+    if (hasSearchFilters) {
+      this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
+    } else {
+      this.anomalyResultModel.setParams({ pageNumber });
+      this.anomalyResultModel.rebuild();
+    }
+  },
+
+  /**
+   * Clear view and Update filters depending on search Params
+   * @param  {Object} params            Params of the new search
+   * @param  {Boolean} hasSearchFilters Does search filters exist
+   */
+  clearViewAndUpdateFilters(params, hasSearchFilters){
+    this.anomalyResultView.destroy();
+    this.anomalyResultModel.reset();
+    this.anomalyResultModel.setParams(params);
+    this.anomalyResultView.renderDatePickers();
+    this.anomalyResultModel.getSearchFilters((filter) => {
+      filter.selectedFilters = params.searchFilters;
+      this.anomalyFilterController.resetModel();
+      this.anomalyFilterController.handleAppEvent(filter);
+      this.updateFilters(hasSearchFilters);
+    });
+  },
+
+  /**
+   * Event Handler for search button clicks
+   * @param  {Object} sender View the event is originating from
+   * @param  {Object} args   Properties of the new search
+   */
   searchButtonEventHandler(sender, args = {}) {
     this.anomalyResultModel.reset();
     HASH_SERVICE.clear();
@@ -105,33 +87,32 @@ AnomalyResultController.prototype = {
     HASH_SERVICE.routeTo('anomalies');
   },
 
-  applyButtonEventHandler(sender, args = {}) {
-    // get anomalies
+  /**
+   * Event Handler for apply filter button clicks
+   */
+  applyButtonEventHandler() {
     const anomalyIds = this.anomalyFilterController.getSelectedAnomalies().join(',');
-    // get details for anomalies
     const searchFilters = this.anomalyFilterController.getViewFiltersHash();
     const pageNumber = 1;
+
     HASH_SERVICE.update({
       searchFilters,
       pageNumber
     });
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
-    // update hash
-
-    // get page
-    // display anomalyresult
-
-    // this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
   },
 
-
+  /**
+   * Event Handler for investigate button clicks
+   * @param  {Object} sender View the event is originating from
+   * @param  {Object} args   params of the anomaly
+   */
   investigateButtonClickEventHandler(sender, args = {}) {
     HASH_SERVICE.clear();
     HASH_SERVICE.set('tab', 'investigate');
     HASH_SERVICE.update(args);
     HASH_SERVICE.refreshWindowHashForRouting('investigate');
     HASH_SERVICE.routeTo('app');
-    // Send this event and the args to parent controller, to route to AnalysisController
   },
 
   /**
@@ -145,65 +126,18 @@ AnomalyResultController.prototype = {
     HASH_SERVICE.routeTo('anomalies');
   },
 
-  initFilters() {
-
-  },
-
-
-  checkedFilterEventHandler(sender, args = {}) {
-    const {
-      filter,
-      isChecked
-    } = args;
-    const allAnomalies = this.anomalyResultModel.anomaliesWrapper.anomalyids;
-    const filters = Object.assign({}, this.anomalyResultModel.anomaliesWrapper.searchFilters);
-    let selectedAnomalies = [];
-    let viewFilters = {};
-
-    // get selected anomalies
-    Object.keys(filters).forEach((key) => {
-      const anomalyLists = filters[key];
-
-      if (anomalyLists[filter] && Array.isArray(anomalyLists[filter])) {
-        anomalyLists[filter].checked = isChecked;
-        selectedAnomalies = anomalyLists[filter];
-      }
-    });
-    debugger;
-
-    // update filter
-    Object.keys(filters).forEach((key) => {
-      const anomalyLists = filters[key];
-      let intersection = [];
-      if (Array.isArray(anomalyLists[filter])) {
-        intersection = anomalyLists[filter].filter((anomaly) => {
-          return selectedAnomalies.includes(anomaly);
-        });
-        if (intersection.length) {
-          viewFilters[filter] = intersection;
-        }
-      }
-    });
-
-    // rerender filters
-    debugger;
-
-
-    //
-  },
-
+  /**
+   * Event Handler for date range picker changes
+   * Refetch and rerenders filter on time range changes
+   * @param  {Object} sender View the event is originating from
+   * @param  {Object} args   containing the new date range
+   */
   changedTimeEventHandler(sender, args ={}) {
     // reload filters
     this.anomalyResultModel.reset();
     this.anomalyFilterController.anomalyFilterModel.resetSelection();
     this.anomalyFilterController.anomalyFilterModel.clear();
     HASH_SERVICE.set('tab', 'anomalies');
-    HASH_SERVICE.update(args);
-    HASH_SERVICE.refreshWindowHashForRouting('anomalies');
-    HASH_SERVICE.routeTo('anomalies');
-  },
-
-  filterEventHandler(sender, args = {}) {
     HASH_SERVICE.update(args);
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
     HASH_SERVICE.routeTo('anomalies');

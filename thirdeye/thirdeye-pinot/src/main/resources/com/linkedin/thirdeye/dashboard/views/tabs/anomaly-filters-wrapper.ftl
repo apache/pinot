@@ -24,7 +24,6 @@
       </div>
     </section>
     <section>
-      <!-- To do: make spinner wrapper expand -->
       <div class="spinner-wrapper">
         <div id="anomaly-filter-spinner"></div>
       </div>
@@ -32,7 +31,6 @@
     </section>
   </div>
   <div class="filter-footer">
-<!--     <a type="button" id="clear-button" class="thirdeye-link">Clear</a> -->
     <a type="button" id="apply-button" class="thirdeye-link">Apply</a>
   </div>
 </aside>

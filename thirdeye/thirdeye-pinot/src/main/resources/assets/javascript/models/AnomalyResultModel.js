@@ -37,6 +37,12 @@ function AnomalyResultModel() {
 }
 
 AnomalyResultModel.prototype = {
+
+  /**
+   * Checks whether params are the same
+   * @param  {Object}  params New params
+   * @return {Boolean}
+   */
   hasSameParams(params) {
     if (!params.anomaliesSearchMode || !this.anomaliesSearchMode) {
       return false;
@@ -52,8 +58,10 @@ AnomalyResultModel.prototype = {
     });
   },
 
+  /**
+   * Resets the model's search params
+   */
   reset() {
-    // this.anomaliesSearchMode = null;
     this.metricIds = null;
     this.dashboardId = null;
     this.anomalyIds = null;
@@ -104,7 +112,11 @@ AnomalyResultModel.prototype = {
       this.appliedFilters = params.appliedFilters;
     }
   },
-  // Call rebuild every time new anomalies are to be loaded with new model
+
+  /**
+   * fetches anomalies based on new search params
+   * Aborts previous search request if it exists
+   */
   rebuild() {
     if (this.ajaxCall && !this.ajaxCall.status) {
       this.ajaxCall.abort();
@@ -113,6 +125,11 @@ AnomalyResultModel.prototype = {
     this.ajaxCall = dataService.fetchAnomalies(params);
   },
 
+
+  /**
+   * Helper function that gets all relevant properties for search
+   * @return {Obj} Object containing all needed params
+   */
   getSearchParams() {
     return function(obj) {
       const {
@@ -145,6 +162,10 @@ AnomalyResultModel.prototype = {
     }(this);
   },
 
+  /**
+   * Gets Search filters and cancel previous call
+   * @param  {Function} callback Function to be called after filters are retrieved
+   */
   getSearchFilters(callback) {
     if (this.searchAjaxCall && !this.searchAjaxCall.status) {
       this.searchAjaxCall.abort();
@@ -156,6 +177,10 @@ AnomalyResultModel.prototype = {
     this.searchAjaxCall = dataService.fetchAnomalies(params);
   },
 
+  /**
+   * Fetches details for given anomaly Ids
+   * @param  {Array}  anomalyIds Array of anomaly Ids to getch
+   */
   getDetailsForAnomalyIds(anomalyIds = []) {
     if (!anomalyIds.length) { return; }
     if (this.ajaxCall && !this.ajaxCall.status) {
@@ -170,8 +195,10 @@ AnomalyResultModel.prototype = {
     params.anomalyIds = anomalyIds;
     this.ajaxCall = dataService.fetchAnomalies(params);
   },
-
-
+  /**
+   * Call Back function that rerenders the view
+   * @param  {Object} anomaliesWrapper Result payload of search
+   */
   updateModelAndNotifyView(anomaliesWrapper) {
     this.anomaliesWrapper = anomaliesWrapper;
     this.formatAnomalies();
@@ -270,7 +297,11 @@ AnomalyResultModel.prototype = {
       }, {});
   },
 
-  getAnomalyFunctions : function() {
+  /**
+   * Function Getter
+   * @return {Array} Array of functions
+   */
+  getAnomalyFunctions() {
     return this.functions;
   },
   // Helper functions to convert between UI string for feedback to database enum

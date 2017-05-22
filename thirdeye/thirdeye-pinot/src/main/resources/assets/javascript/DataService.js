@@ -21,7 +21,17 @@ DataService.prototype = {
       });
       return results;
     },
-    // Make asynchronous get call
+
+    /**
+     * Makes an asynchronous GET request to the back end,
+     * generates a spinner in the UI
+     * execute a callback function on the result of the request,
+     * @param  {string}   url      url of the request
+     * @param  {string}   data     query string data
+     * @param  {Function} callback function to be called after the request
+     * @param  {string}   spinArea id of the spinner element
+     * @return {[type]}            [description]
+     */
     getDataAsynchronous: function(url, data, callback, spinArea)  {
       const target = document.getElementById(spinArea);
       const spinner = new Spinner().spin(target);
@@ -91,6 +101,12 @@ DataService.prototype = {
       this.getDataAsynchronous(url, data, callback, 'summary-spin-area');
     },
 
+
+    /**
+     * Wrapper for all back end search requests
+     * @param  {Object} args arguments needed to perform the search
+     * @return {Object}      result payload
+     */
     fetchAnomalies(args = {}) {
       const {
         anomaliesSearchMode,

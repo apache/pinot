@@ -157,10 +157,20 @@ Handlebars.registerHelper('abbreviateNumber', function(value, digits) {
   return num.toFixed(digits).replace(rx, "$1");
 });
 
+/**
+ * Helper determining if passed param is an object
+ * @param  {Object|Array}  item
+ * @return {Boolean}
+ */
 Handlebars.registerHelper('isObject', function(item) {
   return typeof item === 'object' && !Array.isArray(item);
 });
 
+/**
+ * Display Human Readble filterNames
+ * @param  {String} filter
+ * @return {String} Sanizited Filter Name
+ */
 Handlebars.registerHelper('displayFilterName', function(filter) {
   return filter.split('FilterMap')[0];
 });

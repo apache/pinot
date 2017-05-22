@@ -11,6 +11,10 @@ function AnomalyFilterModel() {
 }
 
 AnomalyFilterModel.prototype = {
+  /**
+   * Initialize filter model
+   * @param  {Object} properties to be initialized
+   */
   init(params = {}) {
     const {
       anomalyIds,
@@ -27,10 +31,16 @@ AnomalyFilterModel.prototype = {
     }
   },
 
+  /**
+   * Resets selected Anomalies
+   */
   resetSelection() {
     this.selectedAnomalyIds = [];
   },
 
+  /**
+   * Clears seleted filters anomaly information
+   */
   clear() {
     this.selectedAnomalyIds = [];
     this.selectedAnomalies = new Map([]);
@@ -39,12 +49,22 @@ AnomalyFilterModel.prototype = {
     this.viewFilters = null;
   },
 
+  /**
+   * Resets all anomalies related information
+   */
   reset() {
     this.clear();
     this.pageNumber = 1;
     this.allAnomalyIds = [];
   },
 
+  /**
+   * Helper function to traverse the anomaly filter object
+   * @param  {Object}   obj       The oject to traverse
+   * @param  {Function} func      Callback  to be called  on value
+   * @param  {Function} formatter Callback  to be called  on key
+   * @return {Object} resulting object after both callback are applied
+   */
   filtersIterator(obj, func, formatter = false) {
     let acc = {};
     Object.keys(obj).forEach((key) => {
@@ -60,6 +80,10 @@ AnomalyFilterModel.prototype = {
     return Object.keys(acc).length ? acc : false;
   },
 
+  /**
+   * Gets Selected Filters section and Name
+   * @return {Array} Array containing [section, filterName]
+   */
   getSelectedFilters() {
     return [...this.selectedAnomalies.keys()].map((key) => key.split('::'));
   },
@@ -76,9 +100,6 @@ AnomalyFilterModel.prototype = {
       anomaliesFilters,
       (key, anomalyIds) => {
         if (!anomalyIds.length) return;
-        // if (this.selectedAnomalies.has(section/key)) {
-        //   anomalyIds.selected = true;
-        // }
         return anomalyIds;
       },
       (key, result) => {
@@ -95,12 +116,21 @@ AnomalyFilterModel.prototype = {
     );
   },
 
+  /**
+   * Get Hash params compatible selected filters
+   * @return {Obj} Hash params compatible object
+   */
   getViewFiltersHash() {
     const selectedFilters = this.getSelectedFilters();
 
     return this.convertToHash(selectedFilters);
   },
 
+  /**
+   * Converts object to hash compatible object
+   * @param  {Object} selectedFilters Object to 'hashify'
+   * @return {Object}                 hashified filter
+   */
   convertToHash(selectedFilters) {
     const hash = {};
     const searchFilters = this.searchFilters;
@@ -122,6 +152,10 @@ AnomalyFilterModel.prototype = {
     return hash;
   },
 
+  /**
+   * Converts object from hash
+   * @param  {Object} selectedFilters Object to parse
+   */
   convertFromHash(selectedFilters) {
     this.filtersIterator(
       selectedFilters,
@@ -129,15 +163,26 @@ AnomalyFilterModel.prototype = {
         filters.forEach((filter) => {
           this.addFilter(filter, section);
         });
-      });
+      }
+    );
   },
 
+  /**
+   * Get Selected Anomalies Ids
+   * @return {Array} Anomaly Ids
+   */
   getSelectedAnomalyIds() {
     return this.selectedAnomalyIds.length ?
       this.selectedAnomalyIds :
       [...this.allAnomalyIds];
   },
 
+  /**
+   * Get Intersection of 2 sets of anomalies
+   * @param  {Set} set1 First Set
+   * @param  {Set} set2 Second Set
+   * @return {Set}      intersection of the 2 sets
+   */
   getIntersection(set1, set2) {
     set1 = new Set(set1);
     set2 = new Set(set2);
@@ -148,20 +193,31 @@ AnomalyFilterModel.prototype = {
     return new Set(set2);
   },
 
+  /**
+   * Gets intersecting anomaly Ids of all selected filters
+   */
   updateSelectedAnomalyIds(anomalies) {
-    this.selectedAnomalyIds = [...this.selectedAnomalies.values()].reduce((acc, anomalyIds) => {
-      return [...this.getIntersection(acc, anomalyIds)];
-    }, []);
+    this.selectedAnomalyIds = [...this.selectedAnomalies.values()]
+        .reduce((acc, anomalyIds) => {
+          return [...this.getIntersection(acc, anomalyIds)];
+        }, []);
   },
 
+  /**
+   * Update Views filters by keeping only selected anomalyIds
+   */
   updateViewFilters() {
     this.viewFilters = this.filtersIterator(this.searchFilters, (filterName, anomalyIds) => {
       return [...this.getIntersection(this.selectedAnomalyIds, anomalyIds)];
     });
   },
 
+  /**
+   * Add filters and update anomalyIds and view Filters
+   * @param {String} filter  Filter Name
+   * @param {String} section Filter section
+   */
   addFilter(filter, section) {
-    // const filters = this.searchFilters;
     const selectedAnomalyIds = this.selectedAnomalyIds;
     this.filtersIterator(
       this.searchFilters,
@@ -181,19 +237,26 @@ AnomalyFilterModel.prototype = {
     );
     this.updateSelectedAnomalyIds();
     this.updateViewFilters();
-
-    console.log('selected anomalids: ', this.selectedAnomalyIds);
   },
 
+  /**
+   * Removes filters and update AnomalyIDs and view filters
+   * @param {String} filter  Filter Name
+   * @param {String} section Filter section
+   */
   removeFilter(filter, section) {
     this.selectedAnomalies.delete(`${section}::${filter}`);
     this.updateSelectedAnomalyIds();
     this.updateViewFilters();
   },
 
-  updatefilterSection(filter) {
-    this.expandedFilters.has(filter) ?
-      this.expandedFilters.delete(filter) :
-      this.expandedFilters.add(filter);
+  /**
+   * Expand/close section
+   * @param  {String} section filter section name
+   */
+  updatefilterSection(section) {
+    this.expandedFilters.has(section) ?
+      this.expandedFilters.delete(section) :
+      this.expandedFilters.add(section);
   }
 };

@@ -20,6 +20,10 @@ InvestigateModel.prototype = {
     this.metricId = anomaly.metricId;
   },
 
+  /**
+   * Fetches information for a given anomalyId
+   * @param  {Number} anomalyId Id of the anomaly to be fetched
+   */
   fetchMetricInformation(anomalyId) {
     dataService.fetchAnomaliesForAnomalyIds(
           this.startDate, this.endDate, this.pageNumber, anomalyId, this.functionName, false, this.updateModelAndNotifyView.bind(this), 'investigate-spin-area');
@@ -56,6 +60,10 @@ InvestigateModel.prototype = {
     }[this.anomaly.anomalyFeedback];
   },
 
+  /**
+   * Call back function rendering the view
+   * @param  {Object} args Result payload
+   */
   updateModelAndNotifyView(args = {}) {
     const { anomalyDetailsList } = args;
     const [anomaly]  = anomalyDetailsList;
