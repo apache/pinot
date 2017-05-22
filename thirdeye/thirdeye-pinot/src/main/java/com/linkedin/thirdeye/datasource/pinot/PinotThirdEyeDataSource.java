@@ -44,6 +44,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private final CloseableHttpClient controllerClient;
   public static final String DATA_SOURCE_NAME = PinotThirdEyeDataSource.class.getSimpleName();
   private PinotDataSourceMaxTime pinotDataSourceMaxTime;
+  private PinotDataSourceDimensionFilters pinotDataSourceDimensionFilters;
 
   public PinotThirdEyeDataSource(Map<String, String> properties) {
     if (!isValidProperties(properties)) {
@@ -60,6 +61,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     this.controllerClient = HttpClients.createDefault();
 
     pinotDataSourceMaxTime = new PinotDataSourceMaxTime();
+    pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters();
     LOG.info("Created PinotThirdEyeDataSource with controller {}", controllerHost);
   }
 
@@ -67,6 +69,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     this.controllerHost = new HttpHost(host, port);
     this.controllerClient = HttpClients.createDefault();
     pinotDataSourceMaxTime = new PinotDataSourceMaxTime();
+    pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters();
     LOG.info("Created PinotThirdEyeDataSource with controller {}", controllerHost);
   }
 
@@ -243,14 +246,19 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
 
   @Override
-  public List<String> getCollections() throws Exception {
-    return CACHE_REGISTRY_INSTANCE.getCollectionsCache().getCollections();
+  public List<String> getDatasets() throws Exception {
+    return CACHE_REGISTRY_INSTANCE.getDatasetsCache().getDatasets();
   }
 
 
   @Override
   public long getMaxDataTime(String dataset) throws Exception {
     return pinotDataSourceMaxTime.getMaxDateTime(dataset);
+  }
+
+  @Override
+  public String getDimensionFilters(String dataset) throws Exception {
+    return pinotDataSourceDimensionFilters.getDimensionFiltersJson(dataset);
   }
 
   @Override

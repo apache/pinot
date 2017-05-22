@@ -1,46 +1,43 @@
 package com.linkedin.thirdeye.datasource.cache;
 
-import java.util.List;
-import java.util.Map;
-
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader;
-import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 
 public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DimensionFiltersCacheLoader.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private QueryCache queryCache;
+  private DatasetConfigManager datasetConfigDAO;
 
-  public DimensionFiltersCacheLoader(QueryCache queryCache) {
+  public DimensionFiltersCacheLoader(QueryCache queryCache, DatasetConfigManager datasetConfigDAO) {
     this.queryCache = queryCache;
+    this.datasetConfigDAO = datasetConfigDAO;
   }
 
+  /**
+   * Fetched dimension filters for this dataset from the right data source
+   * {@inheritDoc}
+   * @see com.google.common.cache.CacheLoader#load(java.lang.Object)
+   */
   @Override
   public String load(String dataset) throws Exception {
-    DateTime startDateTime = new DateTime(System.currentTimeMillis()).minusDays(7);
-    DateTime endDateTime = new DateTime(System.currentTimeMillis());
-
-    String jsonFilters = null;
+    LOGGER.info("Loading from dimension filters cache {}", dataset);
+    String dimensionFiltersJson = null;
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
+    String dataSourceName = datasetConfig.getDataSource();
     try {
-      LOGGER.info("Loading dimension filters cache {}", dataset);
-      List<String> dimensions = Utils.getSortedDimensionNames(dataset);
-      Map<String, List<String>> filters =
-          Utils.getFilters(queryCache, dataset, "filters", dimensions, startDateTime, endDateTime);
-      jsonFilters = OBJECT_MAPPER.writeValueAsString(filters);
-
+      ThirdEyeDataSource dataSource = queryCache.getDataSource(dataSourceName);
+      dimensionFiltersJson = dataSource.getDimensionFilters(dataset);
     } catch (Exception e) {
-      LOGGER.error("Error while fetching dimension values in filter drop down for collection: {}",
-          dataset, e);
+      LOGGER.error("Exception in getting max date time for {} from data source {}", dataset, dataSourceName, e);
     }
-
-    return jsonFilters;
+    return dimensionFiltersJson;
   }
 }
 

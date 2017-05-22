@@ -3,45 +3,37 @@ package com.linkedin.thirdeye.datasource.cache;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 
-import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.joda.time.Period;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> {
+public class DatasetMaxDataTimeCacheLoader extends CacheLoader<String, Long> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(CollectionMaxDataTimeCacheLoader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DatasetMaxDataTimeCacheLoader.class);
 
   private final QueryCache queryCache;
   private DatasetConfigManager datasetConfigDAO;
 
   private final ExecutorService reloadExecutor = Executors.newSingleThreadExecutor();
 
-  public CollectionMaxDataTimeCacheLoader(QueryCache queryCache, DatasetConfigManager datasetConfigDAO) {
+  public DatasetMaxDataTimeCacheLoader(QueryCache queryCache, DatasetConfigManager datasetConfigDAO) {
     this.queryCache = queryCache;
     this.datasetConfigDAO = datasetConfigDAO;
   }
 
+  /**
+   * Fetches the max date time in millis for this dataset from the right data source
+   * {@inheritDoc}
+   * @see com.google.common.cache.CacheLoader#load(java.lang.Object)
+   */
   @Override
   public Long load(String dataset) throws Exception {
     LOGGER.info("Loading maxDataTime cache {}", dataset);
@@ -64,7 +56,7 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
   public ListenableFuture<Long> reload(final String dataset, Long preMaxDataTime) {
     ListenableFutureTask<Long> reloadTask = ListenableFutureTask.create(new Callable<Long>() {
       @Override public Long call() throws Exception {
-        return CollectionMaxDataTimeCacheLoader.this.load(dataset);
+        return DatasetMaxDataTimeCacheLoader.this.load(dataset);
       }
     });
     reloadExecutor.execute(reloadTask);

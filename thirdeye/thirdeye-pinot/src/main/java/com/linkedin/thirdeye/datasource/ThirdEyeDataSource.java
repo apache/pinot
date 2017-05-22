@@ -11,13 +11,15 @@ public interface ThirdEyeDataSource {
 
   ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception;
 
-  List<String> getCollections() throws Exception;
+  List<String> getDatasets() throws Exception;
 
   /** Clear any cached values. */
   void clear() throws Exception;
 
   void close() throws Exception;
 
-  long getMaxDataTime(String collection) throws Exception;
+  long getMaxDataTime(String dataset) throws Exception;
+
+  String getDimensionFilters(String dataset) throws Exception;
 
 }

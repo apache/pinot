@@ -57,7 +57,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.CollectionsCache;
+import com.linkedin.thirdeye.datasource.cache.DatasetsCache;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRequest;
@@ -78,7 +78,7 @@ public class DashboardResource {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private QueryCache queryCache;
-  private CollectionsCache collectionsCache;
+  private DatasetsCache collectionsCache;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
   private LoadingCache<String,String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
@@ -88,7 +88,7 @@ public class DashboardResource {
 
   public DashboardResource() {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-    this.collectionsCache = CACHE_REGISTRY_INSTANCE.getCollectionsCache();
+    this.collectionsCache = CACHE_REGISTRY_INSTANCE.getDatasetsCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
     this.dashboardsCache = CACHE_REGISTRY_INSTANCE.getDashboardsCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
@@ -109,7 +109,7 @@ public class DashboardResource {
   @Produces(MediaType.APPLICATION_JSON)
   public List<String> getCollections() throws Exception {
     try {
-      List<String> collections = collectionsCache.getCollections();
+      List<String> collections = collectionsCache.getDatasets();
       return collections;
     } catch (Exception e) {
       LOG.error("Error while fetching datasets", e);
@@ -556,7 +556,7 @@ public class DashboardResource {
 
     String file = null;
     if (type.equals("dataset")) {
-      List<String> collections = CACHE_REGISTRY_INSTANCE.getCollectionsCache().getCollections();
+      List<String> collections = CACHE_REGISTRY_INSTANCE.getDatasetsCache().getDatasets();
       JSONArray array = new JSONArray(collections);
       response = array.toString();
       // file = "assets/data/getdataset.json";

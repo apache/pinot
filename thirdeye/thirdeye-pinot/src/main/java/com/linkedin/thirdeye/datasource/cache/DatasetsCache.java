@@ -5,56 +5,56 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import jersey.repackaged.com.google.common.collect.Lists;
 
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 
-public class CollectionsCache {
+public class DatasetsCache {
 
   private AtomicReference<List<String>> collectionsRef;
   private DatasetConfigManager datasetConfigDAO;
   private List<String> whitelistCollections;
-  private static final Logger LOG = LoggerFactory.getLogger(CollectionsCache.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DatasetsCache.class);
 
 
-  public CollectionsCache(DatasetConfigManager datasetConfigDAO, ThirdEyeConfiguration config) {
+  public DatasetsCache(DatasetConfigManager datasetConfigDAO, ThirdEyeConfiguration config) {
     this.collectionsRef = new AtomicReference<>();
     this.datasetConfigDAO = datasetConfigDAO;
     this.whitelistCollections = config.getWhitelistCollections();
   }
 
 
-  public List<String> getCollections() {
+  public List<String> getDatasets() {
     return collectionsRef.get();
   }
 
-  public void loadCollections() {
-    List<String> collections = new ArrayList<>();
+  // TODO: remove concept of whitelist.
+  // This of how we will initialize caches, if at all.
+  // Because initializing caches for all datasets will make startup very slow
+  public void loadDatasets() {
+    List<String> datasets = new ArrayList<>();
 
     if (CollectionUtils.isNotEmpty(whitelistCollections)) {
-      for (String collection : whitelistCollections) {
-        DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+      for (String dataset : whitelistCollections) {
+        DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
         if (datasetConfig == null || !datasetConfig.isActive()) {
-          LOG.info("Skipping collection {} due to missing dataset config or status inactive", collection);
+          LOG.info("Skipping dataset {} due to missing dataset config or status inactive", dataset);
           continue;
         }
-        collections.add(collection);
+        datasets.add(dataset);
       }
     } else {
       List<DatasetConfigDTO> datasetConfigs = datasetConfigDAO.findActive();
       for (DatasetConfigDTO datasetConfigDTO : datasetConfigs) {
-        collections.add(datasetConfigDTO.getDataset());
+        datasets.add(datasetConfigDTO.getDataset());
       }
     }
 
-    LOG.info("Loading collections {}", collections);
-    collectionsRef.set(collections);
+    LOG.info("Loading collections {}", datasets);
+    collectionsRef.set(datasets);
   }
 
 }
