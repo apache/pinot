@@ -75,8 +75,8 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
         max = values[i];
       }
     }
-    _minValue = new Integer(min);
-    _maxValue = new Integer(max);
+    _minValue = Integer.valueOf(min);
+    _maxValue = Integer.valueOf(max);
   }
 
   private void computeLongMinMax(int[] rows) {
@@ -92,8 +92,8 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
         max = values[i];
       }
     }
-    _minValue = new Long(min);
-    _maxValue = new Long(max);
+    _minValue = Long.valueOf(min);
+    _maxValue = Long.valueOf(max);
   }
 
   private void computeFloatMinMax(int[] rows) {
@@ -109,8 +109,8 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
         max = values[i];
       }
     }
-    _minValue = new Float(min);
-    _maxValue = new Float(max);
+    _minValue = Float.valueOf(min);
+    _maxValue = Float.valueOf(max);
   }
 
   private void computeDoubleMinMax(int[] rows) {
@@ -126,8 +126,8 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
         max = values[i];
       }
     }
-    _minValue = new Double(min);
-    _maxValue = new Double(max);
+    _minValue = Double.valueOf(min);
+    _maxValue = Double.valueOf(max);
   }
 
   @Override
