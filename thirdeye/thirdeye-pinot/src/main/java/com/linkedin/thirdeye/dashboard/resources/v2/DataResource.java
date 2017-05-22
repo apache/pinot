@@ -190,7 +190,7 @@ public class DataResource {
   public List<MetricConfigDTO> getMetricsWhereNameLike(@QueryParam("name") String name) {
     List<MetricConfigDTO> metricConfigs = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
-      metricConfigs = metricConfigDAO.findWhereNameLikeAndActive("%" + name + "%");
+      metricConfigs = metricConfigDAO.findWhereNameOrAliasLikeAndActive("%" + name + "%");
     }
     return metricConfigs;
   }
