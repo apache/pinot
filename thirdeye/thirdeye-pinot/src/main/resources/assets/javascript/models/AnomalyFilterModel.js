@@ -110,7 +110,6 @@ AnomalyFilterModel.prototype = {
           result.expanded = true;
         }
 
-        //
         return result;
       }
     );
