@@ -69,7 +69,7 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
   }
 
   @Override
-  public List<MetricConfigDTO> findWhereNameLikeAndActive(String name) {
+  public List<MetricConfigDTO> findWhereNameOrAliasLikeAndActive(String name) {
     Map<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("name", name);
     parameterMap.put("active", true);
