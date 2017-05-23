@@ -15,15 +15,16 @@
  */
 package com.linkedin.pinot.common.request.helper;
 
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
+import com.linkedin.pinot.common.utils.DateFormat;
+import com.linkedin.pinot.common.utils.TenantRole;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.utils.TenantRole;
 
 
 public class ControllerRequestBuilder {
@@ -73,7 +74,8 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("timeType", timeType);
     segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
     if (simpleDateFormat != null) {
-      segmentsConfig.put("simpleDateFormat", simpleDateFormat);
+      DateFormat dateFormat = new DateFormat(simpleDateFormat);
+      segmentsConfig.put("dateFormat", dateFormat);
     }
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
