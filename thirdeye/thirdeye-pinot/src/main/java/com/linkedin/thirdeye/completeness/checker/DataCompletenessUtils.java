@@ -7,7 +7,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
@@ -243,29 +242,12 @@ public class DataCompletenessUtils {
   }
 
   public static double getPercentCompleteness(PercentCompletenessFunctionInput input) {
-    DataCompletenessConstants.DataCompletenessAlgorithmName algorithm = input.getAlgorithm();
+    String algorithmClass = input.getAlgorithmClass();
     List<Long> baselineCounts = input.getBaselineCounts();
     Long currentCount = input.getCurrentCount();
 
-    double percentCompleteness = 0;
-    double baselineTotalCount = 0;
-    if (CollectionUtils.isNotEmpty(baselineCounts)) {
-      switch (algorithm) {
-        case WO4W_AVERAGE:
-        default:
-          for (Long baseline : baselineCounts) {
-            baselineTotalCount = baselineTotalCount + baseline;
-          }
-          baselineTotalCount = baselineTotalCount/baselineCounts.size();
-          break;
-      }
-    }
-    if (baselineTotalCount != 0) {
-      percentCompleteness = new Double(currentCount * 100) / baselineTotalCount;
-    }
-    if (baselineTotalCount == 0 && currentCount != 0) {
-      percentCompleteness = 100;
-    }
-    return percentCompleteness;
+    DataCompletenessAlgorithm dataCompletenessAlgorithm =
+        DataCompletenessAlgorithmFactory.getDataCompletenessAlgorithmFromClass(algorithmClass);
+    return dataCompletenessAlgorithm.getPercentCompleteness(baselineCounts, currentCount);
   }
 }

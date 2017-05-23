@@ -24,7 +24,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
@@ -80,10 +79,10 @@ public class DataCompletenessTaskRunner implements TaskRunner {
           DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
           LOG.info("Dataset {} {}", dataset, datasetConfig);
 
-          DataCompletenessAlgorithmName algorithmName = datasetConfig.getDataCompletenessAlgorithmName();
+          String algorithmClass = datasetConfig.getDataCompletenessAlgorithm();
           Double expectedCompleteness = datasetConfig.getExpectedCompleteness();
-          DataCompletenessAlgorithm dataCompletenessAlgorithm = DataCompletenessAlgorithmFactory.getDataCompletenessAlgorithmFromName(algorithmName);
-          LOG.info("DataCompletenessAlgorithmClass: {}", algorithmName);
+          DataCompletenessAlgorithm dataCompletenessAlgorithm = DataCompletenessAlgorithmFactory.getDataCompletenessAlgorithmFromClass(algorithmClass);
+          LOG.info("DataCompletenessAlgorithmClass: {}", algorithmClass);
 
           // get adjusted start time, bucket size and date time formatter, according to dataset granularity
           TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
@@ -118,7 +117,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
 
             // get current counts for all current buckets to process
             Map<String, Long> bucketNameToCount =
-                DataCompletenessUtils.getCountsForBucketsOfDataset(dataset, timeSpec, bucketNameToBucketValueMS);
+                dataCompletenessAlgorithm.getCurrentCountsForBuckets(dataset, timeSpec, bucketNameToBucketValueMS);
             LOG.info("Bucket name to count {}", bucketNameToCount);
 
             // run completeness check for all buckets

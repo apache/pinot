@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 import com.linkedin.thirdeye.completeness.checker.Wo4WAvgDataCompletenessAlgorithm;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
@@ -15,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class DatasetConfigBean extends AbstractBean {
 
+  public static final String DEFAULT_COMPLETENESS_ALGORITHM = Wo4WAvgDataCompletenessAlgorithm.class.getName();
   public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
   public static String DATASET_OFFLINE_PREFIX = "_OFFLINE";
   public static TimeGranularity DEFAULT_HOURLY_EXPECTED_DELAY = new TimeGranularity(8, TimeUnit.HOURS);
@@ -78,7 +78,7 @@ public class DatasetConfigBean extends AbstractBean {
   // delay expected for a dataset for data to arrive
   private TimeGranularity expectedDelay = DEFAULT_DAILY_EXPECTED_DELAY;
   // algorithm to use for computing data completeness
-  private DataCompletenessAlgorithmName dataCompletenessAlgorithmName = DataCompletenessAlgorithmName.WO4W_AVERAGE;
+  private String dataCompletenessAlgorithm = DEFAULT_COMPLETENESS_ALGORITHM;
   // expected percentage completeness for dataset to be marked complete
   private double expectedCompleteness = Wo4WAvgDataCompletenessAlgorithm.DEFAULT_EXPECTED_COMPLETENESS;
 
@@ -280,13 +280,12 @@ public class DatasetConfigBean extends AbstractBean {
 
 
 
-  public DataCompletenessAlgorithmName getDataCompletenessAlgorithmName() {
-    return dataCompletenessAlgorithmName;
+  public String getDataCompletenessAlgorithm() {
+    return dataCompletenessAlgorithm;
   }
 
-  public void setDataCompletenessAlgorithmName(
-      DataCompletenessAlgorithmName dataCompletenessAlgorithmName) {
-    this.dataCompletenessAlgorithmName = dataCompletenessAlgorithmName;
+  public void setDataCompletenessAlgorithm(String dataCompletenessAlgorithm) {
+    this.dataCompletenessAlgorithm = dataCompletenessAlgorithm;
   }
 
   @Override
@@ -317,7 +316,7 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(realtime, dc.isRealtime())
         && Objects.equals(requiresCompletenessCheck, dc.isRequiresCompletenessCheck())
         && Objects.equals(expectedDelay, dc.getExpectedDelay())
-        && Objects.equals(dataCompletenessAlgorithmName, dc.getDataCompletenessAlgorithmName())
+        && Objects.equals(dataCompletenessAlgorithm, dc.getDataCompletenessAlgorithm())
         && Objects.equals(expectedCompleteness,dc.getExpectedCompleteness())
         && Objects.equals(dataSource, dc.getDataSource());
   }
@@ -327,7 +326,7 @@ public class DatasetConfigBean extends AbstractBean {
     return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone, dataSource,
         metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
         dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime,
-        requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithmName, expectedCompleteness, dataSource);
+        requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithm, expectedCompleteness, dataSource);
   }
 
 }
