@@ -33,7 +33,7 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
   }
 
   @Test
-  public void testMergedResultCRUD() throws Exception {
+  public void testMergedResultCRUD() {
     anomalyFunctionDAO.save(function);
     Assert.assertNotNull(function.getId());
 

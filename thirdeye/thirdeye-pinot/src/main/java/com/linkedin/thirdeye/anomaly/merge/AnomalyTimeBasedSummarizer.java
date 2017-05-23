@@ -26,13 +26,13 @@ public abstract class AnomalyTimeBasedSummarizer {
    * @param anomalies   : list of raw anomalies to be merged with last mergedAnomaly
    * @param mergeDuration   : length of a merged anomaly
    * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
-   * @param anomalyFunctionFactory
+   * @param anomalyFunctionFactory : to create the correct anomaly function type in order to check two anomalies are mergeable
    * @return
    */
   public static List<MergedAnomalyResultDTO> mergeAnomalies(
       List<RawAnomalyResultDTO> anomalies,
       long mergeDuration, long sequentialAllowedGap,
-      AnomalyFunctionFactory anomalyFunctionFactory) throws Exception {
+      AnomalyFunctionFactory anomalyFunctionFactory) {
     return mergeAnomalies(null, anomalies, mergeDuration, sequentialAllowedGap, anomalyFunctionFactory);
   }
 
