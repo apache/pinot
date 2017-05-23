@@ -67,10 +67,6 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     public void setDouble(int row, double value) {
       writer.setDouble(row - startRowId, 0, value);
     }
-
-    public void setShort(int row, short value) {
-      writer.setShort(row - startRowId, 0, value);
-    }
   }
 
   private static class ReaderWithOffset implements Closeable {
@@ -101,10 +97,6 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
 
     public double getDouble(int row) {
       return reader.getDouble(row - startRowId, 0);
-    }
-
-    public short getShort(int row) {
-      return reader.getShort(row - startRowId, 0);
     }
 
     public FixedByteSingleValueMultiColReader getReader() {
@@ -171,12 +163,6 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   @Override
-  public void setShort(int row, short s) {
-    addBufferIfNeeded(row);
-    currentWriter.setShort(row, s);
-  }
-
-  @Override
   public void setLong(int row, long l) {
     addBufferIfNeeded(row);
     currentWriter.setLong(row, l);
@@ -192,12 +178,6 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   public void setDouble(int row, double d) {
     addBufferIfNeeded(row);
     currentWriter.setDouble(row, d);
-  }
-
-  @Override
-  public short getShort(int row) {
-    int bufferId = getBufferId(row);
-    return readers.get(bufferId).getShort(row);
   }
 
   @Override
