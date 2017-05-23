@@ -80,12 +80,17 @@ public class ControllerLeaderLocator {
 
     BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
     Stat stat = new Stat();
-    ZNRecord znRecord = dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
-    String leader = znRecord.getId();
-    int index = leader.lastIndexOf('_');
-    _controllerLeaderHostPort = leader.substring(0, index) + ":" + leader.substring(index + 1);
-    _refresh = false;
-    return _controllerLeaderHostPort;
+    try {
+      ZNRecord znRecord = dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+      String leader = znRecord.getId();
+      int index = leader.lastIndexOf('_');
+      _controllerLeaderHostPort = leader.substring(0, index) + ":" + leader.substring(index + 1);
+      _refresh = false;
+      return _controllerLeaderHostPort;
+    } catch (Exception e) {
+      LOGGER.error("Could not locate controller leader, exception " + e);
+      return null;
+    }
   }
 
   public synchronized void refreshControllerLeader() {
