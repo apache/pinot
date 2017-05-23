@@ -45,7 +45,7 @@ TimeSeriesCompareModel.prototype = {
       this.heatMapCurrentStart = params.heatMapCurrentStart ? moment(params.heatMapCurrentStart) : null;
       this.heatMapCurrentEnd = params.heatMapCurrentEnd ? moment(params.heatMapCurrentEnd) : null;
       this.filters = Object.assign({}, params.filters);
-      this.dimension = params.dimension || 'ALL';
+      this.dimension = params.dimension || 'All';
       this.granularity = params.granularity;
     }
   },

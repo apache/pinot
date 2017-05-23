@@ -64,7 +64,7 @@ InvestigateView.prototype = {
 
     const parsedDimensions = JSON.parse(anomalyFunctionDimension);
     const dimensionKeys = Object.keys(parsedDimensions);
-    const dimension = dimensionKeys.length ? dimensionKeys[0] : 'ALL';
+    const dimension = dimensionKeys.length ? dimensionKeys[0] : 'All';
 
     dimensionKeys.forEach((key) => {
       filters[key] = filters[key] || [];

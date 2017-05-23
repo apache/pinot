@@ -31,7 +31,7 @@ DimensionTreeMapModel.prototype = {
       this.baselineEnd = params.heatMapBaselineEnd || this.baselineEnd;
       this.granularity = params.granularity || this.granularity;
       this.heatmapMode = params.heatmapMode || this.heatmapMode;
-      this.heatMapFilters = Object.assign({}, JSON.parse(params.heatMapFilters));
+      this.heatMapFilters = Object.assign({}, params.heatMapFilters);
       this.compareMode = params.compareMode || this.compareMode;
     }
   },

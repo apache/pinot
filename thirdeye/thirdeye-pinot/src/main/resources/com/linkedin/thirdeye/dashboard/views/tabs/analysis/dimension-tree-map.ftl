@@ -1,10 +1,16 @@
 <div class="analysis-card padding-all top-buffer">
   <h4 class="analysis-title bottom-buffer">Contribution Analysis
-    <span class="analysis-details"> (for <label class="label-medium-semibold">Metric</label> {{metricName}} and <label class="label-medium-semibold">Dimensions</label>{{#each heatMapFilters}}
-      {{@key}}: {{this}}
+    <span class="analysis-details"> (for <label class="label-medium-semibold">Metric</label> {{metricName}} and <label class="label-medium-semibold">Dimensions</label>
+
+    {{#each heatMapFilters}}
+      {{@key}}:
+      {{#each this as |dimension|}}
+        {{dimension}}{{#unless @last}}, {{/unless}}
+      {{/each}}{{#unless @last}}/ {{/unless}}
     {{else}}
-      ALL
-    {{/each}}) <span>
+        All
+    {{/each}})
+    </span>
   </h4>
   <div class="contribution-analysis">
     <div class="contribution-analysis__daterangepicker">

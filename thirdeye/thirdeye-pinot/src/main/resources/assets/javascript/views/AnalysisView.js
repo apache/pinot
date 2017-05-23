@@ -372,7 +372,7 @@ AnalysisView.prototype = {
     this.viewParams['filters'] = filterMap;
 
     // Also reset the filters for heatmap
-    this.viewParams['heatmapFilters'] = filterMap;
+    this.viewParams['heatMapFilters'] = filterMap;
   },
 
   clearHeatMapViewParams() {
@@ -381,7 +381,7 @@ AnalysisView.prototype = {
       'heatMapCurrentEnd',
       'heatMapBaselineStart',
       'heatMapBaselineEnd',
-      'heatmapFilters'
+      'heatMapFilters'
       ]
     heatMapProperties.forEach((prop) => {
       this.viewParams[prop] = null
