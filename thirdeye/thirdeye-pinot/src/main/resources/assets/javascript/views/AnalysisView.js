@@ -339,7 +339,7 @@ AnalysisView.prototype = {
         Object.keys(this.viewParams.filters).forEach((key) => {
           this.viewParams.filters[key].forEach((filterName) => {
             if (filters[key] && filters[key].includes(filterName)) {
-              paramFilters.push(`${key}:${filterName}`);
+              paramFilters.push(`${key}::${filterName}`);
             }
           });
         });
