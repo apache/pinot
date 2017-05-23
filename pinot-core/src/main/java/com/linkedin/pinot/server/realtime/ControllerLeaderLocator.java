@@ -88,7 +88,7 @@ public class ControllerLeaderLocator {
       _refresh = false;
       return _controllerLeaderHostPort;
     } catch (Exception e) {
-      LOGGER.error("Could not locate controller leader, exception " + e);
+      LOGGER.warn("Could not locate controller leader, exception ", e);
       return null;
     }
   }
