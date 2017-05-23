@@ -36,6 +36,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.ZNRecord;
@@ -82,6 +83,10 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
    *     "/tables/{tableName}/segments":
    *     "/tables/{tableName}/segments/metadata":
    *     List segment metadata for a given table
+   *   </li>
+   *   <li>
+   *      "/tables/{tableName}/segments/crc":
+   *      Get crc information for a given table
    *   </li>
    *   <li>
    *     "/tables/{tableName}/segments/{segmentName}?state={state}":
@@ -159,6 +164,9 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
           // '/tables/{tableName}/segments/{segmentName}'
           // '/tables/{tableName}/segments/{segmentName}/metadata'
           return getSegmentMetadataForTable(tableName, segmentName, tableType);
+        } else if (lastPart.equals("crc")) {
+          // '/tables/{tableName}/segments/crc'
+          return getAllCrcMetadataForTable(tableName);
         } else {
           // '/tables/{tableName}/segments'
           // '/tables/{tableName}/segments/metadata'
@@ -220,6 +228,49 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     } else {
       setStatus(Status.CLIENT_ERROR_NOT_FOUND);
       return new StringRepresentation("Table " + tableName + " not found.");
+    }
+  }
+
+
+  @HttpVerb("get")
+  @Summary("Lists of crc metadata for a given table")
+  @Tags({"table","segment"})
+  @Paths({"/tables/{tableName}/segments/crc", "/tables/{tableName}/segments/crc/"})
+  @Responses({
+      @Response(statusCode = "200", description = "The list of crc metadata for the table"),
+      @Response(statusCode = "403", description = "Realtime table is not supported"),
+      @Response(statusCode = "404", description = "The table does not exist")
+  })
+  private Representation getAllCrcMetadataForTable(
+      @Parameter(name = "tableName", in = "path", description = "The name of table for which to list crc metadata",
+          required = true) String tableName)
+      throws JSONException, JsonProcessingException {
+    try {
+      PinotResourceManagerResponse response;
+
+      // Realtime table is not supported.
+      if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.REALTIME) {
+        setStatus(Status.CLIENT_ERROR_FORBIDDEN);
+        response = new PinotResourceManagerResponse("Realtime table is not supported.", false);
+        return new StringRepresentation(response.toJSON().toString());
+      }
+
+      // Check that the offline table exists.
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      if (!_pinotHelixResourceManager.getAllTables().contains(offlineTableName)) {
+        setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+        response = new PinotResourceManagerResponse("Offline table " + tableName + " does not exist.", false);
+        return new StringRepresentation(response.toJSON().toString());
+      }
+
+      Map<String, String> segmentCrcForTable = _pinotHelixResourceManager.getSegmentsCrcForTable(offlineTableName);
+      ObjectMapper mapper = new ObjectMapper();
+      String result = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(segmentCrcForTable);
+      return new StringRepresentation(result);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while fetching crc information for table {}", tableName, e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
+      return new StringRepresentation("Caught exception while fetching crc information for table " + tableName);
     }
   }
 

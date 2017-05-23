@@ -22,7 +22,9 @@ import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.List;
+import java.util.Map;
 import javax.ws.rs.core.Response;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -164,6 +166,28 @@ public class TablesResourceTest {
           .path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME, "UNKNOWN_SEGMENT"))
           .request().get(Response.class);
       assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    }
+  }
+
+  @Test
+  public void testSegmentCrcMetadata() throws Exception {
+    final String urlFormat = "/tables/%s/segments/crc";
+
+    // Upload 10 segments
+    List<IndexSegment> segments = testHelper.setUpSegments(10);
+
+    // Trigger crc api to fetch crc information
+    String response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME))
+        .request().get(String.class);
+    JSONObject jsonMeta = new JSONObject(response);
+    ObjectMapper mapper = new ObjectMapper();
+    Map<String, String> crcMap = mapper.readValue(response, new TypeReference<Map<String, Object>>(){});
+
+    // Check that crc info is correct
+    for(IndexSegment segment : segments) {
+      String segmentName = segment.getSegmentName();
+      String crc = segment.getSegmentMetadata().getCrc();
+      assertEquals(crcMap.get(segmentName), crc);
     }
   }
 }

@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.server.api.resources;
 
- import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
@@ -31,8 +31,10 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -44,8 +46,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
- import org.json.JSONException;
- import org.slf4j.Logger;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONException;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Api(tags = "Table")
@@ -154,6 +157,38 @@ public class TablesResource {
       }
     } finally {
       if (segmentDataManager != null) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+  }
+
+  @GET
+  @Path("/tables/{tableName}/segments/crc")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provide segment crc information", notes = "Provide crc information for the segments on server")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
+  public String getCrcMetadataForTable(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName) {
+
+    TableDataManager tableDataManager = checkGetTableDataManager(tableName);
+    ImmutableList<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+    Map<String, String> segmentCrcForTable = new HashMap<>();
+    try {
+      for(SegmentDataManager segmentDataManager : segmentDataManagers) {
+        SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+        segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentMetadata.getCrc());
+      }
+      ObjectMapper mapper = new ObjectMapper();
+      return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(segmentCrcForTable);
+    } catch (Exception e) {
+      throw new WebApplicationException("Failed to convert crc information to json", Response.Status.INTERNAL_SERVER_ERROR);
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }

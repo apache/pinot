@@ -195,6 +195,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments");
   }
 
+  public String forListAllCrcInformationForTable(String tableName) throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments", "crc");
+  }
+
   public String forDeleteTableWithType(String tableName, String tableType) throws Exception {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName + "?type=" + tableType);
   }

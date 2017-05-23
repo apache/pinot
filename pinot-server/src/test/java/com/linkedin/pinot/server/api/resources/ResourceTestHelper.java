@@ -36,6 +36,8 @@ import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
@@ -105,6 +107,14 @@ public class ResourceTestHelper {
     if (indexSegment != null) {
       indexSegment.destroy();
     }
+  }
+
+  public List<IndexSegment> setUpSegments(int numSegments) throws Exception {
+    List<IndexSegment> segments = new ArrayList<>();
+    for (int i = 0; i < numSegments; i++) {
+      segments.add(setupSegment(DEFAULT_TABLE_NAME, DEFAULT_AVRO_DATA_FILE, "1_" + i));
+    }
+    return segments;
   }
 
   public IndexSegment setupSegment()

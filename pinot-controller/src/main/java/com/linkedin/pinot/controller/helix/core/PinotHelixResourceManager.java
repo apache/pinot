@@ -42,6 +42,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.zookeeper.data.Stat;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonProcessingException;
 import org.codehaus.jackson.map.JsonMappingException;
@@ -106,6 +107,9 @@ public class PinotHelixResourceManager {
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
 
   private final Map<String, SegmentAssignmentStrategy> _segmentAssignmentStrategyMap = new HashMap<>();
+  private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
+  private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
+
   private final String _helixZkURL;
   private final String _helixClusterName;
   private final String _instanceId;
@@ -1801,6 +1805,80 @@ public class PinotHelixResourceManager {
     }
 
     return instancesToSegmentsMap;
+  }
+
+  public synchronized Map<String, String> getSegmentsCrcForTable(String tableName) {
+    // Get the segment list for this table
+    IdealState is = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+    List<String> segmentList = new ArrayList<>(is.getPartitionSet());
+
+    // Make a list of segment metadata for the given table
+    List<String> segmentMetadataPaths = new ArrayList<>(segmentList.size());
+    for (String segmentName : segmentList) {
+      segmentMetadataPaths.add(buildPathForSegmentMetadata(tableName, segmentName));
+    }
+
+    // Initialize cache if it is the first time to process the table.
+    if (!_segmentCrcMap.containsKey(tableName)) {
+      _lastKnownSegmentMetadataVersionMap.put(tableName, new HashMap<String, Integer>());
+      _segmentCrcMap.put(tableName, new HashMap<String, Long>());
+    }
+
+    // Get ZNode stats for all segment metadata
+    Stat[] metadataStats = _propertyStore.getStats(segmentMetadataPaths, AccessOption.PERSISTENT);
+
+    // Update the crc information for segments that are updated
+    for (int i = 0; i < metadataStats.length; i++) {
+      String currentSegment = segmentList.get(i);
+      Stat metadataStat = metadataStats[i];
+      // metadataStat can be null in some cases:
+      // 1. SegmentZkMetadata is somehow missing due to system inconsistency.
+      // 2. A segment is deleted after we fetch the list from idealstate and before reaching this part of the code.
+      if (metadataStat != null) {
+        int currentVersion = metadataStat.getVersion();
+        if (_lastKnownSegmentMetadataVersionMap.get(tableName).containsKey(currentSegment)) {
+          int lastKnownVersion = _lastKnownSegmentMetadataVersionMap.get(tableName).get(currentSegment);
+          if (lastKnownVersion != currentVersion) {
+            updateSegmentMetadataCrc(tableName, currentSegment, currentVersion);
+          }
+        } else {
+          // not in version map because it's the first time to fetch this segment metadata
+          updateSegmentMetadataCrc(tableName, currentSegment, currentVersion);
+        }
+      }
+    }
+
+    // Clean up the cache for the segments no longer exist.
+    Set<String> segmentsSet = is.getPartitionSet();
+    Iterator<Map.Entry<String,Long>> iter = _segmentCrcMap.get(tableName).entrySet().iterator();
+    while (iter.hasNext()) {
+      Map.Entry<String, Long> entry = iter.next();
+      String segmentName = entry.getKey();
+      if (!segmentsSet.contains(segmentName)) {
+        iter.remove();
+        _lastKnownSegmentMetadataVersionMap.get(tableName).remove(segmentName);
+      }
+    }
+
+    // Create crc information
+    Map<String, String> resultCrcMap = new HashMap<>();
+    for (String segment : segmentList) {
+      resultCrcMap.put(segment, String.valueOf(_segmentCrcMap.get(tableName).get(segment)));
+    }
+
+    return resultCrcMap;
+  }
+
+  private void updateSegmentMetadataCrc(String tableName, String segmentName, int currentVersion) {
+    OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentName);
+
+    _lastKnownSegmentMetadataVersionMap.get(tableName).put(segmentName, currentVersion);
+    _segmentCrcMap.get(tableName).put(segmentName, offlineSegmentZKMetadata.getCrc());
+  }
+
+  public String buildPathForSegmentMetadata(String tableName, String segmentName) {
+    return "/SEGMENTS/" + tableName +  "/" + segmentName;
   }
 
   /**
