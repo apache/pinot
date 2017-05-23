@@ -17,6 +17,8 @@ package com.linkedin.pinot.common.messages;
 
 import com.google.common.base.Preconditions;
 import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.helix.model.Message;
 
 
@@ -27,10 +29,12 @@ import org.apache.helix.model.Message;
 public class SegmentReloadMessage extends Message {
   public static final String RELOAD_SEGMENT_MSG_SUB_TYPE = "RELOAD_SEGMENT";
 
-  public SegmentReloadMessage(String tableName, String segmentName) {
+  public SegmentReloadMessage(@Nonnull String tableNameWithType, @Nullable String segmentName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
-    setResourceName(tableName);
-    setPartitionName(segmentName);
+    setResourceName(tableNameWithType);
+    if (segmentName != null) {
+      setPartitionName(segmentName);
+    }
     setMsgSubType(RELOAD_SEGMENT_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);

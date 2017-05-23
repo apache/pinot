@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -49,7 +50,11 @@ public interface DataManager {
 
   SegmentMetadataLoader getSegmentMetadataLoader();
 
-  SegmentMetadata getSegmentMetadata(String tableName, String segmentName);
+  @Nonnull
+  List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType);
+
+  @Nullable
+  SegmentMetadata getSegmentMetadata(@Nonnull String tableNameWithType, @Nonnull String segmentName);
 
   boolean isStarted();
 }

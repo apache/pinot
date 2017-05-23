@@ -16,6 +16,7 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
@@ -35,8 +36,11 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -294,10 +298,36 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     return _segmentMetadataLoader;
   }
 
+  @Nonnull
   @Override
-  public SegmentMetadata getSegmentMetadata(String table, String segmentName) {
+  public List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType) {
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager == null) {
+      return Collections.emptyList();
+    } else {
+      ImmutableList<SegmentDataManager> segmentDataManagers = null;
+      try {
+        segmentDataManagers = tableDataManager.acquireAllSegments();
+        List<SegmentMetadata> segmentsMetadata = new ArrayList<>(segmentDataManagers.size());
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          segmentsMetadata.add(segmentDataManager.getSegment().getSegmentMetadata());
+        }
+        return segmentsMetadata;
+      } finally {
+        if (segmentDataManagers != null) {
+          for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+            tableDataManager.releaseSegment(segmentDataManager);
+          }
+        }
+      }
+    }
+  }
+
+  @Nullable
+  @Override
+  public SegmentMetadata getSegmentMetadata(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
     SegmentDataManager segmentDataManager = null;
-    TableDataManager tableDataManager = _tableDataManagerMap.get(table);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     try {
       if (tableDataManager != null) {
         segmentDataManager = tableDataManager.acquireSegment(segmentName);
