@@ -373,22 +373,18 @@ AnomalyResultView.prototype = {
    * @return {Object} Massaged params for search
    */
   getSearchParams() {
-    var anomaliesSearchMode = $('#anomalies-search-mode').val();
-    var metricIds = undefined;
-    var dashboardId = undefined;
-    var anomalyIds = undefined;
-    var functionName = $('#anomaly-function-dropdown').val();
-
+    const anomaliesSearchMode = $('#anomalies-search-mode').val();
+    const functionName = $('#anomaly-function-dropdown').val();
     // uses default startDate and endDate
     const startDate = this.anomalyResultModel.startDate;
     const endDate = this.anomalyResultModel.endDate;
 
     const anomaliesParams = {
-      anomaliesSearchMode: anomaliesSearchMode,
-      startDate: startDate,
-      endDate: endDate,
+      anomaliesSearchMode,
+      startDate,
+      endDate,
       pageNumber: 1,
-      functionName: functionName
+      functionName
     }
 
     if (anomaliesSearchMode == constants.MODE_METRIC) {
