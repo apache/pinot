@@ -101,7 +101,7 @@ public class ServerSegmentCompletionProtocolHandler {
     ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
     final String leaderAddress = leaderLocator.getControllerLeader();
     if (leaderAddress == null) {
-      LOGGER.error("No leader found {}", this.toString());
+      LOGGER.warn("No leader found {}", this.toString());
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String url = request.getUrl(leaderAddress);

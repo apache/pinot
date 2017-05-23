@@ -42,7 +42,7 @@ public class ControllerLeaderLocator {
   // Should we refresh the controller leader co-ordinates?
   private volatile boolean _refresh = true;
 
-  ControllerLeaderLocator(HelixManager helixManager) {
+  public ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
     _clusterName = helixManager.getClusterName();
   }
@@ -88,7 +88,9 @@ public class ControllerLeaderLocator {
       _refresh = false;
       return _controllerLeaderHostPort;
     } catch (Exception e) {
-      LOGGER.warn("Could not locate controller leader, exception ", e);
+      LOGGER.warn("Could not locate controller leader, exception", e);
+      _controllerLeaderHostPort = null;
+      _refresh = true;
       return null;
     }
   }
