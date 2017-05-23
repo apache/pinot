@@ -133,7 +133,8 @@ public class AnomalyMergeExecutor implements Runnable {
    *
    * @return the number of merged anomalies after merging
    */
-  public int synchronousMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isBackfill) {
+  public int synchronousMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isBackfill)
+      throws Exception {
     if (functionSpec.getIsActive()) {
       AnomalyMergeConfig anomalyMergeConfig = functionSpec.getAnomalyMergeConfig();
       if (anomalyMergeConfig == null) {
@@ -164,7 +165,8 @@ public class AnomalyMergeExecutor implements Runnable {
    *
    * @return the number of merged anomalies
    */
-  private int mergeAnomalies(AnomalyFunctionDTO functionSpc, AnomalyMergeConfig mergeConfig, boolean isBackfill) {
+  private int mergeAnomalies(AnomalyFunctionDTO functionSpc, AnomalyMergeConfig mergeConfig, boolean isBackfill)
+      throws Exception {
     List<RawAnomalyResultDTO> unmergedResults = anomalyResultDAO.findUnmergedByFunctionId(functionSpc.getId());
 
     LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", functionSpc.getId(), unmergedResults.size());
@@ -303,14 +305,14 @@ public class AnomalyMergeExecutor implements Runnable {
   @Deprecated
   private void performMergeBasedOnFunctionId(AnomalyFunctionDTO function,
       AnomalyMergeConfig mergeConfig, List<RawAnomalyResultDTO> unmergedResults,
-      List<MergedAnomalyResultDTO> output) {
+      List<MergedAnomalyResultDTO> output) throws Exception {
     // Now find last MergedAnomalyResult in same category
     MergedAnomalyResultDTO latestMergedResult =
         mergedResultDAO.findLatestByFunctionIdOnly(function.getId(), true);
     // TODO : get mergeConfig from function
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
         .mergeAnomalies(latestMergedResult, unmergedResults, mergeConfig.getMaxMergeDurationLength(),
-            mergeConfig.getSequentialAllowedGap());
+            mergeConfig.getSequentialAllowedGap(), anomalyFunctionFactory);
     for (MergedAnomalyResultDTO mergedResult : mergedResults) {
       mergedResult.setFunction(function);
     }
@@ -321,7 +323,7 @@ public class AnomalyMergeExecutor implements Runnable {
 
   private void performMergeBasedOnFunctionIdAndDimensions(AnomalyFunctionDTO function,
       AnomalyMergeConfig mergeConfig, List<RawAnomalyResultDTO> unmergedResults,
-      List<MergedAnomalyResultDTO> output) {
+      List<MergedAnomalyResultDTO> output) throws Exception {
     Map<DimensionMap, List<RawAnomalyResultDTO>> dimensionsResultMap = new HashMap<>();
     for (RawAnomalyResultDTO anomalyResult : unmergedResults) {
       DimensionMap exploredDimensions = anomalyResult.getDimensions();
@@ -350,7 +352,7 @@ public class AnomalyMergeExecutor implements Runnable {
 
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
-              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
+              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap(), anomalyFunctionFactory);
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(exploredDimensions);

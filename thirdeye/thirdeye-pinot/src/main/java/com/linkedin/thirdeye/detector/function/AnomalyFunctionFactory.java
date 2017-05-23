@@ -1,13 +1,21 @@
 package com.linkedin.thirdeye.detector.function;
 
+import com.linkedin.thirdeye.anomalydetection.function.AbstractModularizedAnomalyFunction;
+import com.linkedin.thirdeye.anomalydetection.function.DummyAnomalyFunction;
+import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 
 import org.apache.commons.io.IOUtils;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,16 +57,16 @@ public class AnomalyFunctionFactory {
     }
   }
 
-  public BaseAnomalyFunction fromSpec(AnomalyFunctionDTO functionSpec) throws Exception {
-    BaseAnomalyFunction anomalyFunction = null;
-    String type = functionSpec.getType();
-    if (!props.containsKey(type)) {
-      throw new IllegalArgumentException("Unsupported type " + type);
+  public BaseAnomalyFunction fromSpec(AnomalyFunctionDTO functionSpec) {
+    BaseAnomalyFunction anomalyFunction = new DummyAnomalyFunction();
+    try{
+      String type = functionSpec.getType();
+      String className = props.getProperty(type);
+      anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
+      anomalyFunction.init(functionSpec);
+    } catch (Exception e){
+      LOGGER.warn(e.getMessage());
     }
-    String className = props.getProperty(type);
-    anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
-
-    anomalyFunction.init(functionSpec);
     return anomalyFunction;
   }
 }

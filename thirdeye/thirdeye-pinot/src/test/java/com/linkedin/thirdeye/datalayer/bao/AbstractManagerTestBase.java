@@ -31,11 +31,13 @@ import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.File;
 import java.io.FileReader;
+import java.io.InputStream;
 import java.net.URL;
 import java.sql.Connection;
 import java.util.Arrays;
@@ -70,6 +72,7 @@ public abstract class AbstractManagerTestBase {
   protected EntityToEntityMappingManager entityToEntityMappingDAO;
   protected GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   protected OnboardDatasetMetricManager onboardDatasetMetricDAO;
+  protected AnomalyFunctionFactory anomalyFunctionFactory;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -79,6 +82,8 @@ public abstract class AbstractManagerTestBase {
   protected void init() {
     try {
       URL url = TestDBResources.class.getResource("/persistence-local.yml");
+      String functionPropertiesFile = "/sample-functions.properties";
+      InputStream factoryStream = TestDBResources.class.getResourceAsStream(functionPropertiesFile);
       File configFile = new File(url.toURI());
       PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
       initializeDs(configuration);
@@ -108,6 +113,7 @@ public abstract class AbstractManagerTestBase {
       entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
       groupedAnomalyResultsDAO = daoRegistry.getGroupedAnomalyResultsDAO();
       onboardDatasetMetricDAO = daoRegistry.getOnboardDatasetMetricDAO();
+      anomalyFunctionFactory = new AnomalyFunctionFactory(factoryStream);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

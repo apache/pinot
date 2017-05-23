@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,7 +22,6 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
   MergedAnomalyResultDTO mergedResult = null;
   Long anomalyResultId;
   AnomalyFunctionDTO function = getTestFunctionSpec("metric", "dataset");
-
   @BeforeClass
   void beforeClass() {
     super.init();
@@ -33,7 +33,7 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
   }
 
   @Test
-  public void testMergedResultCRUD() {
+  public void testMergedResultCRUD() throws Exception {
     anomalyFunctionDAO.save(function);
     Assert.assertNotNull(function.getId());
 
@@ -55,7 +55,7 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
 
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
         .mergeAnomalies(rawResults, mergeConfig.getMaxMergeDurationLength(),
-            mergeConfig.getSequentialAllowedGap());
+            mergeConfig.getSequentialAllowedGap(), anomalyFunctionFactory);
     Assert.assertEquals(mergedResults.get(0).getStartTime(), (long) result.getStartTime());
     Assert.assertEquals(mergedResults.get(0).getEndTime(), (long) result.getEndTime());
     Assert.assertEquals(mergedResults.get(0).getAnomalyResults().get(0), result);

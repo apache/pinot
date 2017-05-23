@@ -52,9 +52,4 @@ public class AverageAnomalyMergeModel extends AbstractMergeModel implements NoPr
     anomalyToUpdated.setAvgBaselineVal(avgBaseline);
     anomalyToUpdated.setMessage(String.format(DEFAULT_MESSAGE_TEMPLATE, avgBaseline, avgCurrent, weight, score));
   }
-
-  @Override
-  public Boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2) {
-    return true;
-  }
 }

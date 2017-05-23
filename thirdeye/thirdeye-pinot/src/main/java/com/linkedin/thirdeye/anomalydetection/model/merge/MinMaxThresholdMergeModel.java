@@ -71,9 +71,4 @@ public class MinMaxThresholdMergeModel extends AbstractMergeModel {
         String.format(DEFAULT_MESSAGE_TEMPLATE, deviationFromThreshold, currentAverageValue, min, max);
     anomalyToUpdated.setMessage(message);
   }
-
-  @Override
-  public Boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2) {
-    return true;
-  }
 }

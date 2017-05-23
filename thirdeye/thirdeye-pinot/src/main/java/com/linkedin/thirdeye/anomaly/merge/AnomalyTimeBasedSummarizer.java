@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -18,19 +20,20 @@ public abstract class AnomalyTimeBasedSummarizer {
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyTimeBasedSummarizer.class);
 
   private AnomalyTimeBasedSummarizer() {
-
   }
 
   /**
    * @param anomalies   : list of raw anomalies to be merged with last mergedAnomaly
    * @param mergeDuration   : length of a merged anomaly
    * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
-   *
+   * @param anomalyFunctionFactory
    * @return
    */
-  public static List<MergedAnomalyResultDTO> mergeAnomalies(List<RawAnomalyResultDTO> anomalies,
-      long mergeDuration, long sequentialAllowedGap) {
-    return mergeAnomalies(null, anomalies, mergeDuration, sequentialAllowedGap);
+  public static List<MergedAnomalyResultDTO> mergeAnomalies(
+      List<RawAnomalyResultDTO> anomalies,
+      long mergeDuration, long sequentialAllowedGap,
+      AnomalyFunctionFactory anomalyFunctionFactory) throws Exception {
+    return mergeAnomalies(null, anomalies, mergeDuration, sequentialAllowedGap, anomalyFunctionFactory);
   }
 
   /**
@@ -41,7 +44,7 @@ public abstract class AnomalyTimeBasedSummarizer {
    * @return
    */
   public static List<MergedAnomalyResultDTO> mergeAnomalies(MergedAnomalyResultDTO mergedAnomaly,
-      List<RawAnomalyResultDTO> anomalies, long maxMergedDurationMillis, long sequentialAllowedGap) {
+      List<RawAnomalyResultDTO> anomalies, long maxMergedDurationMillis, long sequentialAllowedGap, AnomalyFunctionFactory anomalyFunctionFactory) {
 
     // sort anomalies in natural order of start time
     Collections.sort(anomalies, new Comparator<RawAnomalyResultDTO>() {
@@ -63,7 +66,6 @@ public abstract class AnomalyTimeBasedSummarizer {
     }
 
     List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
-
     for (int i = 0; i < anomalies.size(); i++) {
       RawAnomalyResultDTO currentResult = anomalies.get(i);
       if (mergedAnomaly == null || currentResult.getEndTime() < mergedAnomaly.getStartTime()) {
@@ -71,9 +73,14 @@ public abstract class AnomalyTimeBasedSummarizer {
         populateMergedResult(mergedAnomaly, currentResult);
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
-        if (applySequentialGapBasedSplit
-            && (currentResult.getStartTime() - mergedAnomaly.getEndTime()) > sequentialAllowedGap) {
 
+        BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(mergedAnomaly.getFunction());
+        MergedAnomalyResultDTO currMergeAnomaly = new MergedAnomalyResultDTO();
+        populateMergedResult(currMergeAnomaly, currentResult);
+        LOG.info("BaseAnomalyFunction Being initiated!, {}", anomalyFunction.getClass());
+        if (applySequentialGapBasedSplit
+            && (currentResult.getStartTime() - mergedAnomaly.getEndTime()) > sequentialAllowedGap
+            && !anomalyFunction.isMergeable(mergedAnomaly, currMergeAnomaly)) {
           // Split here
           // add previous merged result
           mergedAnomalies.add(mergedAnomaly);
@@ -132,5 +139,7 @@ public abstract class AnomalyTimeBasedSummarizer {
     mergedAnomaly.setStartTime(currentResult.getStartTime());
     mergedAnomaly.setEndTime(currentResult.getEndTime());
     mergedAnomaly.setCreatedTime(System.currentTimeMillis());
+//    mergedAnomaly.setFunction(mergedAnomaly.getFunction());
+    mergedAnomaly.setProperties(mergedAnomaly.getProperties());
   }
 }
