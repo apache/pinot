@@ -64,7 +64,7 @@ TimeSeriesCompareView.prototype = {
     // this needs to be called last so that the chart is rendered after the legend
     // otherwise, we run into overflow issues
     this.loadChart(
-        this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
+        this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[constants.DEFAULT_ANALYSIS_DIMENSION]);
     this.loadAnomalyRegion();
     this.setupListenerForChartSubDimension();
   },
@@ -185,15 +185,8 @@ TimeSeriesCompareView.prototype = {
     }
   },
 
-  collectAndUpdateViewParamsForHeatMapRendering(subDimension, bucketIndex) {
-    var currentStart = this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[bucketIndex];
-    var baselineStart = this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsBaseline[bucketIndex];
-    const {
-      dimension : metricDimension,
-      metricId
-    } = this.timeSeriesCompareModel;
-
-    var delta = 5 * 60 * 60 * 1000; // 1 hour
+  calculateDelta() {
+    let delta = 5 * 60 * 60 * 1000; // 1 hour
     if (this.timeSeriesCompareModel.granularity === 'DAYS') {
       delta = 86400 * 1000;
     }
@@ -201,14 +194,20 @@ TimeSeriesCompareView.prototype = {
       delta = this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[1]
           - this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[0];
     }
-    var currentEnd = currentStart + delta;
-    var baselineEnd = baselineStart + delta;
+    return delta;
+  },
 
-    let heatMapFilters = Object.assign({}, this.timeSeriesCompareModel.filters || {});
-
-    // if (this.timeSeriesCompareModel.dimension === 'All') {
-    //   heatMapFilters = this.timeSeriesCompareModel.filters || {};
-    // }
+  collectAndUpdateViewParamsForHeatMapRendering(subDimension, bucketIndex) {
+    const currentStart = this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[bucketIndex];
+    const baselineStart = this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsBaseline[bucketIndex];
+    const delta = this.calculateDelta();
+    const currentEnd = currentStart + delta;
+    const baselineEnd = baselineStart + delta;
+    const heatMapFilters = Object.assign({}, this.timeSeriesCompareModel.filters || {});
+    const {
+      dimension : metricDimension,
+      metricId
+    } = this.timeSeriesCompareModel;
 
     if (subDimension !== constants.DEFAULT_ANALYSIS_DIMENSION) {
       heatMapFilters[metricDimension] = [subDimension];
@@ -237,5 +236,5 @@ TimeSeriesCompareView.prototype = {
       heatMapFilters: null
     };
   }
-}
+};
 
