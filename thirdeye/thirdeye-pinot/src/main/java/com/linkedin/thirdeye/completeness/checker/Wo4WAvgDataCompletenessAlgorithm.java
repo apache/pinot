@@ -15,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -100,14 +99,28 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
     return baselineCounts;
   }
 
+
+
+  @Override
+  public Map<String, Long> getCurrentCountsForBuckets(String dataset, TimeSpec timeSpec,
+      Map<String, Long> bucketNameToBucketValueMS) {
+    return DataCompletenessUtils.getCountsForBucketsOfDataset(dataset, timeSpec, bucketNameToBucketValueMS);
+  }
+
   @Override
   public double getPercentCompleteness(List<Long> baselineCounts, Long currentCount) {
-    PercentCompletenessFunctionInput input = new PercentCompletenessFunctionInput();
-    input.setAlgorithm(DataCompletenessAlgorithmName.WO4W_AVERAGE);
-    input.setBaselineCounts(baselineCounts);
-    input.setCurrentCount(currentCount);
-
-    double percentCompleteness = DataCompletenessUtils.getPercentCompleteness(input);
+    double percentCompleteness = 0;
+    double baselineTotalCount = 0;
+    for (Long baseline : baselineCounts) {
+      baselineTotalCount = baselineTotalCount + baseline;
+    }
+    baselineTotalCount = baselineTotalCount/baselineCounts.size();
+    if (baselineTotalCount != 0) {
+      percentCompleteness = new Double(currentCount * 100) / baselineTotalCount;
+    }
+    if (baselineTotalCount == 0 && currentCount != 0) {
+      percentCompleteness = 100;
+    }
     return percentCompleteness;
   }
 
@@ -127,5 +140,6 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
   public double getConsiderCompleteAfter() {
     return CONSIDER_COMPLETE_AFTER;
   }
+
 
 }
