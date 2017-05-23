@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools;
 
+import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
 import com.linkedin.pinot.core.startree.StarTreeInterf;
 import com.linkedin.pinot.core.startree.StarTreeSerDe;
@@ -88,7 +89,7 @@ public class StarTreeIndexViewer {
       valueIterators.put(columnName, itr);
       dictionaries.put(columnName, dataSource.getDictionary());
     }
-    File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
+    File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(segmentDir);
     StarTreeInterf tree = StarTreeSerDe.fromFile(starTreeFile, ReadMode.mmap);
     dimensionNameToIndexMap = tree.getDimensionNameToIndexMap();
     StarTreeJsonNode jsonRoot = new StarTreeJsonNode("ROOT");
