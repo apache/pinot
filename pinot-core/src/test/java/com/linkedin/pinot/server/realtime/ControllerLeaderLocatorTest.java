@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package com.linkedin.pinot.core.realtime;
+package com.linkedin.pinot.server.realtime;
 
-import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;

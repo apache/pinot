@@ -42,7 +42,7 @@ public class ControllerLeaderLocator {
   // Should we refresh the controller leader co-ordinates?
   private volatile boolean _refresh = true;
 
-  public ControllerLeaderLocator(HelixManager helixManager) {
+  ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
     _clusterName = helixManager.getClusterName();
   }
