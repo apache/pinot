@@ -56,6 +56,12 @@
 <script id="anomalies-template" type="text/x-handlebars-template">
   <#include "tabs/anomalies.ftl"/>
 </script>
+<script id="anomaly-filters-wrapper-template" type="text/x-handlebars-template">
+  <#include "tabs/anomaly-filters-wrapper.ftl"/>
+</script>
+<script id="anomaly-filters-template" type="text/x-handlebars-template">
+  <#include "tabs/anomaly-filters.ftl"/>
+</script>
 <script id="anomaly-results-template" type="text/x-handlebars-template">
   <#include "tabs/anomaly-results.ftl"/>
 </script>
@@ -124,6 +130,10 @@
 <script src="assets/javascript/models/WoWSummaryModel.js"></script>
 <script src="assets/javascript/views/WoWSummaryView.js"></script>
 <script src="assets/javascript/controllers/WoWSummaryController.js"></script>
+
+<script src="assets/javascript/models/AnomalyFilterModel.js"></script>
+<script src="assets/javascript/views/AnomalyFilterView.js"></script>
+<script src="assets/javascript/controllers/AnomalyFilterController.js"></script>
 
 <script src="assets/javascript/models/AnomalyResultModel.js"></script>
 <script src="assets/javascript/views/AnomalyResultView.js"></script>

@@ -115,92 +115,52 @@ function AnomalyResultView(anomalyResultModel) {
   };
 
   // Compile HTML template
-  var anomalies_template = $("#anomalies-template").html();
+  const anomalies_template = $('#anomalies-template').html();
   this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
-  $("#anomalies-place-holder").html(this.anomalies_template_compiled);
+  $('#anomalies-place-holder').html(this.anomalies_template_compiled);
 
-  var anomaly_results_template = $("#anomaly-results-template").html();
+  const anomaly_results_template = $('#anomaly-results-template').html();
   this.anomaly_results_template_compiled = Handlebars.compile(anomaly_results_template);
 
+  const anomaly_filters_wrapper_template = $('#anomaly-filters-wrapper-template').html();
+  this.anomaly_filters_wrapper_template_compiled = Handlebars.compile(anomaly_filters_wrapper_template);
   // events
   this.applyButtonEvent = new Event(this);
+  this.searchButtonEvent = new Event(this);
+  this.resetButtonEvent = new Event(this);
   this.investigateButtonClickEvent = new Event(this);
   this.showDetailsLinkClickEvent = new Event(this);
   this.anomalyFeedbackSelectEvent = new Event(this);
-  this.pageClickEvent = new Event(this)
+  this.pageClickEvent = new Event(this);
+  this.changedTimeEvent = new Event(this);
 
   this.anomalyResultModel.renderViewEvent.attach(this.renderViewEventHandler.bind(this));
-
 }
 
 AnomalyResultView.prototype = {
-  init : function() {
-    var self = this;
+  init() {
     $('#anomalies-search-mode').select2({
       minimumResultsForSearch : -1,
       theme : "bootstrap"
-    }).on("change", function(e) {
-      self.showSearchBarBasedOnMode();
+    }).on('change', (e) => {
+      this.anomalyResultModel.reset();
+      this.showSearchBarBasedOnMode();
+      this.destroy();
     });
 
     this.setupSearchBar();
     this.showSearchBarBasedOnMode();
-
-    // TIME RANGE SELECTION
-    this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
-    this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
-
-    const $anomalyTimeRangeStart = $('#anomalies-time-range-start span');
-    const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
-
-    function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
-      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_TIME_RANGE_FORMAT));
-      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_TIME_RANGE_FORMAT));
-    }
-    $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
-
-    $('#anomalies-time-range-end').on('click', () => {
-      $('#anomalies-time-range-start').click();
-    });
-
-    // $('#anomalies-time-range-end').daterangepicker(this.timeRangeConfig, cb);
-    cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
-
-
-    // APPLY BUTTON
-    this.setupListenerOnApplyButton();
+    this.setupSearchListener();
   },
+
   renderViewEventHandler : function() {
     this.render();
   },
 
-  render : function() {
-
-    var anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
-
-    var anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomaliesWrapper);
-    $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
-    this.renderAnomaliesTab(anomaliesWrapper);
-    self = this;
-
+  render() {
+    this.renderAnomaliesTab();
     this.showSearchBarBasedOnMode();
-
-    var totalAnomalies = anomaliesWrapper.totalAnomalies;
-    var pageSize = this.anomalyResultModel.pageSize;
-    var pageNumber = this.anomalyResultModel.pageNumber;
-    var numPages = Math.ceil(totalAnomalies / pageSize);
-
-    $('#pagination').twbsPagination({
-      totalPages: numPages,
-      visiblePages: 7,
-      startPage: pageNumber,
-      onPageClick: (event, page) => {
-        $('body').scrollTop(0);
-        if (page != pageNumber) {
-          this.pageClickEvent.notify(page);
-        }
-      }
-    });
+    this.renderPagination();
 
     // FUNCTION DROPDOWN
     var functions = this.anomalyResultModel.getAnomalyFunctions();
@@ -208,12 +168,30 @@ AnomalyResultView.prototype = {
     $.each(functions, function(val, text) {
       anomalyFunctionSelector.append($('<option></option>').val(val).html(text));
     });
+  },
 
+  /**
+   * destroys filters and anomaly results
+   */
+  destroy() {
+    this.destroyFilter();
+    $('#anomaly-results-place-holder').children().remove();
+  },
+
+  /**
+   * Destroys the datepickers and the filters wrapper
+   */
+  destroyFilter() {
+    this.destroyDatePickers();
+    $('#anomaly-filters-wrapper-place-holder').children().remove();
 
   },
 
-  destroy() {
-    $("#anomaly-results-place-holder").children().remove();
+  destroyDatePickers() {
+    const $currentRangePicker = $('#current-range');
+    const $baselineRangePicker = $('#baseline-range');
+    $currentRangePicker.length && $currentRangePicker.data('daterangepicker').remove();
+    $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
   },
   showSearchBarBasedOnMode : function() {
     var anomaliesSearchMode = $('#anomalies-search-mode').val();
@@ -247,15 +225,19 @@ AnomalyResultView.prototype = {
     });
   },
 
-  renderAnomaliesTab : function(anomaliesWrapper) {
+  /**
+   * Renders all anomaly results and generates c3 graphs
+   */
+  renderAnomaliesTab() {
+    const anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
+    const anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomaliesWrapper);
+    $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
     const anomalies = anomaliesWrapper.anomalyDetailsList;
     anomalies.forEach((anomaly, index) => {
 
       if (!anomaly) {
         return;
       }
-
-
       const date = ['date'].concat(anomaly.dates);
       const currentValues = ['current'].concat(anomaly.currentValues);
       const baselineValues = ['baseline'].concat(anomaly.baselineValues);
@@ -311,6 +293,71 @@ AnomalyResultView.prototype = {
     })
   },
 
+  /**
+   * render Date pickers and set up listeners
+   */
+  renderDatePickers() {
+    this.destroyDatePickers();
+    $('#anomaly-filters-wrapper-place-holder').children().remove();
+    $('#anomaly-filters-wrapper-place-holder').html(this.anomaly_filters_wrapper_template_compiled);
+     // TIME RANGE SELECTION
+    this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
+    this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
+
+    const $anomalyTimeRangeStart = $('#anomalies-time-range-start span');
+    const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
+
+    const formatDate = (start, end) => {
+      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_TIME_RANGE_FORMAT));
+      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_TIME_RANGE_FORMAT));
+    }
+    const changeDate = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+      formatDate(start, end);
+      this.changedTimeEvent.notify({
+        startDate: start,
+        endDate: end,
+        searchFilters: null
+      })
+    }
+    $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, changeDate.bind(this));
+
+    $('#anomalies-time-range-end').on('click', () => {
+      $('#anomalies-time-range-start').click();
+    });
+
+    formatDate(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
+    this.setupFilterListener();
+  },
+
+  /**
+   * render paginations at the bottom of the page
+   */
+  renderPagination() {
+    // removes children to delete event listeners
+    $('#pagination').children().remove();
+    const totalAnomalies = this.anomalyResultModel.totalAnomalies;
+    const pageSize = this.anomalyResultModel.pageSize;
+    const pageNumber = this.anomalyResultModel.pageNumber;
+    const numPages = Math.ceil(totalAnomalies / pageSize);
+
+    // Don't display pagination when result is empty
+    if (!totalAnomalies) {
+      return;
+    }
+
+    $('#pagination').twbsPagination({
+      totalPages: numPages,
+      visiblePages: 7,
+      startPage: pageNumber,
+      onPageClick: (event, page) => {
+        $('body').scrollTop(0);
+        if (page != pageNumber) {
+          this.pageClickEvent.notify(page);
+        }
+      }
+    });
+  },
+
   dataEventHandler : function(e) {
     e.preventDefault();
     var currentTargetId = e.currentTarget.id;
@@ -320,45 +367,70 @@ AnomalyResultView.prototype = {
       this.showDetailsLinkClickEvent.notify(e.data);
     }
   },
-  setupListenerOnApplyButton : function() {
-    $('#search-button, #apply-button').click(() => {
-      var anomaliesSearchMode = $('#anomalies-search-mode').val();
-      var metricIds = undefined;
-      var dashboardId = undefined;
-      var anomalyIds = undefined;
-      var anomalyGroupIds = undefined;
 
-      var functionName = $('#anomaly-function-dropdown').val();
-      var startDate = $('#anomalies-time-range-start').data('daterangepicker').startDate;
-      var endDate = $('#anomalies-time-range-start').data('daterangepicker').endDate;
+  /**
+   * Gather relevant params for search
+   * @return {Object} Massaged params for search
+   */
+  getSearchParams() {
+    const anomaliesSearchMode = $('#anomalies-search-mode').val();
+    const functionName = $('#anomaly-function-dropdown').val();
+    // uses default startDate and endDate
+    const startDate = this.anomalyResultModel.startDate;
+    const endDate = this.anomalyResultModel.endDate;
 
-      var anomaliesParams = {
-        anomaliesSearchMode : anomaliesSearchMode,
-        startDate : startDate,
-        endDate : endDate,
-        pageNumber : 1,
-        functionName : functionName
-      }
+    const anomaliesParams = {
+      anomaliesSearchMode,
+      startDate,
+      endDate,
+      pageNumber: 1,
+      functionName
+    }
 
-      if (anomaliesSearchMode == constants.MODE_METRIC) {
-        anomaliesParams.metricIds = $('#anomalies-search-metrics-input').val().join();
-      } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
-        anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
-      } else if (anomaliesSearchMode == constants.MODE_ID) {
-        anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
-        delete anomaliesParams.startDate;
-        delete anomaliesParams.endDate;
-      } else if (anomaliesSearchMode == constants.MODE_GROUPID) {
+    if (anomaliesSearchMode == constants.MODE_METRIC) {
+      anomaliesParams.metricIds = $('#anomalies-search-metrics-input').val().join();
+    } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
+      anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
+    } else if (anomaliesSearchMode == constants.MODE_ID) {
+      anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
+      delete anomaliesParams.startDate;
+      delete anomaliesParams.endDate;
+    } else if (anomaliesSearchMode == constants.MODE_GROUPID) {
         anomaliesParams.anomalyGroupIds = $('#anomalies-search-group-input').val().join();
         delete anomaliesParams.startDate;
         delete anomaliesParams.endDate;
-      }
+    }
 
-      this.applyButtonEvent.notify(anomaliesParams);
+    return anomaliesParams;
+  },
+
+  /**
+   * Event Listener for the search button
+   */
+  setupSearchListener() {
+    $('#search-button').click(() => {
+      this.searchFilters = null;
+      const anomaliesParams = this.getSearchParams();
+      anomaliesParams.searchFilters = null;
+      this.searchButtonEvent.notify(anomaliesParams);
     })
   },
-  setupListenersOnAnomaly : function(idx, anomaly) {
 
+  /**
+   * Event Listener for the filter apply button
+   */
+  setupFilterListener() {
+    // search with filters
+    $('#apply-button').click(() => {
+      $('body').scrollTop(0);
+      this.applyButtonEvent.notify();
+    })
+  },
+
+  /**
+   * Event Listener for each anomaly results
+   */
+  setupListenersOnAnomaly(idx, anomaly) {
     const investigateParams = {
       anomalyId : anomaly.anomalyId,
     }

@@ -61,7 +61,7 @@ InvestigateView.prototype = {
     const end = moment(currentEnd);
     const heatMapCurrentStart = moment(anomalyStart);
     const heatMapCurrentEnd = moment(anomalyEnd);
-    const dimension = anomalyFunctionDimension ? Object.keys(JSON.parse(anomalyFunctionDimension))[0] : 'ALL';
+    const dimension = anomalyFunctionDimension && Object.keys(JSON.parse(anomalyFunctionDimension)).length ? Object.keys(JSON.parse(anomalyFunctionDimension))[0] : 'ALL';
 
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')

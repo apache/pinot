@@ -54,6 +54,7 @@ HashService.prototype = {
         break;
       case HASH_PARAMS.ANALYSIS_FILTERS:
       case HASH_PARAMS.HEATMAP_FILTERS:
+      case HASH_PARAMS.ANOMALIES_SEARCH_FILTERS:
         try {
           value = JSON.parse(value);
         } catch (e) {

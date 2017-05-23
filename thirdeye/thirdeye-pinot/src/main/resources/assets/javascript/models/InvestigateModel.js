@@ -20,9 +20,13 @@ InvestigateModel.prototype = {
     this.metricId = anomaly.metricId;
   },
 
+  /**
+   * Fetches information for a given anomalyId
+   * @param  {Number} anomalyId Id of the anomaly to be fetched
+   */
   fetchMetricInformation(anomalyId) {
     dataService.fetchAnomaliesForAnomalyIds(
-          this.startDate, this.endDate, this.pageNumber, anomalyId, this.functionName, this.updateModelAndNotifyView.bind(this), 'investigate-spin-area');
+          this.startDate, this.endDate, this.pageNumber, anomalyId, this.functionName, false, this.updateModelAndNotifyView.bind(this), 'investigate-spin-area');
   },
 
   getWowData() {
@@ -56,8 +60,14 @@ InvestigateModel.prototype = {
     }[this.anomaly.anomalyFeedback];
   },
 
-  updateModelAndNotifyView({anomalyDetailsList}) {
+  /**
+   * Call back function rendering the view
+   * @param  {Object} args Result payload
+   */
+  updateModelAndNotifyView(args = {}) {
+    const { anomalyDetailsList } = args;
     const [anomaly]  = anomalyDetailsList;
+
     this.update(anomaly);
     this.formatAnomaly();
     this.renderViewEvent.notify();

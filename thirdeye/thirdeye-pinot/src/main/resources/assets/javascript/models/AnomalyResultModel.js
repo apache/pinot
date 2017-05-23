@@ -24,13 +24,25 @@ function AnomalyResultModel() {
 
   this.previousPageNumber = null;
   this.pageNumber = 1;
-  this.pageSize = 10;
+  this.pageSize = constants.ANOMALIES_PER_PAGE;
+  this.totalAnomalies = 0;
+  this.ajaxCall = null;
+  this.searchFilters = null;
+  this.appliedFilters = null;
+  this.hiddenFilters = ['statusFilterMap'];
+  this.spinner = 'anomaly-spin-area';
 
   this.renderViewEvent = new Event();
-
+  this.updateModelAndNotifyView = this.updateModelAndNotifyView.bind(this);
 }
 
 AnomalyResultModel.prototype = {
+
+  /**
+   * Checks whether params are the same
+   * @param  {Object}  params New params
+   * @return {Boolean}
+   */
   hasSameParams(params) {
     if (!params.anomaliesSearchMode || !this.anomaliesSearchMode) {
       return false;
@@ -39,21 +51,26 @@ AnomalyResultModel.prototype = {
     // Check that the params are tab or rand
     // and is the same as the HASH_PARAMS
     return Object.keys(params).every((key) => {
-      const isParamTabOrRandom = ['tab', 'rand'].includes(key);
-      const isParamSameAsHash = !!this[key] && HASH_PARAMS.isSame(key, params[key], this[key]);
+      const isWhiteListedParam = ['tab', 'rand', 'searchFilters', 'pageNumber'].includes(key);
+      const isParamSameAsHash = HASH_PARAMS.isSame(key, params[key], this[key]);
 
-      return isParamTabOrRandom || isParamSameAsHash;
+      return isParamSameAsHash || isWhiteListedParam;
     });
   },
 
-  reset : function() {
+  /**
+   * Resets the model's search params
+   */
+  reset() {
     this.metricIds = null;
     this.dashboardId = null;
     this.anomalyIds = null;
     this.anomalyGroupIds = null;
     this.functionName = null;
     this.pageNumber = 1;
-
+    this.totalAnomalies = 0;
+    this.startDate = moment().subtract(1, 'days').startOf('day');
+    this.endDate = moment().subtract(0, 'days').startOf('day');
   },
   // Call setParams every time there is a change to the model
   setParams : function(params) {
@@ -90,26 +107,99 @@ AnomalyResultModel.prototype = {
         this.anomaliesWrapper.anomalyDetailsList[idx].anomalyFeedback = params['feedback'];
         this.anomalyForFeedbackUpdate = this.anomaliesWrapper.anomalyDetailsList[idx];
       }
+      this.searchFilters = params.searchFilters ? Object.assign({}, params.searchFilters) : this.searchFilters;
+      this.totalAnomalies = params.totalAnomalies || this.totalAnomalies;
+      this.appliedFilters = params.appliedFilters;
     }
   },
-  // Call rebuild every time new anomalies are to be loaded with new model
-  rebuild : function() {
-    if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0) {
-      dataService.fetchAnomaliesForMetricIds(
-          this.startDate, this.endDate, this.pageNumber, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined) {
-      dataService.fetchAnomaliesForDashboardId(
-          this.startDate, this.endDate, this.pageNumber, this.dashboardId, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0 && this.anomalyIds != this.previousAnomalyIds) {
-      dataService.fetchAnomaliesForAnomalyIds(
-          this.startDate, this.endDate, this.pageNumber, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_TIME) {
-      dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.pageNumber, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_GROUPID && this.anomalyGroupIds != undefined && this.anomalyGroupIds.length > 0) {
-      dataService.fetchAnomaliesforGroupIds(this.startDate, this.endDate, this.pageNumber, this.anomalyGroupIds, this.functionName, this.updateModelAndNotifyView.bind(this));
+
+  /**
+   * fetches anomalies based on new search params
+   * Aborts previous search request if it exists
+   */
+  rebuild() {
+    if (this.ajaxCall && !this.ajaxCall.status) {
+      this.ajaxCall.abort();
     }
+    const params = this.getSearchParams();
+    this.ajaxCall = dataService.fetchAnomalies(params);
   },
-  updateModelAndNotifyView : function(anomaliesWrapper) {
+
+
+  /**
+   * Helper function that gets all relevant properties for search
+   * @return {Obj} Object containing all needed params
+   */
+  getSearchParams() {
+    return function(obj) {
+      const {
+          anomaliesSearchMode,
+          startDate,
+          endDate,
+          pageNumber,
+          metricIds,
+          dashboardId,
+          anomalyIds,
+          anomalyGroupIds,
+          functionName,
+          updateModelAndNotifyView,
+          spinner
+      } = obj;
+
+      return {
+        anomaliesSearchMode,
+        startDate,
+        endDate,
+        pageNumber,
+        metricIds,
+        dashboardId,
+        anomalyIds,
+        anomalyGroupIds,
+        functionName,
+        updateModelAndNotifyView,
+        spinner
+      };
+    }(this);
+  },
+
+  /**
+   * Gets Search filters and cancel previous call
+   * @param  {Function} callback Function to be called after filters are retrieved
+   */
+  getSearchFilters(callback) {
+    if (this.searchAjaxCall && !this.searchAjaxCall.status) {
+      this.searchAjaxCall.abort();
+    }
+    const params = this.getSearchParams();
+    params.filterOnly = true;
+    params.updateModelAndNotifyView = callback;
+    params.spinner = 'anomaly-filter-spinner';
+    this.searchAjaxCall = dataService.fetchAnomalies(params);
+  },
+
+  /**
+   * Fetches details for given anomaly Ids
+   * @param  {Array}  anomalyIds Array of anomaly Ids to getch
+   */
+  getDetailsForAnomalyIds(anomalyIds = []) {
+    if (!anomalyIds.length) { return; }
+    if (this.ajaxCall && !this.ajaxCall.status) {
+      this.ajaxCall.abort();
+    }
+    const params = {};
+    params.startDate = this.startDate;
+    params.endDate = this.endDate;
+    params.pageNumber = 1;
+    params.anomaliesSearchMode = constants.MODE_ID;
+    params.updateModelAndNotifyView = this.updateModelAndNotifyView;
+    params.anomalyIds = anomalyIds;
+    this.ajaxCall = dataService.fetchAnomalies(params);
+  },
+  /**
+   * Call Back function that rerenders the view
+   * @param  {Object} anomaliesWrapper Result payload of search
+   */
+  updateModelAndNotifyView(anomaliesWrapper) {
     this.anomaliesWrapper = anomaliesWrapper;
     this.formatAnomalies();
     this.renderViewEvent.notify();
@@ -185,10 +275,33 @@ AnomalyResultModel.prototype = {
     var feedbackType = this.getFeedbackTypeFromString(this.anomalyForFeedbackUpdate.anomalyFeedback);
     dataService.updateFeedback(this.anomalyForFeedbackUpdate.anomalyId, feedbackType);
   },
-  getAnomaliesWrapper : function() {
-    return this.anomaliesWrapper;
+  getAnomaliesWrapper() {
+    return Object.assign(this.anomaliesWrapper, {
+      totalAnomalies: this.totalAnomalies,
+      appliedFilters: this.appliedFilters
+    });
   },
-  getAnomalyFunctions : function() {
+
+  /**
+   * Return non empty filters
+   * @return {Object} Subset of searchFilters
+   */
+  getAnomaliesFilters() {
+    const anomaliesFilters = this.anomaliesWrapper.searchFilters || {};
+
+    return Object.keys(anomaliesFilters)
+      .filter(key => Object.keys(anomaliesFilters[key]).length && !this.hiddenFilters.includes(key))
+      .reduce((filters, key) => {
+        filters[key] = anomaliesFilters[key];
+        return filters;
+      }, {});
+  },
+
+  /**
+   * Function Getter
+   * @return {Array} Array of functions
+   */
+  getAnomalyFunctions() {
     return this.functions;
   },
   // Helper functions to convert between UI string for feedback to database enum
@@ -216,4 +329,4 @@ AnomalyResultModel.prototype = {
       return feedbackType;
     }
   },
-}
+};
