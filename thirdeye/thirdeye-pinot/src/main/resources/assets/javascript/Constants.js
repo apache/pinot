@@ -53,7 +53,7 @@ function Constants() {
   this.TAB_INVESTIGATE = 'investigate';
 
   this.DEFAULT_ANALYSIS_GRANULARITY = 'DAYS';
-  this.DEFAULT_ANALYSIS_DIMENSION = 'ALL';
+  this.DEFAULT_ANALYSIS_DIMENSION = 'All';
 
   this.FEEDBACK_STRING_CONFIRMED_ANOMALY = 'Confirmed Anomaly';
   this.FEEDBACK_STRING_FALSE_ALARM = 'False Alarm';

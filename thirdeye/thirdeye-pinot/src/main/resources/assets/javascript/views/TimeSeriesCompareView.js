@@ -41,7 +41,7 @@ TimeSeriesCompareView.prototype = {
         heatmapCurrentEnd: this.timeSeriesCompareModel.heatMapCurrentEnd || this.timeSeriesCompareModel.currentEnd,
         heatmapBaselineStart: this.timeSeriesCompareModel.baselineStart,
         heatmapBaselineEnd: this.timeSeriesCompareModel.baselineEnd,
-        heatmapFilters: Object.assign({}, this.timeSeriesCompareModel.filters)
+        heatMapFilters: Object.assign({}, this.timeSeriesCompareModel.filters)
       };
     }
   },
@@ -64,7 +64,7 @@ TimeSeriesCompareView.prototype = {
     // this needs to be called last so that the chart is rendered after the legend
     // otherwise, we run into overflow issues
     this.loadChart(
-        this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
+        this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[constants.DEFAULT_ANALYSIS_DIMENSION]);
     this.loadAnomalyRegion();
     this.setupListenerForChartSubDimension();
   },
@@ -143,12 +143,11 @@ TimeSeriesCompareView.prototype = {
     });
   },
 
-  setupListenersForPercentageChangeCells: function () {
-    var self = this;
+  setupListenersForPercentageChangeCells() {
     // setting up listeners for percentage change cells
-    for (var i in self.timeSeriesCompareModel.subDimensions) {
+    for (var i in this.timeSeriesCompareModel.subDimensions) {
       for (var j in
-          self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent) {
+          this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent) {
         var tableCellId = i + "-" + j;
         $("#" + tableCellId).click((e) => {
           var subDimensionBucketIndexArr = e.target.attributes[0].value.split("-");
@@ -186,37 +185,45 @@ TimeSeriesCompareView.prototype = {
     }
   },
 
-  collectAndUpdateViewParamsForHeatMapRendering: function (subDimension, bucketIndex) {
-    var self = this;
-
-    var currentStart = self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[bucketIndex];
-    var baselineStart = self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsBaseline[bucketIndex];
-
-    var delta = 5 * 60 * 60 * 1000; // 1 hour
+  calculateDelta() {
+    let delta = 5 * 60 * 60 * 1000; // 1 hour
     if (this.timeSeriesCompareModel.granularity === 'DAYS') {
       delta = 86400 * 1000;
     }
-    if (self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent.length > 1) {
-      delta = self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[1]
-          - self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[0];
+    if (this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent.length > 1) {
+      delta = this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[1]
+          - this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[0];
     }
-    var currentEnd = currentStart + delta;
-    var baselineEnd = baselineStart + delta;
+    return delta;
+  },
 
-    var heatmapFilters = self.timeSeriesCompareModel.filters;
-    if (!(subDimension.toUpperCase() === 'ALL')) {
-      heatmapFilters[self.timeSeriesCompareModel.dimension] = [subDimension];
-    } else {
-      heatmapFilters = {};
+  collectAndUpdateViewParamsForHeatMapRendering(subDimension, bucketIndex) {
+    const currentStart = this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[bucketIndex];
+    const baselineStart = this.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsBaseline[bucketIndex];
+    const delta = this.calculateDelta();
+    const currentEnd = currentStart + delta;
+    const baselineEnd = baselineStart + delta;
+    const heatMapFilters = Object.assign({}, this.timeSeriesCompareModel.filters || {});
+    const {
+      dimension : metricDimension,
+      metricId
+    } = this.timeSeriesCompareModel;
+
+    if (subDimension !== constants.DEFAULT_ANALYSIS_DIMENSION) {
+      heatMapFilters[metricDimension] = [subDimension];
+    } else if (metricDimension !== constants.DEFAULT_ANALYSIS_DIMENSION) {
+      const allSubdimensions = this.timeSeriesCompareModel.subDimensions
+        .filter(subDimension => subDimension !== constants.DEFAULT_ANALYSIS_DIMENSION);
+      heatMapFilters[metricDimension] = allSubdimensions;
     }
 
     this.viewParams = {
-      metricId: self.timeSeriesCompareModel.metricId,
+      metricId,
       heatMapCurrentStart: moment(currentStart),
       heatMapCurrentEnd: moment(currentEnd),
       heatMapBaselineStart: moment(baselineStart),
       heatMapBaselineEnd: moment(baselineEnd),
-      heatmapFilters: heatmapFilters
+      heatMapFilters,
     };
   },
 
@@ -226,8 +233,8 @@ TimeSeriesCompareView.prototype = {
       heatMapCurrentEnd: null,
       heatMapBaselineStart: null,
       heatMapBaselineEnd: null,
-      heatmapFilters: null
+      heatMapFilters: null
     };
   }
-}
+};
 

@@ -1,7 +1,7 @@
 function DimensionTreeMapModel() {
   this.metricId;
   this.metricName;
-  this.heatmapFilters;
+  this.heatMapFilters;
   this.currentStart;
   this.currentEnd;
   this.baselineStart;
@@ -31,7 +31,7 @@ DimensionTreeMapModel.prototype = {
       this.baselineEnd = params.heatMapBaselineEnd || this.baselineEnd;
       this.granularity = params.granularity || this.granularity;
       this.heatmapMode = params.heatmapMode || this.heatmapMode;
-      this.heatmapFilters = Object.assign({}, params.heatmapFilters);
+      this.heatMapFilters = Object.assign({}, params.heatMapFilters);
       this.compareMode = params.compareMode || this.compareMode;
     }
   },
@@ -44,7 +44,7 @@ DimensionTreeMapModel.prototype = {
         this.currentEnd,
         this.baselineStart,
         this.baselineEnd,
-        this.heatmapFilters
+        this.heatMapFilters
       ).then((heatMapData) => {
         this.heatmapData = heatMapData;
         this.transformResponseData(heatMapData);

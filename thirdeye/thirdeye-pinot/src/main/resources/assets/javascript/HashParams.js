@@ -32,7 +32,7 @@ function HashParams() {
   this.HEATMAP_BASELINE_START = 'heatMapBaselineStart';
   this.HEATMAP_BASELINE_END = 'heatMapBaselineEnd';
   this.HEATMAP_MODE = 'heatmapMode';
-  this.HEATMAP_FILTERS = 'heatmapFilters';
+  this.HEATMAP_FILTERS = 'heatMapFilters';
 
   this.RAND = 'rand';
 
