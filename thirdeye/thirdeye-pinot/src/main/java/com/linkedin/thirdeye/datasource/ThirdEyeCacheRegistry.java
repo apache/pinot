@@ -78,7 +78,7 @@ public class ThirdEyeCacheRegistry {
    * Initializes webapp caches
    * @param config
    */
-  public static void initializeCaches(ThirdEyeConfiguration config) {
+  public static void initializeCaches(ThirdEyeConfiguration config) throws Exception {
 
     thirdeyeConfig = config;
     init();
@@ -103,7 +103,7 @@ public class ThirdEyeCacheRegistry {
     }
   }
 
-  private static void initCaches() {
+  private static void initCaches() throws Exception {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
     RemovalListener<PinotQuery, ResultSetGroup> listener = new RemovalListener<PinotQuery, ResultSetGroup>() {

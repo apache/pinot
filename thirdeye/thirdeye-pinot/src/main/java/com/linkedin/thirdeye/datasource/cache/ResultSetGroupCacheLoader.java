@@ -1,14 +1,5 @@
 package com.linkedin.thirdeye.datasource.cache;
 
-import java.util.List;
-
-import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkClient;
-import org.apache.helix.model.InstanceConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.cache.CacheLoader;
 import com.linkedin.pinot.client.Connection;
 import com.linkedin.pinot.client.ConnectionFactory;
@@ -17,10 +8,26 @@ import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.InstanceConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSetGroup> {
   private static final Logger LOG = LoggerFactory.getLogger(ResultSetGroupCacheLoader.class);
-  
+
+  private static final long CONNECTION_TIMEOUT = 60000;
+
   private static int MAX_CONNECTIONS;
   static {
     try {
@@ -33,7 +40,7 @@ public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSet
 
   private static final String BROKER_PREFIX = "Broker_";
 
-  public ResultSetGroupCacheLoader(PinotThirdEyeDataSourceConfig pinotThirdEyeDataSourceConfig) {
+  public ResultSetGroupCacheLoader(PinotThirdEyeDataSourceConfig pinotThirdEyeDataSourceConfig) throws Exception {
 
     if (pinotThirdEyeDataSourceConfig.getBrokerUrl() != null
         && pinotThirdEyeDataSourceConfig.getBrokerUrl().trim().length() > 0) {
@@ -52,16 +59,9 @@ public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSet
         thirdeyeBrokers[i] = instanceConfig.getHostName().replaceAll(BROKER_PREFIX, "") + ":"
             + instanceConfig.getPort();
       }
-      this.connections = new Connection[MAX_CONNECTIONS];
-      for (int i = 0; i < MAX_CONNECTIONS; i++) {
-        connections[i] = ConnectionFactory.fromHostList(thirdeyeBrokers);
-      }
+      this.connections = fromHostList(thirdeyeBrokers);
     } else {
-      this.connections = new Connection[MAX_CONNECTIONS];
-      for (int i = 0; i < MAX_CONNECTIONS; i++) {
-        connections[i] = ConnectionFactory.fromZookeeper(pinotThirdEyeDataSourceConfig.getZookeeperUrl()
-            + "/" + pinotThirdEyeDataSourceConfig.getClusterName());
-      }
+      this.connections = fromZookeeper(pinotThirdEyeDataSourceConfig);
     }
   }
 
@@ -101,5 +101,46 @@ public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSet
       }
     }
     return sb.toString();
+  }
+
+  private static Connection[] fromHostList(final String[] thirdeyeBrokers) throws Exception {
+    Callable<Connection> callable = new Callable<Connection>() {
+        @Override
+        public Connection call() throws Exception {
+          return ConnectionFactory.fromHostList(thirdeyeBrokers);
+        }
+      };
+    return fromFutures(executeReplicated(callable, MAX_CONNECTIONS));
+  }
+
+  private static Connection[] fromZookeeper(final PinotThirdEyeDataSourceConfig pinotThirdEyeDataSourceConfig) throws Exception {
+    Callable<Connection> callable = new Callable<Connection>() {
+        @Override
+        public Connection call() throws Exception {
+          return ConnectionFactory.fromZookeeper(
+              pinotThirdEyeDataSourceConfig.getZookeeperUrl()
+                  + "/" + pinotThirdEyeDataSourceConfig.getClusterName());
+        }
+      };
+    return fromFutures(executeReplicated(callable, MAX_CONNECTIONS));
+  }
+
+  private static <T> Collection<Future<T>> executeReplicated(Callable<T> callable, int n) {
+    ExecutorService executor = Executors.newCachedThreadPool();
+    Collection<Future<T>> futures = new ArrayList<>();
+    for(int i=0; i<n; i++) {
+      futures.add(executor.submit(callable));
+    }
+    executor.shutdown();
+    return futures;
+  }
+
+  private static Connection[] fromFutures(Collection<Future<Connection>> futures) throws Exception {
+    Connection[] connections = new Connection[futures.size()];
+    int i = 0;
+    for(Future<Connection> f : futures) {
+      connections[i++] = f.get(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+    }
+    return connections;
   }
 }
