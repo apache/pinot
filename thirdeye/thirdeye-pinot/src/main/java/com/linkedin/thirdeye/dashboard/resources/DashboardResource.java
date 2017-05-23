@@ -57,7 +57,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.DatasetsCache;
+import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRequest;
@@ -78,7 +78,7 @@ public class DashboardResource {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private QueryCache queryCache;
-  private DatasetsCache collectionsCache;
+  private DatasetListCache collectionsCache;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
   private LoadingCache<String,String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;

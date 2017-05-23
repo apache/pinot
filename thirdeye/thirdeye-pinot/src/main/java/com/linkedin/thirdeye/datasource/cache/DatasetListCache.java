@@ -12,23 +12,23 @@ import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 
-public class DatasetsCache {
+public class DatasetListCache {
 
-  private AtomicReference<List<String>> collectionsRef;
+  private AtomicReference<List<String>> datasetListRef;
   private DatasetConfigManager datasetConfigDAO;
   private List<String> whitelistCollections;
-  private static final Logger LOG = LoggerFactory.getLogger(DatasetsCache.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DatasetListCache.class);
 
 
-  public DatasetsCache(DatasetConfigManager datasetConfigDAO, ThirdEyeConfiguration config) {
-    this.collectionsRef = new AtomicReference<>();
+  public DatasetListCache(DatasetConfigManager datasetConfigDAO, ThirdEyeConfiguration config) {
+    this.datasetListRef = new AtomicReference<>();
     this.datasetConfigDAO = datasetConfigDAO;
     this.whitelistCollections = config.getWhitelistCollections();
   }
 
 
   public List<String> getDatasets() {
-    return collectionsRef.get();
+    return datasetListRef.get();
   }
 
   // TODO: remove concept of whitelist.
@@ -54,7 +54,7 @@ public class DatasetsCache {
     }
 
     LOG.info("Loading collections {}", datasets);
-    collectionsRef.set(datasets);
+    datasetListRef.set(datasets);
   }
 
 }

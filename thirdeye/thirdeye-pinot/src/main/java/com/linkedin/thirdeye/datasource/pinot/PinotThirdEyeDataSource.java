@@ -257,8 +257,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   }
 
   @Override
-  public String getDimensionFilters(String dataset) throws Exception {
-    return pinotDataSourceDimensionFilters.getDimensionFiltersJson(dataset);
+  public Map<String, List<String>> getDimensionFilters(String dataset) throws Exception {
+    return pinotDataSourceDimensionFilters.getDimensionFilters(dataset);
   }
 
   @Override

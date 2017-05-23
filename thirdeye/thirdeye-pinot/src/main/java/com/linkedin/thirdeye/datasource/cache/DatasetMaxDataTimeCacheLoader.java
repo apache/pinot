@@ -36,7 +36,7 @@ public class DatasetMaxDataTimeCacheLoader extends CacheLoader<String, Long> {
    */
   @Override
   public Long load(String dataset) throws Exception {
-    LOGGER.info("Loading maxDataTime cache {}", dataset);
+    LOGGER.debug("Loading maxDataTime cache {}", dataset);
     long maxTime = 0;
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     String dataSourceName = datasetConfig.getDataSource();

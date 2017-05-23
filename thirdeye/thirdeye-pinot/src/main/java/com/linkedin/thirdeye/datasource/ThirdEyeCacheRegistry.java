@@ -25,7 +25,7 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
-import com.linkedin.thirdeye.datasource.cache.DatasetsCache;
+import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
 import com.linkedin.thirdeye.datasource.cache.DashboardConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DashboardsCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetConfigCacheLoader;
@@ -46,7 +46,7 @@ public class ThirdEyeCacheRegistry {
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
   private LoadingCache<String, String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
-  private DatasetsCache datasetsCache;
+  private DatasetListCache datasetsCache;
   private QueryCache queryCache;
 
   private static DatasetConfigManager datasetConfigDAO;
@@ -173,7 +173,7 @@ public class ThirdEyeCacheRegistry {
     cacheRegistry.registerDashboardsCache(dashboardsCache);
 
     // Collections cache
-    DatasetsCache datasetsCache = new DatasetsCache(datasetConfigDAO, thirdeyeConfig);
+    DatasetListCache datasetsCache = new DatasetListCache(datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerDatasetsCache(datasetsCache);
 
 
@@ -252,11 +252,11 @@ public class ThirdEyeCacheRegistry {
     this.collectionMaxDataTimeCache = collectionMaxDataTimeCache;
   }
 
-  public DatasetsCache getDatasetsCache() {
+  public DatasetListCache getDatasetsCache() {
     return datasetsCache;
   }
 
-  public void registerDatasetsCache(DatasetsCache collectionsCache) {
+  public void registerDatasetsCache(DatasetListCache collectionsCache) {
     this.datasetsCache = collectionsCache;
   }
 

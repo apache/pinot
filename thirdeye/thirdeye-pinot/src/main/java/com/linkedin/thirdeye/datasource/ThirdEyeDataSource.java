@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datasource;
 
 import java.util.List;
+import java.util.Map;
 
 public interface ThirdEyeDataSource {
 
@@ -18,8 +19,20 @@ public interface ThirdEyeDataSource {
 
   void close() throws Exception;
 
+  /**
+   * Returns max dateTime in millis for the dataset
+   * @param dataset
+   * @return
+   * @throws Exception
+   */
   long getMaxDataTime(String dataset) throws Exception;
 
-  String getDimensionFilters(String dataset) throws Exception;
+  /**
+   * Returns map of dimension name to dimension values for filters
+   * @param dataset
+   * @return dimension map
+   * @throws Exception
+   */
+  Map<String, List<String>> getDimensionFilters(String dataset) throws Exception;
 
 }
