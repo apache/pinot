@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.detection;
+package com.linkedin.thirdeye.dashboard.resources;
 
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.ALERT_FILTER_LOGISITC_AUTO_TUNE;
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE;
@@ -24,6 +24,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
@@ -54,7 +55,6 @@ import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
@@ -88,6 +88,8 @@ public class DetectionJobResource {
   }
 
 
+  // Toggle Function Activation is redundant to endpoints defined in AnomalyResource
+  @Deprecated
   @POST
   @Path("/{id}")
   public Response enable(@PathParam("id") Long id) throws Exception {
@@ -95,21 +97,7 @@ public class DetectionJobResource {
     return Response.ok().build();
   }
 
-  @POST
-  @Path("/{id}/ad-hoc")
-  public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso) throws Exception {
-    Long startTime = null;
-    Long endTime = null;
-    if (StringUtils.isBlank(startTimeIso) || StringUtils.isBlank(endTimeIso)) {
-      throw new IllegalStateException("startTimeIso and endTimeIso must not be null");
-    }
-    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
-    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
-    detectionJobScheduler.runAdhocAnomalyFunction(id, startTime, endTime);
-    return Response.ok().build();
-  }
-
+  @Deprecated
   @DELETE
   @Path("/{id}")
   public Response disable(@PathParam("id") Long id) throws Exception {
@@ -117,16 +105,18 @@ public class DetectionJobResource {
     return Response.ok().build();
   }
 
+  @Deprecated
   private void toggleActive(Long id, boolean state) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
-    if(anomalyFunctionSpec == null) {
+    if (anomalyFunctionSpec == null) {
       throw new NullArgumentException("Function spec not found");
     }
     anomalyFunctionSpec.setIsActive(state);
     anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
   }
 
-
+  // endpoints to modify to aonmaly detection function
+  // show remove to anomalyResource
   @POST
   @Path("/requiresCompletenessCheck/enable/{id}")
   public Response enableRequiresCompletenessCheck(@PathParam("id") Long id) throws Exception {
@@ -150,6 +140,20 @@ public class DetectionJobResource {
     anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
   }
 
+  @POST
+  @Path("/{id}/ad-hoc")
+  public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
+                        @QueryParam("end") String endTimeIso) throws Exception {
+    Long startTime = null;
+    Long endTime = null;
+    if (StringUtils.isBlank(startTimeIso) || StringUtils.isBlank(endTimeIso)) {
+      throw new IllegalStateException("startTimeIso and endTimeIso must not be null");
+    }
+    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+    detectionJobScheduler.runAdhocAnomalyFunction(id, startTime, endTime);
+    return Response.ok().build();
+  }
 
   /**
    * Returns the weight of the metric at the given window. The calculation of baseline (history) data is specified by
@@ -756,23 +760,26 @@ public class DetectionJobResource {
    * Either functionId or autotuneId should be not null to provide function information, if functionId is not aligned with autotuneId's function, use all function information from autotuneId
    * @param replayStartTimeIso replay start time in ISO format, e.g. 2017-02-27T00:00:00.000Z, replay start time inclusive
    * @param replayEndTimeIso replay end time, e.g. 2017-02-27T00:00:00.000Z, replay end time exclusive
+   * @param speedUp boolean to determine should we speed up the replay process (by maximizing detection window size)
    * @return cloned function Id
    */
   @POST
   @Path("/replay/singlefunction")
   public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") Long functionId,
-      @QueryParam("autotuneId") Long autotuneId,
-      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull  String replayEndTimeIso)
-       {
+                                                    @QueryParam("autotuneId") Long autotuneId,
+                                                    @QueryParam("start") @NotNull String replayStartTimeIso,
+                                                    @QueryParam("end") @NotNull  String replayEndTimeIso,
+                                                    @QueryParam("speedUp") @DefaultValue("true") boolean speedUp) {
+
     if (functionId == null && autotuneId == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     DateTime replayStart;
     DateTime replayEnd;
-    try{
+    try {
       replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
       replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
-    } catch (IllegalArgumentException e){
+    } catch (IllegalArgumentException e) {
       return Response.status(Response.Status.BAD_REQUEST).entity("Input start and end time illegal! ").build();
     }
 
@@ -784,13 +791,8 @@ public class DetectionJobResource {
     } else {
       functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, new HashMap<String, String>(), functionId, replayStart, replayEnd, false);
     }
-    Thread thread = new Thread(functionReplayRunnable);
-    thread.start();
-    try{
-      thread.join();
-    } catch (InterruptedException e){
-      return Response.status(Response.Status.EXPECTATION_FAILED).entity("Threading is interrupted").build();
-    }
+    functionReplayRunnable.setSpeedUp(speedUp);
+    functionReplayRunnable.run();
 
     Map<String, String> responseMessages = new HashMap<>();
     responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getLastClonedFunctionId()));
@@ -808,7 +810,7 @@ public class DetectionJobResource {
    */
   @POST
   @Path("/update/filter/{autotuneId}")
-  public Response updateAlertFilterToFunctionSpecByAutoTuneId(@PathParam("autotuneId") long id){
+  public Response updateAlertFilterToFunctionSpecByAutoTuneId(@PathParam("autotuneId") long id) {
     AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(id);
     long functionId = target.getFunctionId();
     AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
@@ -825,7 +827,7 @@ public class DetectionJobResource {
    */
   @POST
   @Path("/eval/autotuneboundary/{autotuneId}")
-  public Response getAlertFilterBoundaryByAutoTuneId(@PathParam("autotuneId") long id){
+  public Response getAlertFilterBoundaryByAutoTuneId(@PathParam("autotuneId") long id) {
     AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(id);
     return Response.ok(target.getConfiguration()).build();
   }
