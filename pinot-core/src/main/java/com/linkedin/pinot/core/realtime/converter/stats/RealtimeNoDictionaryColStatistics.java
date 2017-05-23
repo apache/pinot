@@ -153,7 +153,7 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public int getCardinality() {
-    throw new UnsupportedOperationException();
+    return Integer.MIN_VALUE;
   }
 
   @Override

@@ -15,6 +15,15 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang.math.IntRange;
+import org.codehaus.jackson.annotate.JsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -27,16 +36,6 @@ import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
-import java.lang.reflect.Field;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.commons.lang.math.IntRange;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
@@ -430,7 +429,17 @@ public class ColumnMetadata {
     return columnName;
   }
 
+  /**
+   * When a realtime segment has no-dictionary columns, the cardinality for those columns will be
+   * set to Integer.MIN_VALUE.
+   *
+   * @return The cardinality of the column.
+   * @throws UnsupportedOperationException if cardinality is not available.
+   */
   public int getCardinality() {
+    if (cardinality == Integer.MIN_VALUE) {
+      throw new UnsupportedOperationException();
+    }
     return cardinality;
   }
 
