@@ -126,28 +126,34 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public boolean execute() throws Exception {
-    if (_serverHost == null) {
-      _serverHost = NetUtil.getHostAddress();
-    }
-
-    Configuration configuration = readConfigFromFile(_configFileName);
-    if (configuration == null) {
-      if (_configFileName != null) {
-        LOGGER.error("Error: Unable to find file {}.", _configFileName);
-        return false;
+    try {
+      if (_serverHost == null) {
+        _serverHost = NetUtil.getHostAddress();
       }
 
-      configuration = new PropertiesConfiguration();
-      configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, _serverHost);
-      configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _serverPort);
-      configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
-      configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
-    }
+      Configuration configuration = readConfigFromFile(_configFileName);
+      if (configuration == null) {
+        if (_configFileName != null) {
+          LOGGER.error("Error: Unable to find file {}.", _configFileName);
+          return false;
+        }
 
-    LOGGER.info("Executing command: " + toString());
-    final HelixServerStarter pinotHelixStarter = new HelixServerStarter(_clusterName, _zkAddress, configuration);
-    String pidFile = ".pinotAdminServer-" + String.valueOf(System.currentTimeMillis()) + ".pid";
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
-    return true;
+        configuration = new PropertiesConfiguration();
+        configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, _serverHost);
+        configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _serverPort);
+        configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
+        configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
+      }
+
+      LOGGER.info("Executing command: " + toString());
+      final HelixServerStarter pinotHelixStarter = new HelixServerStarter(_clusterName, _zkAddress, configuration);
+      String pidFile = ".pinotAdminServer-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+      savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
+      return true;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while starting Pinot server, exiting.", e);
+      System.exit(-1);
+      return false;
+    }
   }
 }
