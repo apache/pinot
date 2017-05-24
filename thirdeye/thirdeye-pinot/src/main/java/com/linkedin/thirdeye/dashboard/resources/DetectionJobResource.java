@@ -766,10 +766,10 @@ public class DetectionJobResource {
   @POST
   @Path("/replay/singlefunction")
   public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") Long functionId,
-                                                    @QueryParam("autotuneId") Long autotuneId,
-                                                    @QueryParam("start") @NotNull String replayStartTimeIso,
-                                                    @QueryParam("end") @NotNull  String replayEndTimeIso,
-                                                    @QueryParam("speedUp") @DefaultValue("true") boolean speedUp) {
+      @QueryParam("autotuneId") Long autotuneId,
+      @QueryParam("start") @NotNull String replayStartTimeIso,
+      @QueryParam("end") @NotNull String replayEndTimeIso,
+      @QueryParam("speedUp") @DefaultValue("true") boolean speedUp) {
 
     if (functionId == null && autotuneId == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
