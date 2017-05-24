@@ -48,6 +48,7 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
   public AutoOnboardPinotDataSource(DataSourceConfig dataSourceConfig) {
     super(dataSourceConfig);
     autoLoadPinotMetricsUtils = new AutoOnboardPinotMetricsUtils(dataSourceConfig);
+    LOG.info("Created {}", AutoOnboardPinotDataSource.class.getName());
   }
 
   public AutoOnboardPinotDataSource(DataSourceConfig dataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
@@ -56,6 +57,7 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
   }
 
   public void run() {
+    LOG.info("Running auto load for {}", AutoOnboardPinotDataSource.class.getSimpleName());
     try {
       loadDatasets();
       LOG.info("Checking all datasets");
