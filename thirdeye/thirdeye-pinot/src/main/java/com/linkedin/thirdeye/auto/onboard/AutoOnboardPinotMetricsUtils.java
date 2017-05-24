@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.autoload.pinot.metrics;
+package com.linkedin.thirdeye.auto.onboard;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,12 +17,10 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.datasource.DataSources;
-import com.linkedin.thirdeye.datasource.DataSourcesLoader;
+import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
 
-public class AutoLoadPinotMetricsUtils {
+public class AutoOnboardPinotMetricsUtils {
   private static final String PINOT_TABLES_ENDPOINT = "tables/";
   private static final String PINOT_SCHEMA_ENDPOINT = "schemas/%s";
   private static final String PINOT_SCHEMA_ENDPOINT_TEMPLATE = "tables/%s/schema";
@@ -31,22 +29,13 @@ public class AutoLoadPinotMetricsUtils {
   private CloseableHttpClient pinotControllerClient;
   private HttpHost pinotControllerHost;
 
-  private static final Logger LOG = LoggerFactory.getLogger(AutoLoadPinotMetricsUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardPinotMetricsUtils.class);
 
-  public AutoLoadPinotMetricsUtils(ThirdEyeConfiguration config) {
-    try {
-      String dataSourcesPath = config.getDataSourcesPath();
-      DataSources dataSources = DataSourcesLoader.fromDataSourcesPath(dataSourcesPath);
-      if (dataSources == null) {
-        throw new IllegalStateException("Could not create data sources config from path " + dataSourcesPath);
-      }
-      PinotThirdEyeDataSourceConfig pinotThirdeyeDataSourceConfig = PinotThirdEyeDataSourceConfig.createPinotThirdeyeDataSourceConfig(dataSources);
+  public AutoOnboardPinotMetricsUtils(DataSourceConfig dataSourceConfig) {
+      PinotThirdEyeDataSourceConfig pinotThirdeyeDataSourceConfig = PinotThirdEyeDataSourceConfig.createPinotThirdeyeDataSourceConfig(dataSourceConfig);
       this.pinotControllerClient = HttpClients.createDefault();
       this.pinotControllerHost = new HttpHost(pinotThirdeyeDataSourceConfig.getControllerHost(),
           pinotThirdeyeDataSourceConfig.getControllerPort());
-    } catch (Exception e) {
-     LOG.error("Exception in creating pinot controller http host", e);
-    }
   }
 
   public JsonNode getAllTablesFromPinot() throws IOException {

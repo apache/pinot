@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardConfiguration;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
@@ -18,6 +19,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private String dashboardHost;
   private SmtpConfiguration smtpConfiguration;
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
+  private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
@@ -68,6 +70,16 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setMonitorConfiguration(MonitorConfiguration monitorConfiguration) {
     this.monitorConfiguration = monitorConfiguration;
+  }
+
+
+
+  public AutoOnboardConfiguration getAutoOnboardConfiguration() {
+    return autoOnboardConfiguration;
+  }
+
+  public void setAutoOnboardConfiguration(AutoOnboardConfiguration autoOnboardConfiguration) {
+    this.autoOnboardConfiguration = autoOnboardConfiguration;
   }
 
   public TaskDriverConfiguration getTaskDriverConfiguration() {

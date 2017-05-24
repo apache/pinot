@@ -20,7 +20,8 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
-import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardPinotDataSource;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -40,7 +41,7 @@ public class ThirdEyeAnomalyApplication
   private AlertJobSchedulerV2 alertJobSchedulerV2;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
-  private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
+  private AutoOnboardService autoOnboardService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
   private AlertFilterFactory alertFilterFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
@@ -127,8 +128,8 @@ public class ThirdEyeAnomalyApplication
           anomalyMergeExecutor.start();
         }
         if (config.isAutoload()) {
-          autoLoadPinotMetricsService = new AutoLoadPinotMetricsService(config);
-          autoLoadPinotMetricsService.start();
+          autoOnboardService = new AutoOnboardService(config);
+          autoOnboardService.start();
         }
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler = new DataCompletenessScheduler();
@@ -159,7 +160,7 @@ public class ThirdEyeAnomalyApplication
           anomalyMergeExecutor.stop();
         }
         if (config.isAutoload()) {
-          autoLoadPinotMetricsService.shutdown();
+          autoOnboardService.shutdown();
         }
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler.shutdown();

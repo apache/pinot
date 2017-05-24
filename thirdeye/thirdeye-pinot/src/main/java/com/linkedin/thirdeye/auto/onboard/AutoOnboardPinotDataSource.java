@@ -1,14 +1,10 @@
-package com.linkedin.thirdeye.autoload.pinot.metrics;
+package com.linkedin.thirdeye.auto.onboard;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,26 +16,23 @@ import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * This is a service to onboard datasets automatically to thirdeye from pinot
- * This service runs periodically and checks for new tables in pinot, to add to thirdeye
+ * The run method is invoked periodically by the AutoOnboardService, and it checks for new tables in pinot, to add to thirdeye
  * If the table is an ingraph table, it loads metrics from the ingraph table
  * It also looks for any changes in dimensions or metrics to the existing tables
  */
-public class AutoLoadPinotMetricsService implements Runnable {
-  private static final Logger LOG = LoggerFactory.getLogger(AutoLoadPinotMetricsService.class);
+public class AutoOnboardPinotDataSource extends AutoOnboard {
+  private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardPinotDataSource.class);
 
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -47,33 +40,27 @@ public class AutoLoadPinotMetricsService implements Runnable {
   private static final String DEFAULT_INGRAPH_METRIC_NAMES_COLUMN = "metricName";
   private static final String DEFAULT_INGRAPH_METRIC_VALUES_COLUMN = "value";
 
-  private ScheduledExecutorService scheduledExecutorService;
-  private AutoLoadPinotMetricsUtils autoLoadPinotMetricsUtils;
+  private AutoOnboardPinotMetricsUtils autoLoadPinotMetricsUtils;
 
   private List<String> allDatasets = new ArrayList<>();
   private Map<String, Schema> allSchemas = new HashMap<>();
 
-  public AutoLoadPinotMetricsService() {
+  public AutoOnboardPinotDataSource(DataSourceConfig dataSourceConfig) {
+    super(dataSourceConfig);
+    autoLoadPinotMetricsUtils = new AutoOnboardPinotMetricsUtils(dataSourceConfig);
+    LOG.info("Created {}", AutoOnboardPinotDataSource.class.getName());
   }
 
-  public AutoLoadPinotMetricsService(ThirdEyeConfiguration config) {
-
-    autoLoadPinotMetricsUtils = new AutoLoadPinotMetricsUtils(config);
-    scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-  }
-
-  public void start() {
-    scheduledExecutorService.scheduleAtFixedRate(this, 0, 4, TimeUnit.HOURS);
-  }
-
-  public void shutdown() {
-    scheduledExecutorService.shutdown();
+  public AutoOnboardPinotDataSource(DataSourceConfig dataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
+    super(dataSourceConfig);
+    autoLoadPinotMetricsUtils = utils;
   }
 
   public void run() {
+    LOG.info("Running auto load for {}", AutoOnboardPinotDataSource.class.getSimpleName());
     try {
       loadDatasets();
-
+      LOG.info("Checking all datasets");
       for (String dataset : allDatasets) {
         LOG.info("Checking dataset {}", dataset);
 
@@ -237,6 +224,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
   private void loadDatasets() throws IOException {
 
     JsonNode tables = autoLoadPinotMetricsUtils.getAllTablesFromPinot();
+    LOG.info("Getting all schemas");
     for (JsonNode table : tables) {
       String dataset = table.asText();
       Schema schema = autoLoadPinotMetricsUtils.getSchemaFromPinot(dataset);
@@ -251,6 +239,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
     }
   }
 
+  // TODO: when all ingraph traces are cleaned, remove these checks for ingraphs
   private boolean isIngraphDataset(Schema schema) {
     boolean isIngraphDataset = false;
     if ((schema.getDimensionNames().contains(DEFAULT_INGRAPH_METRIC_NAMES_COLUMN)
