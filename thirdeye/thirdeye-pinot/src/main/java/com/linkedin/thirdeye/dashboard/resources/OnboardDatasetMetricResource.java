@@ -121,7 +121,7 @@ public class OnboardDatasetMetricResource {
    *
    *    curl -H "Content-Type: application/json" -X POST -d <payload> <url>
    *    Eg: curl -H "Content-Type: application/json" -X POST -d
-   *            '{"datasetName":"xyz","metricName":"xyz", "dataSource":"abc", "properties": { "prop1":"1", "prop2":"2"}}'
+   *            '{"datasetName":"xyz","metricName":"xyz", "dataSource":"PinotThirdeyeDataSource", "properties": { "prop1":"1", "prop2":"2"}}'
    *                http://localhost:8080/onboard/create
    * @param payload
    */

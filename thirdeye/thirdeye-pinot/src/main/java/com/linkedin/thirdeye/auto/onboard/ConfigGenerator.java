@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.autoload.pinot.metrics;
+package com.linkedin.thirdeye.auto.onboard;
 
 import java.util.ArrayList;
 import java.util.List;

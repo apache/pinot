@@ -12,14 +12,16 @@ public class DataSourceConfig {
 
   private String className;
   private Map<String, String> properties;
+  private String autoLoadClassName = null;
 
 
   public DataSourceConfig() {
 
   }
-  public DataSourceConfig(String className, Map<String, String> properties) {
+  public DataSourceConfig(String className, Map<String, String> properties, String autoLoadClassName) {
     this.className = className;
     this.properties = properties;
+    this.autoLoadClassName = autoLoadClassName;
   }
 
   public String getClassName() {
@@ -34,7 +36,12 @@ public class DataSourceConfig {
   public void setProperties(Map<String, String> properties) {
     this.properties = properties;
   }
-
+  public String getAutoLoadClassName() {
+    return autoLoadClassName;
+  }
+  public void setAutoLoadClassName(String autoLoadClassName) {
+    this.autoLoadClassName = autoLoadClassName;
+  }
   @Override
   public String toString() {
     return ToStringBuilder.reflectionToString(this);

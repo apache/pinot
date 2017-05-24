@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.autoload.pinot.metrics;
+package com.linkedin.thirdeye.auto.onboard;
 
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
@@ -6,6 +6,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardPinotDataSource;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -21,16 +22,16 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
+public class AutoOnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
-  private AutoLoadPinotMetricsService testAutoLoadPinotMetricsService;
+  private AutoOnboardPinotDataSource testAutoLoadPinotMetricsService;
   private String dataset = "test-collection";
   private Schema schema;
 
   @BeforeMethod
   void beforeMethod() throws Exception {
     super.init();
-    testAutoLoadPinotMetricsService = new AutoLoadPinotMetricsService();
+    testAutoLoadPinotMetricsService = new AutoOnboardPinotDataSource(null, null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, null);
   }
