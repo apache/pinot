@@ -16,9 +16,9 @@
 package com.linkedin.pinot.transport.common;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -33,8 +33,6 @@ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
@@ -125,43 +123,13 @@ public class TimeBoundaryServiceTest {
     }
   }
 
-  private void addingTableToPropertyStore(String tableName) throws Exception {
-
-    JSONObject offlineTableConfigJson = new JSONObject();
-    offlineTableConfigJson.put("tableName", tableName);
-
-    JSONObject segmentsConfig = new JSONObject();
-    segmentsConfig.put("retentionTimeUnit", "DAYS");
-    segmentsConfig.put("retentionTimeValue", -1);
-    segmentsConfig.put("segmentPushFrequency", "daily");
-    segmentsConfig.put("segmentPushType", "APPEND");
-    segmentsConfig.put("replication", 1);
-    segmentsConfig.put("schemaName", "tableSchema");
-    segmentsConfig.put("timeColumnName", "timestamp");
-    segmentsConfig.put("timeType", "daysSinceEpoch");
-    segmentsConfig.put("segmentAssignmentStrategy", "");
-    offlineTableConfigJson.put("segmentsConfig", segmentsConfig);
-    JSONObject tableIndexConfig = new JSONObject();
-    JSONArray invertedIndexColumns = new JSONArray();
-    invertedIndexColumns.put("column1");
-    invertedIndexColumns.put("column2");
-    tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
-    tableIndexConfig.put("loadMode", "HEAP");
-    tableIndexConfig.put("lazyLoad", "false");
-    offlineTableConfigJson.put("tableIndexConfig", tableIndexConfig);
-    JSONObject tenants = new JSONObject();
-    tenants.put("broker", "brokerTenant");
-    tenants.put("server", "serverTenant");
-    offlineTableConfigJson.put("tenants", tenants);
-    offlineTableConfigJson.put("tableType", "OFFLINE");
-    JSONObject metadata = new JSONObject();
-    JSONObject customConfigs = new JSONObject();
-    customConfigs.put("d2Name", "xlntBetaPinot");
-    metadata.put("customConfigs", customConfigs);
-    offlineTableConfigJson.put("metadata", metadata);
-    TableConfig offlineTableConfig = TableConfig.init(offlineTableConfigJson.toString());
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName,
-        TableConfig.toZnRecord(offlineTableConfig));
+  private void addingTableToPropertyStore(String tableName)
+      throws Exception {
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
+        .setTimeColumnName("timestamp")
+        .setTimeType("DAYS")
+        .build();
+    ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableConfig.getTableName(),
+        TableConfig.toZnRecord(tableConfig));
   }
 }

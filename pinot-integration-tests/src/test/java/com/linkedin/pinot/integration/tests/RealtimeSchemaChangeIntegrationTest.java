@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.data.Schema;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -24,8 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.data.Schema;
 
 
 /**
@@ -47,8 +46,8 @@ public class RealtimeSchemaChangeIntegrationTest extends RealtimeClusterIntegrat
 
     // Create the table with a different schema than the final one
     addRealtimeTable(tableName, timeColumnName, timeColumnType, 900, "Days", kafkaZkUrl, kafkaTopic,
-        schema.getSchemaName(), null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier",
-        new ArrayList<String>(), null, null);
+        schema.getSchemaName(), null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", null, null, null,
+        null);
 
     // Sleep for a little bit to get some events in the realtime table
     Uninterruptibles.sleepUninterruptibly(15L, TimeUnit.SECONDS);

@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.core.common.Block;
@@ -51,7 +52,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.ZNRecord;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
@@ -86,29 +86,19 @@ public class RealtimeTableDataManagerTest {
     realtimeSegmentZKMetadata = getRealtimeSegmentZKMetadata();
     tableDataManagerConfig = getTableDataManagerConfig();
 
-    JSONObject request = new JSONObject();
-    request.put("tableName", "mirror");
-    request.put("tableType", "REALTIME");
-
-    JSONObject indexing = new JSONObject();
-    indexing.put("loadMode", "HEAP");
-
-    JSONObject stream = new JSONObject();
-    stream.put("streamType", "kafka");
-    stream.put("stream.kafka.consumer.type", "highLevel");
-    stream.put("stream.kafka.topic.name", "MirrorDecoratedProfileViewEvent");
-    stream
-        .put("stream.kafka.decoder.class.name", "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    stream.put("stream.kafka.hlc.zk.connect.string", "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");
-    stream.put("stream.kafka.decoder.prop.schema.registry.rest.url",
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.consumer.type", "highLevel");
+    streamConfigs.put("stream.kafka.topic.name", "MirrorDecoratedProfileViewEvent");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
+    streamConfigs.put("stream.kafka.hlc.zk.connect.string",
+        "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");
+    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url",
         "http://eat1-ei2-schema-vip-z.stg.linkedin.com:10252/schemaRegistry/schemas");
-    indexing.put("streamConfigs", stream);
-
-    request.put("tableIndexConfig", indexing);
-    request.put("segmentsConfig", new JSONObject());
-    request.put("tenants", new JSONObject());
-    request.put("metadata", new JSONObject());
-    tableConfig = TableConfig.init(request.toString());
+    tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("mirror")
+        .setStreamConfigs(streamConfigs)
+        .build();
   }
 
   private static TableDataManagerConfig getTableDataManagerConfig() throws ConfigurationException {

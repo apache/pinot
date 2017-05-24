@@ -16,6 +16,7 @@
 package com.linkedin.pinot.routing;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
@@ -486,29 +487,32 @@ public class RoutingTableTest {
   }
 
   @Test
-  public void testTableConfigRoutingTableSelector() throws Exception {
+  public void testTableConfigRoutingTableSelector()
+      throws Exception {
     FakePropertyStore fakePropertyStore = new FakePropertyStore();
 
     TableConfigRoutingTableSelector tableConfigRoutingTableSelector = new TableConfigRoutingTableSelector();
     tableConfigRoutingTableSelector.init(null, fakePropertyStore);
 
-    String propertyStoreEntry = "{\n" + "        \"tableName\":\"fakeTable\",\n" + "        \"segmentsConfig\": {\n" + "            \"retentionTimeUnit\":\"DAYS\",\n" + "            \"retentionTimeValue\":\"5\",\n"
-        + "            \"segmentPushFrequency\":\"daily\",\n" + "            \"segmentPushType\":\"APPEND\",\n" + "            \"replication\": \"2\",\n" + "            \"schemaName\": \"fakeSchema\",\n"
-        + "            \"timeColumnName\": \"time\",\n" + "            \"timeType\": \"MINUTES\",\n" + "            \"segmentAssignmentStrategy\": \"BalanceNumSegmentAssignmentStrategy\"\n" + "         },\n"
-        + "         \"tableIndexConfig\": {\n" + "            \"invertedIndexColumns\": [\"columnA\",\"columnB\"],\n"
-        + "            \"loadMode\": \"MMAP\",\n" + "            \"lazyLoad\": \"false\",\n" + "            \"streamConfigs\": {\n" + "               \"streamType\": \"kafka\",\n"
-        + "               \"stream.kafka.consumer.type\": \"highLevel,simple\",\n" + "               \"stream.kafka.topic.name\": \"FakeTopic\",\n"
-        + "               \"stream.kafka.decoder.class.name\": \"com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder\",\n"
-        + "\n" + "               \"stream.kafka.zk.broker.url\": \"fakezk:1234\",\n" + "               \"stream.kafka.hlc.zk.connect.string\": \"fakezk:1234\",\n"
-        + "               \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"fakeschemaregistry:1234\",\n" + "               \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"FakeSchema\"\n"
-        + "             }\n" + "          },\n" + "          \"tenants\": {\n" + "              \"broker\":\"fakebroker\",\n" + "              \"server\":\"fakeserver\"\n"
-        + "          },\n" + "          \"tableType\":\"REALTIME\",\n" + "          \"metadata\": {\n" + "              \"customConfigs\": {\n" + "                  \"routing.llc.percentage\": \"50.0\"\n"
-        + "               }\n" + "          }\n" + "    }\n" + "}";
-
-    TableConfig tableConfig = TableConfig.init(propertyStoreEntry);
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.consumer.type", "highLevel, simple");
+    streamConfigs.put("stream.kafka.topic.name", "fakeTopic");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
+    streamConfigs.put("stream.kafka.hlc.zk.connect.string", "fakeZK:1234");
+    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url", "fakeSchemaRegistry:1234");
+    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.schema.name", "fakeSchema");
+    TableCustomConfig customConfig = new TableCustomConfig();
+    customConfig.setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "50"));
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("fakeTable")
+            .setLLC(true)
+            .setStreamConfigs(streamConfigs)
+            .setCustomConfig(customConfig)
+            .build();
 
     fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", TableConfig.toZnRecord(tableConfig));
-
     tableConfigRoutingTableSelector.registerTable("fakeTable_REALTIME");
 
     int llcCount = 0;
@@ -518,7 +522,8 @@ public class RoutingTableTest {
       }
     }
 
-    Assert.assertTrue(4500 <= llcCount && llcCount <= 5500, "Expected approximately 50% probability of picking LLC, got " + llcCount / 100.0 + " %");
+    Assert.assertTrue(4500 <= llcCount && llcCount <= 5500,
+        "Expected approximately 50% probability of picking LLC, got " + llcCount / 100.0 + " %");
 
     tableConfig.getCustomConfig().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "0"));
     fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", TableConfig.toZnRecord(tableConfig));

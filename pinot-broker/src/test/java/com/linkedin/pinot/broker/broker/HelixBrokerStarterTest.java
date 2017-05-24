@@ -45,7 +45,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -94,10 +93,9 @@ public class HelixBrokerStarterTest {
         ZkStarter.DEFAULT_ZK_STR, 1, true);
 
     final String tableName = "dining";
-    JSONObject buildCreateOfflineTableV2JSON =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, null, null, 1);
-    TableConfig config = TableConfig.init(buildCreateOfflineTableV2JSON.toString());
-    _pinotResourceManager.addTable(config);
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName).build();
+    _pinotResourceManager.addTable(tableConfig);
 
     for (int i = 1; i <= 5; i++) {
       addOneSegment(tableName);
@@ -146,10 +144,11 @@ public class HelixBrokerStarterTest {
     Assert.assertEquals(Arrays.toString(brokerRoutingTable.keySet().toArray()), "[dining_OFFLINE]");
 
     final String tableName = "coffee";
-    JSONObject buildCreateOfflineTableV2JSON =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, "testServer", "testBroker", 1);
-    TableConfig config = TableConfig.init(buildCreateOfflineTableV2JSON.toString());
-    _pinotResourceManager.addTable(config);
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
+        .setBrokerTenant("testBroker")
+        .setServerTenant("testServer")
+        .build();
+    _pinotResourceManager.addTable(tableConfig);
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 6);
     idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);

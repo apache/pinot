@@ -34,6 +34,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class PinotHelixResourceManagerTest {
   ZkStarter.ZookeeperInstance zkServer;
   private PinotHelixResourceManager pinotHelixResourceManager;
@@ -80,10 +81,13 @@ public class PinotHelixResourceManagerTest {
   }
 
   @Test
-  public void testRebuildBrokerResourceFromHelixTags() throws Exception {
-    TableConfig tableConfig = TableConfig.init(
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON("faketable", "serverTenant", "brokerTenant", 3)
-            .toString());
+  public void testRebuildBrokerResourceFromHelixTags()
+      throws Exception {
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName("faketable")
+        .setNumReplicas(3)
+        .setBrokerTenant("brokerTenant")
+        .setServerTenant("serverTenant")
+        .build();
 
     Tenant tenant = new Tenant();
     tenant.setTenantName("brokerTenant");

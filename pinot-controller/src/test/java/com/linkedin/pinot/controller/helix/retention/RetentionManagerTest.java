@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
-import com.alibaba.fastjson.JSONObject;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -42,10 +41,8 @@ import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -109,10 +106,13 @@ public class RetentionManagerTest {
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     _helixZkManager = _pinotHelixResourceManager.getHelixZkManager();
 
-    String OfflineTableConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(_testTableName, null, null, 2).toString();
-    TableConfig offlineTableConfig = TableConfig.init(OfflineTableConfigJson);
-    _pinotHelixResourceManager.addTable(offlineTableConfig);
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(_testTableName)
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("365")
+            .setNumReplicas(2)
+            .build();
+    _pinotHelixResourceManager.addTable(tableConfig);
     _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, HELIX_CLUSTER_NAME);
   }
 
@@ -348,10 +348,11 @@ public class RetentionManagerTest {
   private Set<String> setupRealtimeTable(final int nSegments, final long now) throws Exception {
     final int replicaCount = 1;
 
-    createRealtimeTableConfig(_realtimeTableName, replicaCount);
+    createRealtimeTableConfig(replicaCount);
     Set<String> remainingSegments = new HashSet<>();
 
-    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(_realtimeTableName, replicaCount);
+    IdealState idealState =
+        PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(_realtimeTableName, replicaCount);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);
@@ -360,8 +361,7 @@ public class RetentionManagerTest {
     // then we could get unpredictable results depending on whether it takes more or less than
     // one millisecond to get to RetentionManager time comparison code. To be safe, set the
     // milliseconds off by 1/2 day.
-    long segmentCreationTime = now - (nSegments+1) * millisInDays + millisInDays/2;
-    List<LLCRealtimeSegmentZKMetadata> segmentZKMetadatas = new ArrayList<>();
+    long segmentCreationTime = now - (nSegments + 1) * millisInDays + millisInDays / 2;
     for (int seq = 1; seq <= nSegments; seq++) {
       segmentCreationTime += millisInDays;
       LLCRealtimeSegmentZKMetadata segmentMetadata = createSegmentMetadata(replicaCount, segmentCreationTime);
@@ -381,7 +381,8 @@ public class RetentionManagerTest {
       } else {
         segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
         idealState.setPartitionState(segName, serverName, "OFFLINE");
-        if (now - segmentCreationTime < TimeUnit.DAYS.toMillis(RetentionManager.getRetentionTimeForOldLLCSegmentsDays())) {
+        if ((now - segmentCreationTime) < TimeUnit.DAYS.toMillis(
+            RetentionManager.getRetentionTimeForOldLLCSegmentsDays())) {
           remainingSegments.add(segName);
         }
       }
@@ -404,34 +405,16 @@ public class RetentionManagerTest {
     return segmentMetadata;
   }
 
-  private void createRealtimeTableConfig(String realtimeTableName, int replicaCount)
-      throws JSONException, IOException {
-    JSONObject tableConfig = new JSONObject();
-    tableConfig.put("tableName", _testTableName);
-    tableConfig.put("tableType", "REALTIME");
-
-    JSONObject segmentsConfig = new JSONObject();
-    segmentsConfig.put("retentionTimeUnit", "DAYS");
-    segmentsConfig.put("retentionTimeValue", "5");
-    segmentsConfig.put("replicasPerPartition", Integer.toString(replicaCount));
-    segmentsConfig.put("replicationNumber", Integer.toString(replicaCount));
-    segmentsConfig.put("replication", Integer.toString(replicaCount));
-    tableConfig.put("segmentsConfig", segmentsConfig);
-
-    JSONObject tableIndexConfig = new JSONObject();
-    tableIndexConfig.put("stream.kafka.consumer.type", "simple");
-    tableConfig.put("tableIndexConfig", tableIndexConfig);
-
-    JSONObject tenants = new JSONObject();
-    tableConfig.put("tenants", tenants);
-
-    JSONObject metadata = new JSONObject();
-    tableConfig.put("metadata", tenants);
-
-    // Set the propertystore entry for table.
-    TableConfig abstractTableConfig = TableConfig.init(tableConfig.toJSONString());
-    ZKMetadataProvider
-        .setRealtimeTableConfig(_propertyStore, realtimeTableName, TableConfig.toZnRecord(abstractTableConfig));
+  private void createRealtimeTableConfig(int replicaCount)
+      throws IOException, JSONException {
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(_testTableName)
+            .setLLC(true)
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setNumReplicas(replicaCount)
+            .build();
+    ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, _realtimeTableName, TableConfig.toZnRecord(tableConfig));
   }
 
   private void registerSegmentMetadata(SegmentMetadata segmentMetadata) {

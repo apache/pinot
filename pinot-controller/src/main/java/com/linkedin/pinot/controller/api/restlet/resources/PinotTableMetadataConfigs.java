@@ -27,6 +27,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
+import org.json.JSONObject;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -86,9 +87,9 @@ public class PinotTableMetadataConfigs extends BasePinotControllerRestletResourc
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the metadata configuration", required = true) String tableName,
       Representation entity)
       throws Exception {
-    TableConfig config = TableConfig.init(entity.getText());
-    _pinotHelixResourceManager.updateMetadataConfigFor(config.getTableName(), config.getTableType(),
-        config.getCustomConfig());
+    TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(entity.getText()));
+    _pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
+        tableConfig.getCustomConfig());
     return new StringRepresentation("done");
   }
 }

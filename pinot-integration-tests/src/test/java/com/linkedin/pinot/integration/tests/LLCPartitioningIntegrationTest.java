@@ -15,12 +15,14 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
@@ -29,11 +31,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 
 
 /**
@@ -46,17 +43,15 @@ public class LLCPartitioningIntegrationTest extends RealtimeClusterIntegrationTe
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls_outgoing.schema";
 
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaTopic, File schemaFile, File avroFile) throws Exception {
+      String kafkaTopic, File schemaFile, File avroFile)
+      throws Exception {
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
-    Map<String, String> map = new HashMap<String, String>();
-    map.put(KAFKA_PARTITIONING_KEY, PartitionFunctionFactory.PartitionFunctionType.ByteArray.toString());
-    timeColumnName = "Date";
-    timeColumnType = "MILLISECONDS";
     List<String> noDictionaryColumns = Arrays.asList("NASDelay", "ArrDelayMinutes", "DepDelayMinutes");
-    addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schema.getSchemaName(),
-        null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", Collections.<String>emptyList(), "mmap",
-        noDictionaryColumns, map);
+    // TODO: add SegmentPartitionConfig here
+    addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+        kafkaTopic, schema.getSchemaName(), null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier",
+        Collections.<String>emptyList(), "mmap", noDictionaryColumns, null);
   }
 
   protected void createKafkaTopic(String kafkaTopic, String zkStr) {
@@ -96,8 +91,6 @@ public class LLCPartitioningIntegrationTest extends RealtimeClusterIntegrationTe
     String query;
     query = "SELECT * FROM mytable limit 1";
     JSONObject response = postQuery(query);
-
-    System.out.println("response");
 
     JSONObject selectionResults = ((JSONObject) response.get("selectionResults"));
     JSONArray columns = (JSONArray) selectionResults.get("columns");

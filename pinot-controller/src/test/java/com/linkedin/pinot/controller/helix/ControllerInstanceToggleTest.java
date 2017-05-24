@@ -15,24 +15,22 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import java.util.Set;
-
-import org.apache.helix.manager.zk.ZkClient;
-import org.apache.helix.model.ExternalView;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import java.util.Set;
+import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.ExternalView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class ControllerInstanceToggleTest extends ControllerTest {
@@ -69,12 +67,17 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   }
 
   @Test
-  public void testInstanceToggle() throws Exception {
-
+  public void testInstanceToggle()
+      throws Exception {
     // Create offline table creation request
     String tableName = "testTable";
-    JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, null, null, 20);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), payload.toString());
+    String tableJSONConfigString =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
+            .setNumReplicas(20)
+            .build()
+            .toJSONConfigString();
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(),
+        tableJSONConfigString);
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
             .getPartitionSet().size(), 1);

@@ -33,7 +33,6 @@ import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.linkedin.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 import java.io.File;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
@@ -98,8 +97,8 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
     addSchema(schemaFile, schema.getSchemaName());
     // Call into the super class method
     addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-        kafkaTopic, schema.getSchemaName(), null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier",
-        Collections.<String>emptyList(), "mmap");
+        kafkaTopic, schema.getSchemaName(), null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", null,
+        "mmap", null, null);
   }
 
   private void addRealtimeTable() throws Exception {

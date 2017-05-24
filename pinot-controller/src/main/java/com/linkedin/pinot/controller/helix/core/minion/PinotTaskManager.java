@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.helix.core.minion;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import com.linkedin.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -129,8 +131,9 @@ public class PinotTaskManager {
   public void scheduleTasks() {
     // TODO: add JobQueue health check here
 
+    Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
     Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
-    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
+    for (String taskType : taskTypes) {
       enabledTableConfigMap.put(taskType, new ArrayList<TableConfig>());
     }
 
@@ -138,12 +141,19 @@ public class PinotTaskManager {
     for (String tableName : _pinotHelixResourceManager.getAllTables()) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
       if (tableConfig != null) {
-        // TODO: add table configs that have certain types of tasks enabled into the map
+        TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+        if (taskConfig != null) {
+          for (String taskType : taskTypes) {
+            if (taskConfig.isTaskTypeEnabled(taskType)) {
+              enabledTableConfigMap.get(taskType).add(tableConfig);
+            }
+          }
+        }
       }
     }
 
     // Generate each type of tasks
-    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
+    for (String taskType : taskTypes) {
       LOGGER.info("Generating tasks for task type: {}", taskType);
       PinotTaskGenerator pinotTaskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
       Preconditions.checkNotNull(pinotTaskGenerator);

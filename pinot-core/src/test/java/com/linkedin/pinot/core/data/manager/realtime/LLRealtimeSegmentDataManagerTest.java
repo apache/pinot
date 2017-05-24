@@ -15,19 +15,6 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.LinkedList;
-import org.apache.commons.io.FileUtils;
-import org.apache.kafka.common.protocol.Errors;
-import org.json.JSONObject;
-import org.mockito.Mockito;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -42,7 +29,21 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.LinkedList;
 import junit.framework.Assert;
+import org.apache.commons.io.FileUtils;
+import org.apache.kafka.common.protocol.Errors;
+import org.json.JSONObject;
+import org.mockito.Mockito;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -106,14 +107,9 @@ public class LLRealtimeSegmentDataManagerTest {
         + "}";
   }
 
-  private TableConfig createTableConfig(String tableConfigJsonStr)
-      throws Exception {
-    return TableConfig.init(tableConfigJsonStr);
-  }
-
   private TableConfig createTableConfig()
       throws Exception {
-    return createTableConfig(_tableConfigJson);
+    return TableConfig.fromJSONConfig(new JSONObject(_tableConfigJson));
   }
 
   private RealtimeTableDataManager createTableDataManager() {
@@ -163,7 +159,7 @@ public class LLRealtimeSegmentDataManagerTest {
     JSONObject streamConfigs = (JSONObject)tableIndexConfig.get("streamConfigs");
     {
       streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h");
-      TableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
       KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
@@ -173,7 +169,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     {
       streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h30m");
-      TableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
       KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
@@ -184,7 +180,7 @@ public class LLRealtimeSegmentDataManagerTest {
     {
       final long segTime = 898789748357L;
       streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, String.valueOf(segTime));
-      TableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
       KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();

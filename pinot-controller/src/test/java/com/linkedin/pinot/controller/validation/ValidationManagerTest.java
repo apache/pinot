@@ -75,7 +75,6 @@ import static org.mockito.Mockito.when;
  *
  */
 public class ValidationManagerTest {
-
   private String HELIX_CLUSTER_NAME = "TestValidationManager";
 
   private String ZK_STR = ZkStarter.DEFAULT_ZK_STR;
@@ -93,7 +92,8 @@ public class ValidationManagerTest {
   private HelixManager _helixManager;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
     Thread.sleep(1000);
@@ -105,14 +105,13 @@ public class ValidationManagerTest {
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
 
-    String OfflineTableConfigJson = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TEST_TABLE_NAME, null, null,
-        "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
-    _offlineTableConfig = TableConfig.init(OfflineTableConfigJson);
+    _offlineTableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TEST_TABLE_NAME)
+        .setNumReplicas(2)
+        .build();
 
     final String instanceId = "localhost_helixController";
     _helixManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, ZK_STR, instanceId, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.addTable(_offlineTableConfig);
-
   }
 
   private void makeMockPinotLLCRealtimeSegmentManager(ZNRecord kafkaPartitionAssignment) {
@@ -135,9 +134,8 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(partitionName);
 
     // Add another table that needs to be rebuilt
-    String offlineTableTwoConfigJson =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TEST_TABLE_TWO, null, null, 1).toString();
-    TableConfig offlineTableConfigTwo = TableConfig.init(offlineTableTwoConfigJson);
+    TableConfig offlineTableConfigTwo =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TEST_TABLE_TWO).build();
     _pinotHelixResourceManager.addTable(offlineTableConfigTwo);
     String partitionNameTwo = offlineTableConfigTwo.getTableName();
 

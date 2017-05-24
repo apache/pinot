@@ -347,7 +347,7 @@ public class AutoAddInvertedIndex {
     httpURLConnection.setRequestMethod("PUT");
 
     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(httpURLConnection.getOutputStream(), "UTF-8"));
-    writer.write(tableConfig.toJSON().toString());
+    writer.write(tableConfig.toJSONConfigString());
     writer.flush();
 
     BufferedReader reader = new BufferedReader(new InputStreamReader(httpURLConnection.getInputStream(), "UTF-8"));
