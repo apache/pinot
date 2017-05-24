@@ -23,6 +23,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private double weight; // change percentage, whose absolute value is severity
   private double impactToGlobal; // the impact of this anomaly to the global metric
   // Additional anomaly detection properties (e.g., patter=UP, etc.)
+  // Being used as identifying if two merged anomalies have same anomaly detection properties, thus can be mergeable
   private Map<String, String> properties = new HashMap<>();
 
   private Long createdTime;

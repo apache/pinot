@@ -1,15 +1,17 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+
+
 
 /**
  * Given list of {@link RawAnomalyResultDTO} and merge parameters, this utility performs time based merge
@@ -71,16 +73,18 @@ public abstract class AnomalyTimeBasedSummarizer {
         populateMergedResult(mergedAnomaly, currentResult);
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
-        if (applySequentialGapBasedSplit
-            && (currentResult.getStartTime() - mergedAnomaly.getEndTime()) > sequentialAllowedGap) {
+        MergedAnomalyResultDTO currMergedAnomaly = new MergedAnomalyResultDTO();
+        populateMergedResult(currMergedAnomaly, currentResult);
+        if ((applySequentialGapBasedSplit
+            && (currentResult.getStartTime() - mergedAnomaly.getEndTime()) > sequentialAllowedGap)
+            || (!isMergeable(mergedAnomaly, currMergedAnomaly))) {
 
           // Split here
           // add previous merged result
           mergedAnomalies.add(mergedAnomaly);
 
           //set current raw result
-          mergedAnomaly = new MergedAnomalyResultDTO();
-          populateMergedResult(mergedAnomaly, currentResult);
+          mergedAnomaly = currMergedAnomaly;
         } else {
           // add the current raw result into mergedResult
           if (currentResult.getStartTime() < mergedAnomaly.getStartTime()) {
@@ -132,5 +136,13 @@ public abstract class AnomalyTimeBasedSummarizer {
     mergedAnomaly.setStartTime(currentResult.getStartTime());
     mergedAnomaly.setEndTime(currentResult.getEndTime());
     mergedAnomaly.setCreatedTime(System.currentTimeMillis());
+    // populate current result's property as well, will be used to identify if two anomalies can be merged by comparing their property
+    mergedAnomaly.setProperties(AnomalyDetectionUtils.decodeCompactedPropertyStringToMap(currentResult.getProperties()));
+  }
+
+  // compare if two anomalies have same property when doing anomaly detection, if from same detection configuration then is mergeable
+  private static boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2){
+    return ((anomaly1.getProperties() == null && anomaly2.getProperties() == null)
+        || (anomaly1.getProperties() != null && anomaly1.getProperties().equals(anomaly2.getProperties()) ));
   }
 }
