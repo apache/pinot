@@ -59,7 +59,7 @@ public class ControllerRequestBuilder {
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
-      String segmentAssignmentStrategy, List<String> invertedIndexColumns, String loadMode, String segmentVersion, String simpleDateFormat) throws JSONException {
+      String segmentAssignmentStrategy, List<String> invertedIndexColumns, String loadMode, String segmentVersion, DateFormat dateFormat) throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -73,8 +73,7 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("timeColumnName", timeColumnName);
     segmentsConfig.put("timeType", timeType);
     segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
-    if (simpleDateFormat != null) {
-      DateFormat dateFormat = new DateFormat(simpleDateFormat);
+    if (dateFormat != null) {
       segmentsConfig.put("dateFormat", dateFormat);
     }
     creationRequest.put("segmentsConfig", segmentsConfig);

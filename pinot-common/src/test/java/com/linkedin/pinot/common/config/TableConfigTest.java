@@ -19,6 +19,7 @@ package com.linkedin.pinot.common.config;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import java.io.IOException;
 import org.json.JSONException;
+import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,7 +32,7 @@ public class TableConfigTest {
     {
       // with quota
       String tableConfigStr =
-          "{\"tableName\":\"myTable\",\"quota\":{\"storage\":\"30G\"},\"segmentsConfig\":{\"retentionTimeUnit\":\"DAYS\",\"retentionTimeValue\":\"60\",\"segmentPushFrequency\":\"daily\",\"segmentPushType\":\"APPEND\",\"replication\":\"2\",\"schemaName\":\"\",\"timeColumnName\":\"\",\"timeType\":\"\",\"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\"},\"tableIndexConfig\":{\"invertedIndexColumns\":[],\"loadMode\":\"HEAP\",\"lazyLoad\":\"false\"},\"tenants\":{\"broker\":\"colocated\",\"server\":\"myServer\"},\"tableType\":\"OFFLINE\",\"metadata\":{\"customConfigs\":{\"loadBalancer\":\"myLoadBalancer\"}}}";
+          "{\"tableName\":\"myTable\",\"quota\":{\"storage\":\"30G\"},\"segmentsConfig\":{\"dateFormat\":{\"simpleDate\":\"yymmdd\"},\"retentionTimeUnit\":\"DAYS\",\"retentionTimeValue\":\"60\",\"segmentPushFrequency\":\"daily\",\"segmentPushType\":\"APPEND\",\"replication\":\"2\",\"schemaName\":\"\",\"timeColumnName\":\"\",\"timeType\":\"\",\"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\"},\"tableIndexConfig\":{\"invertedIndexColumns\":[],\"loadMode\":\"HEAP\",\"lazyLoad\":\"false\"},\"tenants\":{\"broker\":\"colocated\",\"server\":\"myServer\"},\"tableType\":\"OFFLINE\",\"metadata\":{\"customConfigs\":{\"loadBalancer\":\"myLoadBalancer\"}}}";
       TableConfig tableConfig = TableConfig.init(tableConfigStr);
 
       Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
@@ -45,6 +46,8 @@ public class TableConfigTest {
       Assert.assertNotNull(quotaConfig);
       Assert.assertEquals(quotaConfig.getStorage(), tableConfig.getQuotaConfig().getStorage());
       Assert.assertEquals(validator.getTableName(), tableConfig.getTableName());
+      tableConfig.getValidationConfig();
+      Assert.assertEquals(tableConfig.getValidationConfig().getDateFormat().getSimpleDate(), "yymmdd");
     }
     {
       // no quota

@@ -15,15 +15,13 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.json.JSONObject;
 
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class DateFormat extends JSONObject {
-  private static String _simpleDate;
-
-  public DateFormat(String simpleDate) {
-    _simpleDate = simpleDate;
-  }
+  private String _simpleDate;
 
   public String getSimpleDate() {
     return _simpleDate;

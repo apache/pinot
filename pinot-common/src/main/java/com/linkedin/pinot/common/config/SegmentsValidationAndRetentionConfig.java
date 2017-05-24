@@ -131,8 +131,8 @@ public class SegmentsValidationAndRetentionConfig {
     return dateFormat;
   }
 
-  public void setDateFormat(String simpleDate) {
-    dateFormat = new DateFormat(simpleDate);
+  public void setDateFormat(DateFormat dateFormat) {
+    this.dateFormat = dateFormat;
   }
 
   @Override
