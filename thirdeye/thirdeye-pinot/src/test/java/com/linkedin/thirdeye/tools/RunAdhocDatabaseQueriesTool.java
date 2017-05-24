@@ -4,7 +4,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
+import com.linkedin.thirdeye.auto.onboard.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
