@@ -30,7 +30,7 @@ public class TableConfigTest {
   public void testInit()
       throws IOException, JSONException {
     {
-      // with quota
+      // with quota and dateformat
       String tableConfigStr =
           "{\"tableName\":\"myTable\",\"quota\":{\"storage\":\"30G\"},\"segmentsConfig\":{\"dateFormat\":{\"simpleDate\":\"yymmdd\"},\"retentionTimeUnit\":\"DAYS\",\"retentionTimeValue\":\"60\",\"segmentPushFrequency\":\"daily\",\"segmentPushType\":\"APPEND\",\"replication\":\"2\",\"schemaName\":\"\",\"timeColumnName\":\"\",\"timeType\":\"\",\"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\"},\"tableIndexConfig\":{\"invertedIndexColumns\":[],\"loadMode\":\"HEAP\",\"lazyLoad\":\"false\"},\"tenants\":{\"broker\":\"colocated\",\"server\":\"myServer\"},\"tableType\":\"OFFLINE\",\"metadata\":{\"customConfigs\":{\"loadBalancer\":\"myLoadBalancer\"}}}";
       TableConfig tableConfig = TableConfig.init(tableConfigStr);
@@ -50,7 +50,7 @@ public class TableConfigTest {
       Assert.assertEquals(tableConfig.getValidationConfig().getDateFormat().getSimpleDate(), "yymmdd");
     }
     {
-      // no quota
+      // no quota or dateformat
       String tableConfigStr =
           "{\"tableName\":\"myTable\",\"segmentsConfig\":{\"retentionTimeUnit\":\"DAYS\",\"retentionTimeValue\":\"60\",\"segmentPushFrequency\":\"daily\",\"segmentPushType\":\"APPEND\",\"replication\":\"2\",\"schemaName\":\"\",\"timeColumnName\":\"\",\"timeType\":\"\",\"segmentAssignmentStrategy\":\"BalanceNumSegmentAssignmentStrategy\"},\"tableIndexConfig\":{\"invertedIndexColumns\":[],\"loadMode\":\"HEAP\",\"lazyLoad\":\"false\"},\"tenants\":{\"broker\":\"colocated\",\"server\":\"myServer\"},\"tableType\":\"OFFLINE\",\"metadata\":{\"customConfigs\":{\"loadBalancer\":\"myLoadBalancer\"}}}";
       TableConfig tableConfig = TableConfig.init(tableConfigStr);
@@ -63,6 +63,7 @@ public class TableConfigTest {
       TableConfig validator = TableConfig.init(tcFromJson);
       Assert.assertNull(validator.getQuotaConfig());
       Assert.assertEquals(validator.getTableName(), tableConfig.getTableName());
+      Assert.assertNull(tableConfig.getValidationConfig().getDateFormat());
     }
   }
 }
