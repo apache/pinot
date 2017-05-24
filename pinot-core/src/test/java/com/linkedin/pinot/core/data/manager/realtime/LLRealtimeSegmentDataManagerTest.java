@@ -15,6 +15,19 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.LinkedList;
+import org.apache.commons.io.FileUtils;
+import org.apache.kafka.common.protocol.Errors;
+import org.json.JSONObject;
+import org.mockito.Mockito;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -29,16 +42,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.LinkedList;
 import junit.framework.Assert;
-import org.apache.kafka.common.protocol.Errors;
-import org.json.JSONObject;
-import org.mockito.Mockito;
-import org.testng.annotations.Test;
-
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -46,7 +50,8 @@ import static org.mockito.Mockito.when;
 
 // TODO Write more tests for other parts of the class
 public class LLRealtimeSegmentDataManagerTest {
-  private static final String _segmentDir = "/somedir";
+  private static final String _segmentDir = "/tmp/" + LLRealtimeSegmentDataManagerTest.class.getSimpleName();
+  private static final File _segmentDirFile = new File(_segmentDir);
   private static final String _tableName = "Coffee";
   private static final int _partitionId = 13;
   private static final int _sequenceId = 945;
@@ -118,6 +123,7 @@ public class LLRealtimeSegmentDataManagerTest {
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     return tableDataManager;
   }
+
   private LLCRealtimeSegmentZKMetadata createZkMetadata() {
 
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
@@ -138,6 +144,16 @@ public class LLRealtimeSegmentDataManagerTest {
     FakeLLRealtimeSegmentDataManager segmentDataManager = new FakeLLRealtimeSegmentDataManager(segmentZKMetadata,
         tableConfig, instanceZKMetadata, tableDataManager, resourceDir, schema, serverMetrics);
     return segmentDataManager;
+  }
+
+  @BeforeClass
+  public void setUp() {
+    _segmentDirFile.deleteOnExit();
+  }
+
+  @AfterClass
+  public void tearDown() {
+    FileUtils.deleteQuietly(_segmentDirFile);
   }
 
   @Test
@@ -188,8 +204,7 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
         new SegmentCompletionProtocol.Response.Params().withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(
-            endOffset));
+            SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(endOffset));
     // And then never consume as long as we get a hold response, 100 times.
     for (int i = 0; i < 100; i++) {
       segmentDataManager._responses.add(response);
@@ -537,6 +552,66 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentImpl.set(segmentDataManager, mockSegmentImpl);
   }
 
+  // If commit fails, make sure that we do not re-build the segment when we try to commit again.
+  @Test
+  public void testReuseOfBuiltSegment() throws Exception {
+    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+
+    SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
+    params.withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+    SegmentCompletionProtocol.Response commitSuccess = new SegmentCompletionProtocol.Response(params);
+    params.withStatus(SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
+    SegmentCompletionProtocol.Response commitFailed = new SegmentCompletionProtocol.Response(params);
+
+    // Set up the responses so that we get a failed respnse first and then a success response.
+    segmentDataManager._responses.add(commitFailed);
+    segmentDataManager._responses.add(commitSuccess);
+    final long leaseTime = 50000L;
+
+    // The first time we invoke build, it should go ahead and build the segment.
+    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime);
+    Assert.assertTrue(segmentDataManager._buildSegmentCalled);
+    segmentDataManager._buildSegmentCalled = false;
+    Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
+
+    // This time around it should not build the segment.
+    String segTarFileName1 = segmentDataManager.invokeBuildForCommit(leaseTime);
+    Assert.assertFalse(segmentDataManager._buildSegmentCalled);
+    Assert.assertEquals(segTarFileName1, segTarFileName);
+    Assert.assertTrue(segmentDataManager.invokeCommit(segTarFileName1));
+  }
+
+  // If commit fails, and we still have the file, make sure that we remove the file when we go
+  // online.
+  @Test
+  public void testFileRemovedDuringOnlineTransition() throws Exception {
+    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+
+    SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
+    params.withStatus(SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
+    SegmentCompletionProtocol.Response commitFailed = new SegmentCompletionProtocol.Response(params);
+
+    // Set up the responses so that we get a failed respnse first and then a success response.
+    segmentDataManager._responses.add(commitFailed);
+    final long leaseTime = 50000L;
+    final long finalOffset = _startOffset + 600;
+    segmentDataManager.setCurrentOffset(finalOffset);
+
+    // We have set up commit to fail, so we should carry over the segment file.
+    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime);
+    Assert.assertTrue(segmentDataManager._buildSegmentCalled);
+    Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
+    Assert.assertTrue(new File(segTarFileName).exists());
+
+    // Now let the segment go ONLINE from CONSUMING, and ensure that the file is removed.
+    LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+    metadata.setEndOffset(finalOffset);
+    segmentDataManager._stopWaitTimeMs = 0;
+    segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.HOLDING);
+    segmentDataManager.goOnlineFromConsuming(metadata);
+    Assert.assertFalse(new File(segTarFileName).exists());
+  }
+
   public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
 
     public Field _state;
@@ -580,6 +655,14 @@ public class LLRealtimeSegmentDataManagerTest {
       return consumer;
     }
 
+    public String invokeBuildForCommit(long leaseTime) {
+      return super.buildSegmentForCommit(leaseTime);
+    }
+
+    public boolean invokeCommit(String segTarFileName) {
+      return super.commitSegment(segTarFileName);
+    }
+
     private void terminateLoopIfNecessary() {
       if (_consumeOffsets.isEmpty() && _responses.isEmpty()) {
         try {
@@ -609,6 +692,12 @@ public class LLRealtimeSegmentDataManagerTest {
     protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
       SegmentCompletionProtocol.Response response = _responses.remove();
       terminateLoopIfNecessary();
+      return response;
+    }
+
+    @Override
+    protected SegmentCompletionProtocol.Response postSegmentCommitMsg(File segTarFile) {
+      SegmentCompletionProtocol.Response response = _responses.remove();
       return response;
     }
 
@@ -650,13 +739,23 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean buildSegment(boolean buildTgz, long buildTimeLeaseMs) {
+    protected String buildSegmentInternal(boolean forCommit) {
       _buildSegmentCalled = true;
-      return true;
+      if (!forCommit) {
+        return _segmentDir;
+      }
+      final String segTarFileName =  _segmentDir + "/" + "segmentFile";
+      File segmentTgzFile = new File(segTarFileName);
+      try {
+        segmentTgzFile.createNewFile();
+      } catch (IOException e) {
+        Assert.fail("Could not create file " + segmentTgzFile);
+      }
+      return segTarFileName;
     }
 
     @Override
-    protected boolean commitSegment() {
+    protected boolean commitSegment(final String segTarFile) {
       _commitSegmentCalled = true;
       return true;
     }
@@ -731,5 +830,4 @@ public class LLRealtimeSegmentDataManagerTest {
       }
     }
   }
-
 }
