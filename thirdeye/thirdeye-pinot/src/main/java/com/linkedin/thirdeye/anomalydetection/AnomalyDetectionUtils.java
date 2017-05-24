@@ -20,6 +20,11 @@ public class AnomalyDetectionUtils {
   private static Splitter SEMICOLON_SPLITTER = Splitter.on(";").omitEmptyStrings();
   private static Splitter EQUALS_SPLITTER = Splitter.on("=").omitEmptyStrings();
 
+  /**
+   * Decode properties string to into Hashmap
+   * @param propStr: property string which is encoded using com.linkedin.anomalydetection.utils.StringUtil.encodeCompactedProperties
+   * @return
+   */
   public static Map<String, String> decodeCompactedPropertyStringToMap(String propStr) {
     Map<String, String> props = new HashMap<>();
     if(propStr != null) {
