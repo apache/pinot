@@ -15,10 +15,11 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.commons.lang3.ArrayUtils;
+import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.data.partition.PartitionFunction;
 
 
 public class ColumnIndexCreationInfo {
@@ -78,6 +79,9 @@ public class ColumnIndexCreationInfo {
   }
 
   public int getDistinctValueCount() {
+    if (sortedUniqueElementsArray == null) {
+      return Constants.UNKNOWN_CARDINALITY;
+    }
     return ArrayUtils.getLength(sortedUniqueElementsArray);
   }
 
