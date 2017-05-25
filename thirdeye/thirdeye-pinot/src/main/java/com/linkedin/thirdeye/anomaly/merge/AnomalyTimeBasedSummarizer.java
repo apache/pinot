@@ -18,6 +18,7 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
  */
 public abstract class AnomalyTimeBasedSummarizer {
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyTimeBasedSummarizer.class);
+  private static final String anomalyFunctionConfigTagKey = "testConfigTag";
 
   private AnomalyTimeBasedSummarizer() {
 
@@ -31,8 +32,8 @@ public abstract class AnomalyTimeBasedSummarizer {
    * @return
    */
   public static List<MergedAnomalyResultDTO> mergeAnomalies(List<RawAnomalyResultDTO> anomalies,
-      long mergeDuration, long sequentialAllowedGap) {
-    return mergeAnomalies(null, anomalies, mergeDuration, sequentialAllowedGap);
+      long mergeDuration, long sequentialAllowedGap, String anomalyFunctionConfigTagKey) {
+    return mergeAnomalies(null, anomalies, mergeDuration, sequentialAllowedGap, anomalyFunctionConfigTagKey);
   }
 
   /**
@@ -43,7 +44,7 @@ public abstract class AnomalyTimeBasedSummarizer {
    * @return
    */
   public static List<MergedAnomalyResultDTO> mergeAnomalies(MergedAnomalyResultDTO mergedAnomaly,
-      List<RawAnomalyResultDTO> anomalies, long maxMergedDurationMillis, long sequentialAllowedGap) {
+      List<RawAnomalyResultDTO> anomalies, long maxMergedDurationMillis, long sequentialAllowedGap, String anomalyFunctionConfigTagKey) {
 
     // sort anomalies in natural order of start time
     Collections.sort(anomalies, new Comparator<RawAnomalyResultDTO>() {
@@ -77,7 +78,7 @@ public abstract class AnomalyTimeBasedSummarizer {
         populateMergedResult(currMergedAnomaly, currentResult);
         if ((applySequentialGapBasedSplit
             && (currentResult.getStartTime() - mergedAnomaly.getEndTime()) > sequentialAllowedGap)
-            || (!isMergeable(mergedAnomaly, currMergedAnomaly))) {
+            || (!isMergeable(mergedAnomaly, currMergedAnomaly, anomalyFunctionConfigTagKey))) {
 
           // Split here
           // add previous merged result
@@ -141,8 +142,9 @@ public abstract class AnomalyTimeBasedSummarizer {
   }
 
   // compare if two anomalies have same property when doing anomaly detection, if from same detection configuration then is mergeable
-  private static boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2){
-    return ((anomaly1.getProperties() == null && anomaly2.getProperties() == null)
-        || (anomaly1.getProperties() != null && anomaly1.getProperties().equals(anomaly2.getProperties()) ));
+  private static boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2, String anomalyFunctionConfigTagKey){
+    return  (!anomaly1.getProperties().containsKey(anomalyFunctionConfigTagKey) && !anomaly2.getProperties().containsKey(anomalyFunctionConfigTagKey)
+      || anomaly1.getProperties().containsKey(anomalyFunctionConfigTagKey) && anomaly2.getProperties().containsKey(anomalyFunctionConfigTagKey) &&
+        anomaly1.getProperties().get(anomalyFunctionConfigTagKey).equals(anomaly2.getProperties().get(anomalyFunctionConfigTagKey)));
   }
 }

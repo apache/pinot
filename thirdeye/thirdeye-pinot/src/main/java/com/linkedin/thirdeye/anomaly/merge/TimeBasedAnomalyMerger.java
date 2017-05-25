@@ -132,7 +132,7 @@ public class TimeBasedAnomalyMerger {
 
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
-              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
+              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap(), mergeConfig.getAnomalyFunctionConfigTagKey());
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(dimensionMap);
