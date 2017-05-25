@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.DateFormat;
 import java.lang.reflect.Field;
 
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -35,7 +34,6 @@ public class SegmentsValidationAndRetentionConfig {
   private String timeColumnName;
   private String timeType;
   private String segmentAssignmentStrategy;
-  private DateFormat dateFormat;
 
   // Number of replicas per partition of low-level kafka consumers. This config is used for realtime tables only.
   private String replicasPerPartition;
@@ -125,14 +123,6 @@ public class SegmentsValidationAndRetentionConfig {
 
   public void setReplicasPerPartition(String replicasPerPartition) {
     this.replicasPerPartition = replicasPerPartition;
-  }
-
-  public DateFormat getDateFormat() {
-    return dateFormat;
-  }
-
-  public void setDateFormat(DateFormat dateFormat) {
-    this.dateFormat = dateFormat;
   }
 
   @Override
