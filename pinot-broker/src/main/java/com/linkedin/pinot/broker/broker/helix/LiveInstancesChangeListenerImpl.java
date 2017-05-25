@@ -51,11 +51,9 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
   @Override
   public void onLiveInstanceChange(List<LiveInstance> liveInstances, NotificationContext changeContext) {
     if (connectionPool == null) {
-      LOGGER.info("init hasn't been called yet on the live instances listener...");
+      LOGGER.warn("init has not been called on the live instances listener, ignoring live instance change.");
       return;
     }
-
-    LOGGER.info("Connection pool found, moving on...");
 
     for (LiveInstance instance : liveInstances) {
 
@@ -63,7 +61,7 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
       String sessionId = instance.getSessionId();
 
       if (!instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        LOGGER.info("Skipping non-server instance: {}", instanceId);
+        LOGGER.debug("Skipping non-server instance {}", instanceId);
         continue;
       }
 
@@ -73,16 +71,16 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
       try {
         port = Integer.parseInt(namePortStr.split("_")[1]);
       } catch (Exception e) {
-        LOGGER.warn("Port for server instance " + instanceId + " does not appear to be numeric", e);
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+        LOGGER.warn("Port for server instance {} does not appear to be numeric, defaulting to {}.", instanceId, port, e);
       }
 
       if (liveInstanceToSessionIdMap.containsKey(instanceId)) {
         // sessionId has changed
-        LOGGER.info("found instance Id : {} with new session Id : {} old session Id {}", instanceId, sessionId,
-            liveInstanceToSessionIdMap.get(instanceId));
         if (!sessionId.equals(liveInstanceToSessionIdMap.get(instanceId))) {
           try {
+            LOGGER.info("Instance {} has changed session id {} -> {}, validating connection pool for this instance.", instanceId, sessionId,
+                liveInstanceToSessionIdMap.get(instanceId));
             ServerInstance ins = ServerInstance.forHostPort(hostName, port);
             connectionPool.validatePool(ins, DO_NOT_RECREATE);
             liveInstanceToSessionIdMap.put(instanceId, sessionId);
@@ -91,7 +89,7 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
           }
         }
       } else {
-        LOGGER.info("found instance Id : {} with new session Id : {}", instanceId, sessionId);
+        LOGGER.info("Found new instance {} with session id {}, adding to session id map.", instanceId, sessionId);
         // we don't have this instanceId
         // lets first check if the connection is valid or not
         try {
