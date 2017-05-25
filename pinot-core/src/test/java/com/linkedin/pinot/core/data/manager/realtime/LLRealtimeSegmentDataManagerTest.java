@@ -571,14 +571,18 @@ public class LLRealtimeSegmentDataManagerTest {
     // The first time we invoke build, it should go ahead and build the segment.
     String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime);
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
-    segmentDataManager._buildSegmentCalled = false;
     Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
+    Assert.assertTrue(new File(segTarFileName).exists());
+
+    segmentDataManager._buildSegmentCalled = false;
 
     // This time around it should not build the segment.
     String segTarFileName1 = segmentDataManager.invokeBuildForCommit(leaseTime);
     Assert.assertFalse(segmentDataManager._buildSegmentCalled);
     Assert.assertEquals(segTarFileName1, segTarFileName);
+    Assert.assertTrue(new File(segTarFileName).exists());
     Assert.assertTrue(segmentDataManager.invokeCommit(segTarFileName1));
+    Assert.assertFalse(new File(segTarFileName).exists());
   }
 
   // If commit fails, and we still have the file, make sure that we remove the file when we go

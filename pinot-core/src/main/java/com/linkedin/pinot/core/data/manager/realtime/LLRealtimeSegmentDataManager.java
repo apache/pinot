@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -127,7 +126,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private class SegmentFileAndOffset implements Closeable {
+  private class SegmentFileAndOffset {
     final String _segmentFile;
     final long _offset;
     SegmentFileAndOffset(String segmentFile, long offset) {
@@ -142,8 +141,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       return _segmentFile;
     }
 
-    @Override
-    public void close() {
+    public void deleteSegmentFile() {
       FileUtils.deleteQuietly(new File(_segmentFile));
     }
   }
@@ -574,7 +572,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         buildTimeLeaseMs = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds() * 1000L;
       }
       _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
-      return buildSegmentInternal(true);
+      String segTarFile =  buildSegmentInternal(true);
+      _segmentFileAndOffset = new SegmentFileAndOffset(segTarFile, _currentOffset);
+      return segTarFile;
     } finally {
       _leaseExtender.removeSegment(_segmentNameStr);
     }
@@ -636,14 +636,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     SegmentCompletionProtocol.Response response =  postSegmentCommitMsg(segTarFile);
     if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       segmentLogger.warn("Received controller response {}", response);
-      // Save the segment file if commit fails
-      // If, for any reason, we have an older one, remove it now.
-      removeSegmentFile();
-      _segmentFileAndOffset = new SegmentFileAndOffset(segTarFileName, _currentOffset);
       return false;
     }
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
-    FileUtils.deleteQuietly(segTarFile);
+    removeSegmentFile();
     return true;
   }
 
@@ -696,7 +692,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   private void removeSegmentFile() {
     if (_segmentFileAndOffset != null) {
-      _segmentFileAndOffset.close();
+      _segmentFileAndOffset.deleteSegmentFile();
       _segmentFileAndOffset = null;
     }
   }
