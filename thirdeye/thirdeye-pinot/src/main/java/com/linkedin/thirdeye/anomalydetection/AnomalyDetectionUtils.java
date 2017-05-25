@@ -22,24 +22,6 @@ public class AnomalyDetectionUtils {
 
   private static Splitter SEMICOLON_SPLITTER = Splitter.on(";").omitEmptyStrings();
   private static Splitter EQUALS_SPLITTER = Splitter.on("=").omitEmptyStrings();
-
-  /**
-   * Decode properties string to into Hashmap
-   * @param propStr: property string which is encoded using com.linkedin.anomalydetection.utils.StringUtil.encodeCompactedProperties
-   * @return
-   */
-  public static Map<String, String> decodeCompactedPropertyStringToMap(String propStr) {
-    Map<String, String> props = new HashMap<>();
-    if(propStr != null) {
-      for (String part : SEMICOLON_SPLITTER.split(propStr)) {
-        List<String> kvPair = EQUALS_SPLITTER.splitToList(part);
-        props.put(kvPair.get(0), kvPair.get(1));
-      }
-    }
-    return props;
-  }
-
-
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
 
@@ -51,6 +33,22 @@ public class AnomalyDetectionUtils {
       parts.add(EQUALS.join(entry.getKey(), entry.getValue()));
     }
     return SEMICOLON.join(parts);
+  }
+
+  /**
+   * Decode properties string to into Hashmap
+   * @param propStr: property string which is encoded using encodeCompactedProperties
+   * @return
+   */
+  public static Map<String, String> decodeCompactedPropertyStringToMap(String propStr) {
+    Map<String, String> props = new HashMap<>();
+    if(propStr != null) {
+      for (String part : SEMICOLON_SPLITTER.split(propStr)) {
+        List<String> kvPair = EQUALS_SPLITTER.splitToList(part);
+        props.put(kvPair.get(0), kvPair.get(1));
+      }
+    }
+    return props;
   }
 
 }
