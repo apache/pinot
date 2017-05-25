@@ -15,16 +15,15 @@
  */
 package com.linkedin.pinot.common.request.helper;
 
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.utils.DateFormat;
-import com.linkedin.pinot.common.utils.TenantRole;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
+import com.linkedin.pinot.common.utils.TenantRole;
 
 
 public class ControllerRequestBuilder {
@@ -54,12 +53,12 @@ public class ControllerRequestBuilder {
       String segmentAssignmentStrategy) throws JSONException {
     List<String> invertedIndexColumns = Collections.emptyList();
     return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType,
-        retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy, invertedIndexColumns, null, "v1", null);
+        retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy, invertedIndexColumns, null, "v1");
   }
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
-      String segmentAssignmentStrategy, List<String> invertedIndexColumns, String loadMode, String segmentVersion, DateFormat dateFormat) throws JSONException {
+      String segmentAssignmentStrategy, List<String> invertedIndexColumns, String loadMode, String segmentVersion) throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -73,9 +72,6 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("timeColumnName", timeColumnName);
     segmentsConfig.put("timeType", timeType);
     segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
-    if (dateFormat != null) {
-      segmentsConfig.put("dateFormat", dateFormat);
-    }
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
     tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);
