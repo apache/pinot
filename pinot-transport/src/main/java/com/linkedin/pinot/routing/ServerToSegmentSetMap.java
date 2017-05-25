@@ -63,7 +63,7 @@ public class ServerToSegmentSetMap {
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
       }
 
-      ServerInstance serverInstance = new ServerInstance(hostName, port);
+      ServerInstance serverInstance = ServerInstance.forHostPort(hostName, port);
       SegmentIdSet segmentIdSet = new SegmentIdSet();
       for (String segmentId : entry.getValue()) {
         segmentIdSet.addSegment(new SegmentId(segmentId));

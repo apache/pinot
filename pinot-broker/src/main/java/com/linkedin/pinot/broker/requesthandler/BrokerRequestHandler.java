@@ -618,7 +618,7 @@ public class BrokerRequestHandler {
     for (Entry<ServerInstance, ByteBuf> entry : responseMap.entrySet()) {
       ServerInstance serverInstance = entry.getKey();
       if (!isOfflineTable) {
-        serverInstance = new ServerInstance(serverInstance.getHostname(), serverInstance.getPort(), 1);
+        serverInstance = serverInstance.withSeq(1);
       }
       ByteBuf byteBuf = entry.getValue();
       try {

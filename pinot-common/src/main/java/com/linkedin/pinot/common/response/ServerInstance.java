@@ -17,6 +17,8 @@ package com.linkedin.pinot.common.response;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.net.InternetDomainName;
@@ -52,6 +54,9 @@ public class ServerInstance implements Comparable<ServerInstance> {
 
   private final String _shortHostName;
 
+  private static final ConcurrentHashMap<String, Triple<String, String, InetAddress>> nameToInstanceInfo =
+      new ConcurrentHashMap<>();
+
   /**
    * Use this constructor if the name and port are embedded as string with ":" as delimiter
    *
@@ -80,6 +85,14 @@ public class ServerInstance implements Comparable<ServerInstance> {
     _port = port;
     _seq = seq;
     _shortHostName = makeShortHostName(_hostname);
+  }
+
+  private ServerInstance(String hostname, String shortHostName, InetAddress ipAddress, int port, int seq) {
+    _hostname = hostname;
+    _shortHostName = shortHostName;
+    _ipAddress = ipAddress;
+    _port = port;
+    _seq = seq;
   }
 
   /**
@@ -164,6 +177,10 @@ public class ServerInstance implements Comparable<ServerInstance> {
     return true;
   }
 
+  public ServerInstance withSeq(int seq) {
+    return new ServerInstance(_hostname, _shortHostName, _ipAddress, _port, seq);
+  }
+
   @Override
   public String toString() {
     return _hostname + "_" + _port;
@@ -174,4 +191,17 @@ public class ServerInstance implements Comparable<ServerInstance> {
     return this.toString().compareTo(o.toString());
   }
 
+  public static ServerInstance forHostPort(String name, int port) {
+    if (nameToInstanceInfo.containsKey(name)) {
+      Triple<String, String, InetAddress> instanceInfo = nameToInstanceInfo.get(name);
+      return new ServerInstance(instanceInfo.getLeft(), instanceInfo.getMiddle(), instanceInfo.getRight(), port, 0);
+    } else {
+      ServerInstance newInstance = new ServerInstance(name, port);
+
+      nameToInstanceInfo.putIfAbsent(name,
+          Triple.of(newInstance.getHostname(), newInstance.getShortHostName(), newInstance.getIpAddress()));
+
+      return newInstance;
+    }
+  }
 }

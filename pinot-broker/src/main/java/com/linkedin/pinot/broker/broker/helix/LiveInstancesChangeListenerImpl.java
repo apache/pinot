@@ -76,7 +76,6 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
         LOGGER.warn("Port for server instance " + instanceId + " does not appear to be numeric", e);
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
       }
-      ServerInstance ins = new ServerInstance(hostName, port);
 
       if (liveInstanceToSessionIdMap.containsKey(instanceId)) {
         // sessionId has changed
@@ -84,6 +83,7 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
             liveInstanceToSessionIdMap.get(instanceId));
         if (!sessionId.equals(liveInstanceToSessionIdMap.get(instanceId))) {
           try {
+            ServerInstance ins = ServerInstance.forHostPort(hostName, port);
             connectionPool.validatePool(ins, DO_NOT_RECREATE);
             liveInstanceToSessionIdMap.put(instanceId, sessionId);
           } catch (Exception e) {
@@ -95,6 +95,7 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
         // we don't have this instanceId
         // lets first check if the connection is valid or not
         try {
+          ServerInstance ins = ServerInstance.forHostPort(hostName, port);
           connectionPool.validatePool(ins, DO_NOT_RECREATE);
           liveInstanceToSessionIdMap.put(instanceId, sessionId);
         } catch (Exception e) {
