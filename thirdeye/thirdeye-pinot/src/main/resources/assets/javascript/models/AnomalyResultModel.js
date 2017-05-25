@@ -50,12 +50,14 @@ AnomalyResultModel.prototype = {
 
     // Check that the params are tab or rand
     // and is the same as the HASH_PARAMS
-    return Object.keys(params).every((key) => {
-      const isWhiteListedParam = ['tab', 'rand', 'searchFilters', 'pageNumber'].includes(key);
-      const isParamSameAsHash = HASH_PARAMS.isSame(key, params[key], this[key]);
+    return Object.keys(params)
+      .filter(key => params[key])
+      .every((key) => {
+        const isWhiteListedParam = ['tab', 'rand', 'searchFilters', 'pageNumber'].includes(key);
+        const isParamSameAsHash = HASH_PARAMS.isSame(key, params[key], this[key]);
 
-      return isParamSameAsHash || isWhiteListedParam;
-    });
+        return isParamSameAsHash || isWhiteListedParam;
+      });
   },
 
   /**

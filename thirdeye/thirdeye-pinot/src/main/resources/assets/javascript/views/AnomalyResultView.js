@@ -396,9 +396,9 @@ AnomalyResultView.prototype = {
       delete anomaliesParams.startDate;
       delete anomaliesParams.endDate;
     } else if (anomaliesSearchMode == constants.MODE_GROUPID) {
-        anomaliesParams.anomalyGroupIds = $('#anomalies-search-group-input').val().join();
-        delete anomaliesParams.startDate;
-        delete anomaliesParams.endDate;
+      anomaliesParams.anomalyGroupIds = $('#anomalies-search-group-input').val().join();
+      delete anomaliesParams.startDate;
+      delete anomaliesParams.endDate;
     }
 
     return anomaliesParams;
