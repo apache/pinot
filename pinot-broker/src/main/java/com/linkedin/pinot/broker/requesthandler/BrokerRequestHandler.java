@@ -564,10 +564,15 @@ public class BrokerRequestHandler {
     List<String> routingOptions;
     Map<String, String> debugOptions = brokerRequest.getDebugOptions();
     if (debugOptions == null || !debugOptions.containsKey("routingOptions")) {
-      routingOptions = Collections.emptyList();
+      routingOptions = new ArrayList<>();
     } else {
       routingOptions =
           Splitter.on(",").omitEmptyStrings().trimResults().splitToList(debugOptions.get("routingOptions"));
+    }
+    Map<String, String> queryOptions = brokerRequest.getQueryOptions();
+    if (queryOptions != null && queryOptions.containsKey("routingOptions")) {
+      routingOptions.addAll(
+          Splitter.on(",").omitEmptyStrings().trimResults().splitToList(queryOptions.get("routingOptions")));
     }
     RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(tableName, routingOptions);
     return _routingTable.findServers(routingTableLookupRequest);
