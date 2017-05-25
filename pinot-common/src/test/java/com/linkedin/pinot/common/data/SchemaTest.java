@@ -15,33 +15,20 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.pinot.common.utils.SchemaUtils;
 
 
 public class SchemaTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(SchemaTest.class);
-
-  private Schema schema;
-
-  @BeforeClass
-  public void setUp()
-      throws IOException {
-    URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
-    Preconditions.checkNotNull(resourceUrl);
-    schema = Schema.fromFile(new File(resourceUrl.getFile()));
-  }
 
   @Test
   public void testValidation()
@@ -251,26 +238,36 @@ public class SchemaTest {
 
   @Test
   public void testSerializeDeserialize()
-      throws IOException, IllegalAccessException {
-    Schema newSchema;
+      throws Exception {
+    URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
+    Assert.assertNotNull(resourceUrl);
+    Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
 
-    newSchema = Schema.fromString(schema.getJSONSchema());
-    Assert.assertEquals(newSchema, schema);
-    Assert.assertEquals(newSchema.hashCode(), schema.hashCode());
+    Schema schemaToCompare = Schema.fromString(schema.getJSONSchema());
+    Assert.assertEquals(schemaToCompare, schema);
+    Assert.assertEquals(schemaToCompare.hashCode(), schema.hashCode());
 
-    newSchema = SchemaUtils.fromZNRecord(SchemaUtils.toZNRecord(schema));
-    Assert.assertEquals(newSchema, schema);
-    Assert.assertEquals(newSchema.hashCode(), schema.hashCode());
+    schemaToCompare = SchemaUtils.fromZNRecord(SchemaUtils.toZNRecord(schema));
+    Assert.assertEquals(schemaToCompare, schema);
+    Assert.assertEquals(schemaToCompare.hashCode(), schema.hashCode());
+
+    // When setting new fields, schema string should be updated
+    String JSONSchema = schemaToCompare.getJSONSchema();
+    schemaToCompare.setSchemaName("newSchema");
+    String JSONSchemaToCompare = schemaToCompare.getJSONSchema();
+    Assert.assertFalse(JSONSchema.equals(JSONSchemaToCompare));
   }
 
   @Test
-  public void testSimpleDateFormat() throws IOException {
-    TimeGranularitySpec incomingTimeGranularitySpec = new TimeGranularitySpec(DataType.STRING, 1,
-        TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd" , "Date");
-    TimeGranularitySpec outgoingTimeGranularitySpec = new TimeGranularitySpec(DataType.STRING, 1,
-        TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+  public void testSimpleDateFormat()
+      throws Exception {
+    TimeGranularitySpec incomingTimeGranularitySpec =
+        new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+    TimeGranularitySpec outgoingTimeGranularitySpec =
+        new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
+        .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec)
+        .build();
     String jsonSchema = schema.getJSONSchema();
     Schema schemaFromJson = Schema.fromString(jsonSchema);
     Assert.assertEquals(schemaFromJson, schema);

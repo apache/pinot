@@ -58,13 +58,13 @@ public final class Schema {
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
+
+  // Json ignored fields
   private final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
   private final Set<String> _dimensionSet = new HashSet<>();
   private final Set<String> _metricSet = new HashSet<>();
   private final List<String> _dimensionList = new ArrayList<>();
   private final List<String> _metricList = new ArrayList<>();
-
-  private transient String _jsonSchema;
 
   @Nonnull
   public static Schema fromFile(@Nonnull File schemaFile)
@@ -255,14 +255,11 @@ public final class Schema {
   @JsonIgnore
   @Nonnull
   public String getJSONSchema() {
-    if (_jsonSchema == null) {
-      try {
-        _jsonSchema = MAPPER.writeValueAsString(this);
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while writing Schema as JSON format string.", e);
-      }
+    try {
+      return MAPPER.writeValueAsString(this);
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while writing Schema as JSON format string.", e);
     }
-    return _jsonSchema;
   }
 
   /**
