@@ -56,7 +56,7 @@ For more information on Pinot Design and Architecture can be found [here](https:
 
 ## Quick Start 
 
-You can either build Pinot manually or use Docker to run Pinot.
+You can either build Pinot manually or use [Docker](https://www.docker.com/) to run Pinot.
 
 ### 1: Build and install Pinot (optional if you have Docker installed)
 
