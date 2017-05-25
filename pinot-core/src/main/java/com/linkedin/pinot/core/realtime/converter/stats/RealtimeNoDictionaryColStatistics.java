@@ -20,6 +20,7 @@ import java.util.List;
 import org.apache.commons.lang.math.IntRange;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
@@ -153,7 +154,7 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public int getCardinality() {
-    return Integer.MIN_VALUE;
+    return Constants.UNKNOWN_CARDINALITY;
   }
 
   @Override
