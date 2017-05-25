@@ -69,7 +69,7 @@ AnomalyResultController.prototype = {
       filter.selectedFilters = params.searchFilters;
       this.anomalyFilterController.resetModel();
       this.anomalyFilterController.handleAppEvent(filter);
-      this.updateFilters(hasSearchFilters);
+      this.updateFilters(hasSearchFilters, params.pageNumber);
     });
   },
 
