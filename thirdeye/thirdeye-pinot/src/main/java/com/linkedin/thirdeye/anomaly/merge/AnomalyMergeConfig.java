@@ -19,7 +19,6 @@ public class AnomalyMergeConfig {
   private AnomalyMergeStrategy mergeStrategy = AnomalyMergeStrategy.FUNCTION;
   private long sequentialAllowedGap = 30_000; // 30 seconds
   private long maxMergeDurationLength = 12 * 60 * 60 * 1000; // 12 hours
-  private String anomalyFunctionConfigTagKey = "testConfigTag";
 
   public AnomalyMergeStrategy getMergeStrategy() {
     return mergeStrategy;
@@ -32,12 +31,6 @@ public class AnomalyMergeConfig {
   public long getSequentialAllowedGap() {
     return sequentialAllowedGap;
   }
-
-  public void setAnomalyFunctionConfigTagKey(String anomalyFunctionConfigTagKey){ this.anomalyFunctionConfigTagKey =
-      anomalyFunctionConfigTagKey; }
-
-  public String getAnomalyFunctionConfigTagKey() {return this.anomalyFunctionConfigTagKey;}
-
 
   public void setSequentialAllowedGap(long sequentialAllowedGap) {
     this.sequentialAllowedGap = sequentialAllowedGap;

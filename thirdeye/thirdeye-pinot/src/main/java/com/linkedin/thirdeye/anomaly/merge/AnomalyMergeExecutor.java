@@ -310,7 +310,7 @@ public class AnomalyMergeExecutor implements Runnable {
     // TODO : get mergeConfig from function
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
         .mergeAnomalies(latestMergedResult, unmergedResults, mergeConfig.getMaxMergeDurationLength(),
-            mergeConfig.getSequentialAllowedGap(), mergeConfig.getAnomalyFunctionConfigTagKey());
+            mergeConfig.getSequentialAllowedGap());
     for (MergedAnomalyResultDTO mergedResult : mergedResults) {
       mergedResult.setFunction(function);
     }
@@ -350,7 +350,7 @@ public class AnomalyMergeExecutor implements Runnable {
 
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
-              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap(), mergeConfig.getAnomalyFunctionConfigTagKey());
+              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(exploredDimensions);
