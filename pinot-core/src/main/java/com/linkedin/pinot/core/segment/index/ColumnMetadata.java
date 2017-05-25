@@ -437,9 +437,6 @@ public class ColumnMetadata {
    * @throws UnsupportedOperationException if cardinality is not available.
    */
   public int getCardinality() {
-    if (cardinality == Integer.MIN_VALUE) {
-      throw new UnsupportedOperationException();
-    }
     return cardinality;
   }
 
