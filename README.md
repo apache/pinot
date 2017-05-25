@@ -56,7 +56,9 @@ For more information on Pinot Design and Architecture can be found [here](https:
 
 ## Quick Start 
 
-### 1: Build and install Pinot
+You can either build Pinot manually or use Docker to run Pinot.
+
+### 1: Build and install Pinot (optional if you have Docker installed)
 
 ```
 git clone https://github.com/linkedin/pinot.git
@@ -75,9 +77,7 @@ Execute the quick-start-offline.sh script in bin folder which performs the follo
 - Starts Pinot components, Zookeeper, Controller, Broker, Server.
 - Uploads segment to Pinot
 
-```
-bin/quick-start-offline.sh
-```
+If you have Docker, run `docker run -it -p 9000:9000 linkedin/pinot-quickstart-offline`. If you have built Pinot, run `bin/quick-start-offline.sh`.
 
 We should see the following output.
 
@@ -127,10 +127,7 @@ Execute quick-start-realtime.sh script in bin folder which performs the followin
 - start zookeeper, pinot controller, pinot broker, pinot-server.
 - configure the realtime source 
 
-```
-bin/quick-start-realtime.sh
-```
-
+If you have Docker, run `docker run -it -p 9000:9000 linkedin/pinot-quickstart-realtime`. If you have built Pinot, run `bin/quick-start-realtime.sh`.
 
 ```
 Starting Kafka
