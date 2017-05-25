@@ -131,4 +131,27 @@ public class Pql2CompilerTest {
         "select * from vegetables where name != 'Brussels sprouts'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.NOT);
   }
+
+  @Test
+  public void testQueryOptions() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts'");
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 0);
+    Assert.assertNull(brokerRequest.getQueryOptions());
+
+    brokerRequest = compiler.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes)");
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
+    Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
+    Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");
+
+    brokerRequest = compiler.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes, foo=1234, bar='potato')");
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 3);
+    Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
+    Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");
+    Assert.assertEquals(brokerRequest.getQueryOptions().get("foo"), "1234");
+    Assert.assertEquals(brokerRequest.getQueryOptions().get("bar"), "potato");
+  }
 }

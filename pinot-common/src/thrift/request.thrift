@@ -127,6 +127,7 @@ struct BrokerRequest {
  11: optional bool enableTrace;
  12: optional string responseFormat;
  13: optional map<string, string> debugOptions;
+ 14: optional map<string, string> queryOptions;
 }
 
 /**

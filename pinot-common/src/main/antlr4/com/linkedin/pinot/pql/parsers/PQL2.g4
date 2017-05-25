@@ -27,6 +27,7 @@ optionalClause:
   | orderByClause   # OrderBy
   | topClause       # Top
   | limitClause     # Limit
+  | optionListClause   # Options
   ;
 
 outputColumns:
@@ -107,6 +108,9 @@ topClause: TOP INTEGER_LITERAL;
 
 limitClause: LIMIT INTEGER_LITERAL (',' INTEGER_LITERAL)?;
 
+optionListClause: OPTION '(' option (',' option)* ')';
+option: expression ('=' expression)?;
+
 // Keywords
 AND: A N D;
 AS: A S;
@@ -128,6 +132,7 @@ ORDER: O R D E R;
 SELECT: S E L E C T;
 TOP: T O P;
 WHERE: W H E R E;
+OPTION: O P T I O N;
 
 
 WHITESPACE: [ \t\n]+ -> skip;
