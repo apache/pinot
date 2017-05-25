@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RCAFrameworkLoader {
   public static final String PROP_PATH = "path";
+  public static final String PROP_PATH_POSTFIX = "Path";
 
   private static final Logger LOG = LoggerFactory.getLogger(RCAFrameworkLoader.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
@@ -61,10 +62,14 @@ public class RCAFrameworkLoader {
   }
 
   static Map<String, String> augmentPathProperty(Map<String, String> properties, File rcaConfig) {
-    if(properties.containsKey(PROP_PATH)) {
-      File path = new File(properties.get(PROP_PATH));
-      if(!path.isAbsolute())
-        properties.put(PROP_PATH, rcaConfig.getParent() + File.separator + path);
+    for(Map.Entry<String, String> entry : properties.entrySet()) {
+      if (entry.getKey().equals(PROP_PATH) ||
+          entry.getKey().endsWith(PROP_PATH_POSTFIX)) {
+        File path = new File(entry.getValue());
+        if (!path.isAbsolute()) {
+          properties.put(entry.getKey(), rcaConfig.getParent() + File.separator + path);
+        }
+      }
     }
     return properties;
   }
