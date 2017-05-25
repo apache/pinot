@@ -16,6 +16,20 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -50,22 +64,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.yammer.metrics.core.Meter;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
 import kafka.message.MessageAndOffset;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -126,6 +125,27 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       return false;
     }
   }
+
+  private class SegmentFileAndOffset {
+    final String _segmentFile;
+    final long _offset;
+    SegmentFileAndOffset(String segmentFile, long offset) {
+      _segmentFile = segmentFile;
+      _offset = offset;
+    }
+    public long getOffset() {
+      return _offset;
+    }
+
+    public String getSegmentFile() {
+      return _segmentFile;
+    }
+
+    public void deleteSegmentFile() {
+      FileUtils.deleteQuietly(new File(_segmentFile));
+    }
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class);
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
@@ -151,6 +171,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
+  private SegmentFileAndOffset _segmentFileAndOffset;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -270,6 +291,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/idlePipeSleepTimeMillis;  // 3 minute count
     long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
     long idleCount = 0;
+    // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
+    // anymore. Remove the file if it exists.
+    removeSegmentFile();
 
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
@@ -484,12 +508,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT, 1);
               _state = State.COMMITTING;
               long buildTimeSeconds = response.getBuildTimeSeconds();
-              success = buildSegment(true, buildTimeSeconds*1000L);
-              if (!success) {
+              final String segmentTarFile = buildSegmentForCommit(buildTimeSeconds * 1000L);
+              if (segmentTarFile == null) {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
-                success = commitSegment();
+                success = commitSegment(segmentTarFile);
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -515,6 +539,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         return;
       }
 
+      removeSegmentFile();
+
       if (initialConsumptionEnd != 0L) {
         _serverMetrics.setValueOfTableGauge(_metricKeyName,
             ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
@@ -528,29 +554,33 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return new File(_resourceDataDir, _segmentZKMetadata.getSegmentName());
   }
 
-  /**
-   *
-   * @param forCommit true if you want the method to also build tgz file for committing
-   * @param buildTimeLeaseMs
-   * @return true if all succeeds.
-   */
-  protected boolean buildSegment(boolean forCommit, long buildTimeLeaseMs) {
+  protected String buildSegmentForCommit(long buildTimeLeaseMs) {
     try {
+      if (_segmentFileAndOffset != null) {
+        if (_segmentFileAndOffset.getOffset() == _currentOffset) {
+          // Double-check that we have the file, just in case.
+          String segTarFile = _segmentFileAndOffset.getSegmentFile();
+          if (new File(segTarFile).exists()) {
+            return _segmentFileAndOffset.getSegmentFile();
+          } else {
+            _segmentFileAndOffset = null;
+          }
+        }
+        removeSegmentFile();
+      }
       if (buildTimeLeaseMs <= 0) {
         buildTimeLeaseMs = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds() * 1000L;
       }
-      if (forCommit) {
-        _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
-      }
-      return buildSegmentInternal(forCommit);
+      _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
+      String segTarFile =  buildSegmentInternal(true);
+      _segmentFileAndOffset = new SegmentFileAndOffset(segTarFile, _currentOffset);
+      return segTarFile;
     } finally {
-      if (forCommit) {
-        _leaseExtender.removeSegment(_segmentNameStr);
-      }
+      _leaseExtender.removeSegment(_segmentNameStr);
     }
   }
 
-  private boolean buildSegmentInternal(boolean forCommit) {
+  protected String buildSegmentInternal(boolean forCommit) {
     long startTimeMillis = System.currentTimeMillis();
     // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
     // TODO Use an auto-closeable object to delete temp resources.
@@ -568,7 +598,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       segmentLogger.error("Could not build segment", e);
       FileUtils.deleteQuietly(tempSegmentFolder);
-      return false;
+      return null;
     }
     final long buildEndTime = now();
     segmentLogger.info("Successfully built segment in {} ms", (buildEndTime - buildStartTime));
@@ -582,7 +612,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     } catch (IOException e) {
       segmentLogger.error("Exception during move/tar segment", e);
       FileUtils.deleteQuietly(tempSegmentFolder);
-      return false;
+      return null;
     }
     FileUtils.deleteQuietly(tempSegmentFolder);
     long endTimeMillis = System.currentTimeMillis();
@@ -590,35 +620,39 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
         TimeUnit.MILLISECONDS.toSeconds(endTimeMillis - startTimeMillis));
 
+    if (forCommit) {
+      return destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION;
+    }
+    return destDir.getAbsolutePath();
+  }
+
+  protected boolean commitSegment(final String segTarFileName) {
+    // Send segmentCommit() to the controller
+    // if that succeeds, swap in-memory segment with the one built.
+    File segTarFile = new File(segTarFileName);
+    if (!segTarFile.exists()) {
+      throw new RuntimeException("Segment file does not exist:" + segTarFileName);
+    }
+    SegmentCompletionProtocol.Response response =  postSegmentCommitMsg(segTarFile);
+    if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
+      segmentLogger.warn("Received controller response {}", response);
+      return false;
+    }
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
+    removeSegmentFile();
     return true;
   }
 
-  protected boolean commitSegment() {
-    // Send segmentCommit() to the controller
-    // if that succeeds, swap in-memory segment with the one built.
-    File destSeg = makeSegmentDirPath();
-    final String segTarFileName = destSeg.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION;
-    try {
-      SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(_currentOffset, _segmentNameStr,
-          new File(segTarFileName));
-      if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
-        segmentLogger.warn("Received controller response {}", response);
-        return false;
-      }
-      _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
-    } catch (FileNotFoundException e) {
-      segmentLogger.error("Tar file {} not found", segTarFileName, e);
-      return false;
-    } finally {
-      FileUtils.deleteQuietly(new File(segTarFileName));
-    }
-    return true;
+  protected SegmentCompletionProtocol.Response postSegmentCommitMsg(File segmentTarFile) {
+    SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(_currentOffset, _segmentNameStr,
+        segmentTarFile);
+    return response;
   }
 
   protected boolean buildSegmentAndReplace() {
-    boolean success = buildSegmentInternal(false);
-    if (!success) {
-      return success;
+    String segmentDirName = buildSegmentInternal(false);
+    if (segmentDirName == null) {
+      return false;
     }
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     return true;
@@ -656,8 +690,17 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return _protocolHandler.segmentConsumed(params);
   }
 
+  private void removeSegmentFile() {
+    if (_segmentFileAndOffset != null) {
+      _segmentFileAndOffset.deleteSegmentFile();
+      _segmentFileAndOffset = null;
+    }
+  }
+
   public void goOnlineFromConsuming(RealtimeSegmentZKMetadata metadata) throws InterruptedException {
     LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata)metadata;
+    // Remove the segment file before we do anything else.
+    removeSegmentFile();
     _leaseExtender.removeSegment(_segmentNameStr);
     final long endOffset = llcMetadata.getEndOffset();
     segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})",

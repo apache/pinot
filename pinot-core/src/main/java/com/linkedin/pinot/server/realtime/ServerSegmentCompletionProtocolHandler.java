@@ -50,12 +50,19 @@ public class ServerSegmentCompletionProtocolHandler {
     _instanceId = instanceId;
   }
 
-  public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) throws FileNotFoundException {
+  public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
     SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
 
-    final InputStream inputStream = new FileInputStream(segmentTarFile);
+    InputStream fileInputStream;
+    try {
+      fileInputStream = new FileInputStream(segmentTarFile);
+    } catch (FileNotFoundException e) {
+      throw new RuntimeException(e);
+    }
+
+    final InputStream inputStream = fileInputStream;
     Part[] parts = {
         new FilePart(segmentName, new PartSource() {
           @Override
