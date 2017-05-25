@@ -316,7 +316,6 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
         "smallest");
-    metadata.put(DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS, "3600");
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
     JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
