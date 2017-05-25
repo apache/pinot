@@ -431,10 +431,9 @@ public class ColumnMetadata {
 
   /**
    * When a realtime segment has no-dictionary columns, the cardinality for those columns will be
-   * set to Integer.MIN_VALUE.
+   * set to Constants.UNKNOWN_CARDINALITY
    *
    * @return The cardinality of the column.
-   * @throws UnsupportedOperationException if cardinality is not available.
    */
   public int getCardinality() {
     return cardinality;
