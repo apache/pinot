@@ -1,3 +1,5 @@
+import { Faker } from 'ember-cli-mirage';
+
 export default function() {
 
   // These comments are here to help you get started. Feel free to delete them.
@@ -24,13 +26,22 @@ export default function() {
     http://www.ember-cli-mirage.com/docs/v0.3.x/shorthands/
   */
 
-  this.get('/anomalies/search/anomalyIds/1492498800000/1492585200000/:id', () => {
+  this.get('/anomalies/search/anomalyIds/1492498800000/1492585200000/:id', (schema, request) => {
+    const { id } = request.params;
+
     return {
       anomalyDetailsList: [{
-        anomalyId: 1,
+        anomalyId: id,
         anomalyFunctionName: 'example_anomaly_name',
-        currentStart: '1/1/2017',
-        currentEnd: '12/1/2017'
+        currentStart: '2017-04-19 01:00',
+        currentEnd: '2017-04-20 02:00',
+        dates: ['2017-04-19 01:00', '2017-04-19 02:00', '2017-04-20 01:00', '2017-04-20 02:00'],
+        anomalyRegionStart:'2017-04-19 02:00',
+        anomalyRegionEnd: '2017-04-20 01:00',
+        baseline: 1,
+        current: 2,
+        baselineValues: [1.0761083176816282E10, 1.0761083176816282E10, 1.1099807067185179E10, 1.1099807067185179E10],
+        currentValues: [1.0761083176816282E10, 1.0761083176816282E10, 1.1099807067185179E10, 1.1099807067185179E10]
       }]
     };
   });
