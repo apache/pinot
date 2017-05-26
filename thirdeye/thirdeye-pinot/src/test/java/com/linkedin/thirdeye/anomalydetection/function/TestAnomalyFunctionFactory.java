@@ -19,10 +19,6 @@ public class TestAnomalyFunctionFactory {
     anomalyFunctionFactory = new AnomalyFunctionFactory(mappingsPath);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void fromSpecIllegalType() throws Exception {
-    anomalyFunctionFactory.fromSpec(specWithType("NONEXISTENT"));
-  }
 
   @DataProvider(name = "validMappings")
   public static Object[][] validMappings() {

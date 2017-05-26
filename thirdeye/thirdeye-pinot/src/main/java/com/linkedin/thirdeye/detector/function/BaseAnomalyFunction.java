@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -162,5 +163,16 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
     }
     AnomalyOffset anomalyOffset = new AnomalyOffset(preOffsetPeriod, postOffsetPeriod);
     return anomalyOffset;
+  }
+
+  /**
+   * Justify if two anomalies can be merged based on properties
+   * e.g. anomalies generated from different anomaly function configurations should not be merged
+   * @param anomaly1 the first anomaly
+   * @param anomaly2 the second anomaly
+   * @return True if two anomalies are eligible to be merged
+   */
+  public Boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2){
+    return true;
   }
 }
