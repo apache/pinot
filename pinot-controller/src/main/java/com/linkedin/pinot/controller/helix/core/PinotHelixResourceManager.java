@@ -556,29 +556,21 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(final String tableName) {
+  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(@Nonnull final String tableNameWithType) {
     // Get the broker tag for this table
-    String brokerTag = null;
-    TenantConfig tenantConfig = null;
+    String brokerTag;
+    TenantConfig tenantConfig;
 
     try {
-      final TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      TableConfig tableConfig;
-      if (tableType == TableType.OFFLINE) {
-        tableConfig = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName);
-      } else if (tableType == TableType.REALTIME) {
-        tableConfig = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableName);
-      } else {
-        return new PinotResourceManagerResponse("Table " + tableName + " does not have a table type", false);
-      }
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       if (tableConfig == null) {
-        return new PinotResourceManagerResponse("Table " + tableName + " does not exist", false);
+        return new PinotResourceManagerResponse("Table " + tableNameWithType + " does not exist", false);
       }
       tenantConfig = tableConfig.getTenantConfig();
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while getting tenant config for table {}", tableName, e);
+      LOGGER.warn("Caught exception while getting tenant config for table {}", tableNameWithType, e);
       return new PinotResourceManagerResponse(
-          "Failed to fetch broker tag for table " + tableName + " due to exception: " + e.getMessage(), false);
+          "Failed to fetch broker tag for table " + tableNameWithType + " due to exception: " + e.getMessage(), false);
     }
 
     brokerTag = tenantConfig.getBroker();
@@ -591,59 +583,54 @@ public class PinotHelixResourceManager {
     String clusterName = getHelixClusterName();
     IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(helixAdmin, clusterName);
 
-    Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableName);
+    Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableNameWithType);
 
-    if(idealStateBrokerInstances.equals(brokerInstances)) {
+    if (idealStateBrokerInstances.equals(brokerInstances)) {
       return new PinotResourceManagerResponse(
-          "Broker resource is not rebuilt because ideal state is the same for table {} " + tableName, false);
+          "Broker resource is not rebuilt because ideal state is the same for table {} " + tableNameWithType, false);
     }
 
     // Reset ideal state with the instance list
     try {
-      HelixHelper.updateIdealState(getHelixZkManager(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, new Function<IdealState, IdealState>() {
-        @Nullable
-        @Override
-        public IdealState apply(@Nullable IdealState idealState) {
-          Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableName);
-          if (instanceStateMap != null) {
-            instanceStateMap.clear();
-          }
+      HelixHelper.updateIdealState(getHelixZkManager(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
+          new Function<IdealState, IdealState>() {
+            @Nullable
+            @Override
+            public IdealState apply(@Nullable IdealState idealState) {
+              Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableNameWithType);
+              if (instanceStateMap != null) {
+                instanceStateMap.clear();
+              }
 
-          for (String brokerInstance : brokerInstances) {
-            idealState.setPartitionState(tableName, brokerInstance, BrokerOnlineOfflineStateModel.ONLINE);
-          }
+              for (String brokerInstance : brokerInstances) {
+                idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerOnlineOfflineStateModel.ONLINE);
+              }
 
-          return idealState;
-        }
-      }, DEFAULT_RETRY_POLICY);
+              return idealState;
+            }
+          }, DEFAULT_RETRY_POLICY);
 
-      LOGGER.info("Successfully rebuilt brokerResource for table {}", tableName);
-      return new PinotResourceManagerResponse("Rebuilt brokerResource for table " + tableName, true);
+      LOGGER.info("Successfully rebuilt brokerResource for table {}", tableNameWithType);
+      return new PinotResourceManagerResponse("Rebuilt brokerResource for table " + tableNameWithType, true);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e, tableName);
+      LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e,
+          tableNameWithType);
       return new PinotResourceManagerResponse(
-          "Failed to rebuild brokerResource for table " + tableName + " due to exception: " + e.getMessage(), false);
+          "Failed to rebuild brokerResource for table " + tableNameWithType + " due to exception: " + e.getMessage(),
+          false);
     }
   }
 
   private void addInstanceToBrokerIdealState(String brokerTenantTag, String instanceName) {
     IdealState tableIdealState =
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    for (String tableName : tableIdealState.getPartitionSet()) {
-      if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.OFFLINE) {
-        String brokerTag =
-            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider
-                .getOfflineTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker());
-        if (brokerTag.equals(brokerTenantTag)) {
-          tableIdealState.setPartitionState(tableName, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
-        }
-      } else if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.REALTIME) {
-        String brokerTag =
-            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ZKMetadataProvider
-                .getRealtimeTableConfig(getPropertyStore(), tableName).getTenantConfig().getBroker());
-        if (brokerTag.equals(brokerTenantTag)) {
-          tableIdealState.setPartitionState(tableName, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
-        }
+    for (String tableNameWithType : tableIdealState.getPartitionSet()) {
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      Preconditions.checkNotNull(tableConfig);
+      String brokerTag =
+          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
+      if (brokerTag.equals(brokerTenantTag)) {
+        tableIdealState.setPartitionState(tableNameWithType, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
       }
     }
     _helixAdmin.setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
@@ -1244,60 +1231,38 @@ public class PinotHelixResourceManager {
   public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs)
       throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    TableConfig config;
-    if (type == TableType.REALTIME) {
-      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableNameWithType);
-    } else {
-      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableNameWithType);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    if (tableConfig == null) {
+      throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
     }
-    if (config == null) {
-      throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
-    }
-    config.setCustomConfig(newConfigs);
-    setExistingTableConfig(config, tableNameWithType, type);
+    tableConfig.setCustomConfig(newConfigs);
+    setExistingTableConfig(tableConfig, tableNameWithType, type);
   }
 
   public void updateSegmentsValidationAndRetentionConfigFor(String tableName, TableType type,
       SegmentsValidationAndRetentionConfig newConfigs)
       throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    TableConfig config;
-    if (type == TableType.REALTIME) {
-      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableNameWithType);
-    } else {
-      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableNameWithType);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    if (tableConfig == null) {
+      throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
     }
-    if (config == null) {
-      throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
-    }
-    config.setValidationConfig(newConfigs);
-
-    setExistingTableConfig(config, tableNameWithType, type);
+    tableConfig.setValidationConfig(newConfigs);
+    setExistingTableConfig(tableConfig, tableNameWithType, type);
   }
 
   public void updateIndexingConfigFor(String tableName, TableType type, IndexingConfig newConfigs)
       throws Exception {
     String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    TableConfig config;
-    if (type == TableType.REALTIME) {
-      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableNameWithType);
-      if (config != null) {
-        config.setIndexingConfig(newConfigs);
-      }
-    } else {
-      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableNameWithType);
-      if (config != null) {
-        config.setIndexingConfig(newConfigs);
-      }
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    if (tableConfig == null) {
+      throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
     }
-    if (config == null) {
-      throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
-    }
-
-    setExistingTableConfig(config, tableNameWithType, type);
+    tableConfig.setIndexingConfig(newConfigs);
+    setExistingTableConfig(tableConfig, tableNameWithType, type);
 
     if (type == TableType.REALTIME) {
-      ensureRealtimeClusterIsSetUp(config, tableName, newConfigs);
+      ensureRealtimeClusterIsSetUp(tableConfig, tableName, newConfigs);
     }
   }
 
@@ -1844,6 +1809,17 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get the table config for the given table name with type suffix.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @return Table config
+   */
+  @Nullable
+  public TableConfig getTableConfig(@Nonnull String tableNameWithType) {
+    return ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+  }
+
+  /**
    * Get the offline table config for the given table name.
    *
    * @param tableName Table name with or without type suffix
@@ -1878,18 +1854,6 @@ public class PinotHelixResourceManager {
     } else {
       return getRealtimeTableConfig(tableName);
     }
-  }
-
-  /**
-   * Get the table config for the given table name with type suffix.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return Table config
-   */
-  @Nullable
-  public TableConfig getTableConfig(@Nonnull String tableNameWithType) {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    return getTableConfig(tableNameWithType, tableType);
   }
 
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {

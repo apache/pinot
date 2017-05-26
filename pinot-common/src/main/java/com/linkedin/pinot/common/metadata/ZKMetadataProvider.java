@@ -165,27 +165,9 @@ public class ZKMetadataProvider {
   }
 
   @Nullable
-  public static TableConfig getOfflineTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
-      @Nonnull String tableName) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    ZNRecord znRecord =
-        propertyStore.get(constructPropertyStorePathForResourceConfig(offlineTableName), null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      return null;
-    }
-    try {
-      return TableConfig.fromZnRecord(znRecord);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while getting offline table configuration for table: {}", tableName, e);
-      return null;
-    }
-  }
-
-  @Nullable
-  public static TableConfig getRealtimeTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
-      @Nonnull String tableName) {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(realtimeTableName), null,
+  public static TableConfig getTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull String tableNameWithType) {
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null,
         AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
@@ -193,9 +175,21 @@ public class ZKMetadataProvider {
     try {
       return TableConfig.fromZnRecord(znRecord);
     } catch (Exception e) {
-      LOGGER.error("Caught exception while getting realtime table configuration for table: {}", tableName, e);
+      LOGGER.error("Caught exception while getting table configuration for table: {}", tableNameWithType, e);
       return null;
     }
+  }
+
+  @Nullable
+  public static TableConfig getOfflineTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull String tableName) {
+    return getTableConfig(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+  }
+
+  @Nullable
+  public static TableConfig getRealtimeTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull String tableName) {
+    return getTableConfig(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
   @Nullable
