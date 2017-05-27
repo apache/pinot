@@ -89,6 +89,14 @@ public class TimeBasedAnomalyMerger {
       mergeConfig = DEFAULT_TIME_BASED_MERGE_CONFIG;
     }
 
+    try {
+      BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(functionSpec);
+      mergeConfig.setMergeablePropertyKeys(anomalyFunction.getMergeablePropertyKeys());
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+
     if (unmergedAnomalies.size() == 0) {
       return ArrayListMultimap.create();
     } else {
@@ -132,7 +140,7 @@ public class TimeBasedAnomalyMerger {
 
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
-              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
+              mergeConfig);
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(dimensionMap);

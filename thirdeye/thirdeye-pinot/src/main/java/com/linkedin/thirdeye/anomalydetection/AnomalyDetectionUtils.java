@@ -25,8 +25,11 @@ public class AnomalyDetectionUtils {
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
 
-  // the following two functions encode and decode properties are moved from class
-  // com.linkedin.thirdeye.controller.mp.function.ThirdEyeAnomalyFunctionUtil
+  /**
+   * Utility class to encode properties to string in format key1=value1;key2=value2
+   * @param props : the property to be encoded
+   * @return String of encoded property
+   */
   public static String encodeCompactedProperties(Properties props) {
     List<String> parts = new ArrayList<>();
     for (Map.Entry<Object, Object> entry : props.entrySet()) {
@@ -36,7 +39,7 @@ public class AnomalyDetectionUtils {
   }
 
   /**
-   * Decode properties string to into Hashmap
+   * Decode properties string which is encoded by encodeCompactedProperties to into a Hashmap
    * @param propStr: property string which is encoded using encodeCompactedProperties
    * @return
    */

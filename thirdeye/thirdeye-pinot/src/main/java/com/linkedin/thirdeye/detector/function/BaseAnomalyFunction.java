@@ -163,4 +163,16 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
     AnomalyOffset anomalyOffset = new AnomalyOffset(preOffsetPeriod, postOffsetPeriod);
     return anomalyOffset;
   }
+
+  /**
+   * Specify the property keys used for merge comparison
+   * Each anomaly detection function will be capable to overwrite this function to return the key lists when merging two anomalies
+   * If two anomalies don't have equal value on the specified keys, they won't be merged
+   * If this function is not being overwritten, empty list will be returned and anomalies won't be compared on mergeable keys when merging
+   * @return A list of keys to used for comparing if two anomalies are equal on mergeable keys
+   */
+  public List<String> getMergeablePropertyKeys(){
+    return new ArrayList<>();
+  }
+
 }
