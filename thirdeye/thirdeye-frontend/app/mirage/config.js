@@ -1,4 +1,5 @@
-import { Faker } from 'ember-cli-mirage';
+import { faker } from 'ember-cli-mirage';
+import moment from 'moment';
 
 export default function() {
 
@@ -12,10 +13,10 @@ export default function() {
 
   // this.urlPrefix = '';    // make this `http://localhost:8080`, for example, if your API is on a different server
   // this.namespace = '';    // make this `/api`, for example, if your API is namespaced
-  // this.timing = 400;      // delay for each request, automatically set to 0 during testing
+  this.timing = 400;      // delay for each request, automatically set to 0 during testing
 
   /*
-    Shorthand cheatsheet:
+    Shorthand cheatsheet:`
 
     this.get('/posts');
     this.post('/posts');
@@ -26,22 +27,47 @@ export default function() {
     http://www.ember-cli-mirage.com/docs/v0.3.x/shorthands/
   */
 
-  this.get('/anomalies/search/anomalyIds/1492498800000/1492585200000/:id', (schema, request) => {
-    const { id } = request.params;
+  this.get('/anomalies/search/anomalyIds/1492498800000/1492585200000/1', (schema, request) => {
+    const { anomalyIds } = request.queryParams;
+    // TODO: move this to a utils/helper file
+    const makeDates = (dataPointsNum = 100) => {
+      let i = 0;
+      const dateArray = []; 
+      const startDate = moment().subtract(14, 'days');
+      while (i++ < dataPointsNum) {
+        let newDate = startDate.clone().format('YYYY-MM-DD HH:MM');
+        dateArray.push(newDate);
+        startDate.add(1, 'hours');
+      }
+      return dateArray; 
+    }
 
+     // TODO: move this to a utils/helper file
+    const makeValues = (dataPointsNum = 100) => {
+      const valueArray = [];
+      let i = 0;
+      while (i++ < dataPointsNum) {
+        let newValue = faker.random.number({min:1, max:100})
+        valueArray.push(newValue);
+      }
+      return valueArray; 
+    }
+
+    const dateArray = makeDates();
+    const valueArray = makeValues();
     return {
       anomalyDetailsList: [{
-        anomalyId: id,
+        anomalyIds,
         anomalyFunctionName: 'example_anomaly_name',
-        currentStart: '2017-04-19 01:00',
-        currentEnd: '2017-04-20 02:00',
-        dates: ['2017-04-19 01:00', '2017-04-19 02:00', '2017-04-20 01:00', '2017-04-20 02:00'],
-        anomalyRegionStart:'2017-04-19 02:00',
-        anomalyRegionEnd: '2017-04-20 01:00',
+        currentStart: dateArray[0],
+        currentEnd: dateArray[dateArray.length-1],
+        dates: dateArray,
+        anomalyRegionStart: dateArray[40],
+        anomalyRegionEnd: dateArray[50],
         baseline: 1,
         current: 2,
-        baselineValues: [1.0761083176816282E10, 1.0761083176816282E10, 1.1099807067185179E10, 1.1099807067185179E10],
-        currentValues: [1.0761083176816282E10, 1.0761083176816282E10, 1.1099807067185179E10, 1.1099807067185179E10]
+        baselineValues: valueArray,
+        currentValues: valueArray.map(value => value + 20),
       }]
     };
   });

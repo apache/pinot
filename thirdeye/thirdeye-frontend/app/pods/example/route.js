@@ -10,7 +10,7 @@ export default Ember.Route.extend({
     const redux = this.get('redux');
 
     redux.dispatch(AnomalyActions.loading());
-    fetch(`anomalies/search/anomalyIds/1492498800000/1492585200000/1?anomalyIds=${id}&functionName=`)
+    fetch(`/anomalies/search/anomalyIds/1492498800000/1492585200000/1?anomalyIds=${id}&functionName=`)
       .then(res => res.json())
       .then(response => redux.dispatch(AnomalyActions.loadAnomaly(response)))
       .catch(() => redux.dispatch(AnomalyActions.requestFail()));

@@ -5,7 +5,7 @@ module.exports = function(environment) {
     modulePrefix: 'thirdeye-frontend',
     environment: environment,
     podModulePrefix: 'thirdeye-frontend/pods',
-    rootURL: '/app',
+    rootURL: '/app/',
     locationType: 'hash',
     'ember-cli-mirage': {
       directory: 'app/mirage'
@@ -37,6 +37,7 @@ module.exports = function(environment) {
   }
 
   if (environment === 'test') {
+    ENV.rootURL = '/';
     // Testem prefers this...
     ENV.locationType = 'none';
 
