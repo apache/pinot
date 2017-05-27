@@ -180,7 +180,8 @@ AnalysisView.prototype = {
           }
         ],
         order: [[ 2, 'desc' ], [ 0, 'asc' ], [ 1, 'asc' ]],
-        iDisplayLength: 50
+        iDisplayLength: 50,
+        bInfo: false
       });
     }
   },
