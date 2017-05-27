@@ -16,6 +16,8 @@ import java.util.List;
  * sequentialAllowedGap: allowed gap in milli seconds between sequential anomalies
  * <p/>
  * mergeDuration : length of the merged anomaly in milli seconds
+ * <p/>
+ * mergeablePropertyKeys : allow anomalies to be compared using function specified mergeablePropertyKeys
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AnomalyMergeConfig {

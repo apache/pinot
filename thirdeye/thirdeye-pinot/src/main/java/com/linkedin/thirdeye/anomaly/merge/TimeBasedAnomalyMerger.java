@@ -89,6 +89,8 @@ public class TimeBasedAnomalyMerger {
       mergeConfig = DEFAULT_TIME_BASED_MERGE_CONFIG;
     }
 
+    // From anomaly function spec initialize the anomaly function, and get its specified mergeable property keys if any
+    // If failed to create anomaly function, default empty mergeable property keys will be used from mergeConfig
     try {
       BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(functionSpec);
       mergeConfig.setMergeablePropertyKeys(anomalyFunction.getMergeablePropertyKeys());

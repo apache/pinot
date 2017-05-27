@@ -19,7 +19,6 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
  */
 public abstract class AnomalyTimeBasedSummarizer {
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyTimeBasedSummarizer.class);
-  public final static String TEST_CONFIG_TAG =  "testConfigTag";
 
   private AnomalyTimeBasedSummarizer() {
 
@@ -27,9 +26,7 @@ public abstract class AnomalyTimeBasedSummarizer {
 
   /**
    * @param anomalies   : list of raw anomalies to be merged with last mergedAnomaly
-//   * @param mergeDuration   : length of a merged anomaly
-//   * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
-   *
+   * @param mergeConfig : the configurations for merging, i.e. maxMergedDurationMillis, sequentialAllowedGap, mergeablePropertyKeys
    * @return
    */
   public static List<MergedAnomalyResultDTO> mergeAnomalies(List<RawAnomalyResultDTO> anomalies, AnomalyMergeConfig mergeConfig) {
@@ -39,8 +36,7 @@ public abstract class AnomalyTimeBasedSummarizer {
   /**
    * @param mergedAnomaly : last merged anomaly
    * @param anomalies     : list of raw anomalies to be merged with last mergedAnomaly
-//   * @param maxMergedDurationMillis   : length of a merged anomaly
-//   * @param sequentialAllowedGap : allowed gap between two raw anomalies in order to merge
+   * @param mergeConfig   : the configurations needed for time based merging: i.e. maxMergedDurationMillis, sequentialAllowedGap, mergeablePropertyKeys
    * @return
    */
   public static List<MergedAnomalyResultDTO> mergeAnomalies(MergedAnomalyResultDTO mergedAnomaly,
@@ -148,6 +144,7 @@ public abstract class AnomalyTimeBasedSummarizer {
     mergedAnomaly.setProperties(AnomalyDetectionUtils.decodeCompactedPropertyStringToMap(currentResult.getProperties()));
   }
 
+
   /**
    * Given property keys from anomaly function, comparing if two anomalies have same property on the mergeable keys when doing anomaly detection
    * If key set is empty, or both properties for the two anomalies are empty or if all of the values on mergeable keys are equal on anomalies return true
@@ -157,7 +154,6 @@ public abstract class AnomalyTimeBasedSummarizer {
    * @param mergeableKeys keys that passed by AnomalyMergeConfig, which is defined by Anomaly Detection Function
    * @return true if two anomalies are equal on mergeable keys, otherwise return false
    */
-  //
   private static boolean isEqualOnMergeableKeys(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2, List<String> mergeableKeys){
     Map<String, String> prop1 = anomaly1.getProperties();
     Map<String, String> prop2 = anomaly2.getProperties();
