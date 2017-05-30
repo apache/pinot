@@ -1,15 +1,21 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -17,6 +23,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -320,6 +327,96 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       bean.setAnomalyFeedbackId(feedbackDTO.getId());
     }
     genericPojoDao.update(bean);
+  }
+
+  /**
+   * Returns a map (keyed by metric id) of lists of merged anomalies that fall (partially)
+   * within a given time range.
+   *
+   * <br/><b>NOTE:</b> this function implements a manual join between three tables. This is bad.
+   *
+   * @param metricIds metric ids to seek anomalies for
+   * @param start time range start
+   * @param end time range end
+   * @return Map (keyed by metric id) of lists of merged anomalies (sorted by start time)
+   */
+  @Override
+  public Map<Long, List<MergedAnomalyResultDTO>> findAnomaliesByMetricIdsAndTimeRange(List<Long> metricIds, long start, long end) {
+    Map<Long, List<MergedAnomalyResultDTO>> output = new HashMap<>();
+
+    List<MetricConfigBean> metricBeans = genericPojoDao.get(metricIds, MetricConfigBean.class);
+
+    for (MetricConfigBean mbean : metricBeans) {
+      output.put(mbean.getId(), getAnomaliesForMetricBeanAndTimeRange(mbean, start, end));
+    }
+
+    return output;
+  }
+
+  /**
+   * Returns a list of merged anomalies that fall (partially) within a given time range for
+   * a given metric id
+   *
+   * <br/><b>NOTE:</b> this function implements a manual join between three tables. This is bad.
+   *
+   * @param metricId metric id to seek anomalies for
+   * @param start time range start
+   * @param end time range end
+   * @return List of merged anomalies (sorted by start time)
+   */
+  @Override
+  public List<MergedAnomalyResultDTO> findAnomaliesByMetricIdAndTimeRange(Long metricId, long start, long end) {
+    MetricConfigBean mbean = genericPojoDao.get(metricId, MetricConfigBean.class);
+    if (mbean == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric id '%d'", metricId));
+    }
+
+    return this.getAnomaliesForMetricBeanAndTimeRange(mbean, start, end);
+  }
+
+  private List<MergedAnomalyResultDTO> getAnomaliesForMetricBeanAndTimeRange(MetricConfigBean mbean, long start, long end) {
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+
+    LOG.info("Fetching functions for metricId={}", mbean.getId());
+
+    // TODO use metricId instead of metric/dataset on join (requires database cleanup)
+    List<AnomalyFunctionBean> functionBeans = genericPojoDao.get(
+        Predicate.AND(
+            Predicate.EQ("metric", mbean.getName()),
+            Predicate.EQ("collection", mbean.getDataset())),
+        AnomalyFunctionBean.class);
+
+    for (AnomalyFunctionBean fbean : functionBeans) {
+      LOG.info("Fetching functions for metricId={}, functionId={}", mbean.getId(), fbean.getId());
+
+      // TODO use Predicate.BETWEEN (requires fixing it)
+      List<MergedAnomalyResultBean> anomalyBeans = genericPojoDao.get(
+          Predicate.AND(
+              Predicate.EQ("functionId", fbean.getId()),
+              Predicate.OR(
+                  Predicate.AND(
+                      Predicate.GE("startTime", start),
+                      Predicate.LT("startTime", end)
+                  ),
+                  Predicate.AND(
+                      Predicate.GE("endTime", start),
+                      Predicate.LT("endTime", end)
+                  )
+              )
+          ),
+          MergedAnomalyResultBean.class);
+
+      anomalies.addAll(convertMergedAnomalyBean2DTO(anomalyBeans, false));
+    }
+
+    Collections.sort(anomalies, new Comparator<MergedAnomalyResultDTO>() {
+      @Override
+      public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
+        return Long.compare(o1.getStartTime(), o2.getStartTime());
+      }
+    });
+
+    return anomalies;
   }
 
   @Override

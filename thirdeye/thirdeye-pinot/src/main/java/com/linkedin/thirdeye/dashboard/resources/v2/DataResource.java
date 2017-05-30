@@ -1,12 +1,15 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -543,6 +546,98 @@ public class DataResource {
     return wowSummary;
   }
 
+  @GET
+  @Path("anomalies/ranges/metric")
+  public List<TimeRange> getAnomalyTimeRangesByMetricId(
+      @QueryParam("metricId") Long metricId,
+      @QueryParam("start") Long start,
+      @QueryParam("end") Long end) {
+
+    if (metricId == null)
+      throw new IllegalArgumentException("Must provide metricId");
+
+    if (start == null)
+      throw new IllegalArgumentException("Must provide start timestamp");
+
+    if (end == null)
+      throw new IllegalArgumentException("Must provide end timestamp");
+
+    List<MergedAnomalyResultDTO> anomalies = DAO_REGISTRY.getMergedAnomalyResultDAO().findAnomaliesByMetricIdAndTimeRange(metricId, start, end);
+
+    return truncateRanges(extractAnomalyTimeRanges(anomalies), start, end);
+  }
+
+  @GET
+  @Path("anomalies/ranges/metricMap")
+  public Map<Long, List<TimeRange>> getAnomalyTimeRangesByMetricIds(
+      @QueryParam("metricId") List<Long> metricIds,
+      @QueryParam("start") Long start,
+      @QueryParam("end") Long end) {
+
+    if (metricIds == null)
+      throw new IllegalArgumentException("Must provide metricIds");
+
+    if (start == null)
+      throw new IllegalArgumentException("Must provide start timestamp");
+
+    if (end == null)
+      throw new IllegalArgumentException("Must provide end timestamp");
+
+    Map<Long, List<MergedAnomalyResultDTO>> anomalies = DAO_REGISTRY.getMergedAnomalyResultDAO().findAnomaliesByMetricIdsAndTimeRange(metricIds, start, end);
+
+    Map<Long, List<TimeRange>> output = new HashMap<>();
+    for(Map.Entry<Long, List<MergedAnomalyResultDTO>> entry : anomalies.entrySet()) {
+      output.put(entry.getKey(), truncateRanges(extractAnomalyTimeRanges(entry.getValue()), start, end));
+    }
+
+    return output;
+  }
+
+  static List<TimeRange> extractAnomalyTimeRanges(List<MergedAnomalyResultDTO> anomalies) {
+    if(anomalies.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<MergedAnomalyResultDTO> sorted = new ArrayList<>(anomalies);
+    Collections.sort(sorted, new Comparator<MergedAnomalyResultDTO>() {
+      @Override
+      public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
+        return Long.compare(o1.getStartTime(), o2.getStartTime());
+      }
+    });
+
+    List<TimeRange> ranges = new ArrayList<>();
+    Iterator<MergedAnomalyResultDTO> itAnomaly = sorted.iterator();
+    MergedAnomalyResultDTO first = itAnomaly.next();
+    long currStart = first.getStartTime();
+    long currEnd = first.getEndTime();
+
+    while(itAnomaly.hasNext()) {
+      MergedAnomalyResultDTO anomaly = itAnomaly.next();
+      if (currEnd >= anomaly.getStartTime()) {
+        currEnd = Math.max(currEnd, anomaly.getEndTime());
+      } else {
+        ranges.add(new TimeRange(currStart, currEnd));
+        currStart = anomaly.getStartTime();
+        currEnd = anomaly.getEndTime();
+      }
+    }
+
+    ranges.add(new TimeRange(currStart, currEnd));
+
+    return ranges;
+  }
+
+  static List<TimeRange> truncateRanges(List<TimeRange> ranges, long start, long end) {
+    List<TimeRange> output = new ArrayList<>();
+    for (TimeRange r : ranges) {
+      if ((r.getStart() >= start && r.getStart() < end) ||
+          (r.getEnd() > start && r.getEnd() <= end)) {
+        output.add(new TimeRange(Math.max(r.getStart(), start), Math.min(r.getEnd(), end)));
+      }
+    }
+    return output;
+  }
 
   /**
    *  convert label from WowSummaryModel to a TimeRange
