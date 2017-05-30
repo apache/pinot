@@ -1,10 +1,10 @@
-package com.linkedin.thirdeye.anomaly.grouping;
+package com.linkedin.thirdeye.anomaly.classification;
 
 
-public class GroupingConfiguration {
+public class ClassificationJobConfig {
   private long maxLookbackLength;
 
-  public GroupingConfiguration() {
+  public ClassificationJobConfig() {
     maxLookbackLength = 259200000L; // 3 days
   }
 

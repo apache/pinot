@@ -6,7 +6,7 @@ import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.grouping.GroupingJobScheduler;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
@@ -70,7 +70,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private MonitorJobScheduler monitorJobScheduler = null;
   private AlertJobScheduler alertJobScheduler = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
-  private GroupingJobScheduler groupingJobScheduler = null;
+  private ClassificationJobScheduler classificationJobScheduler = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AlertFilterFactory alertFilterFactory = null;
   private ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
@@ -114,8 +114,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     if (dataCompletenessScheduler != null) {
       dataCompletenessScheduler.shutdown();
     }
-    if (groupingJobScheduler != null) {
-      groupingJobScheduler.shutdown();
+    if (classificationJobScheduler != null) {
+      classificationJobScheduler.shutdown();
     }
   }
 
@@ -375,8 +375,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   }
 
   private void startGrouper() {
-    groupingJobScheduler = new GroupingJobScheduler();
-    groupingJobScheduler.start();
+    classificationJobScheduler = new ClassificationJobScheduler();
+    classificationJobScheduler.start();
   }
 
   private void startMonitor() {

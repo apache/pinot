@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.grouping;
+package com.linkedin.thirdeye.anomaly.classification;
 
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GroupingJobScheduler implements Runnable {
-  private static final Logger LOG = LoggerFactory.getLogger(GroupingJobScheduler.class);
+public class ClassificationJobScheduler implements Runnable {
+  private static final Logger LOG = LoggerFactory.getLogger(ClassificationJobScheduler.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final long maxLookbackLength = 259200000L; // 3 days
 
@@ -46,25 +46,32 @@ public class GroupingJobScheduler implements Runnable {
     }
   }
 
+  /**
+   * Creates a classification job whose start time is the end time of the most recent classification job and end time
+   * is the minimal end times of anomaly detection jobs, which are given through a configuration DTO. In the current
+   * implementation, we assume that there exists single main anomaly function and it has to be activated in order to
+   * classify of its anomalies.
+   *
+   * @param classificationConfig a configuration file which provides main and correlated anomaly functions.
+   */
   private void mainMetricTimeBasedGrouping(ClassificationConfigDTO classificationConfig) {
     AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     JobManager jobDAO = DAO_REGISTRY.getJobDAO();
 
-    // TODO: Modularize this grouping logic and make it swappable
     // Get all involved anomaly functions that are activated
-    List<AnomalyFunctionDTO> involvedAnomalyFunctions = new ArrayList<>();
+    List<AnomalyFunctionDTO> syncedAnomalyFunctions = new ArrayList<>();
     List<Long> functionIdList = classificationConfig.getFunctionIdList();
     for (long functionId : functionIdList) {
       AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
       if (anomalyFunctionDTO.getIsActive()) {
-        involvedAnomalyFunctions.add(anomalyFunctionDTO);
+        syncedAnomalyFunctions.add(anomalyFunctionDTO);
       }
     }
     // TODO: Determine if funnel effect has main metric. If it does not, then remove the block below
     if (!functionIdList.contains(classificationConfig.getMainFunctionId())) {
       AnomalyFunctionDTO mainAnomalyFunction = anomalyFunctionDAO.findById(classificationConfig.getMainFunctionId());
       if (mainAnomalyFunction.getIsActive()) {
-        involvedAnomalyFunctions.add(mainAnomalyFunction);
+        syncedAnomalyFunctions.add(mainAnomalyFunction);
       } else {
         LOG.info("Main anomaly function is not activated. Classification job: {} is skipped.", classificationConfig);
         return;
@@ -73,7 +80,7 @@ public class GroupingJobScheduler implements Runnable {
 
     // Check the latest detection time among all anomaly functions in this classification config
     long minDetectionEndTime = Long.MAX_VALUE;
-    for (AnomalyFunctionDTO anomalyFunctionDTO : involvedAnomalyFunctions) {
+    for (AnomalyFunctionDTO anomalyFunctionDTO : syncedAnomalyFunctions) {
       JobDTO job = jobDAO.findLatestCompletedDetectionJobByFunctionId(anomalyFunctionDTO.getId());
       if (job != null) {
         minDetectionEndTime = Math.min(minDetectionEndTime, job.getWindowEndTime());
@@ -108,11 +115,11 @@ public class GroupingJobScheduler implements Runnable {
     }
 
     // create classification job
-    GroupingJobContext jobContext = new GroupingJobContext();
+    ClassificationJobContext jobContext = new ClassificationJobContext();
     jobContext.setWindowStartTime(startTime);
     jobContext.setWindowEndTime(endTime);
     jobContext.setConfigDTO(classificationConfig);
-    GroupingJobRunner jobRunner = new GroupingJobRunner(jobContext);
+    ClassificationJobRunner jobRunner = new ClassificationJobRunner(jobContext);
     jobRunner.run();
   }
 }

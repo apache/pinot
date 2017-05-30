@@ -1,8 +1,8 @@
-package com.linkedin.thirdeye.anomaly.grouping;
+package com.linkedin.thirdeye.anomaly.classification;
 
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 
-public class GroupingJobContext {
+public class ClassificationJobContext {
   private ClassificationConfigDTO configDTO;
   private long windowStartTime;
   private long windowEndTime;
