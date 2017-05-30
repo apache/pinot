@@ -5,8 +5,11 @@ module.exports = function(environment) {
     modulePrefix: 'thirdeye-frontend',
     environment: environment,
     podModulePrefix: 'thirdeye-frontend/pods',
-    rootURL: '/app',
+    rootURL: '/app/',
     locationType: 'hash',
+    'ember-cli-mirage': {
+      directory: 'app/mirage'
+    },
     EmberENV: {
       FEATURES: {
         // Here you can enable experimental features on an ember canary build
@@ -34,6 +37,7 @@ module.exports = function(environment) {
   }
 
   if (environment === 'test') {
+    ENV.rootURL = '/';
     // Testem prefers this...
     ENV.locationType = 'none';
 
