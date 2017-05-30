@@ -336,8 +336,8 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
    * <br/><b>NOTE:</b> this function implements a manual join between three tables. This is bad.
    *
    * @param metricIds metric ids to seek anomalies for
-   * @param start time range start
-   * @param end time range end
+   * @param start time range start (inclusive)
+   * @param end time range end (exclusive)
    * @return Map (keyed by metric id) of lists of merged anomalies (sorted by start time)
    */
   @Override
@@ -360,8 +360,8 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
    * <br/><b>NOTE:</b> this function implements a manual join between three tables. This is bad.
    *
    * @param metricId metric id to seek anomalies for
-   * @param start time range start
-   * @param end time range end
+   * @param start time range start (inclusive)
+   * @param end time range end (exclusive)
    * @return List of merged anomalies (sorted by start time)
    */
   @Override
@@ -375,7 +375,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   private List<MergedAnomalyResultDTO> getAnomaliesForMetricBeanAndTimeRange(MetricConfigBean mbean, long start, long end) {
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
 
     LOG.info("Fetching functions for metricId={}", mbean.getId());
 
@@ -386,28 +385,24 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
             Predicate.EQ("collection", mbean.getDataset())),
         AnomalyFunctionBean.class);
 
-    for (AnomalyFunctionBean fbean : functionBeans) {
-      LOG.info("Fetching functions for metricId={}, functionId={}", mbean.getId(), fbean.getId());
-
-      // TODO use Predicate.BETWEEN (requires fixing it)
-      List<MergedAnomalyResultBean> anomalyBeans = genericPojoDao.get(
-          Predicate.AND(
-              Predicate.EQ("functionId", fbean.getId()),
-              Predicate.OR(
-                  Predicate.AND(
-                      Predicate.GE("startTime", start),
-                      Predicate.LT("startTime", end)
-                  ),
-                  Predicate.AND(
-                      Predicate.GE("endTime", start),
-                      Predicate.LT("endTime", end)
-                  )
-              )
-          ),
-          MergedAnomalyResultBean.class);
-
-      anomalies.addAll(convertMergedAnomalyBean2DTO(anomalyBeans, false));
+    // extract functionIds
+    List<Long> functionIds = new ArrayList<>();
+    for(AnomalyFunctionBean fbean : functionBeans) {
+      functionIds.add(fbean.getId());
     }
+
+    LOG.info("Fetching anomalies for metricId={}, functionIds={}", mbean.getId(), functionIds);
+
+    List<MergedAnomalyResultBean> anomalyBeans = genericPojoDao.get(
+        Predicate.AND(
+            Predicate.IN("functionId", functionIds.toArray()),
+            Predicate.LT("startTime", end),
+            Predicate.GT("endTime", start)
+        ),
+        MergedAnomalyResultBean.class);
+
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>(
+        convertMergedAnomalyBean2DTO(anomalyBeans, false));
 
     Collections.sort(anomalies, new Comparator<MergedAnomalyResultDTO>() {
       @Override

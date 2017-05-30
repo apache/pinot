@@ -631,8 +631,7 @@ public class DataResource {
   static List<TimeRange> truncateRanges(List<TimeRange> ranges, long start, long end) {
     List<TimeRange> output = new ArrayList<>();
     for (TimeRange r : ranges) {
-      if ((r.getStart() >= start && r.getStart() < end) ||
-          (r.getEnd() > start && r.getEnd() <= end)) {
+      if (r.getStart() < end && r.getEnd() > start) {
         output.add(new TimeRange(Math.max(r.getStart(), start), Math.min(r.getEnd(), end)));
       }
     }
