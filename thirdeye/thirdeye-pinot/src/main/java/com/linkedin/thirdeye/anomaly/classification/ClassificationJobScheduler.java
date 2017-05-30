@@ -21,9 +21,17 @@ import org.slf4j.LoggerFactory;
 public class ClassificationJobScheduler implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(ClassificationJobScheduler.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private static final long maxLookbackLength = 259200000L; // 3 days
 
   private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+  private long maxLookbackLength = 259_200_000L; // 3 days
+  private boolean forceSyncDetectionJobs = false;
+
+  public ClassificationJobScheduler() { }
+
+  public ClassificationJobScheduler(ClassificationJobConfig classificationJobConfig) {
+    this.maxLookbackLength = classificationJobConfig.getMaxLookbackLength();
+    this.forceSyncDetectionJobs = classificationJobConfig.getForceSyncDetectionJobs();
+  }
 
   public void start() {
     LOG.info("Starting anomaly classification service");
@@ -78,43 +86,48 @@ public class ClassificationJobScheduler implements Runnable {
       }
     }
 
-    // Check the latest detection time among all anomaly functions in this classification config
+    // By default, we look at only the anomalies in a certain time window just in case of that the previous
+    // classification job does not exists or was executed long time ago.
+    //   minTimeBoundary is the start time of the boundary window.
+    long currentMillis = System.currentTimeMillis();
+    long minTimeBoundary = currentMillis - maxLookbackLength;
+
+    // Check the latest detection time among all anomaly functions in this classification config.
+    // If an activated anomaly function does not have any detection jobs that are executed within the time window
+    // [minTimeBoundary, currentMillis), then it is ignored (i.e., minDetectionEndTime is computed without its endTime).
     long minDetectionEndTime = Long.MAX_VALUE;
     for (AnomalyFunctionDTO anomalyFunctionDTO : syncedAnomalyFunctions) {
       JobDTO job = jobDAO.findLatestCompletedDetectionJobByFunctionId(anomalyFunctionDTO.getId());
-      if (job != null) {
+      if (job != null && job.getWindowEndTime() >= minTimeBoundary) {
         minDetectionEndTime = Math.min(minDetectionEndTime, job.getWindowEndTime());
       } else {
-        minDetectionEndTime = Long.MAX_VALUE;
-        LOG.warn("Could not find most recent executed job for function {}; aborting job for classification config {}",
-            anomalyFunctionDTO.getId(), classificationConfig);
-        break;
+        if (forceSyncDetectionJobs) {
+          minDetectionEndTime = Long.MAX_VALUE;
+          LOG.warn("Could not find most recent executed job for function {}; aborting classification job {id={}}",
+              anomalyFunctionDTO.getId(), classificationConfig.getId());
+          break;
+        }
       }
     }
     if (minDetectionEndTime == Long.MAX_VALUE) {
       return;
     }
-
-    long startTime;
     long endTime = minDetectionEndTime;
-    // Get the most recent classification job
+
+    long startTime = minTimeBoundary;
+    // Get the most recent classification job and continue from previous completed classification job
     JobDTO classificationJobDTO = jobDAO.findLatestCompletedGroupingJobById(classificationConfig.getId());
-    // Continue from previous completed classification job
     if (classificationJobDTO != null) {
-      long recentClassificationEndTime = classificationJobDTO.getWindowEndTime();
-      // skip this job if we have processed the latest available window
-      if (minDetectionEndTime > recentClassificationEndTime) {
-        startTime = recentClassificationEndTime;
-      } else {
-        LOG.info("Skipped grouping for id {}; Info: minDetectionEndTime among all anomaly functions -- {}, lastGroupingEndTime -- {}",
-            classificationJobDTO.getId(), recentClassificationEndTime, minDetectionEndTime);
-        return;
-      }
-    } else { // otherwise, we look back for a certain range of time
-      startTime = minDetectionEndTime - maxLookbackLength;
+      startTime = Math.max(startTime, classificationJobDTO.getWindowEndTime());
+    }
+    if (startTime >= endTime) {
+      LOG.info(
+          "Skipped classification job (id={}) because min detection end time among all anomaly functions {} is not larger than latest classification end time {}",
+          classificationConfig.getId(), minDetectionEndTime, startTime);
+      return;
     }
 
-    // create classification job
+    // Create classification job
     ClassificationJobContext jobContext = new ClassificationJobContext();
     jobContext.setWindowStartTime(startTime);
     jobContext.setWindowEndTime(endTime);
