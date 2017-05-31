@@ -1,31 +1,27 @@
 {
- "metadata": {"customConfigs": {}},
- "segmentsConfig": {
-  "replication": 1,
-  "retentionTimeUnit": "rententionTimeUnit",
-  "retentionTimeValue": "900",
-  "schemaName": "meetupRsvp",
-  "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-  "segmentPushFrequency": "daily",
-  "segmentPushType": "APPEND",
-  "timeColumnName": "mtime",
-  "timeType": "MILLISECONDS"
- },
- "tableIndexConfig": {
-  "invertedIndexColumns": [
-  ],
-  "lazyLoad": "false",
-  "loadMode": "MMAP",
-  "streamConfigs": {
-   "stream.kafka.consumer.type": "highLevel",
-   "stream.kafka.decoder.class.name": "com.linkedin.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
-   "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
-   "stream.kafka.topic.name": "meetupRSVPEvents",
-   "stream.kafka.zk.broker.url": "localhost:2191/kafka",
-   "streamType": "kafka"
+  "tableName": "meetupRsvp",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "mtime",
+    "timeType": "MILLISECONDS",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "meetupRsvp",
+    "replication": "1"
+  },
+  "tenants": {},
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "streamConfigs": {
+      "streamType": "kafka",
+      "stream.kafka.consumer.type": "highLevel",
+      "stream.kafka.topic.name": "meetupRSVPEvents",
+      "stream.kafka.decoder.class.name": "com.linkedin.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+      "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
+      "stream.kafka.zk.broker.url": "localhost:2191/kafka"
+    }
+  },
+  "metadata": {
+    "customConfigs": {}
   }
- },
- "tableName": "meetupRsvp",
- "tableType": "REALTIME",
- "tenants":{"server":"","broker":""}
 }

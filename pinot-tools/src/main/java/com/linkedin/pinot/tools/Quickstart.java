@@ -16,7 +16,6 @@
 package com.linkedin.pinot.tools;
 
 import java.io.File;
-import java.net.URL;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
@@ -121,11 +120,11 @@ public class Quickstart {
       _quickStartDataDir.mkdir();
     }
 
-    File schemaFile = new File(quickStartDataDirName + "/baseball.schema");
+    File schemaFile = new File(quickStartDataDirName + "/baseball_schema.json");
     File dataFile = new File(quickStartDataDirName + "/baseball.csv");
     File tableCreationJsonFileName = new File(quickStartDataDirName + "/baseballTable.json");
 
-    FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseball.schema"), schemaFile);
+    FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseball_schema.json"), schemaFile);
     FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseball.csv"), dataFile);
     FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseballTable.json"),
         tableCreationJsonFileName);

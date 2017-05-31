@@ -81,7 +81,8 @@ public class RealtimeTableDataManagerTest {
   private static volatile boolean keepOnRunning = true;
 
   @BeforeClass
-  public static void setup() throws Exception {
+  public static void setup()
+      throws Exception {
     instanceZKMetadata = getInstanceZKMetadata();
     realtimeSegmentZKMetadata = getRealtimeSegmentZKMetadata();
     tableDataManagerConfig = getTableDataManagerConfig();
@@ -89,13 +90,11 @@ public class RealtimeTableDataManagerTest {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
-    streamConfigs.put("stream.kafka.topic.name", "MirrorDecoratedProfileViewEvent");
+    streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    streamConfigs.put("stream.kafka.hlc.zk.connect.string",
-        "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");
-    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url",
-        "http://eat1-ei2-schema-vip-z.stg.linkedin.com:10252/schemaRegistry/schemas");
+    streamConfigs.put("stream.kafka.hlc.zk.connect.string", "localhost:1111/zkConnect");
+    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url", "http://localhost:2222/schemaRegistry");
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("mirror")
         .setStreamConfigs(streamConfigs)
         .build();
@@ -251,9 +250,9 @@ public class RealtimeTableDataManagerTest {
   }
 
   private static InstanceZKMetadata getInstanceZKMetadata() {
-    ZNRecord record = new ZNRecord("Server_lva1-app0120.corp.linkedin.com_8001");
-    Map<String, String> groupIdMap = new HashMap<String, String>();
-    Map<String, String> partitionMap = new HashMap<String, String>();
+    ZNRecord record = new ZNRecord("Server_localhost_1234");
+    Map<String, String> groupIdMap = new HashMap<>();
+    Map<String, String> partitionMap = new HashMap<>();
 
     groupIdMap.put("mirror", "groupId_testTable_" + String.valueOf(System.currentTimeMillis()));
     partitionMap.put("testTable_R", "0");

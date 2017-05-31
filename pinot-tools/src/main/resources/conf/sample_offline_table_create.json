@@ -1,29 +1,29 @@
 {
-    "tableName":"sampleTable",
-    "segmentsConfig" : {
-        "retentionTimeUnit":"DAYS",
-        "retentionTimeValue":"700",
-        "segmentPushFrequency":"daily",
-        "segmentPushType":"APPEND",
-        "replication" : "3",
-        "schemaName" : "tableSchemaName",
-        "timeColumnName" : "timeColumnName",
-        "timeType" : "timeType",
-        "segmentAssignmentStrategy" : "BalanceNumSegmentAssignmentStrategy"
-    },
-    "tableIndexConfig" : {
-        "invertedIndexColumns" : ["column1","column2"],
-        "loadMode"  : "HEAP",
-        "lazyLoad"  : "false"
-    },
-    "tenants" : {
-        "broker":"brokerOne",
-        "server":"serverOne"
-    },
-    "tableType":"OFFLINE",
-    "metadata": {
-        "customConfigs" : {
-            "d2Name":"xlntBetaPinot"
-        }
+  "tableName": "sampleTable",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "700",
+    "segmentPushType": "APPEND",
+    "replication": "3",
+    "schemaName": "tableSchemaName",
+    "timeColumnName": "timeColumnName",
+    "timeType": "timeType",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+  },
+  "tenants": {
+    "broker": "brokerOne",
+    "server": "serverOne"
+  },
+  "tableIndexConfig": {
+    "invertedIndexColumns": [
+      "column1",
+      "column2"
+    ],
+    "loadMode": "HEAP"
+  },
+  "metadata": {
+    "customConfigs": {
     }
+  }
 }

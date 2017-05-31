@@ -47,25 +47,26 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- *  Sample curl call to create broker tenant
- *  curl -i -X POST -H 'Content-Type: application/json' -d
- *  '{
- *    "role" : "broker",
- *    "numberOfInstances : "5",
- *    "name" : "brokerOne"
- *    }' http://lva1-pinot-controller-vip-1.corp.linkedin.com:11984/tenants
+ * <ul>
+ *   <li>Sample curl call to create broker tenant</li>
+ *   curl -i -X POST -H 'Content-Type: application/json' -d
+ *   '{
+ *     "role" : "broker",
+ *     "numberOfInstances : "5",
+ *     "name" : "brokerOne"
+ *   }' http://localhost:1234/tenants
  *
- *  Sample curl call to create server tenant
- *  curl -i -X POST -H 'Content-Type: application/json' -d
- *  '{
- *    "role" : "server",
- *    "numberOfInstances : "5",
- *    "name" : "serverOne",
- *    "offlineInstances" : "3",
- *    "realtimeInstances" : "2"
- *    }' http://lva1-pinot-controller-vip-1.corp.linkedin.com:11984/tenants
+ *   <li>Sample curl call to create server tenant</li>
+ *   curl -i -X POST -H 'Content-Type: application/json' -d
+ *   '{
+ *     "role" : "server",
+ *     "numberOfInstances : "5",
+ *     "name" : "serverOne",
+ *     "offlineInstances" : "3",
+ *     "realtimeInstances" : "2"
+ *   }' http://localhost:1234/tenants
+ * </ul>
  */
-
 public class PinotTenantRestletResource extends BasePinotControllerRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
 

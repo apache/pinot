@@ -1,21 +1,23 @@
 {
+  "tableName": "baseballStats",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "baseball",
+    "replication": "1"
+  },
+  "tenants": {
+  },
   "tableIndexConfig": {
-    "invertedIndexColumns":["playerID","teamID"],
-    "loadMode":"HEAP",
-    "lazyLoad":"false"
-   },
-   "tenants":{"server":"","broker":""},
-   "tableType":"OFFLINE","metadata":{"customConfigs":{"d2Name":"baseballPinot"}},
-   "segmentsConfig":{
-     "retentionTimeUnit":"DAYS",
-     "segmentPushFrequency":"daily",
-     "replication":1,
-     "timeColumnName":"",
-     "retentionTimeValue":"700",
-     "timeType":"",
-     "segmentPushType":"APPEND",
-     "schemaName":"baseball",
-     "segmentAssignmentStrategy":"BalanceNumSegmentAssignmentStrategy"
-   },
-   "tableName":"baseballStats"
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [
+      "playerID",
+      "teamID"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
 }
