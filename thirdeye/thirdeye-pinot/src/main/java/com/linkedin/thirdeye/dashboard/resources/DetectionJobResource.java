@@ -225,7 +225,7 @@ public class DetectionJobResource {
    * @throws Exception
    */
   @POST
-  @Path("/{id}/generateAnomaliesInRange")
+  @Path("/{id}/replay")
   public Response generateAnomaliesInRange(@PathParam("id") @NotNull String id,
       @QueryParam("start") @NotNull String startTimeIso,
       @QueryParam("end") @NotNull String endTimeIso,
@@ -250,11 +250,11 @@ public class DetectionJobResource {
     startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
     endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
 
-    if(startTime.isAfter(endTime)){
+    if (startTime.isAfter(endTime)) {
       throw new IllegalArgumentException(String.format(
           "[functionId %s] Monitoring start time is after monitoring end time", id));
     }
-    if(endTime.isAfterNow()){
+    if (endTime.isAfterNow()) {
       throw new IllegalArgumentException(String.format(
           "[functionId %s] Monitor end time {} should not be in the future", id, endTime.toString()));
     }
@@ -271,7 +271,7 @@ public class DetectionJobResource {
     //  Check if the raw anomaly results have been cleaned up before regeneration
     List<RawAnomalyResultDTO> rawResults =
         rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
-    if(CollectionUtils.isNotEmpty(rawResults) && !forceBackfill){
+    if (CollectionUtils.isNotEmpty(rawResults) && !forceBackfill) {
       throw new IllegalArgumentException(String.format(
           "[functionId {}] Raw anomaly results should be cleaned up before regeneration", id));
     }
@@ -303,7 +303,7 @@ public class DetectionJobResource {
 
     Long jobId = detectionJobScheduler.runOfflineAnalysis(id, analysisTime);
     List<Long> anomalyIds = new ArrayList<>();
-    if(jobId == null) {
+    if (jobId == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity("Anomaly function " + Long.toString(id)
           + " is inactive. Or thread is interrupted.").build();
     } else {
@@ -331,7 +331,7 @@ public class DetectionJobResource {
    * @param holidayEnds: holidayEnds in in ISO Format ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @return a list of merged anomalies with holidays removed
    */
-  public static List<MergedAnomalyResultDTO> getMergedAnomaliesRemoveHolidays(long functionId, long startTime, long endTime, String holidayStarts, String holidayEnds){
+  public static List<MergedAnomalyResultDTO> getMergedAnomaliesRemoveHolidays(long functionId, long startTime, long endTime, String holidayStarts, String holidayEnds) {
     StringTokenizer starts = new StringTokenizer(holidayStarts, ",");
     StringTokenizer ends = new StringTokenizer(holidayEnds, ",");
     MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
@@ -339,13 +339,13 @@ public class DetectionJobResource {
     int origSize = totalAnomalies.size();
     long start;
     long end;
-    while (starts.hasMoreElements() && ends.hasMoreElements()){
+    while (starts.hasMoreElements() && ends.hasMoreElements()) {
       start = ISODateTimeFormat.dateTimeParser().parseDateTime(starts.nextToken()).getMillis();
       end = ISODateTimeFormat.dateTimeParser().parseDateTime(ends.nextToken()).getMillis();
       List<MergedAnomalyResultDTO> holidayMergedAnomalies = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(start, end, functionId, true);
       totalAnomalies.removeAll(holidayMergedAnomalies);
     }
-    if(starts.hasMoreElements() || ends.hasMoreElements()){
+    if(starts.hasMoreElements() || ends.hasMoreElements()) {
       LOG.warn("Input holiday starts and ends length not equal!");
     }
     LOG.info("Removed {} merged anomalies", origSize - totalAnomalies.size());
@@ -394,19 +394,19 @@ public class DetectionJobResource {
       //evaluate current alert filter (calculate current precision and recall)
       evaluator.init(anomalyResultDTOS);
       LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall: {}", alertFilter.getClass().toString(), evaluator.getPrecision(), evaluator.getRecall());
-    } catch (Exception e){
+    } catch (Exception e) {
       LOG.info(e.getMessage());
     }
     currPrecision = evaluator.getWeightedPrecision();
     currRecall = evaluator.getRecall();
-    try{
+    try {
       // get tuned alert filter
-      Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, currPrecision, currRecall);
+      Map<String, String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, currPrecision, currRecall);
       LOG.info("tuned AlertFilter");
 
       // if alert filter auto tune has updated alert filter, write to autotune_config_index, and get the autotuneId
       // otherwise do nothing and return alert filter
-      if (alertFilterAutotune.isUpdated()){
+      if (alertFilterAutotune.isUpdated()) {
         target.setFunctionId(id);
         target.setAutotuneMethod(ALERT_FILTER_LOGISITC_AUTO_TUNE);
         target.setConfiguration(tunedAlertFilter);
@@ -437,7 +437,7 @@ public class DetectionJobResource {
       @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
-      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds){
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
     List<MergedAnomalyResultDTO> anomalyResultDTOS = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
@@ -462,7 +462,7 @@ public class DetectionJobResource {
       @QueryParam("end") String endTimeIso,
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType, @QueryParam("nExpected") int nExpectedAnomalies,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
-      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds){
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
@@ -476,8 +476,8 @@ public class DetectionJobResource {
     // create alert filter auto tune
     AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
     long autotuneId = -1;
-    try{
-      Map<String,String> tunedAlertFilter = alertFilterAutotune.initiateAutoTune(anomalyResultDTOS, nExpectedAnomalies);
+    try {
+      Map<String, String> tunedAlertFilter = alertFilterAutotune.initiateAutoTune(anomalyResultDTOS, nExpectedAnomalies);
 
       // if achieved the initial alert filter
       if (alertFilterAutotune.isUpdated()) {
@@ -488,7 +488,7 @@ public class DetectionJobResource {
       } else {
         LOG.info("Failed init alert filter since model hasn't been updated");
       }
-    } catch (Exception e){
+    } catch (Exception e) {
       LOG.warn("Failed to achieve init alert filter: {}", e.getMessage());
     }
     return Response.ok(autotuneId).build();
@@ -545,7 +545,7 @@ public class DetectionJobResource {
   public Response evaluateAlertFilterByAutoTuneId(@PathParam("autotuneId") long id,
       @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
-      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds){
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
@@ -600,7 +600,7 @@ public class DetectionJobResource {
       @QueryParam("tune") @DefaultValue("{\"pValueThreshold\":[0.05, 0.01]}") String tuningJSON,
       @QueryParam("goal") @DefaultValue("0.05") double goal,
       @QueryParam("includeOriginal") @DefaultValue("true") boolean includeOrigin,
-      @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
+      @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
       LOG.warn("Unable to find anomaly function {}", functionId);
@@ -617,22 +617,20 @@ public class DetectionJobResource {
         replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayTimeIso);
       }
       replayStart = replayEnd.minus(timeGranularity.toPeriod());
-    }
-    catch (Exception e) {
-      throw new WebApplicationException("Unable to parse strings, "+ replayTimeIso +
-          ", in ISO DateTime format", e);
+    } catch (Exception e) {
+      throw new WebApplicationException("Unable to parse strings, " + replayTimeIso
+          + ", in ISO DateTime format", e);
     }
 
     // List all tuning parameter sets
     List<Map<String, String>> tuningParameters = null;
     try {
       tuningParameters = listAllTuningParameters(new JSONObject(tuningJSON));
-    }
-    catch(JSONException e){
+    } catch(JSONException e) {
       LOG.error("Unable to parse json string: {}", tuningJSON, e );
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
-    if(tuningParameters.size() == 0) { // no tuning combinations
+    if (tuningParameters.size() == 0) { // no tuning combinations
       LOG.warn("No tuning parameter is found in json string {}", tuningJSON);
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
@@ -649,7 +647,7 @@ public class DetectionJobResource {
     AutotuneConfigDTO targetDTO = null;
     List<AutotuneConfigDTO> functionAutoTuneConfigDTOList =
         autotuneConfigDAO.findAllByFuctionIdAndWindow(functionId,replayStart.getMillis(), replayEnd.getMillis());
-    for(AutotuneConfigDTO configDTO : functionAutoTuneConfigDTOList) {
+    for (AutotuneConfigDTO configDTO : functionAutoTuneConfigDTOList) {
       if(configDTO.getAutotuneMethod().equals(autotuneMethodType) &&
           configDTO.getPerformanceEvaluationMethod().equals(performanceEvalMethod) &&
           configDTO.getStartTime() == replayStart.getMillis() && configDTO.getEndTime() == replayEnd.getMillis() &&
@@ -659,7 +657,7 @@ public class DetectionJobResource {
       }
     }
 
-    if(targetDTO == null) {  // Cannot find existing dto
+    if (targetDTO == null) {  // Cannot find existing dto
       targetDTO = new AutotuneConfigDTO();
       targetDTO.setFunctionId(functionId);
       targetDTO.setAutotuneMethod(autotuneMethodType);
@@ -672,7 +670,7 @@ public class DetectionJobResource {
 
     // clear message;
     targetDTO.setMessage("");
-    if(includeOrigin) {
+    if (includeOrigin) {
       targetDTO.setPerformance(originalPerformance);
     } else {
       targetDTO.setPerformance(Collections.EMPTY_MAP);
@@ -846,7 +844,7 @@ public class DetectionJobResource {
   public Response getAlertFilterMetaDataByAutoTuneId(@PathParam("autotuneId") long id,
       @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
-      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds){
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
     long startTime;
     long endTime;
@@ -854,8 +852,8 @@ public class DetectionJobResource {
       startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
     } catch (Exception e) {
-      throw new WebApplicationException("Unable to parse strings, " + startTimeIso + " and " + endTimeIso +
-          ", in ISO DateTime format", e);
+      throw new WebApplicationException("Unable to parse strings, " + startTimeIso + " and " + endTimeIso
+          + ", in ISO DateTime format", e);
     }
 
     AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(id);
@@ -863,7 +861,7 @@ public class DetectionJobResource {
     List<MergedAnomalyResultDTO> anomalyResultDTOS =
         getMergedAnomaliesRemoveHolidays(functionId, startTime, endTime, holidayStarts, holidayEnds);
     List<AnomalyUtils.MetaDataNode> metaData = new ArrayList<>();
-    for(MergedAnomalyResultDTO anomaly: anomalyResultDTOS){
+    for (MergedAnomalyResultDTO anomaly: anomalyResultDTOS) {
       metaData.add(new AnomalyUtils.MetaDataNode(anomaly));
     }
     return Response.ok(metaData).build();
