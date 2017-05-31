@@ -29,11 +29,11 @@ public class AnomalyMergeConfig {
   public AnomalyMergeConfig() {
   }
 
-  public AnomalyMergeConfig(AnomalyMergeConfig other) {
-    this.mergeStrategy = other.getMergeStrategy();
-    this.sequentialAllowedGap = other.getSequentialAllowedGap();
-    this.maxMergeDurationLength = other.getMaxMergeDurationLength();
-    this.mergeablePropertyKeys = other.getMergeablePropertyKeys();
+  public AnomalyMergeConfig(AnomalyMergeStrategy mergeStrategy, long sequentialAllowedGap, long maxMergeDurationLength, List<String> mergeablePropertyKeys) {
+    this.mergeStrategy = mergeStrategy;
+    this.sequentialAllowedGap = sequentialAllowedGap;
+    this.maxMergeDurationLength = maxMergeDurationLength;
+    this.mergeablePropertyKeys = mergeablePropertyKeys;
   }
 
   public AnomalyMergeStrategy getMergeStrategy() {

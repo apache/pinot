@@ -94,8 +94,9 @@ public class TimeBasedAnomalyMerger {
     try {
       BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(functionSpec);
       mergeConfig.setMergeablePropertyKeys(anomalyFunction.getMergeablePropertyKeys());
+      LOG.info("Created anomaly function for class: {}, set mergeable keys as: {}", anomalyFunction.getClass(), anomalyFunction.getMergeablePropertyKeys());
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Unsuccessfully create anomaly function from anomalyFunctionFactory, {}", e.getMessage());
     }
 
 

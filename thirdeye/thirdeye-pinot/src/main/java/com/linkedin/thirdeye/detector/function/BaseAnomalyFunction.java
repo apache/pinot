@@ -172,7 +172,7 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
    * @return A list of keys to used for comparing if two anomalies are equal on mergeable keys
    */
   public List<String> getMergeablePropertyKeys(){
-    return new ArrayList<>();
+    return Collections.emptyList();
   }
 
 }
