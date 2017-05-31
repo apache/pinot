@@ -125,7 +125,7 @@ public class CleanupAndRegenerateAnomaliesTool {
 
       // Clean up merged and raw anomaly of functionID
       OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedResultDAO, rawResultDAO);
-      onboardResource.deleteExistingAnomalies(Long.toString(functionId), startTime, endTime);
+      onboardResource.deleteExistingAnomalies(functionId, startTime, endTime);
     }
   }
 

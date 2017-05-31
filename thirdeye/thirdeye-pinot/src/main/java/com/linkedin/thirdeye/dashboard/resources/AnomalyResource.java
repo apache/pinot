@@ -485,7 +485,7 @@ public class AnomalyResource {
       long cloneId;
       String tag = "clone";
       try {
-        cloneId = onboardResource.cloneFunctionsGetIds(originalFunction.getId(), "clone", Boolean.toString(isCloneAnomalies));
+        cloneId = onboardResource.cloneAnomalyFunctionById(originalFunction.getId(), "clone", isCloneAnomalies);
       } catch (Exception e) {
         responseMessage.put("message", "Unable to clone function " + originalFunction.getId() + " with clone tag \"clone\"");
         LOG.warn("Unable to clone function {} with clone tag \"{}\"", originalFunction.getId(), "clone");

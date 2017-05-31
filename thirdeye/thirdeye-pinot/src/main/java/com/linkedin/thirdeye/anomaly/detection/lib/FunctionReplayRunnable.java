@@ -176,11 +176,10 @@ public class FunctionReplayRunnable implements Runnable {
 
     // clean up and kill itself
     if(selfKill) {
-      onboardResource.deleteExistingAnomalies(Long.toString(clonedFunctionId), replayStart.getMillis(),
+      onboardResource.deleteExistingAnomalies(clonedFunctionId, replayStart.getMillis(),
           replayEnd.getMillis());
       anomalyFunctionDAO.deleteById(clonedFunctionId);
-    }
-    else {
+    } else {
       anomalyFunctionDTO.setWindowSize(originWindowSize);
       anomalyFunctionDTO.setWindowUnit(originWindowUnit);
       anomalyFunctionDTO.setCron(originCron);
