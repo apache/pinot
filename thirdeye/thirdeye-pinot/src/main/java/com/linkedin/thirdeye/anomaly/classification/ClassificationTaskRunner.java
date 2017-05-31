@@ -87,6 +87,18 @@ public class ClassificationTaskRunner implements TaskRunner {
 
   }
 
+  /**
+   * For each dimension of the main anomalies, this method collects its correlated anomalies from other metrics and
+   * invokes the classification logic on those anomalies. The correlated anomalies could come from activated or
+   * deactivated functions. For the former functions, this method retrieves its anomalies from backend DB. For the
+   * latter one, it invokes adhoc anomaly detections on the time window of main anomalies. The time window is determined
+   * by the min. start time and max. end time of main anomalies; in addition, the window is bounded by the start and
+   * end time of this classification job just in case of long main anomalies.
+   *
+   * @param mainAnomalies the collection of main anomalies.
+   *
+   * @return a collection of main anomalies, which has issue type updated, that is grouped by dimensions.
+   */
   private ListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionalShuffleAndUnifyClassification(
       List<MergedAnomalyResultDTO> mainAnomalies) {
 
@@ -145,6 +157,11 @@ public class ClassificationTaskRunner implements TaskRunner {
     return updatedMainAnomaliesByDimension;
   }
 
+  /**
+   * Initiates anomaly function spec and alert filter config for the given function id.
+   *
+   * @param functionId the id of the function to be initiated.
+   */
   private void addAnomalyFunctionAndAlertConfig(long functionId) {
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
     anomalyFunctionConfigMap.put(functionId, anomalyFunctionDTO);
@@ -152,6 +169,14 @@ public class ClassificationTaskRunner implements TaskRunner {
     alertFilterMap.put(functionId, alertFilter);
   }
 
+  /**
+   * Filter the list of anomalies by the given alert filter.
+   *
+   * @param alertFilter the filter to apply on the list of anomalies.
+   * @param anomalies a list of anomalies.
+   *
+   * @return a list of anomalies that pass through the alert filter.
+   */
   private static List<MergedAnomalyResultDTO> filterAnomalies(AlertFilter alertFilter,
       List<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> filteredMainAnomalies = new ArrayList<>();
@@ -163,6 +188,9 @@ public class ClassificationTaskRunner implements TaskRunner {
     return filteredMainAnomalies;
   }
 
+  /**
+   * A comparator to sort merged anomalies in the natural order of their end time.
+   */
   private static class MergeAnomalyEndTimeComparator implements Comparator<MergedAnomalyResultDTO> {
     @Override
     public int compare(MergedAnomalyResultDTO lhs, MergedAnomalyResultDTO rhs) {
