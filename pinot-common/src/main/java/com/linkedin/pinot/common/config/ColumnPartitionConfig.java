@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.config;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -91,6 +92,17 @@ public class ColumnPartitionConfig {
   }
 
   /**
+   * Helper method to convert ranges (one or more) in string form (eg "[1 2],[3 4]") into a
+   * list of {@link IntRange}. Expects string is formatted correctly.
+   *
+   * @param input String representation of ranges.
+   * @return List of IntRange's for the specified string.
+   */
+  public static List<IntRange> rangesFromString(String input) {
+    return rangesFromString(input.split(PARTITION_VALUE_DELIMITER));
+  }
+
+  /**
    * Helper method to convert a list of {@link IntRange} to a delimited string.
    * The delimiter used is {@link #PARTITION_VALUE_DELIMITER}
    * @param ranges List of ranges to be converted to String.
@@ -113,5 +125,24 @@ public class ColumnPartitionConfig {
       }
     }
     return builder.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    ColumnPartitionConfig that = (ColumnPartitionConfig) o;
+    return (_numPartitions == that._numPartitions) &&  _functionName.equals(that._functionName);
+  }
+
+  @Override
+  public int hashCode() {
+    return EqualityUtils.hashCodeOf(_functionName.hashCode(), _numPartitions);
   }
 }
