@@ -612,11 +612,11 @@ public class DetectionJobResource {
       TimeUnit timeUnit = TimeUnit.valueOf(durationUnit.toUpperCase());
 
       TimeGranularity timeGranularity = new TimeGranularity(replayDuration, timeUnit);
-      replayStart = DateTime.now();
+      replayEnd = DateTime.now();
       if (StringUtils.isNotEmpty(replayTimeIso)) {
-        replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayTimeIso);
+        replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayTimeIso);
       }
-      replayEnd = replayStart.minus(timeGranularity.toPeriod());
+      replayStart = replayEnd.minus(timeGranularity.toPeriod());
     }
     catch (Exception e) {
       throw new WebApplicationException("Unable to parse strings, "+ replayTimeIso +
