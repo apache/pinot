@@ -137,7 +137,7 @@ public class ThirdEyeAnomalyApplication
           dataCompletenessScheduler = new DataCompletenessScheduler();
           dataCompletenessScheduler.start();
         }
-        if (config.isGrouper()) {
+        if (config.isClassifier()) {
           classificationJobScheduler = new ClassificationJobScheduler();
           classificationJobScheduler.start();
         }
@@ -167,7 +167,7 @@ public class ThirdEyeAnomalyApplication
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler.shutdown();
         }
-        if (config.isGrouper()) {
+        if (config.isClassifier()) {
           classificationJobScheduler.shutdown();
         }
       }

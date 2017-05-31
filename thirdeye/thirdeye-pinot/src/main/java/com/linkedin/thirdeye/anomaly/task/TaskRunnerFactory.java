@@ -33,7 +33,7 @@ public class TaskRunnerFactory {
     case ALERT2:
       taskRunner = new AlertTaskRunnerV2();
       break;
-    case GROUPING:
+    case CLASSIFICATION:
       taskRunner = new ClassificationTaskRunner();
       break;
     default:

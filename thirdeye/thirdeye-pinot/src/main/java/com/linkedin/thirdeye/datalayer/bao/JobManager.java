@@ -23,5 +23,5 @@ public interface JobManager extends AbstractManager<JobDTO>{
 
   JobDTO findLatestCompletedDetectionJobByFunctionId(long functionId);
 
-  JobDTO findLatestCompletedGroupingJobById(long functionId);
+  JobDTO findLatestCompletedClassificationJobById(long functionId);
 }

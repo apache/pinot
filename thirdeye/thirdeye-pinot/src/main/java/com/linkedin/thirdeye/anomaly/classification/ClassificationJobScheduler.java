@@ -116,7 +116,7 @@ public class ClassificationJobScheduler implements Runnable {
 
     long startTime = minTimeBoundary;
     // Get the most recent classification job and continue from previous completed classification job
-    JobDTO classificationJobDTO = jobDAO.findLatestCompletedGroupingJobById(classificationConfig.getId());
+    JobDTO classificationJobDTO = jobDAO.findLatestCompletedClassificationJobById(classificationConfig.getId());
     if (classificationJobDTO != null) {
       startTime = Math.max(startTime, classificationJobDTO.getWindowEndTime());
     }

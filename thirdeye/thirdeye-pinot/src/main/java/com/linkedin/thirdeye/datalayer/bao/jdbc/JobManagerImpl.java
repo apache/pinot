@@ -128,9 +128,9 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   }
 
   @Override
-  public JobDTO findLatestCompletedGroupingJobById(long functionId) {
+  public JobDTO findLatestCompletedClassificationJobById(long functionId) {
     HashMap<String, Object> parameterMap = new HashMap<>();
-    parameterMap.put("type", TaskConstants.TaskType.GROUPING);
+    parameterMap.put("type", TaskConstants.TaskType.CLASSIFICATION);
     parameterMap.put("status", JobStatus.COMPLETED);
     List<JobBean> list = genericPojoDao
         .executeParameterizedSQL(FIND_LATEST_COMPLETED_GROUPING_JOB_BY_FUNCTION_ID, parameterMap, JobBean.class);

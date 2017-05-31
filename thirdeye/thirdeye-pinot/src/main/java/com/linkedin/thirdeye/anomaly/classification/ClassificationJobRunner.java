@@ -39,7 +39,7 @@ public class ClassificationJobRunner implements JobRunner {
       jobSpec.setWindowEndTime(jobContext.getWindowEndTime());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
-      jobSpec.setTaskType(TaskConstants.TaskType.GROUPING);
+      jobSpec.setTaskType(TaskConstants.TaskType.CLASSIFICATION);
       Long jobExecutionId = jobDAO.save(jobSpec);
       jobContext.setJobName(jobName);
       jobContext.setJobExecutionId(jobExecutionId);
@@ -69,7 +69,7 @@ public class ClassificationJobRunner implements JobRunner {
         }
 
         TaskDTO taskSpec = new TaskDTO();
-        taskSpec.setTaskType(TaskConstants.TaskType.GROUPING);
+        taskSpec.setTaskType(TaskConstants.TaskType.CLASSIFICATION);
         taskSpec.setJobName(jobContext.getJobName());
         taskSpec.setStatus(TaskConstants.TaskStatus.WAITING);
         taskSpec.setStartTime(System.currentTimeMillis());
