@@ -4,6 +4,8 @@ import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.List;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import java.util.Map;
+
 
 public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomalyResultDTO> {
 
@@ -48,6 +50,10 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
   List<MergedAnomalyResultDTO> findByTime(long startTime, long endTime, boolean loadRawAnomalies);
 
   List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(long functionId, long anomalyId, boolean loadRawAnomalies);
+
+  Map<Long, List<MergedAnomalyResultDTO>> findAnomaliesByMetricIdsAndTimeRange(List<Long> metricIds, long start, long end);
+
+  List<MergedAnomalyResultDTO> findAnomaliesByMetricIdAndTimeRange(Long metricId, long start, long end);
 
   void updateAnomalyFeedback(MergedAnomalyResultDTO entity);
 

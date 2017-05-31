@@ -1,12 +1,16 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -543,6 +547,99 @@ public class DataResource {
     return wowSummary;
   }
 
+  @GET
+  @Path("anomalies/ranges")
+  public Map<Long, List<TimeRange>> getAnomalyTimeRangesByMetricIds(
+      @QueryParam("metricIds") String metricIds,
+      @QueryParam("start") Long start,
+      @QueryParam("end") Long end) {
+
+    if (metricIds == null)
+      throw new IllegalArgumentException("Must provide metricIds");
+
+    if (start == null)
+      throw new IllegalArgumentException("Must provide start timestamp");
+
+    if (end == null)
+      throw new IllegalArgumentException("Must provide end timestamp");
+
+    List<Long> ids = new ArrayList<>();
+    for (String metricId : metricIds.split(",")) {
+      ids.add(Long.parseLong(metricId));
+    }
+
+    Map<Long, List<MergedAnomalyResultDTO>> anomalies = DAO_REGISTRY.getMergedAnomalyResultDAO().findAnomaliesByMetricIdsAndTimeRange(ids, start, end);
+
+    Map<Long, List<TimeRange>> output = new HashMap<>();
+    for(Map.Entry<Long, List<MergedAnomalyResultDTO>> entry : anomalies.entrySet()) {
+      output.put(entry.getKey(), truncateRanges(extractAnomalyTimeRanges(entry.getValue()), start, end));
+    }
+
+    return output;
+  }
+
+  /**
+   * Returns a list of TimeRanges that correspond to anomalous time windows covered by at least
+   * one anomaly. If multiple anomalies overlap or form adjacent time windows, they're merged
+   * into a single range.
+   *
+   * @param anomalies merged anomalies
+   * @return list of time ranges
+   */
+  static List<TimeRange> extractAnomalyTimeRanges(List<MergedAnomalyResultDTO> anomalies) {
+    if(anomalies.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<MergedAnomalyResultDTO> sorted = new ArrayList<>(anomalies);
+    Collections.sort(sorted, new Comparator<MergedAnomalyResultDTO>() {
+      @Override
+      public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
+        return Long.compare(o1.getStartTime(), o2.getStartTime());
+      }
+    });
+
+    List<TimeRange> ranges = new ArrayList<>();
+    Iterator<MergedAnomalyResultDTO> itAnomaly = sorted.iterator();
+    MergedAnomalyResultDTO first = itAnomaly.next();
+    long currStart = first.getStartTime();
+    long currEnd = first.getEndTime();
+
+    while(itAnomaly.hasNext()) {
+      MergedAnomalyResultDTO anomaly = itAnomaly.next();
+      if (currEnd >= anomaly.getStartTime()) {
+        currEnd = Math.max(currEnd, anomaly.getEndTime());
+      } else {
+        ranges.add(new TimeRange(currStart, currEnd));
+        currStart = anomaly.getStartTime();
+        currEnd = anomaly.getEndTime();
+      }
+    }
+
+    ranges.add(new TimeRange(currStart, currEnd));
+
+    return ranges;
+  }
+
+  /**
+   * Returns a list of TimeRanges truncated to a given start and end timestamp. If the input
+   * TimeRange is outside the boundaries it is omitted. If it overlaps partially, it is
+   * truncated and included.
+   *
+   * @param ranges list of time ranges
+   * @param start start timestamp (inclusive)
+   * @param end end timestamp (exclusive)
+   * @return list of truncated time ranges
+   */
+  static List<TimeRange> truncateRanges(List<TimeRange> ranges, long start, long end) {
+    List<TimeRange> output = new ArrayList<>();
+    for (TimeRange r : ranges) {
+      if (r.getStart() < end && r.getEnd() > start) {
+        output.add(new TimeRange(Math.max(r.getStart(), start), Math.min(r.getEnd(), end)));
+      }
+    }
+    return output;
+  }
 
   /**
    *  convert label from WowSummaryModel to a TimeRange
