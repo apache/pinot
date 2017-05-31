@@ -572,7 +572,7 @@ public class DetectionJobResource {
    * @param functionId
    * the id of the target anomaly function
    * @param  replayTimeIso
-   * the start time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
+   * the end time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
    * @param replayDuration
    * the duration of the replay ahead of the replayStartTimeIso
    * @param durationUnit
