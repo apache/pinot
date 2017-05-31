@@ -241,8 +241,8 @@ public class OnboardResource {
   @DELETE
   @Path("function/{id}/anomalies")
   public Map<String, Integer> deleteAnomalies(@PathParam("id") Long functionId,
-                                              @QueryParam("start") String startTimeIso,
-                                              @QueryParam("end") String endTimeIso) {
+    @QueryParam("start") String startTimeIso,
+    @QueryParam("end") String endTimeIso) {
 
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
@@ -262,7 +262,7 @@ public class OnboardResource {
 
     LOG.info("Delete anomalies of function {} in the time range: {} -- {}", functionId, startTimeIso, endTimeIso);
 
-    return deleteExistingAnomalies(functionId.toString(), startTime, endTime);
+    return deleteExistingAnomalies(functionId, startTime, endTime);
   }
 
   /**
@@ -277,15 +277,13 @@ public class OnboardResource {
    *
    * If monitoringWindowStartTime is not given, then start time is set to 0.
    * If monitoringWindowEndTime is not given, then end time is set to Long.MAX_VALUE.
+   * @param functionId function id
    * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
    * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
    */
-  @POST
-  @Path("function/{id}/deleteExistingAnomalies")
-  public Map<String, Integer> deleteExistingAnomalies(@PathParam("id") String id,
-                                                      @QueryParam("start") long monitoringWindowStartTime,
-                                                      @QueryParam("end") long monitoringWindowEndTime) {
-    long functionId = Long.valueOf(id);
+  public Map<String, Integer> deleteExistingAnomalies(long functionId,
+      long monitoringWindowStartTime,
+      long monitoringWindowEndTime) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
       LOG.info("Anomaly functionId {} is not found", functionId);
@@ -335,10 +333,10 @@ public class OnboardResource {
    */
   @GET
   @Path("function/{id}/anomalies")
-  public List<Long> getExistingRawAnomalies(@PathParam("id") Long functionId,
-                                            @QueryParam("start") String startTimeIso,
-                                            @QueryParam("end") String endTimeIso,
-                                            @QueryParam("type") @DefaultValue("merged") String anomalyType) {
+  public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId,
+      @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso,
+      @QueryParam("type") @DefaultValue("merged") String anomalyType) {
 
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
