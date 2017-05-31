@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
+import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -43,6 +44,7 @@ public class ThirdEyeAnomalyApplication
   private AutoOnboardService autoOnboardService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
   private AlertFilterFactory alertFilterFactory = null;
+  private AnomalyClassifierFactory anomalyClassifierFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
   private ClassificationJobScheduler classificationJobScheduler = null;
 
@@ -89,8 +91,9 @@ public class ThirdEyeAnomalyApplication
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
           alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+          anomalyClassifierFactory = new AnomalyClassifierFactory(config.getAnomalyClassifierConfigPath());
 
-          taskDriver = new TaskDriver(config, anomalyFunctionFactory, alertFilterFactory);
+          taskDriver = new TaskDriver(config, anomalyFunctionFactory, alertFilterFactory, anomalyClassifierFactory);
           taskDriver.start();
         }
         if (config.isScheduler()) {

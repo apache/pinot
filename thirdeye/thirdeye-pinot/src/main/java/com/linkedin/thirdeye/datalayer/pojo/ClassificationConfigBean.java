@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The configuration for a classification job.
@@ -9,10 +12,12 @@ import java.util.List;
  * anomaly function ids whose anomalies are used for determining the issue type during the classification.
  */
 public class ClassificationConfigBean extends AbstractBean {
-  private String name;
+  private String name = "";
   private long mainFunctionId;
-  private List<Long> functionIdList;
+  private List<Long> functionIdList = new ArrayList<>();
   private boolean active;
+  private Map<String, String> classifierConfig = new HashMap<>();
+
 
   /**
    * Returns the name of this classification configuration.
@@ -86,5 +91,23 @@ public class ClassificationConfigBean extends AbstractBean {
    */
   public void setActive(boolean active) {
     this.active = active;
+  }
+
+  /**
+   * Returns the configuration, which is given by a map of strings to strings, of classifier.
+   *
+   * @return the configuration, which is given by a map of strings to strings, of classifier.
+   */
+  public Map<String, String> getClassifierConfig() {
+    return classifierConfig;
+  }
+
+  /**
+   * Sets the configuration, which should be given by a map of strings to strings, of classifier.
+   *
+   * @param classifierConfig the configuration, which should be given by a map of strings to strings, of classifier.
+   */
+  public void setClassifierConfig(Map<String, String> classifierConfig) {
+    this.classifierConfig = classifierConfig;
   }
 }

@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.anomaly.classification;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
+import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifier;
+import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
@@ -15,7 +17,6 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -42,11 +43,11 @@ public class ClassificationTaskRunner implements TaskRunner {
   private long windowStart;
   private long windowEnd;
   private ClassificationConfigDTO classificationConfig;
-  private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
+  private AnomalyClassifierFactory anomalyClassifierFactory;
 
-  Map<Long, AnomalyFunctionDTO> anomalyFunctionConfigMap = new HashMap<>();
-  Map<Long, AlertFilter> alertFilterMap = new HashMap<>();
+  private Map<Long, AnomalyFunctionDTO> anomalyFunctionConfigMap = new HashMap<>();
+  private Map<Long, AlertFilter> alertFilterMap = new HashMap<>();
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
@@ -65,8 +66,8 @@ public class ClassificationTaskRunner implements TaskRunner {
     windowStart = classificationTaskInfo.getWindowStartTime();
     windowEnd = classificationTaskInfo.getWindowEndTime();
     classificationConfig = classificationTaskInfo.getClassificationConfigDTO();
-    anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     alertFilterFactory = taskContext.getAlertFilterFactory();
+    anomalyClassifierFactory = taskContext.getAnomalyClassifierFactory();
   }
 
   private void runTask(long windowStart, long windowEnd) {
@@ -82,9 +83,12 @@ public class ClassificationTaskRunner implements TaskRunner {
     // Sort merged anomalies by the natural order of the end time
     Collections.sort(filteredMainAnomalies, new MergeAnomalyEndTimeComparator());
     // Run classifier for each dimension of the anomalies
-    ListMultimap<DimensionMap, MergedAnomalyResultDTO> updatedMainAnomaliesByDimension =
+    List<MergedAnomalyResultDTO> updatedMainAnomaliesByDimension =
         dimensionalShuffleAndUnifyClassification(filteredMainAnomalies);
-
+    // Update anomalies whose issue type is updated.
+    for (MergedAnomalyResultDTO mergedAnomalyResultDTO : updatedMainAnomaliesByDimension) {
+      mergedAnomalyDAO.update(mergedAnomalyResultDTO);
+    }
   }
 
   /**
@@ -99,10 +103,10 @@ public class ClassificationTaskRunner implements TaskRunner {
    *
    * @return a collection of main anomalies, which has issue type updated, that is grouped by dimensions.
    */
-  private ListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionalShuffleAndUnifyClassification(
+  private List<MergedAnomalyResultDTO> dimensionalShuffleAndUnifyClassification(
       List<MergedAnomalyResultDTO> mainAnomalies) {
 
-    ListMultimap<DimensionMap, MergedAnomalyResultDTO> updatedMainAnomaliesByDimension = ArrayListMultimap.create();
+    List<MergedAnomalyResultDTO> updatedMainAnomaliesByDimension = new ArrayList<>();
     // Terminate if the main anomaly function has not detected any anomalies in the given window
     if (CollectionUtils.isEmpty(mainAnomalies)) {
       return updatedMainAnomaliesByDimension;
@@ -150,8 +154,12 @@ public class ClassificationTaskRunner implements TaskRunner {
         }
       }
 
-      // TODO: Invoke classification logic for this dimension
-
+      // Invoke classification logic for this dimension
+      Map<String, String> classifierConfig = classificationConfig.getClassifierConfig();
+      AnomalyClassifier anomalyClassifier = anomalyClassifierFactory.fromSpec(classifierConfig);
+      List<MergedAnomalyResultDTO> updatedAnomalyResults =
+          anomalyClassifier.classify(functionIdToAnomalyResult, classificationConfig);
+      updatedMainAnomaliesByDimension.addAll(updatedAnomalyResults);
     }
 
     return updatedMainAnomaliesByDimension;

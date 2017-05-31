@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
@@ -41,7 +42,8 @@ public class TaskDriver {
   private volatile boolean shutdown = false;
 
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
-      AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
+      AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory,
+      AnomalyClassifierFactory anomalyClassifierFactory) {
     driverConfiguration = thirdEyeAnomalyConfiguration.getTaskDriverConfiguration();
     workerId = thirdEyeAnomalyConfiguration.getId();
     anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
@@ -50,6 +52,7 @@ public class TaskDriver {
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
     taskContext.setAlertFilterFactory(alertFilterFactory);
+    taskContext.setAnomalyClassifierFactory(anomalyClassifierFactory);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);
   }
