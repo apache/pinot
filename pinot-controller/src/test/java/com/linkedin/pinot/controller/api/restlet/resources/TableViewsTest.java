@@ -15,20 +15,10 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Collections;
-import java.util.Map;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
@@ -36,6 +26,17 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
+import org.json.JSONException;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
+import org.testng.annotations.Test;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -44,20 +45,20 @@ import static org.testng.AssertJUnit.assertNotSame;
 
 
 public class TableViewsTest extends ControllerTest {
-
   public static final String TABLE_NAME = "VIEWS_TABLE";
   public static final String OFFLINE_ONLY_TABLE = "OFFLINE_ONLY_TABLE";
-  private static PinotHelixResourceManager pinotHelixResourceManager;
+
+  private final ControllerRequestURLBuilder _controllerRequestURLBuilder =
+      ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
+  private PinotHelixResourceManager pinotHelixResourceManager;
 
   @BeforeClass
   public void setupTest()
       throws Exception {
     startZk();
     startController();
-    pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR,
-            getHelixClusterName(), TableViewsTest.class.getName() + "_controller",
-            null, 10000L, true, /*isUpdateStateModel=*/false);
+    pinotHelixResourceManager = new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(),
+        TableViewsTest.class.getName() + "_controller", null, 10000L, true, /*isUpdateStateModel=*/false);
     pinotHelixResourceManager.start();
 
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
@@ -65,39 +66,57 @@ public class TableViewsTest extends ControllerTest {
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
         ZkStarter.DEFAULT_ZK_STR, 20, true);
 
-    JSONObject request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON("default", 5);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantCreate(),
-        request.toString());
+    String request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON("default", 5).toString();
+    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request);
 
-    request = ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON("default", 20, 16, 2);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantCreate(),
-        request.toString());
+    request = ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON("default", 20, 16, 2).toString();
+    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request);
 
-    request = ControllerRequestBuilder.buildCreateOfflineTableJSON(OFFLINE_ONLY_TABLE, "default", "default",
-        2, "BalanceNumSegmentAssignmentStrategy");
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(),
-        request.toString());
+    request = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(OFFLINE_ONLY_TABLE)
+        .setNumReplicas(2)
+        .setBrokerTenant("default")
+        .setServerTenant("default")
+        .build()
+        .toJSONConfigString();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), request);
     addOneSegment(OFFLINE_ONLY_TABLE);
 
-    request = ControllerRequestBuilder.buildCreateOfflineTableJSON(TABLE_NAME, "default", "default",
-        2, "BalanceNumSegmentAssignmentStrategy");
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(),
-        request.toString());
-    JSONObject metadata = new JSONObject();
-    metadata.put("streamType", "kafka");
-    metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.CONSUMER_TYPE, DataSource.Realtime.Kafka.ConsumerType.highLevel.toString());
-    metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.TOPIC_NAME, "fakeTopic");
-    metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.DECODER_CLASS, "fakeClass");
-    metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.ZK_BROKER_URL, "fakeUrl");
-    metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, "potato");
-    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1234));
-    metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + DataSource.Realtime.Kafka.AUTO_OFFSET_RESET,
-        "smallest");
-    request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(TABLE_NAME, "default", "default",
-        "potato", "DAYS", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy", metadata, "fakeSchema", "fakeColumn",
-        Collections.<String>emptyList(), "MMAP", true);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(),
-        request.toString());
+    request = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNumReplicas(2)
+        .setBrokerTenant("default")
+        .setServerTenant("default")
+        .build()
+        .toJSONConfigString();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), request);
+
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.CONSUMER_TYPE,
+        DataSource.Realtime.Kafka.ConsumerType.highLevel.toString());
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.TOPIC_NAME, "fakeTopic");
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.DECODER_CLASS, "fakeClass");
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.ZK_BROKER_URL, "fakeUrl");
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING,
+        "potato");
+    streamConfigs.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1234));
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "."
+        + DataSource.Realtime.Kafka.AUTO_OFFSET_RESET, "smallest");
+
+    request = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("potato")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5")
+        .setSchemaName("fakeSchema")
+        .setNumReplicas(2)
+        .setBrokerTenant("default")
+        .setServerTenant("default")
+        .setLoadMode("MMAP")
+        .setSortedColumn("fakeColumn")
+        .setStreamConfigs(streamConfigs)
+        .build()
+        .toJSONConfigString();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), request);
   }
 
   @AfterClass
@@ -139,9 +158,7 @@ public class TableViewsTest extends ControllerTest {
   @Test(dataProvider = "stateProvider")
   public void testTableNotFound(String state)
       throws IOException, JSONException {
-     ControllerRequestURLBuilder requestBuilder =
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
-    String url = requestBuilder.forTableView("UNKNOWN_TABLE", state, null);
+    String url = _controllerRequestURLBuilder.forTableView("UNKNOWN_TABLE", state, null);
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     assertEquals(connection.getResponseCode(), 404);
   }
@@ -149,9 +166,7 @@ public class TableViewsTest extends ControllerTest {
   @Test(dataProvider = "stateProvider")
   public void testBadRequest(String state)
       throws IOException {
-    ControllerRequestURLBuilder requestURLBuilder =
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
-    String url = requestURLBuilder.forTableView("UNKNOWN_TABLE", state, "no_such_type");
+    String url = _controllerRequestURLBuilder.forTableView("UNKNOWN_TABLE", state, "no_such_type");
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     assertEquals(connection.getResponseCode(), 400);
   }
@@ -187,9 +202,7 @@ public class TableViewsTest extends ControllerTest {
 
   private String getState(String tableName, String state, String tableType)
       throws IOException, JSONException {
-    ControllerRequestURLBuilder requestBuilder =
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
-    return sendGetRequest(requestBuilder.forTableView(tableName, state, tableType));
+    return sendGetRequest(_controllerRequestURLBuilder.forTableView(tableName, state, tableType));
   }
 
   private void addOneSegment(String tableName) {

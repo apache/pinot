@@ -17,7 +17,6 @@ package com.linkedin.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
@@ -27,7 +26,6 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.BufferedReader;
@@ -264,19 +262,16 @@ public class PerfBenchmarkDriver {
 
   public void configureTable(String tableName, List<String> invertedIndexColumns)
       throws Exception {
-    String jsonString =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, _serverTenantName, _brokerTenantName,
-            _numReplicas, _segmentAssignmentStrategy).toString();
-    TableConfig offlineTableConfig = TableConfig.init(jsonString);
-    offlineTableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
-    offlineTableConfig.getValidationConfig().setRetentionTimeValue("");
-    IndexingConfig indexingConfig = offlineTableConfig.getIndexingConfig();
-    indexingConfig.setLoadMode(_loadMode);
-    indexingConfig.setSegmentFormatVersion(_segmentFormatVersion);
-    if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
-      indexingConfig.setInvertedIndexColumns(invertedIndexColumns);
-    }
-    _helixResourceManager.addTable(offlineTableConfig);
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
+        .setSegmentAssignmentStrategy(_segmentAssignmentStrategy)
+        .setNumReplicas(_numReplicas)
+        .setBrokerTenant(_brokerTenantName)
+        .setServerTenant(_serverTenantName)
+        .setLoadMode(_loadMode)
+        .setSegmentVersion(_segmentFormatVersion)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .build();
+    _helixResourceManager.addTable(tableConfig);
   }
 
   private void uploadIndexSegments()

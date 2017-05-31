@@ -39,7 +39,7 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
   protected void createTable()
       throws Exception {
     addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, ORIGIN_INVERTED_INDEX_COLUMNS, null,
-        "mytable", SegmentVersion.v1);
+        "mytable", SegmentVersion.v1, null);
   }
 
   @Test
@@ -49,7 +49,7 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
     JSONObject queryResponse = postQuery(TEST_QUERY);
     Assert.assertEquals(queryResponse.getLong("numEntriesScannedInFilter"), TOTAL_DOCS);
     updateOfflineTable("DaysSinceEpoch", -1, "", null, null, UPDATED_INVERTED_INDEX_COLUMNS, null, "mytable",
-        SegmentVersion.v1);
+        SegmentVersion.v1, null);
 
     triggerReload();
     long endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;

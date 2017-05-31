@@ -27,6 +27,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
+import org.json.JSONObject;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -89,9 +90,9 @@ public class PinotTableSegmentConfigs extends BasePinotControllerRestletResource
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the segment configuration", required = true) String tableName,
       Representation entity)
       throws Exception {
-    TableConfig config = TableConfig.init(entity.getText());
-    _pinotHelixResourceManager.updateSegmentsValidationAndRetentionConfigFor(config.getTableName(),
-        config.getTableType(), config.getValidationConfig());
+    TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(entity.getText()));
+    _pinotHelixResourceManager.updateSegmentsValidationAndRetentionConfigFor(tableConfig.getTableName(),
+        tableConfig.getTableType(), tableConfig.getValidationConfig());
     return new StringRepresentation("done");
   }
 }

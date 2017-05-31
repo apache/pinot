@@ -19,6 +19,8 @@ import com.clearspring.analytics.util.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableTaskConfig;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -28,7 +30,7 @@ import com.linkedin.pinot.minion.exception.FatalException;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import com.linkedin.pinot.minion.executor.BaseTaskExecutor;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +53,13 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private PinotTaskManager _pinotTaskManager;
+
+  @Override
+  protected TableTaskConfig getTaskConfig() {
+    TableTaskConfig tableTaskConfig = new TableTaskConfig();
+    tableTaskConfig.setEnabledTaskTypes(Collections.singleton(TestTaskGenerator.TASK_TYPE));
+    return tableTaskConfig;
+  }
 
   @BeforeClass
   public void setUp()
@@ -186,17 +195,18 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
     @Override
     public List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs) {
       // Generate at most 4 tasks
-      if (_clusterInfoProvider.getTaskStates(TASK_TYPE).size() < 4) {
-        Map<String, String> config1 = new HashMap<>();
-        config1.put("arg1", "foo1");
-        config1.put("arg2", "bar1");
-        Map<String, String> config2 = new HashMap<>();
-        config2.put("arg1", "foo2");
-        config2.put("arg2", "bar2");
-        return Arrays.asList(new PinotTaskConfig(TASK_TYPE, config1), new PinotTaskConfig(TASK_TYPE, config2));
-      } else {
+      if (_clusterInfoProvider.getTaskStates(TASK_TYPE).size() >= 4) {
         return Collections.emptyList();
       }
+
+      List<PinotTaskConfig> taskConfigs = new ArrayList<>();
+      for (TableConfig tableConfig : tableConfigs) {
+        Map<String, String> configs = new HashMap<>();
+        configs.put("tableName", tableConfig.getTableName());
+        configs.put("tableType", tableConfig.getTableType().toString());
+        taskConfigs.add(new PinotTaskConfig(TASK_TYPE, configs));
+      }
+      return taskConfigs;
     }
   }
 
@@ -205,9 +215,20 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
     public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
       try {
         Preconditions.checkArgument(pinotTaskConfig.getTaskType().equals(TestTaskGenerator.TASK_TYPE));
-        Preconditions.checkArgument(pinotTaskConfig.getConfigs().size() == 2);
-        Preconditions.checkArgument(pinotTaskConfig.getConfigs().containsKey("arg1"));
-        Preconditions.checkArgument(pinotTaskConfig.getConfigs().containsKey("arg2"));
+        Map<String, String> configs = pinotTaskConfig.getConfigs();
+        Preconditions.checkArgument(configs.size() == 2);
+        Preconditions.checkArgument(configs.containsKey("tableName"));
+        Preconditions.checkArgument(configs.containsKey("tableType"));
+        switch (configs.get("tableName")) {
+          case OFFLINE_TABLE_NAME:
+            Preconditions.checkArgument(configs.get("tableType").equals(TableType.OFFLINE.toString()));
+            break;
+          case REALTIME_TABLE_NAME:
+            Preconditions.checkArgument(configs.get("tableType").equals(TableType.REALTIME.toString()));
+            break;
+          default:
+            throw new IllegalArgumentException("Got unexpected table name: " + configs.get("tableName"));
+        }
       } catch (IllegalArgumentException e) {
         throw new FatalException("Got unexpected task config: " + pinotTaskConfig, e);
       }

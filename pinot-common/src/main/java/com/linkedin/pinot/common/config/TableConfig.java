@@ -15,9 +15,12 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -37,6 +40,7 @@ public class TableConfig {
   private static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
   private static final String CUSTOM_CONFIG_KEY = "metadata";
   private static final String QUOTA_CONFIG_KEY = "quota";
+  private static final String TASK_CONFIG_KEY = "task";
 
   private String _tableName;
   private TableType _tableType;
@@ -45,11 +49,12 @@ public class TableConfig {
   private IndexingConfig _indexingConfig;
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
+  private TableTaskConfig _taskConfig;
 
   private TableConfig(@Nonnull String tableName, @Nonnull TableType tableType,
       @Nonnull SegmentsValidationAndRetentionConfig validationConfig, @Nonnull TenantConfig tenantConfig,
       @Nonnull IndexingConfig indexingConfig, @Nonnull TableCustomConfig customConfig,
-      @Nullable QuotaConfig quotaConfig) {
+      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -57,13 +62,20 @@ public class TableConfig {
     _indexingConfig = indexingConfig;
     _customConfig = customConfig;
     _quotaConfig = quotaConfig;
+    _taskConfig = taskConfig;
+  }
+
+  // For backward compatible
+  @Deprecated
+  @Nonnull
+  public static TableConfig init(@Nonnull String jsonConfigString)
+      throws IOException, JSONException {
+    return fromJSONConfig(new JSONObject(jsonConfigString));
   }
 
   @Nonnull
-  public static TableConfig init(@Nonnull String jsonString)
+  public static TableConfig fromJSONConfig(@Nonnull JSONObject jsonConfig)
       throws IOException, JSONException {
-    JSONObject jsonConfig = new JSONObject(jsonString);
-
     TableType tableType = TableType.valueOf(jsonConfig.getString(TABLE_TYPE_KEY).toUpperCase());
     String tableName = TableNameBuilder.forType(tableType).tableNameWithType(jsonConfig.getString(TABLE_NAME_KEY));
     SegmentsValidationAndRetentionConfig validationConfig =
@@ -80,45 +92,83 @@ public class TableConfig {
       quotaConfig = OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(QUOTA_CONFIG_KEY).toString(), QuotaConfig.class);
       quotaConfig.validate();
     }
+    TableTaskConfig taskConfig = null;
+    if (jsonConfig.has(TASK_CONFIG_KEY)) {
+      taskConfig = OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(TASK_CONFIG_KEY).toString(), TableTaskConfig.class);
+    }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig);
+        quotaConfig, taskConfig);
   }
 
   @Nonnull
-  public static TableConfig fromZnRecord(@Nonnull ZNRecord record)
+  public static JSONObject toJSONConfig(@Nonnull TableConfig tableConfig)
       throws IOException, JSONException {
-    Map<String, String> simpleFields = record.getSimpleFields();
     JSONObject jsonConfig = new JSONObject();
-    jsonConfig.put(TABLE_NAME_KEY, simpleFields.get(TABLE_NAME_KEY));
-    jsonConfig.put(TABLE_TYPE_KEY, simpleFields.get(TABLE_TYPE_KEY));
-    jsonConfig.put(VALIDATION_CONFIG_KEY, new JSONObject(simpleFields.get(VALIDATION_CONFIG_KEY)));
-    jsonConfig.put(TENANT_CONFIG_KEY, new JSONObject(simpleFields.get(TENANT_CONFIG_KEY)));
-    jsonConfig.put(INDEXING_CONFIG_KEY, new JSONObject(simpleFields.get(INDEXING_CONFIG_KEY)));
-    jsonConfig.put(CUSTOM_CONFIG_KEY, new JSONObject(simpleFields.get(CUSTOM_CONFIG_KEY)));
-    String quotaConfig = simpleFields.get(QUOTA_CONFIG_KEY);
-    if (quotaConfig != null) {
-      jsonConfig.put(QUOTA_CONFIG_KEY, new JSONObject(quotaConfig));
+    jsonConfig.put(TABLE_NAME_KEY, tableConfig._tableName);
+    jsonConfig.put(TABLE_TYPE_KEY, tableConfig._tableType.toString());
+    jsonConfig.put(VALIDATION_CONFIG_KEY,
+        new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._validationConfig)));
+    jsonConfig.put(TENANT_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._tenantConfig)));
+    jsonConfig.put(INDEXING_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._indexingConfig)));
+    jsonConfig.put(CUSTOM_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._customConfig)));
+    if (tableConfig._quotaConfig != null) {
+      jsonConfig.put(QUOTA_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._quotaConfig)));
     }
-    return init(jsonConfig.toString());
+    if (tableConfig._taskConfig != null) {
+      jsonConfig.put(TASK_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._taskConfig)));
+    }
+    return jsonConfig;
   }
 
   @Nonnull
-  public static ZNRecord toZnRecord(@Nonnull TableConfig config)
-      throws IOException {
-    ZNRecord record = new ZNRecord(config.getTableName());
-    Map<String, String> simpleFields = new HashMap<>();
-    simpleFields.put(TABLE_NAME_KEY, config._tableName);
-    simpleFields.put(TABLE_TYPE_KEY, config._tableType.toString().toLowerCase());
-    simpleFields.put(VALIDATION_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(config._validationConfig));
-    simpleFields.put(TENANT_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(config._tenantConfig));
-    simpleFields.put(INDEXING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(config._indexingConfig));
-    simpleFields.put(CUSTOM_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(config._customConfig));
-    if (config._quotaConfig != null) {
-      simpleFields.put(QUOTA_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(config._quotaConfig));
+  public static TableConfig fromZnRecord(@Nonnull ZNRecord znRecord)
+      throws IOException, JSONException {
+    Map<String, String> simpleFields = znRecord.getSimpleFields();
+    TableType tableType = TableType.valueOf(simpleFields.get(TABLE_TYPE_KEY).toUpperCase());
+    String tableName = TableNameBuilder.forType(tableType).tableNameWithType(simpleFields.get(TABLE_NAME_KEY));
+    SegmentsValidationAndRetentionConfig validationConfig =
+        OBJECT_MAPPER.readValue(simpleFields.get(VALIDATION_CONFIG_KEY), SegmentsValidationAndRetentionConfig.class);
+    TenantConfig tenantConfig = OBJECT_MAPPER.readValue(simpleFields.get(TENANT_CONFIG_KEY), TenantConfig.class);
+    IndexingConfig indexingConfig =
+        OBJECT_MAPPER.readValue(simpleFields.get(INDEXING_CONFIG_KEY), IndexingConfig.class);
+    TableCustomConfig customConfig =
+        OBJECT_MAPPER.readValue(simpleFields.get(CUSTOM_CONFIG_KEY), TableCustomConfig.class);
+    QuotaConfig quotaConfig = null;
+    String quotaConfigString = simpleFields.get(QUOTA_CONFIG_KEY);
+    if (quotaConfigString != null) {
+      quotaConfig = OBJECT_MAPPER.readValue(quotaConfigString, QuotaConfig.class);
+      quotaConfig.validate();
     }
-    record.setSimpleFields(simpleFields);
-    return record;
+    TableTaskConfig taskConfig = null;
+    String taskConfigString = simpleFields.get(TASK_CONFIG_KEY);
+    if (taskConfigString != null) {
+      taskConfig = OBJECT_MAPPER.readValue(taskConfigString, TableTaskConfig.class);
+    }
+
+    return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
+        quotaConfig, taskConfig);
+  }
+
+  @Nonnull
+  public static ZNRecord toZnRecord(@Nonnull TableConfig tableConfig)
+      throws IOException {
+    ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
+    Map<String, String> simpleFields = new HashMap<>();
+    simpleFields.put(TABLE_NAME_KEY, tableConfig._tableName);
+    simpleFields.put(TABLE_TYPE_KEY, tableConfig._tableType.toString());
+    simpleFields.put(VALIDATION_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._validationConfig));
+    simpleFields.put(TENANT_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._tenantConfig));
+    simpleFields.put(INDEXING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._indexingConfig));
+    simpleFields.put(CUSTOM_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._customConfig));
+    if (tableConfig._quotaConfig != null) {
+      simpleFields.put(QUOTA_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._quotaConfig));
+    }
+    if (tableConfig._taskConfig != null) {
+      simpleFields.put(TASK_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._taskConfig));
+    }
+    znRecord.setSimpleFields(simpleFields);
+    return znRecord;
   }
 
   @Nonnull
@@ -184,28 +234,228 @@ public class TableConfig {
     _quotaConfig = quotaConfig;
   }
 
+  @Nullable
+  public TableTaskConfig getTaskConfig() {
+    return _taskConfig;
+  }
+
+  public void setTaskConfig(@Nullable TableTaskConfig taskConfig) {
+    _taskConfig = taskConfig;
+  }
+
   @Nonnull
-  public JSONObject toJSON()
+  public String toJSONConfigString()
       throws IOException, JSONException {
-    JSONObject jsonConfig = new JSONObject();
-    jsonConfig.put(TABLE_NAME_KEY, _tableName);
-    jsonConfig.put(TABLE_TYPE_KEY, _tableType.toString().toLowerCase());
-    jsonConfig.put(VALIDATION_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(_validationConfig)));
-    jsonConfig.put(TENANT_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(_tenantConfig)));
-    jsonConfig.put(INDEXING_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(_indexingConfig)));
-    jsonConfig.put(CUSTOM_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(_customConfig)));
-    if (_quotaConfig != null) {
-      jsonConfig.put(QUOTA_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(_quotaConfig)));
-    }
-    return jsonConfig;
+    return toJSONConfig(this).toString();
   }
 
   @Override
   public String toString() {
     try {
-      return toJSON().toString(2);
+      return toJSONConfig(this).toString(2);
     } catch (Exception e) {
       return e.toString();
+    }
+  }
+
+  public static class Builder {
+    private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
+    private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
+    private static final String DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
+    private static final String DEFAULT_NUM_REPLICAS = "1";
+    private static final String DEFAULT_LOAD_MODE = "HEAP";
+    private static final String MMAP_LOAD_MODE = "MMAP";
+
+    private final TableType _tableType;
+    private String _tableName;
+    private boolean _isLLC;
+
+    // Validation config related
+    private String _timeColumnName;
+    private String _timeType;
+    private String _retentionTimeUnit;
+    private String _retentionTimeValue;
+    private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
+    private String _segmentAssignmentStrategy = DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY;
+    private String _schemaName;
+    private String _numReplicas = DEFAULT_NUM_REPLICAS;
+
+    // Tenant config related
+    private String _brokerTenant;
+    private String _serverTenant;
+
+    // Indexing config related
+    private String _loadMode = DEFAULT_LOAD_MODE;
+    private String _segmentVersion;
+    private String _sortedColumn;
+    private List<String> _invertedIndexColumns;
+    private List<String> _noDictionaryColumns;
+    private Map<String, String> _streamConfigs;
+
+    private TableCustomConfig _customConfig;
+    private QuotaConfig _quotaConfig;
+    private TableTaskConfig _taskConfig;
+
+    public Builder(TableType tableType) {
+      _tableType = tableType;
+    }
+
+    public Builder setTableName(String tableName) {
+      _tableName = tableName;
+      return this;
+    }
+
+    public Builder setLLC(boolean isLLC) {
+      Preconditions.checkState(_tableType == TableType.REALTIME);
+      _isLLC = isLLC;
+      return this;
+    }
+
+    public Builder setTimeColumnName(String timeColumnName) {
+      _timeColumnName = timeColumnName;
+      return this;
+    }
+
+    public Builder setTimeType(String timeType) {
+      _timeType = timeType;
+      return this;
+    }
+
+    public Builder setRetentionTimeUnit(String retentionTimeUnit) {
+      _retentionTimeUnit = retentionTimeUnit;
+      return this;
+    }
+
+    public Builder setRetentionTimeValue(String retentionTimeValue) {
+      _retentionTimeValue = retentionTimeValue;
+      return this;
+    }
+
+    public Builder setSegmentPushType(String segmentPushType) {
+      if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
+        _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
+      } else {
+        _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
+      }
+      return this;
+    }
+
+    public Builder setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
+      _segmentAssignmentStrategy = segmentAssignmentStrategy;
+      return this;
+    }
+
+    public Builder setSchemaName(String schemaName) {
+      _schemaName = schemaName;
+      return this;
+    }
+
+    public Builder setNumReplicas(int numReplicas) {
+      Preconditions.checkArgument(numReplicas > 0);
+      _numReplicas = String.valueOf(numReplicas);
+      return this;
+    }
+
+    public Builder setBrokerTenant(String brokerTenant) {
+      _brokerTenant = brokerTenant;
+      return this;
+    }
+
+    public Builder setServerTenant(String serverTenant) {
+      _serverTenant = serverTenant;
+      return this;
+    }
+
+    public Builder setLoadMode(String loadMode) {
+      if (MMAP_LOAD_MODE.equalsIgnoreCase(loadMode)) {
+        _loadMode = MMAP_LOAD_MODE;
+      } else {
+        _loadMode = DEFAULT_LOAD_MODE;
+      }
+      return this;
+    }
+
+    public Builder setSegmentVersion(String segmentVersion) {
+      _segmentVersion = segmentVersion;
+      return this;
+    }
+
+    public Builder setSortedColumn(String sortedColumn) {
+      _sortedColumn = sortedColumn;
+      return this;
+    }
+
+    public Builder setInvertedIndexColumns(List<String> invertedIndexColumns) {
+      _invertedIndexColumns = invertedIndexColumns;
+      return this;
+    }
+
+    public Builder setNoDictionaryColumns(List<String> noDictionaryColumns) {
+      _noDictionaryColumns = noDictionaryColumns;
+      return this;
+    }
+
+    public Builder setStreamConfigs(Map<String, String> streamConfigs) {
+      Preconditions.checkState(_tableType == TableType.REALTIME);
+      _streamConfigs = streamConfigs;
+      return this;
+    }
+
+    public Builder setCustomConfig(TableCustomConfig customConfig) {
+      _customConfig = customConfig;
+      return this;
+    }
+
+    public Builder setQuotaConfig(QuotaConfig quotaConfig) {
+      _quotaConfig = quotaConfig;
+      return this;
+    }
+
+    public Builder setTaskConfig(TableTaskConfig taskConfig) {
+      _taskConfig = taskConfig;
+      return this;
+    }
+
+    public TableConfig build()
+        throws IOException, JSONException {
+      // Validation config
+      SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
+      validationConfig.setTimeColumnName(_timeColumnName);
+      validationConfig.setTimeType(_timeType);
+      validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
+      validationConfig.setRetentionTimeValue(_retentionTimeValue);
+      validationConfig.setSegmentPushType(_segmentPushType);
+      validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
+      validationConfig.setSchemaName(_schemaName);
+      validationConfig.setReplication(_numReplicas);
+      if (_isLLC) {
+        validationConfig.setReplicasPerPartition(_numReplicas);
+      }
+
+      // Tenant config
+      TenantConfig tenantConfig = new TenantConfig();
+      tenantConfig.setBroker(_brokerTenant);
+      tenantConfig.setServer(_serverTenant);
+
+      // Indexing config
+      IndexingConfig indexingConfig = new IndexingConfig();
+      indexingConfig.setLoadMode(_loadMode);
+      indexingConfig.setSegmentFormatVersion(_segmentVersion);
+      if (_sortedColumn != null) {
+        indexingConfig.setSortedColumn(Collections.singletonList(_sortedColumn));
+      }
+      indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
+      indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
+      indexingConfig.setStreamConfigs(_streamConfigs);
+      // TODO: set SegmentPartitionConfig here
+
+      if (_customConfig == null) {
+        _customConfig = new TableCustomConfig();
+        _customConfig.setCustomConfigs(new HashMap<String, String>());
+      }
+
+      return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
+          _quotaConfig, _taskConfig);
     }
   }
 }

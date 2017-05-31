@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.io.File;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -24,14 +26,12 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import kafka.server.KafkaServerStartable;
 
 
 /**
@@ -53,7 +53,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestWi
     addSchema(schemaFile, schema.getSchemaName());
     List<String> noDictionaryColumns = Arrays.asList("NASDelay", "ArrDelayMinutes", "DepDelayMinutes");
     addRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", new ArrayList<String>(), null, noDictionaryColumns);
+        null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", new ArrayList<String>(), null,
+        noDictionaryColumns, null);
   }
 
   protected void startKafka() {

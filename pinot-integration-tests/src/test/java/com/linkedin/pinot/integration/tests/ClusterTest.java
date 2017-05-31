@@ -15,27 +15,11 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
@@ -44,6 +28,7 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
@@ -56,7 +41,24 @@ import com.linkedin.pinot.minion.MinionStarter;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -64,7 +66,13 @@ import javax.annotation.Nullable;
  *
  */
 public abstract class ClusterTest extends ControllerTest {
+  private static final int LLC_SEGMENT_FLUSH_SIZE = 5000;
+  private static final int HLC_SEGMENT_FLUSH_SIZE = 20000;
+
   protected static String partitioningKey = null;
+
+  private final ControllerRequestURLBuilder _controllerRequestURLBuilder =
+      ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
 
   private List<HelixBrokerStarter> _brokerStarters = new ArrayList<>();
   private List<HelixServerStarter> _serverStarters = new ArrayList<>();
@@ -72,9 +80,9 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected int getRealtimeSegmentFlushSize(boolean useLlc) {
     if (useLlc) {
-      return 5000;
+      return LLC_SEGMENT_FLUSH_SIZE;
     } else {
-      return 20000;
+      return HLC_SEGMENT_FLUSH_SIZE;
     }
   }
 
@@ -111,8 +119,7 @@ public abstract class ClusterTest extends ControllerTest {
             Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT,
             Integer.toString(Integer.valueOf(Server.DEFAULT_ADMIN_API_PORT) - i));
-        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
-            Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
+        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, Integer.toString(Helix.DEFAULT_SERVER_NETTY_PORT + i));
         configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostnameOrAddress());
         configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
         configuration.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, "10000");
@@ -191,39 +198,59 @@ public abstract class ClusterTest extends ControllerTest {
       String retentionTimeUnit, String brokerTenant, String serverTenant, String tableName,
       SegmentVersion segmentVersion) throws Exception {
     addOfflineTable(timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant, serverTenant,
-        new ArrayList<String>(), null, tableName, segmentVersion);
+        null, null, tableName, segmentVersion, null);
   }
 
   protected void addOfflineTable(String timeColumnName, String timeColumnType, int retentionTimeValue,
       String retentionTimeUnit, String brokerTenant, String serverTenant, List<String> invertedIndexColumns,
-      String loadMode, String tableName, SegmentVersion segmentVersion)
-          throws Exception {
-    JSONObject request = ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant,
-        timeColumnName, "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3,
-        "BalanceNumSegmentAssignmentStrategy", invertedIndexColumns, loadMode, segmentVersion.toString());
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+      String loadMode, String tableName, SegmentVersion segmentVersion, TableTaskConfig taskConfig)
+      throws Exception {
+    String tableJSONConfigString = new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
+        .setTimeColumnName(timeColumnName)
+        .setTimeType(timeColumnType)
+        .setRetentionTimeUnit(retentionTimeUnit)
+        .setRetentionTimeValue(String.valueOf(retentionTimeValue))
+        .setNumReplicas(3)
+        .setBrokerTenant(brokerTenant)
+        .setServerTenant(serverTenant)
+        .setLoadMode(loadMode)
+        .setSegmentVersion(segmentVersion.toString())
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setTaskConfig(taskConfig)
+        .build()
+        .toJSONConfigString();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
   }
 
   protected void updateOfflineTable(String timeColumnName, int retentionTimeValue, String retentionTimeUnit,
       String brokerTenant, String serverTenant, List<String> invertedIndexColumns, String loadMode, String tableName,
-      SegmentVersion segmentVersion)
+      SegmentVersion segmentVersion, TableTaskConfig taskConfig)
       throws Exception {
-    JSONObject request =
-        ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName,
-            "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3, "BalanceNumSegmentAssignmentStrategy",
-            invertedIndexColumns, loadMode, segmentVersion.toString());
-    sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forUpdateTableConfig(tableName),
-        request.toString());
+    String tableJSONConfigString = new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
+        .setTimeColumnName(timeColumnName)
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit(retentionTimeUnit)
+        .setRetentionTimeValue(String.valueOf(retentionTimeValue))
+        .setNumReplicas(3)
+        .setBrokerTenant(brokerTenant)
+        .setServerTenant(serverTenant)
+        .setLoadMode(loadMode)
+        .setSegmentVersion(segmentVersion.toString())
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setTaskConfig(taskConfig)
+        .build()
+        .toJSONConfigString();
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableJSONConfigString);
   }
 
-  protected void dropOfflineTable(String tableName) throws Exception {
-    sendDeleteRequest(
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName + "_OFFLINE"));
+  protected void dropOfflineTable(String tableName)
+      throws Exception {
+    sendDeleteRequest(_controllerRequestURLBuilder.forTableDelete(tableName + "_OFFLINE"));
   }
 
-  protected void dropRealtimeTable(String tableName) throws Exception {
-    sendDeleteRequest(
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName + "_REALTIME"));
+  protected void dropRealtimeTable(String tableName)
+      throws Exception {
+    sendDeleteRequest(_controllerRequestURLBuilder.forTableDelete(tableName + "_REALTIME"));
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder {
@@ -265,96 +292,107 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
       String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic, String schemaName, String serverTenant,
       String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
-      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns)
+      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
       throws Exception {
-    if (noDictionaryColumns == null) {
-      noDictionaryColumns = new ArrayList<String>();
-    }
-    JSONObject streamConfig = new JSONObject();
-    streamConfig.put("streamType", "kafka");
-    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
-    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
-    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
         AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
-    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
-    streamConfig.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
-    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
-        "smallest");
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
+    streamConfigs.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
+    streamConfigs.put(
+        DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET, "smallest");
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-    JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
-        timeColumnName, timeColumnType, retentionTimeUnit, Integer.toString(retentionDays), 1,
-        "BalanceNumSegmentAssignmentStrategy", streamConfig, schemaName, sortedColumn, invertedIndexColumns, null, true, noDictionaryColumns);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+    String tableJSONConfigString = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName)
+        .setTimeColumnName(timeColumnName)
+        .setTimeType(timeColumnType)
+        .setRetentionTimeUnit(retentionTimeUnit)
+        .setRetentionTimeValue(String.valueOf(retentionDays))
+        .setSchemaName(schemaName)
+        .setBrokerTenant(brokerTenant)
+        .setServerTenant(serverTenant)
+        .setLoadMode(loadMode)
+        .setSortedColumn(sortedColumn)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setNoDictionaryColumns(noDictionaryColumns)
+        .setStreamConfigs(streamConfigs)
+        .setTaskConfig(taskConfig)
+        .build()
+        .toJSONConfigString();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
   }
 
   protected void addLLCRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
       String retentionTimeUnit, String kafkaBrokerList, String kafkaTopic, String schemaName, String serverTenant,
       String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
-      List<String> invertedIndexColumns, String loadMode)
+      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
       throws Exception {
-    addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays,
-    retentionTimeUnit, kafkaBrokerList, kafkaTopic, schemaName, serverTenant,
-        brokerTenant, avroFile, realtimeSegmentFlushSize, sortedColumn,
-        invertedIndexColumns, loadMode, null, new HashMap<String,String>());
-  }
-
-  protected void addLLCRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
-      String retentionTimeUnit, String kafkaBrokerList, String kafkaTopic, String schemaName, String serverTenant,
-      String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
-      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns,
-      Map<String, String> partitioner)
-          throws Exception {
-    JSONObject metadata = new JSONObject();
-    metadata.put("streamType", "kafka");
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
         AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
-    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
-        "smallest");
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
+    streamConfigs.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
+    streamConfigs.put(
+        DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET, "smallest");
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-    JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
-        timeColumnName, timeColumnType, retentionTimeUnit, Integer.toString(retentionDays), 1,
-        "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, sortedColumn, invertedIndexColumns, null, false,
-        noDictionaryColumns, partitioner);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+    String tableJSONConfigString = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName)
+        .setLLC(true)
+        .setTimeColumnName(timeColumnName)
+        .setTimeType(timeColumnType)
+        .setRetentionTimeUnit(retentionTimeUnit)
+        .setRetentionTimeValue(String.valueOf(retentionDays))
+        .setSchemaName(schemaName)
+        .setBrokerTenant(brokerTenant)
+        .setServerTenant(serverTenant)
+        .setLoadMode(loadMode)
+        .setSortedColumn(sortedColumn)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setNoDictionaryColumns(noDictionaryColumns)
+        .setStreamConfigs(streamConfigs)
+        .setTaskConfig(taskConfig)
+        .build()
+        .toJSONConfigString();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
   }
 
   protected void addHybridTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile,
       String sortedColumn, List<String> invertedIndexColumns, String loadMode, boolean useLlc,
-      List<String> noDictionaryColumns) throws Exception {
+      List<String> noDictionaryColumns, TableTaskConfig taskConfig)
+      throws Exception {
     int retentionDays = -1;
     String retentionTimeUnit = "";
     if (useLlc) {
-      addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(useLlc),
-          sortedColumn, invertedIndexColumns, loadMode);
+      addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit,
+          KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile,
+          LLC_SEGMENT_FLUSH_SIZE, sortedColumn, invertedIndexColumns, loadMode, noDictionaryColumns, taskConfig);
     } else {
       addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(useLlc),
-          sortedColumn, invertedIndexColumns, loadMode, noDictionaryColumns);
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, HLC_SEGMENT_FLUSH_SIZE, sortedColumn,
+          invertedIndexColumns, loadMode, noDictionaryColumns, taskConfig);
     }
     addOfflineTable(timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant,
-        invertedIndexColumns, loadMode, tableName, SegmentVersion.v1);
+        invertedIndexColumns, loadMode, tableName, SegmentVersion.v1, taskConfig);
   }
 
-  protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {
-    JSONObject request = ControllerRequestBuilder.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantCreate(),
-        request.toString());
+  protected void createBrokerTenant(String tenantName, int brokerCount)
+      throws Exception {
+    JSONObject request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
+    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request.toString());
   }
 
   protected void createServerTenant(String tenantName, int offlineServerCount, int realtimeServerCount)
       throws Exception {
-    JSONObject request = ControllerRequestBuilder.buildServerTenantCreateRequestJSON(tenantName,
+    JSONObject request = ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(tenantName,
         offlineServerCount + realtimeServerCount, offlineServerCount, realtimeServerCount);
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forServerTenantCreate(),
-        request.toString());
+    sendPostRequest(_controllerRequestURLBuilder.forServerTenantCreate(), request.toString());
   }
 }
