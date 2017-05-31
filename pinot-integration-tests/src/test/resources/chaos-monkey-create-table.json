@@ -1,29 +1,18 @@
 {
-  "tableName":"myTable",
-  "segmentsConfig" : {
-    "retentionTimeUnit":"DAYS",
-    "retentionTimeValue":"7000000",
-    "segmentPushFrequency":"daily",
-    "segmentPushType":"APPEND",
-    "replication" : "3",
-    "schemaName" : "tableSchemaName",
-    "timeColumnName" : "timeColumnName",
-    "timeType" : "timeType",
-    "segmentAssignmentStrategy" : "BalanceNumSegmentAssignmentStrategy"
+  "tableName": "myTable",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "replication": "3"
   },
-  "tableIndexConfig" : {
-    "invertedIndexColumns" : ["column1","column2"],
-    "loadMode"  : "HEAP",
-    "lazyLoad"  : "false"
+  "tenants": {
   },
-  "tenants" : {
-    "broker":"brokerOne",
-    "server":"serverOne"
+  "tableIndexConfig": {
+    "loadMode": "HEAP"
   },
-  "tableType":"OFFLINE",
   "metadata": {
-    "customConfigs" : {
-      "d2Name":"Test"
+    "customConfigs": {
     }
   }
 }
