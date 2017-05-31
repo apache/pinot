@@ -97,9 +97,9 @@ public class ClassificationTaskRunner implements TaskRunner {
     }
 
     // Sort anomalies by their dimensions
-    ListMultimap<DimensionMap, MergedAnomalyResultDTO> mainAnomaliesByDimension = ArrayListMultimap.create();
+    ListMultimap<DimensionMap, MergedAnomalyResultDTO> mainAnomaliesByDimensionMap = ArrayListMultimap.create();
     for (MergedAnomalyResultDTO mainAnomaly : mainAnomalies) {
-      mainAnomaliesByDimension.put(mainAnomaly.getDimensions(), mainAnomaly);
+      mainAnomaliesByDimensionMap.put(mainAnomaly.getDimensions(), mainAnomaly);
     }
 
     // Set up maps of function id to anomaly function config and alert filter
@@ -109,16 +109,27 @@ public class ClassificationTaskRunner implements TaskRunner {
     }
 
     // For each dimension, we get the anomalies from the correlated metric
-    for (DimensionMap dimensionMap : mainAnomaliesByDimension.keySet()) {
-      Map<Long, List<MergedAnomalyResultDTO>> functionIdToAnomalyResult = new HashMap<>();
+    for (DimensionMap dimensionMap : mainAnomaliesByDimensionMap.keySet()) {
+      // Determine the smallest time window that could enclose all main anomalies. In addition, this window is bounded
+      // by windowStart and windowEnd because we don't want to grab too many correlated anomalies for classification.
+      // The start and end time of this window is used to retrieve the anomalies on the correlated metrics.
+      List<MergedAnomalyResultDTO> mainAnomaliesByDimension = mainAnomaliesByDimensionMap.get(dimensionMap);
+      long startTimeForCorrelatedAnomalies = windowStart;
+      long endTimeForCorrelatedAnomalies = windowEnd;
+      for (MergedAnomalyResultDTO mainAnomaly : mainAnomaliesByDimension) {
+        startTimeForCorrelatedAnomalies = Math.max(startTimeForCorrelatedAnomalies, mainAnomaly.getStartTime());
+        endTimeForCorrelatedAnomalies = Math.min(endTimeForCorrelatedAnomalies, mainAnomaly.getEndTime());
+      }
 
+      Map<Long, List<MergedAnomalyResultDTO>> functionIdToAnomalyResult = new HashMap<>();
       // Get the anomalies from other anomaly function that are activated
       for (Long functionId : functionIds) {
         AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionConfigMap.get(functionId);
         AlertFilter alertFilter = alertFilterMap.get(functionId);
         if (anomalyFunctionDTO.getIsActive()) {
           List<MergedAnomalyResultDTO> anomalies = mergedAnomalyDAO
-              .findAllOverlapByFunctionIdDimensions(functionId, windowStart, windowEnd, dimensionMap.toString(), false);
+              .findAllOverlapByFunctionIdDimensions(functionId, startTimeForCorrelatedAnomalies,
+                  endTimeForCorrelatedAnomalies, dimensionMap.toString(), false);
           List<MergedAnomalyResultDTO> filteredAnomalies = filterAnomalies(alertFilter, anomalies);
           Collections.sort(filteredAnomalies, new MergeAnomalyEndTimeComparator());
           functionIdToAnomalyResult.put(functionId, filteredAnomalies);
