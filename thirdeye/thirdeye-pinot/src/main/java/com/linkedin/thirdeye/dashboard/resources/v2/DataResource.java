@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -547,30 +548,9 @@ public class DataResource {
   }
 
   @GET
-  @Path("anomalies/ranges/metric")
-  public List<TimeRange> getAnomalyTimeRangesByMetricId(
-      @QueryParam("metricId") Long metricId,
-      @QueryParam("start") Long start,
-      @QueryParam("end") Long end) {
-
-    if (metricId == null)
-      throw new IllegalArgumentException("Must provide metricId");
-
-    if (start == null)
-      throw new IllegalArgumentException("Must provide start timestamp");
-
-    if (end == null)
-      throw new IllegalArgumentException("Must provide end timestamp");
-
-    List<MergedAnomalyResultDTO> anomalies = DAO_REGISTRY.getMergedAnomalyResultDAO().findAnomaliesByMetricIdAndTimeRange(metricId, start, end);
-
-    return truncateRanges(extractAnomalyTimeRanges(anomalies), start, end);
-  }
-
-  @GET
-  @Path("anomalies/ranges/metricMap")
+  @Path("anomalies/ranges")
   public Map<Long, List<TimeRange>> getAnomalyTimeRangesByMetricIds(
-      @QueryParam("metricId") List<Long> metricIds,
+      @QueryParam("metricIds") String metricIds,
       @QueryParam("start") Long start,
       @QueryParam("end") Long end) {
 
@@ -583,7 +563,12 @@ public class DataResource {
     if (end == null)
       throw new IllegalArgumentException("Must provide end timestamp");
 
-    Map<Long, List<MergedAnomalyResultDTO>> anomalies = DAO_REGISTRY.getMergedAnomalyResultDAO().findAnomaliesByMetricIdsAndTimeRange(metricIds, start, end);
+    List<Long> ids = new ArrayList<>();
+    for (String metricId : metricIds.split(",")) {
+      ids.add(Long.parseLong(metricId));
+    }
+
+    Map<Long, List<MergedAnomalyResultDTO>> anomalies = DAO_REGISTRY.getMergedAnomalyResultDAO().findAnomaliesByMetricIdsAndTimeRange(ids, start, end);
 
     Map<Long, List<TimeRange>> output = new HashMap<>();
     for(Map.Entry<Long, List<MergedAnomalyResultDTO>> entry : anomalies.entrySet()) {
