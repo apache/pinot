@@ -578,6 +578,14 @@ public class DataResource {
     return output;
   }
 
+  /**
+   * Returns a list of TimeRanges that correspond to anomalous time windows covered by at least
+   * one anomaly. If multiple anomalies overlap or form adjacent time windows, they're merged
+   * into a single range.
+   *
+   * @param anomalies merged anomalies
+   * @return list of time ranges
+   */
   static List<TimeRange> extractAnomalyTimeRanges(List<MergedAnomalyResultDTO> anomalies) {
     if(anomalies.isEmpty()) {
       return Collections.emptyList();
@@ -613,6 +621,16 @@ public class DataResource {
     return ranges;
   }
 
+  /**
+   * Returns a list of TimeRanges truncated to a given start and end timestamp. If the input
+   * TimeRange is outside the boundaries it is omitted. If it overlaps partially, it is
+   * truncated and included.
+   *
+   * @param ranges list of time ranges
+   * @param start start timestamp (inclusive)
+   * @param end end timestamp (exclusive)
+   * @return list of truncated time ranges
+   */
   static List<TimeRange> truncateRanges(List<TimeRange> ranges, long start, long end) {
     List<TimeRange> output = new ArrayList<>();
     for (TimeRange r : ranges) {
