@@ -80,6 +80,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private List<TaskDTO> tasks;
   private List<JobDTO> jobs;
   private long functionId;
+  private long classificationConfigId;
 
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
@@ -197,7 +198,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     datasetConfigDAO.save(getTestDatasetConfig(collection));
 
     // create test grouping config
-    classificationConfigDAO.save(getTestGroupingConfiguration(functionId));
+    classificationConfigId = classificationConfigDAO.save(getTestGroupingConfiguration(functionId));
 
     // setup function factory for worker and merger
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
@@ -368,12 +369,16 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // start classifier
     startClassifier();
-    JobDTO latestCompletedDetectionJobDTO = jobDAO.findLatestCompletedDetectionJobByFunctionId(functionId);
+    List<JobDTO> latestCompletedDetectionJobDTO =
+        jobDAO.findRecentScheduledJobByTypeAndConfigId(TaskType.ANOMALY_DETECTION, functionId, 0L);
     Assert.assertNotNull(latestCompletedDetectionJobDTO);
+    Assert.assertEquals(latestCompletedDetectionJobDTO.get(0).getStatus(), JobStatus.COMPLETED);
     Thread.sleep(5000);
     jobs = jobDAO.findAll();
-    JobDTO latestCompletedClassificationJobDTO = jobDAO.findLatestCompletedClassificationJobById(functionId);
+    List<JobDTO> latestCompletedClassificationJobDTO =
+        jobDAO.findRecentScheduledJobByTypeAndConfigId(TaskType.CLASSIFICATION, classificationConfigId, 0L);
     Assert.assertNotNull(latestCompletedClassificationJobDTO);
+    Assert.assertEquals(latestCompletedClassificationJobDTO.get(0).getStatus(), JobStatus.COMPLETED);
   }
 
   private void startDataCompletenessScheduler() throws Exception {

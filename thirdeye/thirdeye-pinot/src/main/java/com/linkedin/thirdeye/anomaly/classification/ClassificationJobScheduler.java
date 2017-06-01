@@ -1,12 +1,15 @@
 package com.linkedin.thirdeye.anomaly.classification;
 
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 
 import java.util.ArrayList;
@@ -15,6 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,7 +101,9 @@ public class ClassificationJobScheduler implements Runnable {
     // [minTimeBoundary, currentMillis), then it is ignored (i.e., minDetectionEndTime is computed without its endTime).
     long minDetectionEndTime = Long.MAX_VALUE;
     for (AnomalyFunctionDTO anomalyFunctionDTO : syncedAnomalyFunctions) {
-      JobDTO job = jobDAO.findLatestCompletedDetectionJobByFunctionId(anomalyFunctionDTO.getId());
+      JobDTO job =
+          findLatestCompletedJobByTypeAndConfigId(TaskConstants.TaskType.ANOMALY_DETECTION, anomalyFunctionDTO.getId(),
+              minTimeBoundary);
       if (job != null && job.getWindowEndTime() >= minTimeBoundary) {
         minDetectionEndTime = Math.min(minDetectionEndTime, job.getWindowEndTime());
       } else {
@@ -116,7 +122,9 @@ public class ClassificationJobScheduler implements Runnable {
 
     long startTime = minTimeBoundary;
     // Get the most recent classification job and continue from previous completed classification job
-    JobDTO classificationJobDTO = jobDAO.findLatestCompletedClassificationJobById(classificationConfig.getId());
+    JobDTO classificationJobDTO =
+        findLatestCompletedJobByTypeAndConfigId(TaskConstants.TaskType.CLASSIFICATION, classificationConfig.getId(),
+            minTimeBoundary);
     if (classificationJobDTO != null) {
       startTime = Math.max(startTime, classificationJobDTO.getWindowEndTime());
     }
@@ -134,5 +142,29 @@ public class ClassificationJobScheduler implements Runnable {
     jobContext.setConfigDTO(classificationConfig);
     ClassificationJobRunner jobRunner = new ClassificationJobRunner(jobContext);
     jobRunner.run();
+  }
+
+  private JobDTO findLatestCompletedJobByTypeAndConfigId(TaskConstants.TaskType taskType, long configId,
+      long minTimeBoundary) {
+    List<JobDTO> jobDTOs =
+        DAO_REGISTRY.getJobDAO().findRecentScheduledJobByTypeAndConfigId(taskType, configId, minTimeBoundary);
+    if (CollectionUtils.isNotEmpty(jobDTOs)) {
+      return findLatestCompletedJob(jobDTOs);
+    } else {
+      return null;
+    }
+  }
+
+  private JobDTO findLatestCompletedJob(List<JobDTO> jobs) {
+    TaskManager taskDAO = DAO_REGISTRY.getTaskDAO();
+    if (CollectionUtils.isNotEmpty(jobs)) {
+      for (JobDTO job : jobs) {
+        List<TaskDTO> taskDTOS = taskDAO.findByJobIdStatusNotIn(job.getId(), TaskConstants.TaskStatus.COMPLETED);
+        if (CollectionUtils.isEmpty(taskDTOS)) {
+          return job;
+        }
+      }
+    }
+    return null;
   }
 }

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import java.util.List;
 import java.util.Set;
 
@@ -7,7 +8,7 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
 
-public interface JobManager extends AbstractManager<JobDTO>{
+public interface JobManager extends AbstractManager<JobDTO> {
 
   List<JobDTO> findByStatus(JobStatus status);
 
@@ -21,7 +22,5 @@ public interface JobManager extends AbstractManager<JobDTO>{
 
   JobDTO findLatestBackfillScheduledJobByFunctionId(long functionId, long backfillWindowStart, long backfillWindowEnd);
 
-  JobDTO findLatestCompletedDetectionJobByFunctionId(long functionId);
-
-  JobDTO findLatestCompletedClassificationJobById(long functionId);
+  List<JobDTO> findRecentScheduledJobByTypeAndConfigId(TaskConstants.TaskType taskType, long configId, long minScheduledTime);
 }

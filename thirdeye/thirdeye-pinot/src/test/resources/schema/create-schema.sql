@@ -46,7 +46,7 @@ create table if not exists job_index (
     name varchar(200) not null,
     status varchar(100) not null,
     type varchar(100) not null,
-    anomaly_function_id bigint(20),
+    config_id bigint(20),
     schedule_start_time bigint(20) not null,
     schedule_end_time bigint(20) not null,
     base_id bigint(20) not null,
@@ -56,7 +56,7 @@ create table if not exists job_index (
 ) ENGINE=InnoDB;
 create index job_status_idx on job_index(status);
 create index job_type_idx on job_index(type);
-create index job_anomaly_function_id_idx on job_index(anomaly_function_id);
+create index job_config_id_idx on job_index(config_id);
 
 create table if not exists task_index (
     name varchar(200) not null,

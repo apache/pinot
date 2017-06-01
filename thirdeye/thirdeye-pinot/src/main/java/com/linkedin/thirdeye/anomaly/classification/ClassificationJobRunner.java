@@ -35,6 +35,7 @@ public class ClassificationJobRunner implements JobRunner {
       JobDTO jobSpec = new JobDTO();
       String jobName = createJobName(jobContext);
       jobSpec.setJobName(jobName);
+      jobSpec.setConfigId(jobContext.getConfigDTO().getId());
       jobSpec.setWindowStartTime(jobContext.getWindowStartTime());
       jobSpec.setWindowEndTime(jobContext.getWindowEndTime());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());

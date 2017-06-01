@@ -6,7 +6,7 @@ public class JobIndex extends AbstractIndexEntity {
   String name;
   String status;
   TaskConstants.TaskType type;
-  long anomalyFunctionId;
+  long configId;
   long scheduleStartTime;
   long scheduleEndTime;
 
@@ -35,12 +35,12 @@ public class JobIndex extends AbstractIndexEntity {
     this.type = type;
   }
 
-  public long getAnomalyFunctionId() {
-    return anomalyFunctionId;
+  public long getConfigId() {
+    return configId;
   }
 
-  public void setAnomalyFunctionId(long anomalyFunctionId) {
-    this.anomalyFunctionId = anomalyFunctionId;
+  public void setConfigId(long configId) {
+    this.configId = configId;
   }
 
   public String getName() {

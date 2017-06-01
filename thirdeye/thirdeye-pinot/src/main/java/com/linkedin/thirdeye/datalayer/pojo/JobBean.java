@@ -19,7 +19,10 @@ public class JobBean extends AbstractBean {
   private long windowStartTime;
   private long windowEndTime;
   private Timestamp lastModified;
-  private long anomalyFunctionId; // 0 if this job is not a detection job
+  // The id of the job configuration, which could be a detection, alert, or classification job, that triggers
+  // this job. If this job is not triggered from a job config (e.g., monitor job), then it is 0.
+  // For example, this config id is the function id when this job is an anomaly detection.
+  private long configId;
 
   public String getJobName() {
     return jobName;
@@ -85,12 +88,12 @@ public class JobBean extends AbstractBean {
     this.lastModified = lastModified;
   }
 
-  public long getAnomalyFunctionId() {
-    return anomalyFunctionId;
+  public long getConfigId() {
+    return configId;
   }
 
-  public void setAnomalyFunctionId(long anomalyFunctionId) {
-    this.anomalyFunctionId = anomalyFunctionId;
+  public void setConfigId(long configId) {
+    this.configId = configId;
   }
 
   @Override
@@ -101,11 +104,11 @@ public class JobBean extends AbstractBean {
     JobBean af = (JobBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName()) && Objects
         .equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime())
-        && Objects.equals(taskType, af.getTaskType()) && Objects.equals(anomalyFunctionId, af.getAnomalyFunctionId());
+        && Objects.equals(taskType, af.getTaskType()) && Objects.equals(configId, af.getConfigId());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), jobName, status, scheduleStartTime, taskType, anomalyFunctionId);
+    return Objects.hash(getId(), jobName, status, scheduleStartTime, taskType, configId);
   }
 }

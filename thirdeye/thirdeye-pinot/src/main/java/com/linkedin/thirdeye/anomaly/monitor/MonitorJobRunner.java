@@ -63,6 +63,7 @@ public class MonitorJobRunner implements JobRunner {
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
       jobSpec.setTaskType(TaskType.MONITOR);
+      jobSpec.setConfigId(0); // Monitor job does not have a config id
       jobExecutionId = jobDAO.save(jobSpec);
       LOG.info("Created JobSpec {} with jobExecutionId {}", jobSpec,
           jobExecutionId);

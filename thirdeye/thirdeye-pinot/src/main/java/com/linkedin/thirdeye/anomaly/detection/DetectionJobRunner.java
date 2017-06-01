@@ -113,7 +113,7 @@ public class DetectionJobRunner {
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
       jobSpec.setTaskType(TaskType.ANOMALY_DETECTION);
-      jobSpec.setAnomalyFunctionId(functionId);
+      jobSpec.setConfigId(functionId);
       jobExecutionId = DAO_REGISTRY.getJobDAO().save(jobSpec);
 
       LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec, jobExecutionId);

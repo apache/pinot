@@ -24,11 +24,8 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 @Singleton
 public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobManager {
 
-  private static final String FIND_LATEST_COMPLETED_ANOMALY_JOB_BY_FUNCTION_ID =
-      "where type=:type and anomalyFunctionId=:anomalyFunctionId and status=:status order by createTime desc";
-
-  private static final String FIND_LATEST_COMPLETED_GROUPING_JOB_BY_FUNCTION_ID =
-      "where type=:type and status=:status order by createTime desc";
+  private static final String FIND_RECENT_SCHEDULED_JOB_BY_TYPE_AND_CONFIG_ID =
+      "where type=:type and configId=:configId and status!=:status and scheduleStartTime>=:scheduleStartTime order by scheduleStartTime desc";
 
   public JobManagerImpl() {
     super(JobDTO.class, JobBean.class);
@@ -112,33 +109,27 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   }
 
   @Override
-  public JobDTO findLatestCompletedDetectionJobByFunctionId(long functionId) {
+  public List<JobDTO> findRecentScheduledJobByTypeAndConfigId(TaskConstants.TaskType taskType, long configId,
+      long minScheduledTime) {
     HashMap<String, Object> parameterMap = new HashMap<>();
-    parameterMap.put("type", TaskConstants.TaskType.ANOMALY_DETECTION);
-    parameterMap.put("anomalyFunctionId", functionId);
-    parameterMap.put("status", JobStatus.COMPLETED);
+    parameterMap.put("type", taskType);
+    parameterMap.put("configId", configId);
+    parameterMap.put("status", JobStatus.FAILED);
+    parameterMap.put("scheduleStartTime", minScheduledTime);
     List<JobBean> list = genericPojoDao
-        .executeParameterizedSQL(FIND_LATEST_COMPLETED_ANOMALY_JOB_BY_FUNCTION_ID, parameterMap, JobBean.class);
+        .executeParameterizedSQL(FIND_RECENT_SCHEDULED_JOB_BY_TYPE_AND_CONFIG_ID, parameterMap, JobBean.class);
 
     if (CollectionUtils.isNotEmpty(list)) {
-      return convertBean2DTO(list.get(0), JobDTO.class);
+      // Sort by scheduleStartTime; most recent scheduled job at the beginning
+      Collections.sort(list, Collections.reverseOrder(new Comparator<JobBean>() {
+        @Override
+        public int compare(JobBean o1, JobBean o2) {
+          return Long.compare(o1.getScheduleStartTime(), o2.getScheduleStartTime());
+        }
+      }));
+      return convertBeanListToDTOList(list);
     } else {
-      return null;
-    }
-  }
-
-  @Override
-  public JobDTO findLatestCompletedClassificationJobById(long functionId) {
-    HashMap<String, Object> parameterMap = new HashMap<>();
-    parameterMap.put("type", TaskConstants.TaskType.CLASSIFICATION);
-    parameterMap.put("status", JobStatus.COMPLETED);
-    List<JobBean> list = genericPojoDao
-        .executeParameterizedSQL(FIND_LATEST_COMPLETED_GROUPING_JOB_BY_FUNCTION_ID, parameterMap, JobBean.class);
-
-    if (CollectionUtils.isNotEmpty(list)) {
-      return convertBean2DTO(list.get(0), JobDTO.class);
-    } else {
-      return null;
+      return Collections.emptyList();
     }
   }
 }
