@@ -2,25 +2,25 @@
   "tableName": "sampleTable",
   "tableType": "REALTIME",
   "segmentsConfig": {
+    "timeColumnName": "outgoingName",
+    "timeType": "DAYS",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "700",
+    "retentionTimeValue": "5",
     "segmentPushType": "APPEND",
-    "replication": "3",
-    "schemaName": "tableSchemaName",
-    "timeColumnName": "timeColumnName",
-    "timeType": "timeType",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "schemaName",
+    "replication": "3"
   },
   "tenants": {
     "broker": "brokerOne",
     "server": "serverOne"
   },
   "tableIndexConfig": {
+    "loadMode": "HEAP",
     "invertedIndexColumns": [
       "column1",
       "column2"
     ],
-    "loadMode": "HEAP",
     "streamConfigs": {
       "streamType": "kafka",
       "stream.kafka.consumer.type": "highLevel",

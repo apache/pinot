@@ -117,9 +117,8 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
             Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
-        configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT,
-            Integer.toString(Integer.valueOf(Server.DEFAULT_ADMIN_API_PORT) - i));
-        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, Integer.toString(Helix.DEFAULT_SERVER_NETTY_PORT + i));
+        configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - i);
+        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + i);
         configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostnameOrAddress());
         configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
         configuration.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, "10000");

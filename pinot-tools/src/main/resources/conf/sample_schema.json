@@ -8,7 +8,6 @@
   "dimensionFieldSpecs": [
     {
       "dataType": "STRING",
-      "singleValueField": true,
       "name": "dim1"
     },
     {

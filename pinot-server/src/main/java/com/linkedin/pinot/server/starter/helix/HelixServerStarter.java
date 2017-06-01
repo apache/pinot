@@ -133,7 +133,7 @@ public class HelixServerStarter {
     addInstanceTagIfNeeded(helixClusterName, _instanceId);
     // Start restlet server for admin API endpoint
     int adminApiPort = pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT,
-        Integer.parseInt(CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+        CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
     _adminApiApplication = new AdminApiApplication(_serverInstance);
     _adminApiApplication.start(adminApiPort);
     updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
