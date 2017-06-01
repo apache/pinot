@@ -1,5 +1,5 @@
 {
-    "role" : "broker",
-    "numberOfInstances" : "5",
-    "name" : "brokerOne"
+  "role": "broker",
+  "numberOfInstances": "5",
+  "name": "brokerOne"
 }

@@ -82,7 +82,7 @@ public class ResourceTestHelper {
     LOGGER.info("Trying to start ServerInstance!");
     serverInstance.start();
     apiApplication = new AdminApiApplication(serverInstance);
-    apiApplication.start(Integer.parseInt(CommonConstants.Server.DEFAULT_ADMIN_API_PORT));
+    apiApplication.start(CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
     client = ClientBuilder.newClient();
     target = client.target(apiApplication.getBaseUri().toString());
     setupSegment();
