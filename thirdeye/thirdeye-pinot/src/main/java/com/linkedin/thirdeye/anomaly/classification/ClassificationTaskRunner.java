@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
@@ -39,6 +40,7 @@ public class ClassificationTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(ClassificationTaskRunner.class);
   private AnomalyFunctionManager anomalyFunctionDAO = DAORegistry.getInstance().getAnomalyFunctionDAO();
   private MergedAnomalyResultManager mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+  private ClassificationConfigManager classificationConfigDAO = DAORegistry.getInstance().getClassificationConfigDAO();
 
   private long windowStart;
   private long windowEnd;
@@ -89,6 +91,9 @@ public class ClassificationTaskRunner implements TaskRunner {
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : updatedMainAnomaliesByDimension) {
       mergedAnomalyDAO.update(mergedAnomalyResultDTO);
     }
+    // Update watermark of window end time
+    classificationConfig.setEndTimeWatermark(windowEnd);
+    classificationConfigDAO.update(classificationConfig);
   }
 
   /**
@@ -147,8 +152,10 @@ public class ClassificationTaskRunner implements TaskRunner {
               .findAllOverlapByFunctionIdDimensions(functionId, startTimeForCorrelatedAnomalies,
                   endTimeForCorrelatedAnomalies, dimensionMap.toString(), false);
           List<MergedAnomalyResultDTO> filteredAnomalies = filterAnomalies(alertFilter, anomalies);
-          Collections.sort(filteredAnomalies, new MergeAnomalyEndTimeComparator());
-          functionIdToAnomalyResult.put(functionId, filteredAnomalies);
+          if (CollectionUtils.isNotEmpty(filteredAnomalies)) {
+            Collections.sort(filteredAnomalies, new MergeAnomalyEndTimeComparator());
+            functionIdToAnomalyResult.put(functionId, filteredAnomalies);
+          }
         } else {
           // TODO: Trigger adhoc anomaly detection
         }

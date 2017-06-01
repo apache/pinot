@@ -17,6 +17,7 @@ public class ClassificationConfigBean extends AbstractBean {
   private List<Long> functionIdList = new ArrayList<>();
   private boolean active;
   private Map<String, String> classifierConfig = new HashMap<>();
+  private long endTimeWatermark = 0L;
 
 
   /**
@@ -109,5 +110,13 @@ public class ClassificationConfigBean extends AbstractBean {
    */
   public void setClassifierConfig(Map<String, String> classifierConfig) {
     this.classifierConfig = classifierConfig;
+  }
+
+  public long getEndTimeWatermark() {
+    return endTimeWatermark;
+  }
+
+  public void setEndTimeWatermark(long endTimeWatermark) {
+    this.endTimeWatermark = endTimeWatermark;
   }
 }

@@ -54,7 +54,7 @@ public class ClassificationJobScheduler implements Runnable {
 
     for (ClassificationConfigDTO classificationConfig : classificationConfigs) {
       LOG.info("Running classifier: {}", classificationConfig);
-      mainMetricTimeBasedGrouping(classificationConfig);
+      mainMetricTimeBasedClassification(classificationConfig);
     }
   }
 
@@ -66,7 +66,7 @@ public class ClassificationJobScheduler implements Runnable {
    *
    * @param classificationConfig a configuration file which provides main and correlated anomaly functions.
    */
-  private void mainMetricTimeBasedGrouping(ClassificationConfigDTO classificationConfig) {
+  private void mainMetricTimeBasedClassification(ClassificationConfigDTO classificationConfig) {
     AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     JobManager jobDAO = DAO_REGISTRY.getJobDAO();
 
@@ -120,17 +120,10 @@ public class ClassificationJobScheduler implements Runnable {
     }
     long endTime = minDetectionEndTime;
 
-    long startTime = minTimeBoundary;
-    // Get the most recent classification job and continue from previous completed classification job
-    JobDTO classificationJobDTO =
-        findLatestCompletedJobByTypeAndConfigId(TaskConstants.TaskType.CLASSIFICATION, classificationConfig.getId(),
-            minTimeBoundary);
-    if (classificationJobDTO != null) {
-      startTime = Math.max(startTime, classificationJobDTO.getWindowEndTime());
-    }
+    long startTime = Math.max(minTimeBoundary, classificationConfig.getEndTimeWatermark());
     if (startTime >= endTime) {
       LOG.info(
-          "Skipped classification job (id={}) because min detection end time among all anomaly functions {} is not larger than latest classification end time {}",
+          "Skipped classification job (id={}) because min detection end time among all anomaly functions {} is not larger than last window end time {}",
           classificationConfig.getId(), minDetectionEndTime, startTime);
       return;
     }
