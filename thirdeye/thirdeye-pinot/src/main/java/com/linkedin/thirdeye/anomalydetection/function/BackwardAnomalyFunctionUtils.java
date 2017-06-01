@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -78,7 +79,7 @@ public class BackwardAnomalyFunctionUtils {
   public static AnomalyDetectionContext buildAnomalyDetectionContext(
       AnomalyDetectionFunction anomalyFunction, MetricTimeSeries timeSeries, String metric,
       DimensionMap exploredDimensions, int bucketSize, TimeUnit bucketUnit, DateTime windowStart,
-      DateTime windowEnd) {
+      DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies) {
     // Create the anomaly detection context for the new modularized anomaly function
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
     anomalyDetectionContext
@@ -90,6 +91,9 @@ public class BackwardAnomalyFunctionUtils {
     timeSeriesKey.setDimensionMap(exploredDimensions);
     timeSeriesKey.setMetricName(metric);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
+
+    // set historical anomalies
+    anomalyDetectionContext.setHistoricalAnomalies(knownAnomalies);
 
     // Split time series to observed time series and baselines for each metric
     for (String metricName : anomalyFunction.getSpec().getMetrics()) {
