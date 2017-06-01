@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.operator.docvalsets.RealtimeFixedWidthRawValueSet;
 import com.linkedin.pinot.core.operator.docvalsets.RealtimeSingleValueSet;
-import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -36,12 +36,12 @@ public class RealtimeSingleValueBlock implements Block {
 
   private final MutableRoaringBitmap filteredBitmap;
   final FieldSpec spec;
-  private final BaseOnHeapMutableDictionary dictionary;
+  private final MutableDictionary dictionary;
   final int docIdSearchableOffset;
   final FixedByteSingleColumnSingleValueReaderWriter reader;
   private Predicate p;
 
-  public RealtimeSingleValueBlock(MutableRoaringBitmap filteredBitmap, FieldSpec spec, BaseOnHeapMutableDictionary dictionary,
+  public RealtimeSingleValueBlock(MutableRoaringBitmap filteredBitmap, FieldSpec spec, MutableDictionary dictionary,
       int offset, FixedByteSingleColumnSingleValueReaderWriter indexReader) {
     this.spec = spec;
     this.dictionary = dictionary;

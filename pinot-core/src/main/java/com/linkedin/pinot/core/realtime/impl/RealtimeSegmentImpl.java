@@ -50,7 +50,7 @@ import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiVa
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
-import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.DimensionInvertertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
@@ -70,7 +70,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private String segmentName;
 
-  private final Map<String, BaseOnHeapMutableDictionary> dictionaryMap;
+  private final Map<String, MutableDictionary> dictionaryMap;
   private final Map<String, RealtimeInvertedIndex> invertedIndexMap;
 
   private final TimeConverter timeConverter;
@@ -114,7 +114,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     this.serverMetrics = serverMetrics;
     LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class.getName() + "_" + segmentName + "_" + streamName);
     dataSchema = schema;
-    dictionaryMap = new HashMap<String, BaseOnHeapMutableDictionary>();
+    dictionaryMap = new HashMap<String, MutableDictionary>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
     outgoingTimeColumnName = dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName();
 
@@ -520,13 +520,21 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         LOGGER.error("Failed to close inverted index. Service will continue with memory leaks, error: ", e);
       }
     }
+
+    for (Map.Entry<String, MutableDictionary> entry : dictionaryMap.entrySet()) {
+      try {
+        entry.getValue().close();
+      } catch (IOException e) {
+        LOGGER.error("Could not close dictionary for column {}", entry.getKey());
+      }
+    }
     invertedIndexMap.clear();
     _segmentMetadata.close();
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForStringColumn(final String columnToSortOn) {
     final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
-    final BaseOnHeapMutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
+    final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
     final List<String> rawValues = new ArrayList<String>();
@@ -548,7 +556,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private IntIterator[] getSortedBitmapIntIteratorsForIntegerColumn(final String columnToSortOn) {
     final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
-    final BaseOnHeapMutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
+    final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
     int[] rawValuesArr = new int[dictionary.length()];
@@ -572,7 +580,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private IntIterator[] getSortedBitmapIntIteratorsForLongColumn(final String columnToSortOn) {
     final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
-    final BaseOnHeapMutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
+    final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
     final List<Long> rawValues = new ArrayList<Long>();
@@ -594,7 +602,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private IntIterator[] getSortedBitmapIntIteratorsForFloatColumn(final String columnToSortOn) {
     final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
-    final BaseOnHeapMutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
+    final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
     final List<Float> rawValues = new ArrayList<Float>();
@@ -616,7 +624,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private IntIterator[] getSortedBitmapIntIteratorsForDoubleColumn(final String columnToSortOn) {
     final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
-    final BaseOnHeapMutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
+    final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
     final List<Double> rawValues = new ArrayList<Double>();

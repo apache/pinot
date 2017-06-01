@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.datasource;
 
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -30,10 +31,9 @@ import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiVa
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.operator.blocks.RealtimeMultiValueBlock;
 import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
-import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class RealtimeColumnDataSource extends DataSource {
@@ -52,10 +52,10 @@ public class RealtimeColumnDataSource extends DataSource {
   private final RealtimeInvertedIndex invertedIndex;
   private final int offset;
   private final int maxNumberOfMultiValues;
-  private final BaseOnHeapMutableDictionary dictionary;
+  private final MutableDictionary dictionary;
 
   public RealtimeColumnDataSource(FieldSpec spec, DataFileReader indexReader, RealtimeInvertedIndex invertedIndex,
-      int searchOffset, int maxNumberOfMultivalues, Schema schema, BaseOnHeapMutableDictionary dictionary) {
+      int searchOffset, int maxNumberOfMultivalues, Schema schema, MutableDictionary dictionary) {
     this.fieldSpec = spec;
     this.indexReader = indexReader;
     this.invertedIndex = invertedIndex;
@@ -188,7 +188,7 @@ public class RealtimeColumnDataSource extends DataSource {
   }
 
   @Override
-  public BaseOnHeapMutableDictionary getDictionary() {
+  public MutableDictionary getDictionary() {
     return dictionary;
   }
 }

@@ -22,7 +22,7 @@ public class MutableDictionaryFactory {
   private MutableDictionaryFactory() {
   }
 
-  public static BaseOnHeapMutableDictionary getMutableDictionary(FieldSpec.DataType dataType) {
+  public static MutableDictionary getMutableDictionary(FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
         return new IntOnHeapMutableDictionary();

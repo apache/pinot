@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
-import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 
 
@@ -41,7 +41,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
   private final RealtimeColumnDataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
-  private final BaseOnHeapMutableDictionary _dictionaryReader;
+  private final MutableDictionary _dictionaryReader;
   private final Block _block;
   private PartitionFunction partitionFunction;
   private int numPartitions;

@@ -15,25 +15,25 @@
  */
 package com.linkedin.pinot.core.realtime.utils;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 
 
 public class RealtimeDimensionsSerDe {
 
   private final List<String> dimensionsList;
   private final Schema dataSchema;
-  private final Map<String, BaseOnHeapMutableDictionary> dictionaryMap;
+  private final Map<String, MutableDictionary> dictionaryMap;
 
   public RealtimeDimensionsSerDe(List<String> dimensionName, Schema schema,
-      Map<String, BaseOnHeapMutableDictionary> dictionary) {
+      Map<String, MutableDictionary> dictionary) {
     this.dimensionsList = dimensionName;
     this.dataSchema = schema;
     this.dictionaryMap = dictionary;
