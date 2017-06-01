@@ -73,6 +73,7 @@ public class BackwardAnomalyFunctionUtils {
    * @param exploredDimensions the dimension map of the given time series.
    * @param windowStart the start of the interval of the time series.
    * @param windowEnd the end of the interval of the time series.
+   * @param knownAnomalies the list of historical merged anomalies.
    *
    * @return an anomaly detection context from the given information.
    */
