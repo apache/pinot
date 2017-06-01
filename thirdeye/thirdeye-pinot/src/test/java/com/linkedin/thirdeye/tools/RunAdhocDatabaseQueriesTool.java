@@ -356,6 +356,13 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void disableAllActiveFunction(){
+    List<AnomalyFunctionDTO> functionSpecs = anomalyFunctionDAO.findAllActiveFunctions();
+    for (AnomalyFunctionDTO functionSpec : functionSpecs) {
+      functionSpec.setActive(false);
+      anomalyFunctionDAO.update(functionSpec);
+    }
+  }
 
   public static void main(String[] args) throws Exception {
 
@@ -365,6 +372,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+    dq.disableAllActiveFunction();
   }
 
 }

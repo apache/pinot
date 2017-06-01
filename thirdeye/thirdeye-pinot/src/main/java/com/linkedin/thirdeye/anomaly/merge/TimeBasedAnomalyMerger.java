@@ -89,6 +89,17 @@ public class TimeBasedAnomalyMerger {
       mergeConfig = DEFAULT_TIME_BASED_MERGE_CONFIG;
     }
 
+    // From anomaly function spec initialize the anomaly function, and get its specified mergeable property keys if any
+    // If failed to create anomaly function, default empty mergeable property keys will be used from mergeConfig
+    try {
+      BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(functionSpec);
+      mergeConfig.setMergeablePropertyKeys(anomalyFunction.getMergeablePropertyKeys());
+      LOG.info("Created anomaly function for class: {}, set mergeable keys as: {}", anomalyFunction.getClass(), anomalyFunction.getMergeablePropertyKeys());
+    } catch (Exception e) {
+      LOG.warn("Unsuccessfully create anomaly function from anomalyFunctionFactory, {}", e.getMessage());
+    }
+
+
     if (unmergedAnomalies.size() == 0) {
       return ArrayListMultimap.create();
     } else {
@@ -132,7 +143,7 @@ public class TimeBasedAnomalyMerger {
 
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
-              mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
+              mergeConfig);
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
         mergedResult.setDimensions(dimensionMap);
