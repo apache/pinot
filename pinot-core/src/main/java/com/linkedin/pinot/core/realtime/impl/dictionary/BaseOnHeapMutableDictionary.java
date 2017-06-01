@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
@@ -29,7 +29,7 @@ import javax.annotation.Nonnull;
  * value later, but not reversely. So whenever we return a valid dictionary id for a value, we need to ensure the value
  * can be fetched by the dictionary id returned.
  */
-public abstract class BaseOnHeapMutableDictionary implements Dictionary {
+public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
   private static final int SHIFT_OFFSET = 13;  // INITIAL_DICTIONARY_SIZE = 8192
   private static final int INITIAL_DICTIONARY_SIZE = 1 << SHIFT_OFFSET;
   private static final int MASK = 0xFFFFFFFF >>> (Integer.SIZE - SHIFT_OFFSET);
@@ -48,72 +48,16 @@ public abstract class BaseOnHeapMutableDictionary implements Dictionary {
   }
 
   @Override
-  public String getStringValue(int dictId) {
-    return get(dictId).toString();
-  }
-
-  @Override
   public int length() {
     return _entriesIndexed;
-  }
-
-  @Override
-  public void readIntValues(int[] dictIds, int startPos, int limit, int[] outValues, int outStartPos) {
-    int endPos = startPos + limit;
-    for (int i = startPos; i < endPos; i++) {
-      outValues[outStartPos++] = getIntValue(dictIds[i]);
-    }
-  }
-
-  @Override
-  public void readLongValues(int[] dictIds, int startPos, int limit, long[] outValues, int outStartPos) {
-    int endPos = startPos + limit;
-    for (int i = startPos; i < endPos; i++) {
-      outValues[outStartPos++] = getLongValue(dictIds[i]);
-    }
-  }
-
-  @Override
-  public void readFloatValues(int[] dictIds, int startPos, int limit, float[] outValues, int outStartPos) {
-    int endPos = startPos + limit;
-    for (int i = startPos; i < endPos; i++) {
-      outValues[outStartPos++] = getFloatValue(dictIds[i]);
-    }
-  }
-
-  @Override
-  public void readDoubleValues(int[] dictIds, int startPos, int limit, double[] outValues, int outStartPos) {
-    int endPos = startPos + limit;
-    for (int i = startPos; i < endPos; i++) {
-      outValues[outStartPos++] = getDoubleValue(dictIds[i]);
-    }
-  }
-
-  @Override
-  public void readStringValues(int[] dictIds, int startPos, int limit, String[] outValues, int outStartPos) {
-    int endPos = startPos + limit;
-    for (int i = startPos; i < endPos; i++) {
-      outValues[outStartPos++] = getStringValue(dictIds[i]);
-    }
   }
 
   public boolean isEmpty() {
     return _entriesIndexed == 0;
   }
 
-  public abstract void index(@Nonnull Object rawValue);
-
-  public abstract boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare,
-      boolean includeLower, boolean includeUpper);
-
-  @Nonnull
-  public abstract Object getMinVal();
-
-  @Nonnull
-  public abstract Object getMaxVal();
-
-  @Nonnull
-  public abstract Object getSortedValues();
+  public void close() throws IOException {
+  }
 
   /**
    * Index a single value.

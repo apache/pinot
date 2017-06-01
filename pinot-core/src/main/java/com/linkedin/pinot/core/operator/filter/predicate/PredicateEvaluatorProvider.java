@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
-import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
@@ -53,7 +53,7 @@ public class PredicateEvaluatorProvider {
                   (ImmutableDictionaryReader) dictionary);
             } else {
               return RangePredicateEvaluatorFactory.newRealtimeDictionaryBasedEvaluator((RangePredicate) predicate,
-                  (BaseOnHeapMutableDictionary) dictionary);
+                  (MutableDictionary) dictionary);
             }
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
