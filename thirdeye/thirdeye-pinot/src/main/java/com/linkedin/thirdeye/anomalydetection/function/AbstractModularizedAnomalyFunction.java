@@ -236,7 +236,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
       throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
         .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(), exploredDimensions,
-            spec.getBucketSize(), spec.getBucketUnit(), windowStart, windowEnd);
+            spec.getBucketSize(), spec.getBucketUnit(), windowStart, windowEnd, knownAnomalies);
 
     return this.analyze(anomalyDetectionContext);
   }
@@ -251,7 +251,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
       anomalyDetectionContext = BackwardAnomalyFunctionUtils
           .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(),
               anomalyToUpdated.getDimensions(), spec.getBucketSize(), spec.getBucketUnit(),
-              windowStart, windowEnd);
+              windowStart, windowEnd, knownAnomalies);
     }
 
     updateMergedAnomalyInfo(anomalyDetectionContext, anomalyToUpdated);
@@ -265,7 +265,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
         .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(), null,
             spec.getBucketSize(), spec.getBucketUnit(), new DateTime(viewWindowStartTime),
-            new DateTime(viewWindowEndTime));
+            new DateTime(viewWindowEndTime), knownAnomalies);
 
     return this.getTimeSeriesView(anomalyDetectionContext, bucketMillis, metric, viewWindowStartTime, viewWindowEndTime,
         knownAnomalies);
