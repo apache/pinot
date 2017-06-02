@@ -165,7 +165,8 @@ public class AnomaliesResource {
 
       MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
           .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
-      double currentVal = getTotalFromTimeSeries(currentTimeSeries, dataset.isAdditive());
+      String metricName = anomaly.getMetric();
+      double currentVal = getTotalFromTimeSeries(currentTimeSeries, metricName, dataset.isAdditive());
       response.setCurrentVal(currentVal);
 
       for (AlertConfigBean.COMPARE_MODE compareMode : AlertConfigBean.COMPARE_MODE.values()) {
@@ -179,7 +180,7 @@ public class AnomaliesResource {
         MetricTimeSeries baselineTimeSeries = anomalyDetectionInputContextBuilder.build()
             .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
         AnomalyDataCompare.CompareResult compareResult = new AnomalyDataCompare.CompareResult();
-        double baseLineval = getTotalFromTimeSeries(baselineTimeSeries, dataset.isAdditive());
+        double baseLineval = getTotalFromTimeSeries(baselineTimeSeries, metricName, dataset.isAdditive());
         compareResult.setBaselineValue(baseLineval);
         compareResult.setCompareMode(compareMode);
         compareResult.setChange(calculateChange(currentVal, baseLineval));
@@ -204,12 +205,17 @@ public class AnomaliesResource {
     return (currentValue - baselineValue) / baselineValue;
   }
 
-  double getTotalFromTimeSeries (MetricTimeSeries metricTimeSeries, boolean isAdditive) {
+  double getTotalFromTimeSeries (MetricTimeSeries metricTimeSeries, String metricName, boolean isAdditive) {
     double total = 0.0;
 
     // MetricTimeSeries will have multiple values in case of derived/multimetric
     Number[] metricTotals = metricTimeSeries.getMetricSums();
-    total = metricTotals[0].doubleValue();
+    Integer metricIndex = metricTimeSeries.getSchema().getMetricIndex(metricName);
+    if (metricIndex != null) {
+      total = metricTotals[metricIndex].doubleValue();
+    } else {
+      total = metricTotals[0].doubleValue();
+    }
 
     if (!isAdditive) {
       // for non Additive data sets return the average
