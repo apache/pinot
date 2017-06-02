@@ -1,31 +1,23 @@
 import Ember from 'ember';
 import moment from 'moment';
 
-export function formatDate(params/*, hash*/) {
-  const date = params[0];
-  const dateFormat = 'M/D hh:mm a';
+/**
+ * Template Helper that displays human readable date
+ * @param {string} date A date
+ * @param {string} granularity granularity of the metric
+ * @return {string} human readable date
+ */
+export function formatDate([date, granularity='DAYS']) {
+  const dateFormat = {
+    'DAYS': 'M/D',
+    'HOURS': 'M/D ha',
+    '5_MINUTES': 'M/D hh:mm a'
+  }[granularity];
+  const momentDate = moment(date);
 
-  return moment(date).format(dateFormat);
+  return momentDate.isValid() && dateFormat
+    ? momentDate.format(dateFormat)
+    : '';
 }
 
 export default Ember.Helper.helper(formatDate);
-
-
-/**
- * Displays human readable date
- * @param {string} granularity granularity of the metric
- * @param {string} date A date
- * @return {string} human readable date
- */
-// Handlebars.registerHelper('formatDate', function (granularity, date) {
-  // var tz = getTimeZone();
-  // const dateFormat = 'M/D hh:mm a';
-  
-  // const dateFormat = {
-  //   'DAYS': 'M/D',
-  //   'HOURS': 'M/D ha',
-  //   '5_MINUTES': 'M/D hh:mm a'
-  // }[granularity];
-
-  // return moment(date).format(dateFormat);
-// });
