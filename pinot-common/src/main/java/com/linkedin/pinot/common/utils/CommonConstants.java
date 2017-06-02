@@ -257,6 +257,7 @@ public class CommonConstants {
     public static final String CRC = "segment.crc";
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
+    public static final String PARTITION_METADATA = "segment.partition.metadata";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";

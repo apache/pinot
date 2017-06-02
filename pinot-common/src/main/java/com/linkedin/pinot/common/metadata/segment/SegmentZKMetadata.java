@@ -15,23 +15,25 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.helix.ZNRecord;
-
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.ZNRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqualIgnoreOrder;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadata.class);
 
   private static final String NULL = "null";
 
@@ -45,6 +47,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private long _totalRawDocs = -1;
   private long _crc = -1;
   private long _creationTime = -1;
+  private SegmentPartitionMetadata _partitionMetadata = null;
 
   public SegmentZKMetadata() {
   }
@@ -63,6 +66,17 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _totalRawDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
     _crc = znRecord.getLongField(CommonConstants.Segment.CRC, -1);
     _creationTime = znRecord.getLongField(CommonConstants.Segment.CREATION_TIME, -1);
+
+    try {
+      String partitionMetadataJson = znRecord.getSimpleField(CommonConstants.Segment.PARTITION_METADATA);
+      if (partitionMetadataJson != null) {
+        _partitionMetadata = SegmentPartitionMetadata.fromJsonString(partitionMetadataJson);
+      }
+    } catch (IOException e) {
+      LOGGER.error(
+          "Exception caught while reading partition info from zk metadata for segment '{}', partition info dropped.",
+          _segmentName, e);
+    }
   }
 
   public String getSegmentName() {
@@ -145,6 +159,14 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _creationTime = creationTime;
   }
 
+  public void setPartitionMetadata(SegmentPartitionMetadata partitionMetadata) {
+    _partitionMetadata = partitionMetadata;
+  }
+
+  public SegmentPartitionMetadata getPartitionMetadata() {
+    return _partitionMetadata;
+  }
+
   @Override
   public boolean equals(Object segmentMetadata) {
     if (isSameReference(this, segmentMetadata)) {
@@ -165,7 +187,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
         isEqual(_segmentType, metadata._segmentType) &&
         isEqual(_totalRawDocs, metadata._totalRawDocs) &&
         isEqual(_crc, metadata._crc) &&
-        isEqual(_creationTime, metadata._creationTime);
+        isEqual(_creationTime, metadata._creationTime) &&
+        isEqual(_partitionMetadata, metadata._partitionMetadata);
   }
 
   @Override
@@ -180,6 +203,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     result = hashCodeOf(result, _totalRawDocs);
     result = hashCodeOf(result, _crc);
     result = hashCodeOf(result, _creationTime);
+    result = hashCodeOf(result, _partitionMetadata);
     return result;
   }
 
@@ -201,6 +225,17 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     znRecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, _totalRawDocs);
     znRecord.setLongField(CommonConstants.Segment.CRC, _crc);
     znRecord.setLongField(CommonConstants.Segment.CREATION_TIME, _creationTime);
+
+    if (_partitionMetadata != null) {
+      try {
+        String partitionMetadataJson = _partitionMetadata.toJsonString();
+        znRecord.setSimpleField(CommonConstants.Segment.PARTITION_METADATA, partitionMetadataJson);
+      } catch (IOException e) {
+        LOGGER.error(
+            "Exception caught while writing partition metadata into ZNRecord for segment '{}', will be dropped",
+            _segmentName, e);
+      }
+    }
     return znRecord;
   }
 
@@ -221,6 +256,17 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     configMap.put(CommonConstants.Segment.TOTAL_DOCS, Long.toString(_totalRawDocs));
     configMap.put(CommonConstants.Segment.CRC, Long.toString(_crc));
     configMap.put(CommonConstants.Segment.CREATION_TIME, Long.toString(_creationTime));
+
+    if (_partitionMetadata != null) {
+      try {
+        String partitionMetadataJson = _partitionMetadata.toJsonString();
+        configMap.put(CommonConstants.Segment.PARTITION_METADATA, partitionMetadataJson);
+      } catch (IOException e) {
+        LOGGER.error(
+            "Exception caught while converting partition metadata into JSON string for segment '{}', will be dropped",
+            _segmentName, e);
+      }
+    }
     return configMap;
   }
 }

@@ -20,10 +20,8 @@ import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
@@ -112,8 +110,7 @@ public class SegmentPartitionTest {
 
     List<IntRange> partitionValues = columnMetadata.getPartitionRanges();
     Assert.assertEquals(partitionValues.size(), 1);
-    List<IntRange> expectedPartitionValues = ColumnPartitionConfig.rangesFromString(
-        EXPECTED_PARTITION_VALUE_STRING.split(ColumnPartitionConfig.PARTITION_VALUE_DELIMITER));
+    List<IntRange> expectedPartitionValues = ColumnPartitionConfig.rangesFromString(EXPECTED_PARTITION_VALUE_STRING);
 
     IntRange actualValue = partitionValues.get(0);
     IntRange expectedPartitionValue = expectedPartitionValues.get(0);

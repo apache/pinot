@@ -15,13 +15,18 @@
  */
 package com.linkedin.pinot.controller.helix.core.util;
 
-import java.util.concurrent.TimeUnit;
-
-import org.joda.time.Duration;
-
+import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.core.data.partition.PartitionFunction;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.joda.time.Duration;
 
 
 public class ZKMetadataUtils {
@@ -45,6 +50,28 @@ public class ZKMetadataUtils {
     offlineSegmentZKMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
     offlineSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     offlineSegmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+
+    // Extract column partition metadata (if any), and set it into segment ZK metadata.
+    Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
+    if (segmentMetadata instanceof SegmentMetadataImpl) {
+      SegmentMetadataImpl metadata = (SegmentMetadataImpl) segmentMetadata;
+      for (Map.Entry<String, ColumnMetadata> entry : metadata.getColumnMetadataMap().entrySet()) {
+        String column = entry.getKey();
+        ColumnMetadata columnMetadata = entry.getValue();
+        PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
+
+        if (partitionFunction != null) {
+          ColumnPartitionMetadata columnPartitionMetadata =
+              new ColumnPartitionMetadata(partitionFunction.toString(), columnMetadata.getNumPartitions(),
+                  columnMetadata.getPartitionRanges());
+          columnPartitionMap.put(column, columnPartitionMetadata);
+        }
+      }
+    }
+
+    if (!columnPartitionMap.isEmpty()) {
+      offlineSegmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
+    }
     return offlineSegmentZKMetadata;
   }
 
