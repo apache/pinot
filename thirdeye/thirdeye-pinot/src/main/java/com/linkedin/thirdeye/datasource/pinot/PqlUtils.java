@@ -42,12 +42,11 @@ public class PqlUtils {
    * Due to the summation, all metric column values can be assumed to be doubles.
    * @throws ExecutionException
    */
-  public static String getPql(ThirdEyeRequest request, MetricFunction metricFunction, TimeSpec dataTimeSpec)
-      throws ExecutionException {
+  public static String getPql(ThirdEyeRequest request, MetricFunction metricFunction,
+      Multimap<String, String> filterSet, TimeSpec dataTimeSpec) throws ExecutionException {
     // TODO handle request.getFilterClause()
 
-    return getPql(metricFunction,
-        request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
+    return getPql(metricFunction, request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec);
   }
 
@@ -100,12 +99,11 @@ public class PqlUtils {
    * and the metric values are all in a single value column
    * @param request
    * @param dataTimeSpec
-   * @param collectionConfig
    * @return
    * @throws Exception
    */
   public static String getMetricAsDimensionPql(ThirdEyeRequest request, MetricFunction metricFunction,
-      TimeSpec dataTimeSpec, DatasetConfigDTO datasetConfig) throws Exception {
+      Multimap<String, String> filterSet, TimeSpec dataTimeSpec, DatasetConfigDTO datasetConfig) throws Exception {
 
     // select sum(metric_values_column) from collection
     // where time_clause and metric_names_column=function.getMetricName
@@ -113,7 +111,7 @@ public class PqlUtils {
     String metricNamesColumn = datasetConfig.getMetricNamesColumn();
 
     String metricAsDimensionPql = getMetricAsDimensionPql(metricFunction,
-        request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
+        request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
         metricValuesColumn, metricNamesColumn);
 

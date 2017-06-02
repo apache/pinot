@@ -1,14 +1,19 @@
 package com.linkedin.thirdeye.datasource.pinot;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -106,13 +111,22 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         timeSpec = dataTimeSpec;
       }
 
+      // Decorate filter set for pre-computed (non-additive) dataset
+      Multimap<String, String> decoratedFilterSet = request.getFilterSet();
+      if (!datasetConfig.isAdditive()) {
+        decoratedFilterSet =
+            generateFilterSetWithPreAggregatedDimensionValue(request.getFilterSet(), request.getGroupBy(),
+                datasetConfig.getDimensions(), datasetConfig.getDimensionsHaveNoPreAggregation(),
+                datasetConfig.getPreAggregatedKeyword());
+      }
+
       // By default, query only offline, unless dataset has been marked as realtime
       String tableName = ThirdEyeUtils.computeTableName(dataset);
       String pql = null;
       if (datasetConfig.isMetricAsDimension()) {
-        pql = PqlUtils.getMetricAsDimensionPql(request, metricFunction, dataTimeSpec, datasetConfig);
+        pql = PqlUtils.getMetricAsDimensionPql(request, metricFunction, decoratedFilterSet, dataTimeSpec, datasetConfig);
       } else {
-        pql = PqlUtils.getPql(request, metricFunction, dataTimeSpec);
+        pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
       }
       ResultSetGroup resultSetGroup = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(pql, tableName));
       metricFunctionToResultSetList.put(metricFunction, getResultSetList(resultSetGroup));
@@ -123,6 +137,58 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     return resp;
   }
 
+  /**
+   * Definition of Pre-Aggregated Data: the data that has been pre-aggregated or pre-calculated and should not be
+   * applied with any aggregation function during grouping by. Usually, this kind of data exists in non-additive
+   * dataset. For such data, we assume that there exists a dimension value named "all", which could be overridden
+   * in dataset configuration, that stores the pre-aggregated value.
+   *
+   * By default, when a query does not specify any value on pre-aggregated dimension, Pinot aggregates all values
+   * at that dimension, which is an undesirable behavior for non-additive data. Therefore, this method modifies the
+   * request's dimension filters such that the filter could pick out the "all" value for that dimension. Example:
+   * Suppose that we have a dataset with 3 pre-aggregated dimensions: country, pageName, and osName, and the pre-
+   * aggregated keyword is 'all'. Further assume that the original request's filter = {'country'='US, IN'} and
+   * GroupBy dimension = pageName, then the decorated request has the new filter =
+   * {'country'='US, IN', 'osName' = 'all'}. Note that 'pageName' = 'all' is not in the filter set because it is
+   * a GroupBy dimension, which will not be aggregated.
+   *
+   * @param filterSet the original filterSet, which will NOT be modified.
+   *
+   * @return a decorated filter set for the queries to the pre-aggregated dataset.
+   */
+  public static Multimap<String, String> generateFilterSetWithPreAggregatedDimensionValue(
+      Multimap<String, String> filterSet, List<String> groupByDimensions, List<String> allDimensions,
+      List<String> dimensionsHaveNoPreAggregation, String preAggregatedKeyword) {
+
+    Set<String> preAggregatedDimensionNames = new HashSet<>(allDimensions);
+    // Remove dimension names that do not have the pre-aggregated value
+    if (CollectionUtils.isNotEmpty(dimensionsHaveNoPreAggregation)) {
+      preAggregatedDimensionNames.removeAll(dimensionsHaveNoPreAggregation);
+    }
+    // Remove dimension names that have been included in the original filter set because we should not override
+    // users' explicit filter setting
+    if (filterSet != null) {
+      preAggregatedDimensionNames.removeAll(filterSet.asMap().keySet());
+    }
+    // Remove dimension names that are going to be grouped by because GroupBy dimensions will not be aggregated anyway
+    if (CollectionUtils.isNotEmpty(groupByDimensions)) {
+      preAggregatedDimensionNames.removeAll(groupByDimensions);
+    }
+    // Add pre-aggregated dimension value to the remaining dimension names
+    Multimap<String, String> decoratedFilterSet;
+    if (filterSet != null) {
+      decoratedFilterSet = HashMultimap.create(filterSet);
+    } else {
+      decoratedFilterSet = HashMultimap.create();
+    }
+    if (preAggregatedDimensionNames.size() != 0) {
+      for (String preComputedDimensionName : preAggregatedDimensionNames) {
+        decoratedFilterSet.put(preComputedDimensionName, preAggregatedKeyword);
+      }
+    }
+
+    return decoratedFilterSet;
+  }
 
   private static List<ResultSet> getResultSetList(ResultSetGroup resultSetGroup) {
     List<ResultSet> resultSets = new ArrayList<>();
