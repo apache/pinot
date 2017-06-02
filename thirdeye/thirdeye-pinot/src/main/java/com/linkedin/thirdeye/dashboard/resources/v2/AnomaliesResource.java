@@ -911,7 +911,7 @@ public class AnomaliesResource {
     // Combine dimension map and filter set to construct a new filter set for the time series query of this anomaly
     Multimap<String, String> newFilterSet = generateFilterSetForTimeSeriesQuery(mergedAnomaly);
     try {
-      anomalyDetails.setAnomalyFunctionDimension(OBJECT_MAPPER.writeValueAsString(newFilterSet));
+      anomalyDetails.setAnomalyFunctionDimension(OBJECT_MAPPER.writeValueAsString(newFilterSet.asMap()));
     } catch (JsonProcessingException e) {
       LOG.warn("Failed to convert the dimension info ({}) to a JSON string; the original dimension info ({}) is used.",
           newFilterSet, mergedAnomaly.getDimensions());
