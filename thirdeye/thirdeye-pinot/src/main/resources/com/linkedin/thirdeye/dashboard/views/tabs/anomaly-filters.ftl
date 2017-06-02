@@ -18,7 +18,7 @@
                 {{#if this.length}}
                    <li class="filter-item">
                     <input class="filter-item__checkbox" type="checkbox" id="{{@key}}" data-filter={{@key}} {{#if this.selected}} checked=true {{/if}}>
-                    <label for="{{@key}}" class="filter-item__label">{{@key}}</label>
+                    <label for="{{@key}}" class="filter-item__label" title={{@key}}>{{@key}}</label>
                     <span class="filter-item__count">{{this.length}}</span>
                   </li>
                 {{/if}}
@@ -29,7 +29,7 @@
           {{#if this.length}}
             <li class="filter-item">
               <input class="filter-item__checkbox" type="checkbox" id="{{@key}}" data-filter={{@key}} {{#if this.selected}} checked=true {{/if}}>
-              <label for="{{@key}}" class="filter-item__label">{{@key}}</label>
+              <label for="{{@key}}" class="filter-item__label" title={{@key}}>{{@key}}</label>
               <span class="filter-item__count">{{this.length}}</span>
             </li>
           {{/if}}
