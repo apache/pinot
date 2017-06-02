@@ -65,12 +65,7 @@ InvestigateView.prototype = {
     const parsedDimensions = JSON.parse(anomalyFunctionDimension);
     const dimensionKeys = Object.keys(parsedDimensions);
     const dimension = dimensionKeys.length ? dimensionKeys[0] : 'All';
-
-    dimensionKeys.forEach((key) => {
-      filters[key] = filters[key] || [];
-      filters[key].push(parsedDimensions[key]);
-    });
-
+    
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')
       .map((wow) => {
@@ -85,7 +80,7 @@ InvestigateView.prototype = {
             `compareMode=${wow.compareMode}&filters={}&granularity=${granularity}&` +
             `heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
             `heatMapCurrentEnd=${heatMapCurrentEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
-            `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}&filters=${JSON.stringify(filters)}&heatMapFilters=${JSON.stringify(filters)}`;
+            `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}&filters=${anomalyFunctionDimension}&heatMapFilters=${anomalyFunctionDimension}`;
         return wow;
       });
   },
