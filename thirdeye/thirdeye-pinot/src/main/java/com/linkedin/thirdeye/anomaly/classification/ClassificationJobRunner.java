@@ -44,7 +44,8 @@ public class ClassificationJobRunner implements JobRunner {
       Long jobExecutionId = jobDAO.save(jobSpec);
       jobContext.setJobName(jobName);
       jobContext.setJobExecutionId(jobExecutionId);
-      LOG.info("Created classification job spec {} with jobExecutionId {}", jobSpec, jobExecutionId);
+      LOG.info("Created classification job spec {} with jobExecutionId {}, window start {} and end {}", jobSpec,
+          jobExecutionId, jobContext.getWindowStartTime(), jobContext.getWindowEndTime());
       return jobExecutionId;
     } catch (Exception e) {
       LOG.error("Exception in creating classification job", e);

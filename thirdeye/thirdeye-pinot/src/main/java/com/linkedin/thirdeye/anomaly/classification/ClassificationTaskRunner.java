@@ -81,15 +81,19 @@ public class ClassificationTaskRunner implements TaskRunner {
     List<MergedAnomalyResultDTO> mainAnomalies =
         mergedAnomalyDAO.findAllOverlapByFunctionId(mainFunctionId, windowStart, windowEnd, false);
     List<MergedAnomalyResultDTO> filteredMainAnomalies = filterAnomalies(alertFilter, mainAnomalies);
+    if (CollectionUtils.isNotEmpty(filteredMainAnomalies)) {
+      LOG.info("Classification config {} gets {} anomalies to identify issue type.", classificationConfig.getId(),
+          filteredMainAnomalies.size());
 
-    // Sort merged anomalies by the natural order of the end time
-    Collections.sort(filteredMainAnomalies, new MergeAnomalyEndTimeComparator());
-    // Run classifier for each dimension of the anomalies
-    List<MergedAnomalyResultDTO> updatedMainAnomaliesByDimension =
-        dimensionalShuffleAndUnifyClassification(filteredMainAnomalies);
-    // Update anomalies whose issue type is updated.
-    for (MergedAnomalyResultDTO mergedAnomalyResultDTO : updatedMainAnomaliesByDimension) {
-      mergedAnomalyDAO.update(mergedAnomalyResultDTO);
+      // Sort merged anomalies by the natural order of the end time
+      Collections.sort(filteredMainAnomalies, new MergeAnomalyEndTimeComparator());
+      // Run classifier for each dimension of the anomalies
+      List<MergedAnomalyResultDTO> updatedMainAnomaliesByDimension =
+          dimensionalShuffleAndUnifyClassification(filteredMainAnomalies);
+      // Update anomalies whose issue type is updated.
+      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : updatedMainAnomaliesByDimension) {
+        mergedAnomalyDAO.update(mergedAnomalyResultDTO);
+      }
     }
     // Update watermark of window end time
     classificationConfig.setEndTimeWatermark(windowEnd);
@@ -131,6 +135,7 @@ public class ClassificationTaskRunner implements TaskRunner {
 
     // For each dimension, we get the anomalies from the correlated metric
     for (DimensionMap dimensionMap : mainAnomaliesByDimensionMap.keySet()) {
+
       // Determine the smallest time window that could enclose all main anomalies. In addition, this window is bounded
       // by windowStart and windowEnd because we don't want to grab too many correlated anomalies for classification.
       // The start and end time of this window is used to retrieve the anomalies on the correlated metrics.
@@ -140,9 +145,11 @@ public class ClassificationTaskRunner implements TaskRunner {
       for (MergedAnomalyResultDTO mainAnomaly : mainAnomaliesByDimension) {
         startTimeForCorrelatedAnomalies = Math.max(startTimeForCorrelatedAnomalies, mainAnomaly.getStartTime());
         endTimeForCorrelatedAnomalies = Math.min(endTimeForCorrelatedAnomalies, mainAnomaly.getEndTime());
+
       }
 
       Map<Long, List<MergedAnomalyResultDTO>> functionIdToAnomalyResult = new HashMap<>();
+      functionIdToAnomalyResult.put(classificationConfig.getMainFunctionId(), mainAnomaliesByDimension);
       // Get the anomalies from other anomaly function that are activated
       for (Long functionId : functionIds) {
         AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionConfigMap.get(functionId);
