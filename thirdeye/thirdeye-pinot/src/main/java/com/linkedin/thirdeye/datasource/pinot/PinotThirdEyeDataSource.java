@@ -13,6 +13,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -113,10 +114,9 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
       // Decorate filter set for pre-computed (non-additive) dataset
       Multimap<String, String> decoratedFilterSet = request.getFilterSet();
       if (!datasetConfig.isAdditive()) {
-        List<String> collectionDimensionNames = datasetConfig.getDimensions();
         decoratedFilterSet =
-            generateDecoratedFilterSetForPrecomputedDataset(request.getFilterSet(), request.getGroupBy(),
-                collectionDimensionNames, datasetConfig.getDimensionsHaveNoPreAggregation(),
+            generateFilterSetWithPreAggregatedDimensionValue(request.getFilterSet(), request.getGroupBy(),
+                datasetConfig.getDimensions(), datasetConfig.getDimensionsHaveNoPreAggregation(),
                 datasetConfig.getPreAggregatedKeyword());
       }
 
@@ -138,42 +138,51 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   }
 
   /**
-   * Definition of Pre-Computed Data: the data that has been pre-calculated or pre-aggregated, and does not require
-   * further aggregation (i.e., aggregation function of Pinot should do no-op). For such data, we assume that there
-   * exists a dimension value named "all", which is user-definable keyword in collection configuration, that stores
-   * the pre-aggregated value.
-   * By default, when a query does not specify any value on a certain dimension, Pinot aggregates all values at that
-   * dimension, which is an undesirable behavior for pre-computed data. Therefore, this method modifies the request's
-   * dimension filters such that the filter could pick out the "all" value for that dimension.
-   * Example: Suppose that we have a dataset with 3 dimensions: country, pageName, and osName, and the pre-aggregated
-   * keyword is 'all'. Further assume that the original request's filter = {'country'='US, IN'} and GroupBy dimension =
-   * pageName, then the decorated request has the new filter = {'country'='US, IN', 'osName' = 'all'}.
+   * Definition of Pre-Aggregated Data: the data that has been pre-aggregated or pre-calculated and should not be
+   * applied with any aggregation function during grouping by. Usually, this kind of data exists in non-additive
+   * dataset. For such data, we assume that there exists a dimension value named "all", which could be overridden
+   * in dataset configuration, that stores the pre-aggregated value.
+   *
+   * By default, when a query does not specify any value on pre-aggregated dimension, Pinot aggregates all values
+   * at that dimension, which is an undesirable behavior for non-additive data. Therefore, this method modifies the
+   * request's dimension filters such that the filter could pick out the "all" value for that dimension. Example:
+   * Suppose that we have a dataset with 3 pre-aggregated dimensions: country, pageName, and osName, and the pre-
+   * aggregated keyword is 'all'. Further assume that the original request's filter = {'country'='US, IN'} and
+   * GroupBy dimension = pageName, then the decorated request has the new filter =
+   * {'country'='US, IN', 'osName' = 'all'}. Note that 'pageName' = 'all' is not in the filter set because it is
+   * a GroupBy dimension, which will not be aggregated.
    *
    * @param filterSet the original filterSet, which will NOT be modified.
    *
-   * @return a decorated filter set for the given precomputed dataset.
+   * @return a decorated filter set for the queries to the pre-aggregated dataset.
    */
-  public static Multimap<String, String> generateDecoratedFilterSetForPrecomputedDataset(
+  public static Multimap<String, String> generateFilterSetWithPreAggregatedDimensionValue(
       Multimap<String, String> filterSet, List<String> groupByDimensions, List<String> allDimensions,
       List<String> dimensionsHaveNoPreAggregation, String preAggregatedKeyword) {
-    Multimap<String, String> decoratedFilterSet = HashMultimap.create(filterSet);
-    Set<String> preComputedDimensionNames = new HashSet<>(allDimensions);
 
-    if (dimensionsHaveNoPreAggregation.size() != 0) {
-      preComputedDimensionNames.removeAll(dimensionsHaveNoPreAggregation);
+    Set<String> preAggregatedDimensionNames = new HashSet<>(allDimensions);
+    // Remove dimension names that do not have the pre-aggregated value
+    if (CollectionUtils.isNotEmpty(dimensionsHaveNoPreAggregation)) {
+      preAggregatedDimensionNames.removeAll(dimensionsHaveNoPreAggregation);
     }
-
-    Set<String> filterDimensions = filterSet.asMap().keySet();
-    if (filterDimensions.size() != 0) {
-      preComputedDimensionNames.removeAll(filterDimensions);
+    // Remove dimension names that have been included in the original filter set because we should not override
+    // users' explicit filter setting
+    if (filterSet != null) {
+      preAggregatedDimensionNames.removeAll(filterSet.asMap().keySet());
     }
-
-    if (groupByDimensions.size() != 0) {
-      preComputedDimensionNames.removeAll(groupByDimensions);
+    // Remove dimension names that are going to be grouped by because GroupBy dimensions will not be aggregated anyway
+    if (CollectionUtils.isNotEmpty(groupByDimensions)) {
+      preAggregatedDimensionNames.removeAll(groupByDimensions);
     }
-
-    if (preComputedDimensionNames.size() != 0) {
-      for (String preComputedDimensionName : preComputedDimensionNames) {
+    // Add pre-aggregated dimension value to the remaining dimension names
+    Multimap<String, String> decoratedFilterSet;
+    if (filterSet != null) {
+      decoratedFilterSet = HashMultimap.create(filterSet);
+    } else {
+      decoratedFilterSet = HashMultimap.create();
+    }
+    if (preAggregatedDimensionNames.size() != 0) {
+      for (String preComputedDimensionName : preAggregatedDimensionNames) {
         decoratedFilterSet.put(preComputedDimensionName, preAggregatedKeyword);
       }
     }
