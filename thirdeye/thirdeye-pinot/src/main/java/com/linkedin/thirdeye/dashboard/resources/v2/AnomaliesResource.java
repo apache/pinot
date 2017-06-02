@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
@@ -97,6 +100,7 @@ import org.slf4j.LoggerFactory;
 public class AnomaliesResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomaliesResource.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String START_END_DATE_FORMAT_DAYS = "MMM d yyyy";
   private static final String START_END_DATE_FORMAT_HOURS = "MMM d yyyy HH:mm";
   private static final String TIME_SERIES_DATE_FORMAT = "yyyy-MM-dd HH:mm";
@@ -267,8 +271,8 @@ public class AnomaliesResource {
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
       @PathParam("pageNumber") int pageNumber,
-      @QueryParam("searchFilters") String searchFiltersJSON, 
-      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly 
+      @QueryParam("searchFilters") String searchFiltersJSON,
+      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly
       ) throws Exception {
 
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime, false);
@@ -300,7 +304,7 @@ public class AnomaliesResource {
       @PathParam("pageNumber") int pageNumber,
       @QueryParam("anomalyIds") String anomalyIdsString,
       @QueryParam("functionName") String functionName,
-      @QueryParam("searchFilters") String searchFiltersJSON, 
+      @QueryParam("searchFilters") String searchFiltersJSON,
       @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
 
     String[] anomalyIds = anomalyIdsString.split(COMMA_SEPARATOR);
@@ -358,7 +362,7 @@ public class AnomaliesResource {
       @PathParam("pageNumber") int pageNumber,
       @QueryParam("metricIds") String metricIdsString,
       @QueryParam("functionName") String functionName,
-      @QueryParam("searchFilters") String searchFiltersJSON, 
+      @QueryParam("searchFilters") String searchFiltersJSON,
       @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
 
     String[] metricIdsList = metricIdsString.split(COMMA_SEPARATOR);
@@ -592,12 +596,9 @@ public class AnomaliesResource {
 
   /**
    * Constructs AnomaliesWrapper object from a list of merged anomalies
-   * @param mergedAnomalies
-   * @return
-   * @throws ExecutionException
    */
-  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> anomalies, String searchFiltersJSON,
-      int pageNumber, boolean filterOnly) throws ExecutionException {
+  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> anomalies,
+      String searchFiltersJSON, int pageNumber, boolean filterOnly) throws ExecutionException {
     List<MergedAnomalyResultDTO> mergedAnomalies = anomalies;
 
     AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
@@ -612,7 +613,7 @@ public class AnomaliesResource {
     //set the search filters
     anomaliesWrapper.setSearchFilters(SearchFilters.fromAnomalies(mergedAnomalies));
     anomaliesWrapper.setTotalAnomalies(mergedAnomalies.size());
-    
+
     //set anomalyIds
     List<Long> anomalyIds = new ArrayList<>();
     for(MergedAnomalyResultDTO mergedAnomaly: mergedAnomalies){
@@ -677,7 +678,7 @@ public class AnomaliesResource {
     return anomaliesWrapper;
   }
 
-  
+
   /**
    * Return the natural order of MergedAnomaly by comparing their anomaly's end time.
    * The tie breaker is their anomaly ID.
@@ -907,12 +908,51 @@ public class AnomaliesResource {
     anomalyDetails.setAnomalyFunctionName(anomalyFunction.getFunctionName());
     anomalyDetails.setAnomalyFunctionType(anomalyFunction.getType());
     anomalyDetails.setAnomalyFunctionProps(anomalyFunction.getProperties());
-    anomalyDetails.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
+    // Combine dimension map and filter set to construct a new filter set for the time series query of this anomaly
+    Multimap<String, String> newFilterSet = generateFilterSetForTimeSeriesQuery(mergedAnomaly);
+    try {
+      anomalyDetails.setAnomalyFunctionDimension(OBJECT_MAPPER.writeValueAsString(newFilterSet));
+    } catch (JsonProcessingException e) {
+      LOG.warn("Failed to convert the dimension info ({}) to a JSON string; the original dimension info ({}) is used.",
+          newFilterSet, mergedAnomaly.getDimensions());
+      anomalyDetails.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
+    }
     if (mergedAnomaly.getFeedback() != null) {
       anomalyDetails.setAnomalyFeedback(AnomalyDetails.getFeedbackStringFromFeedbackType(mergedAnomaly.getFeedback().getFeedbackType()));
-    } 
+    }
     anomalyDetails.setExternalUrl(externalUrl);
     return anomalyDetails;
+  }
+
+  private static Multimap<String, String> generateFilterSetForTimeSeriesQuery(MergedAnomalyResultDTO mergedAnomaly) {
+    AnomalyFunctionDTO anomalyFunctionDTO = mergedAnomaly.getFunction();
+    Multimap<String, String> filterSet = anomalyFunctionDTO.getFilterSet();
+    Multimap<String, String> newFilterSet = generateFilterSetWithDimensionMap(mergedAnomaly.getDimensions(), filterSet);
+    return newFilterSet;
+  }
+
+  private static Multimap<String, String> generateFilterSetWithDimensionMap(DimensionMap dimensionMap,
+      Multimap<String, String> filterSet) {
+
+    Multimap<String, String> newFilterSet = HashMultimap.create();
+
+    // Dimension map gives more specified dimension information than filter set (i.e., Dimension Map should be a subset
+    // of filterSet), so it needs to be processed first.
+    if (MapUtils.isNotEmpty(dimensionMap)) {
+      for (Map.Entry<String, String> dimensionMapEntry : dimensionMap.entrySet()) {
+        newFilterSet.put(dimensionMapEntry.getKey(), dimensionMapEntry.getValue());
+      }
+    }
+
+    if (filterSet != null && filterSet.size() != 0) {
+      for (String key : filterSet.keySet()) {
+        if (!newFilterSet.containsKey(key)) {
+          newFilterSet.putAll(key, filterSet.get(key));
+        }
+      }
+    }
+
+    return newFilterSet;
   }
 
 
