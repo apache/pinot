@@ -924,6 +924,18 @@ public class AnomaliesResource {
     return anomalyDetails;
   }
 
+  /**
+   * Returns the filter set to query the time series on UI. The filter set is constructed by combining the dimension
+   * information of the given anomaly and the filter set from its corresponding anomaly function.
+   *
+   * For instance, assume that the dimension from the detected anomaly is {"country":"US"} and the filter on its
+   * anomaly function is {"country":["US", "IN"],"page_key":["p1,p2"]}, then the returned filter set for querying
+   * is {"country":["US"],"page_key":["p1,p2"]}.
+   *
+   * @param mergedAnomaly the target anomaly for which we want to generate the query filter set.
+   *
+   * @return the filter set for querying the time series that produce the anomaly.
+   */
   private static Multimap<String, String> generateFilterSetForTimeSeriesQuery(MergedAnomalyResultDTO mergedAnomaly) {
     AnomalyFunctionDTO anomalyFunctionDTO = mergedAnomaly.getFunction();
     Multimap<String, String> filterSet = anomalyFunctionDTO.getFilterSet();
