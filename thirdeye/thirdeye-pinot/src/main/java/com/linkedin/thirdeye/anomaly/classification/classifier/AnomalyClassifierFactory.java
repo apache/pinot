@@ -79,10 +79,10 @@ public class AnomalyClassifierFactory {
     // the default recipient provider is a dummy recipient provider
     AnomalyClassifier anomalyClassifier = DUMMY_ANOMALY_CLASSIFIER;
     if (spec.containsKey(ANOMALY_CLASSIFIER_TYPE_KEY)) {
-      String recipientProviderType = spec.get(ANOMALY_CLASSIFIER_TYPE_KEY);
+      String classifierType = spec.get(ANOMALY_CLASSIFIER_TYPE_KEY);
       // We first check if the implementation (class) of this provider comes from external packages
-      if(props.containsKey(recipientProviderType.toUpperCase())) {
-        String className = props.getProperty(recipientProviderType.toUpperCase());
+      if(props.containsKey(classifierType.toUpperCase())) {
+        String className = props.getProperty(classifierType.toUpperCase());
         try {
           anomalyClassifier = (AnomalyClassifier) Class.forName(className).newInstance();
         } catch (Exception e) {
@@ -116,15 +116,15 @@ public class AnomalyClassifierFactory {
       return DUMMY_ANOMALY_CLASSIFIER;
     }
 
-    AnomalyClassifierType providerType = AnomalyClassifierType.DUMMY;
-    for (AnomalyClassifierType enumProviderType : AnomalyClassifierType.values()) {
-      if (enumProviderType.name().compareToIgnoreCase(type) == 0) {
-        providerType = enumProviderType;
+    AnomalyClassifierType classifierType = AnomalyClassifierType.DUMMY;
+    for (AnomalyClassifierType enumClassifierType : AnomalyClassifierType.values()) {
+      if (enumClassifierType.name().compareToIgnoreCase(type) == 0) {
+        classifierType = enumClassifierType;
         break;
       }
     }
 
-    switch (providerType) {
+    switch (classifierType) {
     case DUMMY: // speed optimization for most use cases
     default:
       return DUMMY_ANOMALY_CLASSIFIER;

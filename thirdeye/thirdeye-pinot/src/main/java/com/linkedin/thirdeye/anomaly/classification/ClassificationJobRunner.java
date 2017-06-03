@@ -22,30 +22,30 @@ public class ClassificationJobRunner implements JobRunner {
   private static final Logger LOG = LoggerFactory.getLogger(ClassificationJobRunner.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final JobManager jobDAO = DAO_REGISTRY.getJobDAO();
-  private ClassificationJobContext jobContext;
+  private ClassificationJobContext classificationJobContext;
   private TaskGenerator taskGenerator = new TaskGenerator();
 
   public ClassificationJobRunner(ClassificationJobContext classificationJobContext) {
-    this.jobContext = classificationJobContext;
+    this.classificationJobContext = classificationJobContext;
   }
 
   @Override
   public Long createJob() {
     try {
       JobDTO jobSpec = new JobDTO();
-      String jobName = createJobName(jobContext);
+      String jobName = createJobName(classificationJobContext);
       jobSpec.setJobName(jobName);
-      jobSpec.setConfigId(jobContext.getConfigDTO().getId());
-      jobSpec.setWindowStartTime(jobContext.getWindowStartTime());
-      jobSpec.setWindowEndTime(jobContext.getWindowEndTime());
+      jobSpec.setConfigId(classificationJobContext.getConfigDTO().getId());
+      jobSpec.setWindowStartTime(classificationJobContext.getWindowStartTime());
+      jobSpec.setWindowEndTime(classificationJobContext.getWindowEndTime());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
       jobSpec.setTaskType(TaskConstants.TaskType.CLASSIFICATION);
       Long jobExecutionId = jobDAO.save(jobSpec);
-      jobContext.setJobName(jobName);
-      jobContext.setJobExecutionId(jobExecutionId);
+      classificationJobContext.setJobName(jobName);
+      classificationJobContext.setJobExecutionId(jobExecutionId);
       LOG.info("Created classification job spec {} with jobExecutionId {}, window start {} and end {}", jobSpec,
-          jobExecutionId, jobContext.getWindowStartTime(), jobContext.getWindowEndTime());
+          jobExecutionId, classificationJobContext.getWindowStartTime(), classificationJobContext.getWindowEndTime());
       return jobExecutionId;
     } catch (Exception e) {
       LOG.error("Exception in creating classification job", e);
@@ -60,7 +60,8 @@ public class ClassificationJobRunner implements JobRunner {
     try {
       LOG.info("Creating classification tasks");
       List<ClassificationTaskInfo> taskInfos = taskGenerator
-          .createGroupingTasks(jobContext, jobContext.getWindowStartTime(), jobContext.getWindowEndTime());
+          .createGroupingTasks(classificationJobContext, classificationJobContext.getWindowStartTime(),
+              classificationJobContext.getWindowEndTime());
       LOG.info("Classification tasks {}", taskInfos);
       for (ClassificationTaskInfo taskInfo : taskInfos) {
         String taskInfoJson = null;
@@ -72,11 +73,11 @@ public class ClassificationJobRunner implements JobRunner {
 
         TaskDTO taskSpec = new TaskDTO();
         taskSpec.setTaskType(TaskConstants.TaskType.CLASSIFICATION);
-        taskSpec.setJobName(jobContext.getJobName());
+        taskSpec.setJobName(classificationJobContext.getJobName());
         taskSpec.setStatus(TaskConstants.TaskStatus.WAITING);
         taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
-        taskSpec.setJobId(jobContext.getJobExecutionId());
+        taskSpec.setJobId(classificationJobContext.getJobExecutionId());
         long taskId = DAO_REGISTRY.getTaskDAO().save(taskSpec);
 
         taskIds.add(taskId);

@@ -2,20 +2,20 @@ package com.linkedin.thirdeye.anomaly.classification;
 
 
 public class ClassificationJobConfig {
-  private long maxLookbackLength;
+  private long maxMonitoringWindowInMS;
   private boolean forceSyncDetectionJobs;
 
   public ClassificationJobConfig() {
-    maxLookbackLength = 259200000L; // 3 days
+    maxMonitoringWindowInMS = 259200000L; // 3 days
     forceSyncDetectionJobs = false;
   }
 
-  public long getMaxLookbackLength() {
-    return maxLookbackLength;
+  public long getMaxMonitoringWindowSizeInMS() {
+    return maxMonitoringWindowInMS;
   }
 
-  public void setMaxLookbackLength(long maxLookbackLength) {
-    this.maxLookbackLength = maxLookbackLength;
+  public void setMaxMonitoringWindowInMS(long maxMonitoringWindowInMS) {
+    this.maxMonitoringWindowInMS = maxMonitoringWindowInMS;
   }
 
   public boolean getForceSyncDetectionJobs() {

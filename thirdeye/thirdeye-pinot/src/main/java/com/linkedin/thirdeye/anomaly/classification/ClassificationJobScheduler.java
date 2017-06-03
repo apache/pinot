@@ -27,13 +27,13 @@ public class ClassificationJobScheduler implements Runnable {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-  private long maxLookbackLength = 259_200_000L; // 3 days
+  private long maxMonitoringWindowSizeInMS = 259_200_000L; // 3 days
   private boolean forceSyncDetectionJobs = false;
 
   public ClassificationJobScheduler() { }
 
   public ClassificationJobScheduler(ClassificationJobConfig classificationJobConfig) {
-    this.maxLookbackLength = classificationJobConfig.getMaxLookbackLength();
+    this.maxMonitoringWindowSizeInMS = classificationJobConfig.getMaxMonitoringWindowSizeInMS();
     this.forceSyncDetectionJobs = classificationJobConfig.getForceSyncDetectionJobs();
   }
 
@@ -94,7 +94,7 @@ public class ClassificationJobScheduler implements Runnable {
     // classification job does not exists or was executed long time ago.
     //   minTimeBoundary is the start time of the boundary window.
     long currentMillis = System.currentTimeMillis();
-    long minTimeBoundary = currentMillis - maxLookbackLength;
+    long minTimeBoundary = currentMillis - maxMonitoringWindowSizeInMS;
 
     // Check the latest detection time among all anomaly functions in this classification config.
     // If an activated anomaly function does not have any detection jobs that are executed within the time window
