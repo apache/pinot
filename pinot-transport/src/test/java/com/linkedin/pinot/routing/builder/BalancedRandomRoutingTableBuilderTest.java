@@ -51,11 +51,12 @@ public class BalancedRandomRoutingTableBuilderTest {
     instanceConfigList.add(new InstanceConfig("Server_1.2.3.6_3456"));
 
     // Build routing table
-    List<ServerToSegmentSetMap> routingTable =
-        routingTableBuilder.computeRoutingTableFromExternalView("dummy", externalView, instanceConfigList);
+    
+    routingTableBuilder.computeRoutingTableFromExternalView("dummy", externalView, instanceConfigList);
 
+    List<ServerToSegmentSetMap> routingTables = routingTableBuilder.getRoutingTables();
     // Check that at least two routing tables are different
-    Iterator<ServerToSegmentSetMap> routingTableIterator = routingTable.iterator();
+    Iterator<ServerToSegmentSetMap> routingTableIterator = routingTables.iterator();
     ServerToSegmentSetMap previous = routingTableIterator.next();
     while (routingTableIterator.hasNext()) {
       ServerToSegmentSetMap current = routingTableIterator.next();

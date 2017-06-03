@@ -16,12 +16,17 @@
 package com.linkedin.pinot.routing.builder;
 
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.routing.RoutingTable;
+import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 /**
@@ -44,8 +49,23 @@ public interface RoutingTableBuilder {
    * @param externalView The external view for the table
    * @param instanceConfigList The instance configurations for the instances serving this particular table (used for
    *                           pruning)
+   */
+  void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigList);
+
+  /**
+   * Return the candidate set of servers that hosts each segment-set.
+   * The List of services are expected to be ordered so that replica-selection strategy can be
+   * applied to them to select one Service among the list for each segment.
+   *
+   * @return SegmentSet to Servers map.
+   */
+  Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request);
+
+  /**
    * @return List of routing tables used to route queries
    */
-  List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigList);
+  List<ServerToSegmentSetMap> getRoutingTables();
+
+
 }

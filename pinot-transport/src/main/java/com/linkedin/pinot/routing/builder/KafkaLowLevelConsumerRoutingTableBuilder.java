@@ -34,10 +34,14 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 /**
@@ -300,4 +304,5 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
       return segmentToInstanceMap;
     }
   }
+
 }

@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableCustomConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentsValidationAndRetentionConfig.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableCustomConfig.class);
 
   public static final String MESSAGE_BASED_REFRESH_KEY = "messageBasedRefresh";
 

@@ -122,8 +122,11 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
 
       // Create routing tables
       long startTime = System.nanoTime();
-      List<ServerToSegmentSetMap> routingTables = routingTableBuilder.computeRoutingTableFromExternalView(
+      routingTableBuilder.computeRoutingTableFromExternalView(
           "table_REALTIME", externalView, instanceConfigs);
+
+      List<ServerToSegmentSetMap> routingTables = routingTableBuilder.getRoutingTables();
+
       long endTime = System.nanoTime();
       totalNanos += endTime - startTime;
 
@@ -173,9 +176,8 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
       externalView.setState(segmentNames.get(i).getSegmentName(), "Server_localhost_1234", "CONSUMING");
     }
 
-    List<ServerToSegmentSetMap> routingTables =
-        routingTableBuilder.computeRoutingTableFromExternalView("table", externalView, instanceConfigs);
-
+    routingTableBuilder.computeRoutingTableFromExternalView("table", externalView, instanceConfigs);
+    List<ServerToSegmentSetMap> routingTables = routingTableBuilder.getRoutingTables();
     for (ServerToSegmentSetMap routingTable : routingTables) {
       for (String server : routingTable.getServerSet()) {
         Set<String> segmentSet = routingTable.getSegmentSet(server);

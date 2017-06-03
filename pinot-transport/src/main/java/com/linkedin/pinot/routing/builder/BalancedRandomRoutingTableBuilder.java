@@ -21,13 +21,18 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +40,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Create a given number of routing tables based on random selections from ExternalView.
  */
-public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
+public class BalancedRandomRoutingTableBuilder extends AbstractRoutingTableBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BalancedRandomRoutingTableBuilder.class);
 
   private int _numberOfRoutingTables;
@@ -54,7 +59,7 @@ public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public synchronized List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName,
+  public synchronized void computeRoutingTableFromExternalView(String tableName,
       ExternalView externalView, List<InstanceConfig> instanceConfigList) {
 
     RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
@@ -114,7 +119,7 @@ public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
     for (int i = 0; i < _numberOfRoutingTables; ++i) {
       resultRoutingTableList.add(new ServerToSegmentSetMap(routingTables.get(i)));
     }
-    return resultRoutingTableList;
-
+    setRoutingTables(resultRoutingTableList);
+    setIsEmpty(externalView.getPartitionSet().isEmpty());
   }
 }

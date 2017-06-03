@@ -16,7 +16,11 @@
 
 package com.linkedin.pinot.routing.builder;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -48,6 +52,9 @@ public abstract class GeneratorBasedRoutingTableBuilder extends AbstractRoutingT
   /** Number of routing tables to generate during the optimization phase */
   protected static final int ROUTING_TABLE_GENERATION_COUNT = 1000;
 
+  protected List<ServerToSegmentSetMap> _routingTables = new ArrayList<>();
+
+  protected Random _random = new Random();
   /**
    * Generates a routing table, decorated with a metric.
    *
@@ -216,7 +223,7 @@ public abstract class GeneratorBasedRoutingTableBuilder extends AbstractRoutingT
   protected abstract RoutingTableGenerator buildRoutingTableGenerator();
 
   @Override
-  public List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigList) {
     // The default routing table algorithm tries to balance all available segments across all servers, so that each
     // server is hit on every query. This works fine with small clusters (say less than 20 servers) but for larger
@@ -291,7 +298,17 @@ public abstract class GeneratorBasedRoutingTableBuilder extends AbstractRoutingT
       Pair<Map<String, Set<String>>, Float> routingTableWithMetric = topRoutingTables.poll();
       routingTables.add(new ServerToSegmentSetMap(routingTableWithMetric.getKey()));
     }
-
-    return routingTables;
+    _routingTables = routingTables;
   }
+  
+  @Override
+  public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
+    return _routingTables.get(_random.nextInt(_routingTables.size())).getRouting();
+  }
+
+  @Override
+  public List<ServerToSegmentSetMap> getRoutingTables() {
+    return _routingTables;
+  }
+
 }

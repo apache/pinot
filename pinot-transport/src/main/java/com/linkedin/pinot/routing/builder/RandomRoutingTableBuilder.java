@@ -33,7 +33,7 @@ import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 /**
  * Create a given number of routing tables based on random selections from ExternalView.
  */
-public class RandomRoutingTableBuilder implements RoutingTableBuilder {
+public class RandomRoutingTableBuilder extends AbstractRoutingTableBuilder {
 
   private int _numberOfRoutingTables;
 
@@ -51,7 +51,7 @@ public class RandomRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public synchronized List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName,
+  public synchronized void computeRoutingTableFromExternalView(String tableName,
       ExternalView externalView, List<InstanceConfig> instanceConfigList) {
 
     RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
@@ -89,7 +89,6 @@ public class RandomRoutingTableBuilder implements RoutingTableBuilder {
     for (int i = 0; i < _numberOfRoutingTables; ++i) {
       resultRoutingTableList.add(new ServerToSegmentSetMap(routingTables.get(i)));
     }
-    return resultRoutingTableList;
-
+    setRoutingTables(resultRoutingTableList);
   }
 }

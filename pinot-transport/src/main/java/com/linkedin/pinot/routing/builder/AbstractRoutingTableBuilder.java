@@ -16,18 +16,30 @@
 
 package com.linkedin.pinot.routing.builder;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
+
 
 /**
  * Utility class to share common utility methods between routing table builders.
  */
 public abstract class AbstractRoutingTableBuilder implements RoutingTableBuilder {
+  
+  private List<ServerToSegmentSetMap> _routingTables;
+
+  protected Random _random = new Random();
+
+  //by default we will set it to false. Implementations can override this
+  private boolean _isEmpty= false;
+
   /**
    * Picks a random replica, inversely weighted by the number of segments already assigned to each replica. See a longer
    * description of the probabilities used in
@@ -95,4 +107,24 @@ public abstract class AbstractRoutingTableBuilder implements RoutingTableBuilder
 
     return replicas[i];
   }
+  
+  @Override
+  public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
+    return _routingTables.get(_random.nextInt(_routingTables.size())).getRouting();
+  }
+  
+  @Override
+  public List<ServerToSegmentSetMap> getRoutingTables() {
+    return _routingTables;
+  }
+  
+  protected void setRoutingTables(List<ServerToSegmentSetMap> routingTables){
+    _routingTables = routingTables;
+  }
+
+  protected void setIsEmpty(boolean isEmpty){
+    _isEmpty = isEmpty;
+  }
+  
+   
 }
