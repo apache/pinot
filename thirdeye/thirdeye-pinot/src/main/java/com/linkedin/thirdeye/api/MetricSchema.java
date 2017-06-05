@@ -61,6 +61,10 @@ public class MetricSchema {
     return types.get(mapping.get(name));
   }
 
+  public Integer getMetricIndex(String name) {
+    return mapping.get(name);
+  }
+
   public List<MetricType> getTypes() {
     return types;
   }

@@ -15,12 +15,10 @@ Handlebars.registerHelper('formatPercent', function (percentValue) {
 });
 
 Handlebars.registerHelper('formatDouble', function (doubleValue) {
-  if(doubleValue >= 0){
-    return "" + doubleValue.toFixed(1);
-  } else {
-    return "" + doubleValue.toFixed(1);
-  }
+  var value = Number(doubleValue);
+  return Number.isNaN(value) ? '' : d3.format('.3r')(doubleValue);
 });
+
 Handlebars.registerHelper('formatDelta', function (a, b) {
   delta = a - b;
   if(delta >= 0){
