@@ -237,11 +237,10 @@ public class DetectionJobScheduler implements Runnable {
     String dataset = datasetConfig.getDataset();
 
     /**
-     * Check is completeness check required is set at dataset level. That flag is false by default, so user will set as needed
-     * Check also for same flag in function level. That flag is true by default, so dataset config's flag will have its way unless user has tampered with this flag
+     * Check flag in function level. This flag is true by default
      * This flag would typically be unset, in backfill cases
      */
-    if (datasetConfig.isRequiresCompletenessCheck() && anomalyFunction.isRequiresCompletenessCheck()) {
+    if (anomalyFunction.isRequiresCompletenessCheck()) {
 
       LOG.info("Function: {} Dataset: {} Checking for completeness of time range {}({}) to {}({})",
           anomalyFunction.getId(), dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
