@@ -182,6 +182,7 @@ public abstract class AbstractManagerTestBase {
     functionSpec.setWindowUnit(TimeUnit.DAYS);
     functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
     functionSpec.setIsActive(true);
+    functionSpec.setRequiresCompletenessCheck(false);
     return functionSpec;
   }
 
