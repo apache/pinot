@@ -1,13 +1,18 @@
 module.exports = {
+  "extends": "eslint:recommended",
   root: true,
   parserOptions: {
-    ecmaVersion: 6,
-    sourceType: 'module'
+    ecmaVersion: 8,
+    sourceType: "module"
   },
   extends: 'eslint:recommended',
   env: {
-    browser: true
+    browser: true,
+    es6: true
   },
   rules: {
+    "eol-last": ["error", "always"],
+    "indent": ["error", 2],
+    "space-in-parens": ["error", "never"]
   }
 };

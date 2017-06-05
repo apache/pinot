@@ -9,7 +9,20 @@ module.exports = function(defaults) {
     },
     fingerprint: {
       prepend: '/app/'
-    }
+    },
+    sassOptions: {
+      extension: 'scss',
+      includePaths:[
+       'bower_components/source-sans-pro'
+      ]
+    },
+    sourcemaps: {
+      enabled: EmberApp.env() !== 'production',
+      extensions: ['js', 'css']
+    },
+    babel: {
+      sourceMaps: 'inline'
+    },
   });
 
   // Use `app.import` to add additional libraries to the generated

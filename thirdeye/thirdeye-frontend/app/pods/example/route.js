@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import fetch from 'ember-network/fetch';
+import fetch from 'fetch';
 import { Actions as AnomalyActions } from 'thirdeye-frontend/actions/anomaly';
 
 export default Ember.Route.extend({
