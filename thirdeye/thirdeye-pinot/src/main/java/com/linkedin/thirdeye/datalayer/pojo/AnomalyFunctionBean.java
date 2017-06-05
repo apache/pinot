@@ -70,9 +70,8 @@ public class AnomalyFunctionBean extends AbstractBean {
   private AnomalyMergeConfig anomalyMergeConfig;
 
   /**
-   * This flag always true. The same flag in dataset config, will act as master, always false.
+   * This flag always true.
    * This flag would typically be unset, in backfill cases, where we want to override the completeness check,
-   * but not have to touch the dataset config setting for that
    */
   private boolean requiresCompletenessCheck = true;
 
