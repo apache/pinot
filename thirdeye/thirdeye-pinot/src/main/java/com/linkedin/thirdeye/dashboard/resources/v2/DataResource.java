@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -552,7 +553,8 @@ public class DataResource {
   public Map<Long, List<TimeRange>> getAnomalyTimeRangesByMetricIds(
       @QueryParam("metricIds") String metricIds,
       @QueryParam("start") Long start,
-      @QueryParam("end") Long end) {
+      @QueryParam("end") Long end,
+      @QueryParam("filters") String filtersJson) {
 
     if (metricIds == null)
       throw new IllegalArgumentException("Must provide metricIds");
@@ -568,8 +570,20 @@ public class DataResource {
       ids.add(Long.parseLong(metricId));
     }
 
+    // fetch anomalies in time range
     Map<Long, List<MergedAnomalyResultDTO>> anomalies = DAO_REGISTRY.getMergedAnomalyResultDAO().findAnomaliesByMetricIdsAndTimeRange(ids, start, end);
 
+    // apply search filters
+    if (filtersJson != null) {
+      SearchFilters filters = SearchFilters.fromJSON(filtersJson);
+      if (filters != null) {
+        for (Map.Entry<Long, List<MergedAnomalyResultDTO>> entry : anomalies.entrySet()) {
+          entry.setValue(SearchFilters.applySearchFilters(entry.getValue(), filters));
+        }
+      }
+    }
+
+    // extract and truncate time ranges
     Map<Long, List<TimeRange>> output = new HashMap<>();
     for(Map.Entry<Long, List<MergedAnomalyResultDTO>> entry : anomalies.entrySet()) {
       output.put(entry.getKey(), truncateRanges(extractAnomalyTimeRanges(entry.getValue()), start, end));
