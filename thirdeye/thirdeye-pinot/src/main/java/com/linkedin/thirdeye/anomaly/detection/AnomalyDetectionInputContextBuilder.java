@@ -685,7 +685,7 @@ public class AnomalyDetectionInputContextBuilder {
     seedRequest.setGroupByDimensions(groupByDimensions);
     seedRequest.setEndDateInclusive(endTimeInclusive);
 
-    LOG.info("Found [{}] time ranges to fetch data for metric(s): {}", startEndTimeRanges.size(), metricsToRetrieve);
+    LOG.info("Found [{}] time ranges to fetch data for metric(s): {}, with filter: {}", startEndTimeRanges.size(), metricsToRetrieve, filters);
 
     // MultiQuery request
     List<Future<TimeSeriesResponse>> futureResponses = new ArrayList<>();

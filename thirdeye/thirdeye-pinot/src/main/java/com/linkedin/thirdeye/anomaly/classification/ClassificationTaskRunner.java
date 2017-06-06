@@ -65,7 +65,7 @@ public class ClassificationTaskRunner implements TaskRunner {
   private AlertFilterFactory alertFilterFactory;
   private AnomalyClassifierFactory anomalyClassifierFactory;
 
-  private Map<Long, AnomalyFunctionDTO> anomalyFunctionConfigMap = new HashMap<>();
+  private Map<Long, AnomalyFunctionDTO> anomalyFunctionSpecMap = new HashMap<>();
   private Map<Long, AlertFilter> alertFilterMap = new HashMap<>();
 
   @Override
@@ -172,7 +172,7 @@ public class ClassificationTaskRunner implements TaskRunner {
       functionIdToAnomalyResult.put(classificationConfig.getMainFunctionId(), mainAnomaliesByDimension);
       // Get the anomalies from other anomaly function that are activated
       for (Long functionId : functionIds) {
-        AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionConfigMap.get(functionId);
+        AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionSpecMap.get(functionId);
         AlertFilter alertFilter = alertFilterMap.get(functionId);
         List<MergedAnomalyResultDTO> anomalies;
         if (anomalyFunctionDTO.getIsActive()) {
@@ -203,7 +203,7 @@ public class ClassificationTaskRunner implements TaskRunner {
       Map<String, String> classifierConfig = classificationConfig.getClassifierConfig();
       AnomalyClassifier anomalyClassifier = anomalyClassifierFactory.fromSpec(classifierConfig);
       List<MergedAnomalyResultDTO> updatedAnomalyResults =
-          anomalyClassifier.classify(functionIdToAnomalyResult, classificationConfig);
+          anomalyClassifier.classify(classificationConfig, functionIdToAnomalyResult);
       updatedMainAnomaliesByDimension.addAll(updatedAnomalyResults);
     }
 
@@ -217,7 +217,7 @@ public class ClassificationTaskRunner implements TaskRunner {
    */
   private void addAnomalyFunctionAndAlertConfig(long functionId) {
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
-    anomalyFunctionConfigMap.put(functionId, anomalyFunctionDTO);
+    anomalyFunctionSpecMap.put(functionId, anomalyFunctionDTO);
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionDTO.getAlertFilter());
     alertFilterMap.put(functionId, alertFilter);
   }
@@ -271,9 +271,9 @@ public class ClassificationTaskRunner implements TaskRunner {
   private List<MergedAnomalyResultDTO> adhocAnomalyDetection(long functionId, long monitoringWindowStart,
       long monitoringWindowEnd, DimensionMap dimensions) throws Exception {
     // Initiate anomaly function
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionId);
-    BaseAnomalyFunction anomalyFunction = null;
-      anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionSpecMap.get(functionId);
+    AlertFilter alertFilter = alertFilterMap.get(functionId);
+    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
     DateTime windowStart = new DateTime(monitoringWindowStart);
     DateTime windowEnd = new DateTime(monitoringWindowEnd);
@@ -338,7 +338,7 @@ public class ClassificationTaskRunner implements TaskRunner {
           List<MergedAnomalyResultDTO> mergedAnomaliesInMonitoringWindow = new ArrayList<>();
           for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
             if ((mergedAnomaly.getEndTime() > monitoringWindowStart) && (mergedAnomaly.getStartTime()
-                < monitoringWindowEnd)) {
+                < monitoringWindowEnd) && alertFilter.isQualified(mergedAnomaly)) {
               mergedAnomaliesInMonitoringWindow.add(mergedAnomaly);
             }
           }

@@ -13,8 +13,8 @@ public class DummyAnomalyClassifier extends BaseAnomalyClassifier {
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> classify(Map<Long, List<MergedAnomalyResultDTO>> anomalies,
-      ClassificationConfigDTO classificationConfig) {
+  public List<MergedAnomalyResultDTO> classify(ClassificationConfigDTO classificationConfig,
+      Map<Long, List<MergedAnomalyResultDTO>> anomalies) {
     return Collections.emptyList();
   }
 }
