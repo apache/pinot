@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import org.apache.commons.lang.ArrayUtils;
 
 
 /**
@@ -266,6 +267,20 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     if(this.size() != 1)
       throw new IllegalStateException("Series must contain exactly one element");
     return this.values[0];
+  }
+
+  /**
+   * Returns the contents of the series wrapped as list.
+   *
+   * @return list of series elements
+   */
+  public List<Long> toList() {
+    Long[] values = new Long[this.values.length];
+    for(int i=0; i<this.values.length; i++) {
+      if(!this.isNull(i))
+        values[i] = this.values[i];
+    }
+    return Arrays.asList(values);
   }
 
   /**
