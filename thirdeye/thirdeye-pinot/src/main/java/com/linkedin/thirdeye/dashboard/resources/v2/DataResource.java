@@ -1,13 +1,16 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -554,7 +557,7 @@ public class DataResource {
       @QueryParam("metricIds") String metricIds,
       @QueryParam("start") Long start,
       @QueryParam("end") Long end,
-      @QueryParam("filters") String filtersJson) {
+      @QueryParam("filters") String filters) {
 
     if (metricIds == null)
       throw new IllegalArgumentException("Must provide metricIds");
@@ -572,15 +575,22 @@ public class DataResource {
 
     // fetch anomalies in time range
     Map<Long, List<MergedAnomalyResultDTO>> anomalies = DAO_REGISTRY.getMergedAnomalyResultDAO().findAnomaliesByMetricIdsAndTimeRange(ids, start, end);
+    int countAll = countNested(anomalies);
 
     // apply search filters
-    if (filtersJson != null) {
-      SearchFilters filters = SearchFilters.fromJSON(filtersJson);
-      if (filters != null) {
-        for (Map.Entry<Long, List<MergedAnomalyResultDTO>> entry : anomalies.entrySet()) {
-          entry.setValue(SearchFilters.applySearchFilters(entry.getValue(), filters));
-        }
+    if (filters != null && !filters.isEmpty()) {
+      Multimap<String, String> filterMap = ThirdEyeUtils.convertToMultiMap(filters);
+
+      for (Map.Entry<Long, List<MergedAnomalyResultDTO>> entry : anomalies.entrySet()) {
+        entry.setValue(applyAnomalyFilters(entry.getValue(), filterMap));
       }
+
+      int countPassed = countNested(anomalies);
+      LOG.info("Fetched {} anomalies ({} after filter) for time range {}-{}", countAll, countPassed, start, end);
+
+    } else {
+      // no filter
+      LOG.info("Fetched {} anomalies for time range {}-{}", countAll, start, end);
     }
 
     // extract and truncate time ranges
@@ -653,6 +663,61 @@ public class DataResource {
       }
     }
     return output;
+  }
+
+  /**
+   * Returns a list of anomalies that fulfills the dimension filter requirements specified in
+   * {@code filters}. Returns an empty list if no anomaly passes the filter. If {@code filters}
+   * contains multiple values for the same dimension key, ANY match will pass the filter.
+   *
+   * @param anomalies list of anomalies
+   * @param filters dimension filter multimap
+   * @return list of filtered anomalies
+   */
+  static List<MergedAnomalyResultDTO> applyAnomalyFilters(List<MergedAnomalyResultDTO> anomalies, Multimap<String, String> filters) {
+    List<MergedAnomalyResultDTO> output = new ArrayList<>();
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (applyAnomalyFilters(anomaly, filters)) {
+        output.add(anomaly);
+      }
+    }
+    return output;
+  }
+
+  /**
+   * Returns {@code true} if a given anomaly passes the dimension filters {@code filters}, or
+   * {@code false} otherwise. If {@code filters} contains multiple values for the same dimension
+   * key, ANY match will pass the filter.
+   *
+   * @param anomaly anomaly to filter
+   * @param filters dimension filter multimap
+   * @return {@code true} if anomaly passed the filters, {@code false} otherwise
+   */
+  static boolean applyAnomalyFilters(MergedAnomalyResultDTO anomaly, Multimap<String, String> filters) {
+    DimensionMap dim = anomaly.getDimensions();
+    for (String filterKey : filters.keySet()) {
+      if (!dim.containsKey(filterKey))
+        return false;
+
+      Collection<String> filterValues = filters.get(filterKey);
+      if (!filterValues.contains(dim.get(filterKey)))
+        return false;
+    }
+    return true;
+  }
+
+  /**
+   * Returns the total count of elements in collections nested within a map.
+   *
+   * @param map map with nested collection
+   * @return total nested item count
+   */
+  static int countNested(Map<?, ? extends Collection<?>> map) {
+    int count = 0;
+    for (Map.Entry<?, ? extends Collection<?>> entry : map.entrySet()) {
+      count += entry.getValue().size();
+    }
+    return count;
   }
 
   /**
