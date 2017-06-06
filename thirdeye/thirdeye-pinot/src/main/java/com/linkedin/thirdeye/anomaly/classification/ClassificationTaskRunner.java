@@ -4,27 +4,41 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifier;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
+import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +52,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ClassificationTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(ClassificationTaskRunner.class);
+  private static final MergeAnomalyEndTimeComparator MERGE_ANOMALY_END_TIME_COMPARATOR =
+      new MergeAnomalyEndTimeComparator();
   private AnomalyFunctionManager anomalyFunctionDAO = DAORegistry.getInstance().getAnomalyFunctionDAO();
   private MergedAnomalyResultManager mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
   private ClassificationConfigManager classificationConfigDAO = DAORegistry.getInstance().getClassificationConfigDAO();
@@ -45,6 +61,7 @@ public class ClassificationTaskRunner implements TaskRunner {
   private long windowStart;
   private long windowEnd;
   private ClassificationConfigDTO classificationConfig;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
   private AnomalyClassifierFactory anomalyClassifierFactory;
 
@@ -68,6 +85,7 @@ public class ClassificationTaskRunner implements TaskRunner {
     windowStart = classificationTaskInfo.getWindowStartTime();
     windowEnd = classificationTaskInfo.getWindowEndTime();
     classificationConfig = classificationTaskInfo.getClassificationConfigDTO();
+    anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     alertFilterFactory = taskContext.getAlertFilterFactory();
     anomalyClassifierFactory = taskContext.getAnomalyClassifierFactory();
   }
@@ -86,7 +104,7 @@ public class ClassificationTaskRunner implements TaskRunner {
           filteredMainAnomalies.size());
 
       // Sort merged anomalies by the natural order of the end time
-      Collections.sort(filteredMainAnomalies, new MergeAnomalyEndTimeComparator());
+      Collections.sort(filteredMainAnomalies, MERGE_ANOMALY_END_TIME_COMPARATOR);
       // Run classifier for each dimension of the anomalies
       List<MergedAnomalyResultDTO> updatedMainAnomaliesByDimension =
           dimensionalShuffleAndUnifyClassification(filteredMainAnomalies);
@@ -96,8 +114,10 @@ public class ClassificationTaskRunner implements TaskRunner {
       }
     }
     // Update watermark of window end time
-    classificationConfig.setEndTimeWatermark(windowEnd);
-    classificationConfigDAO.update(classificationConfig);
+    if (windowEnd > classificationConfig.getEndTimeWatermark()) {
+      classificationConfig.setEndTimeWatermark(windowEnd);
+      classificationConfigDAO.update(classificationConfig);
+    }
   }
 
   /**
@@ -154,17 +174,28 @@ public class ClassificationTaskRunner implements TaskRunner {
       for (Long functionId : functionIds) {
         AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionConfigMap.get(functionId);
         AlertFilter alertFilter = alertFilterMap.get(functionId);
+        List<MergedAnomalyResultDTO> anomalies;
         if (anomalyFunctionDTO.getIsActive()) {
-          List<MergedAnomalyResultDTO> anomalies = mergedAnomalyDAO
-              .findAllOverlapByFunctionIdDimensions(functionId, startTimeForCorrelatedAnomalies,
-                  endTimeForCorrelatedAnomalies, dimensionMap.toString(), false);
-          List<MergedAnomalyResultDTO> filteredAnomalies = filterAnomalies(alertFilter, anomalies);
-          if (CollectionUtils.isNotEmpty(filteredAnomalies)) {
-            Collections.sort(filteredAnomalies, new MergeAnomalyEndTimeComparator());
-            functionIdToAnomalyResult.put(functionId, filteredAnomalies);
-          }
+          // Get existing anomalies from DB
+          anomalies = mergedAnomalyDAO.findAllOverlapByFunctionIdDimensions(functionId, startTimeForCorrelatedAnomalies,
+              endTimeForCorrelatedAnomalies, dimensionMap.toString(), false);
         } else {
-          // TODO: Trigger adhoc anomaly detection
+          LOG.info("Invoking ad-hoc anomaly detection for anomaly function {} at window ({}--{}).", functionId,
+              new DateTime(windowStart), new DateTime(windowEnd));
+          // Trigger ad-hoc anomaly detection
+          try {
+            anomalies = adhocAnomalyDetection(functionId, startTimeForCorrelatedAnomalies, endTimeForCorrelatedAnomalies,
+                dimensionMap);
+          } catch (Exception e) {
+            anomalies = Collections.emptyList();
+            LOG.warn("Failed to initiate detection context builder for anomaly function (id={}); Omitting anomalies from this function.", functionId, e);
+          }
+        }
+        // Filter anomalies for current anomaly function
+        List<MergedAnomalyResultDTO> filteredAnomalies = filterAnomalies(alertFilter, anomalies);
+        if (CollectionUtils.isNotEmpty(filteredAnomalies)) {
+          Collections.sort(filteredAnomalies, MERGE_ANOMALY_END_TIME_COMPARATOR);
+          functionIdToAnomalyResult.put(functionId, filteredAnomalies);
         }
       }
 
@@ -202,9 +233,11 @@ public class ClassificationTaskRunner implements TaskRunner {
   private static List<MergedAnomalyResultDTO> filterAnomalies(AlertFilter alertFilter,
       List<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> filteredMainAnomalies = new ArrayList<>();
-    for (MergedAnomalyResultDTO mainAnomaly : anomalies) {
-      if (alertFilter.isQualified(mainAnomaly)) {
-        filteredMainAnomalies.add(mainAnomaly);
+    if (CollectionUtils.isNotEmpty(anomalies)) {
+      for (MergedAnomalyResultDTO mainAnomaly : anomalies) {
+        if (alertFilter.isQualified(mainAnomaly)) {
+          filteredMainAnomalies.add(mainAnomaly);
+        }
       }
     }
     return filteredMainAnomalies;
@@ -218,5 +251,103 @@ public class ClassificationTaskRunner implements TaskRunner {
     public int compare(MergedAnomalyResultDTO lhs, MergedAnomalyResultDTO rhs) {
       return (int) (lhs.getEndTime() - rhs.getEndTime());
     }
+  }
+
+  // TODO: Refine the almost duplicated code in anomaly detection task runner
+  /**
+   * Invokes an ad-hoc anomalies detection for the given anomaly function on the given monitoring window and dimensions.
+   * The monitoring window might be extended to satisfy the min detection window of the anomaly function.
+   *
+   * @param functionId            the function id of the anomaly function.
+   * @param monitoringWindowStart the original monitoring window start, which might be changed in order to satisfy the
+   *                              min detection window size.
+   * @param monitoringWindowEnd   the monitoring window end.
+   * @param dimensions            the dimension on which the anomaly detection is executed.
+   *
+   * @return A list of merged anomalies that are detected in the given monitoring window.
+   *
+   * @throws Exception If the ad-hoc anomaly detection cannot be finished successfully.
+   */
+  private List<MergedAnomalyResultDTO> adhocAnomalyDetection(long functionId, long monitoringWindowStart,
+      long monitoringWindowEnd, DimensionMap dimensions) throws Exception {
+    // Initiate anomaly function
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionId);
+    BaseAnomalyFunction anomalyFunction = null;
+      anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+
+    DateTime windowStart = new DateTime(monitoringWindowStart);
+    DateTime windowEnd = new DateTime(monitoringWindowEnd);
+    // Increase window size if it is smaller than the detection window size defined by anomaly function.
+    // The reason is that an anomaly function could have minimal detection window size, i.e., detection does not
+    // happen if monitoring window size is smaller than min size.
+    Integer detectionWindowSize = anomalyFunctionSpec.getWindowSize();
+    TimeUnit detectionWindowUnit = anomalyFunctionSpec.getWindowUnit();
+    TimeGranularity minDetectionWindowSize = new TimeGranularity(detectionWindowSize, detectionWindowUnit);
+    if (monitoringWindowEnd - monitoringWindowStart < minDetectionWindowSize.toMillis()) {
+      windowStart = windowEnd.minus(minDetectionWindowSize.toPeriod());
+    }
+
+    // The ad-hoc anomaly detection pipeline starts here
+    // Gathering input context, e.g., time series, known anomalies, etc.
+    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+      anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec)
+          .fetchTimeSeriesDataByDimension(windowStart, windowEnd, dimensions, false)
+          .fetchSaclingFactors(windowStart, windowEnd)
+          .fetchExistingMergedAnomaliesByDimension(windowStart, windowEnd, dimensions);
+    if (anomalyFunctionSpec.isToCalculateGlobalMetric()) {
+      anomalyDetectionInputContextBuilder.fetchTimeSeriesGlobalMetric(windowStart, windowEnd);
+    }
+    AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
+
+    MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
+    if (metricTimeSeries != null) {
+      List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
+      // Transform time series with scaling factor
+      List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
+      if (CollectionUtils.isNotEmpty(scalingFactors)) {
+        Properties properties = anomalyFunction.getProperties();
+        MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
+            anomalyFunctionSpec.getTopicMetric(), properties);
+      }
+
+      // Starts anomaly detection
+      List<RawAnomalyResultDTO> adhocRawAnomalies =
+          anomalyFunction.analyze(dimensions, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
+
+      // Generate merged anomalies from the adhoc raw anomalies
+      if (CollectionUtils.isNotEmpty(adhocRawAnomalies)) {
+        for (RawAnomalyResultDTO rawAnomaly : adhocRawAnomalies) {
+          rawAnomaly.setFunction(anomalyFunctionSpec);
+          // Make sure score and weight are valid numbers
+          rawAnomaly.setScore(DetectionTaskRunner.normalize(rawAnomaly.getScore()));
+          rawAnomaly.setWeight(DetectionTaskRunner.normalize(rawAnomaly.getWeight()));
+        }
+
+        ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = ArrayListMultimap.create();
+        resultRawAnomalies.putAll(dimensions, adhocRawAnomalies);
+        final boolean isBackfill = false;
+        TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
+        ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
+            timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
+        // The list of mergedAnomalies might contain the anomalies that are located inside the original monitoring
+        // window, because the window might be extended to satisfy the min detection window.
+        List<MergedAnomalyResultDTO> mergedAnomalies = resultMergedAnomalies.get(dimensions);
+        LOG.info("{} anomalies are detected by ad-hoc anomaly detection for function {})", mergedAnomalies.size(), functionId);
+        if (CollectionUtils.isNotEmpty(mergedAnomalies)) {
+          List<MergedAnomalyResultDTO> mergedAnomaliesInMonitoringWindow = new ArrayList<>();
+          for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+            if ((mergedAnomaly.getEndTime() > monitoringWindowStart) && (mergedAnomaly.getStartTime()
+                < monitoringWindowEnd)) {
+              mergedAnomaliesInMonitoringWindow.add(mergedAnomaly);
+            }
+          }
+          LOG.info("{} anomalies are located in monitoring window for function {}", mergedAnomaliesInMonitoringWindow.size(), functionId);
+          return mergedAnomaliesInMonitoringWindow;
+        }
+      }
+    }
+
+    return Collections.emptyList();
   }
 }

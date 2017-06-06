@@ -58,11 +58,10 @@ public class ClassificationJobRunner implements JobRunner {
     List<Long> taskIds = new ArrayList<>();
 
     try {
-      LOG.info("Creating classification tasks");
       List<ClassificationTaskInfo> taskInfos = taskGenerator
           .createGroupingTasks(classificationJobContext, classificationJobContext.getWindowStartTime(),
               classificationJobContext.getWindowEndTime());
-      LOG.info("Classification tasks {}", taskInfos);
+      LOG.info("Creating classification tasks {}", taskInfos);
       for (ClassificationTaskInfo taskInfo : taskInfos) {
         String taskInfoJson = null;
         try {

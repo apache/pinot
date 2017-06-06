@@ -146,12 +146,9 @@ public class Utils {
     }
     ArrayList<String> metricExpressionNames;
     try {
-      TypeReference<ArrayList<String>> valueTypeRef = new TypeReference<ArrayList<String>>() {
-      };
-
+      TypeReference<ArrayList<String>> valueTypeRef = new TypeReference<ArrayList<String>>() {};
       metricExpressionNames = OBJECT_MAPPER.readValue(metricsJson, valueTypeRef);
     } catch (Exception e) {
-      LOG.warn("Expected json expression for metric [{}], adding as it is. Error in json parsing : [{}]", metricsJson, e.getMessage());
       metricExpressionNames = new ArrayList<>();
       String[] metrics = metricsJson.split(",");
       for (String metric : metrics) {

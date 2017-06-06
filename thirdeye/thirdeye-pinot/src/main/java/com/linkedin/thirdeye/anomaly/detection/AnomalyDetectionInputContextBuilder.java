@@ -685,11 +685,7 @@ public class AnomalyDetectionInputContextBuilder {
     seedRequest.setGroupByDimensions(groupByDimensions);
     seedRequest.setEndDateInclusive(endTimeInclusive);
 
-    LOG.info("Found [{}] time ranges to fetch data", startEndTimeRanges.size());
-    for (Pair<Long, Long> timeRange : startEndTimeRanges) {
-      LOG.info("Start Time [{}], End Time [{}] for anomaly analysis", new DateTime(timeRange.getFirst()),
-          new DateTime(timeRange.getSecond()));
-    }
+    LOG.info("Found [{}] time ranges to fetch data for metric(s): {}", startEndTimeRanges.size(), metricsToRetrieve);
 
     // MultiQuery request
     List<Future<TimeSeriesResponse>> futureResponses = new ArrayList<>();
@@ -706,7 +702,7 @@ public class AnomalyDetectionInputContextBuilder {
       if (response != null) {
         futureResponses.add(response);
         requests.add(request);
-        LOG.info("Fetching data with startTime: [{}], endTime: [{}], metricExpressions: [{}], timeGranularity: [{}]",
+        LOG.info("Fetching time series for range: [{} -- {}], metricExpressions: [{}], timeGranularity: [{}]",
             startTime, endTime, metricExpressions, timeGranularity);
       }
     }
