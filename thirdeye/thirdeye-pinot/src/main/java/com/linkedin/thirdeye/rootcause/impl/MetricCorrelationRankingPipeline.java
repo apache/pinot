@@ -3,10 +3,9 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
-import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -17,13 +16,11 @@ import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -31,7 +28,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,8 +47,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final String PRE_CURRENT = "current:";
   private static final String PRE_BASELINE = "baseline:";
 
-  private static final String COL_TIME = "timestamp";
-  private static final String COL_VALUE = "value";
+  private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
   private static final String COL_REL_DIFF = "rel_diff";
 
   private static final String STRATEGY_CORRELATION = "correlation";
@@ -153,8 +148,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
       for(ThirdEyeResponse response : result) {
         String id = response.getRequest().getRequestReference();
-        DataFrame df = parseResponse(response);
-        evaluateExpressions(df, requests.get(id).expressions);
+        DataFrame df = DataFrameUtils.parseResponse(response);
+        DataFrameUtils.evaluateExpressions(df, requests.get(id).expressions);
         if(LOG.isDebugEnabled()) {
           LOG.debug("DataFrame '{}':\n{}", id, df);
         }
@@ -222,7 +217,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         DoubleSeries candidate = joined.getDoubles(COL_REL_DIFF + DataFrame.COLUMN_JOIN_RIGHT);
 
         try {
-          double score = Math.abs(target.corr(candidate)) * targetMetric.getScore();
+          double score = this.strategy.score(target, candidate) * targetMetric.getScore();
 
           LOG.debug("Score for target '{}' and candidate '{}' is {} (based on {} data points)", targetMetric.getUrn(), candidateMetric.getUrn(), score, target.size());
 
@@ -305,79 +300,6 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
   private static String makeIdentifier(String urn, String prefix) {
     return prefix + urn;
-  }
-
-  private static DataFrame parseResponse(ThirdEyeResponse response) {
-    // builders
-    LongSeries.Builder timeBuilder = LongSeries.builder();
-    List<StringSeries.Builder> dimensionBuilders = new ArrayList<>();
-    List<DoubleSeries.Builder> functionBuilders = new ArrayList<>();
-
-    for(int i=0; i<response.getGroupKeyColumns().size(); i++) {
-      dimensionBuilders.add(StringSeries.builder());
-    }
-
-    for(int i=0; i<response.getMetricFunctions().size(); i++) {
-      functionBuilders.add(DoubleSeries.builder());
-    }
-
-    // values
-    for(int i=0; i<response.getNumRows(); i++) {
-      ThirdEyeResponseRow r = response.getRow(i);
-      timeBuilder.addValues(r.getTimeBucketId());
-
-      for(int j=0; j<r.getDimensions().size(); j++) {
-        dimensionBuilders.get(j).addValues(r.getDimensions().get(j));
-      }
-
-      for(int j=0; j<r.getMetrics().size(); j++) {
-        functionBuilders.get(j).addValues(r.getMetrics().get(j));
-      }
-    }
-
-    // dataframe
-    String timeColumn = response.getDataTimeSpec().getColumnName();
-
-    DataFrame df = new DataFrame();
-    df.addSeries(COL_TIME, timeBuilder.build());
-    df.setIndex(COL_TIME);
-
-    int i = 0;
-    for(String n : response.getGroupKeyColumns()) {
-      if(!timeColumn.equals(n)) {
-        df.addSeries(n, dimensionBuilders.get(i++).build());
-      }
-    }
-
-    int j = 0;
-    for(MetricFunction mf : response.getMetricFunctions()) {
-      df.addSeries(mf.toString(), functionBuilders.get(j++).build());
-    }
-
-    return df.sortedBy(COL_TIME);
-  }
-
-  private static DataFrame evaluateExpressions(DataFrame df, Collection<MetricExpression> expressions) throws Exception {
-    if(expressions.size() != 1)
-      throw new IllegalArgumentException("Requires exactly one expression");
-
-    MetricExpression me = expressions.iterator().next();
-    Collection<MetricFunction> functions = me.computeMetricFunctions();
-
-    Map<String, Double> context = new HashMap<>();
-    double[] values = new double[df.size()];
-
-    for(int i=0; i<df.size(); i++) {
-      for(MetricFunction f : functions) {
-        // TODO check inconsistency between getMetricName() and toString()
-        context.put(f.getMetricName(), df.getDouble(f.toString(), i));
-      }
-      values[i] = MetricExpression.evaluateExpression(me, context);
-    }
-
-    df.addSeries(COL_VALUE, values);
-
-    return df;
   }
 
   private static ScoringStrategy parseStrategy(String strategy) {
