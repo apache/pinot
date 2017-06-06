@@ -9,7 +9,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class TestClassificationConfigManager extends AbstractManagerTestBase {
+public class TestClassificationJobConfigManager extends AbstractManagerTestBase {
   private static final long MAIN_FUNCTION_ID = 101L;
 
   private static final String NAME1 = "test classification name1";

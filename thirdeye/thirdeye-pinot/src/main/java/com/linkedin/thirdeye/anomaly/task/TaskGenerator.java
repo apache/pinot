@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.anomaly.task;
 
-import com.linkedin.thirdeye.anomaly.grouping.GroupingJobContext;
-import com.linkedin.thirdeye.anomaly.grouping.GroupingTaskInfo;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationJobContext;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import java.util.ArrayList;
@@ -100,16 +100,16 @@ public class TaskGenerator {
     return tasks;
   }
 
-  public List<GroupingTaskInfo> createGroupingTasks(GroupingJobContext groupingJobContext,
+  public List<ClassificationTaskInfo> createGroupingTasks(ClassificationJobContext classificationJobContext,
       long monitoringWindowStartTime, long monitoringWindowEndTime) throws Exception {
-    long jobexecutionId = groupingJobContext.getJobExecutionId();
-    ClassificationConfigDTO groupingConfig = groupingJobContext.getConfigDTO();
-    GroupingTaskInfo groupingTaskInfo =
-        new GroupingTaskInfo(jobexecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
+    long jobexecutionId = classificationJobContext.getJobExecutionId();
+    ClassificationConfigDTO groupingConfig = classificationJobContext.getConfigDTO();
+    ClassificationTaskInfo classificationTaskInfo =
+        new ClassificationTaskInfo(jobexecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
             groupingConfig);
 
-    List<GroupingTaskInfo> tasks = new ArrayList<>();
-    tasks.add(groupingTaskInfo);
+    List<ClassificationTaskInfo> tasks = new ArrayList<>();
+    tasks.add(classificationTaskInfo);
     return tasks;
   }
 

@@ -5,8 +5,9 @@ import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
+import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.grouping.GroupingJobScheduler;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
@@ -70,19 +71,22 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private MonitorJobScheduler monitorJobScheduler = null;
   private AlertJobScheduler alertJobScheduler = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
-  private GroupingJobScheduler groupingJobScheduler = null;
+  private ClassificationJobScheduler classificationJobScheduler = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AlertFilterFactory alertFilterFactory = null;
+  private AnomalyClassifierFactory anomalyClassifierFactory = null;
   private ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
   private ThirdEyeAnomalyConfiguration thirdeyeAnomalyConfig;
   private List<TaskDTO> tasks;
   private List<JobDTO> jobs;
   private long functionId;
+  private long classificationConfigId;
 
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
   private String functionPropertiesFile = "/sample-functions.properties";
   private String alertFilterPropertiesFile = "/sample-alertfilter.properties";
+  private String classifierPropertiesFile = "/sample-classifier.properties";
   private String metric = "cost";
   private String collection = "test-collection";
 
@@ -114,8 +118,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     if (dataCompletenessScheduler != null) {
       dataCompletenessScheduler.shutdown();
     }
-    if (groupingJobScheduler != null) {
-      groupingJobScheduler.shutdown();
+    if (classificationJobScheduler != null) {
+      classificationJobScheduler.shutdown();
     }
   }
 
@@ -194,7 +198,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     datasetConfigDAO.save(getTestDatasetConfig(collection));
 
     // create test grouping config
-    classificationConfigDAO.save(getTestGroupingConfiguration(functionId));
+    classificationConfigId = classificationConfigDAO.save(getTestGroupingConfiguration(functionId));
 
     // setup function factory for worker and merger
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
@@ -203,6 +207,10 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     // setup alertfilter factory for worker
     InputStream alertFilterStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(alertFilterPropertiesFile);
     alertFilterFactory = new AlertFilterFactory(alertFilterStream);
+
+    // setup classifier factory for worker
+    InputStream classifierStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(classifierPropertiesFile);
+    anomalyClassifierFactory = new AnomalyClassifierFactory(classifierStream);
   }
 
 
@@ -359,14 +367,18 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     }
     Assert.assertTrue(completedJobCount > 0);
 
-    // start grouper
-    startGrouper();
-    JobDTO latestCompletedDetectionJobDTO = jobDAO.findLatestCompletedDetectionJobByFunctionId(functionId);
+    // start classifier
+    startClassifier();
+    List<JobDTO> latestCompletedDetectionJobDTO =
+        jobDAO.findRecentScheduledJobByTypeAndConfigId(TaskType.ANOMALY_DETECTION, functionId, 0L);
     Assert.assertNotNull(latestCompletedDetectionJobDTO);
+    Assert.assertEquals(latestCompletedDetectionJobDTO.get(0).getStatus(), JobStatus.COMPLETED);
     Thread.sleep(5000);
     jobs = jobDAO.findAll();
-    JobDTO latestCompletedGroupingJobDTO = jobDAO.findLatestCompletedGroupingJobById(functionId);
-    Assert.assertNotNull(latestCompletedGroupingJobDTO);
+    List<JobDTO> latestCompletedClassificationJobDTO =
+        jobDAO.findRecentScheduledJobByTypeAndConfigId(TaskType.CLASSIFICATION, classificationConfigId, 0L);
+    Assert.assertNotNull(latestCompletedClassificationJobDTO);
+    Assert.assertEquals(latestCompletedClassificationJobDTO.get(0).getStatus(), JobStatus.COMPLETED);
   }
 
   private void startDataCompletenessScheduler() throws Exception {
@@ -374,9 +386,9 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     dataCompletenessScheduler.start();
   }
 
-  private void startGrouper() {
-    groupingJobScheduler = new GroupingJobScheduler();
-    groupingJobScheduler.start();
+  private void startClassifier() {
+    classificationJobScheduler = new ClassificationJobScheduler();
+    classificationJobScheduler.start();
   }
 
   private void startMonitor() {
@@ -386,7 +398,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
 
   private void startWorker() throws Exception {
-    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, anomalyFunctionFactory, alertFilterFactory);
+    taskDriver =
+        new TaskDriver(thirdeyeAnomalyConfig, anomalyFunctionFactory, alertFilterFactory, anomalyClassifierFactory);
     taskDriver.start();
   }
 

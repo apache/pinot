@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.grouping;
+package com.linkedin.thirdeye.anomaly.classification;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
@@ -18,32 +18,34 @@ import org.slf4j.LoggerFactory;
 
 import static com.linkedin.thirdeye.dashboard.resources.EntityManagerResource.OBJECT_MAPPER;
 
-public class GroupingJobRunner implements JobRunner {
-  private static final Logger LOG = LoggerFactory.getLogger(GroupingJobRunner.class);
+public class ClassificationJobRunner implements JobRunner {
+  private static final Logger LOG = LoggerFactory.getLogger(ClassificationJobRunner.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final JobManager jobDAO = DAO_REGISTRY.getJobDAO();
-  private GroupingJobContext jobContext;
+  private ClassificationJobContext classificationJobContext;
   private TaskGenerator taskGenerator = new TaskGenerator();
 
-  public GroupingJobRunner(GroupingJobContext classificationJobContext) {
-    this.jobContext = classificationJobContext;
+  public ClassificationJobRunner(ClassificationJobContext classificationJobContext) {
+    this.classificationJobContext = classificationJobContext;
   }
 
   @Override
   public Long createJob() {
     try {
       JobDTO jobSpec = new JobDTO();
-      String jobName = createJobName(jobContext);
+      String jobName = createJobName(classificationJobContext);
       jobSpec.setJobName(jobName);
-      jobSpec.setWindowStartTime(jobContext.getWindowStartTime());
-      jobSpec.setWindowEndTime(jobContext.getWindowEndTime());
+      jobSpec.setConfigId(classificationJobContext.getConfigDTO().getId());
+      jobSpec.setWindowStartTime(classificationJobContext.getWindowStartTime());
+      jobSpec.setWindowEndTime(classificationJobContext.getWindowEndTime());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
-      jobSpec.setTaskType(TaskConstants.TaskType.GROUPING);
+      jobSpec.setTaskType(TaskConstants.TaskType.CLASSIFICATION);
       Long jobExecutionId = jobDAO.save(jobSpec);
-      jobContext.setJobName(jobName);
-      jobContext.setJobExecutionId(jobExecutionId);
-      LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec, jobExecutionId);
+      classificationJobContext.setJobName(jobName);
+      classificationJobContext.setJobExecutionId(jobExecutionId);
+      LOG.info("Created classification job spec {} with jobExecutionId {}, window start {} and end {}", jobSpec,
+          jobExecutionId, classificationJobContext.getWindowStartTime(), classificationJobContext.getWindowEndTime());
       return jobExecutionId;
     } catch (Exception e) {
       LOG.error("Exception in creating classification job", e);
@@ -57,24 +59,25 @@ public class GroupingJobRunner implements JobRunner {
 
     try {
       LOG.info("Creating classification tasks");
-      List<GroupingTaskInfo> taskInfos = taskGenerator
-          .createGroupingTasks(jobContext, jobContext.getWindowStartTime(), jobContext.getWindowEndTime());
+      List<ClassificationTaskInfo> taskInfos = taskGenerator
+          .createGroupingTasks(classificationJobContext, classificationJobContext.getWindowStartTime(),
+              classificationJobContext.getWindowEndTime());
       LOG.info("Classification tasks {}", taskInfos);
-      for (GroupingTaskInfo taskInfo : taskInfos) {
+      for (ClassificationTaskInfo taskInfo : taskInfos) {
         String taskInfoJson = null;
         try {
           taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
         } catch (JsonProcessingException e) {
-          LOG.error("Exception when converting GroupingTaskInfo {} to jsonString", taskInfo, e);
+          LOG.error("Exception when converting ClassificationTaskInfo {} to jsonString", taskInfo, e);
         }
 
         TaskDTO taskSpec = new TaskDTO();
-        taskSpec.setTaskType(TaskConstants.TaskType.GROUPING);
-        taskSpec.setJobName(jobContext.getJobName());
+        taskSpec.setTaskType(TaskConstants.TaskType.CLASSIFICATION);
+        taskSpec.setJobName(classificationJobContext.getJobName());
         taskSpec.setStatus(TaskConstants.TaskStatus.WAITING);
         taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
-        taskSpec.setJobId(jobContext.getJobExecutionId());
+        taskSpec.setJobId(classificationJobContext.getJobExecutionId());
         long taskId = DAO_REGISTRY.getTaskDAO().save(taskSpec);
 
         taskIds.add(taskId);
@@ -95,7 +98,7 @@ public class GroupingJobRunner implements JobRunner {
     }
   }
 
-  private static String createJobName(GroupingJobContext jobContext) {
+  private static String createJobName(ClassificationJobContext jobContext) {
     long configId = jobContext.getConfigDTO().getId();
     String configName = jobContext.getConfigDTO().getName();
     long startTimes = jobContext.getWindowStartTime();

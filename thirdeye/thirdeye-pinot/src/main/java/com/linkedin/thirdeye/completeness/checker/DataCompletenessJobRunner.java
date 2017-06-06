@@ -86,6 +86,7 @@ public class DataCompletenessJobRunner implements JobRunner {
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
       jobSpec.setTaskType(TaskType.DATA_COMPLETENESS);
+      jobSpec.setConfigId(0); // Data completeness job does not have a config id
       jobExecutionId = DAO_REGISTRY.getJobDAO().save(jobSpec);
       LOG.info("Created JobSpec {} with jobExecutionId {}", jobSpec,
           jobExecutionId);

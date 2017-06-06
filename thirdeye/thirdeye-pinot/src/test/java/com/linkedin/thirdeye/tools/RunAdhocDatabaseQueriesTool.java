@@ -314,7 +314,7 @@ public class RunAdhocDatabaseQueriesTool {
       String[] names = name.split("-");
       try {
         long anomalyFunctionId = Long.parseLong(names[0]);
-        jobDTO.setAnomalyFunctionId(anomalyFunctionId);
+        jobDTO.setConfigId(anomalyFunctionId);
         jobDTO.setTaskType(TaskConstants.TaskType.ANOMALY_DETECTION);
         jobDTO.setLastModified(new Timestamp(System.currentTimeMillis()));
         jobDAO.save(jobDTO);

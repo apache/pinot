@@ -1,7 +1,8 @@
 package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
-import com.linkedin.thirdeye.anomaly.grouping.GroupingJobScheduler;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
+import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -20,7 +21,6 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
-import com.linkedin.thirdeye.auto.onboard.AutoOnboardPinotDataSource;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
@@ -44,8 +44,9 @@ public class ThirdEyeAnomalyApplication
   private AutoOnboardService autoOnboardService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
   private AlertFilterFactory alertFilterFactory = null;
+  private AnomalyClassifierFactory anomalyClassifierFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
-  private GroupingJobScheduler groupingJobScheduler = null;
+  private ClassificationJobScheduler classificationJobScheduler = null;
 
   public static void main(final String[] args) throws Exception {
 
@@ -90,8 +91,9 @@ public class ThirdEyeAnomalyApplication
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
           alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+          anomalyClassifierFactory = new AnomalyClassifierFactory(config.getAnomalyClassifierConfigPath());
 
-          taskDriver = new TaskDriver(config, anomalyFunctionFactory, alertFilterFactory);
+          taskDriver = new TaskDriver(config, anomalyFunctionFactory, alertFilterFactory, anomalyClassifierFactory);
           taskDriver.start();
         }
         if (config.isScheduler()) {
@@ -135,9 +137,9 @@ public class ThirdEyeAnomalyApplication
           dataCompletenessScheduler = new DataCompletenessScheduler();
           dataCompletenessScheduler.start();
         }
-        if (config.isGrouper()) {
-          groupingJobScheduler = new GroupingJobScheduler();
-          groupingJobScheduler.start();
+        if (config.isClassifier()) {
+          classificationJobScheduler = new ClassificationJobScheduler();
+          classificationJobScheduler.start();
         }
       }
 
@@ -165,8 +167,8 @@ public class ThirdEyeAnomalyApplication
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler.shutdown();
         }
-        if (config.isGrouper()) {
-          groupingJobScheduler.shutdown();
+        if (config.isClassifier()) {
+          classificationJobScheduler.shutdown();
         }
       }
     });

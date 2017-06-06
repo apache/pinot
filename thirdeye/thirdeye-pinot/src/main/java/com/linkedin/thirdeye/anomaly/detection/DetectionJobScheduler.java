@@ -448,7 +448,7 @@ public class DetectionJobScheduler implements Runnable {
     JobManager jobDAO = DAO_REGISTRY.getJobDAO();
     JobDTO jobDTO;
     List<TaskDTO> scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
-    long functionId = jobDAO.findById(jobExecutionId).getAnomalyFunctionId();
+    long functionId = jobDAO.findById(jobExecutionId).getConfigId();
 
     while (scheduledTaskDTO.size() > 0) {
       List<Long> failedTaskIds = new ArrayList<>();

@@ -77,6 +77,10 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     return getRootDir() + "/detector-config/anomaly-functions/alertGroupRecipientProvider.properties";
   }
 
+  public String getAnomalyClassifierConfigPath() {
+    return getRootDir() + "/detector-config/anomaly-functions/anomalyClassifier.properties";
+  }
+
   public String getSmtpHost() {
     return smtpHost;
   }

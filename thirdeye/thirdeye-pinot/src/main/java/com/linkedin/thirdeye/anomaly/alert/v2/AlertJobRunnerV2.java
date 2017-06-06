@@ -91,6 +91,7 @@ public class AlertJobRunnerV2 implements Job {
     try {
       JobDTO jobSpec = new JobDTO();
       jobSpec.setJobName(alertJobContext.getJobName());
+      jobSpec.setConfigId(alertJobContext.getAlertConfigId());
       jobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
       jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());

@@ -1,18 +1,18 @@
-package com.linkedin.thirdeye.anomaly.grouping;
+package com.linkedin.thirdeye.anomaly.classification;
 
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 
-public class GroupingTaskInfo implements TaskInfo {
+public class ClassificationTaskInfo implements TaskInfo {
   private long jobexecutionId;
   private long windowStartTime;
   private long windowEndTime;
   private ClassificationConfigDTO classificationConfigDTO;
 
-  public GroupingTaskInfo() {
+  public ClassificationTaskInfo() {
   }
 
-  public GroupingTaskInfo(long jobexecutionId, long windowStartTime, long windowEndTime,
+  public ClassificationTaskInfo(long jobexecutionId, long windowStartTime, long windowEndTime,
       ClassificationConfigDTO classificationConfigDTO) {
     this.jobexecutionId = jobexecutionId;
     this.windowStartTime = windowStartTime;

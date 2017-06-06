@@ -232,7 +232,7 @@ public abstract class AbstractManagerTestBase {
 
   protected ClassificationConfigDTO getTestGroupingConfiguration(long mainFunctionId) {
     ClassificationConfigDTO configDTO = new ClassificationConfigDTO();
-    configDTO.setName("groupingJob");
+    configDTO.setName("classificationJob");
     configDTO.setMainFunctionId(mainFunctionId);
     configDTO.setFunctionIdList(Collections.singletonList(mainFunctionId));
     configDTO.setActive(true);
@@ -260,6 +260,7 @@ public abstract class AbstractManagerTestBase {
     jobSpec.setScheduleStartTime(System.currentTimeMillis());
     jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
     jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());
+    jobSpec.setConfigId(100);
     return jobSpec;
   }
 
