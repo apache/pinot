@@ -378,7 +378,7 @@ public class DetectionTaskRunner implements TaskRunner {
   /**
    * Handle any infinite or NaN values by replacing them with +/- max value or 0
    */
-  private double normalize(double value) {
+  public static double normalize(double value) {
     if (Double.isInfinite(value)) {
       return (value > 0.0 ? 1 : -1) * Double.MAX_VALUE;
     } else if (Double.isNaN(value)) {

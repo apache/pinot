@@ -20,5 +20,6 @@ public interface AnomalyClassifier {
    *
    * @return a list of main anomalies that have issue type updated.
    */
-  List<MergedAnomalyResultDTO> classify(Map<Long, List<MergedAnomalyResultDTO>> anomalies, ClassificationConfigDTO classificationConfig);
+  List<MergedAnomalyResultDTO> classify(ClassificationConfigDTO classificationConfig,
+      Map<Long, List<MergedAnomalyResultDTO>> anomalies);
 }
