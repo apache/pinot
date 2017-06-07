@@ -345,7 +345,7 @@ public class AnomalyDetectionInputContextBuilder {
    * the end time of the monitoring window
    * @return
    */
-  public AnomalyDetectionInputContextBuilder fetchSaclingFactors(DateTime windowStart, DateTime windowEnd) {
+  public AnomalyDetectionInputContextBuilder fetchScalingFactors(DateTime windowStart, DateTime windowEnd) {
     List<ScalingFactor> scalingFactors = OverrideConfigHelper
         .getTimeSeriesScalingFactors(DAO_REGISTRY.getOverrideConfigDAO(), anomalyFunctionSpec.getCollection(),
             anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(),

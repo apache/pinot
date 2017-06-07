@@ -113,7 +113,7 @@ public class DetectionTaskRunner implements TaskRunner {
         .fetchTimeSeriesData(windowStart, windowEnd)
         .fetchExistingRawAnomalies(windowStart, windowEnd)
         .fetchExistingMergedAnomalies(windowStart, windowEnd, true)
-        .fetchSaclingFactors(windowStart, windowEnd);
+        .fetchScalingFactors(windowStart, windowEnd);
     if (anomalyFunctionSpec.isToCalculateGlobalMetric()) {
       anomalyDetectionInputContextBuilder.fetchTimeSeriesGlobalMetric(windowStart, windowEnd);
     }

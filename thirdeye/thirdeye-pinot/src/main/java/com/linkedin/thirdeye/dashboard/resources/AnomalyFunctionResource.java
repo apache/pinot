@@ -123,7 +123,7 @@ public class AnomalyFunctionResource {
     anomalyDetectionInputContextBuilder
         .setFunction(anomalyFunctionSpec)
         .fetchTimeSeriesData(windowStart, windowEnd)
-        .fetchSaclingFactors(windowStart, windowEnd);
+        .fetchScalingFactors(windowStart, windowEnd);
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();
 
     Map<DimensionMap, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
