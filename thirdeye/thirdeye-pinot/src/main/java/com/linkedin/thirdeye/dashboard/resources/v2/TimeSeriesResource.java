@@ -32,6 +32,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,6 +58,11 @@ import org.slf4j.LoggerFactory;
 @Path(value = "/timeseries")
 @Produces(MediaType.APPLICATION_JSON)
 public class TimeSeriesResource {
+  enum TransformationType {
+    CUMULATIVE,
+    FORWARDFILL
+  }
+
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesResource.class);
@@ -71,6 +77,7 @@ public class TimeSeriesResource {
   private static final long TIMEOUT = 60000;
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
+  private static final String SERIES_PREFIX = "_";
 
   private final ExecutorService executor;
 
@@ -85,7 +92,8 @@ public class TimeSeriesResource {
       @QueryParam("start") Long start,
       @QueryParam("end") Long end,
       @QueryParam("filters") String filterString,
-      @QueryParam("granularity") String granularityString) throws Exception {
+      @QueryParam("granularity") String granularityString,
+      @QueryParam("transformations") String transformationsString) throws Exception {
 
     // validate input
     if (metricIds == null) {
@@ -102,12 +110,20 @@ public class TimeSeriesResource {
 
     TimeGranularity granularity = null;
     if (granularityString != null) {
-      granularity = TimeGranularity.fromString(granularityString);
+      granularity = TimeGranularity.fromString(granularityString.toUpperCase());
     }
 
     Multimap<String, String> filters = null;
     if (filterString != null) {
       filters = ThirdEyeUtils.convertToMultiMap(filterString);
+    }
+
+    Collection<TransformationType> transformations = new ArrayList<>();
+    if (transformationsString != null && !transformationsString.isEmpty()) {
+      String[] parts = transformationsString.split(",");
+      for (String part : parts) {
+        transformations.add(TransformationType.valueOf(part.toUpperCase()));
+      }
     }
 
     // make requests
@@ -121,16 +137,118 @@ public class TimeSeriesResource {
     }
 
     // collect results
-    Map<String, List<Double>> output = new HashMap<>();
-    for (String id : ids) {
-      DataFrame df = requests.get(id).get(TIMEOUT, TimeUnit.MILLISECONDS);
-      if (!output.containsKey(COL_TIME)) {
-        output.put(COL_TIME, df.getDoubles(COL_TIME).toList());
-      }
-      output.put(id, df.getDoubles(COL_VALUE).toList());
+    Map<String, DataFrame> results = new HashMap<>();
+    for (String id : requests.keySet()) {
+      results.put(id, requests.get(id).get(TIMEOUT, TimeUnit.MILLISECONDS));
     }
 
+    // merge results
+    DataFrame data = mergeResults(results);
+
+    // transform output
+    data = transformTimeSeries(data, transformations);
+
+    return convertDataToMap(data);
+  }
+
+  /**
+   * Returns a DataFrame merging individual query results and aligning them to the same timestamps.
+   *
+   * @param results query results
+   * @return merged aligned dataframe
+   */
+  private static DataFrame mergeResults(Map<String, DataFrame> results) {
+    DataFrame df = new DataFrame();
+    if (results.isEmpty())
+      return df;
+
+    Series timestamp = results.values().iterator().next().get(COL_TIME);
+    df.addSeries(COL_TIME, timestamp);
+    df.setIndex(COL_TIME);
+
+    for (Map.Entry<String, DataFrame> entry : results.entrySet()) {
+      String name = SERIES_PREFIX + entry.getKey();
+      DataFrame res = new DataFrame(entry.getValue()).renameSeries(COL_VALUE, name);
+      df.addSeries(res);
+    }
+
+    return df;
+  }
+
+  /**
+   * Returns a map of time series (keyed by series name) derived from the results dataframe.
+   *
+   * @param data (transformed) query results
+   * @return map of lists of double (keyed by series name)
+   */
+  private static Map<String, List<Double>> convertDataToMap(DataFrame data) {
+    Map<String, List<Double>> output = new HashMap<>();
+    for (String name : data.getSeriesNames()) {
+      String outName = name;
+      if (outName.startsWith(SERIES_PREFIX)) {
+        outName = outName.substring(SERIES_PREFIX.length());
+      }
+
+      output.put(outName, data.getDoubles(name).toList());
+    }
     return output;
+  }
+
+  /**
+   * Returns time series transformed by {@code transformations} (in order).
+   *
+   * @param data query results
+   * @param transformations transformations to apply
+   * @return transformed time series
+   */
+  private DataFrame transformTimeSeries(DataFrame data, Collection<TransformationType> transformations) {
+    for (TransformationType t : transformations) {
+      data = transformTimeSeries(data, t);
+    }
+    return data;
+  }
+
+  /**
+   * Returns time series transformed by {@code transformation}.
+   *
+   * @param data query results
+   * @param transformation transformation to apply
+   * @return transformed time series
+   */
+  private DataFrame transformTimeSeries(DataFrame data, TransformationType transformation) {
+    switch (transformation) {
+      case CUMULATIVE:
+        return transformTimeSeriesCumulative(data);
+      case FORWARDFILL:
+        return transformTimeSeriesForwardFill(data);
+    }
+    throw new IllegalArgumentException(String.format("Unknown transformation type '%s'", transformation));
+  }
+
+  /**
+   * Returns time series of cumulative values.
+   *
+   * @param data query results
+   * @return cumulative time series
+   */
+  private DataFrame transformTimeSeriesCumulative(DataFrame data) {
+    DataFrame.DataFrameGrouping group = data.groupByExpandingWindow();
+    for (String id : data.getSeriesNames()) {
+      if (data.getIndexName().equals(id))
+        continue;
+      data.addSeries(id, group.aggregate(id, DoubleSeries.SUM).getValues());
+    }
+    return data;
+  }
+
+  /**
+   * Returns time series with nulls filled forward.
+   *
+   * @param data query results
+   * @return filled time series
+   */
+  private DataFrame transformTimeSeriesForwardFill(DataFrame data) {
+    return data.fillNullForward(data.getSeriesNames().toArray(new String[0]));
   }
 
   /**
@@ -214,41 +332,26 @@ public class TimeSeriesResource {
     DataFrame df = DataFrameUtils.parseResponse(response);
     DataFrameUtils.evaluateExpressions(df, expressions);
 
-    // enforce time granularity
+    // generate time stamps
     DataFrame output = new DataFrame();
     output.addSeries(COL_TIME, makeTimeRangeIndex(dataAlignedStart, end, granularity));
     output.setIndex(COL_TIME);
 
     LOG.info("Metric id {} has {} data points for time range {}-{}, need {} for time range {}-{}", metricId, df.size(), dataAlignedStart, end, output.size(), alignedStart, end);
 
-    // align values and time stamps
-    DataFrame grouped = null;
-    if(dataset.isAdditive()) {
-      grouped = df.groupByValue(COL_TIME).aggregate(COL_VALUE, DoubleSeries.SUM);
-    } else {
-      grouped = df.groupByValue(COL_TIME).aggregate(COL_VALUE, DoubleSeries.FIRST);
-    }
+    // handle down-sampling - group by timestamp
+    output.addSeries(df.groupByValue(COL_TIME).aggregate(COL_VALUE, getGroupingFunction(dataset)));
 
-    DataFrame joined = output.joinLeft(grouped);
-
-    // fill gaps
-    output.addSeries(COL_VALUE, joined.getDoubles(COL_VALUE).fillNullForward());
+    // NOTE: up-sampling handled outside
 
     // project onto (aligned) start timestamp
     int fromIndex = (int) granularity.convertToUnit(alignedStart - dataAlignedStart);
-
     if (fromIndex > 0) {
       LOG.info("Metric id {} resampling over-generated {} data points (out of {}). Truncating.", metricId, fromIndex, output.size());
-
       output = output.sliceFrom(fromIndex);
 
-      final long minValue = output.getLongs(COL_TIME).min();
-      output.mapInPlace(new Series.LongFunction() {
-        @Override
-        public long apply(long... values) {
-          return values[0] - minValue;
-        }
-      }, COL_TIME);
+      LongSeries timestamps = output.getLongs(COL_TIME);
+      output.addSeries(COL_TIME, timestamps.subtract(timestamps.min()));
     }
 
     return output;
@@ -270,6 +373,18 @@ public class TimeSeriesResource {
       values[i] = i;
     }
     return LongSeries.buildFrom(values);
+  }
+
+  /**
+   * Returns the grouping function based on whether the dataset is additive or not.
+   *
+   * @param dataset dataset config
+   * @return grouping function
+   */
+  private static Series.DoubleFunction getGroupingFunction(DatasetConfigDTO dataset) {
+    if(dataset.isAdditive())
+      return DoubleSeries.SUM;
+    return DoubleSeries.LAST;
   }
 
   @GET
