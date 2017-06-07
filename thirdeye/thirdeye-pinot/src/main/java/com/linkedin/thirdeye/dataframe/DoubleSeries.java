@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.math.stat.correlation.Covariance;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 
@@ -24,6 +25,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
   public static final DoubleFunction SUM = new DoubleSum();
   public static final DoubleFunction PRODUCT = new DoubleProduct();
+  public static final DoubleFunction FIRST = new DoubleFirst();
   public static final DoubleFunction LAST = new DoubleLast();
   public static final DoubleFunction MIN = new DoubleMin();
   public static final DoubleFunction MAX = new DoubleMax();
@@ -348,6 +350,20 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     if(this.size() != 1)
       throw new IllegalStateException("Series must contain exactly one element");
     return this.values[0];
+  }
+
+  /**
+   * Returns the contents of the series wrapped as list.
+   *
+   * @return list of series elements
+   */
+  public List<Double> toList() {
+    Double[] values = new Double[this.values.length];
+    for(int i=0; i<this.values.length; i++) {
+      if(!this.isNull(i))
+        values[i] = this.values[i];
+    }
+    return Arrays.asList(values);
   }
 
   /**

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import org.apache.commons.lang.ArrayUtils;
 
 
 /**
@@ -312,6 +313,20 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     if(this.size() != 1)
       throw new IllegalStateException("Series must contain exactly one element");
     return isTrue(this.values[0]);
+  }
+
+  /**
+   * Returns the contents of the series wrapped as list.
+   *
+   * @return list of series elements
+   */
+  public List<Boolean> toList() {
+    Boolean[] values = new Boolean[this.values.length];
+    for(int i=0; i<this.values.length; i++) {
+      if(!this.isNull(i))
+        values[i] = booleanValueOf(this.values[i]);
+    }
+    return Arrays.asList(values);
   }
 
   /**
