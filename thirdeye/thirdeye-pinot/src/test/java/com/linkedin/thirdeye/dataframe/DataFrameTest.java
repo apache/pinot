@@ -1423,6 +1423,69 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testAddSeriesFromDataFrame() {
+    DataFrame dfLeft = new DataFrame(6)
+        .addSeries("one", 5, 4, 3, 2, 1, 0);
+    DataFrame dfRight = new DataFrame(5)
+        .addSeries("two", 11, 12, 13, 14, 15)
+        .addSeries("three", 22, 23, 24, 25, 26)
+        .addSeries("four", 1, 1, 1, 1, 1);
+
+    dfLeft.addSeries(dfRight, "two", "three");
+
+    assertEquals(dfLeft.getLongs("two"), 11, 12, 13, 14, 15, LNULL);
+    assertEquals(dfLeft.getLongs("three"), 22, 23, 24, 25, 26, LNULL);
+    Assert.assertTrue(dfLeft.contains("one"));
+    Assert.assertTrue(!dfLeft.contains("four"));
+  }
+
+  @Test
+  public void testAddSeriesFromDataFrameFast() {
+    DataFrame dfLeft = new DataFrame(5)
+        .addSeries("one", 5, 4, 3, 2, 1);
+    DataFrame dfRight = new DataFrame(5)
+        .addSeries("two", 11, 12, 13, 14, 15);
+
+    Assert.assertEquals(dfLeft.getIndex(), dfRight.getIndex());
+
+    dfLeft.addSeries(dfRight);
+
+    assertEquals(dfLeft.getLongs("two"), 11, 12, 13, 14, 15);
+    Assert.assertTrue(dfLeft.contains("one"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testAddSeriesFromDataFrameFailIndexSource() {
+    DataFrame dfLeft = new DataFrame(5);
+    DataFrame dfRight = new DataFrame();
+    dfLeft.addSeries(dfRight);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testAddSeriesFromDataFrameFailIndexDestination() {
+    DataFrame dfLeft = new DataFrame();
+    DataFrame dfRight = new DataFrame(5);
+    dfLeft.addSeries(dfRight);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testAddSeriesFromDataFrameFailMissingSeries() {
+    DataFrame dfLeft = new DataFrame(5);
+    DataFrame dfRight = new DataFrame(5);
+    dfLeft.addSeries(dfRight, "missing");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testAddSeriesFromDataFrameFailNonUniqueMapping() {
+    DataFrame dfLeft = new DataFrame(3)
+        .addSeries("one", 1, 2, 3);
+    DataFrame dfRight = new DataFrame(1, 1, 3)
+        .addSeries("two", 10, 11, 12);
+
+    dfLeft.addSeries(dfRight);
+  }
+
+  @Test
   public void testBooleanHasTrueFalseNull() {
     BooleanSeries s1 = DataFrame.toSeries(new boolean[0]);
     Assert.assertFalse(s1.hasFalse());

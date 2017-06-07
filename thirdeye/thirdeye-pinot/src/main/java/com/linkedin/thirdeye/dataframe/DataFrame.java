@@ -15,7 +15,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -642,6 +641,69 @@ public class DataFrame {
    */
   public DataFrame addSeries(String seriesName, boolean... values) {
     return addSeries(seriesName, DataFrame.toSeries(values));
+  }
+
+  /**
+   * Adds new series to the DataFrame in-place. The series are copied from a source DataFrame
+   * and aligned based on the indexes. If the indexes match, the series are copied directly.
+   * Otherwise, the method performs a left join to align series from the source with the
+   * destination's (this) index.
+   *
+   * @param source source DataFrame
+   * @param seriesNames series names
+   * @return reference to modified DataFrame (this)
+   * @throws IllegalArgumentException if one of the series names does not exist, any DataFrame's
+   * index is missing, or the left-join generates a non-unique mapping between source and
+   * destination indexes
+   */
+  public DataFrame addSeries(DataFrame source, String... seriesNames) {
+    for(String name : seriesNames)
+      if(!source.contains(name))
+        throw new IllegalArgumentException(String.format("Source does not contain series '%s'", name));
+    if(!this.hasIndex())
+      throw new IllegalArgumentException("Destination DataFrame does not have an index");
+    if(!source.hasIndex())
+      throw new IllegalArgumentException("Source DataFrame does not have an index");
+    if(seriesNames.length <= 0)
+      return this;
+
+    // fast - if indexes match
+    if(this.getIndex().equals(source.getIndex())) {
+      for(String name : seriesNames)
+        addSeries(name, source.get(name));
+      return this;
+    }
+
+    // left join - on minimal structure
+    DataFrame dfLeft = new DataFrame(this.getIndex());
+    DataFrame dfRight = new DataFrame(source.getIndex());
+    for(String name : seriesNames)
+      dfRight.addSeries(name, source.get(name));
+
+    DataFrame joined = dfLeft.joinLeft(dfRight);
+    if(joined.size() != this.size())
+      throw new IllegalArgumentException("Non-unique mapping between source and destination indexes");
+
+    for(String name : seriesNames)
+      addSeries(name, joined.get(name));
+
+    return this;
+  }
+
+  /**
+   * Adds new series to the DataFrame in-place. All series from the source DataFrame (excluding
+   * the index) are added to the destination (this) with {@code addSeries(DataFrame source, String... seriesNames)}
+   * semantics.
+   *
+   * @see DataFrame#addSeries(DataFrame source, String... seriesNames)
+   *
+   * @param source source DataFrame
+   * @return reference to modified DataFrame (this)
+   */
+  public DataFrame addSeries(DataFrame source) {
+    Collection<String> seriesNames = new HashSet<>(source.getSeriesNames());
+    seriesNames.remove(source.getIndexName());
+    return this.addSeries(source, seriesNames.toArray(new String[seriesNames.size()]));
   }
 
   /**
