@@ -96,7 +96,7 @@ public class TaskDriver {
         }
       };
       taskExecutorService.submit(callable);
-      LOG.info(Thread.currentThread().getId() + " : Started task driver");
+      LOG.info("Thread {} : Started task driver", Thread.currentThread().getId());
     }
   }
 
