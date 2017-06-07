@@ -258,7 +258,7 @@ public class AnomalyMergeExecutor implements Runnable {
     anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec)
         .fetchTimeSeriesDataByDimension(anomalyResultStart, anomalyResultEnd, dimensions, false)
         .fetchExistingMergedAnomaliesByDimension(anomalyResultStart, anomalyResultEnd, dimensions)
-        .fetchSaclingFactors(anomalyResultStart, anomalyResultEnd);
+        .fetchScalingFactors(anomalyResultStart, anomalyResultEnd);
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();
     MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 

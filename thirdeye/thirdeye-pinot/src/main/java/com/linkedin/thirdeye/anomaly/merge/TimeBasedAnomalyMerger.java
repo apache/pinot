@@ -250,7 +250,7 @@ public class TimeBasedAnomalyMerger {
         new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
     anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec)
         .fetchTimeSeriesDataByDimension(windowStart, windowEnd, dimensions, false)
-        .fetchSaclingFactors(windowStart, windowEnd)
+        .fetchScalingFactors(windowStart, windowEnd)
         .fetchExistingMergedAnomaliesByDimension(windowStart, windowEnd, dimensions);
     if (anomalyFunctionSpec.isToCalculateGlobalMetric()) {
       anomalyDetectionInputContextBuilder.fetchTimeSeriesGlobalMetric(windowStart, windowEnd);

@@ -795,7 +795,7 @@ public class AnomalyResource {
           new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
       anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec)
           .fetchTimeSeriesDataByDimension(viewWindowStart, viewWindowEnd, dimensions, false)
-          .fetchSaclingFactors(viewWindowStart, viewWindowEnd)
+          .fetchScalingFactors(viewWindowStart, viewWindowEnd)
           .fetchExistingMergedAnomalies(viewWindowStart, viewWindowEnd, false);
 
       AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
