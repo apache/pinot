@@ -564,18 +564,14 @@ public final class StringSeries extends TypedSeries<StringSeries> {
    * @see Series#aggregate(Function)
    */
   public static StringSeries aggregate(StringFunction function, Series series) {
-    if(series.hasNull())
-      return buildFrom(NULL);
-    return buildFrom(function.apply(series.getStrings().values));
+    return buildFrom(function.apply(series.dropNull().getStrings().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(StringConditional function, Series series) {
-    if(series.hasNull())
-      return BooleanSeries.buildFrom(BooleanSeries.NULL);
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.getStrings().values)).build();
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getStrings().values)).build();
   }
 
   public static boolean isNull(String value) {

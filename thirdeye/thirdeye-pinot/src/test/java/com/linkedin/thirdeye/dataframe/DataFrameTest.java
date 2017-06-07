@@ -754,7 +754,7 @@ public class DataFrameTest {
   @Test
   public void testDoubleAggregateWithNull() {
     DoubleSeries s = DataFrame.toSeries(1.0, 2.0, DNULL, 4.0);
-    Assert.assertEquals(s.sum(), DNULL);
+    Assert.assertEquals(s.sum(), 7.0);
     Assert.assertEquals(s.fillNull().sum(), 7.0);
     Assert.assertEquals(s.dropNull().sum(), 7.0);
   }
@@ -762,7 +762,7 @@ public class DataFrameTest {
   @Test
   public void testLongAggregateWithNull() {
     LongSeries s = DataFrame.toSeries(1, 2, LNULL, 4);
-    Assert.assertEquals(s.sum(), LNULL);
+    Assert.assertEquals(s.sum(), 7);
     Assert.assertEquals(s.fillNull().sum(), 7);
     Assert.assertEquals(s.dropNull().sum(), 7);
   }
@@ -770,7 +770,7 @@ public class DataFrameTest {
   @Test
   public void testStringAggregateWithNull() {
     StringSeries s = DataFrame.toSeries("a", "b", SNULL, "d");
-    Assert.assertEquals(s.join(), SNULL);
+    Assert.assertEquals(s.join(), "abd");
     Assert.assertEquals(s.fillNull().join(), "abd");
     Assert.assertEquals(s.dropNull().join(), "abd");
   }
@@ -778,7 +778,7 @@ public class DataFrameTest {
   @Test
   public void testBooleanAggregateWithNull() {
     BooleanSeries s = DataFrame.toSeries(TRUE, FALSE, BNULL, TRUE);
-    Assert.assertEquals(s.aggregate(BooleanSeries.HAS_TRUE).value(), BNULL);
+    Assert.assertEquals(s.aggregate(BooleanSeries.HAS_TRUE).value(), TRUE);
     Assert.assertEquals(s.fillNull().aggregate(BooleanSeries.HAS_TRUE).value(), 1);
     Assert.assertEquals(s.dropNull().aggregate(BooleanSeries.HAS_TRUE).value(), 1);
   }
@@ -1531,8 +1531,8 @@ public class DataFrameTest {
     Assert.assertFalse(s4.hasNull());
 
     BooleanSeries s5 = DataFrame.toSeries(TRUE, FALSE, BNULL);
-    Assert.assertFalse(s5.hasFalse());
-    Assert.assertFalse(s5.hasTrue());
+    Assert.assertTrue(s5.hasFalse());
+    Assert.assertTrue(s5.hasTrue());
     Assert.assertTrue(s5.hasNull());
   }
 
@@ -1556,10 +1556,10 @@ public class DataFrameTest {
 
     BooleanSeries s5 = DataFrame.toSeries(TRUE, TRUE, BNULL);
     Assert.assertFalse(s5.allFalse());
-    Assert.assertFalse(s5.allTrue());
+    Assert.assertTrue(s5.allTrue());
 
     BooleanSeries s6 = DataFrame.toSeries(FALSE, FALSE, BNULL);
-    Assert.assertFalse(s6.allFalse());
+    Assert.assertTrue(s6.allFalse());
     Assert.assertFalse(s6.allTrue());
 
     BooleanSeries s7 = DataFrame.toSeries(TRUE, FALSE, BNULL);
