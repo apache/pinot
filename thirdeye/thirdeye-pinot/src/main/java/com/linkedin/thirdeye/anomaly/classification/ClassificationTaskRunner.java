@@ -35,6 +35,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
@@ -54,6 +55,8 @@ public class ClassificationTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(ClassificationTaskRunner.class);
   private static final MergeAnomalyEndTimeComparator MERGE_ANOMALY_END_TIME_COMPARATOR =
       new MergeAnomalyEndTimeComparator();
+  private static final String ISSUE_TYPE_KEY = "issue_type";
+
   private AnomalyFunctionManager anomalyFunctionDAO = DAORegistry.getInstance().getAnomalyFunctionDAO();
   private MergedAnomalyResultManager mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
   private ClassificationConfigManager classificationConfigDAO = DAORegistry.getInstance().getClassificationConfigDAO();
@@ -168,8 +171,8 @@ public class ClassificationTaskRunner implements TaskRunner {
 
       }
 
-      Map<Long, List<MergedAnomalyResultDTO>> functionIdToAnomalyResult = new HashMap<>();
-      functionIdToAnomalyResult.put(classificationConfig.getMainFunctionId(), mainAnomaliesByDimension);
+      Map<String, List<MergedAnomalyResultDTO>> functionIdToAnomalyResult = new HashMap<>();
+
       // Get the anomalies from other anomaly function that are activated
       for (Long functionId : functionIds) {
         AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionSpecMap.get(functionId);
@@ -195,19 +198,75 @@ public class ClassificationTaskRunner implements TaskRunner {
         List<MergedAnomalyResultDTO> filteredAnomalies = filterAnomalies(alertFilter, anomalies);
         if (CollectionUtils.isNotEmpty(filteredAnomalies)) {
           Collections.sort(filteredAnomalies, MERGE_ANOMALY_END_TIME_COMPARATOR);
-          functionIdToAnomalyResult.put(functionId, filteredAnomalies);
+          functionIdToAnomalyResult.put(anomalyFunctionDTO.getMetric(), filteredAnomalies);
         }
       }
 
-      // Invoke classification logic for this dimension
-      Map<String, String> classifierConfig = classificationConfig.getClassifierConfig();
-      AnomalyClassifier anomalyClassifier = anomalyClassifierFactory.fromSpec(classifierConfig);
-      List<MergedAnomalyResultDTO> updatedAnomalyResults =
-          anomalyClassifier.classify(classificationConfig, anomalyFunctionSpecMap, functionIdToAnomalyResult);
-      updatedMainAnomaliesByDimension.addAll(updatedAnomalyResults);
+      // Invoke classification logic for each main anomaly of this dimension
+      for (MergedAnomalyResultDTO mainAnomalyResult : mainAnomaliesByDimension) {
+        // Initiate classifier
+        Map<String, String> classifierConfig = new HashMap<>(classificationConfig.getClassifierConfig());
+        AnomalyClassifier anomalyClassifier = anomalyClassifierFactory.fromSpec(classifierConfig);
+        anomalyClassifier.setParameters(classifierConfig);
+        // Construct map of metric name to auxiliary anomalies
+        Map<String, List<MergedAnomalyResultDTO>> auxiliaryAnomalies = new HashMap<>();
+        for (Map.Entry<String, List<MergedAnomalyResultDTO>> metricName2AuxAnomalyList : functionIdToAnomalyResult
+            .entrySet()) {
+          List<MergedAnomalyResultDTO> overlappedAuxAnomalies = new ArrayList<>();
+          for (MergedAnomalyResultDTO auxAnomalyResult : metricName2AuxAnomalyList.getValue()) {
+            if (auxAnomalyResult.getEndTime() > mainAnomalyResult.getStartTime()
+                && auxAnomalyResult.getStartTime() < mainAnomalyResult.getEndTime()) {
+              overlappedAuxAnomalies.add(auxAnomalyResult);
+            }
+          }
+          String metricName = metricName2AuxAnomalyList.getKey();
+          if (auxiliaryAnomalies.containsKey(metricName)) {
+            List<MergedAnomalyResultDTO> existingOverlappedAuxAnomalies = auxiliaryAnomalies.get(metricName);
+            existingOverlappedAuxAnomalies.addAll(overlappedAuxAnomalies);
+          } else {
+            auxiliaryAnomalies.put(metricName, overlappedAuxAnomalies);
+          }
+        }
+        // Get and update issue type for the current main anomalies
+        String issueType = anomalyClassifier.classify(mainAnomalyResult, auxiliaryAnomalies);
+        if (updateIssueTypeForAnomalyResult(mainAnomalyResult, issueType)) {
+          updatedMainAnomaliesByDimension.add(mainAnomalyResult);
+        }
+      }
     }
 
     return updatedMainAnomaliesByDimension;
+  }
+
+  /**
+   * Adds or updates the issue type to the property field of the given anomaly. If the given issue type is null, then
+   * no addition or update is performed.
+   *
+   * @param mainAnomaly the anomaly to be updated.
+   * @param issueType   the issue type to be added or updated to the given anomaly. If the given issue type is null,
+   *                    then no addition or update is performed.
+   *
+   * @return if the issue type is added/updated successfully, i.e., if the anomaly should be written back to DB.
+   */
+  private boolean updateIssueTypeForAnomalyResult(MergedAnomalyResultDTO mainAnomaly, String issueType) {
+    if (mainAnomaly == null || issueType == null) {
+      return false;
+    }
+
+    Map<String, String> anomalyProperties = mainAnomaly.getProperties();
+    if (anomalyProperties == null) {
+      anomalyProperties = new HashMap<>();
+      mainAnomaly.setProperties(anomalyProperties);
+    }
+    String originalIssueType = null;
+    if (anomalyProperties.containsKey(ISSUE_TYPE_KEY)) {
+      originalIssueType = anomalyProperties.get(ISSUE_TYPE_KEY);
+    }
+    if (!Objects.equals(issueType, originalIssueType)) {
+      anomalyProperties.put(ISSUE_TYPE_KEY, issueType);
+      return true;
+    }
+    return false;
   }
 
   /**

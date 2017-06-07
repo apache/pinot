@@ -1,9 +1,6 @@
 package com.linkedin.thirdeye.anomaly.classification.classifier;
 
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -14,8 +11,7 @@ public class DummyAnomalyClassifier extends BaseAnomalyClassifier {
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> classify(ClassificationConfigDTO classificationConfig,
-      Map<Long, AnomalyFunctionDTO> anomalyFunctionSpecMap, Map<Long, List<MergedAnomalyResultDTO>> anomalies) {
-    return Collections.emptyList();
+  public String classify(MergedAnomalyResultDTO mainAnomaly, Map<String, List<MergedAnomalyResultDTO>> auxAnomalies) {
+    return null;
   }
 }
