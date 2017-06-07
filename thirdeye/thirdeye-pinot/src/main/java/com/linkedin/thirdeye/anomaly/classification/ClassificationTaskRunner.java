@@ -229,8 +229,7 @@ public class ClassificationTaskRunner implements TaskRunner {
         }
         // Get and update issue type for the current main anomalies
         String issueType = anomalyClassifier.classify(mainAnomalyResult, auxiliaryAnomalies);
-        boolean updated = updateIssueTypeForAnomalyResult(mainAnomalyResult, issueType);
-        if (updated) {
+        if (updateIssueTypeForAnomalyResult(mainAnomalyResult, issueType)) {
           updatedMainAnomaliesByDimension.add(mainAnomalyResult);
         }
       }
@@ -254,7 +253,6 @@ public class ClassificationTaskRunner implements TaskRunner {
       return false;
     }
 
-    boolean updated = false;
     Map<String, String> anomalyProperties = mainAnomaly.getProperties();
     if (anomalyProperties == null) {
       anomalyProperties = new HashMap<>();
@@ -266,9 +264,9 @@ public class ClassificationTaskRunner implements TaskRunner {
     }
     if (!Objects.equals(issueType, originalIssueType)) {
       anomalyProperties.put(ISSUE_TYPE_KEY, issueType);
-      updated = true;
+      return true;
     }
-    return updated;
+    return false;
   }
 
   /**
