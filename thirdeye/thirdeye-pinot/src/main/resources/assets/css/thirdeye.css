@@ -1169,7 +1169,6 @@ text {
    display: none;
 }
 
-.rootcause__details {
-  max-width: 600px;
-  word-wrap: break-word;
+.rootcause__table {
+  width: 100%;
 }
