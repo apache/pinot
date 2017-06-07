@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.anomaly.classification.classifier;
 
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.List;
 import java.util.Map;
@@ -15,14 +13,14 @@ public interface AnomalyClassifier {
   void setParameters(Map<String, String> props);
 
   /**
-   * Returns a list of main anomalies that have issue type updated.
+   * Given a main anomaly and lists of auxiliary anomalies, which could be retrieve through its corresponding metric
+   * name, this method returns the issue type for the main anomaly. The issue type will be stored in the property field
+   * of anomalies.
    *
-   * @param classificationConfig the configuration of the current classification job that triggers this method.
-   * @param anomalyFunctionSpecMap the anomaly function of the main and correlated anomalies.
-   * @param anomalies the collection of main and correlated anomalies for this classification task.
+   * @param mainAnomaly the main anomaly for which the issue typed is determined.
+   * @param auxAnomalies   the auxiliary anomalies for determining the issue type of the main anomaly.
    *
-   * @return a list of main anomalies that have issue type updated.
+   * @return the issue type to be stored in the property field of the anomaly. Return null to do no-op.
    */
-  List<MergedAnomalyResultDTO> classify(ClassificationConfigDTO classificationConfig,
-      Map<Long, AnomalyFunctionDTO> anomalyFunctionSpecMap, Map<Long, List<MergedAnomalyResultDTO>> anomalies);
+  String classify(MergedAnomalyResultDTO mainAnomaly, Map<String, List<MergedAnomalyResultDTO>> auxAnomalies);
 }
