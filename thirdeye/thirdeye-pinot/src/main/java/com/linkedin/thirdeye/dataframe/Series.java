@@ -214,7 +214,7 @@ public abstract class Series {
      * @param function aggregation function to map to each grouped series
      * @return grouped aggregation series
      */
-    public DataFrame aggregate(Function function) {
+    public GroupingDataFrame aggregate(Function function) {
       Builder builder = this.source.getBuilder();
       for(Bucket b : this.buckets) {
         builder.addSeries(this.source.project(b.fromIndex).aggregate(function));
@@ -228,19 +228,52 @@ public abstract class Series {
      *
      * @return grouped aggregation series
      */
-    public DataFrame count() {
-      LongSeries.Builder builder = LongSeries.builder();
+    public GroupingDataFrame count() {
+      long[] values = new long[this.buckets.size()];
+      int i = 0;
       for(Bucket b : this.buckets) {
-        builder.addValues(b.size());
+        values[i++] = b.size();
       }
-      return makeAggregate(this.keys, builder.build());
+      return makeAggregate(this.keys, LongSeries.buildFrom(values));
     }
 
-    static DataFrame makeAggregate(Series keys, Series values) {
-      DataFrame df = new DataFrame();
-      df.addSeries(GROUP_KEY, keys);
-      df.addSeries(GROUP_VALUE, values);
-      return df;
+    static GroupingDataFrame makeAggregate(Series keys, Series values) {
+      return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, keys, values);
+    }
+  }
+
+  /**
+   * GroupingDataFrame holds the result of a series aggregation after grouping. It functions like
+   * a regular DataFrame, but provides additional comfort for accessing key and value columns.
+   *
+   * @see DataFrame
+   */
+  public static final class GroupingDataFrame extends DataFrame {
+    final String keyName;
+    final String valueName;
+
+    GroupingDataFrame(String keyName, String valueName, Series keys, Series values) {
+      this.keyName = keyName;
+      this.valueName = valueName;
+      this.addSeries(keyName, keys);
+      this.addSeries(valueName, values);
+      this.setIndex(keyName);
+    }
+
+    public Series getKeys() {
+      return this.get(this.keyName);
+    }
+
+    public Series getValues() {
+      return this.get(this.valueName);
+    }
+
+    public String getKeyName() {
+      return this.keyName;
+    }
+
+    public String getValueName() {
+      return this.valueName;
     }
   }
 
@@ -989,19 +1022,26 @@ public abstract class Series {
    * @return grouping by element count
    */
   public final SeriesGrouping groupByCount(int bucketSize) {
+    return groupByCount(this.size(), bucketSize).applyTo(this);
+  }
+
+  /**
+   * @see Series#groupByCount(int)
+   */
+  static final SeriesGrouping groupByCount(int size, int bucketSize) {
     if(bucketSize <= 0)
       throw new IllegalArgumentException("bucketSize must be greater than 0");
-    if(this.isEmpty())
-      return new SeriesGrouping(this);
+    if(size <= 0)
+      return new SeriesGrouping(null);
 
-    bucketSize = Math.min(bucketSize, this.size());
+    bucketSize = Math.min(bucketSize, size);
 
-    int numBuckets = (this.size() - 1) / bucketSize + 1;
+    int numBuckets = (size - 1) / bucketSize + 1;
     long[] keys = new long[numBuckets];
     List<Bucket> buckets = new ArrayList<>();
     for(int i=0; i<numBuckets; i++) {
       int from = i*bucketSize;
-      int to = Math.min((i+1)*bucketSize, this.size());
+      int to = Math.min((i+1)*bucketSize, size);
       int[] fromIndex = new int[to-from];
       for(int j=0; j<fromIndex.length; j++) {
         fromIndex[j] = j + from;
@@ -1009,7 +1049,7 @@ public abstract class Series {
       buckets.add(new Bucket(fromIndex));
       keys[i] = i;
     }
-    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
+    return new SeriesGrouping(DataFrame.toSeries(keys), null, buckets);
   }
 
   /**
@@ -1021,12 +1061,19 @@ public abstract class Series {
    * @return grouping by bucket count
    */
   public final SeriesGrouping groupByPartitions(int partitionCount) {
+    return groupByPartitions(this.size(), partitionCount).applyTo(this);
+  }
+
+  /**
+   * @see Series#groupByPartitions(int)
+   */
+  static final SeriesGrouping groupByPartitions(int size, int partitionCount) {
     if(partitionCount <= 0)
       throw new IllegalArgumentException("partitionCount must be greater than 0");
-    if(this.isEmpty())
-      return new SeriesGrouping(this);
+    if(size <= 0)
+      return new SeriesGrouping(null);
 
-    double perPartition = this.size() /  (double)partitionCount;
+    double perPartition = size /  (double)partitionCount;
 
     long[] keys = new long[partitionCount];
     List<Bucket> buckets = new ArrayList<>();
@@ -1040,11 +1087,11 @@ public abstract class Series {
       buckets.add(new Bucket(fromIndex));
       keys[i] = i;
     }
-    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
+    return new SeriesGrouping(DataFrame.toSeries(keys), null, buckets);
   }
 
   /**
-   * Returns an (overlapping) SeriesGrouping base on a moving window size. Elements are grouped
+   * Returns an (overlapping) SeriesGrouping based on a moving window size. Elements are grouped
    * into overlapping buckets in sequences of {@code windowSize} consecutive items. The number
    * of buckets is guaranteed to be equal to {@code series_size - moving_window_size + 1}, or
    * 0 if the window size is greater than the series size.
@@ -1053,12 +1100,19 @@ public abstract class Series {
    * @return grouping by moving window
    */
   public final SeriesGrouping groupByMovingWindow(int windowSize) {
+    return groupByMovingWindow(this.size(), windowSize).applyTo(this);
+  }
+
+  /**
+   * @see Series#groupByMovingWindow(int)
+   */
+  static final SeriesGrouping groupByMovingWindow(int size, int windowSize) {
     if(windowSize <= 0)
       throw new IllegalArgumentException("windowSize must be greater than 0");
-    if(this.size() < windowSize)
-      return new SeriesGrouping(this);
+    if(size < windowSize)
+      return new SeriesGrouping(null);
 
-    int windowCount = this.size() - windowSize + 1;
+    int windowCount = size - windowSize + 1;
     long[] keys = new long[windowCount];
     List<Bucket> buckets = new ArrayList<>();
     for(int i=0; i<windowCount; i++) {
@@ -1069,7 +1123,38 @@ public abstract class Series {
       }
       buckets.add(new Bucket(fromIndex));
     }
-    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
+    return new SeriesGrouping(DataFrame.toSeries(keys), null, buckets);
+  }
+
+  /**
+   * Returns an (overlapping) SeriesGrouping based on an expanding window. Elements are grouped
+   * into overlapping buckets in expanding sequences of consecutive items (always starting with
+   * index {@code 0}). The number of buckets is guaranteed to be equal to {@code series_size}.
+   *
+   * @return grouping by expanding window
+   */
+  public final SeriesGrouping groupByExpandingWindow() {
+    return groupByExpandingWindow(this.size()).applyTo(this);
+  }
+
+  /**
+   * @see Series#groupByExpandingWindow()
+   */
+  static final SeriesGrouping groupByExpandingWindow(int size) {
+    if(size <= 0)
+      return new SeriesGrouping(null);
+
+    long[] keys = new long[size];
+    List<Bucket> buckets = new ArrayList<>();
+    for(int i=0; i<size; i++) {
+      keys[i] = i;
+      int[] fromIndex = new int[i + 1];
+      for(int j=0; j<=i; j++) {
+        fromIndex[j] = j;
+      }
+      buckets.add(new Bucket(fromIndex));
+    }
+    return new SeriesGrouping(DataFrame.toSeries(keys), null, buckets);
   }
 
   /**

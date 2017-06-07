@@ -58,7 +58,6 @@ public class TimeSeriesResource {
       .getCollectionMaxDataTimeCache();
   private QueryCache queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
 
-
   @GET
   @Path("/compare/{metricId}/{currentStart}/{currentEnd}/{baselineStart}/{baselineEnd}")
   public TimeSeriesCompareMetricView getTimeseriesCompareData(

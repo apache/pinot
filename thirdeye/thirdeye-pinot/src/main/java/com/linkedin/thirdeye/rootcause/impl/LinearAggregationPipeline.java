@@ -85,7 +85,7 @@ public class LinearAggregationPipeline extends Pipeline {
     df.addSeries(URN, urns);
     df.addSeries(SCORE, scores);
 
-    DataFrame grp = df.groupBy(URN).aggregate(SCORE, DoubleSeries.SUM);
+    DataFrame grp = df.groupByValue(URN).aggregate(SCORE, DoubleSeries.SUM);
     grp = grp.sortedBy(SCORE).reverse();
 
     return new PipelineResult(context, toEntities(grp, URN, SCORE));

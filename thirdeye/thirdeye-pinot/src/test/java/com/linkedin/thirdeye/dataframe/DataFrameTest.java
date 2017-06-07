@@ -647,6 +647,29 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testLongGroupByExpandingWindow() {
+    LongSeries in = DataFrame.toSeries(3, 4, 5, 5);
+    Series.SeriesGrouping grouping = in.groupByExpandingWindow();
+
+    Assert.assertEquals(grouping.size(), 4);
+    Assert.assertEquals(grouping.buckets.get(0).fromIndex, new int[] { 0 });
+    Assert.assertEquals(grouping.buckets.get(1).fromIndex, new int[] { 0, 1 });
+    Assert.assertEquals(grouping.buckets.get(2).fromIndex, new int[] { 0, 1, 2 });
+    Assert.assertEquals(grouping.buckets.get(3).fromIndex, new int[] { 0, 1, 2, 3 });
+  }
+
+  @Test
+  public void testLongGroupByExpandingWindowAggregation() {
+    LongSeries in = DataFrame.toSeries(3, 4, 5, 5);
+    Series.SeriesGrouping grouping = in.groupByExpandingWindow();
+    DataFrame out = grouping.aggregate(LongSeries.SUM);
+
+    Assert.assertEquals(out.size(), 4);
+    assertEquals(out.getLongs(Series.GROUP_KEY), 0, 1, 2, 3);
+    assertEquals(out.getLongs(Series.GROUP_VALUE), 3, 7, 12, 17);
+  }
+
+  @Test
   public void testBooleanGroupByValueEmpty() {
     Assert.assertTrue(DataFrame.toSeries(new boolean[0]).groupByValue().isEmpty());
   }
@@ -762,7 +785,7 @@ public class DataFrameTest {
 
   @Test
   public void testDataFrameGroupBy() {
-    DataFrame.DataFrameGrouping grouping = df.groupBy("boolean");
+    DataFrame.DataFrameGrouping grouping = df.groupByValue("boolean");
     DoubleSeries ds = grouping.aggregate("double", new DoubleSeries.DoubleSum()).getDoubles("double");
     assertEquals(ds, 0.0, -0.4);
 
