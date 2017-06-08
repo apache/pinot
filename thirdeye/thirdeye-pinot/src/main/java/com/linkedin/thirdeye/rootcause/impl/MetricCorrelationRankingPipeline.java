@@ -309,7 +309,6 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         .setStartTimeInclusive(t.getStart())
         .setEndTimeExclusive(t.getEnd())
         .setMetricFunctions(functions)
-        .setGroupBy(dataset.getTimeColumn())
         .setGroupByTimeGranularity(dataset.bucketTimeGranularity())
         .setDataSource(dataset.getDataSource())
         .build(reference);
