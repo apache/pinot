@@ -99,11 +99,12 @@ public class DataFrame {
       return new Series.SeriesGrouping(this.keys, this.source.get(seriesName), this.buckets);
     }
 
-    public DataFrame aggregate(String seriesName, Series.Function function) {
-      return this.get(seriesName).aggregate(function)
-          .renameSeries(Series.GROUP_KEY, this.keyName)
-          .renameSeries(Series.GROUP_VALUE, seriesName)
-          .setIndex(this.keyName);
+    public Series.GroupingDataFrame count() {
+      return new Series.SeriesGrouping(this.keys, null, this.buckets).count();
+    }
+
+    public Series.GroupingDataFrame aggregate(String seriesName, Series.Function function) {
+      return new Series.GroupingDataFrame(this.keyName, seriesName, this.keys, this.get(seriesName).aggregate(function).getValues());
     }
   }
 
@@ -1276,7 +1277,7 @@ public class DataFrame {
    * @param labels grouping labels
    * @return DataFrameGrouping
    */
-  public DataFrameGrouping groupBy(Series labels) {
+  public DataFrameGrouping groupByValue(Series labels) {
     Series.SeriesGrouping grouping = labels.groupByValue();
     return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
   }
@@ -1288,9 +1289,60 @@ public class DataFrame {
    * @param seriesName series containing grouping labels
    * @return DataFrameGrouping
    */
-  public DataFrameGrouping groupBy(String seriesName) {
+  public DataFrameGrouping groupByValue(String seriesName) {
     Series.SeriesGrouping grouping = this.get(seriesName).groupByValue();
     return new DataFrameGrouping(seriesName, grouping.keys(), this, grouping.buckets);
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on items counts.
+   *
+   * @see Series#groupByCount(int)
+   *
+   * @param count item count
+   * @return DataFrameGrouping
+   */
+  public DataFrameGrouping groupByCount(int count) {
+    Series.SeriesGrouping grouping = Series.groupByCount(this.size(), count);
+    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on partition counts.
+   *
+   * @see Series#groupByPartitions(int)
+   *
+   * @param partitionCount item count
+   * @return DataFrameGrouping
+   */
+  public DataFrameGrouping groupByPartitions(int partitionCount) {
+    Series.SeriesGrouping grouping = Series.groupByPartitions(this.size(), partitionCount);
+    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on a moving window.
+   *
+   * @see Series#groupByMovingWindow(int)
+   *
+   * @param windowSize moving window size
+   * @return DataFrameGrouping
+   */
+  public DataFrameGrouping groupByMovingWindow(int windowSize) {
+    Series.SeriesGrouping grouping = Series.groupByMovingWindow(this.size(), windowSize);
+    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on an expanding window.
+   *
+   * @see Series#groupByExpandingWindow()
+   *
+   * @return DataFrameGrouping
+   */
+  public DataFrameGrouping groupByExpandingWindow() {
+    Series.SeriesGrouping grouping = Series.groupByExpandingWindow(this.size());
+    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
   }
 
   /**
@@ -1331,15 +1383,45 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame with series {@code seriesName} replacing {@code null}
+   * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
    * values with its native default value.
    *
-   * @param seriesName
-   * @return
+   * @param seriesNames series name
+   * @return DataFrame copy with filled nulls
    */
-  public DataFrame fillNull(String seriesName) {
+  public DataFrame fillNull(String... seriesNames) {
     DataFrame df = new DataFrame(this);
-    return df.addSeries(seriesName, assertSeriesExists(seriesName).fillNull());
+    for(String name : seriesNames)
+      df.addSeries(name, assertSeriesExists(name).fillNull());
+    return df;
+  }
+
+  /**
+   * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
+   * values via forward fill.
+   *
+   * @param seriesNames series name
+   * @return DataFrame copy with filled nulls
+   */
+  public DataFrame fillNullForward(String... seriesNames) {
+    DataFrame df = new DataFrame(this);
+    for(String name : seriesNames)
+      df.addSeries(name, assertSeriesExists(name).fillNullForward());
+    return df;
+  }
+
+  /**
+   * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
+   * values via back fill.
+   *
+   * @param seriesNames series name
+   * @return DataFrame copy with filled nulls
+   */
+  public DataFrame fillNullBackward(String... seriesNames) {
+    DataFrame df = new DataFrame(this);
+    for(String name : seriesNames)
+      df.addSeries(name, assertSeriesExists(name).fillNullBackward());
+    return df;
   }
 
   /* **************************************************************************

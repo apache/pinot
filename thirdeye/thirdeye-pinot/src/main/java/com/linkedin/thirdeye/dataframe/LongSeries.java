@@ -687,18 +687,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
    * @see Series#aggregate(Function)
    */
   public static LongSeries aggregate(LongFunction function, Series series) {
-    if(series.hasNull())
-      return buildFrom(NULL);
-    return buildFrom(function.apply(series.getLongs().values));
+    return buildFrom(function.apply(series.dropNull().getLongs().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(LongConditional function, Series series) {
-    if(series.hasNull())
-      return BooleanSeries.buildFrom(BooleanSeries.NULL);
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.getLongs().values)).build();
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getLongs().values)).build();
   }
 
   public static long valueOf(Long value) {

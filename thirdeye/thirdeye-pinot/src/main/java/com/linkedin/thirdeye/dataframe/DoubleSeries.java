@@ -803,18 +803,14 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
    * @see Series#aggregate(Function)
    */
   public static DoubleSeries aggregate(DoubleFunction function, Series series) {
-    if(series.hasNull())
-      return buildFrom(NULL);
-    return buildFrom(function.apply(series.getDoubles().values));
+    return buildFrom(function.apply(series.dropNull().getDoubles().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(DoubleConditional function, Series series) {
-    if(series.hasNull())
-      return BooleanSeries.buildFrom(BooleanSeries.NULL);
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.getDoubles().values)).build();
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getDoubles().values)).build();
   }
 
   public static double corr(Series a, Series b) {

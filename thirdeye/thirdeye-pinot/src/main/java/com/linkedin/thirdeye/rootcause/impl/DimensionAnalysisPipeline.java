@@ -179,7 +179,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
       }
     }, KEY, DIMENSION, VALUE);
 
-    DataFrame.DataFrameGrouping grouping = dfScore.groupBy(KEY);
+    DataFrame.DataFrameGrouping grouping = dfScore.groupByValue(KEY);
     DataFrame sumCost = grouping.aggregate(COST, DoubleSeries.SUM).fillNull(COST);
     DataFrame dimension = grouping.aggregate(DIMENSION, StringSeries.FIRST);
     DataFrame value = grouping.aggregate(VALUE, StringSeries.FIRST);

@@ -830,27 +830,21 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(BooleanFunction function, Series series) {
-    if(series.hasNull())
-      return buildFrom(NULL);
-    return builder().addBooleanValues(function.apply(series.getBooleans().valuesBoolean())).build();
+    return builder().addBooleanValues(function.apply(series.dropNull().getBooleans().valuesBoolean())).build();
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(BooleanFunctionEx function, Series series) {
-    if(series.hasNull())
-      return buildFrom(NULL);
-    return builder().addValues(function.apply(series.getBooleans().values())).build();
+    return builder().addValues(function.apply(series.dropNull().getBooleans().values())).build();
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(BooleanConditional function, Series series) {
-    if(series.hasNull())
-      return buildFrom(NULL);
-    return builder().addBooleanValues(function.apply(series.getBooleans().valuesBoolean())).build();
+    return builder().addBooleanValues(function.apply(series.dropNull().getBooleans().valuesBoolean())).build();
   }
 
   public static boolean isNull(byte value) {
