@@ -38,10 +38,19 @@ public class ModuloPartitionFunction implements PartitionFunction {
     _numPartitions = numPartitions;
   }
 
+  /**
+   * Returns partition id for a given value. Assumes that the passed in object
+   * is either an Integer, or a string representation of an Integer.
+   *
+   * @param value Value for which to determine the partition id.
+   * @return Partition id for the given value.
+   */
   @Override
   public int getPartition(Object value) {
     if (value instanceof Integer) {
       return ((Integer) value) % _numPartitions;
+    } else if (value instanceof String) {
+      return ((Integer.parseInt((String) value)) % _numPartitions);
     } else {
       throw new IllegalArgumentException(
           "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());

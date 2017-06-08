@@ -15,17 +15,8 @@
  */
 package com.linkedin.pinot.broker.broker;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.webapp.WebAppContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.servlet.PinotBrokerHealthCheckServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerRoutingTableDebugServlet;
@@ -55,6 +46,16 @@ import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.webapp.WebAppContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BrokerServerBuilder {
   private static final String TRANSPORT_CONFIG_PREFIX = "pinot.broker.transport";
@@ -64,6 +65,8 @@ public class BrokerServerBuilder {
   private static final String BROKER_DELAY_SHUTDOWN_TIME_CONFIG = "pinot.broker.delayShutdownTimeMs";
   private static final String PINOT_BROKER_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
   private static final String PINOT_BROKER_TABLE_LEVEL_METRICS_LIST = "pinot.broker.tablelevel.metrics.whitelist";
+  private static final String BROKER_SEGMENT_PRUNERS = "pinot.broker.segment.pruners";
+  private static final String[] DEFAULT_BROKER_SEGMENT_PRUNERS = {};
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
   // Connection Pool Related
@@ -162,12 +165,17 @@ public class BrokerServerBuilder {
     // Setup ScatterGather
     _scatterGather = new ScatterGatherImpl(_connPool, _requestSenderPool);
 
+    // Setup the broker pruner service
+    String[] prunerNames = _config.getStringArray(BROKER_SEGMENT_PRUNERS);
+    if (prunerNames == null) {
+      prunerNames = DEFAULT_BROKER_SEGMENT_PRUNERS;
+    }
+    SegmentZKMetadataPrunerService _brokerPrunerService = new SegmentZKMetadataPrunerService(prunerNames);
+
     // Setup Broker Request Handler
-
-
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
-        reduceServiceRegistry, _brokerMetrics, _config);
+        reduceServiceRegistry, _brokerPrunerService, _brokerMetrics, _config);
 
     LOGGER.info("Network initialized !!");
   }
