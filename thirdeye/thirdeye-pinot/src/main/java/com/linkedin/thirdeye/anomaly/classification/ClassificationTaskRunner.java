@@ -94,14 +94,17 @@ public class ClassificationTaskRunner implements TaskRunner {
   }
 
   private void runTask(long windowStart, long windowEnd) {
-    long mainFunctionId = classificationConfig.getMainFunctionId();
-    addAnomalyFunctionAndAlertConfig(mainFunctionId);
-    AlertFilter alertFilter = alertFilterMap.get(mainFunctionId);
-
-    // Get the anomalies from the main anomaly function
-    List<MergedAnomalyResultDTO> mainAnomalies =
-        mergedAnomalyDAO.findAllOverlapByFunctionId(mainFunctionId, windowStart, windowEnd, false);
-    List<MergedAnomalyResultDTO> filteredMainAnomalies = filterAnomalies(alertFilter, mainAnomalies);
+    List<MergedAnomalyResultDTO> filteredMainAnomalies = new ArrayList<>();
+    List<Long> mainFunctionIdList = classificationConfig.getMainFunctionIdList();
+    for (Long mainFunctionId : mainFunctionIdList) {
+      addAnomalyFunctionAndAlertConfig(mainFunctionId);
+      AlertFilter alertFilter = alertFilterMap.get(mainFunctionId);
+      // Get the anomalies from the main anomaly function
+      List<MergedAnomalyResultDTO> mainAnomalies =
+          mergedAnomalyDAO.findAllOverlapByFunctionId(mainFunctionId, windowStart, windowEnd, false);
+      filteredMainAnomalies.addAll(filterAnomalies(alertFilter, mainAnomalies));
+    }
+    // Run classification on each main anomaly that passes through alert filter
     if (CollectionUtils.isNotEmpty(filteredMainAnomalies)) {
       LOG.info("Classification config {} gets {} anomalies to identify issue type.", classificationConfig.getId(),
           filteredMainAnomalies.size());
@@ -151,9 +154,9 @@ public class ClassificationTaskRunner implements TaskRunner {
     }
 
     // Set up maps of function id to anomaly function config and alert filter
-    List<Long> functionIds = classificationConfig.getFunctionIdList();
-    for (Long functionId : functionIds) {
-      addAnomalyFunctionAndAlertConfig(functionId);
+    List<Long> auxFunctionIdList = classificationConfig.getAuxFunctionIdList();
+    for (Long auxFunctionId : auxFunctionIdList) {
+      addAnomalyFunctionAndAlertConfig(auxFunctionId);
     }
 
     // For each dimension, we get the anomalies from the correlated metric
@@ -168,37 +171,43 @@ public class ClassificationTaskRunner implements TaskRunner {
       for (MergedAnomalyResultDTO mainAnomaly : mainAnomaliesByDimension) {
         startTimeForCorrelatedAnomalies = Math.max(startTimeForCorrelatedAnomalies, mainAnomaly.getStartTime());
         endTimeForCorrelatedAnomalies = Math.min(endTimeForCorrelatedAnomalies, mainAnomaly.getEndTime());
-
       }
 
-      Map<String, List<MergedAnomalyResultDTO>> functionIdToAnomalyResult = new HashMap<>();
+      Map<String, List<MergedAnomalyResultDTO>> metricNameToAuxAnomalies = new HashMap<>();
 
       // Get the anomalies from other anomaly function that are activated
-      for (Long functionId : functionIds) {
-        AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionSpecMap.get(functionId);
-        AlertFilter alertFilter = alertFilterMap.get(functionId);
+      for (Long auxFunctionId : auxFunctionIdList) {
+        AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionSpecMap.get(auxFunctionId);
+        AlertFilter alertFilter = alertFilterMap.get(auxFunctionId);
         List<MergedAnomalyResultDTO> anomalies;
         if (anomalyFunctionDTO.getIsActive()) {
           // Get existing anomalies from DB
-          anomalies = mergedAnomalyDAO.findAllOverlapByFunctionIdDimensions(functionId, startTimeForCorrelatedAnomalies,
+          anomalies = mergedAnomalyDAO.findAllOverlapByFunctionIdDimensions(auxFunctionId, startTimeForCorrelatedAnomalies,
               endTimeForCorrelatedAnomalies, dimensionMap.toString(), false);
         } else {
-          LOG.info("Invoking ad-hoc anomaly detection for anomaly function {} at window ({}--{}).", functionId,
+          LOG.info("Invoking ad-hoc anomaly detection for anomaly function {} at window ({}--{}).", auxFunctionId,
               new DateTime(windowStart), new DateTime(windowEnd));
           // Trigger ad-hoc anomaly detection
           try {
-            anomalies = adhocAnomalyDetection(functionId, startTimeForCorrelatedAnomalies, endTimeForCorrelatedAnomalies,
-                dimensionMap);
+            anomalies = adhocAnomalyDetection(auxFunctionId, startTimeForCorrelatedAnomalies,
+                endTimeForCorrelatedAnomalies, dimensionMap);
           } catch (Exception e) {
             anomalies = Collections.emptyList();
-            LOG.warn("Failed to initiate detection context builder for anomaly function (id={}); Omitting anomalies from this function.", functionId, e);
+            LOG.warn(
+                "Failed to fetch data for the auxiliary anomaly function ({}); Omitting anomalies from this function.",
+                auxFunctionId, e);
           }
         }
         // Filter anomalies for current anomaly function
         List<MergedAnomalyResultDTO> filteredAnomalies = filterAnomalies(alertFilter, anomalies);
         if (CollectionUtils.isNotEmpty(filteredAnomalies)) {
           Collections.sort(filteredAnomalies, MERGE_ANOMALY_END_TIME_COMPARATOR);
-          functionIdToAnomalyResult.put(anomalyFunctionDTO.getMetric(), filteredAnomalies);
+          String metricName = anomalyFunctionDTO.getMetric();
+          if (metricNameToAuxAnomalies.containsKey(metricName)) {
+            metricNameToAuxAnomalies.get(metricName).addAll(filteredAnomalies);
+          } else {
+            metricNameToAuxAnomalies.put(metricName, filteredAnomalies);
+          }
         }
       }
 
@@ -208,27 +217,26 @@ public class ClassificationTaskRunner implements TaskRunner {
         Map<String, String> classifierConfig = new HashMap<>(classificationConfig.getClassifierConfig());
         AnomalyClassifier anomalyClassifier = anomalyClassifierFactory.fromSpec(classifierConfig);
         anomalyClassifier.setParameters(classifierConfig);
-        // Construct map of metric name to auxiliary anomalies
-        Map<String, List<MergedAnomalyResultDTO>> auxiliaryAnomalies = new HashMap<>();
-        for (Map.Entry<String, List<MergedAnomalyResultDTO>> metricName2AuxAnomalyList : functionIdToAnomalyResult
+        // Construct map of metric name to auxiliary anomalies that are overlapping with the current main anomaly
+        Map<String, List<MergedAnomalyResultDTO>> metricNameToOverlappingAuxAnomalies = new HashMap<>();
+        for (Map.Entry<String, List<MergedAnomalyResultDTO>> metricNameToAuxAnomaliesEntry : metricNameToAuxAnomalies
             .entrySet()) {
-          List<MergedAnomalyResultDTO> overlappedAuxAnomalies = new ArrayList<>();
-          for (MergedAnomalyResultDTO auxAnomalyResult : metricName2AuxAnomalyList.getValue()) {
+          List<MergedAnomalyResultDTO> overlappingAuxAnomalies = new ArrayList<>();
+          for (MergedAnomalyResultDTO auxAnomalyResult : metricNameToAuxAnomaliesEntry.getValue()) {
             if (auxAnomalyResult.getEndTime() > mainAnomalyResult.getStartTime()
                 && auxAnomalyResult.getStartTime() < mainAnomalyResult.getEndTime()) {
-              overlappedAuxAnomalies.add(auxAnomalyResult);
+              overlappingAuxAnomalies.add(auxAnomalyResult);
             }
           }
-          String metricName = metricName2AuxAnomalyList.getKey();
-          if (auxiliaryAnomalies.containsKey(metricName)) {
-            List<MergedAnomalyResultDTO> existingOverlappedAuxAnomalies = auxiliaryAnomalies.get(metricName);
-            existingOverlappedAuxAnomalies.addAll(overlappedAuxAnomalies);
+          String metricName = metricNameToAuxAnomaliesEntry.getKey();
+          if (metricNameToOverlappingAuxAnomalies.containsKey(metricName)) {
+            metricNameToOverlappingAuxAnomalies.get(metricName).addAll(overlappingAuxAnomalies);
           } else {
-            auxiliaryAnomalies.put(metricName, overlappedAuxAnomalies);
+            metricNameToOverlappingAuxAnomalies.put(metricName, overlappingAuxAnomalies);
           }
         }
         // Get and update issue type for the current main anomalies
-        String issueType = anomalyClassifier.classify(mainAnomalyResult, auxiliaryAnomalies);
+        String issueType = anomalyClassifier.classify(mainAnomalyResult, metricNameToOverlappingAuxAnomalies);
         if (updateIssueTypeForAnomalyResult(mainAnomalyResult, issueType)) {
           updatedMainAnomaliesByDimension.add(mainAnomalyResult);
         }
@@ -276,8 +284,8 @@ public class ClassificationTaskRunner implements TaskRunner {
    */
   private void addAnomalyFunctionAndAlertConfig(long functionId) {
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
-    anomalyFunctionSpecMap.put(functionId, anomalyFunctionDTO);
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionDTO.getAlertFilter());
+    anomalyFunctionSpecMap.put(functionId, anomalyFunctionDTO);
     alertFilterMap.put(functionId, alertFilter);
   }
 
