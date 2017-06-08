@@ -4,20 +4,21 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,7 @@ public class ClassificationJobScheduler implements Runnable {
 
   public void start() {
     LOG.info("Starting anomaly classification service");
-    this.scheduledExecutorService.scheduleWithFixedDelay(this, 0, 15, TimeUnit.MINUTES);
+    this.scheduledExecutorService.scheduleWithFixedDelay(this, 0, 1, TimeUnit.MINUTES);
   }
 
   public void shutdown() {
@@ -61,38 +62,44 @@ public class ClassificationJobScheduler implements Runnable {
   /**
    * Creates a classification job whose start time is the end time of the most recent classification job and end time
    * is the minimal end times of anomaly detection jobs, which are given through a configuration DTO. In the current
-   * implementation, we assume that there exists single main anomaly function and it has to be activated in order to
-   * classify of its anomalies.
+   * implementation, we assume that there exists a list of main anomaly functions and they need to be activated in
+   * order to be classified.
    *
-   * @param classificationConfig a configuration file which provides main and correlated anomaly functions.
+   * @param classificationConfig a configuration file which provides main and auxiliary (correlated) anomaly functions.
    */
   private void mainMetricTimeBasedClassification(ClassificationConfigDTO classificationConfig) {
     AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    JobManager jobDAO = DAO_REGISTRY.getJobDAO();
 
-    // Get all involved anomaly functions that are activated
-    List<AnomalyFunctionDTO> syncedAnomalyFunctions = new ArrayList<>();
-    List<Long> functionIdList = classificationConfig.getFunctionIdList();
-    for (long functionId : functionIdList) {
-      AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
-      if (anomalyFunctionDTO.getIsActive()) {
-        syncedAnomalyFunctions.add(anomalyFunctionDTO);
-      }
+    // Get all involved anomaly functions that are activated to the set of synchronized anomaly functions
+    Set<AnomalyFunctionDTO> syncedAnomalyFunctions = new HashSet<>();
+    // Add all activated main functions to the set of functions that has to be synchronized
+    if (CollectionUtils.isEmpty(classificationConfig.getMainFunctionIdList())) {
+      LOG.info("Classification job (id={}) is skipped because its main anomaly function list is empty.",
+          classificationConfig.getId());
+      return;
     }
-    // TODO: Determine if funnel effect has main metric. If it does not, then remove the block below
-    if (!functionIdList.contains(classificationConfig.getMainFunctionId())) {
-      AnomalyFunctionDTO mainAnomalyFunction = anomalyFunctionDAO.findById(classificationConfig.getMainFunctionId());
+    for (Long mainFunctionId : classificationConfig.getMainFunctionIdList()) {
+      AnomalyFunctionDTO mainAnomalyFunction = anomalyFunctionDAO.findById(mainFunctionId);
       if (mainAnomalyFunction.getIsActive()) {
         syncedAnomalyFunctions.add(mainAnomalyFunction);
       } else {
-        LOG.info("Main anomaly function is not activated. Classification job: {} is skipped.", classificationConfig);
+        LOG.info(
+            "Classification job (id={}) is skipped because one of its main anomaly function (id={}) is not activated.",
+            classificationConfig.getId(), mainFunctionId);
         return;
+      }
+    }
+    // Add all activated auxiliary functions to the set of functions that has to be synchronized
+    for (long auxFunctionId : classificationConfig.getAuxFunctionIdList()) {
+      AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(auxFunctionId);
+      if (anomalyFunctionDTO.getIsActive()) {
+        syncedAnomalyFunctions.add(anomalyFunctionDTO);
       }
     }
 
     // By default, we look at only the anomalies in a certain time window just in case of that the previous
     // classification job does not exists or was executed long time ago.
-    //   minTimeBoundary is the start time of the boundary window.
+    // The variable minTimeBoundary is the start time of the boundary window.
     long currentMillis = System.currentTimeMillis();
     long minTimeBoundary = currentMillis - maxMonitoringWindowSizeInMS;
 

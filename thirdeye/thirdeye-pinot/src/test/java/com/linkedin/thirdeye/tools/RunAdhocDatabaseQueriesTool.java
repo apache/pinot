@@ -51,12 +51,13 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.File;
 import java.sql.Timestamp;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -294,11 +295,12 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void createClassificationConfig(String name, long mainFunctionId, List<Long> functionIdList, boolean active) {
+  private void createClassificationConfig(String name, List<Long> mainFunctionIdList, List<Long> functionIdList,
+      boolean active) {
     ClassificationConfigDTO configDTO = new ClassificationConfigDTO();
     configDTO.setName(name);
-    configDTO.setMainFunctionId(mainFunctionId);
-    configDTO.setFunctionIdList(functionIdList);
+    configDTO.setMainFunctionIdList(mainFunctionIdList);
+    configDTO.setAuxFunctionIdList(functionIdList);
     configDTO.setActive(active);
     System.out.println(configDTO);
     classificationConfigDAO.save(configDTO);
@@ -356,11 +358,18 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void disableAllActiveFunction(){
+  private void disableAllActiveFunction() {
+    disableAllActiveFunction(null);
+  }
+
+  private void disableAllActiveFunction(Collection<Long> exception){
     List<AnomalyFunctionDTO> functionSpecs = anomalyFunctionDAO.findAllActiveFunctions();
     for (AnomalyFunctionDTO functionSpec : functionSpecs) {
-      functionSpec.setActive(false);
-      anomalyFunctionDAO.update(functionSpec);
+      if (functionSpec.getIsActive() && (CollectionUtils.isEmpty(exception) || !exception
+          .contains(functionSpec.getId()))) {
+        functionSpec.setActive(false);
+        anomalyFunctionDAO.update(functionSpec);
+      }
     }
   }
 

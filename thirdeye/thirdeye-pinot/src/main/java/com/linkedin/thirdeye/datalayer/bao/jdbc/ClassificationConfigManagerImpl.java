@@ -23,14 +23,6 @@ public class ClassificationConfigManagerImpl extends AbstractManagerImpl<Classif
   }
 
   @Override
-  public List<ClassificationConfigDTO> findActiveByFunctionId(long functionId) {
-    Predicate predicate = Predicate.AND(
-        Predicate.EQ("mainFunctionId", functionId),
-        Predicate.EQ("active", true));
-    return findByPredicate(predicate);
-  }
-
-  @Override
   public ClassificationConfigDTO findByName(String name) {
     Predicate predicate = Predicate.EQ("name", name);
     List<ClassificationConfigDTO> results = findByPredicate(predicate);

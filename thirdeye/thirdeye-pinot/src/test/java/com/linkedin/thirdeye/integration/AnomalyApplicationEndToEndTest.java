@@ -43,6 +43,8 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -198,7 +200,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     datasetConfigDAO.save(getTestDatasetConfig(collection));
 
     // create test grouping config
-    classificationConfigId = classificationConfigDAO.save(getTestGroupingConfiguration(functionId));
+    classificationConfigId =
+        classificationConfigDAO.save(getTestGroupingConfiguration(Collections.singletonList(functionId)));
 
     // setup function factory for worker and merger
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);

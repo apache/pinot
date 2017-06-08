@@ -230,11 +230,11 @@ public abstract class AbstractManagerTestBase {
     return emailConfiguration;
   }
 
-  protected ClassificationConfigDTO getTestGroupingConfiguration(long mainFunctionId) {
+  protected ClassificationConfigDTO getTestGroupingConfiguration(List<Long> mainFunctionIdList) {
     ClassificationConfigDTO configDTO = new ClassificationConfigDTO();
     configDTO.setName("classificationJob");
-    configDTO.setMainFunctionId(mainFunctionId);
-    configDTO.setFunctionIdList(Collections.singletonList(mainFunctionId));
+    configDTO.setMainFunctionIdList(mainFunctionIdList);
+    configDTO.setAuxFunctionIdList(mainFunctionIdList);
     configDTO.setActive(true);
     return configDTO;
   }
@@ -375,12 +375,12 @@ public abstract class AbstractManagerTestBase {
     return autotuneConfigDTO;
   }
 
-  protected ClassificationConfigDTO getTestClassificationConfig(String name, long mainFunctionId,
+  protected ClassificationConfigDTO getTestClassificationConfig(String name, List<Long> mainFunctionIdList,
       List<Long> functionIds) {
     ClassificationConfigDTO classificationConfigDTO = new ClassificationConfigDTO();
     classificationConfigDTO.setName(name);
-    classificationConfigDTO.setMainFunctionId(mainFunctionId);
-    classificationConfigDTO.setFunctionIdList(functionIds);
+    classificationConfigDTO.setMainFunctionIdList(mainFunctionIdList);
+    classificationConfigDTO.setAuxFunctionIdList(functionIds);
     classificationConfigDTO.setActive(true);
     return classificationConfigDTO;
   }

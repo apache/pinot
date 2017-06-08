@@ -290,7 +290,6 @@ create index autotune_config_start_time_idx on autotune_config_index(start_time)
 
 create table if not exists classification_config_index (
     name varchar(200) not null,
-    main_function_id bigint(20),
     active boolean,
     base_id bigint(20) not null,
     create_time timestamp,
@@ -299,7 +298,6 @@ create table if not exists classification_config_index (
 ) ENGINE=InnoDB;
 ALTER TABLE `classification_config_index` ADD UNIQUE `classification_config_unique_index`(`name`);
 create index classification_config_name_index on classification_config_index(name);
-create index classification_config_function_index on classification_config_index(main_function_id);
 
 
 create table if not exists entity_to_entity_mapping_index (
