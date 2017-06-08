@@ -40,7 +40,7 @@ public class ClassificationJobScheduler implements Runnable {
 
   public void start() {
     LOG.info("Starting anomaly classification service");
-    this.scheduledExecutorService.scheduleWithFixedDelay(this, 0, 1, TimeUnit.MINUTES);
+    this.scheduledExecutorService.scheduleWithFixedDelay(this, 0, 15, TimeUnit.MINUTES);
   }
 
   public void shutdown() {
