@@ -15,7 +15,7 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
 
   private static final String DETECTION_JOB_ENDPOINT = "/api/detection-job/";
   private static final String ADHOC = "/ad-hoc";
-  private static final String BACKFILL = "/generateAnomaliesInRange";
+  private static final String BACKFILL = "/replay";
   private static final String AUTOTUNE_FILTER = "autotune/filter/";
   private static final String EVAL_FILTER = "eval/filter/";
   private static final String EVAL_AUTOTUNE = "eval/autotune/";
