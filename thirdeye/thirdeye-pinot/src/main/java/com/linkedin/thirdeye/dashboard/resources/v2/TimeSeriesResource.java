@@ -60,7 +60,8 @@ import org.slf4j.LoggerFactory;
 public class TimeSeriesResource {
   enum TransformationType {
     CUMULATIVE,
-    FORWARDFILL
+    FORWARDFILL,
+    MILLISECONDS
   }
 
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -87,7 +88,7 @@ public class TimeSeriesResource {
 
   @GET
   @Path("/query")
-  public Map<String, List<Double>> getTimeSeries(
+  public Map<String, List<? extends Number>> getTimeSeries(
       @QueryParam("metricIds") String metricIds,
       @QueryParam("start") Long start,
       @QueryParam("end") Long end,
@@ -106,6 +107,10 @@ public class TimeSeriesResource {
 
     if (end == null) {
       throw new IllegalArgumentException("Must provide end timestamp");
+    }
+
+    if (end <= start) {
+      throw  new IllegalArgumentException("Start must be greater than end");
     }
 
     TimeGranularity granularity = null;
@@ -146,7 +151,7 @@ public class TimeSeriesResource {
     DataFrame data = mergeResults(results);
 
     // transform output
-    data = transformTimeSeries(data, transformations);
+    data = transformTimeSeries(data, transformations, start, end, granularity);
 
     return convertDataToMap(data);
   }
@@ -162,6 +167,7 @@ public class TimeSeriesResource {
     if (results.isEmpty())
       return df;
 
+    // TODO move timestamp generation here
     Series timestamp = results.values().iterator().next().get(COL_TIME);
     df.addSeries(COL_TIME, timestamp);
     df.setIndex(COL_TIME);
@@ -181,12 +187,17 @@ public class TimeSeriesResource {
    * @param data (transformed) query results
    * @return map of lists of double (keyed by series name)
    */
-  private static Map<String, List<Double>> convertDataToMap(DataFrame data) {
-    Map<String, List<Double>> output = new HashMap<>();
+  private static Map<String, List<? extends Number>> convertDataToMap(DataFrame data) {
+    Map<String, List<? extends Number>> output = new HashMap<>();
     for (String name : data.getSeriesNames()) {
       String outName = name;
       if (outName.startsWith(SERIES_PREFIX)) {
         outName = outName.substring(SERIES_PREFIX.length());
+      }
+
+      if (data.getIndexName().equals(name)) {
+        output.put(outName, data.getLongs(name).toList());
+        continue;
       }
 
       output.put(outName, data.getDoubles(name).toList());
@@ -197,13 +208,11 @@ public class TimeSeriesResource {
   /**
    * Returns time series transformed by {@code transformations} (in order).
    *
-   * @param data query results
-   * @param transformations transformations to apply
-   * @return transformed time series
+   * @see TimeSeriesResource#transformTimeSeries(DataFrame, TransformationType, long, long, TimeGranularity)
    */
-  private DataFrame transformTimeSeries(DataFrame data, Collection<TransformationType> transformations) {
+  private DataFrame transformTimeSeries(DataFrame data, Collection<TransformationType> transformations, long start, long end, TimeGranularity granularity) {
     for (TransformationType t : transformations) {
-      data = transformTimeSeries(data, t);
+      data = transformTimeSeries(data, t, start, end, granularity);
     }
     return data;
   }
@@ -213,14 +222,19 @@ public class TimeSeriesResource {
    *
    * @param data query results
    * @param transformation transformation to apply
+   * @param start start time stamp
+   * @param end end time stamp
+   * @param granularity time granularity
    * @return transformed time series
    */
-  private DataFrame transformTimeSeries(DataFrame data, TransformationType transformation) {
+  private DataFrame transformTimeSeries(DataFrame data, TransformationType transformation, long start, long end, TimeGranularity granularity) {
     switch (transformation) {
       case CUMULATIVE:
         return transformTimeSeriesCumulative(data);
       case FORWARDFILL:
         return transformTimeSeriesForwardFill(data);
+      case MILLISECONDS:
+        return transformTimeSeriesMilliseconds(data, start, granularity);
     }
     throw new IllegalArgumentException(String.format("Unknown transformation type '%s'", transformation));
   }
@@ -249,6 +263,25 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesForwardFill(DataFrame data) {
     return data.fillNullForward(data.getSeriesNames().toArray(new String[0]));
+  }
+
+  /**
+   * Returns time series with time stamps in milliseconds (rather than indices)
+   *
+   * @param data query results
+   * @param start start time offset in millis
+   * @param granularity time granularity of rows
+   * @return data series with millisecond timestamps
+   */
+  private DataFrame transformTimeSeriesMilliseconds(DataFrame data, long start, final TimeGranularity granularity) {
+    final long offset = granularity.toMillis(granularity.convertToUnit(start));
+    data.mapInPlace(new Series.LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return granularity.toMillis(values[0]) + offset;
+      }
+    }, data.getIndexName());
+    return data;
   }
 
   /**
@@ -367,7 +400,8 @@ public class TimeSeriesResource {
    * @return long series
    */
   private static LongSeries makeTimeRangeIndex(long start, long end, TimeGranularity granularity) {
-    int maxCount = (int) granularity.convertToUnit(end - start);
+    long roundUp = granularity.toMillis(1) - 1;
+    int maxCount = (int) granularity.convertToUnit(end - start + roundUp);
     long[] values = new long[maxCount];
     for(int i=0; i<maxCount; i++) {
       values[i] = i;
@@ -737,5 +771,4 @@ public class TimeSeriesResource {
     }
     return timeSeriesCompareView;
   }
-
 }
