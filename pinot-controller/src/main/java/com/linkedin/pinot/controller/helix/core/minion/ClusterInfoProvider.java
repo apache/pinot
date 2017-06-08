@@ -65,13 +65,7 @@ public class ClusterInfoProvider {
    */
   @Nullable
   public Schema getTableSchema(@Nonnull String tableNameWithType) {
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    Preconditions.checkNotNull(tableType);
-    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-      return _pinotHelixResourceManager.getOfflineTableSchema(tableNameWithType);
-    } else {
-      return _pinotHelixResourceManager.getRealtimeTableSchema(tableNameWithType);
-    }
+    return _pinotHelixResourceManager.getTableSchema(tableNameWithType);
   }
 
   /**

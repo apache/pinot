@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -207,40 +208,40 @@ public class ZKMetadataProvider {
     }
   }
 
+  /**
+   * Get the schema associated with the given table name.
+   *
+   * @param propertyStore Helix property store
+   * @param tableName Table name with or without type suffix.
+   * @return Schema associated with the given table name.
+   */
   @Nullable
-  public static Schema getOfflineTableSchema(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public static Schema getTableSchema(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
       @Nonnull String tableName) {
-    // TODO: After uniform schema, always use raw table name
-
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    // First try to get schema using offline table name
-    Schema schema = getSchema(propertyStore, offlineTableName);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    Schema schema = getSchema(propertyStore, rawTableName);
     if (schema != null) {
       return schema;
     }
 
-    // If cannot find schema using offline table name, try with raw table name
-    return getSchema(propertyStore, TableNameBuilder.extractRawTableName(offlineTableName));
-  }
-
-  @Nullable
-  public static Schema getRealtimeTableSchema(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
-      @Nonnull String tableName) {
-    // TODO: After uniform schema, get schema using raw table name
-
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    try {
-      TableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, realtimeTableName);
-      if (realtimeTableConfig == null) {
-        return null;
+    // For backward compatible where schema name is not the same as raw table name
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    // Try to fetch realtime schema first
+    if (tableType == null || tableType == CommonConstants.Helix.TableType.REALTIME) {
+      TableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, tableName);
+      if (realtimeTableConfig != null) {
+        schema = getSchema(propertyStore, realtimeTableConfig.getValidationConfig().getSchemaName());
       }
-
-      String schemaName = realtimeTableConfig.getValidationConfig().getSchemaName();
-      return getSchema(propertyStore, schemaName);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while getting schema for realtime table: {}", realtimeTableName);
-      return null;
     }
+    // Try to fetch offline schema if realtime schema does not exist
+    if (schema == null &&  (tableType == null || tableType == CommonConstants.Helix.TableType.OFFLINE)) {
+      schema = getSchema(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    }
+    if (schema != null) {
+      LOGGER.warn("Schema name does not match raw table name, schema name: {}, raw table name: {}",
+          schema.getSchemaName(), TableNameBuilder.extractRawTableName(tableName));
+    }
+    return schema;
   }
 
   public static List<OfflineSegmentZKMetadata> getOfflineSegmentZKMetadataListForTable(

@@ -23,7 +23,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -155,10 +154,6 @@ public class AutoAddInvertedIndex {
       }
       LOGGER.info("Table: {} matches the table name pattern: {}", tableNameWithType, _tableNamePattern);
 
-      // Get the table type
-      CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      Preconditions.checkNotNull(tableType);
-
       // Get the inverted index config
       TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       Preconditions.checkNotNull(tableConfig);
@@ -216,7 +211,7 @@ public class AutoAddInvertedIndex {
       }
 
       // Skip tables without a schema
-      Schema tableSchema = getTableSchema(tableNameWithType, tableType);
+      Schema tableSchema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
       if (tableSchema == null) {
         LOGGER.info("Table: {}, skip adding inverted index because it does not have a schema", tableNameWithType);
         continue;
@@ -314,14 +309,6 @@ public class AutoAddInvertedIndex {
           }
         }
       }
-    }
-  }
-
-  private Schema getTableSchema(String tableName, CommonConstants.Helix.TableType tableType) {
-    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-      return ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
-    } else {
-      return ZKMetadataProvider.getRealtimeTableSchema(_propertyStore, tableName);
     }
   }
 

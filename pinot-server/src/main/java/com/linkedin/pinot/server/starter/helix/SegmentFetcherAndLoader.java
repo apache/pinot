@@ -31,7 +31,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
@@ -88,7 +87,7 @@ public class SegmentFetcherAndLoader {
 
     // Try to load table schema from Helix property store.
     // This schema is used for adding default values for newly added columns.
-    Schema schema = ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
 
     LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentId, tableName, offlineSegmentZKMetadata);
     try {
@@ -276,14 +275,8 @@ public class SegmentFetcherAndLoader {
 
   public void reloadAllSegments(@Nonnull String tableNameWithType)
       throws Exception {
-    List<SegmentMetadata> allSegmentsMetadata = _dataManager.getAllSegmentsMetadata(tableNameWithType);
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == null) {
-      LOGGER.error("Invalid table name: {}, neither OFFLINE or REALTIME table", tableNameWithType);
-      return;
-    }
-    for (SegmentMetadata segmentMetadata : allSegmentsMetadata) {
-      reloadSegment(segmentMetadata, tableType);
+    for (SegmentMetadata segmentMetadata : _dataManager.getAllSegmentsMetadata(tableNameWithType)) {
+      reloadSegment(tableNameWithType, segmentMetadata);
     }
   }
 
@@ -294,35 +287,25 @@ public class SegmentFetcherAndLoader {
       LOGGER.warn("Cannot locate segment: {} in table: {]", segmentName, tableNameWithType);
       return;
     }
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == null) {
-      LOGGER.error("Invalid table name: {}, neither OFFLINE or REALTIME table", tableNameWithType);
-      return;
-    }
-    reloadSegment(segmentMetadata, tableType);
+    reloadSegment(tableNameWithType, segmentMetadata);
   }
 
-  private void reloadSegment(@Nonnull SegmentMetadata segmentMetadata,
-      @Nonnull CommonConstants.Helix.TableType tableType)
+  private void reloadSegment(@Nonnull String tableNameWithType, @Nonnull SegmentMetadata segmentMetadata)
       throws Exception {
     String segmentName = segmentMetadata.getName();
-    String tableName = segmentMetadata.getTableName();
 
     String indexDir = segmentMetadata.getIndexDir();
     if (indexDir == null) {
-      LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableName);
+      LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
       return;
     }
 
-    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-      // For OFFLINE table, try to get schema for default columns
-      TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-      Schema schema = ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
-      _dataManager.reloadSegment(segmentMetadata, tableType, offlineTableConfig, schema);
-    } else {
-      // For REALTIME table, ignore schema for default columns
-      TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
-      _dataManager.reloadSegment(segmentMetadata, tableType, realtimeTableConfig, null);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    Schema schema = null;
+    // For OFFLINE table, try to get schema for default columns
+    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
+      schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
     }
+    _dataManager.reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
   }
 }

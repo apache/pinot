@@ -16,13 +16,11 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
@@ -63,30 +61,13 @@ public class PinotTableSchema extends BasePinotControllerRestletResource {
   private Representation getTableSchema(
       @Parameter(name = "tableName", in = "path", description = "Table name for which to get the schema",
           required = true) String tableName) {
-    // TODO: After uniform schema, directly use table name as schema name
-
-    if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      Schema schema = _pinotHelixResourceManager.getRealtimeTableSchema(tableName);
-      if (schema == null) {
-        LOGGER.error("Failed to fetch schema for realtime table: {}", tableName);
-        ControllerRestApplication.getControllerMetrics()
-            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
-        setStatus(Status.SERVER_ERROR_INTERNAL);
-        return new StringRepresentation("Error: failed to fetch schema for realtime table: " + tableName);
-      }
+    Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
+    if (schema != null) {
       return new StringRepresentation(schema.getJSONSchema());
+    } else {
+      LOGGER.info("Failed to fetch schema for table: {}", tableName);
+      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+      return new StringRepresentation("Error: schema not found for table: " + tableName);
     }
-
-    if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      Schema schema = _pinotHelixResourceManager.getOfflineTableSchema(tableName);
-      if (schema == null) {
-        setStatus(Status.CLIENT_ERROR_NOT_FOUND);
-        return new StringRepresentation("Error: schema not found for offline table: " + tableName);
-      }
-      return new StringRepresentation(schema.getJSONSchema());
-    }
-
-    setStatus(Status.CLIENT_ERROR_NOT_FOUND);
-    return new StringRepresentation("Error: table: " + tableName + " not found");
   }
 }
