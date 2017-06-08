@@ -28,6 +28,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +43,8 @@ import org.slf4j.LoggerFactory;
 public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricCorrelationRankingPipeline.class);
 
+  private static final long TIMEOUT = 60000;
+
   private static final String PROP_TARGET_INPUT = "targetInput";
   private static final String PROP_STRATEGY = "strategy";
 
@@ -48,7 +52,11 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final String PRE_BASELINE = "baseline:";
 
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
+  private static final String COL_CURRENT = "current";
+  private static final String COL_BASELINE = "baseline";
   private static final String COL_REL_DIFF = "rel_diff";
+  private static final String COL_TARGET = "target";
+  private static final String COL_CANDIDATE = "candidate";
 
   private static final String STRATEGY_CORRELATION = "correlation";
   private static final String STRATEGY_EUCLIDEAN = "euclidean";
@@ -138,26 +146,44 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     // fetch responses and calculate derived metrics
     Map<String, DataFrame> responses = new HashMap<>();
-    try {
-      List<ThirdEyeRequest> thirdeyeRequests = new ArrayList<>();
-      for(RequestContainer rc : requestList) {
-        thirdeyeRequests.add(rc.request);
+    List<ThirdEyeRequest> thirdeyeRequests = new ArrayList<>();
+    for(RequestContainer rc : requestList) {
+      thirdeyeRequests.add(rc.request);
+    }
+
+      // send requests
+    Collection<Future<ThirdEyeResponse>> futures = submitRequests(thirdeyeRequests);
+
+    int i = 0;
+    for(Future<ThirdEyeResponse> future : futures) {
+      // fetch response
+      ThirdEyeResponse response;
+      try {
+        response = future.get(TIMEOUT, TimeUnit.MILLISECONDS);
+      } catch (Exception e) {
+        LOG.warn("Error executing request '{}'. Skipping.", requestList.get(i).request.getRequestReference(), e);
+        continue;
+      } finally {
+        i++;
       }
 
-      Collection<ThirdEyeResponse> result = this.cache.getQueryResultsAsyncAndWait(thirdeyeRequests).values();
-
-      for(ThirdEyeResponse response : result) {
-        String id = response.getRequest().getRequestReference();
-        DataFrame df = DataFrameUtils.parseResponse(response);
+      // parse time series
+      String id = response.getRequest().getRequestReference();
+      DataFrame df;
+      try {
+        df = DataFrameUtils.parseResponse(response);
         DataFrameUtils.evaluateExpressions(df, requests.get(id).expressions);
-        if(LOG.isDebugEnabled()) {
-          LOG.debug("DataFrame '{}':\n{}", id, df);
-        }
-
-        responses.put(id, df);
+      } catch (Exception e) {
+        LOG.warn("Could not parse response for '{}'. Skipping.", id, e);
+        continue;
       }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("DataFrame '{}':\n{}", id, df);
+      }
+
+      // store time series
+      responses.put(id, df);
     }
 
     // determine current-baseline changes
@@ -177,23 +203,23 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
       }
 
       LOG.info("Preparing data for metric '{}'", entity.getUrn());
-      DataFrame current = responses.get(currentId);
-      DataFrame baseline = responses.get(baselineId);
+      DataFrame current = new DataFrame(responses.get(currentId)).renameSeries(COL_VALUE, COL_CURRENT);
+      DataFrame baseline = new DataFrame(responses.get(baselineId)).renameSeries(COL_VALUE, COL_BASELINE);
       DataFrame joined = current.joinInner(baseline);
 
-      DataFrame pctChange = joined.mapInPlace(new Series.DoubleFunction() {
+      joined.mapInPlace(new Series.DoubleFunction() {
         @Override
         public double apply(double... values) {
           return (values[0] - values[1]) / values[1];
         }
-      },
-          COL_REL_DIFF,
-          COL_VALUE + DataFrame.COLUMN_JOIN_LEFT, COL_VALUE + DataFrame.COLUMN_JOIN_RIGHT);
+      }, COL_REL_DIFF, COL_CURRENT, COL_BASELINE);
+      joined.dropSeries(COL_CURRENT);
+      joined.dropSeries(COL_BASELINE);
 
-      pctChanges.put(entity, pctChange);
+      pctChanges.put(entity, joined);
     }
 
-    // determine score - by absolute strength of correlation
+    // determine score
     Map<MetricEntity, Double> scores = new HashMap<>();
     for(MetricEntity targetMetric : targetMetrics) {
       if(!pctChanges.containsKey(targetMetric)) {
@@ -201,25 +227,25 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         continue;
       }
 
-      DataFrame changesTarget = pctChanges.get(targetMetric);
+      DataFrame changesTarget = new DataFrame(pctChanges.get(targetMetric))
+          .renameSeries(COL_REL_DIFF, COL_TARGET);
 
       for(MetricEntity candidateMetric : candidateMetrics) {
-        if(!pctChanges.containsKey(targetMetric)) {
+        if(!pctChanges.containsKey(candidateMetric)) {
           LOG.warn("No diff data for candidate metric '{}'. Skipping.", candidateMetric.getUrn());
           continue;
         }
 
         LOG.info("Calculating correlation for metric '{}'", candidateMetric.getUrn());
-        DataFrame changesCandidate = pctChanges.get(candidateMetric);
+        DataFrame changesCandidate = new DataFrame(pctChanges.get(candidateMetric))
+            .renameSeries(COL_REL_DIFF, COL_CANDIDATE);
+
         DataFrame joined = changesTarget.joinInner(changesCandidate);
 
-        DoubleSeries target = joined.getDoubles(COL_REL_DIFF + DataFrame.COLUMN_JOIN_LEFT);
-        DoubleSeries candidate = joined.getDoubles(COL_REL_DIFF + DataFrame.COLUMN_JOIN_RIGHT);
-
         try {
-          double score = this.strategy.score(target, candidate) * targetMetric.getScore();
+          double score = this.strategy.score(joined.getDoubles(COL_TARGET), joined.getDoubles(COL_CANDIDATE)) * targetMetric.getScore();
 
-          LOG.debug("Score for target '{}' and candidate '{}' is {} (based on {} data points)", targetMetric.getUrn(), candidateMetric.getUrn(), score, target.size());
+          LOG.debug("Score for target '{}' and candidate '{}' is {} (based on {} data points)", targetMetric.getUrn(), candidateMetric.getUrn(), score, joined.size());
 
           if (!scores.containsKey(candidateMetric)) {
             scores.put(candidateMetric, 0.0);
@@ -241,6 +267,14 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     LOG.info("Generated {} MetricEntities with valid scores", entities.size());
 
     return new PipelineResult(context, entities);
+  }
+
+  private Collection<Future<ThirdEyeResponse>> submitRequests(List<ThirdEyeRequest> thirdeyeRequests) {
+    try {
+      return this.cache.getQueryResultsAsync(thirdeyeRequests).values();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private List<RequestContainer> makeRequests(Collection<MetricEntity> metrics, TimeRangeEntity timerange, String prefix) {
