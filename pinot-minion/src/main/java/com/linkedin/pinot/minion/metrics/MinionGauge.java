@@ -13,23 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.minion.executor;
+package com.linkedin.pinot.minion.metrics;
 
-import com.linkedin.pinot.minion.MinionContext;
-import javax.annotation.Nonnull;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.AbstractMetrics;
 
 
-public abstract class BaseTaskExecutor implements PinotTaskExecutor {
-  protected MinionContext _minionContext;
-  protected boolean _cancelled = false;
+public enum MinionGauge implements AbstractMetrics.Gauge {
+  ;
 
-  @Override
-  public void setMinionContext(@Nonnull MinionContext minionContext) {
-    _minionContext = minionContext;
+  private final String _gaugeName;
+  private final String _unit;
+  private final boolean _global;
+
+  MinionGauge(String unit, boolean global) {
+    _gaugeName = Utils.toCamelCase(name().toLowerCase());
+    _unit = unit;
+    _global = global;
   }
 
   @Override
-  public void cancel() {
-    _cancelled = true;
+  public String getGaugeName() {
+    return _gaugeName;
+  }
+
+  @Override
+  public String getUnit() {
+    return _unit;
+  }
+
+  @Override
+  public boolean isGlobal() {
+    return _global;
   }
 }

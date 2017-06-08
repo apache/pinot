@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -214,6 +214,9 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
     @Override
     public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
       try {
+        Preconditions.checkState(_minionContext.getDataDir().exists());
+        Preconditions.checkNotNull(_minionContext.getMinionMetrics());
+
         Preconditions.checkArgument(pinotTaskConfig.getTaskType().equals(TestTaskGenerator.TASK_TYPE));
         Map<String, String> configs = pinotTaskConfig.getConfigs();
         Preconditions.checkArgument(configs.size() == 2);

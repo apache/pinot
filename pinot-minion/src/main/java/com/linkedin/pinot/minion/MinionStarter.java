@@ -15,11 +15,19 @@
  */
 package com.linkedin.pinot.minion;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.minion.executor.TaskExecutorRegistry;
+import com.linkedin.pinot.minion.metrics.MinionMeter;
+import com.linkedin.pinot.minion.metrics.MinionMetrics;
 import com.linkedin.pinot.minion.taskfactory.TaskFactoryRegistry;
+import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
@@ -28,6 +36,8 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,8 +45,11 @@ import org.apache.helix.task.TaskStateModelFactory;
  * <p>Pinot Minion will automatically join the given Helix cluster as a participant.
  */
 public class MinionStarter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MinionStarter.class);
+
   private final String _helixClusterName;
-  private final String _minionId;
+  private final Configuration _config;
+  private final String _instanceId;
   private final HelixManager _helixManager;
   private final TaskExecutorRegistry _taskExecutorRegistry;
 
@@ -45,9 +58,11 @@ public class MinionStarter {
   public MinionStarter(String zkAddress, String helixClusterName, Configuration config)
       throws Exception {
     _helixClusterName = helixClusterName;
-    _minionId = config.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
-        CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + NetUtil.getHostAddress());
-    _helixManager = new ZKHelixManager(_helixClusterName, _minionId, InstanceType.PARTICIPANT, zkAddress);
+    _config = config;
+    _instanceId = config.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
+        CommonConstants.Minion.INSTANCE_PREFIX + NetUtil.getHostAddress() + "_"
+            + CommonConstants.Minion.DEFAULT_HELIX_PORT);
+    _helixManager = new ZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     _taskExecutorRegistry = new TaskExecutorRegistry();
   }
 
@@ -69,28 +84,66 @@ public class MinionStarter {
    */
   public void start()
       throws Exception {
+    LOGGER.info("Starting Pinot minion: {}", _instanceId);
+    Utils.logVersions();
+
+    // Initialize data directory
+    LOGGER.info("Initializing data directory");
+    File dataDir = new File(
+        _config.getString(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_DATA_DIR));
+    if (!dataDir.exists()) {
+      Preconditions.checkState(dataDir.mkdirs());
+    }
+
+    // Initialize metrics
+    LOGGER.info("Initializing metrics");
+    MetricsHelper.initializeMetrics(_config);
+    MetricsRegistry metricsRegistry = new MetricsRegistry();
+    MetricsHelper.registerMetricsRegistry(metricsRegistry);
+    MinionMetrics minionMetrics = new MinionMetrics(metricsRegistry);
+    minionMetrics.initializeGlobalMeters();
+
+    // Join the Helix cluster
+    LOGGER.info("Joining the Helix cluster");
+    final MinionContext minionContext = new MinionContext(dataDir, minionMetrics);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory("Task", new TaskStateModelFactory(_helixManager,
-            new TaskFactoryRegistry(_taskExecutorRegistry).getTaskFactoryRegistry()));
+            new TaskFactoryRegistry(_taskExecutorRegistry, minionContext).getTaskFactoryRegistry()));
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded();
+
+    // Initialize health check callback
+    LOGGER.info("Initializing health check callback");
+    ServiceStatus.setServiceStatusCallback(new ServiceStatus.ServiceStatusCallback() {
+      @Override
+      public ServiceStatus.Status getServiceStatus() {
+        // TODO: add health check here
+        minionContext.getMinionMetrics().addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_GOOD_CALLS, 1L);
+        return ServiceStatus.Status.GOOD;
+      }
+    });
+
+    LOGGER.info("Pinot minion started");
   }
 
   /**
    * Stop the Pinot Minion instance.
    */
   public void stop() {
+    LOGGER.info("Stopping Pinot minion: " + _instanceId);
     _helixManager.disconnect();
+    LOGGER.info("Pinot minion stopped");
   }
 
   /**
    * Tag Pinot Minion instance if needed.
    */
   private void addInstanceTagIfNeeded() {
-    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _minionId);
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, _instanceId);
     if (instanceConfig.getTags().isEmpty()) {
-      _helixAdmin.addInstanceTag(_helixClusterName, _minionId, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+      LOGGER.info("Adding default Helix tag: {} to Pinot minion", CommonConstants.Minion.UNTAGGED_INSTANCE);
+      _helixAdmin.addInstanceTag(_helixClusterName, _instanceId, CommonConstants.Minion.UNTAGGED_INSTANCE);
     }
   }
 }

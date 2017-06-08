@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.io.File;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -24,17 +25,14 @@ public class CommonConstants {
 
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
-    public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
 
     public static final String SERVER_INSTANCE_TYPE = "server";
     public static final String BROKER_INSTANCE_TYPE = "broker";
-    public static final String MINION_INSTANCE_TYPE = "minion";
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
 
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
-    public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
 
     public static class StateModel {
       public static class SegmentOnlineOfflineStateModel {
@@ -153,6 +151,7 @@ public class CommonConstants {
       public static final String GROUP_ID_SUFFIX = "kafka.hlc.groupId";
       public static final String PARTITION_SUFFIX = "kafka.hlc.partition";
       public static final String INSTANCE_ID_KEY = "instanceId";
+      public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
     }
 
@@ -221,6 +220,20 @@ public class CommonConstants {
     public static final String DEFAULT_SEGMENT_FORMAT_VERSION = "v3";
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
+  }
+
+  public static class Minion {
+    public static final String INSTANCE_PREFIX = "Minion_";
+    public static final String INSTANCE_TYPE = "minion";
+    public static final String UNTAGGED_INSTANCE = "minion_untagged";
+    public static final String METRICS_PREFIX = "pinot.minion.";
+
+    // Config keys
+    public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
+
+    // Default settings
+    public static final int DEFAULT_HELIX_PORT = 9514;
+    public static final String DEFAULT_DATA_DIR = System.getProperty("java.io.tmpdir") + File.separator + "pinotMinion";
   }
 
   public static class Metric {

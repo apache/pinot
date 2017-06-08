@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
+import com.linkedin.pinot.common.utils.CommonConstants.Minion;
 import com.linkedin.pinot.common.utils.CommonConstants.Server;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
@@ -139,7 +140,8 @@ public abstract class ClusterTest extends ControllerTest {
     try {
       for (int i = 0; i < minionCount; i++) {
         Configuration config = new PropertiesConfiguration();
-        config.setProperty(Helix.Instance.INSTANCE_ID_KEY, Helix.PREFIX_OF_MINION_INSTANCE + "minion" + i);
+        config.setProperty(Helix.Instance.INSTANCE_ID_KEY,
+            Minion.INSTANCE_PREFIX + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
         MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), config);
 
         // Register plug-in task executors

@@ -17,10 +17,14 @@ package com.linkedin.pinot.minion.taskfactory;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.minion.MinionContext;
 import com.linkedin.pinot.minion.exception.FatalException;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.minion.executor.TaskExecutorRegistry;
+import com.linkedin.pinot.minion.metrics.MinionMeter;
+import com.linkedin.pinot.minion.metrics.MinionMetrics;
+import com.linkedin.pinot.minion.metrics.MinionQueryPhase;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -38,8 +42,9 @@ import org.apache.helix.task.TaskResult;
 public class TaskFactoryRegistry {
   private final Map<String, TaskFactory> _taskFactoryRegistry = new HashMap<>();
 
-  public TaskFactoryRegistry(@Nonnull TaskExecutorRegistry taskExecutorRegistry) {
-    for (String taskType : taskExecutorRegistry.getAllTaskTypes()) {
+  public TaskFactoryRegistry(@Nonnull TaskExecutorRegistry taskExecutorRegistry,
+      @Nonnull final MinionContext minionContext) {
+    for (final String taskType : taskExecutorRegistry.getAllTaskTypes()) {
       final Class<? extends PinotTaskExecutor> taskExecutorClass = taskExecutorRegistry.getTaskExecutorClass(taskType);
       Preconditions.checkNotNull(taskExecutorClass);
       TaskFactory taskFactory = new TaskFactory() {
@@ -52,16 +57,27 @@ public class TaskFactoryRegistry {
 
               @Override
               public TaskResult run() {
+                long startTime = System.nanoTime();
+                _pinotTaskExecutor.setMinionContext(minionContext);
+                MinionMetrics minionMetrics = minionContext.getMinionMetrics();
+                TaskResult taskResult;
                 try {
+                  minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
                   _pinotTaskExecutor.executeTask(PinotTaskConfig.fromHelixTaskConfig(_taskConfig));
-                  return new TaskResult(TaskResult.Status.COMPLETED, "Succeeded");
+                  minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_COMPLETED, 1L);
+                  taskResult = new TaskResult(TaskResult.Status.COMPLETED, "Succeeded");
                 } catch (TaskCancelledException e) {
-                  return new TaskResult(TaskResult.Status.CANCELED, e.toString());
+                  taskResult = new TaskResult(TaskResult.Status.CANCELED, e.toString());
+                  minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
                 } catch (FatalException e) {
-                  return new TaskResult(TaskResult.Status.FATAL_FAILED, e.toString());
+                  taskResult = new TaskResult(TaskResult.Status.FATAL_FAILED, e.toString());
+                  minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
                 } catch (Exception e) {
-                  return new TaskResult(TaskResult.Status.FAILED, e.toString());
+                  taskResult = new TaskResult(TaskResult.Status.FAILED, e.toString());
+                  minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
                 }
+                minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, System.nanoTime() - startTime);
+                return taskResult;
               }
 
               @Override

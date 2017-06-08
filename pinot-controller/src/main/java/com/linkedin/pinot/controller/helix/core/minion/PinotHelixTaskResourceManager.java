@@ -140,7 +140,7 @@ public class PinotHelixTaskResourceManager {
    */
   @Nonnull
   public synchronized String submitTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
-    return submitTask(pinotTaskConfig, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+    return submitTask(pinotTaskConfig, CommonConstants.Minion.UNTAGGED_INSTANCE);
   }
 
   /**
