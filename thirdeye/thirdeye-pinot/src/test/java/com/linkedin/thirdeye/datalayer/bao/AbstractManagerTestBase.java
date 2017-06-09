@@ -14,6 +14,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
@@ -70,6 +71,7 @@ public abstract class AbstractManagerTestBase {
   protected EntityToEntityMappingManager entityToEntityMappingDAO;
   protected GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   protected OnboardDatasetMetricManager onboardDatasetMetricDAO;
+  protected ConfigManager configDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -108,6 +110,7 @@ public abstract class AbstractManagerTestBase {
       entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
       groupedAnomalyResultsDAO = daoRegistry.getGroupedAnomalyResultsDAO();
       onboardDatasetMetricDAO = daoRegistry.getOnboardDatasetMetricDAO();
+      configDAO = daoRegistry.getConfigDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -399,6 +402,14 @@ public abstract class AbstractManagerTestBase {
     dto.setDatasetName(datasetName);
     dto.setMetricName(metricName);
     dto.setDataSource(dataSource);
+    return dto;
+  }
+
+  protected ConfigDTO getTestConfig(String namespace, String name, Object value) {
+    ConfigDTO dto = new ConfigDTO();
+    dto.setNamespace(namespace);
+    dto.setName(name);
+    dto.setValue(value);
     return dto;
   }
 }

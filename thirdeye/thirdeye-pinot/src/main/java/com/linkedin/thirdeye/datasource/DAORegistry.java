@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.datasource;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -24,6 +25,7 @@ import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.ConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
@@ -169,5 +171,9 @@ public class DAORegistry {
 
   public OnboardDatasetMetricManager getOnboardDatasetMetricDAO() {
     return DaoProviderUtil.getInstance(OnboardDatasetMetricManagerImpl.class);
+  }
+
+  public ConfigManager getConfigDAO() {
+    return DaoProviderUtil.getInstance(ConfigManagerImpl.class);
   }
 }

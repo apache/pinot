@@ -1,19 +1,63 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Sets;
+import com.google.inject.Inject;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
+import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
+import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.ClassificationConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.EventIndex;
+import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
+import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import com.linkedin.thirdeye.datalayer.entity.AutotuneConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.ClassificationConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.ConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
+import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
+import com.linkedin.thirdeye.datalayer.entity.EntityToEntityMappingIndex;
+import com.linkedin.thirdeye.datalayer.entity.EventIndex;
+import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.GroupedAnomalyResultsIndex;
+import com.linkedin.thirdeye.datalayer.entity.IngraphDashboardConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.IngraphMetricConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.JobIndex;
+import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
+import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.OnboardDatasetMetricIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
+import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
+import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.ClassificationConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.EventBean;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.AutotuneConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.ClassificationConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.ConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.DetectionStatusBean;
+import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
+import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
+import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.pojo.GroupedAnomalyResultsBean;
+import com.linkedin.thirdeye.datalayer.pojo.IngraphDashboardConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.IngraphMetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.JobBean;
+import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.OnboardDatasetMetricBean;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
-
+import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
+import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
+import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -26,58 +70,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-
 import javax.sql.DataSource;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.Sets;
-import com.google.inject.Inject;
-import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
-import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
-import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
-import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
-import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
-import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
-import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
-import com.linkedin.thirdeye.datalayer.entity.EntityToEntityMappingIndex;
-import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
-import com.linkedin.thirdeye.datalayer.entity.IngraphDashboardConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.IngraphMetricConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.JobIndex;
-import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
-import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.OnboardDatasetMetricIndex;
-import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
-import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
-import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.DetectionStatusBean;
-import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
-import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
-import com.linkedin.thirdeye.datalayer.pojo.IngraphDashboardConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.IngraphMetricConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.JobBean;
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.OnboardDatasetMetricBean;
-import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
-import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
-import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
 
 public class GenericPojoDao {
   private static final Logger LOG = LoggerFactory.getLogger(GenericPojoDao.class);
@@ -133,6 +130,9 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, GroupedAnomalyResultsIndex.class));
     pojoInfoMap.put(OnboardDatasetMetricBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, OnboardDatasetMetricIndex.class));
+    pojoInfoMap.put(ConfigBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, ConfigIndex.class));
+
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,
