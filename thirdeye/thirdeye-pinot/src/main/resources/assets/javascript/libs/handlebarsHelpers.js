@@ -165,11 +165,25 @@ Handlebars.registerHelper('isObject', function(item) {
 });
 
 /**
- * Display Human Readble filterNames
+ * Display Human Readable filterNames
  * @param  {String} filter
  * @return {String} Sanizited Filter Name
  */
 Handlebars.registerHelper('displayFilterName', function(filter) {
   return filter.split('FilterMap')[0];
 });
+
+/**
+ * Display Human Readable filters
+ * @param  {String} filters
+ * @return {String} Sanizited Filter
+ */
+Handlebars.registerHelper('parseFilters', function(filters) {
+  filters = JSON.parse(filters);
+  const uiFilters = Object.keys(filters).map((filter) => {
+    return `${filter}: ${filters[filter].join(', ')}</br>` 
+  }).join('');
+  return new Handlebars.SafeString(uiFilters);
+});
+
 

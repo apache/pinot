@@ -59,7 +59,7 @@
                 {{#if_eq anomalyFunctionDimension '{}'}}
                   N/A
                 {{else}}
-                  {{anomalyFunctionDimension}}
+                  {{parseFilters anomalyFunctionDimension}}
                 {{/if_eq}}
                 </span>
               </div>
