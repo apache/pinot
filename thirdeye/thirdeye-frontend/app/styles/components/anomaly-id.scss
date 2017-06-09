@@ -1,0 +1,32 @@
+.anomaly-id {
+  list-style: none;
+  font-size: 15px;
+  font-weight: lighter;
+  width: 100%;
+  padding: 25px;
+
+  &__item {
+    line-height: 28px;
+
+    &--title {
+      font-size: 22px;
+    }
+  }
+
+  &__value {
+    font-size: 18px;
+    font-weight: normal;
+  }
+
+  &__total {
+    font-weight: bold;
+  }
+
+  &__percent {
+    color: $anomaly-id-percent-change;
+  }
+
+  &__subtitle {
+    font-weight: normal;
+  }
+}
