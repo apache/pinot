@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly;
 
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
@@ -84,6 +85,9 @@ public class ThirdEyeAnomalyApplication
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
+
+    environment.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
