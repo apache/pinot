@@ -15,8 +15,14 @@
  */
 package com.linkedin.pinot.controller.helix.sharding;
 
+import com.linkedin.pinot.common.config.ColumnPartitionConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -25,19 +31,29 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.*;
 
 
 public class SegmentAssignmentStrategyTest {
@@ -47,11 +63,16 @@ public class SegmentAssignmentStrategyTest {
   private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";
   private final static String TABLE_NAME_BALANCED = "testResourceBalanced";
   private final static String TABLE_NAME_RANDOM = "testResourceRandom";
+  private final static String TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP= "testTableLevelReplicaGroup";
+  private final static String TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP = "testPartitionLevelReplicaGroup";
+
+  private final static String PARTITION_COLUMN = "memberId";
+  private final static int NUM_REPLICA = 2;
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkClient _zkClient;
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
-  private final int _numServerInstance = 5;
+  private final int _numServerInstance = 6;
   private final int _numBrokerInstance = 1;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
@@ -76,7 +97,7 @@ public class SegmentAssignmentStrategyTest {
         _numServerInstance, true);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER,
         _numBrokerInstance, true);
-    Thread.sleep(3000);
+    Thread.sleep(100);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE").size(),
         _numServerInstance);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_REALTIME").size(),
@@ -95,33 +116,38 @@ public class SegmentAssignmentStrategyTest {
 
   @Test
   public void testRandomSegmentAssignmentStrategy() throws Exception {
-    final int numReplicas = 2;
-
     // Adding table
     TableConfig tableConfig =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME_RANDOM)
             .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
-            .setNumReplicas(numReplicas)
+            .setNumReplicas(NUM_REPLICA)
             .build();
     _pinotHelixResourceManager.addTable(tableConfig);
 
-    Thread.sleep(3000);
+    // Wait for the table addition
+    while (!_pinotHelixResourceManager.hasOfflineTable(TABLE_NAME_RANDOM)) {
+      Thread.sleep(100);
+    }
+
     for (int i = 0; i < 10; ++i) {
       addOneSegment(TABLE_NAME_RANDOM);
-      Thread.sleep(3000);
+
+      // Wait for all segments appear in the external view
+      while (!allSegmentsPushedToExternalView(TABLE_NAME_RANDOM, i + 1)) {
+        Thread.sleep(100);
+      }
       final Set<String> taggedInstances =
           _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
       final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+      ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
           TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_RANDOM));
       Assert.assertEquals(externalView.getPartitionSet().size(), i + 1);
       for (final String segmentId : externalView.getPartitionSet()) {
-        Assert.assertEquals(externalView.getStateMap(segmentId).size(), numReplicas);
+        Assert.assertEquals(externalView.getStateMap(segmentId).size(), NUM_REPLICA);
       }
-
     }
   }
 
@@ -137,12 +163,16 @@ public class SegmentAssignmentStrategyTest {
             .build();
     _pinotHelixResourceManager.addTable(tableConfig);
 
-    Thread.sleep(3000);
     int numSegments = 20;
     for (int i = 0; i < numSegments; ++i) {
       addOneSegment(TABLE_NAME_BALANCED);
-      Thread.sleep(2000);
     }
+
+    // Wait for all segments appear in the external view
+    while (!allSegmentsPushedToExternalView(TABLE_NAME_BALANCED, numSegments)) {
+      Thread.sleep(100);
+    }
+
     final Set<String> taggedInstances =
         _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
     final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
@@ -171,10 +201,204 @@ public class SegmentAssignmentStrategyTest {
     _helixAdmin.dropResource(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_BALANCED));
   }
 
+  @Test
+  public void testTableLevelAndMirroringReplicaGroupSegmentAssignmentStrategy() throws Exception {
+    // Create the configuration for segment assignment strategy.
+    int numInstancesPerPartition = 3;
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
+    replicaGroupStrategyConfig.setNumInstancesPerPartition(numInstancesPerPartition);
+    replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
+
+    // Create table config
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
+        .setTableName(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP)
+        .setNumReplicas(NUM_REPLICA)
+        .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
+        .build();
+
+    tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+
+    // Create the table and upload segments
+    _pinotHelixResourceManager.addTable(tableConfig);
+
+    // Wait for table addition
+    while (!_pinotHelixResourceManager.hasOfflineTable(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP)) {
+      Thread.sleep(100);
+    }
+
+    int numSegments = 20;
+    Set<String> segments = new HashSet<>();
+    for (int i = 0; i < numSegments; ++i) {
+      String segmentName = "segment" + i;
+      addOneSegmentWithPartitionInfo(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP, segmentName, null, 0);
+      segments.add(segmentName);
+    }
+
+    // Wait for all segments appear in the external view
+    while (!allSegmentsPushedToExternalView(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP, numSegments)) {
+      Thread.sleep(100);
+    }
+
+    // Create a table of a list of segments that are assigned to a server.
+    Map<String, Set<String>> serverToSegments = getServersToSegmentsMapping(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP);
+
+    // Fetch the replica group mapping table
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixZkManager.getHelixPropertyStore();
+    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMaping =
+        ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(propertyStore,
+            TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP);
+
+    // Check that each replica group for contains all segments of the table.
+    for (int group = 0; group < NUM_REPLICA; group++) {
+      List<String> serversInReplicaGroup = partitionToReplicaGroupMaping.getInstancesfromReplicaGroup(0, group);
+      Set<String> segmentsInReplicaGroup = new HashSet<>();
+      for (String server : serversInReplicaGroup) {
+        segmentsInReplicaGroup.addAll(serverToSegments.get(server));
+      }
+      Assert.assertTrue(segmentsInReplicaGroup.containsAll(segments));
+    }
+
+    // Create the expected mirroring servers.
+    for (int instanceIndex = 0; instanceIndex < numInstancesPerPartition; instanceIndex++) {
+      Set<Set<String>> mirroringServerSegments = new HashSet<>();
+      for (int group = 0; group < NUM_REPLICA; group++) {
+        List<String> serversInReplicaGroup = partitionToReplicaGroupMaping.getInstancesfromReplicaGroup(0, group);
+        String server = serversInReplicaGroup.get(instanceIndex);
+        mirroringServerSegments.add(serverToSegments.get(server));
+      }
+      Assert.assertEquals(mirroringServerSegments.size(), 1);
+    }
+  }
+
+  @Test
+  public void testPartitionLevelReplicaGroupSegmentAssignmentStrategy() throws Exception {
+    int totalPartitionNumber = 2;
+    int numInstancesPerPartition = 3;
+
+    // Create the configuration for segment assignment strategy.
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
+    replicaGroupStrategyConfig.setNumInstancesPerPartition(numInstancesPerPartition);
+    replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(false);
+    // Now, set the partitioning column to trigger the partition level replica group assignment.
+    replicaGroupStrategyConfig.setPartitionColumn(PARTITION_COLUMN);
+
+    // Create the indexing config
+    IndexingConfig indexingConfig = new IndexingConfig();
+    Map<String, ColumnPartitionConfig> partitionConfigMap = new HashMap<>();
+    partitionConfigMap.put(PARTITION_COLUMN, new ColumnPartitionConfig("modulo", totalPartitionNumber));
+    indexingConfig.setSegmentPartitionConfig(new SegmentPartitionConfig(partitionConfigMap));
+
+    // Create table config
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
+        .setTableName(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP)
+        .setNumReplicas(NUM_REPLICA)
+        .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
+        .build();
+
+    tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+    tableConfig.setIndexingConfig(indexingConfig);
+
+    // This will trigger to build the partition to replica group mapping table.
+    _pinotHelixResourceManager.addTable(tableConfig);
+
+    // Wait for table addition
+    while (!_pinotHelixResourceManager.hasOfflineTable(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP)) {
+      Thread.sleep(100);
+    }
+
+    // Tracking segments that belong to a partition number.
+    Map<Integer, Set<String>> partitionToSegment = new HashMap<>();
+
+    // Upload segments
+    int numSegments = 20;
+    for (int i = 0; i < numSegments; ++i) {
+      int partitionNumber = i % totalPartitionNumber;
+      String segmentName = "segment" + i;
+      addOneSegmentWithPartitionInfo(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP, segmentName, PARTITION_COLUMN,
+          partitionNumber);
+      if (!partitionToSegment.containsKey(partitionNumber)) {
+        partitionToSegment.put(partitionNumber, new HashSet<String>());
+      }
+      partitionToSegment.get(partitionNumber).add(segmentName);
+    }
+
+    // Wait for all segments appear in the external view
+    while (!allSegmentsPushedToExternalView(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP, numSegments)) {
+      Thread.sleep(100);
+    }
+
+    // Create a table of a list of segments that are assigned to a server.
+    Map<String, Set<String>> serverToSegments = getServersToSegmentsMapping(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP);
+
+    // Fetch the replica group mapping table.
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixZkManager.getHelixPropertyStore();
+    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMaping =
+        ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(propertyStore,
+            TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP);
+
+    // Check that each replica group for a partition contains all segments that belong to the partition.
+    for (int partition = 0; partition < totalPartitionNumber; partition++) {
+      for (int group = 0; group < NUM_REPLICA; group++) {
+        List<String> serversInReplicaGroup =
+            partitionToReplicaGroupMaping.getInstancesfromReplicaGroup(partition, group);
+        Set<String> segmentsInReplicaGroup = new HashSet<>();
+        for (String server : serversInReplicaGroup) {
+          segmentsInReplicaGroup.addAll(serverToSegments.get(server));
+        }
+        Assert.assertTrue(segmentsInReplicaGroup.containsAll(partitionToSegment.get(partition)));
+      }
+    }
+  }
+
+  private boolean allSegmentsPushedToExternalView(String tableName, int segmentNum) {
+    ExternalView externalView =
+        _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    if (externalView != null && externalView.getPartitionSet() != null
+        && externalView.getPartitionSet().size() == segmentNum) {
+      return true;
+    }
+    return false;
+  }
+
+  private Map<String, Set<String>> getServersToSegmentsMapping(String tableName) {
+    ExternalView externalView =
+        _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+
+    List<String> servers = _pinotHelixResourceManager.getServerInstancesForTable(tableName, CommonConstants.Helix.TableType.OFFLINE);
+    Map<String, Set<String>> serverToSegments = new HashMap<>();
+
+    for (String server : servers) {
+      serverToSegments.put(server, new HashSet<String>());
+    }
+
+    for (String segment : externalView.getPartitionSet()) {
+      for (String server : externalView.getStateMap(segment).keySet()) {
+        serverToSegments.get(server).add(segment);
+      }
+    }
+    return serverToSegments;
+  }
+
   private void addOneSegment(String tableName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(tableName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
     _pinotHelixResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }
 
+  private void addOneSegmentWithPartitionInfo(String tableName, String segmentName, String columnName,
+      int partitionNumber) {
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    List<IntRange> partitionRanges = new ArrayList<>();
+    partitionRanges.add(new IntRange(partitionNumber));
+    when(columnMetadata.getPartitionRanges()).thenReturn(partitionRanges);
+
+    SegmentMetadataImpl meta = mock(SegmentMetadataImpl.class);
+    if (columnName != null) {
+      when(meta.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
+    }
+    when(meta.getTableName()).thenReturn(tableName);
+    when(meta.getName()).thenReturn(segmentName);
+    when(meta.getCrc()).thenReturn("0");
+    _pinotHelixResourceManager.addSegment(meta, "downloadUrl");
+  }
 }

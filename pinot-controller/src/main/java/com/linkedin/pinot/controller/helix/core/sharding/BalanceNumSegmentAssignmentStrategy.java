@@ -28,7 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,8 +42,8 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
   private static final Logger LOGGER = LoggerFactory.getLogger(BalanceNumSegmentAssignmentStrategy.class);
 
   @Override
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
-      SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
     String serverTenantName;
     String tableName;
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
