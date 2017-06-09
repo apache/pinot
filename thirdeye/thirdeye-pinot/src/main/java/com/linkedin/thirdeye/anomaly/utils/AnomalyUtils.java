@@ -75,10 +75,10 @@ public class AnomalyUtils {
    * or timeout occurs (5-minutes), or the current thread is interrupted, whichever happens first.
    *
    * @param executorService the executor service to be shutdown.
-   * @param ownerClass the class that owns the executor service; it could be null;
+   * @param ownerClass the class that owns the executor service; it could be null.
    */
   public static void safelyShutdownExecutionService(ExecutorService executorService, Class ownerClass) {
-    safelyShutdownExecutionService(executorService, 60, 5_000, ownerClass);
+    safelyShutdownExecutionService(executorService, 300, ownerClass);
   }
 
   /**
@@ -86,11 +86,10 @@ public class AnomalyUtils {
    * or number of retries is reached, or the current thread is interrupted, whichever happens first.
    *
    * @param executorService the executor service to be shutdown.
-   * @param retries the max number of retries.
-   * @param sleepTimeInMS the sleep time between retries.
-   * @param ownerClass the class that owns the executor service; it could be null;
+   * @param maxWaitTimeInSeconds max wait time for threads that are still running.
+   * @param ownerClass the class that owns the executor service; it could be null.
    */
-  public static void safelyShutdownExecutionService(ExecutorService executorService, int retries, int sleepTimeInMS,
+  public static void safelyShutdownExecutionService(ExecutorService executorService, int maxWaitTimeInSeconds,
       Class ownerClass) {
     if (executorService == null) {
       return;
@@ -99,21 +98,20 @@ public class AnomalyUtils {
     try {
       // If not all threads are complete, then a retry loop waits until all threads are complete, or timeout occurs,
       // or the current thread is interrupted, whichever happens first.
-      if (!executorService.awaitTermination(1, TimeUnit.SECONDS)) {
-        int retryCount = 0;
-        for (; retryCount < retries; ++retryCount) {
+      for (int retryCount = 0; retryCount < maxWaitTimeInSeconds; ++retryCount) {
+        // Wait a while for existing tasks to terminate
+        if (!executorService.awaitTermination(1, TimeUnit.SECONDS)) {
           // Force terminate all currently executing tasks if they support such operation
           executorService.shutdownNow();
-          // Wait a while for existing tasks to terminate
-          if (executorService.awaitTermination(sleepTimeInMS, TimeUnit.MILLISECONDS)) {
-            break; // break out retry loop if all threads are complete
+          if (retryCount % 10 == 0) {
+            if (ownerClass != null) {
+              LOG.info("Trying to terminate thread pool for class {}", ownerClass.getSimpleName());
+            } else {
+              LOG.info("Trying to terminate thread pool: {}.", executorService);
+            }
           }
-          if (ownerClass != null) {
-            LOG.warn("Failed to terminate thread pool for {}; retrying... ({}/{})", ownerClass.getSimpleName(),
-                retryCount, retries);
-          } else {
-            LOG.warn("Failed to terminate thread pool: {}; retrying... ({}/{})", executorService, retryCount, retries);
-          }
+        } else {
+          break; // break out retry loop if all threads are complete
         }
       }
     } catch (InterruptedException e) { // If current thread is interrupted
