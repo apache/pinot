@@ -18,7 +18,6 @@ package com.linkedin.pinot.common.data;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -38,7 +37,7 @@ public interface DataManager {
 
   void removeSegment(String segmentName);
 
-  void reloadSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull CommonConstants.Helix.TableType tableType,
+  void reloadSegment(@Nonnull String tableNameWithType, @Nonnull SegmentMetadata segmentMetadata,
       @Nullable TableConfig tableConfig, @Nullable Schema schema)
       throws Exception;
 

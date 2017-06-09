@@ -231,17 +231,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void reloadSegment(@Nonnull SegmentMetadata segmentMetadata,
-      @Nonnull CommonConstants.Helix.TableType tableType, @Nullable TableConfig tableConfig, @Nullable Schema schema)
+  public synchronized void reloadSegment(@Nonnull String tableNameWithType, @Nonnull SegmentMetadata segmentMetadata,
+      @Nullable TableConfig tableConfig, @Nullable Schema schema)
       throws Exception {
     String segmentName = segmentMetadata.getName();
-    String tableName = segmentMetadata.getTableName();
-    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-      tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    } else {
-      tableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    }
-    LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableName);
+    LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
 
     File indexDir = new File(segmentMetadata.getIndexDir());
     Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
@@ -265,7 +259,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
           ColumnarSegmentLoader.load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
 
       // Replace the old segment in memory
-      _tableDataManagerMap.get(tableName).addSegment(indexSegment);
+      _tableDataManagerMap.get(tableNameWithType).addSegment(indexSegment);
 
       // Rename segment backup directory to segment temporary directory (atomic)
       // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we
@@ -275,6 +269,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Preconditions.checkState(segmentBackupDir.renameTo(segmentTempDir),
           "Failed to rename segment backup directory: %s to segment temporary directory: %s", segmentBackupDir,
           segmentTempDir);
+      LOGGER.info("Reloaded segment: {} in table: {}", segmentName, tableNameWithType);
 
       // Delete segment temporary directory
       FileUtils.deleteDirectory(segmentTempDir);

@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.data.manager.realtime;
 
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -142,7 +143,8 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
             _segmentsMap.get(segmentName).getClass().getSimpleName());
         return;
       }
-      Schema schema = ZKMetadataProvider.getRealtimeTableSchema(propertyStore, tableName);
+      Schema schema =
+          ZKMetadataProvider.getTableSchema(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName));
       if (!isValid(schema, tableConfig.getIndexingConfig())) {
         LOGGER.error("Not adding segment {}", segmentName);
         throw new RuntimeException("Mismatching schema/table config for " + _tableName);

@@ -1024,13 +1024,8 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  public Schema getOfflineTableSchema(@Nonnull String tableName) {
-    return ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
-  }
-
-  @Nullable
-  public Schema getRealtimeTableSchema(@Nonnull String tableName) {
-    return ZKMetadataProvider.getRealtimeTableSchema(_propertyStore, tableName);
+  public Schema getTableSchema(@Nonnull String tableName) {
+    return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
   }
 
   public List<String> getSchemaNames() {
