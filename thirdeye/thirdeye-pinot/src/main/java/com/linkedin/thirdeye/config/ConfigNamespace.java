@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.config;
 
 import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,16 @@ public class ConfigNamespace {
   public ConfigNamespace(String namespace, ConfigManager configDAO) {
     this.namespace = namespace;
     this.configDAO = configDAO;
+  }
+
+  /**
+   * Constructor for injection via DAORegistry
+   *
+   * @param namespace config namespace
+   */
+  public ConfigNamespace(String namespace) {
+    this.namespace = namespace;
+    this.configDAO = DAORegistry.getInstance().getConfigDAO();
   }
 
   /**
