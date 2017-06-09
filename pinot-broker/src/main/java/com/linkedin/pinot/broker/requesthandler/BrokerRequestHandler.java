@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.requesthandler;
 
 import com.google.common.base.Splitter;
+import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -87,6 +88,7 @@ public class BrokerRequestHandler {
   private static final String DEFAULT_BROKER_ID;
   public static final String BROKER_ID_CONFIG_KEY = "pinot.broker.id";
   private static final ResponseType DEFAULT_BROKER_RESPONSE_TYPE = ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+  private final SegmentZKMetadataPrunerService _segmentPrunerService;
 
   static {
     String defaultBrokerId = "";
@@ -112,8 +114,8 @@ public class BrokerRequestHandler {
   private RoundRobinReplicaSelection _replicaSelection;
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
-      ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry, BrokerMetrics brokerMetrics,
-      Configuration config) {
+      ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry,
+      SegmentZKMetadataPrunerService segmentPrunerService, BrokerMetrics brokerMetrics, Configuration config) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _reduceServiceRegistry = reduceServiceRegistry;
@@ -125,6 +127,8 @@ public class BrokerRequestHandler {
     _queryResponseLimit = config.getInt(BROKER_QUERY_RESPONSE_LIMIT_CONFIG, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _brokerTimeOutMs = config.getLong(BROKER_TIME_OUT_CONFIG, DEFAULT_BROKER_TIME_OUT_MS);
     _brokerId = config.getString(BROKER_ID_CONFIG_KEY, DEFAULT_BROKER_ID);
+    _segmentPrunerService = segmentPrunerService;
+
     LOGGER.info("Broker response limit is: " + _queryResponseLimit);
     LOGGER.info("Broker timeout is - " + _brokerTimeOutMs + " ms");
     LOGGER.info("Broker id: " + _brokerId);
