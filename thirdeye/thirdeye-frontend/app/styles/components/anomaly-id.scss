@@ -1,20 +1,24 @@
 .anomaly-id {
   list-style: none;
-  font-size: 15px;
+  font-size: $te-font-size-default;
   font-weight: lighter;
   width: 100%;
-  padding: 25px;
+  padding: $te-header-component-padding;
 
   &__item {
-    line-height: 28px;
+    line-height: $te-list-line-height;
 
     &--title {
-      font-size: 22px;
+      font-size: $te-font-size-component-title;
+    }
+
+    &--value {
+      font-size: $te-font-size-medium;
+      font-weight: normal;
     }
   }
 
-  &__value {
-    font-size: 18px;
+  &__subtitle {
     font-weight: normal;
   }
 
@@ -24,9 +28,5 @@
 
   &__percent {
     color: $anomaly-id-percent-change;
-  }
-
-  &__subtitle {
-    font-weight: normal;
   }
 }

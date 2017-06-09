@@ -12,12 +12,12 @@ const changeRateSelector = '.anomaly-id__percent';
 const anomalyId = 20475;
 const anomalyCurrentValue = 10;
 const anomalyBaselineValue = 2;
-const anomaly = Ember.Object.create({
+const anomaly = {
   anomalyIds: anomalyId,
   current: anomalyCurrentValue,
   baseline: anomalyBaselineValue,
   anomalyFunctionName: 'some-function-name'
-});
+};
 const calculateChangeRate = (current, baseline) => {
   return (baseline === 0) ? 0 : ((current - baseline) / baseline * 100).toFixed(2);
 };
@@ -26,14 +26,15 @@ const calculateChangeRate = (current, baseline) => {
 test('Anomaly ID block: all meta properties render', function(assert) {
   let changeRate = calculateChangeRate(anomaly.current, anomaly.baseline);
 
-  this.set('anomaly', anomaly);
-  this.set('anomalyChangeRate', changeRate);
+  // this.set('anomaly', anomaly);
+  // this.set('anomalyChangeRate', changeRate);
+  this.setProperties({ 'anomaly': anomaly, 'anomalyChangeRate': changeRate });
   this.render(hbs`{{anomaly-id anomaly=anomaly}}`);
 
-  assert.equal(this.$(idSelector).text().trim(), anomalyId);
-  assert.equal(this.$(nameSelector).text().trim(), anomaly.anomalyFunctionName);
-  assert.equal(this.$(currentValueSelector).text().trim(), anomaly.current);
-  assert.equal(this.$(changeRateSelector).text().trim(), '(' + changeRate + '%)');
+  assert.equal(this.$(idSelector).text().trim(), anomalyId, 'The anomaly id is correct and renders');
+  assert.equal(this.$(nameSelector).text().trim(), anomaly.anomalyFunctionName, 'The anomaly name is correct and renders');
+  assert.equal(this.$(currentValueSelector).text().trim(), anomaly.current, 'The current value is correct and renders');
+  assert.equal(this.$(changeRateSelector).text().trim(), '(' + changeRate + '%)', 'The change rate is correct and renders');
 });
 
 // Now test for proper handling of a zero-value for baseline. In this case, percent change
@@ -42,9 +43,10 @@ test('Anomaly ID block: render correct change rate for zero baseline', function(
   anomaly.baseline = 0;
   let changeRate = calculateChangeRate(anomaly.current, anomaly.baseline);
 
-  this.set('anomaly', anomaly);
-  this.set('anomalyChangeRate', changeRate);
+  // this.set('anomaly', anomaly);
+  // this.set('anomalyChangeRate', changeRate);
+  this.setProperties({ 'anomaly': anomaly, 'anomalyChangeRate': changeRate });
   this.render(hbs`{{anomaly-id anomaly=anomaly}}`);
 
-  assert.equal(this.$(changeRateSelector).text().trim(), '(' + changeRate + '%)');
+  assert.equal(this.$(changeRateSelector).text().trim(), '(' + changeRate + '%)', 'The change rate handles a zero baseline correctly');
 });
