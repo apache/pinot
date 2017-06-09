@@ -22,6 +22,7 @@ import com.linkedin.thirdeye.dashboard.resources.OverrideConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import com.linkedin.thirdeye.dashboard.resources.v2.ConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
@@ -124,6 +125,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
+    env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
 
     if(config.getRootCause() != null) {
       env.jersey().register(makeRootCauseResource(config));
