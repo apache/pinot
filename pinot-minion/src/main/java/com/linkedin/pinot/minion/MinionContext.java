@@ -13,23 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.minion.executor;
+package com.linkedin.pinot.minion;
 
-import com.linkedin.pinot.minion.MinionContext;
+import com.linkedin.pinot.minion.metrics.MinionMetrics;
+import java.io.File;
 import javax.annotation.Nonnull;
 
 
-public abstract class BaseTaskExecutor implements PinotTaskExecutor {
-  protected MinionContext _minionContext;
-  protected boolean _cancelled = false;
+/**
+ * The <code>MinionContext</code> class contains all minion related context.
+ */
+public class MinionContext {
+  private final File _dataDir;
+  private final MinionMetrics _minionMetrics;
 
-  @Override
-  public void setMinionContext(@Nonnull MinionContext minionContext) {
-    _minionContext = minionContext;
+  public MinionContext(@Nonnull File dataDir, @Nonnull MinionMetrics minionMetrics) {
+    _dataDir = dataDir;
+    _minionMetrics = minionMetrics;
   }
 
-  @Override
-  public void cancel() {
-    _cancelled = true;
+  public File getDataDir() {
+    return _dataDir;
+  }
+
+  public MinionMetrics getMinionMetrics() {
+    return _minionMetrics;
   }
 }

@@ -51,9 +51,9 @@ public class Instance {
     } else if (CommonConstants.Helix.BROKER_INSTANCE_TYPE.equalsIgnoreCase(type)) {
       _instancePrefix = CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE;
       _type = CommonConstants.Helix.BROKER_INSTANCE_TYPE;
-    } else if (CommonConstants.Helix.MINION_INSTANCE_TYPE.equalsIgnoreCase(type)) {
-      _instancePrefix = CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE;
-      _type = CommonConstants.Helix.MINION_INSTANCE_TYPE;
+    } else if (CommonConstants.Minion.INSTANCE_TYPE.equalsIgnoreCase(type)) {
+      _instancePrefix = CommonConstants.Minion.INSTANCE_PREFIX;
+      _type = CommonConstants.Minion.INSTANCE_TYPE;
     } else {
       throw new IllegalArgumentException("Invalid instance type " + type + ", expected either server or broker");
     }
@@ -118,8 +118,8 @@ public class Instance {
           return CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
         case CommonConstants.Helix.BROKER_INSTANCE_TYPE:
           return CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
-        case CommonConstants.Helix.MINION_INSTANCE_TYPE:
-          return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
+        case CommonConstants.Minion.INSTANCE_TYPE:
+          return CommonConstants.Minion.UNTAGGED_INSTANCE;
         default:
           throw new RuntimeException("Unknown instance type " + _type + ", was expecting either server or broker");
       }

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.minion.executor;
 
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.minion.MinionContext;
 import javax.annotation.Nonnull;
 
 
@@ -23,6 +24,11 @@ import javax.annotation.Nonnull;
  * The interface <code>PinotTaskExecutor</code> defines the APIs for task executors.
  */
 public interface PinotTaskExecutor {
+
+  /**
+   * Set the minion context.
+   */
+  void setMinionContext(@Nonnull MinionContext minionContext);
 
   /**
    * Execute the task based on the given {@link PinotTaskConfig}.

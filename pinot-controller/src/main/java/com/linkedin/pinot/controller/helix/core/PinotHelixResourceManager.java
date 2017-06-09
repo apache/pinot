@@ -823,7 +823,7 @@ public class PinotHelixResourceManager {
       for (String tag : config.getTags()) {
         if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
             || tag.equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
-            || tag.equals(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE)) {
+            || tag.equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
         if (ControllerTenantNameBuilder.getTenantRoleFromTenantName(tag) == TenantRole.BROKER) {
@@ -842,7 +842,7 @@ public class PinotHelixResourceManager {
       for (String tag : config.getTags()) {
         if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
             || tag.equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
-            || tag.equals(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE)) {
+            || tag.equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
         if (ControllerTenantNameBuilder.getTenantRoleFromTenantName(tag) == TenantRole.SERVER) {
