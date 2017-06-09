@@ -342,7 +342,7 @@ create index onboard_onboarded_idx on onboard_dataset_metric_index(onboarded);
 
 create table if not exists config_index (
     namespace varchar(64) not null,
-    name varchar(128),
+    name varchar(128) not null,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
