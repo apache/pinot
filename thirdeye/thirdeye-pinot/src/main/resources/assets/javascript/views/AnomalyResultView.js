@@ -92,8 +92,8 @@ function AnomalyResultView(anomalyResultModel) {
   this.timeRangeConfig = {
     startDate : this.anomalyResultModel.startDate,
     endDate : this.anomalyResultModel.endDate,
-    dateLimit : {
-      days : 60
+    dateLimit: {
+      months: 6
     },
     showDropdowns : true,
     showWeekNumbers : true,
