@@ -248,7 +248,7 @@ AnalysisView.prototype = {
       endDate: initialEnd,
       maxDate: maxTime,
       dateLimit: {
-        days: 60
+      months: 6
       },
       showDropdowns: true,
       showWeekNumbers: true,
