@@ -1455,14 +1455,6 @@ public class PinotHelixResourceManager {
   public int reloadAllSegments(@Nonnull String tableNameWithType) {
     LOGGER.info("Sending reload message for table: {}", tableNameWithType);
 
-    // TODO: Remove this part after all servers get updated
-    int numMessagesSent = 0;
-    List<String> segments = getSegmentsFor(tableNameWithType);
-    for (String segmentName : segments) {
-      numMessagesSent += reloadSegment(tableNameWithType, segmentName);
-    }
-
-    /* TODO: uncomment this part after all servers get updated
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
@@ -1479,7 +1471,7 @@ public class PinotHelixResourceManager {
     } else {
       LOGGER.warn("No reload message sent for table: {}", tableNameWithType);
     }
-    */
+
     return numMessagesSent;
   }
 
