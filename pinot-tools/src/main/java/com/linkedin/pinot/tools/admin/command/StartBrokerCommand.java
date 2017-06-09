@@ -107,10 +107,6 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   @Override
   public boolean execute() throws Exception {
     try {
-      if (_brokerHost == null) {
-        _brokerHost = NetUtil.getHostAddress();
-      }
-
       Configuration configuration = readConfigFromFile(_configFileName);
       if (configuration == null) {
         if (_configFileName != null) {
@@ -124,7 +120,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
       }
 
       LOGGER.info("Executing command: " + toString());
-      final HelixBrokerStarter pinotHelixBrokerStarter = new HelixBrokerStarter(_clusterName, _zkAddress, configuration);
+      final HelixBrokerStarter pinotHelixBrokerStarter =
+          new HelixBrokerStarter(_brokerHost, _clusterName, _zkAddress, configuration);
 
       String pidFile = ".pinotAdminBroker-" + String.valueOf(System.currentTimeMillis()) + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);

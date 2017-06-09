@@ -76,16 +76,26 @@ public class HelixBrokerStarter {
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
+    this(null, helixClusterName, zkServer, pinotHelixProperties);
+  }
+
+  public HelixBrokerStarter(String brokerHost, String helixClusterName, String zkServer, Configuration pinotHelixProperties)
+      throws Exception {
     LOGGER.info("Starting Pinot broker");
 
     _liveInstancesListener = new LiveInstancesChangeListenerImpl(helixClusterName);
 
     _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
+
+    if (brokerHost == null) {
+      brokerHost = NetUtil.getHostAddress();
+    }
+
     final String brokerId =
         _pinotHelixProperties.getString(
                 CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
                 CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE
-                        + NetUtil.getHostAddress()
+                        + brokerHost
                         + "_"
                         + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
@@ -243,7 +253,7 @@ public class HelixBrokerStarter {
     configuration.addProperty("pinot.broker.timeoutMs", 500 * 1000L);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("quickstart", "localhost:2122", configuration);
+        new HelixBrokerStarter(null, "quickstart", "localhost:2122", configuration);
     return pinotHelixBrokerStarter;
   }
 
