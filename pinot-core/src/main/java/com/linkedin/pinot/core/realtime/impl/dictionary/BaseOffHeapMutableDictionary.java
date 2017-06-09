@@ -133,6 +133,9 @@ import javax.annotation.Nonnull;
 public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   // Percent of cardinality that we expect to hold in the overflow hash table.
   private static final int OVERFLOW_THRESHOLD_PERCENT = 1;
+  // List of primes from http://compoasso.free.fr/primelistweb/page/prime/liste_online_en.php
+  private static int[] PRIME_NUMBERS = new int[] {20011, 40009, 60013, 80021, 100003, 125113, 150011, 175003, 200003,
+      225023, 250007, 275003, 300007,350003, 400009, 450001, 500009, 600011,700001, 800011, 900001, 1000003};
 
   // expansionMultiple setting as we add new buffers. A setting of 1 sets the new buffer to be
   // the same size as the last one added. Setting of 2 allocates a buffer twice as big as the
@@ -182,14 +185,14 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
 
   private AtomicReference<ValueToDictId> _valueToDict = new AtomicReference<>();
 
-  protected BaseOffHeapMutableDictionary(int estimatedCardinality) {
-    final int initialRowCount = nearestPowerOf2(estimatedCardinality);
+  protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize) {
+    final int initialRowCount = nearestPrime(estimatedCardinality);
     _numEntries = 0;
-    _maxItemsInOverflowHash = initialRowCount * OVERFLOW_THRESHOLD_PERCENT /100 + 1;
+    _maxItemsInOverflowHash = maxOverflowHashSize;
     ValueToDictId valueToDictId = new ValueToDictId(new ArrayList<IntBuffer>(0), new ConcurrentHashMap<Object, Integer>(0));
     _valueToDict.set(valueToDictId);
     _sizeOfFirstBuf = initialRowCount * NUM_COLUMNS;
-    if (!HEAP_FIRST) {
+    if (!HEAP_FIRST || (maxOverflowHashSize == 0)) {
       expand(_sizeOfFirstBuf);
     }
   }
@@ -251,10 +254,19 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     _pinotDataBuffers.clear();
   }
 
+  private int nearestPrime(int size) {
+    for (int i = 0; i < PRIME_NUMBERS.length; i++) {
+      if (PRIME_NUMBERS[i] >= size) {
+        return PRIME_NUMBERS[i];
+      }
+    }
+    return PRIME_NUMBERS[PRIME_NUMBERS.length-1];
+  }
+
   private IntBuffer expand(final int newSize) {
-    // newSize must be a power of 2
+    // newSize must be a multiple of NUM_COLUMNS
     final int bbSize = newSize * V1Constants.Numbers.INTEGER_SIZE;
-    final int mask = newSize/NUM_COLUMNS - 1;
+    final int modulo = newSize / NUM_COLUMNS;
 
     ValueToDictId valueToDictId = _valueToDict.get();
     List<IntBuffer> oldList = valueToDictId.getIBufList();
@@ -270,22 +282,23 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       iBuf.put(i, NULL_VALUE_INDEX);
     }
     newList.add(iBuf);
-
-    Map<Object, Integer> oldOverflowMap = valueToDictId.getOverflowMap();
     Map<Object, Integer> newOverflowMap = new ConcurrentHashMap<>(_maxItemsInOverflowHash);
-    for (Map.Entry<Object, Integer> entry: oldOverflowMap.entrySet()) {
-      final int hashVal = Math.abs(entry.getKey().hashCode());
-      final int offsetInBuf = (hashVal & mask) * NUM_COLUMNS;
-      boolean done= false;
-      for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
-        if (iBuf.get(i) == NULL_VALUE_INDEX) {
-          iBuf.put(i, entry.getValue());
-          done = true;
-          break;
+    if (_maxItemsInOverflowHash > 0) {
+      Map<Object, Integer> oldOverflowMap = valueToDictId.getOverflowMap();
+      for (Map.Entry<Object, Integer> entry : oldOverflowMap.entrySet()) {
+        final int hashVal = Math.abs(entry.getKey().hashCode());
+        final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
+        boolean done = false;
+        for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
+          if (iBuf.get(i) == NULL_VALUE_INDEX) {
+            iBuf.put(i, entry.getValue());
+            done = true;
+            break;
+          }
         }
-      }
-      if (!done) {
-        newOverflowMap.put(entry.getKey(), entry.getValue());
+        if (!done) {
+          newOverflowMap.put(entry.getKey(), entry.getValue());
+        }
       }
     }
     ValueToDictId newValueToDictId = new ValueToDictId(newList, newOverflowMap);
@@ -317,7 +330,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     while (newSize >= Integer.MAX_VALUE) {
       newSize = newSize/2;
     }
-    return (int)newSize;
+    return nearestPrime((int) newSize);
   }
 
   protected int nearestPowerOf2(int num) {
@@ -334,8 +347,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     final ValueToDictId valueToDictId = _valueToDict.get();
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
     for (IntBuffer iBuf : iBufList) {
-      final int mask = iBuf.capacity()/NUM_COLUMNS - 1;
-      final int offsetInBuf = (hashVal & mask) * NUM_COLUMNS;
+      final int modulo = iBuf.capacity()/NUM_COLUMNS;
+      final int offsetInBuf = (hashVal % modulo)  * NUM_COLUMNS;
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         int dictId = iBuf.get(i);
         if (dictId != NULL_VALUE_INDEX) {
@@ -344,6 +357,9 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
           }
         }
       }
+    }
+    if (_maxItemsInOverflowHash == 0) {
+      return NULL_VALUE_INDEX;
     }
     Integer dictId = valueToDictId.getOverflowMap().get(rawValue);
     if (dictId == null) {
@@ -358,8 +374,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
 
     for (IntBuffer iBuf : iBufList) {
-      final int mask = iBuf.capacity()/NUM_COLUMNS - 1;
-      final int offsetInBuf = (hashVal & mask) * NUM_COLUMNS;
+      final int modulo = iBuf.capacity()/NUM_COLUMNS;
+      final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         final int dictId = iBuf.get(i);
         if (dictId == NULL_VALUE_INDEX) {
@@ -374,21 +390,25 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     }
     // We know that we had a hash collision beyond the number of columns in the buffer.
     Map<Object, Integer> overflowMap = valueToDictId.getOverflowMap();
-    Integer dictId = overflowMap.get(value);
-    if (dictId != null) {
-      return;
+    if (_maxItemsInOverflowHash > 0) {
+      Integer dictId = overflowMap.get(value);
+      if (dictId != null) {
+        return;
+      }
     }
 
     setRawValueAt(_numEntries, value);
 
-    if (overflowMap.size() < _maxItemsInOverflowHash) {
-      overflowMap.put(value, _numEntries++);
-      return;
+    if (_maxItemsInOverflowHash > 0) {
+      if (overflowMap.size() < _maxItemsInOverflowHash) {
+        overflowMap.put(value, _numEntries++);
+        return;
+      }
     }
-    // Overflow map has exceeded in size, create a new buffer.
+    // Need a new buffer
     IntBuffer buf = expand();
-    final int mask = buf.capacity()/NUM_COLUMNS - 1;
-    final int offsetInBuf = (hashVal & mask) * NUM_COLUMNS;
+    final int modulo = buf.capacity()/NUM_COLUMNS;
+    final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
     boolean done = false;
     for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
       if (buf.get(i) == NULL_VALUE_INDEX) {
@@ -397,12 +417,59 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
         break;
       }
     }
+    if (_maxItemsInOverflowHash == 0) {
+      if (!done) {
+        throw new RuntimeException("Impossible");
+      }
+    }
     if (!done) {
       valueToDictId = _valueToDict.get();
       overflowMap = valueToDictId.getOverflowMap();
       overflowMap.put(value, _numEntries++);
     }
   }
+
+  public long getTotalOffHeapMemUsed() {
+    ValueToDictId valueToDictId = _valueToDict.get();
+    long size = 0;
+    for (IntBuffer iBuf : valueToDictId._iBufList) {
+      size = size + iBuf.capacity() * V1Constants.Numbers.INTEGER_SIZE;
+    }
+    return size;
+  }
+
+  public int getNumberOfHeapBuffersUsed() {
+    ValueToDictId valueToDictId = _valueToDict.get();
+    return valueToDictId._iBufList.size();
+  }
+
+  public int getNumberOfOveflowValues() {
+    ValueToDictId valueToDictId = _valueToDict.get();
+    return valueToDictId._overflowMap.size();
+  }
+
+  public int[] getRowFillCount() {
+    ValueToDictId valueToDictId = _valueToDict.get();
+    int rowsWith1Col[] = new int[NUM_COLUMNS];
+
+    for (int i = 0; i < rowsWith1Col.length; i++) {
+      rowsWith1Col[i] = 0;
+    }
+
+    for (IntBuffer iBuf : valueToDictId._iBufList) {
+      final int nRows = iBuf.capacity()/NUM_COLUMNS;
+      for (int row = 0; row < nRows; row++) {
+        for (int col = 0; col < NUM_COLUMNS; col++) {
+          if (iBuf.get(row * NUM_COLUMNS + col) == NULL_VALUE_INDEX) {
+            rowsWith1Col[col]++;
+            break;
+          }
+        }
+      }
+    }
+    return rowsWith1Col;
+  }
+
 
   public abstract void doClose() throws IOException;
 

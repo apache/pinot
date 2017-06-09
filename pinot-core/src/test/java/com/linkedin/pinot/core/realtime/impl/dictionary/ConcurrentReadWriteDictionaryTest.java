@@ -49,7 +49,7 @@ public class ConcurrentReadWriteDictionaryTest {
         dictionary.close();
       }
       {
-        MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3));
+        MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000);
         testSingleReaderSingleWriter(dictionary);
         dictionary.close();
       }
@@ -78,7 +78,7 @@ public class ConcurrentReadWriteDictionaryTest {
       }
       */
       {
-        MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3));
+        MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000);
         testMultiReadersSingleWriter(dictionary);
         dictionary.close();
       }
@@ -96,40 +96,43 @@ public class ConcurrentReadWriteDictionaryTest {
     FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[] {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE};
     int numEntries;
     final Map<Object, Integer> valueToDictId = new HashMap<>();
+    final int[] overflowSizes = new int[] {0, 2000};
 
     for (FieldSpec.DataType dataType : dataTypes) {
-      MutableDictionary dictionary = makeDictionary(dataType, estCaridinality);
-      valueToDictId.clear();
-      numEntries = 0;
-      for (int i = 0; i < numValues; i++) {
-        try {
-          Object x = makeRandomNumber(dataType);
-          if (valueToDictId.containsKey(x)) {
-            Assert.assertEquals(Integer.valueOf(dictionary.indexOf(x)), valueToDictId.get(x));
-          } else {
-            dictionary.index(x);
-            int dictId = dictionary.indexOf(x);
-            Assert.assertEquals(dictId, numEntries++);
-            valueToDictId.put(x, dictId);
+      for (int overflowSize : overflowSizes) {
+        MutableDictionary dictionary = makeDictionary(dataType, estCaridinality, overflowSize);
+        valueToDictId.clear();
+        numEntries = 0;
+        for (int i = 0; i < numValues; i++) {
+          try {
+            Object x = makeRandomNumber(dataType);
+            if (valueToDictId.containsKey(x)) {
+              Assert.assertEquals(Integer.valueOf(dictionary.indexOf(x)), valueToDictId.get(x));
+            } else {
+              dictionary.index(x);
+              int dictId = dictionary.indexOf(x);
+              Assert.assertEquals(dictId, numEntries++);
+              valueToDictId.put(x, dictId);
+            }
+          } catch (Throwable t) {
+            t.printStackTrace();
+            Assert.fail("Failed with seed " + SEED + " iteration " + i + " for dataType " + dataType.toString() + " overflowsize=" + overflowSize);
           }
-        } catch (Throwable t) {
-          t.printStackTrace();
-          Assert.fail("Failed with seed " + SEED + " iteration " + i + " for dataType " + dataType.toString());
         }
       }
     }
   }
 
-  private MutableDictionary makeDictionary(FieldSpec.DataType dataType, final int estCaridinality) {
+  private MutableDictionary makeDictionary(FieldSpec.DataType dataType, final int estCaridinality, int maxOverflowSize) {
     switch (dataType) {
       case INT:
-        return new IntOffHeapMutableDictionary(estCaridinality);
+        return new IntOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
       case LONG:
-        return new LongOffHeapMutableDictionary(estCaridinality);
+        return new LongOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
       case FLOAT:
-        return new FloatOffHeapMutableDictionary(estCaridinality);
+        return new FloatOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
       case DOUBLE:
-        return new DoubleOffHeapMutableDictionary(estCaridinality);
+        return new DoubleOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
     }
     throw new UnsupportedOperationException("Unsupported type " + dataType.toString());
   }

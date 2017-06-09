@@ -29,8 +29,8 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   private final FixedByteSingleColumnSingleValueReaderWriter _dictIdToValue;
 
-  public DoubleOffHeapMutableDictionary(int estimatedCardinality) {
-    super(estimatedCardinality);
+  public DoubleOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize) {
+    super(estimatedCardinality, maxOverflowSize);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);
     _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.DOUBLE_SIZE);
   }
