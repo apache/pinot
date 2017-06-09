@@ -57,6 +57,7 @@
   "private": true,
   "dependencies": {
     "bower": "^1.8.0",
+    "ember-radio-button": "^1.1.1",
     "moment": "^2.18.1"
   }
 }
