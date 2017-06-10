@@ -243,7 +243,9 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         DataFrame joined = changesTarget.joinInner(changesCandidate);
 
         try {
-          double score = this.strategy.score(joined.getDoubles(COL_TARGET), joined.getDoubles(COL_CANDIDATE)) * targetMetric.getScore();
+          double score =
+              this.strategy.score(joined.getDoubles(COL_TARGET), joined.getDoubles(COL_CANDIDATE))
+              * targetMetric.getScore() * candidateMetric.getScore();
 
           LOG.debug("Score for target '{}' and candidate '{}' is {} (based on {} data points)", targetMetric.getUrn(), candidateMetric.getUrn(), score, joined.size());
 
