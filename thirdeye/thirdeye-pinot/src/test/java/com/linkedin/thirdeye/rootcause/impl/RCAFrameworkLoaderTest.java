@@ -12,13 +12,13 @@ public class RCAFrameworkLoaderTest {
   public void testAugmentPathProperty() {
     File rcaConfig = new File("/my/path/config.yml");
 
-    Map<String, String> prop = new HashMap<>();
+    Map<String, Object> prop = new HashMap<>();
     prop.put("key", "value");
     prop.put("absolutePath", "/absolute/path.txt");
     prop.put("relativePath", "relative_path.txt");
     prop.put("path", "another_relative_path.txt");
 
-    Map<String, String> aug = RCAFrameworkLoader.augmentPathProperty(prop, rcaConfig);
+    Map<String, Object> aug = RCAFrameworkLoader.augmentPathProperty(prop, rcaConfig);
 
     Assert.assertEquals(aug.get("key"), "value");
     Assert.assertEquals(aug.get("absolutePath"), "/absolute/path.txt");

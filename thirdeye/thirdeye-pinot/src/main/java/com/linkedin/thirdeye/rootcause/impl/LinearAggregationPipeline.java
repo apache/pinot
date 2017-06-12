@@ -51,12 +51,12 @@ public class LinearAggregationPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_K})
    */
-  public LinearAggregationPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) {
+  public LinearAggregationPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
 
     String kProp = PROP_K_DEFAULT;
     if(properties.containsKey(PROP_K))
-      kProp = properties.get(PROP_K);
+      kProp = properties.get(PROP_K).toString();
     this.k = Integer.parseInt(kProp);
   }
 

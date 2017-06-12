@@ -68,20 +68,20 @@ public class EntityMappingPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_MAPPING_TYPE}, {@code PROP_IS_REWRITER=false}, {@code PROP_MATCH_PREFIX=false})
    */
-  public EntityMappingPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) throws IOException {
+  public EntityMappingPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) throws IOException {
     super(outputName, inputNames);
 
     if(!properties.containsKey(PROP_MAPPING_TYPE))
       throw new IllegalArgumentException(String.format("Property '%s' required, but not found", PROP_MAPPING_TYPE));
-    String mappingTypeProp = properties.get(PROP_MAPPING_TYPE);
+    String mappingTypeProp = properties.get(PROP_MAPPING_TYPE).toString();
 
     String isRewriterProp = String.valueOf(PROP_IS_REWRITER_DEFAULT);
     if(properties.containsKey(PROP_IS_REWRITER))
-      isRewriterProp = properties.get(PROP_IS_REWRITER);
+      isRewriterProp = properties.get(PROP_IS_REWRITER).toString();
 
     String matchPrefixProp = String.valueOf(PROP_MATCH_PREFIX_DEFAULT);
     if(properties.containsKey(PROP_MATCH_PREFIX))
-      matchPrefixProp = properties.get(PROP_MATCH_PREFIX);
+      matchPrefixProp = properties.get(PROP_MATCH_PREFIX).toString();
 
     this.entityDAO = DAORegistry.getInstance().getEntityToEntityMappingDAO();
     this.mappingType = mappingTypeProp;

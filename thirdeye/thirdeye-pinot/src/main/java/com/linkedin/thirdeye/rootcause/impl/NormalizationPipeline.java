@@ -34,7 +34,7 @@ public class NormalizationPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-  public NormalizationPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+  public NormalizationPipeline(String outputName, Set<String> inputNames, Map<String, Object> ignore) {
     super(outputName, inputNames);
   }
 

@@ -48,17 +48,18 @@ public class TopKPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_K}, {@code PROP_CLASS})
    */
-  public TopKPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) throws Exception {
+  @SuppressWarnings("unchecked")
+  public TopKPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) throws Exception {
     super(outputName, inputNames);
 
     if(!properties.containsKey(PROP_K))
       throw new IllegalArgumentException(String.format("Property '%s' required, but not found", PROP_K));
-    this.k = Integer.parseInt(properties.get(PROP_K));
+    this.k = Integer.parseInt(properties.get(PROP_K).toString());
 
     String classProp = PROP_CLASS_DEFAULT;
     if(properties.containsKey(PROP_CLASS))
-      classProp = properties.get(PROP_CLASS);
-    this.clazz = (Class<? extends Entity>)Class.forName(classProp);
+      classProp = properties.get(PROP_CLASS).toString();
+    this.clazz = (Class<? extends Entity>) Class.forName(classProp);
   }
 
   @Override

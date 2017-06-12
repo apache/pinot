@@ -14,7 +14,7 @@ public class PipelineConfiguration {
   private String outputName;
   private String className;
   private List<String> inputNames;
-  private Map<String, String> properties = null;
+  private Map<String, Object> properties;
 
   public String getOutputName() {
     return outputName;
@@ -28,10 +28,10 @@ public class PipelineConfiguration {
   public void setClassName(String className) {
     this.className = className;
   }
-  public Map<String, String> getProperties() {
+  public Map<String, Object> getProperties() {
     return properties;
   }
-  public void setProperties(Map<String, String> properties) {
+  public void setProperties(Map<String, Object> properties) {
     this.properties = properties;
   }
   public List<String> getInputNames() {
