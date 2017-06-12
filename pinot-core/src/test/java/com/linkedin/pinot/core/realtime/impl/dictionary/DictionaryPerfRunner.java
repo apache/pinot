@@ -114,17 +114,16 @@ public class DictionaryPerfRunner {
   public static void main(String[] args)
       throws InterruptedException, IOException {
     final int cardinality = Integer.parseInt(args[0]);
-    MutableDictionary dictionary;
 
     System.out.println("--------------------------------------------------------------------------------");
-    dictionary = new IntOnHeapMutableDictionary();
-    readWritePerfOnCardinality(cardinality, dictionary);
-    dictionary.close();
+    try (MutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
+      readWritePerfOnCardinality(cardinality, dictionary);
+    }
     System.out.println("--------------------------------------------------------------------------------");
     System.out.println("--------------------------------------------------------------------------------");
-    dictionary = new IntOnHeapMutableDictionary();
-    multiReadersPerfOnCardinality(cardinality, dictionary);
-    dictionary.close();
+    try (MutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
+      multiReadersPerfOnCardinality(cardinality, dictionary);
+    }
     System.out.println("--------------------------------------------------------------------------------");
 
     EXECUTOR_SERVICE.shutdown();

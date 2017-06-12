@@ -42,14 +42,14 @@ import javax.annotation.Nonnull;
  * size. At this point, we add a new IntBuffer, and transfer items from the overflow hashmap into the newly allocated
  * buffer, and also create a new overflow hashmap to handle future collisions.
  *
- * The overflow hashmap is set to have a size threshold of OVERFLOW_THRESHOLD_PERCENT (as a percentage of the initial
- * estimated cardinality).
+ * Overflow on-heap hashmap is set to contain a max number of values as provided in the constructor. If number is 0
+ * then overflow on-heap hashmap is disabled.
  *
  * To start with, we only have the on-heap overflow buffer. The IntBuffers are allocated when overflow hashmap reaches
  * a threshold number of entries.
  *
- * A buffer has N (a power of 2) rows  and NUM_COLUMNS columns, as below.
- * - The actual value for  NUM_COLUMNS is yet to be tuned.
+ * A buffer has N rows (N being a prime number) and NUM_COLUMNS columns, as below.
+ * - The actual value for NUM_COLUMNS is yet to be tuned.
  * - Each cell in the buffer can hold one integer.
  *
  *                | col 0 | col 1 | ..... | col M-1 |

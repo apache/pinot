@@ -70,13 +70,11 @@ public class ConcurrentReadWriteDictionaryTest {
   @Test
   public void testMultiReadersSingleWriter() throws Exception {
     try {
-      /*
       {
         MutableDictionary dictionary = new IntOnHeapMutableDictionary();
         testMultiReadersSingleWriter(dictionary);
         dictionary.close();
       }
-      */
       {
         MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000);
         testMultiReadersSingleWriter(dictionary);
@@ -89,10 +87,9 @@ public class ConcurrentReadWriteDictionaryTest {
   }
 
   // A test to verify the functionality of off-heap int dictionary without concurrency
-  @Test
-  public void testOffHeapDictionary() throws Exception {
-    final int estCaridinality = 943;
-    final int numValues = estCaridinality * 107;
+  private void testRealtimeDictionary(boolean onHeap) throws Exception {
+    final int estCardinality = 943;
+    final int numValues = estCardinality * 107;
     FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[] {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE};
     int numEntries;
     final Map<Object, Integer> valueToDictId = new HashMap<>();
@@ -100,7 +97,7 @@ public class ConcurrentReadWriteDictionaryTest {
 
     for (FieldSpec.DataType dataType : dataTypes) {
       for (int overflowSize : overflowSizes) {
-        MutableDictionary dictionary = makeDictionary(dataType, estCaridinality, overflowSize);
+        MutableDictionary dictionary = makeDictionary(dataType, estCardinality, overflowSize, onHeap);
         valueToDictId.clear();
         numEntries = 0;
         for (int i = 0; i < numValues; i++) {
@@ -123,15 +120,34 @@ public class ConcurrentReadWriteDictionaryTest {
     }
   }
 
-  private MutableDictionary makeDictionary(FieldSpec.DataType dataType, final int estCaridinality, int maxOverflowSize) {
+  @Test
+  public void testRealtimeDictionary() throws Exception {
+    testRealtimeDictionary(true);
+    testRealtimeDictionary(false);
+  }
+
+  private MutableDictionary makeDictionary(FieldSpec.DataType dataType, final int estCaridinality, int maxOverflowSize,
+      boolean onHeap) {
     switch (dataType) {
       case INT:
+        if (onHeap) {
+          return new IntOnHeapMutableDictionary();
+        }
         return new IntOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
       case LONG:
+        if (onHeap) {
+          return new LongOnHeapMutableDictionary();
+        }
         return new LongOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
       case FLOAT:
+        if (onHeap) {
+          return new FloatOnHeapMutableDictionary();
+        }
         return new FloatOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
       case DOUBLE:
+        if (onHeap) {
+          return new DoubleOnHeapMutableDictionary();
+        }
         return new DoubleOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
     }
     throw new UnsupportedOperationException("Unsupported type " + dataType.toString());
