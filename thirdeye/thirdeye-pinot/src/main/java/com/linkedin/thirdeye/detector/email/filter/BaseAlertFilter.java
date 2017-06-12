@@ -8,6 +8,19 @@ import org.slf4j.LoggerFactory;
 
 public abstract class BaseAlertFilter implements AlertFilter {
   private final static Logger LOG = LoggerFactory.getLogger(BaseAlertFilter.class);
+
+  // Check if the given string can be parsed as double value
+  public static boolean isNumeric(String str) {
+    try {
+      double d = Double.parseDouble(str);
+    }
+    catch(NumberFormatException nfe) {
+      return false;
+    }
+    return true;
+  }
+
+
   /**
    * Parses the parameter setting for this filter.
    *
@@ -23,9 +36,17 @@ public abstract class BaseAlertFilter implements AlertFilter {
     Class c = this.getClass();
     for (String fieldName : getPropertyNames()) {
       Double value = null;
+      String strVal = null;
+      boolean isNumeric = true;
       // Get user's value for the specified field
       if (parameterSetting.containsKey(fieldName)) {
-        value = Double.parseDouble(parameterSetting.get(fieldName));
+        String fieldVal = parameterSetting.get(fieldName);
+        if (isNumeric(fieldVal)) {
+          value = Double.parseDouble(parameterSetting.get(fieldName));
+        } else {
+          isNumeric = false;
+          strVal = fieldVal;
+        }
       } else {
         // If user's value does not exist, try to get the default value from Class definition
         try {
@@ -50,7 +71,12 @@ public abstract class BaseAlertFilter implements AlertFilter {
         Field field = c.getDeclaredField(fieldName);
         boolean accessible = field.isAccessible();
         field.setAccessible(true);
-        field.set(this, Double.valueOf(value));
+        if (isNumeric) {
+          field.set(this, Double.valueOf(value));
+        }
+        else {
+          field.set(this, strVal);
+        }
         field.setAccessible(accessible);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         LOG.warn("Failed to set the field {} for class {} exception: {}", fieldName, c.getSimpleName(), e.toString());
