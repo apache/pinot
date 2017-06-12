@@ -127,7 +127,7 @@ public class BenchmarkDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapMinSizeWithoutOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 0);
+    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 0);
 
     for (int i = 0; i < colValues.length; i++) {
       dictionary.index(colValues[i]);
@@ -141,7 +141,7 @@ public class BenchmarkDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapMinSizeWithOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 1000);
+    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 1000);
 
     for (int i = 0; i < colValues.length; i++) {
       dictionary.index(colValues[i]);
