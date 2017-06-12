@@ -16,33 +16,16 @@
 
 package com.linkedin.pinot.routing;
 
-import com.google.common.collect.Sets;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.BrokerTimer;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.KafkaLowLevelConsumerRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.LargeClusterRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
@@ -58,6 +41,21 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Sets;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerTimer;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
+
 
 /*
  * TODO
@@ -69,166 +67,49 @@ import org.slf4j.LoggerFactory;
 public class HelixExternalViewBasedRouting implements RoutingTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
 
-  private final RoutingTableBuilder _largeClusterRoutingTableBuilder;
-  private RoutingTableBuilder _smallClusterRoutingTableBuilder;
-  private final RoutingTableBuilder _realtimeHLCRoutingTableBuilder;
-  private final RoutingTableBuilder _realtimeLLCRoutingTableBuilder;
-
-  private static int MIN_SERVER_COUNT_FOR_LARGE_CLUSTER = 30;
-  private static int MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER = 4;
-
-  /*
-   * _brokerRoutingTable has entries for offline as well as realtime tables. For the
-   * realtime tables it has entries consisting of high-level kafka consumer segments only.
-   *
-   * _llcBrokerRoutingTable has entries for realtime tables only, and has entries for low-level
-   * kafka consumer segments only.
-   */
-  private final Map<String, List<ServerToSegmentSetMap>> _brokerRoutingTable =
-      new ConcurrentHashMap<String, List<ServerToSegmentSetMap>>();
-  private final Map<String, List<ServerToSegmentSetMap>> _llcBrokerRoutingTable =
-      new ConcurrentHashMap<String, List<ServerToSegmentSetMap>>();
+  private final Map<String,RoutingTableBuilder> _routingTableBuilderMap;
 
   private final Map<String, Integer> _lastKnownExternalViewVersionMap = new ConcurrentHashMap<>();
   private final Map<String, Map<String, InstanceConfig>> _lastKnownInstanceConfigsForTable = new ConcurrentHashMap<>();
   private final Map<String, InstanceConfig> _lastKnownInstanceConfigs = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> _tablesForInstance = new ConcurrentHashMap<>();
 
-  private final Random _random = new Random(System.currentTimeMillis());
   private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
-  private final RoutingTableSelector _routingTableSelector;
   private final HelixManager _helixManager;
   private static final int INVALID_EXTERNAL_VIEW_VERSION = Integer.MIN_VALUE;
 
   private BrokerMetrics _brokerMetrics;
 
-  /**
-   * Changes the small cluster routing builder, only used by tests.
-   */
-  void setSmallClusterRoutingTableBuilder(RoutingTableBuilder routingTableBuilder) {
-    _smallClusterRoutingTableBuilder = routingTableBuilder;
-  }
+  private Configuration _configuration;
 
-  public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      RoutingTableSelector routingTableSelector, HelixManager helixManager, Configuration configuration) {
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+
+  private RoutingTableBuilderFactory _routingTableBuilderFactory;
+
+
+  public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore, RoutingTableSelector selector,
+       HelixManager helixManager, Configuration configuration) {
+    _propertyStore = propertyStore;
+    _configuration = configuration;
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
-    _largeClusterRoutingTableBuilder = new LargeClusterRoutingTableBuilder();
-    _smallClusterRoutingTableBuilder = new BalancedRandomRoutingTableBuilder();
-    _realtimeHLCRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
-    _realtimeLLCRoutingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
-
-    if (configuration.containsKey("minServerCountForLargeCluster")) {
-      final String minServerCountForLargeCluster = configuration.getString("minServerCountForLargeCluster");
-      try {
-        MIN_SERVER_COUNT_FOR_LARGE_CLUSTER = Integer.parseInt(minServerCountForLargeCluster);
-        LOGGER.info("Using large cluster min server count of {}", MIN_SERVER_COUNT_FOR_LARGE_CLUSTER);
-      } catch (Exception e) {
-        LOGGER.warn(
-            "Could not get the large cluster min server count from configuration value {}, keeping default value {}",
-            minServerCountForLargeCluster, MIN_SERVER_COUNT_FOR_LARGE_CLUSTER, e);
-      }
-    } else {
-      LOGGER.info("Using default value for large cluster min server count of {}", MIN_SERVER_COUNT_FOR_LARGE_CLUSTER);
-    }
-
-    if (configuration.containsKey("minReplicaCountForLargeCluster")) {
-      final String minReplicaCountForLargeCluster = configuration.getString("minReplicaCountForLargeCluster");
-      try {
-        MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER = Integer.parseInt(minReplicaCountForLargeCluster);
-        LOGGER.info("Using large cluster min replica count of {}", MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER);
-      } catch (Exception e) {
-        LOGGER.warn(
-            "Could not get the large cluster min replica count from configuration value {}, keeping default value {}",
-            minReplicaCountForLargeCluster, MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER, e);
-      }
-    } else {
-      LOGGER.info("Using default value for large cluster min replica count of {}", MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER);
-    }
-
-    _largeClusterRoutingTableBuilder.init(configuration);
-    _smallClusterRoutingTableBuilder.init(configuration);
-    _realtimeHLCRoutingTableBuilder.init(configuration);
-    _realtimeLLCRoutingTableBuilder.init(configuration);
-
-    _routingTableSelector = routingTableSelector;
+    _routingTableBuilderMap = new HashMap<>();
     _helixManager = helixManager;
+    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration); 
   }
 
   @Override
   public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
     String tableName = request.getTableName();
-    List<ServerToSegmentSetMap> serverToSegmentSetMaps;
 
-    boolean forceLLC = false;
-    boolean forceHLC = false;
-
-    for (String routingOption : request.getRoutingOptions()) {
-      if (routingOption.equalsIgnoreCase("FORCE_HLC")) {
-        forceHLC = true;
-      }
-
-      if (routingOption.equalsIgnoreCase("FORCE_LLC")) {
-        forceLLC = true;
-      }
-    }
-
-    if (forceHLC && forceLLC) {
-      throw new RuntimeException("Trying to force routing to both HLC and LLC at the same time");
-    }
-
-    if (CommonConstants.Helix.TableType.REALTIME.equals(TableNameBuilder.getTableTypeFromTableName(tableName))) {
-      if (_brokerRoutingTable.containsKey(tableName) && _brokerRoutingTable.get(tableName).size() != 0) {
-        if (_llcBrokerRoutingTable.containsKey(tableName) && _llcBrokerRoutingTable.get(tableName).size() != 0) {
-          // Has both high and low-level segments. Follow what the routing table selector says.
-          if (!forceHLC && (_routingTableSelector.shouldUseLLCRouting(tableName) || forceLLC)) {
-            serverToSegmentSetMaps = routeToLLC(tableName);
-          } else {
-            serverToSegmentSetMaps = routeToHLC(tableName);
-          }
-        } else {
-          // Has only hi-level consumer segments.
-          if (forceLLC) {
-            throw new RuntimeException("Failed to route to LLC, table has only HLC segments");
-          }
-          serverToSegmentSetMaps = routeToHLC(tableName);
-        }
-      } else {
-        // May have only low-level consumer segments
-        if (forceHLC) {
-          throw new RuntimeException("Failed to route to HLC, table has only LLC segments");
-        }
-        serverToSegmentSetMaps = routeToLLC(tableName);
-      }
-    } else {  // Offline table, use the conventional routing table
-      serverToSegmentSetMaps = _brokerRoutingTable.get(tableName);
-    }
-
-    // This map can be potentially empty, for example for realtime table with no segments.
-    if (serverToSegmentSetMaps == null || serverToSegmentSetMaps.isEmpty()) {
-      return Collections.emptyMap();
-    }
-    return serverToSegmentSetMaps.get(_random.nextInt(serverToSegmentSetMaps.size())).getRouting();
+    RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
+    return routingTableBuilder.findServers(request);
   }
 
   @Override
   public boolean routingTableExists(String tableName) {
-    return (_brokerRoutingTable.containsKey(tableName) && !_brokerRoutingTable.get(tableName).isEmpty()) || (
-        _llcBrokerRoutingTable.containsKey(tableName) && !_llcBrokerRoutingTable.get(tableName).isEmpty());
+    return _routingTableBuilderMap.containsKey(tableName);
   }
 
-  private List<ServerToSegmentSetMap> routeToLLC(String tableName) {
-    if (_brokerMetrics != null) {
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.LLC_QUERY_COUNT, 1);
-    }
-    return _llcBrokerRoutingTable.get(tableName);
-  }
-
-  private List<ServerToSegmentSetMap> routeToHLC(String tableName) {
-    if (_brokerMetrics != null) {
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.HLC_QUERY_COUNT, 1);
-    }
-    return _brokerRoutingTable.get(tableName);
-  }
 
   public void setBrokerMetrics(BrokerMetrics brokerMetrics) {
     _brokerMetrics = brokerMetrics;
@@ -244,16 +125,21 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     LOGGER.info("Shutting down HelixExternalViewBasedRouting!");
   }
 
-  public void markDataResourceOnline(String tableName, ExternalView externalView,
+  public void markDataResourceOnline(TableConfig tableConfig, ExternalView externalView,
       List<InstanceConfig> instanceConfigList) {
+    String tableName = tableConfig.getTableName();
+    
+    RoutingTableBuilder routingTableBuilder = _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig);
+    routingTableBuilder.init(_configuration);
+    LOGGER.info("Initialized routingTableBuilder:%s for table:%", routingTableBuilder.getClass().getName(), tableName);
+    _routingTableBuilderMap.put(tableName, routingTableBuilder);
+    // Build the routing table
     if (externalView == null) {
       // It is possible for us to get a request to serve a table for which there is no external view. In this case, just
       // keep a bogus last seen external view version to force a rebuild the next time we see an external view.
       _lastKnownExternalViewVersionMap.put(tableName, INVALID_EXTERNAL_VIEW_VERSION);
       return;
     }
-
-    // Build the routing table
     buildRoutingTable(tableName, externalView, instanceConfigList);
   }
 
@@ -352,19 +238,12 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     int externalViewRecordVersion = externalView.getRecord().getVersion();
     _lastKnownExternalViewVersionMap.put(tableName, externalViewRecordVersion);
 
-    RoutingTableBuilder routingTableBuilder;
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-
-    // Pick the appropriate routing table builder based on the table type
-    if (CommonConstants.Helix.TableType.REALTIME.equals(tableType)) {
-      routingTableBuilder = _realtimeHLCRoutingTableBuilder;
-    } else {
-      if (isLargeCluster(externalView)) {
-        routingTableBuilder = _largeClusterRoutingTableBuilder;
-      } else {
-        routingTableBuilder = _smallClusterRoutingTableBuilder;
-      }
+    RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
+    if(routingTableBuilder == null) {
+      //TODO: warn
+      return;
     }
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
 
     LOGGER.info("Trying to compute routing table for table {} using {}", tableName, routingTableBuilder);
     long startTimeMillis = System.currentTimeMillis();
@@ -372,32 +251,10 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     try {
       Map<String, InstanceConfig> relevantInstanceConfigs = new HashMap<>();
 
-      // Build a list of routing tables
-      List<ServerToSegmentSetMap> serverToSegmentSetMap =
-          routingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      routingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
 
       // Keep track of the instance configs that are used in that routing table
       updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs, externalView);
-
-      _brokerRoutingTable.put(tableName, serverToSegmentSetMap);
-
-      // If this is a realtime table, also build a LLC routing table
-      if (CommonConstants.Helix.TableType.REALTIME.equals(tableType)) {
-        _routingTableSelector.registerTable(tableName);
-
-        try {
-          // Build the routing table
-          List<ServerToSegmentSetMap> llcserverToSegmentSetMap = _realtimeLLCRoutingTableBuilder
-              .computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
-
-          // Keep track of the instance configs that are used in that routing table
-          updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs, externalView);
-
-          _llcBrokerRoutingTable.put(tableName, llcserverToSegmentSetMap);
-        } catch (Exception e) {
-          LOGGER.error("Failed to compute LLC routing table for {}. Ignoring", tableName, e);
-        }
-      }
 
       // Save the instance configs used so that we can avoid unnecessary routing table updates later
       _lastKnownInstanceConfigsForTable.put(tableName, relevantInstanceConfigs);
@@ -445,7 +302,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         // Does a realtime table exist?
         String realtimeTableName =
             TableNameBuilder.REALTIME.tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
-        if (_brokerRoutingTable.containsKey(realtimeTableName)) {
+        if (_routingTableBuilderMap.containsKey(realtimeTableName)) {
           tableForTimeBoundaryUpdate = tableName;
           externalViewForTimeBoundaryUpdate = externalView;
         }
@@ -455,7 +312,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         // Does an offline table exist?
         String offlineTableName =
             TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
-        if (_brokerRoutingTable.containsKey(offlineTableName)) {
+        if (_routingTableBuilderMap.containsKey(offlineTableName)) {
           // Is there no time boundary?
           if (_timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName) == null) {
             tableForTimeBoundaryUpdate = offlineTableName;
@@ -480,32 +337,6 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     }
 
     LOGGER.info("Routing table update for table {} completed in {} ms", tableName, updateTime);
-  }
-
-  private boolean isLargeCluster(ExternalView externalView) {
-    // Check if the number of replicas is sufficient to treat it as a large cluster
-    final String helixReplicaCount = externalView.getRecord().getSimpleField("REPLICAS");
-    final int replicaCount;
-
-    try {
-      replicaCount = Integer.parseInt(helixReplicaCount);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to parse the replica count ({}) from external view of table {}", helixReplicaCount,
-          externalView.getResourceName());
-      return false;
-    }
-
-    if (replicaCount < MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER) {
-      return false;
-    }
-
-    // Check if the server count is high enough to count as a large cluster
-    final Set<String> instanceSet = new HashSet<>();
-    for (String partition : externalView.getPartitionSet()) {
-      instanceSet.addAll(externalView.getStateMap(partition).keySet());
-    }
-
-    return MIN_SERVER_COUNT_FOR_LARGE_CLUSTER <= instanceSet.size();
   }
 
   protected void updateTimeBoundary(String tableName, ExternalView externalView) {
@@ -541,7 +372,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   public void markDataResourceOffline(String tableName) {
     LOGGER.info("Trying to remove data table from broker for {}", tableName);
-    _brokerRoutingTable.remove(tableName);
+    _routingTableBuilderMap.remove(tableName);
     _lastKnownExternalViewVersionMap.remove(tableName);
     _lastKnownInstanceConfigsForTable.remove(tableName);
     _timeBoundaryService.remove(tableName);
@@ -739,42 +570,22 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     JSONObject ret = new JSONObject();
     JSONArray routingTableSnapshot = new JSONArray();
 
-    for (String currentTable : _brokerRoutingTable.keySet()) {
+    for (String currentTable : _routingTableBuilderMap.keySet()) {
       if (tableName == null || currentTable.startsWith(tableName)) {
         JSONObject tableEntry = new JSONObject();
         tableEntry.put("tableName", currentTable);
 
         JSONArray entries = new JSONArray();
-        List<ServerToSegmentSetMap> routableTable = _brokerRoutingTable.get(currentTable);
-        for (ServerToSegmentSetMap serverToInstaceMap : routableTable) {
+        RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(currentTable);
+        List<ServerToSegmentSetMap> routingTables = routingTableBuilder.getRoutingTables();
+        for (ServerToSegmentSetMap serverToInstaceMap : routingTables) {
           entries.put(new JSONObject(serverToInstaceMap.toString()));
         }
         tableEntry.put("routingTableEntries", entries);
-
         routingTableSnapshot.put(tableEntry);
       }
     }
-
     ret.put("routingTableSnapshot", routingTableSnapshot);
-
-    routingTableSnapshot = new JSONArray();
-    for (String currentTable : _llcBrokerRoutingTable.keySet()) {
-      if (tableName == null || currentTable.startsWith(tableName)) {
-        JSONObject tableEntry = new JSONObject();
-        tableEntry.put("tableName", currentTable);
-
-        JSONArray entries = new JSONArray();
-        List<ServerToSegmentSetMap> routableTable = _llcBrokerRoutingTable.get(currentTable);
-        for (ServerToSegmentSetMap serverToInstaceMap : routableTable) {
-          entries.put(new JSONObject(serverToInstaceMap.toString()));
-        }
-        tableEntry.put("routingTableEntries", entries);
-
-        routingTableSnapshot.put(tableEntry);
-      }
-    }
-    ret.put("llcRoutingTableSnapshot", routingTableSnapshot);
-
     ret.put("host", NetUtil.getHostnameOrAddress());
 
     return ret.toString(2);

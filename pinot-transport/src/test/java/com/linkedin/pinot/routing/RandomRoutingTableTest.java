@@ -33,7 +33,12 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TableConfig.Builder;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
@@ -57,11 +62,11 @@ public class RandomRoutingTableTest {
         new HelixExternalViewBasedRouting(null, new PercentageBasedRoutingTableSelector(), null,
             new BaseConfiguration());
 
-    routingTable.setSmallClusterRoutingTableBuilder(routingStrategy);
+    //routingTable.setSmallClusterRoutingTableBuilder(routingStrategy);
 
     ExternalView externalView = new ExternalView(externalViewRecord);
 
-    routingTable.markDataResourceOnline(tableName, externalView, getInstanceConfigs(externalView));
+    routingTable.markDataResourceOnline(generateTableConfig(tableName), externalView, getInstanceConfigs(externalView));
 
     double[] globalArrays = new double[9];
 
@@ -112,4 +117,12 @@ public class RandomRoutingTableTest {
 
     return instanceConfigList;
   }
+  
+  private TableConfig generateTableConfig(String tableName) throws Exception {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    Builder builder = new TableConfig.Builder(tableType);
+    builder.setTableName(tableName);
+    return builder.build();
+  }
+
 }

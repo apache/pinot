@@ -24,26 +24,31 @@ import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
-public class KafkaHighLevelConsumerBasedRoutingTableBuilder implements RoutingTableBuilder {
+public class KafkaHighLevelConsumerBasedRoutingTableBuilder extends AbstractRoutingTableBuilder {
+
 
   @Override
   public void init(Configuration configuration) {
   }
 
   @Override
-  public List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigList) {
 
     RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
 
     Set<String> segments = externalView.getPartitionSet();
-    List<ServerToSegmentSetMap> routingTable = new ArrayList<ServerToSegmentSetMap>();
+    List<ServerToSegmentSetMap> routingTables = new ArrayList<ServerToSegmentSetMap>();
     Map<String, Map<String, Set<String>>> groupIdToRouting = new HashMap<String, Map<String, Set<String>>>();
     for (String segment : segments) {
       Map<String, String> instanceMap = externalView.getStateMap(segment);
@@ -69,9 +74,12 @@ public class KafkaHighLevelConsumerBasedRoutingTableBuilder implements RoutingTa
       }
     }
     for (Map<String, Set<String>> replicaRouting : groupIdToRouting.values()) {
-      routingTable.add(new ServerToSegmentSetMap(replicaRouting));
+      routingTables.add(new ServerToSegmentSetMap(replicaRouting));
     }
-    return routingTable;
+    setRoutingTables(routingTables);
+    setIsEmpty(groupIdToRouting.isEmpty());
   }
+
+
 
 }

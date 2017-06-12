@@ -41,6 +41,7 @@ public class TableConfig {
   private static final String CUSTOM_CONFIG_KEY = "metadata";
   private static final String QUOTA_CONFIG_KEY = "quota";
   private static final String TASK_CONFIG_KEY = "task";
+  private static final String ROUTING_CONFIG_KEY = "routing";
 
   private String _tableName;
   private TableType _tableType;
@@ -50,11 +51,12 @@ public class TableConfig {
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
   private TableTaskConfig _taskConfig;
+  private RoutingConfig _routingConfig;
 
   private TableConfig(@Nonnull String tableName, @Nonnull TableType tableType,
       @Nonnull SegmentsValidationAndRetentionConfig validationConfig, @Nonnull TenantConfig tenantConfig,
       @Nonnull IndexingConfig indexingConfig, @Nonnull TableCustomConfig customConfig,
-      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig) {
+      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -63,6 +65,8 @@ public class TableConfig {
     _customConfig = customConfig;
     _quotaConfig = quotaConfig;
     _taskConfig = taskConfig;
+    _routingConfig = routingConfig;
+
   }
 
   // For backward compatible
@@ -96,9 +100,13 @@ public class TableConfig {
     if (jsonConfig.has(TASK_CONFIG_KEY)) {
       taskConfig = OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(TASK_CONFIG_KEY).toString(), TableTaskConfig.class);
     }
+    RoutingConfig routingConfig = null;
+    if (jsonConfig.has(ROUTING_CONFIG_KEY)) {
+      routingConfig = OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(ROUTING_CONFIG_KEY).toString(), RoutingConfig.class);
+    }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig);
+        quotaConfig, taskConfig, routingConfig);
   }
 
   @Nonnull
@@ -117,6 +125,9 @@ public class TableConfig {
     }
     if (tableConfig._taskConfig != null) {
       jsonConfig.put(TASK_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._taskConfig)));
+    }
+    if (tableConfig._routingConfig != null) {
+      jsonConfig.put(ROUTING_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._routingConfig)));
     }
     return jsonConfig;
   }
@@ -145,9 +156,15 @@ public class TableConfig {
     if (taskConfigString != null) {
       taskConfig = OBJECT_MAPPER.readValue(taskConfigString, TableTaskConfig.class);
     }
+    String routingConfigString = simpleFields.get(ROUTING_CONFIG_KEY);
+    
+    RoutingConfig routingConfig = null;
+    if (routingConfigString != null) {
+      routingConfig = OBJECT_MAPPER.readValue(routingConfigString, RoutingConfig.class);
+    }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig);
+        quotaConfig, taskConfig, routingConfig);
   }
 
   @Nonnull
@@ -166,6 +183,9 @@ public class TableConfig {
     }
     if (tableConfig._taskConfig != null) {
       simpleFields.put(TASK_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._taskConfig));
+    }
+    if (tableConfig._routingConfig != null) {
+      simpleFields.put(ROUTING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._routingConfig));
     }
     znRecord.setSimpleFields(simpleFields);
     return znRecord;
@@ -243,6 +263,15 @@ public class TableConfig {
     _taskConfig = taskConfig;
   }
 
+  
+  public RoutingConfig getRoutingConfig() {
+    return _routingConfig;
+  }
+
+  public void setRoutingConfig(RoutingConfig routingConfig) {
+    _routingConfig = routingConfig;
+  }
+
   @Nonnull
   public String toJSONConfigString()
       throws IOException, JSONException {
@@ -295,6 +324,7 @@ public class TableConfig {
     private TableCustomConfig _customConfig;
     private QuotaConfig _quotaConfig;
     private TableTaskConfig _taskConfig;
+    private RoutingConfig _routingConfig;
 
     public Builder(TableType tableType) {
       _tableType = tableType;
@@ -415,6 +445,11 @@ public class TableConfig {
       _taskConfig = taskConfig;
       return this;
     }
+    
+    public Builder setRoutingConfig(RoutingConfig routingConfig) {
+      _routingConfig = routingConfig;
+      return this;
+    }
 
     public TableConfig build()
         throws IOException, JSONException {
@@ -453,9 +488,13 @@ public class TableConfig {
         _customConfig = new TableCustomConfig();
         _customConfig.setCustomConfigs(new HashMap<String, String>());
       }
+      
+      if (_routingConfig == null) {
+        _routingConfig = new RoutingConfig();
+      }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
-          _quotaConfig, _taskConfig);
+          _quotaConfig, _taskConfig, _routingConfig);
     }
   }
 }

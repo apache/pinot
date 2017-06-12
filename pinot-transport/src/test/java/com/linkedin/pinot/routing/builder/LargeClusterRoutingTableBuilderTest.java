@@ -121,8 +121,9 @@ public class LargeClusterRoutingTableBuilderTest {
     ExternalView externalView = createExternalView(tableName, segmentCount, replicationFactor, instanceCount);
     List<InstanceConfig> instanceConfigs = createInstanceConfigs(instanceCount);
 
-    List<ServerToSegmentSetMap> routingTables =
-        _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+    _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+
+    List<ServerToSegmentSetMap> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
     int routingTableCount = 0;
     int largerThanDesiredRoutingTableCount = 0;
@@ -148,8 +149,9 @@ public class LargeClusterRoutingTableBuilderTest {
     ExternalView externalView = createExternalView(tableName, segmentCount, replicationFactor, instanceCount);
     List<InstanceConfig> instanceConfigs = createInstanceConfigs(instanceCount);
 
-    List<ServerToSegmentSetMap> routingTables =
-        _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+    _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+
+    List<ServerToSegmentSetMap> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
     Map<String, Integer> segmentCountPerServer = new HashMap<>();
 
@@ -239,8 +241,9 @@ public class LargeClusterRoutingTableBuilderTest {
 
   private void validateAssertionForOneRoutingTable(RoutingTableValidator routingTableValidator, String message,
       ExternalView externalView, List<InstanceConfig> instanceConfigs, String tableName) {
-    List<ServerToSegmentSetMap> routingTables =
-        _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+
+    _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+    List<ServerToSegmentSetMap> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
     for (ServerToSegmentSetMap routingTable : routingTables) {
       boolean isValid = routingTableValidator.isRoutingTableValid(routingTable, externalView, instanceConfigs);

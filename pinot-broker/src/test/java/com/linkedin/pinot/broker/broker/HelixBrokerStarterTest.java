@@ -30,11 +30,12 @@ import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -126,22 +127,22 @@ public class HelixBrokerStarterTest {
     Assert.assertEquals(externalView.getStateMap(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
 
     HelixExternalViewBasedRouting helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
-    Field brokerRoutingTableField;
-    brokerRoutingTableField = HelixExternalViewBasedRouting.class.getDeclaredField("_brokerRoutingTable");
-    brokerRoutingTableField.setAccessible(true);
+    Field brokerRoutingTableBuilderMapField;
+    brokerRoutingTableBuilderMapField = HelixExternalViewBasedRouting.class.getDeclaredField("_routingTableBuilderMap");
+    brokerRoutingTableBuilderMapField.setAccessible(true);
 
-    final Map<String, List<ServerToSegmentSetMap>> brokerRoutingTable =
-        (Map<String, List<ServerToSegmentSetMap>>)brokerRoutingTableField.get(helixExternalViewBasedRouting);
+    final Map<String, RoutingTableBuilder> brokerRoutingTableBuilderMap =
+        (Map<String, RoutingTableBuilder>)brokerRoutingTableBuilderMapField.get(helixExternalViewBasedRouting);
 
     // Wait up to 30s for routing table to reach the expected size
     waitForPredicate(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
-        return brokerRoutingTable.size() == 1;
+        return brokerRoutingTableBuilderMap.size() == 1;
       }
     }, 30000L);
 
-    Assert.assertEquals(Arrays.toString(brokerRoutingTable.keySet().toArray()), "[dining_OFFLINE]");
+    Assert.assertEquals(Arrays.toString(brokerRoutingTableBuilderMap.keySet().toArray()), "[dining_OFFLINE]");
 
     final String tableName = "coffee";
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
@@ -172,16 +173,16 @@ public class HelixBrokerStarterTest {
     waitForPredicate(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
-        return brokerRoutingTable.size() == 2;
+        return brokerRoutingTableBuilderMap.size() == 2;
       }
     }, 30000L);
 
-    Object[] tableArray = brokerRoutingTable.keySet().toArray();
+    Object[] tableArray = brokerRoutingTableBuilderMap.keySet().toArray();
     Arrays.sort(tableArray);
     Assert.assertEquals(Arrays.toString(tableArray), "[coffee_OFFLINE, dining_OFFLINE]");
 
-    Set<String> serverSet = brokerRoutingTable.get(DINING_TABLE_NAME).get(0).getServerSet();
-    Assert.assertEquals(brokerRoutingTable.get(DINING_TABLE_NAME).get(0)
+    Set<String> serverSet = brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0).getServerSet();
+    Assert.assertEquals(brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0)
         .getSegmentSet(serverSet.iterator().next()).size(), 5);
 
     final String dataResource = DINING_TABLE_NAME;
@@ -198,7 +199,7 @@ public class HelixBrokerStarterTest {
 
     externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, DINING_TABLE_NAME);
     Assert.assertEquals(externalView.getPartitionSet().size(), SEGMENT_COUNT);
-    tableArray = brokerRoutingTable.keySet().toArray();
+    tableArray = brokerRoutingTableBuilderMap.keySet().toArray();
     Arrays.sort(tableArray);
     Assert.assertEquals(Arrays.toString(tableArray), "[coffee_OFFLINE, dining_OFFLINE]");
 
@@ -206,14 +207,14 @@ public class HelixBrokerStarterTest {
     waitForPredicate(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
-        ServerToSegmentSetMap routingTable = brokerRoutingTable.get(DINING_TABLE_NAME).get(0);
+        ServerToSegmentSetMap routingTable = brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0);
         String firstServer = routingTable.getServerSet().iterator().next();
         return routingTable.getSegmentSet(firstServer).size() == SEGMENT_COUNT;
       }
     }, 30000L);
 
-    serverSet = brokerRoutingTable.get(DINING_TABLE_NAME).get(0).getServerSet();
-    Assert.assertEquals(brokerRoutingTable.get(DINING_TABLE_NAME).get(0)
+    serverSet = brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0).getServerSet();
+    Assert.assertEquals(brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0)
         .getSegmentSet(serverSet.iterator().next()).size(), SEGMENT_COUNT);
 
   }

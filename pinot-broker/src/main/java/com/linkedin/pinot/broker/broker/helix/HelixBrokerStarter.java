@@ -129,7 +129,7 @@ public class HelixBrokerStarter {
         HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
     StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     StateModelFactory<?> stateModelFactory =
-        new BrokerResourceOnlineOfflineStateModelFactory(_spectatorHelixManager, _helixExternalViewBasedRouting);
+        new BrokerResourceOnlineOfflineStateModelFactory(_spectatorHelixManager, _propertyStore, _helixExternalViewBasedRouting);
     stateMachineEngine.registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
