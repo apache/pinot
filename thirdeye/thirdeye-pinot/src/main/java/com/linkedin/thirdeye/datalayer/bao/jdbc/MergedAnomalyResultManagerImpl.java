@@ -158,19 +158,22 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findAllOverlapByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd, boolean loadRawAnomalies) {
-    Predicate predicate =
-        Predicate.AND(Predicate.LT("startTime", conflictWindowEnd), Predicate.GE("endTime", conflictWindowStart),
+  public List<MergedAnomalyResultDTO> findOverlappingByFunctionId(long functionId, long searchWindowStart,
+      long searchWindowEnd, boolean loadRawAnomalies) {
+    // LT and GT are used instead of LE and GE because ThirdEye uses end time exclusive.
+    Predicate predicate = Predicate
+        .AND(Predicate.LT("startTime", searchWindowEnd), Predicate.GT("endTime", searchWindowStart),
             Predicate.EQ("functionId", functionId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return convertMergedAnomalyBean2DTO(list, loadRawAnomalies);
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findAllOverlapByFunctionIdDimensions(long functionId, long conflictWindowStart,
-      long conflictWindowEnd, String dimensions, boolean loadRawAnomalies) {
-    Predicate predicate =
-        Predicate.AND(Predicate.LE("startTime", conflictWindowEnd), Predicate.GE("endTime", conflictWindowStart),
+  public List<MergedAnomalyResultDTO> findOverlappingByFunctionIdDimensions(long functionId, long searchWindowStart,
+      long searchWindowEnd, String dimensions, boolean loadRawAnomalies) {
+    // LT and GT are used instead of LE and GE because ThirdEye uses end time exclusive.
+    Predicate predicate = Predicate
+        .AND(Predicate.LT("startTime", searchWindowEnd), Predicate.GT("endTime", searchWindowStart),
             Predicate.EQ("functionId", functionId), Predicate.EQ("dimensions", dimensions));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return convertMergedAnomalyBean2DTO(list, loadRawAnomalies);

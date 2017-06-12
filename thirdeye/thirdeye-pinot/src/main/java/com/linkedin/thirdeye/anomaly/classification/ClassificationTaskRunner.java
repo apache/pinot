@@ -101,7 +101,7 @@ public class ClassificationTaskRunner implements TaskRunner {
       AlertFilter alertFilter = alertFilterMap.get(mainFunctionId);
       // Get the anomalies from the main anomaly function
       List<MergedAnomalyResultDTO> mainAnomalies =
-          mergedAnomalyDAO.findAllOverlapByFunctionId(mainFunctionId, windowStart, windowEnd, false);
+          mergedAnomalyDAO.findOverlappingByFunctionId(mainFunctionId, windowStart, windowEnd, false);
       filteredMainAnomalies.addAll(filterAnomalies(alertFilter, mainAnomalies));
     }
     // Run classification on each main anomaly that passes through alert filter
@@ -182,7 +182,7 @@ public class ClassificationTaskRunner implements TaskRunner {
         List<MergedAnomalyResultDTO> anomalies;
         if (anomalyFunctionDTO.getIsActive()) {
           // Get existing anomalies from DB
-          anomalies = mergedAnomalyDAO.findAllOverlapByFunctionIdDimensions(auxFunctionId, startTimeForCorrelatedAnomalies,
+          anomalies = mergedAnomalyDAO.findOverlappingByFunctionIdDimensions(auxFunctionId, startTimeForCorrelatedAnomalies,
               endTimeForCorrelatedAnomalies, dimensionMap.toString(), false);
         } else {
           LOG.info("Invoking ad-hoc anomaly detection for anomaly function {} at window ({}--{}).", auxFunctionId,
