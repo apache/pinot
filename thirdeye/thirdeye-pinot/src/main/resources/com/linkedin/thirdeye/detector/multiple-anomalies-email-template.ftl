@@ -108,6 +108,10 @@
                       <#list r.dimensions as dimension>
                         ${dimension} <br>
                       </#list>
+                      <#if r.issueType??>
+                        issue type : ${r.issueType} <br>
+                      </#if>
+
 
                     </td>
                     <td style="padding:12px;">

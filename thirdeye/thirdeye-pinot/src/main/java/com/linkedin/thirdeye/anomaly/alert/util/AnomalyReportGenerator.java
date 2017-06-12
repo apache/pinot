@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 
@@ -18,6 +19,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
 
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
@@ -159,7 +161,8 @@ public class AnomalyReportGenerator {
             anomaly.getMetric(),
             getDateString(anomaly.getStartTime(), timeZone),
             getDateString(anomaly.getEndTime(), timeZone),
-            getTimezoneString(timeZone)
+            getTimezoneString(timeZone),
+            getIssueType(anomaly)
         );
 
         // include notified alerts only in the email
@@ -321,6 +324,14 @@ public class AnomalyReportGenerator {
     return dashboardUrl + urlPart;
   }
 
+  private String getIssueType(MergedAnomalyResultDTO anomalyResultDTO) {
+    Map<String, String> properties = anomalyResultDTO.getProperties();
+    if (MapUtils.isNotEmpty(properties) && properties.containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
+      return properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
+    }
+    return null;
+  }
+
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class AnomalyReportDTO {
     String metric;
@@ -338,11 +349,11 @@ public class AnomalyReportGenerator {
     String startTime;
     String endTime;
     String timezone;
+    String issueType;
 
-
-    public AnomalyReportDTO(String anomalyId, String anomalyURL, String baselineVal,
-        String currentVal, List<String> dimensions, String duration, String feedback, String function,
-        String lift, boolean positiveLift, String metric, String startTime, String endTime, String timezone) {
+    public AnomalyReportDTO(String anomalyId, String anomalyURL, String baselineVal, String currentVal,
+        List<String> dimensions, String duration, String feedback, String function, String lift, boolean positiveLift,
+        String metric, String startTime, String endTime, String timezone, String issueType) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
       this.baselineVal = baselineVal;
@@ -357,6 +368,7 @@ public class AnomalyReportGenerator {
       this.startDateTime = startTime;
       this.endTime = endTime;
       this.timezone = timezone;
+      this.issueType = issueType;
     }
 
     public String getBaselineVal() {
@@ -479,7 +491,13 @@ public class AnomalyReportGenerator {
       this.timezone = timezone;
     }
 
+    public String getIssueType() {
+      return issueType;
+    }
 
+    public void setIssueType(String issueType) {
+      this.issueType = issueType;
+    }
   }
 
 }
