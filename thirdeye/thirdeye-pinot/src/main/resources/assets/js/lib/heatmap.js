@@ -24,6 +24,7 @@ function getHeatmap(tab) {
             "&currentStart=" + hash.currentStart +
             "&currentEnd=" + hash.currentEnd +
             "&dimensions=" + hash.dimensions +
+            "&filters=" + hash.filters +
             "&topDimensions=3" +
             "&oneSideError=false" +
             "&summarySize=10" +

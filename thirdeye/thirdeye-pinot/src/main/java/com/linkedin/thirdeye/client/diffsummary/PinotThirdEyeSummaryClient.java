@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
+import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -90,30 +91,32 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   }
 
   @Override
-  public Row getTopAggregatedValues() throws Exception {
+  public Row getTopAggregatedValues(Multimap<String, String> filterSets) throws Exception {
     List<String> groupBy = Collections.emptyList();
-      List<ThirdEyeRequest> timeOnTimeBulkRequests = constructTimeOnTimeBulkRequests(groupBy);
+      List<ThirdEyeRequest> timeOnTimeBulkRequests = constructTimeOnTimeBulkRequests(groupBy, filterSets);
       Row row = constructAggregatedValues(null, timeOnTimeBulkRequests).get(0).get(0);
       return row;
   }
 
   @Override
-  public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions) throws Exception {
+  public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions, Multimap<String, String> filterSets)
+      throws Exception {
       List<ThirdEyeRequest> timeOnTimeBulkRequests = new ArrayList<>();
       for (int level = 0; level < dimensions.size(); ++level) {
         List<String> groupBy = Lists.newArrayList(dimensions.get(level));
-        timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy));
+        timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy, filterSets));
       }
       List<List<Row>> rows = constructAggregatedValues(dimensions, timeOnTimeBulkRequests);
       return rows;
   }
 
   @Override
-  public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions) throws Exception {
+  public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions, Multimap<String, String> filterSets)
+      throws Exception {
       List<ThirdEyeRequest> timeOnTimeBulkRequests = new ArrayList<>();
       for (int level = 0; level < dimensions.size() + 1; ++level) {
         List<String> groupBy = Lists.newArrayList(dimensions.groupByStringsAtLevel(level));
-        timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy));
+        timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy, filterSets));
       }
       List<List<Row>> rows = constructAggregatedValues(dimensions, timeOnTimeBulkRequests);
       return rows;
@@ -123,9 +126,11 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
    * Returns the baseline and current requests for the given GroupBy dimensions.
    *
    * @param groupBy the dimensions to do GroupBy queries
+   * @param filterSets the filter to apply on the DB queries (e.g., country=US, etc.)
    * @return Baseline and Current requests.
    */
-  private List<ThirdEyeRequest> constructTimeOnTimeBulkRequests(List<String> groupBy) {
+  private List<ThirdEyeRequest> constructTimeOnTimeBulkRequests(List<String> groupBy,
+      Multimap<String, String> filterSets) {
     List<ThirdEyeRequest> requests = new ArrayList<>();;
 
     // baseline requests
@@ -135,6 +140,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setStartTimeInclusive(baselineStartInclusive);
     builder.setEndTimeExclusive(baselineEndExclusive);
     builder.setDataSource(ThirdEyeUtils.getDataSourceFromMetricFunctions(metricFunctions));
+    builder.setFilterSet(filterSets);
     ThirdEyeRequest baselineRequest = builder.build("baseline");
     requests.add(baselineRequest);
 
@@ -145,6 +151,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setStartTimeInclusive(currentStartInclusive);
     builder.setEndTimeExclusive(currentEndExclusive);
     builder.setDataSource(ThirdEyeUtils.getDataSourceFromMetricFunctions(metricFunctions));
+    builder.setFilterSet(filterSets);
     ThirdEyeRequest currentRequest = builder.build("current");
     requests.add(currentRequest);
 

@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import java.util.Arrays;
@@ -12,6 +14,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -51,6 +54,7 @@ public class SummaryResource {
       @QueryParam("baselineStart") Long baselineStartInclusive,
       @QueryParam("baselineEnd") Long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filters,
       @QueryParam("summarySize") int summarySize,
       @QueryParam("topDimensions") @DefaultValue(DEFAULT_TOP_DIMENSIONS) int topDimensions,
       @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
@@ -77,12 +81,20 @@ public class SummaryResource {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
 
+      Multimap<String, String> filterSetMap;
+      if (StringUtils.isNotBlank(filters)) {
+        filterSetMap = OBJECT_MAPPER.readValue(filters, new TypeReference<Multimap<String, String>>() {
+        });
+      } else {
+        filterSetMap = ArrayListMultimap.create();
+      }
+
       List<List<String>> hierarchies =
           OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
           });
 
       Cube cube = new Cube();
-      cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies);
+      cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies, filterSetMap);
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
@@ -105,6 +117,7 @@ public class SummaryResource {
       @QueryParam("baselineStart") Long baselineStartInclusive,
       @QueryParam("baselineEnd") Long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filters,
       @QueryParam("summarySize") int summarySize,
       @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
@@ -135,7 +148,7 @@ public class SummaryResource {
 
 
       Cube cube = new Cube();
-      cube.buildWithManualDimensionOrder(olapClient, dimensions);
+      cube.buildWithManualDimensionOrder(olapClient, dimensions, null);
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError);
