@@ -20,6 +20,9 @@ import com.linkedin.pinot.common.restlet.PinotRestletApplication;
 import com.linkedin.pinot.common.restlet.swagger.SwaggerResource;
 import com.linkedin.pinot.controller.api.restlet.resources.BasePinotControllerRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentCommit;
+import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentCommitEnd;
+import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentCommitStart;
+import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentCommitUpload;
 import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentConsumed;
 import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentStoppedConsuming;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotControllerHealthCheck;
@@ -110,6 +113,10 @@ public class ControllerRestApplication extends PinotRestletApplication {
     attachRoutesForClass(router, LLCSegmentCommit.class);
     attachRoutesForClass(router, LLCSegmentConsumed.class);
     attachRoutesForClass(router, LLCSegmentStoppedConsuming.class);
+    // 3 phase commit implementation
+    attachRoutesForClass(router, LLCSegmentCommitStart.class);
+    attachRoutesForClass(router, LLCSegmentCommitUpload.class);
+    attachRoutesForClass(router, LLCSegmentCommitEnd.class);
 
     // GET... add it here because it can block visibility of
     // some of the existing paths (like indexingConfigs) added above
