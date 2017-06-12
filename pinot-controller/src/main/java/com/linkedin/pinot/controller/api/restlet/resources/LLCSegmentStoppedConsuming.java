@@ -29,10 +29,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class LLCSegmentStoppedConsuming extends PinotSegmentUploadRestletResource {
-  private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCommit.class);
-  long _offset;
-  String _segmentNameStr;
-  String _instanceId;
+  private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentStoppedConsuming.class);
 
   public LLCSegmentStoppedConsuming() throws IOException {
   }

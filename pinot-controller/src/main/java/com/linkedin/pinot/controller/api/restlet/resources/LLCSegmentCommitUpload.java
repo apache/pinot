@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -35,70 +34,38 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A resource class that fields the segmentCommit() message (and the upload of a realtime segment)
- * from the servers. Servers go through {@link SegmentCompletionProtocol} to complete a segment and
- * one of the servers commit the segment that has been completed.
- */
-public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
-  private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCommit.class);
-  long _offset;
-  String _segmentNameStr;
-  String _instanceId;
+public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
+  private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCommitUpload.class);
 
-  public LLCSegmentCommit()
+  public LLCSegmentCommitUpload()
       throws IOException {
   }
 
   @Override
   @HttpVerb("post")
-  @Description("Uploads an LLC segment coming in from a server")
-  @Summary("Uploads an LLC segment coming in from a server")
-  @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_COMMIT})
+  @Description("Uploads an LLC segment using split commit")
+  @Summary("Uploads an LLC segment using split commit")
+  @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD})
+  // TODO: TInclude the generated file name in the response to the server
   public Representation post(Representation entity) {
-    if (!extractParams()) {
+    SegmentCompletionProtocol.Request.Params params = SegmentCompletionUtils.extractParams(getReference());
+    if (params == null) {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
-    LOGGER.info("segment={} offset={} instance={} ", _segmentNameStr, _offset, _instanceId);
-    final SegmentCompletionManager segmentCompletionManager = getSegmentCompletionManager();
 
-    final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    reqParams.withInstanceId(_instanceId).withSegmentName(_segmentNameStr).withOffset(_offset);
-    SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(reqParams, false);
-    if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
+    LOGGER.info(params.toString());
 
-      // Get the segment and put it in the right place.
-      boolean success = uploadSegment(_instanceId, _segmentNameStr);
-
-      response = segmentCompletionManager.segmentCommitEnd(reqParams, success, false);
+    boolean success = uploadSegment(params.getInstanceId(), params.getSegmentName(), params.getOffset());
+    if (success) {
+      LOGGER.info("Uploaded segment successfully");
+      return new StringRepresentation(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS.toString());
+    } else {
+      LOGGER.info("Failed to upload segment");
+      return new StringRepresentation(SegmentCompletionProtocol.ControllerResponseStatus.FAILED.toString());
     }
-
-    LOGGER.info("Response: instance={}  segment={} status={} offset={}", _instanceId, _segmentNameStr,
-        response.getStatus(), response.getOffset());
-    return new StringRepresentation(response.toJsonString());
   }
 
-  boolean extractParams() {
-    final String offsetStr = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
-    final String segmentName = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
-    final String instanceId = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
-
-    if (offsetStr == null || segmentName == null || instanceId == null) {
-      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offsetStr, segmentName, instanceId);
-      return false;
-    }
-    _segmentNameStr = segmentName;
-    _instanceId = instanceId;
-    try {
-      _offset = Long.valueOf(offsetStr);
-    } catch (NumberFormatException e) {
-      LOGGER.error("Invalid offset {} for segment {} from instance {}", offsetStr, segmentName, instanceId);
-      return false;
-    }
-    return true;
-  }
-
-  boolean uploadSegment(final String instanceId, final String segmentNameStr) {
+  boolean uploadSegment(final String instanceId, final String segmentNameStr, final long offset) {
     // 1/ Create a factory for disk-based file items
     final DiskFileItemFactory factory = new DiskFileItemFactory();
 
@@ -141,17 +108,19 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
       // We will not check for quota here. Instead, committed segments will count towards the quota of a
       // table
       LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+
       final String rawTableName = segmentName.getTableName();
       final File tableDir = new File(baseDataDir, rawTableName);
-      final File segmentFile = new File(tableDir, segmentNameStr);
+      String generatedSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentNameStr, offset, instanceId);
+      final File segmentFile = new File(tableDir, generatedSegmentFileName);
 
-      synchronized (_pinotHelixResourceManager) {
-        if (segmentFile.exists()) {
-          LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentNameStr, instanceId);
-          FileUtils.deleteQuietly(segmentFile);
-        }
-        FileUtils.moveFile(dataFile, segmentFile);
+      // Always delete the segment file if it exists for split commit.
+      if (segmentFile.exists()) {
+        LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentNameStr, instanceId);
+        FileUtils.deleteQuietly(segmentFile);
       }
+      FileUtils.moveFile(dataFile, segmentFile);
+      LOGGER.info("Segment file " + generatedSegmentFileName);
 
       return true;
     } catch (Exception e) {

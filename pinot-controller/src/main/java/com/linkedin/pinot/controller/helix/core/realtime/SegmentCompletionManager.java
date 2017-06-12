@@ -181,7 +181,7 @@ public class SegmentCompletionManager {
    * Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
    * incoming segment).
    */
-  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams) {
+  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams, boolean isSplitCommit) {
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -193,7 +193,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitStart(instanceId, offset);
+      response = fsm.segmentCommitStart(instanceId, offset, isSplitCommit);
     } catch (Exception e) {
       // Return failed response
     }
@@ -268,7 +268,7 @@ public class SegmentCompletionManager {
    *
    * @return
    */
-  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit) {
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -280,7 +280,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(instanceId, offset, success);
+      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit);
     } catch (Exception e) {
       // Return failed response
     }
@@ -470,7 +470,7 @@ public class SegmentCompletionManager {
      * from the map, and things start over. In this case, we respond to the server with a 'hold' so
      * that they re-transmit their segmentConsumed() message and start over.
      */
-    public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, long offset) {
+    public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, long offset, boolean isSplitCommit) {
       long now = _segmentCompletionManager.getCurrentTimeMs();
       if (_excludedServerStateMap.contains(instanceId)) {
         LOGGER.warn("Not accepting commit from {} since it had stoppd consuming", instanceId);
@@ -570,7 +570,7 @@ public class SegmentCompletionManager {
      * We can get this call only when the state is COMMITTER_UPLOADING. Also, the instanceId should be equal to
      * the _winner.
      */
-    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success) {
+    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommit) {
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
