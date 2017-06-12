@@ -288,7 +288,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   protected boolean consumeLoop() throws Exception {
     _fieldExtractor.resetCounters();
     final long idlePipeSleepTimeMillis = 100;
-    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/idlePipeSleepTimeMillis;  // 3 minute count
+    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/(idlePipeSleepTimeMillis + _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());  // 3 minute count
     long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
     long idleCount = 0;
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
