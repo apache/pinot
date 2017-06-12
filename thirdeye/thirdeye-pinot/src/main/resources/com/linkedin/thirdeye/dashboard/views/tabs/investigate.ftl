@@ -58,6 +58,12 @@
               {{/if}}
             </span>
           </div>
+          {{#if issueType}}
+            <div class="anomaly-details-items anomaly-details-items--small">
+              <label class="label-medium-semibold">Issue Type</label>
+              <span>{{issueType}}</span>
+            </div>
+          {{/if}}
         </div>
         <div class="anomaly-details-row">
           <div class="anomaly-details-items">

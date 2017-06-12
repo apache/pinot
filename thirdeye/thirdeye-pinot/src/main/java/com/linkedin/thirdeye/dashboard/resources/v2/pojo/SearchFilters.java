@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,12 +35,15 @@ public class SearchFilters {
 
   Map<String, Map<String, List<Long>>> dimensionFilterMap;
 
+  Map<String, List<Long>> issueTypeFilterMap;
+
   public SearchFilters() {
 
   }
 
-  public SearchFilters(Map<String, List<Long>> statusFilterMap, Map<String, List<Long>> functionFilterMap, Map<String, List<Long>> datasetFilterMap,
-      Map<String, List<Long>> metricFilterMap, Map<String, Map<String, List<Long>>> dimensionFilterMap) {
+  public SearchFilters(Map<String, List<Long>> statusFilterMap, Map<String, List<Long>> functionFilterMap,
+      Map<String, List<Long>> datasetFilterMap, Map<String, List<Long>> metricFilterMap,
+      Map<String, Map<String, List<Long>>> dimensionFilterMap, Map<String, List<Long>> issueTypeFilterMap) {
     super();
     this.statusFilterMap = sortByValue(statusFilterMap, true);
     this.functionFilterMap = sortByValue(functionFilterMap, true);
@@ -48,6 +53,7 @@ public class SearchFilters {
     for (String dimensionName : dimensionFilterMap.keySet()) {
       this.dimensionFilterMap.put(dimensionName, sortByValue(dimensionFilterMap.get(dimensionName), true));
     }
+    this.issueTypeFilterMap = issueTypeFilterMap;
   }
 
   public static <K, V extends Comparable<? super V>> Map<K, List<V>> sortByValue(Map<K, List<V>> map) {
@@ -110,6 +116,14 @@ public class SearchFilters {
     this.dimensionFilterMap = dimensionFilterMap;
   }
 
+  public Map<String, List<Long>> getIssueTypeFilterMap() {
+    return issueTypeFilterMap;
+  }
+
+  public void setIssueTypeFilterMap(Map<String, List<Long>> issueTypeFilterMap) {
+    this.issueTypeFilterMap = issueTypeFilterMap;
+  }
+
   public static List<MergedAnomalyResultDTO> applySearchFilters(List<MergedAnomalyResultDTO> anomalies, SearchFilters searchFilters) {
     if (searchFilters == null) {
       return anomalies;
@@ -119,6 +133,7 @@ public class SearchFilters {
     Map<String, List<Long>> datasetFilterMap = searchFilters.getDatasetFilterMap();
     Map<String, List<Long>> metricFilterMap = searchFilters.getMetricFilterMap();
     Map<String, Map<String, List<Long>>> dimensionFilterMap = searchFilters.getDimensionFilterMap();
+    Map<String, List<Long>> issueTypeFilterMap = searchFilters.getIssueTypeFilterMap();
     List<MergedAnomalyResultDTO> filteredAnomalies = new ArrayList<>();
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalies) {
       boolean passed = true;
@@ -147,6 +162,12 @@ public class SearchFilters {
           }
         }
       }
+      // check issue type
+      Map<String, String> properties = mergedAnomalyResultDTO.getProperties();
+      if (MapUtils.isNotEmpty(properties) && properties.containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
+        String issueType = properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
+        passed = passed && checkFilter(issueTypeFilterMap, issueType);
+      }
       if (passed) {
         filteredAnomalies.add(mergedAnomalyResultDTO);
       }
@@ -168,6 +189,7 @@ public class SearchFilters {
     Map<String, List<Long>> datasetFilterMap = new HashMap<>();
     Map<String, List<Long>> metricFilterMap = new HashMap<>();
     Map<String, Map<String, List<Long>>> dimensionFilterMap = new HashMap<>();
+    Map<String, List<Long>> issueTypeFilterMap = new HashMap<>();
 
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalies) {
       // update status filter
@@ -194,9 +216,16 @@ public class SearchFilters {
         String dimensionValue = dimensions.get(dimensionName);
         update(dimensionFilterMap.get(dimensionName), dimensionValue, mergedAnomalyResultDTO.getId());
       }
+      // update issue type
+      Map<String, String> properties = mergedAnomalyResultDTO.getProperties();
+      if (MapUtils.isNotEmpty(properties) && properties.containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
+        String issueType = properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
+        update(issueTypeFilterMap, issueType, mergedAnomalyResultDTO.getId());
+      }
     }
 
-    return new SearchFilters(statusFilterMap, functionFilterMap, datasetFilterMap, metricFilterMap, dimensionFilterMap);
+    return new SearchFilters(statusFilterMap, functionFilterMap, datasetFilterMap, metricFilterMap, dimensionFilterMap,
+        issueTypeFilterMap);
   }
 
   private static void update(Map<String, List<Long>> map, String value, Long anomalyId) {
@@ -205,7 +234,7 @@ public class SearchFilters {
       map.put(value, new ArrayList<Long>());
     }
     map.get(value).add(anomalyId);
-    
+
   }
 
   public static SearchFilters fromJSON(String searchFiltersJSON) {

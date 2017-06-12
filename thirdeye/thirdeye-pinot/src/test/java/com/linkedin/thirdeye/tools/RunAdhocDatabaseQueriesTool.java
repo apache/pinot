@@ -48,7 +48,6 @@ import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.Collection;
@@ -56,7 +55,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -382,6 +380,10 @@ public class RunAdhocDatabaseQueriesTool {
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
 
+//    List<Long> list = Arrays.asList(90794L, 90795L, 3583805L, 3583812L);
+//    dq.disableAllActiveFunction(list);
+
+    System.exit(1);
   }
 
 }
