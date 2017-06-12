@@ -339,3 +339,15 @@ create index onboard_dataset_idx on onboard_dataset_metric_index(dataset_name);
 create index onboard_metric_idx on onboard_dataset_metric_index(metric_name);
 create index onboard_datasource_idx on onboard_dataset_metric_index(data_source);
 create index onboard_onboarded_idx on onboard_dataset_metric_index(onboarded);
+
+create table if not exists config_index (
+    namespace varchar(64) not null,
+    name varchar(128) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `config_index` ADD UNIQUE `config_unique_index`(`namespace`, `name`);
+create index config_namespace_idx on config_index(namespace);
+create index config_name_idx on config_index(name);
