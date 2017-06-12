@@ -8,6 +8,13 @@ import java.util.List;
 import java.util.Map;
 
 
+/**
+ * ConfigNamespace provides safe access to ConfigBean properties by enforcing a fixed namespace.
+ * It provides basic get, put, list, and delete functionality.  Use ConfigNamespace to store
+ * simple key-value configuration properties that (a) require at-runtime modification of
+ * configuration values, or (b) seem too trivial to justify the introduction of a separate
+ * new bean class.
+ */
 public class ConfigNamespace {
   private final String namespace;
   private final ConfigManager configDAO;
