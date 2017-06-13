@@ -25,10 +25,10 @@ echo "Untaring Pinot Segments Without Extra Index..."
 tar -zxf pinot_non_startree.tar.gz -C temp
 echo "Untaring Pinot Segments With Inverted Index..."
 tar -zxf pinot_non_startree_inverted_index.tar.gz -C temp
-echo "Untaring Pinot Segments With Default Startree Index..."
-tar -zxf pinot_default_startree.tar.gz -C temp
-echo "Untaring Pinot Segments With Optimal Startree Index..."
-tar -zxf pinot_optimal_startree.tar.gz -C temp
+#echo "Untaring Pinot Segments With Default Startree Index..."
+#tar -zxf pinot_default_startree.tar.gz -C temp
+#echo "Untaring Pinot Segments With Optimal Startree Index..."
+#tar -zxf pinot_optimal_startree.tar.gz -C temp
 echo "Untaring Druid Segments..."
 tar -zxf druid_segment_cache.tar.gz -C temp
 
@@ -66,27 +66,27 @@ echo "Starting throughput benchmark..."
 ./target/appassembler/bin/pinot-throughput.sh src/main/resources/pinot_queries http://localhost:8099/query 5 60 | tee results/pinot_non_startree_inverted_index_throughput.txt
 kill -9 ${PINOT_PROCESS_ID}
 
-echo "Benchmarking Pinot with Default Startree Index..."
-java -jar pinot-tool-launcher-jar-with-dependencies.jar PerfBenchmarkRunner -mode startAll -dataDir temp/default_startree_small_yearly -tableNames tpch_lineitem_OFFLINE > /dev/null 2>&1 &
-PINOT_PROCESS_ID=$!
-echo "Wait 30 seconds so that cluster is ready for processing queries..."
-sleep 30
-echo "Starting response time benchmark..."
-./target/appassembler/bin/pinot-response-time.sh src/main/resources/pinot_queries http://localhost:8099/query 20 20 results/pinot_default_startree | tee results/pinot_default_startree_response_time.txt
-echo "Starting throughput benchmark..."
-./target/appassembler/bin/pinot-throughput.sh src/main/resources/pinot_queries http://localhost:8099/query 5 60 | tee results/pinot_default_startree_throughput.txt
-kill -9 ${PINOT_PROCESS_ID}
-
-echo "Benchmarking Pinot with Optimal Startree Index..."
-java -jar pinot-tool-launcher-jar-with-dependencies.jar PerfBenchmarkRunner -mode startAll -dataDir temp/optimal_startree_small_yearly -tableNames tpch_lineitem_OFFLINE > /dev/null 2>&1 &
-PINOT_PROCESS_ID=$!
-echo "Wait 30 seconds so that cluster is ready for processing queries..."
-sleep 30
-echo "Starting response time benchmark..."
-./target/appassembler/bin/pinot-response-time.sh src/main/resources/pinot_queries http://localhost:8099/query 20 20 results/pinot_optimal_startree | tee results/pinot_optimal_startree_response_time.txt
-echo "Starting throughput benchmark..."
-./target/appassembler/bin/pinot-throughput.sh src/main/resources/pinot_queries http://localhost:8099/query 5 60 | tee results/pinot_optimal_startree_throughput.txt
-kill -9 ${PINOT_PROCESS_ID}
+#echo "Benchmarking Pinot with Default Startree Index..."
+#java -jar pinot-tool-launcher-jar-with-dependencies.jar PerfBenchmarkRunner -mode startAll -dataDir temp/default_startree_small_yearly -tableNames tpch_lineitem_OFFLINE > /dev/null 2>&1 &
+#PINOT_PROCESS_ID=$!
+#echo "Wait 30 seconds so that cluster is ready for processing queries..."
+#sleep 30
+#echo "Starting response time benchmark..."
+#./target/appassembler/bin/pinot-response-time.sh src/main/resources/pinot_queries http://localhost:8099/query 20 20 results/pinot_default_startree | tee results/pinot_default_startree_response_time.txt
+#echo "Starting throughput benchmark..."
+#./target/appassembler/bin/pinot-throughput.sh src/main/resources/pinot_queries http://localhost:8099/query 5 60 | tee results/pinot_default_startree_throughput.txt
+#kill -9 ${PINOT_PROCESS_ID}
+#
+#echo "Benchmarking Pinot with Optimal Startree Index..."
+#java -jar pinot-tool-launcher-jar-with-dependencies.jar PerfBenchmarkRunner -mode startAll -dataDir temp/optimal_startree_small_yearly -tableNames tpch_lineitem_OFFLINE > /dev/null 2>&1 &
+#PINOT_PROCESS_ID=$!
+#echo "Wait 30 seconds so that cluster is ready for processing queries..."
+#sleep 30
+#echo "Starting response time benchmark..."
+#./target/appassembler/bin/pinot-response-time.sh src/main/resources/pinot_queries http://localhost:8099/query 20 20 results/pinot_optimal_startree | tee results/pinot_optimal_startree_response_time.txt
+#echo "Starting throughput benchmark..."
+#./target/appassembler/bin/pinot-throughput.sh src/main/resources/pinot_queries http://localhost:8099/query 5 60 | tee results/pinot_optimal_startree_throughput.txt
+#kill -9 ${PINOT_PROCESS_ID}
 
 echo "Benchmarking Druid with Inverted Index (Default Setting)..."
 cd temp/druid-0.9.2
