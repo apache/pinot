@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -220,7 +221,9 @@ public class AnomalyReportGenerator {
 
       if (CollectionUtils.isNotEmpty(anomalyReportDTOList)) {
         Set<String> metricNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        for (AnomalyReportDTO anomalyReportDTO : anomalyReportDTOList) {
+        Iterator<AnomalyReportDTO> iterator = anomalyReportDTOList.iterator();
+        while (iterator.hasNext() && metricNames.size() < 2) {
+          AnomalyReportDTO anomalyReportDTO = iterator.next();
           metricNames.add(anomalyReportDTO.getMetric());
         }
         if (metricNames.size() == 1) {
