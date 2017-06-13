@@ -33,6 +33,7 @@ public class AnomalyDetails {
   private String anomalyFunctionProps;
   private String anomalyFunctionDimension;
   private String anomalyFeedback;
+  private String issueType;
 
   public Long getAnomalyId() {
     return anomalyId;
@@ -235,5 +236,13 @@ public class AnomalyDetails {
         break;
     }
     return feedback;
+  }
+
+  public String getIssueType() {
+    return issueType;
+  }
+
+  public void setIssueType(String issueType) {
+    this.issueType = issueType;
   }
 }

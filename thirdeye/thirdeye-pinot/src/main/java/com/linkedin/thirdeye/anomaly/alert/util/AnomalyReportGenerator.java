@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 
@@ -12,12 +13,16 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
 
+import java.util.TreeSet;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
@@ -92,21 +97,21 @@ public class AnomalyReportGenerator {
 
   public void buildReport(List<MergedAnomalyResultDTO> anomalies,
       ThirdEyeAnomalyConfiguration configuration, AlertConfigDTO alertConfig) {
-    buildReport(null, anomalies, configuration, alertConfig.getRecipients(), alertConfig.getFromAddress(),
+    buildReport(null, null, anomalies, configuration, alertConfig.getRecipients(), alertConfig.getFromAddress(),
         alertConfig.getName());
   }
 
   /**
    * Build report/alert for the given list of anomalies, which could belong to a grouped anomaly if groupId is not null.
-   *
    * @param groupId the group id of the list of anomalies; null means they does not belong to any grouped anomaly.
+   * @param groupName the group name, i.e., dimension information, of this report.
    * @param anomalies the list of anomalies to be put in the report/alert.
    * @param configuration the configuration that contains the information of ThirdEye host.
    * @param recipients the recipients of this (group) list of anomalies.
    * @param fromAddress the source email address of this report/alert.
    * @param alertConfigName the name of this alert configuration.
    */
-  public void buildReport(Long groupId, List<MergedAnomalyResultDTO> anomalies,
+  public void buildReport(Long groupId, String groupName, List<MergedAnomalyResultDTO> anomalies,
       ThirdEyeAnomalyConfiguration configuration, String recipients, String fromAddress, String alertConfigName) {
     String subject = "Thirdeye Alert : " + alertConfigName;
     long startTime = System.currentTimeMillis();
@@ -119,16 +124,14 @@ public class AnomalyReportGenerator {
         endTime = anomaly.getEndTime();
       }
     }
-    buildReport(startTime, endTime, groupId, anomalies, subject, configuration, false,
+    buildReport(startTime, endTime, groupId, groupName, anomalies, subject, configuration, false,
         recipients, fromAddress, alertConfigName, false);
   }
 
-
-
-
-  public void buildReport(long startTime, long endTime, Long groupId, List<MergedAnomalyResultDTO> anomalies,
-      String subject, ThirdEyeAnomalyConfiguration configuration, boolean includeSentAnomaliesOnly,
-      String emailRecipients, String fromEmail, String alertConfigName, boolean includeSummary) {
+  public void buildReport(long startTime, long endTime, Long groupId, String groupName,
+      List<MergedAnomalyResultDTO> anomalies, String subject, ThirdEyeAnomalyConfiguration configuration,
+      boolean includeSentAnomaliesOnly, String emailRecipients, String fromEmail, String alertConfigName,
+      boolean includeSummary) {
     if (anomalies == null || anomalies.size() == 0) {
       LOG.info("No anomalies found to send email, please check the parameters.. exiting");
     } else {
@@ -159,7 +162,8 @@ public class AnomalyReportGenerator {
             anomaly.getMetric(),
             getDateString(anomaly.getStartTime(), timeZone),
             getDateString(anomaly.getEndTime(), timeZone),
-            getTimezoneString(timeZone)
+            getTimezoneString(timeZone),
+            getIssueType(anomaly)
         );
 
         // include notified alerts only in the email
@@ -205,17 +209,33 @@ public class AnomalyReportGenerator {
         templateData.put("isGroupedAnomaly", false);
         templateData.put("groupId", Long.toString(-1));
       }
+      if (StringUtils.isNotBlank(groupName)) {
+        templateData.put("groupName", groupName);
+        subject = subject + " - " + groupName;
+      }
       if(precisionRecallEvaluator.getTotalResponses() > 0) {
         templateData.put("precision", precisionRecallEvaluator.getPrecisionInResponse());
         templateData.put("recall", precisionRecallEvaluator.getRecall());
         templateData.put("falseNegative", precisionRecallEvaluator.getFalseNegativeRate());
       }
 
+      if (CollectionUtils.isNotEmpty(anomalyReportDTOList)) {
+        Set<String> metricNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        Iterator<AnomalyReportDTO> iterator = anomalyReportDTOList.iterator();
+        while (iterator.hasNext() && metricNames.size() < 2) {
+          AnomalyReportDTO anomalyReportDTO = iterator.next();
+          metricNames.add(anomalyReportDTO.getMetric());
+        }
+        if (metricNames.size() == 1) {
+          AnomalyReportDTO singleAnomaly = anomalyReportDTOList.get(0);
+          subject = subject + " - " + singleAnomaly.getMetric();
+        }
+      }
+
       String imgPath = null;
       String cid = "";
       if (anomalyReportDTOList.size() == 1) {
         AnomalyReportDTO singleAnomaly = anomalyReportDTOList.get(0);
-        subject = subject + " - " + singleAnomaly.getMetric();
         try {
           imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
           if (StringUtils.isNotBlank(imgPath)) {
@@ -321,6 +341,14 @@ public class AnomalyReportGenerator {
     return dashboardUrl + urlPart;
   }
 
+  private String getIssueType(MergedAnomalyResultDTO anomalyResultDTO) {
+    Map<String, String> properties = anomalyResultDTO.getProperties();
+    if (MapUtils.isNotEmpty(properties) && properties.containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
+      return properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
+    }
+    return null;
+  }
+
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class AnomalyReportDTO {
     String metric;
@@ -338,11 +366,11 @@ public class AnomalyReportGenerator {
     String startTime;
     String endTime;
     String timezone;
+    String issueType;
 
-
-    public AnomalyReportDTO(String anomalyId, String anomalyURL, String baselineVal,
-        String currentVal, List<String> dimensions, String duration, String feedback, String function,
-        String lift, boolean positiveLift, String metric, String startTime, String endTime, String timezone) {
+    public AnomalyReportDTO(String anomalyId, String anomalyURL, String baselineVal, String currentVal,
+        List<String> dimensions, String duration, String feedback, String function, String lift, boolean positiveLift,
+        String metric, String startTime, String endTime, String timezone, String issueType) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
       this.baselineVal = baselineVal;
@@ -357,6 +385,7 @@ public class AnomalyReportGenerator {
       this.startDateTime = startTime;
       this.endTime = endTime;
       this.timezone = timezone;
+      this.issueType = issueType;
     }
 
     public String getBaselineVal() {
@@ -479,7 +508,13 @@ public class AnomalyReportGenerator {
       this.timezone = timezone;
     }
 
+    public String getIssueType() {
+      return issueType;
+    }
 
+    public void setIssueType(String issueType) {
+      this.issueType = issueType;
+    }
   }
 
 }

@@ -7,6 +7,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
@@ -927,6 +928,11 @@ public class AnomaliesResource {
       anomalyDetails.setAnomalyFeedback(AnomalyDetails.getFeedbackStringFromFeedbackType(mergedAnomaly.getFeedback().getFeedbackType()));
     }
     anomalyDetails.setExternalUrl(externalUrl);
+    if (MapUtils.isNotEmpty(mergedAnomaly.getProperties()) && mergedAnomaly.getProperties()
+        .containsKey(ClassificationTaskRunner.ISSUE_TYPE_KEY)) {
+      anomalyDetails.setIssueType(mergedAnomaly.getProperties().get(ClassificationTaskRunner.ISSUE_TYPE_KEY));
+    }
+
     return anomalyDetails;
   }
 

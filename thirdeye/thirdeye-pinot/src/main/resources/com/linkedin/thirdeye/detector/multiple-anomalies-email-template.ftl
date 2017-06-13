@@ -41,6 +41,15 @@
           </td>
         </tr>
 
+        <#if groupName?has_content>
+          <tr>
+            <td style="padding: 0 24px;" colspan="2">
+              <p style="color: rgba(0,0,0,0.55); font-size:16px; margin-bottom:0;">GROUP</p>
+              <p style="margin-top:8px; margin-bottom:24px; font-size:20px">${groupName}</p>
+            </td>
+          </tr>
+        </#if>
+
         <tr>
           <td style="padding: 0 24px;" colspan="2">
             <table align="left" border="0" width="100%" style="width:100%; border-collapse:collapse; border-spacing:0;">
@@ -108,6 +117,10 @@
                       <#list r.dimensions as dimension>
                         ${dimension} <br>
                       </#list>
+                      <#if r.issueType??>
+                        issue type : ${r.issueType} <br>
+                      </#if>
+
 
                     </td>
                     <td style="padding:12px;">

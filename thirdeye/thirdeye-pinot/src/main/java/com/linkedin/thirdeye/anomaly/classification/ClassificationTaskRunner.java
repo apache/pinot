@@ -55,7 +55,7 @@ public class ClassificationTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(ClassificationTaskRunner.class);
   private static final MergeAnomalyEndTimeComparator MERGE_ANOMALY_END_TIME_COMPARATOR =
       new MergeAnomalyEndTimeComparator();
-  private static final String ISSUE_TYPE_KEY = "issue_type";
+  public static final String ISSUE_TYPE_KEY = "issue_type";
 
   private AnomalyFunctionManager anomalyFunctionDAO = DAORegistry.getInstance().getAnomalyFunctionDAO();
   private MergedAnomalyResultManager mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
