@@ -11,6 +11,7 @@ import org.testng.Assert;
 public class TestBaseAlertFilter extends AbstractManagerTestBase {
   private static String collection = "my dataset";
   private static String metricName = "__counts";
+
   // test set up double, Double, string for alpha_beta
   // also test missing input parameter, will use default value defined in the specified class
   @Test
@@ -29,6 +30,12 @@ public class TestBaseAlertFilter extends AbstractManagerTestBase {
     alertfilter.put("threshold", String.valueOf(threshold));
     alphaBetaAlertFilter.setParameters(alertfilter);
     Assert.assertEquals(alphaBetaAlertFilter.getThreshold(), Double.valueOf(alertfilter.get("threshold")));
+
+    // test missing field
+    alertfilter.remove("threshold");
+    AlphaBetaAlertFilter alphaBetaAlertFilter1 = new AlphaBetaAlertFilter();
+    alphaBetaAlertFilter1.setParameters(alertfilter);
+    Assert.assertEquals(alphaBetaAlertFilter1.getThreshold(), Double.valueOf(AlphaBetaAlertFilter.DEFAULT_THRESHOLD));
   }
 
 }
