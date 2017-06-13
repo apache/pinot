@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -13,6 +14,7 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.Arrays;
 import java.util.List;
 
+import java.util.Map;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -216,7 +218,7 @@ public class EmailResource {
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
 
     anomalyReportGenerator
-        .buildReport(startTime, endTime, null, anomalies, emailSub, configuration,
+        .buildReport(startTime, endTime, null, null, anomalies, emailSub, configuration,
             includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }
@@ -282,7 +284,7 @@ public class EmailResource {
     configuration.setPhantomJsPath(phantomJsPath);
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
-        .buildReport(startTime, endTime, null, anomalies, emailSub, configuration,
+        .buildReport(startTime, endTime, null, null, anomalies, emailSub, configuration,
             includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }

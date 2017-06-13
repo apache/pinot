@@ -188,13 +188,19 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
           // Append group name after config name if dimensions of this group is not empty
           String emailSubjectName = alertConfig.getName();
+          String groupName = null;
           if (dimensions.size() != 0) {
-            String groupName = dimensions.toJavaString();
-            emailSubjectName = emailSubjectName + " " + groupName;
+            StringBuilder sb = new StringBuilder();
+            String separator = "";
+            for (Map.Entry<String, String> dimension : dimensions.entrySet()) {
+              sb.append(separator).append(dimension.getKey()).append(":").append(dimension.getValue());
+              separator = ", ";
+            }
+            groupName = sb.toString();
           }
           // Generate and send out an anomaly report for this group
           AnomalyReportGenerator.getInstance()
-              .buildReport(groupedAnomalyDTO.getId(), anomalyResultListOfGroup, thirdeyeConfig, recipientsForThisGroup,
+              .buildReport(groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, thirdeyeConfig, recipientsForThisGroup,
                   alertConfig.getFromAddress(), emailSubjectName);
           // Update notified flag
           if (alertGrouper instanceof DummyAlertGrouper) {
