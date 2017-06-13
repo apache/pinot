@@ -18,9 +18,9 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
   List<MergedAnomalyResultDTO> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime,
       long emailId, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findAllOverlapByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd, boolean loadRawAnomalies);
+  List<MergedAnomalyResultDTO> findOverlappingByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findAllOverlapByFunctionIdDimensions(long functionId, long conflictWindowStart, long conflictWindowEnd, String dimensions, boolean loadRawAnomalies);
+  List<MergedAnomalyResultDTO> findOverlappingByFunctionIdDimensions(long functionId, long conflictWindowStart, long conflictWindowEnd, String dimensions, boolean loadRawAnomalies);
 
   List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
       String metric, String dimensions, long startTime, long endTime, boolean loadRawAnomalies);

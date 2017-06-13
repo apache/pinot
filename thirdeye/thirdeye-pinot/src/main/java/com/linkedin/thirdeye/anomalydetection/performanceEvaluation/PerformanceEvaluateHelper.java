@@ -27,9 +27,9 @@ public class PerformanceEvaluateHelper {
       long functionId, long clonedFunctionId, Interval windowInterval,
       MergedAnomalyResultManager mergedAnomalyResultDAO) {
     PerformanceEvaluate performanceEvaluator = null;
-    List<MergedAnomalyResultDTO> knownAnomalies = mergedAnomalyResultDAO.findAllOverlapByFunctionId(functionId,
+    List<MergedAnomalyResultDTO> knownAnomalies = mergedAnomalyResultDAO.findOverlappingByFunctionId(functionId,
         windowInterval.getStartMillis(), windowInterval.getEndMillis(), true);
-    List<MergedAnomalyResultDTO> detectedMergedAnomalies = mergedAnomalyResultDAO.findAllOverlapByFunctionId(
+    List<MergedAnomalyResultDTO> detectedMergedAnomalies = mergedAnomalyResultDAO.findOverlappingByFunctionId(
         clonedFunctionId, windowInterval.getStartMillis(), windowInterval.getEndMillis(), true);
     switch (performanceEvaluationMethod){
       case F1_SCORE:

@@ -389,7 +389,7 @@ public class AnomalyDetectionInputContextBuilder {
     for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
       try {
         results.addAll(
-            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllOverlapByFunctionId(functionId, startEndTimeRange.getFirst(),
+            DAO_REGISTRY.getMergedAnomalyResultDAO().findOverlappingByFunctionId(functionId, startEndTimeRange.getFirst(),
                 startEndTimeRange.getSecond(), loadRawAnomalies));
       } catch (Exception e) {
         LOG.error("Exception in getting merged anomalies", e);
@@ -415,7 +415,7 @@ public class AnomalyDetectionInputContextBuilder {
     for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
       try {
         results.addAll(
-            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllOverlapByFunctionIdDimensions(functionId,
+            DAO_REGISTRY.getMergedAnomalyResultDAO().findOverlappingByFunctionIdDimensions(functionId,
                 startEndTimeRange.getFirst(), startEndTimeRange.getSecond(), dimensions.toString(), true));
       } catch (Exception e) {
         LOG.error("Exception in getting merged anomalies", e);
