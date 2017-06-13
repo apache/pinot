@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -181,14 +180,14 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     }
   }
 
-  private AtomicReference<ValueToDictId> _valueToDict = new AtomicReference<>();
+  private volatile ValueToDictId _valueToDict;
 
   protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize) {
     final int initialRowCount = nearestPrime(estimatedCardinality);
     _numEntries = 0;
     _maxItemsInOverflowHash = maxOverflowHashSize;
     ValueToDictId valueToDictId = new ValueToDictId(new ArrayList<IntBuffer>(0), new ConcurrentHashMap<Object, Integer>(0));
-    _valueToDict.set(valueToDictId);
+    _valueToDict = valueToDictId;
     _sizeOfFirstBuf = initialRowCount * NUM_COLUMNS;
     if (!HEAP_FIRST || (maxOverflowHashSize == 0)) {
       expand(_sizeOfFirstBuf);
@@ -239,8 +238,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   public void close() throws IOException {
     doClose();
 
-    ValueToDictId valueToDictId = _valueToDict.get();
-    _valueToDict.set(null);
+    ValueToDictId valueToDictId = _valueToDict;
+    _valueToDict = null;
     Map<Object, Integer> overflowMap = valueToDictId.getOverflowMap();
     overflowMap.clear();
     List<IntBuffer> iBufs = valueToDictId.getIBufList();
@@ -266,7 +265,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     final int bbSize = newSize * V1Constants.Numbers.INTEGER_SIZE;
     final int modulo = newSize / NUM_COLUMNS;
 
-    ValueToDictId valueToDictId = _valueToDict.get();
+    final ValueToDictId valueToDictId = _valueToDict;
     List<IntBuffer> oldList = valueToDictId.getIBufList();
     List<IntBuffer> newList = new ArrayList<>(oldList.size() + 1);
     for (IntBuffer iBuf : oldList) {
@@ -299,16 +298,14 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
         }
       }
     }
-    ValueToDictId newValueToDictId = new ValueToDictId(newList, newOverflowMap);
-    _valueToDict.set(newValueToDictId);
-
+    _valueToDict  = new ValueToDictId(newList, newOverflowMap);
     // We should not clear oldOverflowMap or oldList here, as readers may still be accessing those.
     // We let GC take care of those elements.
     return iBuf;
   }
 
   private IntBuffer expand() {
-    ValueToDictId valueToDictId = _valueToDict.get();
+    final ValueToDictId valueToDictId = _valueToDict;
     List<IntBuffer> iBufList = valueToDictId.getIBufList();
     final int numBuffers = iBufList.size();
     if (numBuffers == 0) {
@@ -342,7 +339,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
 
   protected int getDictId(@Nonnull Object rawValue) {
     final long hashVal = Math.abs(rawValue.hashCode());
-    final ValueToDictId valueToDictId = _valueToDict.get();
+    final ValueToDictId valueToDictId = _valueToDict;
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
     for (IntBuffer iBuf : iBufList) {
       final int modulo = iBuf.capacity()/NUM_COLUMNS;
@@ -368,7 +365,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
 
   protected void indexValue(@Nonnull Object value) {
     final long hashVal = Math.abs(value.hashCode());
-    ValueToDictId valueToDictId = _valueToDict.get();
+    ValueToDictId valueToDictId = _valueToDict;
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
 
     for (IntBuffer iBuf : iBufList) {
@@ -421,14 +418,14 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       }
     }
     if (!done) {
-      valueToDictId = _valueToDict.get();
+      valueToDictId = _valueToDict;
       overflowMap = valueToDictId.getOverflowMap();
       overflowMap.put(value, _numEntries++);
     }
   }
 
   public long getTotalOffHeapMemUsed() {
-    ValueToDictId valueToDictId = _valueToDict.get();
+    ValueToDictId valueToDictId = _valueToDict;
     long size = 0;
     for (IntBuffer iBuf : valueToDictId._iBufList) {
       size = size + iBuf.capacity() * V1Constants.Numbers.INTEGER_SIZE;
@@ -437,17 +434,17 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   public int getNumberOfHeapBuffersUsed() {
-    ValueToDictId valueToDictId = _valueToDict.get();
+    ValueToDictId valueToDictId = _valueToDict;
     return valueToDictId._iBufList.size();
   }
 
   public int getNumberOfOveflowValues() {
-    ValueToDictId valueToDictId = _valueToDict.get();
+    ValueToDictId valueToDictId = _valueToDict;
     return valueToDictId._overflowMap.size();
   }
 
   public int[] getRowFillCount() {
-    ValueToDictId valueToDictId = _valueToDict.get();
+    ValueToDictId valueToDictId = _valueToDict;
     int rowsWith1Col[] = new int[NUM_COLUMNS];
 
     for (int i = 0; i < rowsWith1Col.length; i++) {
