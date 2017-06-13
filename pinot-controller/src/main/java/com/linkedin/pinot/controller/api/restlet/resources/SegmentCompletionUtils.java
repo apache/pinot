@@ -16,6 +16,10 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import java.io.File;
+import java.io.FileFilter;
+import java.util.UUID;
+import java.util.regex.Pattern;
 import org.restlet.data.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +32,7 @@ public class SegmentCompletionUtils {
     final String offsetStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
     final String segmentName = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
     final String instanceId = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
+    final String segmentLocation = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION);
 
     if (offsetStr == null || segmentName == null || instanceId == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offsetStr, segmentName, instanceId);
@@ -43,10 +48,32 @@ public class SegmentCompletionUtils {
     return new SegmentCompletionProtocol.Request.Params()
         .withInstanceId(instanceId)
         .withOffset(offset)
-        .withSegmentName(segmentName);
+        .withSegmentName(segmentName)
+        .withSegmentLocation(segmentLocation);
   }
 
-  public static String generateSegmentFileName(String segmentNameStr, long offset, String instanceId) {
-    return segmentNameStr + "##" + offset + "##" +  instanceId;
+  public static String generateSegmentNamePrefix(String segmentName) {
+    return segmentName + ".tmp.";
+  }
+
+  public static String generateSegmentFileName(String segmentNameStr) {
+    return generateSegmentNamePrefix(segmentNameStr) + SegmentCompletionUtils.generateUUID();
+  }
+
+  public static String generateUUID() {
+    return UUID.randomUUID().toString();
+  }
+
+  public static File[] listFilesMatching(File root, String segmentName) {
+    if(!root.isDirectory()) {
+      throw new IllegalArgumentException(root+" is no directory.");
+    }
+    final Pattern p = Pattern.compile(segmentName + "*");
+    return root.listFiles(new FileFilter(){
+      @Override
+      public boolean accept(File file) {
+        return p.matcher(file.getName()).matches();
+      }
+    });
   }
 }

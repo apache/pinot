@@ -24,12 +24,17 @@ import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.restlet.resources.SegmentCompletionUtils;
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
@@ -193,7 +198,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitStart(instanceId, offset, isSplitCommit);
+      response = fsm.segmentCommitStart(instanceId, offset);
     } catch (Exception e) {
       // Return failed response
     }
@@ -268,7 +273,7 @@ public class SegmentCompletionManager {
    *
    * @return
    */
-  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit, String temporarySegmentName) {
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -280,7 +285,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit);
+      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit, temporarySegmentName);
     } catch (Exception e) {
       // Return failed response
     }
@@ -470,7 +475,7 @@ public class SegmentCompletionManager {
      * from the map, and things start over. In this case, we respond to the server with a 'hold' so
      * that they re-transmit their segmentConsumed() message and start over.
      */
-    public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, long offset, boolean isSplitCommit) {
+    public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, long offset) {
       long now = _segmentCompletionManager.getCurrentTimeMs();
       if (_excludedServerStateMap.contains(instanceId)) {
         LOGGER.warn("Not accepting commit from {} since it had stoppd consuming", instanceId);
@@ -570,7 +575,7 @@ public class SegmentCompletionManager {
      * We can get this call only when the state is COMMITTER_UPLOADING. Also, the instanceId should be equal to
      * the _winner.
      */
-    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommit) {
+    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommit, String temporarySegmentName) {
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
@@ -591,7 +596,7 @@ public class SegmentCompletionManager {
           _state = State.ABORTED;
           return SegmentCompletionProtocol.RESP_FAILED;
         }
-        SegmentCompletionProtocol.Response response = updateZk(instanceId, offset);
+        SegmentCompletionProtocol.Response response = updateZk(instanceId, offset, isSplitCommit, temporarySegmentName);
         if (response != null) {
           return response;
         }
@@ -960,7 +965,7 @@ public class SegmentCompletionManager {
       return response;
     }
 
-    private SegmentCompletionProtocol.Response updateZk(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response updateZk(String instanceId, long offset, boolean isSplitCommit, String temporarySegmentName) {
       boolean success;
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
         // State changed while we were out of sync. return a failed commit.
@@ -970,7 +975,10 @@ public class SegmentCompletionManager {
       }
       LOGGER.info("Committing segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
       _state = State.COMMITTING;
-      success = _segmentManager.commitSegment(_segmentName.getTableName(), _segmentName.getSegmentName(),
+      if (isSplitCommit) {
+        _segmentManager.commitSegmentFile(_segmentName.getTableName(), temporarySegmentName, _segmentName.getSegmentName());
+      }
+      success = _segmentManager.commitZkSegment(_segmentName.getTableName(), _segmentName.getSegmentName(),
           _winningOffset);
       if (success) {
         _state = State.COMMITTED;

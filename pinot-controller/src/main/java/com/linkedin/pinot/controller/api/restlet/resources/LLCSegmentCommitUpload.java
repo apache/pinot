@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
   private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCommitUpload.class);
+  private String _generatedSegmentName;
 
   public LLCSegmentCommitUpload()
       throws IOException {
@@ -46,7 +47,6 @@ public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
   @Description("Uploads an LLC segment using split commit")
   @Summary("Uploads an LLC segment using split commit")
   @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD})
-  // TODO: TInclude the generated file name in the response to the server
   public Representation post(Representation entity) {
     SegmentCompletionProtocol.Request.Params params = SegmentCompletionUtils.extractParams(getReference());
     if (params == null) {
@@ -55,17 +55,27 @@ public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
 
     LOGGER.info(params.toString());
 
-    boolean success = uploadSegment(params.getInstanceId(), params.getSegmentName(), params.getOffset());
+    boolean success = uploadSegment(params.getInstanceId(), params.getSegmentName());
     if (success) {
       LOGGER.info("Uploaded segment successfully");
-      return new StringRepresentation(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS.toString());
+      SegmentCompletionProtocol.Response.Params successParams = new SegmentCompletionProtocol.Response.Params()
+          .withOffset(params.getOffset())
+          .withSplitCommit(true)
+          .withSegmentLocation(_generatedSegmentName)
+          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
+      return new StringRepresentation(new SegmentCompletionProtocol.Response(successParams).toJsonString());
     } else {
       LOGGER.info("Failed to upload segment");
-      return new StringRepresentation(SegmentCompletionProtocol.ControllerResponseStatus.FAILED.toString());
+      SegmentCompletionProtocol.Response.Params failureParams = new SegmentCompletionProtocol.Response.Params()
+          .withOffset(params.getOffset())
+          .withSplitCommit(true)
+          .withSegmentLocation(_generatedSegmentName)
+          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
+      return new StringRepresentation(new SegmentCompletionProtocol.Response(failureParams).toJsonString());
     }
   }
 
-  boolean uploadSegment(final String instanceId, final String segmentNameStr, final long offset) {
+  boolean uploadSegment(final String instanceId, final String segmentNameStr) {
     // 1/ Create a factory for disk-based file items
     final DiskFileItemFactory factory = new DiskFileItemFactory();
 
@@ -111,16 +121,14 @@ public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
 
       final String rawTableName = segmentName.getTableName();
       final File tableDir = new File(baseDataDir, rawTableName);
-      String generatedSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentNameStr, offset, instanceId);
-      final File segmentFile = new File(tableDir, generatedSegmentFileName);
-
-      // Always delete the segment file if it exists for split commit.
+      // For split commit, generate a new segment name with offset, instanceId, and UUID
+      _generatedSegmentName = SegmentCompletionUtils.generateSegmentFileName(segmentNameStr);
+      final File segmentFile = new File(tableDir, _generatedSegmentName);
       if (segmentFile.exists()) {
-        LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentNameStr, instanceId);
-        FileUtils.deleteQuietly(segmentFile);
+        LOGGER.warn("Segment file exists " + segmentFile);
       }
       FileUtils.moveFile(dataFile, segmentFile);
-      LOGGER.info("Segment file " + generatedSegmentFileName);
+      LOGGER.info("Generated segment name " + _generatedSegmentName);
 
       return true;
     } catch (Exception e) {

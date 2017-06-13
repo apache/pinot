@@ -248,7 +248,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     LLCRealtimeSegmentZKMetadata committingSegmentMetadata =  new LLCRealtimeSegmentZKMetadata(segmentManager._records.get(committingPartition));
     segmentManager._paths.clear();
     segmentManager._records.clear();
-    boolean status = segmentManager.commitSegment(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset);
+    boolean status = segmentManager.commitZkSegment(rawTableName, committingSegmentMetadata.getSegmentName(),
+        nextOffset);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
 

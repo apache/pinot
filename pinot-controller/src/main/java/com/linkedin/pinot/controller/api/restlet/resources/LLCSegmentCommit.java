@@ -70,7 +70,7 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
       // Get the segment and put it in the right place.
       boolean success = uploadSegment(_instanceId, _segmentNameStr);
 
-      response = segmentCompletionManager.segmentCommitEnd(reqParams, success, false);
+      response = segmentCompletionManager.segmentCommitEnd(reqParams, success, false, null);
     }
 
     LOGGER.info("Response: instance={}  segment={} status={} offset={}", _instanceId, _segmentNameStr,

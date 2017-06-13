@@ -19,6 +19,7 @@ package com.linkedin.pinot.controller.helix.core.realtime;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,6 +68,7 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.restlet.resources.SegmentCompletionUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -467,6 +469,27 @@ public class PinotLLCRealtimeSegmentManager {
     return HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
   }
 
+  public boolean commitSegmentFile(String rawTableName, String temporarySegmentName, String segmentName) {
+
+    File baseDataDir = new File(_controllerConf.getDataDir());
+    File tableDir = new File(baseDataDir, rawTableName);
+
+    try {
+      FileUtils.moveFile(new File(tableDir, temporarySegmentName), new File(tableDir, segmentName));
+    } catch (IOException e) {
+      LOGGER.error("Could not move file {} to {}", temporarySegmentName, segmentName);
+      return false;
+    }
+    // Try to delete similar files
+    File[] filesToDelete = SegmentCompletionUtils.listFilesMatching(/* parent directory*/new File(""),
+        SegmentCompletionUtils.generateSegmentNamePrefix(segmentName) + "*");
+    for (File file : filesToDelete) {
+      LOGGER.warn("Deleting " + file);
+      FileUtils.deleteQuietly(file);
+    }
+    return true;
+  }
+
   /**
    * This method is invoked after the realtime segment is uploaded but before a response is sent to the server.
    * It updates the propertystore segment metadata from IN_PROGRESS to DONE, and also creates new propertystore
@@ -477,7 +500,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param nextOffset The offset with which the next segment should start.
    * @return
    */
-  public boolean commitSegment(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
+  public boolean commitZkSegment(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
     final long now = System.currentTimeMillis();
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
