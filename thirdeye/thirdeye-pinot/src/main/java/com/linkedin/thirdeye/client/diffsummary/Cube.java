@@ -29,7 +29,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Cube { // the cube (Ca|Cb)
   private static final Logger LOG = LoggerFactory.getLogger(Cube.class);
+
   private static final int DEFAULT_TOP_DIMENSION = 3;
+  private static final String TOP_K_POSTFIX = "_topk";
   public static final double PERCENTAGE_CONTRIBUTION_THRESHOLD = 3d;
 
   private double topBaselineValue;
@@ -117,6 +119,7 @@ public class Cube { // the cube (Ca|Cb)
     this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions, filterSets);
   }
 
+  // TODO: Replace with method with an user configurable method
   private static Dimensions sanitizeDimensions(Dimensions dimensions) {
     List<String> allDimensionNames = dimensions.allDimensions();
     Set<String> dimensionsToRemove = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
@@ -124,19 +127,27 @@ public class Cube { // the cube (Ca|Cb)
     dimensionsToRemove.add("colo");
     dimensionsToRemove.add("fabric");
     for (String dimensionName : allDimensionNames) {
-      if(dimensionName.contains("_topk")) {
-        String rawDimensionName = dimensionName.replaceAll("_topk", "");
+      if(dimensionName.contains(TOP_K_POSTFIX)) {
+        String rawDimensionName = dimensionName.replaceAll(TOP_K_POSTFIX, "");
         dimensionsToRemove.add(rawDimensionName.toLowerCase());
       }
     }
     return removeDimensions(dimensions, dimensionsToRemove);
   }
 
+  /**
+   * Removes dimensions from the given list of dimensions, which has single values in the filter set. Only dimensions
+   * with one value is removed from the given dimensions because setting a filter one dimension names with one dimension
+   * value (e.g., "country=US") implies that the final data cube does not contain other dimension values. Thus, the
+   * summary algorithm could simply ignore that dimension (because the cube does not have any other values to compare
+   * with in that dimension).
+   *
+   * @param dimensions the list of dimensions to be modified.
+   * @param filterSets the filter to be applied on the data cube.
+   *
+   * @return the list of dimensions that should be used for retrieving the data for summary algorithm.
+   */
   private static Dimensions shrinkDimensionsByFilterSets(Dimensions dimensions, Multimap<String, String> filterSets) {
-    // Only dimensions with one value is removed from the given dimensions. Because setting a filter one dimension names
-    // with one dimension value (e.g., "country=US") implies that the final data cube does not contain other dimension
-    // values. Thus, the summary algorithm could simply ignore that dimension (because the cube does not have any other
-    // values to compare with in that dimension).
     Set<String> dimensionsToRemove = new HashSet<>();
     for (Map.Entry<String, Collection<String>> filterSetEntry : filterSets.asMap().entrySet()) {
       if (filterSetEntry.getValue().size() == 1) {
