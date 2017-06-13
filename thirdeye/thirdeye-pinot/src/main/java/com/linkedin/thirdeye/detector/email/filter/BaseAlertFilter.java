@@ -67,8 +67,11 @@ public abstract class BaseAlertFilter implements AlertFilter {
         if (field.getType().equals(Double.class) || field.getType().equals(double.class)) {
           field.set(this, value);
         }
+        else if (field.getType().equals(String.class)) {
+            field.set(this, strVal);
+          }
         else {
-          field.set(this, strVal);
+         throw new IllegalAccessException ("Field type is neither Double or String, cannot set value!");
         }
         field.setAccessible(accessible);
       } catch (NoSuchFieldException | IllegalAccessException e) {
