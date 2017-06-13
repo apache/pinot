@@ -101,7 +101,7 @@ public class Cube { // the cube (Ca|Cb)
     initializeBasicInfo(olapClient, filterSets);
     Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
     Dimensions shrankDimensions = shrinkDimensionsByFilterSets(sanitizedDimensions, filterSets);
-    this.costSet = computeOneDimensionCost(olapClient, topRatio, shrankDimensions);
+    this.costSet = computeOneDimensionCost(olapClient, topRatio, shrankDimensions, filterSets);
     this.dimensions = sortDimensionOrder(costSet, shrankDimensions, topDimension, hierarchy);
 
     LOG.info("Auto decided dimensions: " + this.dimensions);
@@ -114,7 +114,7 @@ public class Cube { // the cube (Ca|Cb)
       throws Exception {
     Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
     initializeBasicInfo(olapClient, filterSets);
-    this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions);
+    this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions, filterSets);
   }
 
   private static Dimensions sanitizeDimensions(Dimensions dimensions) {
@@ -165,7 +165,7 @@ public class Cube { // the cube (Ca|Cb)
     if (this.dimensions == null) { // which means buildWithAutoDimensionOrder is not triggered
       initializeBasicInfo(olapClient, filterSets);
       this.dimensions = dimensions;
-      this.costSet = computeOneDimensionCost(olapClient, topRatio, dimensions);
+      this.costSet = computeOneDimensionCost(olapClient, topRatio, dimensions, filterSets);
     }
 
     int size = 0;
@@ -178,7 +178,7 @@ public class Cube { // the cube (Ca|Cb)
     //                       / \   \
     //     Level 2          d   e   f
     // The Comparator for generating the order is implemented in the class DimensionValues.
-    List<List<Row>> rowOfLevels = olapClient.getAggregatedValuesOfLevels(dimensions, null);
+    List<List<Row>> rowOfLevels = olapClient.getAggregatedValuesOfLevels(dimensions, filterSets);
     for (int i = 0; i <= dimensions.size(); ++i) {
       List<Row> rowAtLevelI = rowOfLevels.get(i);
       Collections.sort(rowAtLevelI, new RowDimensionValuesComparator());
@@ -259,16 +259,15 @@ public class Cube { // the cube (Ca|Cb)
   }
 
   private static List<DimNameValueCostEntry> computeOneDimensionCost(OLAPDataBaseClient olapClient, double topRatio,
-      Dimensions dimensions) throws Exception {
+      Dimensions dimensions, Multimap<String, String> filterSets) throws Exception {
     List<DimNameValueCostEntry> costSet = new ArrayList<>();
 
-    List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions, null);
+    List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions, filterSets);
     double baselineTotal = 0;
     double currentTotal = 0;
     //use one dimension to compute baseline/current total
     List<Row> wowValuesOfFirstDimension = wowValuesOfDimensions.get(0);
-    for (int j = 0; j < wowValuesOfFirstDimension.size(); ++j) {
-      Row wowValues = wowValuesOfFirstDimension.get(j);
+    for (Row wowValues : wowValuesOfFirstDimension) {
       baselineTotal += wowValues.baselineValue;
       currentTotal += wowValues.currentValue;
     }

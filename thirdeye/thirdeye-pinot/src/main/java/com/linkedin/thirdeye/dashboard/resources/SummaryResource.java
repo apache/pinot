@@ -4,6 +4,8 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.List;
 
@@ -54,7 +56,7 @@ public class SummaryResource {
       @QueryParam("baselineStart") Long baselineStartInclusive,
       @QueryParam("baselineEnd") Long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
-      @QueryParam("filters") String filters,
+      @QueryParam("filters") String filterJsonPayload,
       @QueryParam("summarySize") int summarySize,
       @QueryParam("topDimensions") @DefaultValue(DEFAULT_TOP_DIMENSIONS) int topDimensions,
       @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
@@ -82,9 +84,9 @@ public class SummaryResource {
       }
 
       Multimap<String, String> filterSetMap;
-      if (StringUtils.isNotBlank(filters)) {
-        filterSetMap = OBJECT_MAPPER.readValue(filters, new TypeReference<Multimap<String, String>>() {
-        });
+      if (StringUtils.isNotBlank(filterJsonPayload)) {
+        filterJsonPayload = URLDecoder.decode(filterJsonPayload, "UTF-8");
+        filterSetMap = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
       } else {
         filterSetMap = ArrayListMultimap.create();
       }
@@ -117,7 +119,7 @@ public class SummaryResource {
       @QueryParam("baselineStart") Long baselineStartInclusive,
       @QueryParam("baselineEnd") Long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
-      @QueryParam("filters") String filters,
+      @QueryParam("filters") String filterJsonPayload,
       @QueryParam("summarySize") int summarySize,
       @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
@@ -146,9 +148,16 @@ public class SummaryResource {
       }
       Dimensions dimensions = new Dimensions(allDimensions);
 
+      Multimap<String, String> filterSets;
+      if (StringUtils.isNotBlank(filterJsonPayload)) {
+        filterJsonPayload = URLDecoder.decode(filterJsonPayload, "UTF-8");
+        filterSets = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
+      } else {
+        filterSets = ArrayListMultimap.create();
+      }
 
       Cube cube = new Cube();
-      cube.buildWithManualDimensionOrder(olapClient, dimensions, null);
+      cube.buildWithManualDimensionOrder(olapClient, dimensions, filterSets);
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError);

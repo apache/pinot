@@ -23,7 +23,9 @@ public interface OLAPDataBaseClient {
 
   Row getTopAggregatedValues(Multimap<String, String> filterSets) throws Exception;
 
-  List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions, Multimap<String, String> filterSets) throws Exception;
+  List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions, Multimap<String, String> filterSets)
+      throws Exception;
 
-  List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions, Multimap<String, String> filterSets) throws Exception;
+  List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions, Multimap<String, String> filterSets)
+      throws Exception;
 }
