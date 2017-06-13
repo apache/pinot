@@ -3,24 +3,14 @@ package com.linkedin.thirdeye.detector.email.filter;
 import java.lang.reflect.Field;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.swing.StringUIClientPropertyKey;
 
 
 public abstract class BaseAlertFilter implements AlertFilter {
   private final static Logger LOG = LoggerFactory.getLogger(BaseAlertFilter.class);
 
-//  // Check if the given string can be parsed as double value
-//  public static boolean isNumeric(String str) {
-//    try {
-//      double d = Double.parseDouble(str);
-//    }
-//    catch(NumberFormatException nfe) {
-//      return false;
-//    }
-//    return true;
-//  }
 
 
   /**
@@ -42,7 +32,7 @@ public abstract class BaseAlertFilter implements AlertFilter {
       // Get user's value for the specified field
       if (parameterSetting.containsKey(fieldName)) {
         String fieldVal = parameterSetting.get(fieldName);
-        if (StringUtils.isNumeric(fieldVal)) {
+        if (NumberUtils.isNumber(fieldVal)) {
           value = Double.parseDouble(parameterSetting.get(fieldName));
         } else {
           strVal = fieldVal;
@@ -50,7 +40,7 @@ public abstract class BaseAlertFilter implements AlertFilter {
       } else {
         // If user's value does not exist, try to get the default value from Class definition
         try {
-          Field field = c.getDeclaredField("DEFAULT_" + fieldName.toUpperCase());
+          Field field = c.getDeclaredField(fieldName);
           boolean accessible = field.isAccessible();
           field.setAccessible(true);
           Object object = field.get(this);
@@ -74,9 +64,9 @@ public abstract class BaseAlertFilter implements AlertFilter {
       // Set the final value to the specified field
       try {
         Field field = c.getDeclaredField(fieldName);
-        Object object = field.get(this);
         boolean accessible = field.isAccessible();
         field.setAccessible(true);
+        Object object = field.get(this);
         if (object instanceof Double) {
           field.set(this, value);
         }
