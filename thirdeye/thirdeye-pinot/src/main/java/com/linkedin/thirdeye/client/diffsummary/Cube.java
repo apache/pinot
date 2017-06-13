@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
+import com.google.common.collect.Multimap;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import java.util.TreeSet;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.MutablePair;
@@ -26,7 +29,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Cube { // the cube (Ca|Cb)
   private static final Logger LOG = LoggerFactory.getLogger(Cube.class);
+
   private static final int DEFAULT_TOP_DIMENSION = 3;
+  private static final String TOP_K_POSTFIX = "_topk";
   public static final double PERCENTAGE_CONTRIBUTION_THRESHOLD = 3d;
 
   private double topBaselineValue;
@@ -76,70 +81,102 @@ public class Cube { // the cube (Ca|Cb)
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions)
       throws Exception {
-    buildWithAutoDimensionOrder(olapClient, dimensions, DEFAULT_TOP_DIMENSION, Collections.<List<String>>emptyList());
+    buildWithAutoDimensionOrder(olapClient, dimensions, DEFAULT_TOP_DIMENSION, Collections.<List<String>>emptyList(),
+        null);
   }
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimensions)
       throws Exception {
-    buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
+    buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList(), null);
   }
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimension,
-      List<List<String>> hierarchy)
+      List<List<String>> hierarchy, Multimap<String, String> filterSets)
       throws Exception {
-    Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
-    initializeBasicInfo(olapClient);
     if (dimensions == null || dimensions.size() == 0) {
       throw new IllegalArgumentException("Dimensions cannot be empty.");
     }
     if (hierarchy == null) {
       hierarchy = Collections.emptyList();
     }
-    this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions);
-    this.dimensions = sortDimensionOrder(costSet, sanitizedDimensions, topDimension, hierarchy);
+
+    initializeBasicInfo(olapClient, filterSets);
+    Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
+    Dimensions shrankDimensions = shrinkDimensionsByFilterSets(sanitizedDimensions, filterSets);
+    this.costSet = computeOneDimensionCost(olapClient, topRatio, shrankDimensions, filterSets);
+    this.dimensions = sortDimensionOrder(costSet, shrankDimensions, topDimension, hierarchy);
 
     LOG.info("Auto decided dimensions: " + this.dimensions);
 
-    buildWithManualDimensionOrder(olapClient, this.dimensions);
+    buildWithManualDimensionOrder(olapClient, this.dimensions, filterSets);
   }
 
-  public void buildDimensionCostSet(OLAPDataBaseClient olapClient, Dimensions dimensions)
+  public void buildDimensionCostSet(OLAPDataBaseClient olapClient, Dimensions dimensions,
+      Multimap<String, String> filterSets)
       throws Exception {
     Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
-    initializeBasicInfo(olapClient);
-    this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions);
+    initializeBasicInfo(olapClient, filterSets);
+    this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions, filterSets);
   }
 
-  private Dimensions sanitizeDimensions(Dimensions dimensions) {
-    List<String> allDimensions = dimensions.allDimensions();
-    List<String> dimensionsToRemove = new ArrayList<>();
+  // TODO: Replace with method with an user configurable method
+  private static Dimensions sanitizeDimensions(Dimensions dimensions) {
+    List<String> allDimensionNames = dimensions.allDimensions();
+    Set<String> dimensionsToRemove = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
     dimensionsToRemove.add("environment");
     dimensionsToRemove.add("colo");
     dimensionsToRemove.add("fabric");
-    List<String> validDimensionNames = new ArrayList<>();
-    for(String dim:allDimensions){
-      if(dim.indexOf("_topk") > -1) {
-        String rawDimensionName = dim.replaceAll("_topk", "");
+    for (String dimensionName : allDimensionNames) {
+      if(dimensionName.contains(TOP_K_POSTFIX)) {
+        String rawDimensionName = dimensionName.replaceAll(TOP_K_POSTFIX, "");
         dimensionsToRemove.add(rawDimensionName.toLowerCase());
       }
     }
-    for(String dim:allDimensions){
-      if(!dimensionsToRemove.contains(dim.toLowerCase())){
-        validDimensionNames.add(dim);
-      }
-    }
-    return new Dimensions(validDimensionNames);
+    return removeDimensions(dimensions, dimensionsToRemove);
   }
 
-  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions)
+  /**
+   * Removes dimensions from the given list of dimensions, which has single values in the filter set. Only dimensions
+   * with one value is removed from the given dimensions because setting a filter one dimension names with one dimension
+   * value (e.g., "country=US") implies that the final data cube does not contain other dimension values. Thus, the
+   * summary algorithm could simply ignore that dimension (because the cube does not have any other values to compare
+   * with in that dimension).
+   *
+   * @param dimensions the list of dimensions to be modified.
+   * @param filterSets the filter to be applied on the data cube.
+   *
+   * @return the list of dimensions that should be used for retrieving the data for summary algorithm.
+   */
+  private static Dimensions shrinkDimensionsByFilterSets(Dimensions dimensions, Multimap<String, String> filterSets) {
+    Set<String> dimensionsToRemove = new HashSet<>();
+    for (Map.Entry<String, Collection<String>> filterSetEntry : filterSets.asMap().entrySet()) {
+      if (filterSetEntry.getValue().size() == 1) {
+        dimensionsToRemove.add(filterSetEntry.getKey());
+      }
+    }
+    return removeDimensions(dimensions, dimensionsToRemove);
+  }
+
+  private static Dimensions removeDimensions(Dimensions dimensions, Collection<String> dimensionsToRemove) {
+    List<String> dimensionsToRetain = new ArrayList<>();
+    for (String dimensionName : dimensions.allDimensions()) {
+      if(!dimensionsToRemove.contains(dimensionName)){
+        dimensionsToRetain.add(dimensionName);
+      }
+    }
+    return new Dimensions(dimensionsToRetain);
+  }
+
+  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions,
+      Multimap<String, String> filterSets)
       throws Exception {
     if (dimensions == null || dimensions.size() == 0) {
       throw new IllegalArgumentException("Dimensions cannot be empty.");
     }
     if (this.dimensions == null) { // which means buildWithAutoDimensionOrder is not triggered
-      initializeBasicInfo(olapClient);
+      initializeBasicInfo(olapClient, filterSets);
       this.dimensions = dimensions;
-      this.costSet = computeOneDimensionCost(olapClient, topRatio, dimensions);
+      this.costSet = computeOneDimensionCost(olapClient, topRatio, dimensions, filterSets);
     }
 
     int size = 0;
@@ -152,7 +189,7 @@ public class Cube { // the cube (Ca|Cb)
     //                       / \   \
     //     Level 2          d   e   f
     // The Comparator for generating the order is implemented in the class DimensionValues.
-    List<List<Row>> rowOfLevels = olapClient.getAggregatedValuesOfLevels(dimensions);
+    List<List<Row>> rowOfLevels = olapClient.getAggregatedValuesOfLevels(dimensions, filterSets);
     for (int i = 0; i <= dimensions.size(); ++i) {
       List<Row> rowAtLevelI = rowOfLevels.get(i);
       Collections.sort(rowAtLevelI, new RowDimensionValuesComparator());
@@ -168,9 +205,9 @@ public class Cube { // the cube (Ca|Cb)
    * Calculate the change ratio of the top aggregated values.
    * @throws Exception An exception is thrown if OLAP database cannot be connected.
    */
-  private void initializeBasicInfo(OLAPDataBaseClient olapClient)
+  private void initializeBasicInfo(OLAPDataBaseClient olapClient, Multimap<String, String> filterSets)
       throws Exception {
-    Row topAggValues = olapClient.getTopAggregatedValues();
+    Row topAggValues = olapClient.getTopAggregatedValues(filterSets);
     topBaselineValue = topAggValues.baselineValue; // aggregated baseline values
     topCurrentValue = topAggValues.currentValue; // aggregated current values
     topRatio = topCurrentValue / topBaselineValue; // change ratio
@@ -233,16 +270,15 @@ public class Cube { // the cube (Ca|Cb)
   }
 
   private static List<DimNameValueCostEntry> computeOneDimensionCost(OLAPDataBaseClient olapClient, double topRatio,
-      Dimensions dimensions) throws Exception {
+      Dimensions dimensions, Multimap<String, String> filterSets) throws Exception {
     List<DimNameValueCostEntry> costSet = new ArrayList<>();
 
-    List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions);
+    List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions, filterSets);
     double baselineTotal = 0;
     double currentTotal = 0;
     //use one dimension to compute baseline/current total
     List<Row> wowValuesOfFirstDimension = wowValuesOfDimensions.get(0);
-    for (int j = 0; j < wowValuesOfFirstDimension.size(); ++j) {
-      Row wowValues = wowValuesOfFirstDimension.get(j);
+    for (Row wowValues : wowValuesOfFirstDimension) {
       baselineTotal += wowValues.baselineValue;
       currentTotal += wowValues.currentValue;
     }

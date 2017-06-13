@@ -24,7 +24,6 @@ import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -233,7 +232,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
     Dimensions dimensions = new Dimensions(dataset.getDimensions());
 
     Cube cube = new Cube();
-    cube.buildDimensionCostSet(olapClient, dimensions);
+    cube.buildDimensionCostSet(olapClient, dimensions, null);
 
     return toNormalizedDataFrame(cube.getCostSet());
   }

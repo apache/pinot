@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.List;
 
@@ -12,6 +16,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -32,14 +37,17 @@ import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 
 @Path(value = "/dashboard")
 public class SummaryResource {
+  private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-  private static final Logger LOG = LoggerFactory.getLogger(SummaryResource.class);
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
   private static final String DEFAULT_TOP_DIMENSIONS = "3";
   private static final String DEFAULT_HIERARCHIES = "[]";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String DEFAULT_ONE_SIDE_ERROR = "false";
+  private static final String JAVASCRIPT_NULL_STRING = "undefined";
+  private static final String HTML_STRING_ENCODING = "UTF-8";
+
 
   @GET
   @Path(value = "/summary/autoDimensionOrder")
@@ -51,6 +59,7 @@ public class SummaryResource {
       @QueryParam("baselineStart") Long baselineStartInclusive,
       @QueryParam("baselineEnd") Long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filterJsonPayload,
       @QueryParam("summarySize") int summarySize,
       @QueryParam("topDimensions") @DefaultValue(DEFAULT_TOP_DIMENSIONS) int topDimensions,
       @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
@@ -71,10 +80,18 @@ public class SummaryResource {
       olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
 
       Dimensions dimensions;
-      if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
+      if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
         dimensions = new Dimensions(Utils.getSchemaDimensionNames(collection));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
+      }
+
+      Multimap<String, String> filterSetMap;
+      if (StringUtils.isBlank(filterJsonPayload) || JAVASCRIPT_NULL_STRING.equals(filterJsonPayload)) {
+        filterSetMap = ArrayListMultimap.create();
+      } else {
+        filterJsonPayload = URLDecoder.decode(filterJsonPayload, HTML_STRING_ENCODING);
+        filterSetMap = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
       }
 
       List<List<String>> hierarchies =
@@ -82,7 +99,7 @@ public class SummaryResource {
           });
 
       Cube cube = new Cube();
-      cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies);
+      cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies, filterSetMap);
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
@@ -105,6 +122,7 @@ public class SummaryResource {
       @QueryParam("baselineStart") Long baselineStartInclusive,
       @QueryParam("baselineEnd") Long baselineEndExclusive,
       @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filterJsonPayload,
       @QueryParam("summarySize") int summarySize,
       @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
@@ -123,7 +141,7 @@ public class SummaryResource {
       olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
 
       List<String> allDimensions;
-      if (groupByDimensions == null || groupByDimensions.length() == 0 || groupByDimensions.equals("undefined")) {
+      if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
         allDimensions = Utils.getSchemaDimensionNames(collection);
       } else {
         allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
@@ -133,9 +151,16 @@ public class SummaryResource {
       }
       Dimensions dimensions = new Dimensions(allDimensions);
 
+      Multimap<String, String> filterSets;
+      if (StringUtils.isBlank(filterJsonPayload) || JAVASCRIPT_NULL_STRING.equals(filterJsonPayload)) {
+        filterSets = ArrayListMultimap.create();
+      } else {
+        filterJsonPayload = URLDecoder.decode(filterJsonPayload, HTML_STRING_ENCODING);
+        filterSets = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
+      }
 
       Cube cube = new Cube();
-      cube.buildWithManualDimensionOrder(olapClient, dimensions);
+      cube.buildWithManualDimensionOrder(olapClient, dimensions, filterSets);
 
       Summary summary = new Summary(cube);
       response = summary.computeSummary(summarySize, doOneSideError);
