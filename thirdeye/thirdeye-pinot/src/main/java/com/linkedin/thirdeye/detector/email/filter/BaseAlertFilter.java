@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detector.email.filter;
 
 import java.lang.reflect.Field;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,11 +42,10 @@ public abstract class BaseAlertFilter implements AlertFilter {
           Field field = c.getDeclaredField(fieldName);
           boolean accessible = field.isAccessible();
           field.setAccessible(true);
-          Object object = field.get(this);
-          if (object instanceof Double)  {
-            value = (Double) object;
+          if (field.getType().equals(Double.class) || field.getType().equals(double.class)) {
+            value = (Double) field.get(this);
           } else {
-            strVal = object.toString();
+            strVal = field.get(this).toString();
           }
           field.setAccessible(accessible);
         } catch (NoSuchFieldException | IllegalAccessException e) {
@@ -66,8 +64,7 @@ public abstract class BaseAlertFilter implements AlertFilter {
         Field field = c.getDeclaredField(fieldName);
         boolean accessible = field.isAccessible();
         field.setAccessible(true);
-        Object object = field.get(this);
-        if (object instanceof Double) {
+        if (field.getType().equals(Double.class) || field.getType().equals(double.class)) {
           field.set(this, value);
         }
         else {
