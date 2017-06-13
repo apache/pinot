@@ -62,6 +62,7 @@ public class ThirdEyeDashboardApplication
     return "Thirdeye Dashboard";
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public void initialize(Bootstrap<ThirdEyeDashboardConfiguration> bootstrap) {
     bootstrap.addBundle(new ViewBundle());
@@ -116,7 +117,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new OverrideConfigResource());
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new TimeSeriesResource());
+    env.jersey().register(new TimeSeriesResource(Executors.newFixedThreadPool(10)));
     env.jersey().register(new OnboardResource());
     env.jersey().register(new EventResource(config));
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
