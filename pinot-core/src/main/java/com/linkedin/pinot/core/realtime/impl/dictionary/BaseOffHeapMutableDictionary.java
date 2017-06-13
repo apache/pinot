@@ -156,7 +156,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   // We keep a list of PinotDataBuffer items from which we get the IntBuffer items, so
   // that we can call close() on these.
   private List<PinotDataBuffer> _pinotDataBuffers = new ArrayList<>();
-  private final int _sizeOfFirstBuf;
+  private final int _initialRowCount;
 
   /**
    * A class to hold all the objects needed for the reverse mapping.
@@ -183,14 +183,14 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   private volatile ValueToDictId _valueToDict;
 
   protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize) {
-    final int initialRowCount = nearestPrime(estimatedCardinality);
+    int initialRowCount = nearestPrime(estimatedCardinality);
     _numEntries = 0;
     _maxItemsInOverflowHash = maxOverflowHashSize;
     ValueToDictId valueToDictId = new ValueToDictId(new ArrayList<IntBuffer>(0), new ConcurrentHashMap<Object, Integer>(0));
     _valueToDict = valueToDictId;
-    _sizeOfFirstBuf = initialRowCount * NUM_COLUMNS;
+    _initialRowCount = initialRowCount;
     if (!HEAP_FIRST || (maxOverflowHashSize == 0)) {
-      expand(_sizeOfFirstBuf);
+      expand(_initialRowCount, 1);
     }
   }
 
@@ -260,10 +260,27 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return PRIME_NUMBERS[PRIME_NUMBERS.length-1];
   }
 
-  private IntBuffer expand(final int newSize) {
-    // newSize must be a multiple of NUM_COLUMNS
-    final int bbSize = newSize * V1Constants.Numbers.INTEGER_SIZE;
-    final int modulo = newSize / NUM_COLUMNS;
+  private long computeBBsize(long numRows) {
+    return numRows * NUM_COLUMNS * V1Constants.Numbers.INTEGER_SIZE;
+  }
+
+  // Assume prevNumRows is a valid value, and return it if the new one overflows.
+  private int validatedNumRows(int prevNumRows, int multiple) {
+    long newNumRows = (long)prevNumRows * multiple;
+
+    if (newNumRows > Integer.MAX_VALUE) {
+      return prevNumRows;
+    }
+
+    if (computeBBsize(newNumRows) > Integer.MAX_VALUE) {
+      return prevNumRows;
+    }
+    return (int)newNumRows;
+  }
+
+  private IntBuffer expand(int prevNumRows, int multiple) {
+    final int newNumRows = validatedNumRows(prevNumRows, multiple);
+    final int bbSize = (int)computeBBsize(newNumRows);
 
     final ValueToDictId valueToDictId = _valueToDict;
     List<IntBuffer> oldList = valueToDictId.getIBufList();
@@ -284,7 +301,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       Map<Object, Integer> oldOverflowMap = valueToDictId.getOverflowMap();
       for (Map.Entry<Object, Integer> entry : oldOverflowMap.entrySet()) {
         final long hashVal = Math.abs(entry.getKey().hashCode());
-        final int offsetInBuf = (int)(hashVal % modulo) * NUM_COLUMNS;
+        final int offsetInBuf = (int)(hashVal % newNumRows) * NUM_COLUMNS;
         boolean done = false;
         for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
           if (iBuf.get(i) == NULL_VALUE_INDEX) {
@@ -309,23 +326,15 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     List<IntBuffer> iBufList = valueToDictId.getIBufList();
     final int numBuffers = iBufList.size();
     if (numBuffers == 0) {
-      return expand(_sizeOfFirstBuf);
+      return expand(_initialRowCount, 1);
     }
     final int lastCapacity = iBufList.get(numBuffers-1).capacity();
     int expansionMultiple = EXPANSION_MULTIPLES[EXPANSION_MULTIPLES.length-1];
     if (numBuffers < EXPANSION_MULTIPLES.length) {
       expansionMultiple = EXPANSION_MULTIPLES[numBuffers];
     }
-    int newSize = validateSize(lastCapacity, expansionMultiple);
-    return expand(newSize);
-  }
-
-  private int validateSize(int lastCapacity, int expansionMultiple) {
-    long newSize = (long) lastCapacity * expansionMultiple;
-    while (newSize >= Integer.MAX_VALUE) {
-      newSize = newSize/2;
-    }
-    return nearestPrime((int) newSize);
+    int prevNumRows = lastCapacity/NUM_COLUMNS;
+    return expand(prevNumRows, expansionMultiple);
   }
 
   protected int nearestPowerOf2(int num) {
