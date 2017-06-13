@@ -278,7 +278,7 @@ public abstract class EmailHelper {
     String subject = String
         .format("[ThirdEye Anomaly Detector] FAILED SCREENSHOT FOR ANOMALY ID=%s", anomalyId);
     String textBody = String
-        .format("%sException:%s", anomalyId, ExceptionUtils.getStackTrace(t));
+        .format("Anomaly ID:%s; Exception:%s", anomalyId, ExceptionUtils.getStackTrace(t));
     try {
       EmailHelper
           .sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
