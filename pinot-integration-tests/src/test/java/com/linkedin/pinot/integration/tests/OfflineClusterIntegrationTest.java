@@ -52,7 +52,6 @@ import static org.testng.Assert.assertEquals;
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
-@Test
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestWithQueryGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterIntegrationTest.class);
 

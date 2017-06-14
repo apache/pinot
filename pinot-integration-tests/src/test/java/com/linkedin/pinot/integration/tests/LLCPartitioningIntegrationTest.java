@@ -66,7 +66,8 @@ public class LLCPartitioningIntegrationTest extends RealtimeClusterIntegrationTe
         .getResource(SCHEMA_FILE_NAME).getFile());
   }
 
-  @Test
+  // Disabled because segment partition config is not there
+  @Test(enabled = false)
   public void testSegmentFlushSize() {
     ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR, 10000);
     zkClient.setZkSerializer(new ZNRecordSerializer());
@@ -82,8 +83,9 @@ public class LLCPartitioningIntegrationTest extends RealtimeClusterIntegrationTe
     zkClient.close();
   }
 
+  // Disabled because segment partition config is not there
   @Override
-  @Test(enabled = true)
+  @Test(enabled = false)
   public void testHardcodedQueries()
       throws Exception {
 

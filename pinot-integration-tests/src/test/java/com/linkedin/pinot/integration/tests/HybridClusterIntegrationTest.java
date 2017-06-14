@@ -340,11 +340,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestWith
     }
   }
 
-  @Override
-  @Test
-  public void testInstanceShutdown() {
-    super.testInstanceShutdown();
-  }
+// Commented out because already tested in MultipleNodeOfflineClusterIntegrationTest
+//  @Override
+//  @Test
+//  public void testInstanceShutdown() {
+//    super.testInstanceShutdown();
+//  }
 
   @AfterClass
   public void tearDown() throws Exception {
