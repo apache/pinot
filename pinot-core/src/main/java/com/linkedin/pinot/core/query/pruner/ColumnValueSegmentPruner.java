@@ -15,19 +15,19 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.configuration.Configuration;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
 
 
 /**
@@ -76,102 +76,106 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
   @Override
   public boolean pruneSegment(@Nonnull FilterQueryTree filterQueryTree,
       @Nonnull Map<String, ColumnMetadata> columnMetadataMap) {
-    FilterOperator filterOperator = filterQueryTree.getOperator();
-    List<FilterQueryTree> children = filterQueryTree.getChildren();
+    try {
+      FilterOperator filterOperator = filterQueryTree.getOperator();
+      List<FilterQueryTree> children = filterQueryTree.getChildren();
 
-    if (children == null || children.isEmpty()) {
-      // Leaf Node
+      if (children == null || children.isEmpty()) {
+        // Leaf Node
 
-      // Skip operator other than EQUALITY and RANGE
-      if ((filterOperator != FilterOperator.EQUALITY) && (filterOperator != FilterOperator.RANGE)) {
-        return false;
-      }
-
-      ColumnMetadata columnMetadata = columnMetadataMap.get(filterQueryTree.getColumn());
-      if (columnMetadata == null) {
-        // Should not reach here after DataSchemaSegmentPruner
-        return true;
-      }
-
-      Comparable minValue = columnMetadata.getMinValue();
-      Comparable maxValue = columnMetadata.getMaxValue();
-
-      if (filterOperator == FilterOperator.EQUALITY) {
-        // EQUALITY
-
-        // Doesn't have min/max value set in metadata
-        if ((minValue == null) || (maxValue == null)) {
+        // Skip operator other than EQUALITY and RANGE
+        if ((filterOperator != FilterOperator.EQUALITY) && (filterOperator != FilterOperator.RANGE)) {
           return false;
         }
 
-        // Check if the value is in the min/max range
-        FieldSpec.DataType dataType = columnMetadata.getDataType();
-        Comparable value = getValue(filterQueryTree.getValue().get(0), dataType);
-        return (value.compareTo(minValue) < 0) || (value.compareTo(maxValue) > 0);
+        ColumnMetadata columnMetadata = columnMetadataMap.get(filterQueryTree.getColumn());
+        if (columnMetadata == null) {
+          // Should not reach here after DataSchemaSegmentPruner
+          return true;
+        }
+
+        Comparable minValue = columnMetadata.getMinValue();
+        Comparable maxValue = columnMetadata.getMaxValue();
+
+        if (filterOperator == FilterOperator.EQUALITY) {
+          // EQUALITY
+
+          // Doesn't have min/max value set in metadata
+          if ((minValue == null) || (maxValue == null)) {
+            return false;
+          }
+
+          // Check if the value is in the min/max range
+          FieldSpec.DataType dataType = columnMetadata.getDataType();
+          Comparable value = getValue(filterQueryTree.getValue().get(0), dataType);
+          return (value.compareTo(minValue) < 0) || (value.compareTo(maxValue) > 0);
+        } else {
+          // RANGE
+
+          // Get lower/upper boundary value
+          FieldSpec.DataType dataType = columnMetadata.getDataType();
+          RangePredicate rangePredicate = new RangePredicate(null, filterQueryTree.getValue());
+          String lowerBoundary = rangePredicate.getLowerBoundary();
+          boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
+          Comparable lowerBoundaryValue = null;
+          if (!lowerBoundary.equals(RangePredicate.UNBOUNDED)) {
+            lowerBoundaryValue = getValue(lowerBoundary, dataType);
+          }
+          String upperBoundary = rangePredicate.getUpperBoundary();
+          boolean includeUpperBoundary = rangePredicate.includeUpperBoundary();
+          Comparable upperBoundaryValue = null;
+          if (!upperBoundary.equals(RangePredicate.UNBOUNDED)) {
+            upperBoundaryValue = getValue(upperBoundary, dataType);
+          }
+
+          // Check if the range is valid
+          if ((lowerBoundaryValue != null) && (upperBoundaryValue != null)) {
+            if (includeLowerBoundary && includeUpperBoundary) {
+              if (lowerBoundaryValue.compareTo(upperBoundaryValue) > 0) {
+                return true;
+              }
+            } else {
+              if (lowerBoundaryValue.compareTo(upperBoundaryValue) >= 0) {
+                return true;
+              }
+            }
+          }
+
+          // Doesn't have min/max value set in metadata
+          if ((minValue == null) || (maxValue == null)) {
+            return false;
+          }
+
+          if (lowerBoundaryValue != null) {
+            if (includeLowerBoundary) {
+              if (lowerBoundaryValue.compareTo(maxValue) > 0) {
+                return true;
+              }
+            } else {
+              if (lowerBoundaryValue.compareTo(maxValue) >= 0) {
+                return true;
+              }
+            }
+          }
+          if (upperBoundaryValue != null) {
+            if (includeUpperBoundary) {
+              if (upperBoundaryValue.compareTo(minValue) < 0) {
+                return true;
+              }
+            } else {
+              if (upperBoundaryValue.compareTo(minValue) <= 0) {
+                return true;
+              }
+            }
+          }
+          return false;
+        }
       } else {
-        // RANGE
-
-        // Get lower/upper boundary value
-        FieldSpec.DataType dataType = columnMetadata.getDataType();
-        RangePredicate rangePredicate = new RangePredicate(null, filterQueryTree.getValue());
-        String lowerBoundary = rangePredicate.getLowerBoundary();
-        boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
-        Comparable lowerBoundaryValue = null;
-        if (!lowerBoundary.equals(RangePredicate.UNBOUNDED)) {
-          lowerBoundaryValue = getValue(lowerBoundary, dataType);
-        }
-        String upperBoundary = rangePredicate.getUpperBoundary();
-        boolean includeUpperBoundary = rangePredicate.includeUpperBoundary();
-        Comparable upperBoundaryValue = null;
-        if (!upperBoundary.equals(RangePredicate.UNBOUNDED)) {
-          upperBoundaryValue = getValue(upperBoundary, dataType);
-        }
-
-        // Check if the range is valid
-        if ((lowerBoundaryValue != null) && (upperBoundaryValue != null)) {
-          if (includeLowerBoundary && includeUpperBoundary) {
-            if (lowerBoundaryValue.compareTo(upperBoundaryValue) > 0) {
-              return true;
-            }
-          } else {
-            if (lowerBoundaryValue.compareTo(upperBoundaryValue) >= 0) {
-              return true;
-            }
-          }
-        }
-
-        // Doesn't have min/max value set in metadata
-        if ((minValue == null) || (maxValue == null)) {
-          return false;
-        }
-
-        if (lowerBoundaryValue != null) {
-          if (includeLowerBoundary) {
-            if (lowerBoundaryValue.compareTo(maxValue) > 0) {
-              return true;
-            }
-          } else {
-            if (lowerBoundaryValue.compareTo(maxValue) >= 0) {
-              return true;
-            }
-          }
-        }
-        if (upperBoundaryValue != null) {
-          if (includeUpperBoundary) {
-            if (upperBoundaryValue.compareTo(minValue) < 0) {
-              return true;
-            }
-          } else {
-            if (upperBoundaryValue.compareTo(minValue) <= 0) {
-              return true;
-            }
-          }
-        }
-        return false;
+        // Parent node
+        return pruneNonLeaf(filterQueryTree, columnMetadataMap);
       }
-    } else {
-      // Parent node
-      return pruneNonLeaf(filterQueryTree, columnMetadataMap);
+    } catch (NumberFormatException e) {
+      throw new BadQueryRequestException(e);
     }
   }
 }
