@@ -16,9 +16,10 @@
 
 package com.linkedin.pinot.broker.servlet;
 
+import com.linkedin.pinot.broker.routing.TimeBoundaryService;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.routing.TimeBoundaryService;
+
 import java.io.IOException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
