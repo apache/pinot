@@ -45,11 +45,13 @@ public class TableConfigTest {
       TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
       Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       Assert.assertNull(tableConfigToCompare.getQuotaConfig());
+      Assert.assertNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
 
       ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
       tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
       Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       Assert.assertNull(tableConfigToCompare.getQuotaConfig());
+      Assert.assertNull(tableConfig.getValidationConfig().getReplicaGroupStrategyConfig());
     }
     {
       // With quota config
@@ -78,5 +80,41 @@ public class TableConfigTest {
       Assert.assertEquals(tableConfigToCompare.getQuotaConfig().getStorage(),
           tableConfig.getQuotaConfig().getStorage());
     }
+    {
+      // With SegmentAssignmentStrategyConfig
+      ReplicaGroupStrategyConfig replicaGroupConfig = new ReplicaGroupStrategyConfig();
+      replicaGroupConfig.setNumInstancesPerPartition(5);
+      replicaGroupConfig.setMirrorAssignmentAcrossReplicaGroups(true);
+      replicaGroupConfig.setPartitionColumn("memberId");
+
+      TableConfig tableConfig = tableConfigBuilder
+          .setSegmentAssignmentStrategy("ReplicatGroupSegmentAssignmentStrategy")
+          .build();
+      tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupConfig);
+
+      // Serialize then de-serialize
+      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
+
+      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
+      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
+      checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
+    }
+  }
+
+  private void checkTableConfigWithAssignmentConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
+    // Check that the segment assignment configuration does exist.
+    Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    Assert.assertNotNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
+    Assert.assertEquals(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig(),
+        tableConfig.getValidationConfig().getReplicaGroupStrategyConfig());
+
+    // Check that the configurations are correct.
+    ReplicaGroupStrategyConfig strategyConfig =
+        tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig();
+    Assert.assertEquals(strategyConfig.getMirrorAssignmentAcrossReplicaGroups(), true);
+    Assert.assertEquals(strategyConfig.getNumInstancesPerPartition(), 5);
+    Assert.assertEquals(strategyConfig.getPartitionColumn(), "memberId");
   }
 }

@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SchemaUtils;
@@ -46,6 +47,7 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static final String PROPERTYSTORE_KAFKA_PARTITIONS_PREFIX = "/KAFKA_PARTITIONS";
+  private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
   private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
@@ -84,6 +86,10 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_KAFKA_PARTITIONS_PREFIX, realtimeTableName);
   }
 
+  public static String constructPropertyStorePathForInstancePartitions(String offlineTableName) {
+    return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, offlineTableName);
+  }
+
   public static String constructPropertyStorePathForResource(String resourceName) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName);
   }
@@ -120,6 +126,20 @@ public class ZKMetadataProvider {
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }
+  }
+
+  public static void removeInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName) {
+    String propertyStorePath = constructPropertyStorePathForInstancePartitions(offlineTableName);
+    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+    }
+  }
+
+  public static void setInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      PartitionToReplicaGroupMappingZKMetadata partitionMappingZKMetadata) {
+    propertyStore.set(constructPropertyStorePathForInstancePartitions(
+        TableNameBuilder.OFFLINE.tableNameWithType(partitionMappingZKMetadata.getTableName())),
+        partitionMappingZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
   public static void setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -163,6 +183,19 @@ public class ZKMetadataProvider {
     } else {
       return new LLCRealtimeSegmentZKMetadata(znRecord);
     }
+  }
+
+  @Nullable
+  public static PartitionToReplicaGroupMappingZKMetadata getPartitionToReplicaGroupMappingZKMedata(
+      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String tableName) {
+    // Segment Assignment Strategy is triggered only for offline table.
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForInstancePartitions(offlineTableName), null,
+        AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
+    }
+    return new PartitionToReplicaGroupMappingZKMetadata(znRecord);
   }
 
   @Nullable

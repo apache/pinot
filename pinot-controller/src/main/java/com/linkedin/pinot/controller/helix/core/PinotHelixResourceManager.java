@@ -21,6 +21,7 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableCustomConfig;
@@ -33,6 +34,7 @@ import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
@@ -54,6 +56,7 @@ import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
+import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
@@ -1089,6 +1092,18 @@ public class PinotHelixResourceManager {
 
         _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(offlineTableName), new ZNRecord(
             offlineTableName), AccessOption.PERSISTENT);
+
+        // If the segment assignment strategy is using replica groups, build the mapping table and
+        // store to property store.
+        String assignmentStrategy = segmentsConfig.getSegmentAssignmentStrategy();
+        if (assignmentStrategy != null && SegmentAssignmentStrategyEnum.valueOf(assignmentStrategy)
+            == SegmentAssignmentStrategyEnum.ReplicaGroupSegmentAssignmentStrategy) {
+          PartitionToReplicaGroupMappingZKMetadata partitionMappingMetadata =
+              buildPartitionToReplicaGroupMapping(offlineTableName, config);
+          _propertyStore.set(ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(offlineTableName),
+              partitionMappingMetadata.toZNRecord(), AccessOption.PERSISTENT);
+        }
+
         break;
       case REALTIME:
         final String realtimeTableName = config.getTableName();
@@ -1327,6 +1342,64 @@ public class PinotHelixResourceManager {
 
     // dropping table
     _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
+  }
+
+  /**
+   * Build the partition mapping table that maps a tuple of (partition number, replica group number) to a list of
+   * servers. Two important configurations are explained below.
+   *
+   * - 'numInstancesPerPartition': this number decides the number of servers within a replica group.
+   *
+   * - 'partitionColumn': this configuration decides whether to use the table or partition level replica groups.
+   *
+   * @param tableName: Name of table
+   * @param tableConfig: Configuration for table
+   * @return Partition mapping table from the given configuration
+   */
+  private PartitionToReplicaGroupMappingZKMetadata buildPartitionToReplicaGroupMapping(String tableName,
+      TableConfig tableConfig) {
+
+    // Fetch the server instances for the table.
+    List<String> servers = getServerInstancesForTable(tableName, TableType.OFFLINE);
+
+    // Fetch information required to build the mapping table from the table configuration.
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
+    String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
+    int numInstancesPerPartition = replicaGroupStrategyConfig.getNumInstancesPerPartition();
+
+    // If we do not have the partition column configuration, we assume to use the table level replica groups,
+    // which is equivalent to have the same partition number for all segments (i.e. 1 partition).
+    int numPartitions = 1;
+    if (partitionColumn != null) {
+      numPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
+    }
+    int numReplicas = tableConfig.getValidationConfig().getReplicationNumber();
+    int numServers = servers.size();
+
+    // Enforcing disjoint server sets for each replica group.
+    if (numInstancesPerPartition * numReplicas > numServers) {
+      throw new UnsupportedOperationException("Replica group aware segment assignment assumes that servers in "
+          + "each replica group are disjoint. Check the configurations to see if the following inequality holds. "
+          + "'numInstancePerPartition' * 'numReplicas' <= 'totalServerNumbers'" );
+    }
+
+    // Creating a mapping table
+    PartitionToReplicaGroupMappingZKMetadata
+        partitionToReplicaGroupMapping = new PartitionToReplicaGroupMappingZKMetadata();
+    partitionToReplicaGroupMapping.setTableName(tableName);
+
+    Collections.sort(servers);
+    for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
+      // If the configuration contains partition column information, we use the segment level replica groups.
+      if (numPartitions != 1) {
+        Collections.shuffle(servers);
+      }
+      for (int i = 0; i < numInstancesPerPartition * numReplicas; i++) {
+        int groupId = i / numInstancesPerPartition;
+        partitionToReplicaGroupMapping.addInstanceToReplicaGroup(partitionId, groupId, servers.get(i));
+      }
+    }
+    return partitionToReplicaGroupMapping;
   }
 
   /**
@@ -1593,7 +1666,7 @@ public class PinotHelixResourceManager {
               ControllerTenantNameBuilder.getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig()
                   .getServer());
           final int replicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
-          return segmentAssignmentStrategy.getAssignedInstances(_helixAdmin, _helixClusterName, segmentMetadata,
+          return segmentAssignmentStrategy.getAssignedInstances(_helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
               replicas, serverTenant);
         } else {
           return new ArrayList<String>(currentIdealState.getInstanceSet(segmentName));

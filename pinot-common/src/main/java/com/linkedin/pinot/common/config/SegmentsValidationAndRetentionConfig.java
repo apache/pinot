@@ -33,7 +33,9 @@ public class SegmentsValidationAndRetentionConfig {
   private String schemaName;
   private String timeColumnName;
   private String timeType;
+
   private String segmentAssignmentStrategy;
+  private ReplicaGroupStrategyConfig replicaGroupStrategyConfig;
 
   // Number of replicas per partition of low-level kafka consumers. This config is used for realtime tables only.
   private String replicasPerPartition;
@@ -108,6 +110,14 @@ public class SegmentsValidationAndRetentionConfig {
 
   public void setReplicasPerPartition(String replicasPerPartition) {
     this.replicasPerPartition = replicasPerPartition;
+  }
+
+  public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
+    return replicaGroupStrategyConfig;
+  }
+
+  public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
+    this.replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }
 
   @JsonIgnore
