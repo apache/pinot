@@ -126,5 +126,8 @@ public abstract class AbstractRoutingTableBuilder implements RoutingTableBuilder
     _isEmpty = isEmpty;
   }
   
-   
+   @Override
+  public boolean isPartitionAware() {
+    return false;
+  }
 }

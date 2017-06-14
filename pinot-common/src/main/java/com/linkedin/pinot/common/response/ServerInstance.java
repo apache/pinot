@@ -22,6 +22,7 @@ import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.net.InternetDomainName;
+import com.linkedin.pinot.common.utils.CommonConstants;
 
 
 /**
@@ -203,5 +204,17 @@ public class ServerInstance implements Comparable<ServerInstance> {
 
       return newInstance;
     }
+  }
+
+  public static ServerInstance forInstanceName(String instanceName) {
+    String namePortStr = instanceName.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
+    String hostName = namePortStr.split(NAME_PORT_DELIMITER)[0];
+    int port;
+    try {
+      port = Integer.parseInt(namePortStr.split(NAME_PORT_DELIMITER)[1]);
+    } catch (Exception e) {
+      port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+    }
+    return forHostPort(hostName, port);
   }
 }

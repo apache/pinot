@@ -17,6 +17,8 @@ package com.linkedin.pinot.broker.routing;
 
 import java.util.List;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
+
 
 /**
  * Routing table lookup request. Future filtering parameters for lookup needs to be added here.
@@ -29,6 +31,8 @@ public class RoutingTableLookupRequest {
 
   private final List<String> routingOptions;
 
+  private BrokerRequest brokerRequest;
+  
   public String getTableName() {
     return tableName;
   }
@@ -36,10 +40,15 @@ public class RoutingTableLookupRequest {
   public List<String> getRoutingOptions() {
     return routingOptions;
   }
+  
+  public BrokerRequest getBrokerRequest() {
+    return brokerRequest;
+  }
 
-  public RoutingTableLookupRequest(String tableName, List<String> routingOptions) {
+  public RoutingTableLookupRequest(String tableName, List<String> routingOptions, BrokerRequest brokerRequest) {
     super();
     this.tableName = tableName;
     this.routingOptions = routingOptions;
+    this.brokerRequest = brokerRequest;
   }
 }

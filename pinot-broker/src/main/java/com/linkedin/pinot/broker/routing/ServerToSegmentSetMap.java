@@ -54,16 +54,8 @@ public class ServerToSegmentSetMap {
     _serverToSegmentSetMap = serverToSegmentSetMap;
     _routingTable = new HashMap<ServerInstance, SegmentIdSet>();
     for (Entry<String, Set<String>> entry : _serverToSegmentSetMap.entrySet()) {
-      String namePortStr = entry.getKey().split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
-      String hostName = namePortStr.split(NAME_PORT_DELIMITER)[0];
-      int port;
-      try {
-        port = Integer.parseInt(namePortStr.split(NAME_PORT_DELIMITER)[1]);
-      } catch (Exception e) {
-        port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
-      }
-
-      ServerInstance serverInstance = ServerInstance.forHostPort(hostName, port);
+      String instanceName = entry.getKey();
+      ServerInstance serverInstance = ServerInstance.forInstanceName(instanceName);
       SegmentIdSet segmentIdSet = new SegmentIdSet();
       for (String segmentId : entry.getValue()) {
         segmentIdSet.addSegment(new SegmentId(segmentId));

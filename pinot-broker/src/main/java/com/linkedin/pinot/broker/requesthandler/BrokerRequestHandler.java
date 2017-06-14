@@ -594,7 +594,7 @@ public class BrokerRequestHandler {
       routingOptions =
           Splitter.on(",").omitEmptyStrings().trimResults().splitToList(debugOptions.get("routingOptions"));
     }
-    RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(tableName, routingOptions);
+    RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(tableName, routingOptions, brokerRequest);
     return _routingTable.findServers(routingTableLookupRequest);
   }
 

@@ -18,6 +18,8 @@ package com.linkedin.pinot.broker.routing;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,12 +38,15 @@ public class RoutingTableBuilderFactory {
   private static final Set<Class<? extends RoutingTableBuilder>> _routingTableBuilders = new HashSet<>();
   private Configuration _configuration;
 
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+
   enum RoutingTableBuilderName {
     DefaultOffline, DefaultRealtime, BalancedRandom, KafkaLowLevel, KafkaHighLevel
   }
 
-  public RoutingTableBuilderFactory(Configuration configuration) {
+  public RoutingTableBuilderFactory(Configuration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _configuration = configuration;
+    _propertyStore = propertyStore;
   }
 
   public RoutingTableBuilder createRoutingTableBuilder(TableConfig tableConfig) {
@@ -87,7 +92,7 @@ public class RoutingTableBuilderFactory {
       builder = new KafkaLowLevelConsumerRoutingTableBuilder();
       break;
     }
-    builder.init(_configuration);
+    builder.init(_configuration, tableConfig, _propertyStore);
     return builder;
   }
 

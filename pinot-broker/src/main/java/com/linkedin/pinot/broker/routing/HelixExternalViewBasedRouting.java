@@ -91,13 +91,12 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     _routingTableBuilderMap = new HashMap<>();
     _helixManager = helixManager;
-    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration);
+    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore);
   }
 
   @Override
   public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
     String tableName = request.getTableName();
-
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
     return routingTableBuilder.findServers(request);
   }
@@ -127,9 +126,10 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     String tableName = tableConfig.getTableName();
 
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig);
-    routingTableBuilder.init(_configuration);
+    routingTableBuilder.init(_configuration, tableConfig, _propertyStore);
     LOGGER.info("Initialized routingTableBuilder:%s for table:%", routingTableBuilder.getClass().getName(), tableName);
     _routingTableBuilderMap.put(tableName, routingTableBuilder);
+
     // Build the routing table
     if (externalView == null) {
       // It is possible for us to get a request to serve a table for which there is no external view. In this case, just
