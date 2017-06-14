@@ -37,36 +37,28 @@ public class StaticPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_ENTITIES}, {@code PROP_SCORES})
    */
-  public StaticPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) {
+  @SuppressWarnings("unchecked")
+  public StaticPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
 
     if(!properties.containsKey(PROP_ENTITIES))
       throw new IllegalArgumentException(String.format("Property '%s' required, but not found", PROP_ENTITIES));
 
     this.entities = new HashSet<>();
-    String entitiesProp = properties.get(PROP_ENTITIES);
-    String[] urns = entitiesProp.split(",");
 
-    List<Double> scores = new ArrayList<>();
-    if(properties.containsKey(PROP_SCORES)) {
-      // per entity score
-      String scoresProp = properties.get(PROP_SCORES);
-      String[] scoreStrings = scoresProp.split(",");
-      for(String s : scoreStrings) {
-        scores.add(Double.parseDouble(s));
+    if (properties.get(PROP_ENTITIES) instanceof Map) {
+      // with scores
+      Map<String, Double> entities = (Map<String, Double>) properties.get(PROP_ENTITIES);
+      for (Map.Entry<String, Double> entry : entities.entrySet()) {
+        this.entities.add(EntityUtils.parseURN(entry.getKey(), entry.getValue()));
       }
 
-    } else {
-      // default score
-      for(int i=0; i<urns.length; i++)
-        scores.add(1.0);
-    }
-
-    if(scores.size() != urns.length)
-      throw new IllegalArgumentException(String.format("Requires equal number of scores [=%d] and entities [=%d]", scores.size(), urns.length));
-
-    for(int i=0; i<urns.length; i++) {
-      this.entities.add(EntityUtils.parseURN(urns[i], scores.get(i)));
+    } else if (properties.get(PROP_ENTITIES) instanceof List) {
+      // without scores
+      List<String> urns = (List<String>) properties.get(PROP_ENTITIES);
+      for (String urn : urns) {
+        this.entities.add(EntityUtils.parseURN(urn, 1.0));
+      }
     }
   }
 

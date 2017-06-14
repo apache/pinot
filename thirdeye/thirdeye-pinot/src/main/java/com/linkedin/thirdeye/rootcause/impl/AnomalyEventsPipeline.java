@@ -52,7 +52,7 @@ public class AnomalyEventsPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> ignore) {
     super(outputName, inputNames);
     this.manager = EventDataProviderManager.getInstance();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();

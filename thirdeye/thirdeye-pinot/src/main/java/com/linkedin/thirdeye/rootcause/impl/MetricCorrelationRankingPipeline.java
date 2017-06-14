@@ -94,7 +94,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_TARGET_INPUT})
    */
-  public MetricCorrelationRankingPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) {
+  public MetricCorrelationRankingPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
@@ -102,11 +102,11 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     if(!properties.containsKey(PROP_TARGET_INPUT))
       throw new IllegalArgumentException(String.format("Property '%s' required, but not found.", PROP_TARGET_INPUT));
-    this.targetInput = properties.get(PROP_TARGET_INPUT);
+    this.targetInput = properties.get(PROP_TARGET_INPUT).toString();
 
     String propStrategy = STRATEGY_CORRELATION;
     if(properties.containsKey(PROP_STRATEGY))
-      propStrategy = properties.get(PROP_STRATEGY);
+      propStrategy = properties.get(PROP_STRATEGY).toString();
     this.strategy = parseStrategy(propStrategy);
   }
 

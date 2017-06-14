@@ -53,7 +53,7 @@ public class HolidayEventsPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-  public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+  public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> ignore) {
     super(outputName, inputNames);
     this.eventDataProvider = EventDataProviderManager.getInstance();
   }

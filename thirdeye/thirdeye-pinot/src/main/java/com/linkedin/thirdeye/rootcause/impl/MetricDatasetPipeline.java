@@ -55,7 +55,7 @@ public class MetricDatasetPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-  public MetricDatasetPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+  public MetricDatasetPipeline(String outputName, Set<String> inputNames, Map<String, Object> ignore) {
     super(outputName, inputNames);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();

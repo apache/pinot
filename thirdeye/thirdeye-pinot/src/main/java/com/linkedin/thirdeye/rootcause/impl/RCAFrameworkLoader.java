@@ -44,7 +44,7 @@ public class RCAFrameworkLoader {
         String outputName = pipelineConfig.getOutputName();
         Set<String> inputNames = new HashSet<>(pipelineConfig.getInputNames());
         String className = pipelineConfig.getClassName();
-        Map<String, String> properties = pipelineConfig.getProperties();
+        Map<String, Object> properties = pipelineConfig.getProperties();
         if(properties == null)
           properties = new HashMap<>();
 
@@ -61,11 +61,12 @@ public class RCAFrameworkLoader {
     return pipelines;
   }
 
-  static Map<String, String> augmentPathProperty(Map<String, String> properties, File rcaConfig) {
-    for(Map.Entry<String, String> entry : properties.entrySet()) {
-      if (entry.getKey().equals(PROP_PATH) ||
-          entry.getKey().endsWith(PROP_PATH_POSTFIX)) {
-        File path = new File(entry.getValue());
+  static Map<String, Object> augmentPathProperty(Map<String, Object> properties, File rcaConfig) {
+    for(Map.Entry<String, Object> entry : properties.entrySet()) {
+      if ((entry.getKey().equals(PROP_PATH) ||
+          entry.getKey().endsWith(PROP_PATH_POSTFIX)) &&
+          entry.getValue() instanceof String) {
+        File path = new File(entry.getValue().toString());
         if (!path.isAbsolute()) {
           properties.put(entry.getKey(), rcaConfig.getParent() + File.separator + path);
         }
