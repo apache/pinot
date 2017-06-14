@@ -20,8 +20,6 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
@@ -59,8 +57,6 @@ public abstract class AbstractManagerTestBase {
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
   protected DashboardConfigManager dashboardConfigDAO;
-  protected IngraphDashboardConfigManager ingraphDashboardConfigDAO;
-  protected IngraphMetricConfigManager ingraphMetricConfigDAO;
   protected OverrideConfigManager overrideConfigDAO;
   protected AlertConfigManager alertConfigDAO;
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
@@ -97,8 +93,6 @@ public abstract class AbstractManagerTestBase {
       datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
       metricConfigDAO = daoRegistry.getMetricConfigDAO();
       dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
-      ingraphDashboardConfigDAO = daoRegistry.getIngraphDashboardConfigDAO();
-      ingraphMetricConfigDAO = daoRegistry.getIngraphMetricConfigDAO();
       overrideConfigDAO = daoRegistry.getOverrideConfigDAO();
       alertConfigDAO = daoRegistry.getAlertConfigDAO();
       dataCompletenessConfigDAO = daoRegistry.getDataCompletenessConfigDAO();
@@ -289,33 +283,6 @@ public abstract class AbstractManagerTestBase {
     metricConfigDTO.setName(metric);
     metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(collection, metric));
     return metricConfigDTO;
-  }
-
-  protected IngraphMetricConfigDTO getTestIngraphMetricConfig(String rrd, String metric,
-      String dashboard) {
-    IngraphMetricConfigDTO ingraphMetricConfigDTO = new IngraphMetricConfigDTO();
-    ingraphMetricConfigDTO.setRrdName(rrd);
-    ingraphMetricConfigDTO.setMetricName(metric);
-    ingraphMetricConfigDTO.setDashboardName(dashboard);
-    ingraphMetricConfigDTO.setContainer("test");
-    ingraphMetricConfigDTO.setMetricDataType("test");
-    ingraphMetricConfigDTO.setMetricSourceType("test");
-    return ingraphMetricConfigDTO;
-  }
-
-  protected IngraphDashboardConfigDTO getTestIngraphDashboardConfig(String name) {
-    IngraphDashboardConfigDTO ingraphDashboardConfigDTO = new IngraphDashboardConfigDTO();
-    ingraphDashboardConfigDTO.setName(name);
-    ingraphDashboardConfigDTO.setFabricGroup("test");
-    ingraphDashboardConfigDTO.setFetchIntervalPeriod(3600_000);
-    ingraphDashboardConfigDTO.setMergeNumAvroRecords(100);
-    ingraphDashboardConfigDTO.setGranularitySize(5);
-    ingraphDashboardConfigDTO.setGranularityUnit(TimeUnit.MINUTES);
-    ingraphDashboardConfigDTO.setBootstrap(true);
-    DateTime now = new DateTime();
-    ingraphDashboardConfigDTO.setBootstrapStartTime(now.getMillis());
-    ingraphDashboardConfigDTO.setBootstrapEndTime(now.minusDays(30).getMillis());
-    return ingraphDashboardConfigDTO;
   }
 
   protected OverrideConfigDTO getTestOverrideConfigForTimeSeries(DateTime now) {

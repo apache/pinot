@@ -13,8 +13,6 @@ import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
-import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -35,8 +33,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.EntityToEntityMappingManagerImpl
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.GroupedAnomalyResultsManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
@@ -126,15 +122,6 @@ public class DAORegistry {
 
   public DashboardConfigManager getDashboardConfigDAO() {
     return DaoProviderUtil.getInstance(DashboardConfigManagerImpl.class);
-  }
-
-
-  public IngraphDashboardConfigManager getIngraphDashboardConfigDAO() {
-    return DaoProviderUtil.getInstance(IngraphDashboardConfigManagerImpl.class);
-  }
-
-  public IngraphMetricConfigManager getIngraphMetricConfigDAO() {
-    return DaoProviderUtil.getInstance(IngraphMetricConfigManagerImpl.class);
   }
 
   public OverrideConfigManager getOverrideConfigDAO() {

@@ -356,7 +356,6 @@ public class AnomalyDetectionInputContextBuilder {
 
   /**
    * Returns existing raw anomalies in the given monitoring window
-   *ingraph_dashboard_config_index
    * @param functionId the id of the anomaly function
    * @param monitoringWindowStart inclusive
    * @param monitoringWindowEnd inclusive but it doesn't matter

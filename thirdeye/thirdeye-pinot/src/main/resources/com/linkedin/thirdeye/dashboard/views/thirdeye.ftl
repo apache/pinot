@@ -40,8 +40,6 @@
 <script src="assets/javascript/libs/handlebarsHelpers.js" defer></script>
 
 
-<script src="assets/js/thirdeye/ingraph-metric-config.js"></script>
-<script src="assets/js/thirdeye/ingraph-dashboard-config.js"></script>
 <script src="assets/js/thirdeye/metric-config.js"></script>
 <script src="assets/js/thirdeye/dataset-config.js"></script>
 <script src="assets/js/thirdeye/job-info.js"></script>
@@ -105,8 +103,6 @@
   <#include "tabs/analysis/rootcause-table.ftl"/>
 </script>
 <#include "admin/job-info.ftl"/>
-<#include "admin/ingraph-metric-config.ftl"/>
-<#include "admin/ingraph-dashboard-config.ftl"/>
 <#include "admin/dataset-config.ftl"/>
 <#include "admin/metric-config.ftl"/>
 <#include "admin/job-info.ftl"/>
@@ -193,8 +189,6 @@
                 <li><a href="#">Manage Anomalies</a></li>
                 <li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
                   <ul class="dropdown-menu">
-                    <li class=""><a href="#ingraph-metric-config" data-toggle="tab">Ingraph Metric</a></li>
-                    <li class=""><a href="#ingraph-dashboard-config" data-toggle="tab">Ingraph Dashboard</a></li>
                     <li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
                     <li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
                     <li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
@@ -223,12 +217,6 @@
 
     <div class="tab-pane" id="analysis">
       <div id="analysis-place-holder"></div>
-    </div>
-    <div class="tab-pane" id="ingraph-metric-config">
-      <div id="ingraph-metric-config-place-holder"></div>
-    </div>
-    <div class="tab-pane" id="ingraph-dashboard-config">
-      <div id="ingraph-dashboard-config-place-holder"></div>
     </div>
     <div class="tab-pane" id="dataset-config">
       <div id="dataset-config-place-holder"></div>

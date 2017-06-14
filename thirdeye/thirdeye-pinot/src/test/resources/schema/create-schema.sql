@@ -171,31 +171,6 @@ create index dashboard_config_name_idx on dashboard_config_index(name);
 create index dashboard_config_dataset_idx on dashboard_config_index(dataset);
 create index dashboard_config_active_idx on dashboard_config_index(active);
 
-create table if not exists ingraph_metric_config_index (
-    rrd_name varchar(2000) not null,
-    metric_name varchar(500) not null,
-    dashboard_name varchar(200) not null,
-    base_id bigint(20) not null,
-    create_time timestamp,
-    update_time timestamp default current_timestamp,
-    version int(10)
-) ENGINE=InnoDB;
-ALTER TABLE `ingraph_metric_config_index` ADD UNIQUE `ingraph_metric_config_unique_index`(`dashboard_name`, `metric_name`);
-create index ingraph_metric_config_metric_name_idx on ingraph_metric_config_index(metric_name);
-create index ingraph_metric_config_dashboard_name_idx on ingraph_metric_config_index(dashboard_name);
-
-create table if not exists ingraph_dashboard_config_index (
-    name varchar(500) not null,
-    bootstrap boolean,
-    base_id bigint(20) not null,
-    create_time timestamp,
-    update_time timestamp default current_timestamp,
-    version int(10)
-) ENGINE=InnoDB;
-ALTER TABLE `ingraph_dashboard_config_index` ADD UNIQUE `ingraph_dashboard_config_unique_index`(`name`);
-create index ingraph_dashboard_config_name_idx on ingraph_dashboard_config_index(name);
-create index ingraph_dashboard_config_bootstrap_idx on ingraph_dashboard_config_index(bootstrap);
-
 create table if not exists override_config_index (
     start_time bigint(20) NOT NULL,
     end_time bigint(20) NOT NULL,

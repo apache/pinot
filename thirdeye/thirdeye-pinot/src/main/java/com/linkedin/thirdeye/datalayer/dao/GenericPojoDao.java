@@ -22,8 +22,6 @@ import com.linkedin.thirdeye.datalayer.entity.EntityToEntityMappingIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.GroupedAnomalyResultsIndex;
-import com.linkedin.thirdeye.datalayer.entity.IngraphDashboardConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.IngraphMetricConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.JobIndex;
 import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
@@ -46,8 +44,6 @@ import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.pojo.GroupedAnomalyResultsBean;
-import com.linkedin.thirdeye.datalayer.pojo.IngraphDashboardConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.IngraphMetricConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.JobBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -106,10 +102,6 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, MetricConfigIndex.class));
     pojoInfoMap.put(DashboardConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DashboardConfigIndex.class));
-    pojoInfoMap.put(IngraphDashboardConfigBean.class,
-        newPojoInfo(DEFAULT_BASE_TABLE_NAME, IngraphDashboardConfigIndex.class));
-    pojoInfoMap.put(IngraphMetricConfigBean.class,
-        newPojoInfo(DEFAULT_BASE_TABLE_NAME, IngraphMetricConfigIndex.class));
     pojoInfoMap.put(OverrideConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, OverrideConfigIndex.class));
     pojoInfoMap.put(EventBean.class,
