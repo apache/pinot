@@ -12,7 +12,7 @@ module.exports = {
   },
   rules: {
     "eol-last": ["error", "always"],
-    "indent": ["error", 2],
+    "indent": ["error", 2, { "SwitchCase": 1 }],
     "space-in-parens": ["error", "never"]
   }
 };

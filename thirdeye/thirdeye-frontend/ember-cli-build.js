@@ -9,22 +9,32 @@ module.exports = function(defaults) {
     'ember-cli-babel': {
       includePolyfill: true
     },
+
     fingerprint: {
       prepend: '/app/'
     },
+
     sassOptions: {
       extension: 'scss',
     },
+
     sourcemaps: {
       enabled: EmberApp.env() !== 'production',
       extensions: ['js', 'css']
     },
+
     babel: {
       sourceMaps: 'inline'
     },
+
+    'ember-bootstrap': {
+      'bootstrapVersion': 3,
+      'importBootstrapFont': true,
+      'importBootstrapCSS': false
+    }
   });
 
-  const sourceSansProFontTree = new Funnel('bower_components/source-sans-pro', {
+  const sourceSansProFontTree = new Funnel(app.bowerDirectory + '/source-sans-pro', {
     srcDir: '/',
     include: ['**/*.woff2', '**/*.woff', '**/*.ttf'],
     destDir: '/assets'
@@ -32,15 +42,9 @@ module.exports = function(defaults) {
 
   app.import('bower_components/source-sans-pro/source-sans-pro.css')
 
-
   // Use `app.import` to add additional libraries to the generated
   // output files.
   
-  // app.import('bower_components/source-sans-pro/source-sans-pro.css'), {
-  //   type: 'vendor',
-  //   prepend: true
-  // };
-
   // If you need to use different assets in different
   // environments, specify an object as the first parameter. That
   // object's keys should be the environment name and the values

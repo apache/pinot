@@ -15,8 +15,10 @@
     "test": "ember test"
   },
   "devDependencies": {
+    "bootstrap-sass": "^3.3.7",
     "broccoli-asset-rev": "^2.4.5",
     "ember-ajax": "^2.4.1",
+    "ember-bootstrap": "^1.0.0-beta.1",
     "ember-c3": "^0.3.1",
     "ember-c3-shim": "0.0.6",
     "ember-cli": "2.12.1",
