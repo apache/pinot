@@ -2,12 +2,16 @@ package com.linkedin.thirdeye.detector.email.filter;
 
 import java.lang.reflect.Field;
 import java.util.Map;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public abstract class BaseAlertFilter implements AlertFilter {
   private final static Logger LOG = LoggerFactory.getLogger(BaseAlertFilter.class);
+
+
+
   /**
    * Parses the parameter setting for this filter.
    *
@@ -23,23 +27,33 @@ public abstract class BaseAlertFilter implements AlertFilter {
     Class c = this.getClass();
     for (String fieldName : getPropertyNames()) {
       Double value = null;
+      String strVal = null;
       // Get user's value for the specified field
       if (parameterSetting.containsKey(fieldName)) {
-        value = Double.parseDouble(parameterSetting.get(fieldName));
+        String fieldVal = parameterSetting.get(fieldName);
+        if (NumberUtils.isNumber(fieldVal)) {
+          value = Double.parseDouble(parameterSetting.get(fieldName));
+        } else {
+          strVal = fieldVal;
+        }
       } else {
         // If user's value does not exist, try to get the default value from Class definition
         try {
-          Field field = c.getDeclaredField("DEFAULT_" + fieldName.toUpperCase());
+          Field field = c.getDeclaredField(fieldName);
           boolean accessible = field.isAccessible();
           field.setAccessible(true);
-          value = Double.parseDouble((String) field.get(this));
+          if (field.getType().equals(Double.class) || field.getType().equals(double.class)) {
+            value = (Double) field.get(this);
+          } else {
+            strVal = field.get(this).toString();
+          }
           field.setAccessible(accessible);
         } catch (NoSuchFieldException | IllegalAccessException e) {
           LOG.error("Failed to get default value for field {} of class {}; exception: {}", "DEFAULT_" + fieldName,
               c.getSimpleName(), e.toString());
         }
         // If failed to get the default value from Class definition, then use value 0d
-        if (value == null) {
+        if (value == null && strVal == null) {
           value = 0d;
         }
         LOG.warn("Unable to read the setting for the field {} of class {}; the value {} is used.", fieldName,
@@ -50,7 +64,15 @@ public abstract class BaseAlertFilter implements AlertFilter {
         Field field = c.getDeclaredField(fieldName);
         boolean accessible = field.isAccessible();
         field.setAccessible(true);
-        field.set(this, Double.valueOf(value));
+        if (field.getType().equals(Double.class) || field.getType().equals(double.class)) {
+          field.set(this, value);
+        }
+        else if (field.getType().equals(String.class)) {
+            field.set(this, strVal);
+          }
+        else {
+         throw new IllegalAccessException ("Field type is neither Double or String, cannot set value!");
+        }
         field.setAccessible(accessible);
       } catch (NoSuchFieldException | IllegalAccessException e) {
         LOG.warn("Failed to set the field {} for class {} exception: {}", fieldName, c.getSimpleName(), e.toString());

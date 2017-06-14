@@ -144,9 +144,9 @@ public class PrecisionRecallEvaluator {
       AnomalyFeedback feedback = anomaly.getFeedback();
       boolean isLabeledTrueAnomaly = false;
       boolean isLabeledTrueAnomalyNotActionable = false;
-      if(feedback != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NO_ACTION)) {
+      if(feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NO_ACTION)) {
         isLabeledTrueAnomalyNotActionable = true;
-      } else if (feedback != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
+      } else if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
         isLabeledTrueAnomaly = true;
       }
 
@@ -154,7 +154,7 @@ public class PrecisionRecallEvaluator {
 
 
       if(isQualified) {
-        if(feedback == null) {
+        if(feedback == null || feedback.getFeedbackType() == null) {
           this.qualifiedNotLabeled++;
         } else if (isLabeledTrueAnomaly) {
           qualifiedTrueAnomaly++;
