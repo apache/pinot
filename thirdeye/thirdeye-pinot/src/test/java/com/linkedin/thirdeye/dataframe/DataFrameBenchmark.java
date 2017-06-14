@@ -20,6 +20,7 @@ public class DataFrameBenchmark {
   private static final int N_ROUNDS = 15;
   private static final int N_ROUNDS_SLOW = 3;
   private static final int N_ELEMENTS = 10_000_000;
+  private static final int N_NULLS = 100_000;
 
   private static final String[] SERIES_NAMES = new String[] { "task", "min", "mid", "max", "outer", "checksum", "samples" };
 
@@ -157,6 +158,27 @@ public class DataFrameBenchmark {
     }
 
     logResults("benchmarkMapLongArray", checksum);
+  }
+
+  void benchmarkMapLongObjectArray() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      Long[] longValues = generateLongObjectData(N_ELEMENTS);
+      final long delta = r;
+
+      startTimer();
+      Long[] results = new Long[longValues.length];
+      for (int i = 0; i < longValues.length; i++) {
+        results[i] = longValues[i] + delta;
+      }
+      stopTimer();
+
+      checksum ^= checksum(ArrayUtils.toPrimitive(results));
+    }
+
+    logResults("benchmarkMapLongObjectArray", checksum);
   }
 
   void benchmarkMapTwoSeriesExpression() {
@@ -442,7 +464,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkEqualsLongSeries", checksum);
   }
 
-  void benchmarkEqualsLongSeriesOperation() {
+  void benchmarkEqLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -463,7 +485,7 @@ public class DataFrameBenchmark {
       checksum ^= checksum(other.values());
     }
 
-    logResults("benchmarkEqualsLongSeriesOperation", checksum);
+    logResults("benchmarkEqLongSeries", checksum);
   }
 
   void benchmarkSortLongArray() {
@@ -576,24 +598,176 @@ public class DataFrameBenchmark {
     logResults("benchmarkShiftLongSeries", checksum);
   }
 
+  void benchmarkDropNullLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      for(int i : randomIndices(N_ELEMENTS, N_NULLS)) {
+        longValues[i] = LongSeries.NULL;
+      }
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      LongSeries out = series.dropNull();
+      stopTimer();
+
+      checksum ^= checksum(out.values());
+    }
+
+    logResults("benchmarkDropNullLongSeries", checksum);
+  }
+
+  void benchmarkDropNullLongArray() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      for(int i : randomIndices(N_ELEMENTS, N_NULLS)) {
+        longValues[i] = LongSeries.NULL;
+      }
+
+      startTimer();
+      int count = 0;
+      for(int i=0; i<N_ELEMENTS; i++) {
+        if(longValues[i] != LongSeries.NULL) {
+          longValues[count] = longValues[i];
+          count++;
+        }
+      }
+      long[] out = Arrays.copyOf(longValues, count);
+      stopTimer();
+
+      checksum ^= checksum(out);
+    }
+
+    logResults("benchmarkDropNullLongArray", checksum);
+  }
+
+  void benchmarkAggregateLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      long out = series.sum();
+      stopTimer();
+
+      checksum ^= checksum(out);
+    }
+
+    logResults("benchmarkAggregateLongSeries", checksum);
+  }
+
+  void benchmarkAggregateLongArray() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+
+      startTimer();
+      long sum = 0;
+      for(int i=0; i<N_ELEMENTS; i++) {
+        sum += longValues[i];
+      }
+      stopTimer();
+
+      checksum ^= checksum(sum);
+    }
+
+    logResults("benchmarkAggregateLongArray", checksum);
+  }
+
+  void benchmarkHasNullLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      boolean out = series.hasNull();
+      stopTimer();
+
+      checksum ^= checksum(out ? 1 : 0);
+    }
+
+    logResults("benchmarkHasNullLongSeries", checksum);
+  }
+
+  void benchmarkExpandingWindowLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      LongSeries out = series.groupByExpandingWindow().aggregate(LongSeries.SUM).getValues().getLongs();
+      stopTimer();
+
+      checksum ^= checksum(out.values());
+    }
+
+    logResults("benchmarkExpandingWindowLongSeries", checksum);
+  }
+
+  void benchmarkExpandingWindowLongArray() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+
+      startTimer();
+      long sum = 0;
+      long[] out = new long[N_ELEMENTS];
+      for(int i=0; i<N_ELEMENTS; i++) {
+        sum += longValues[i];
+        out[i] = sum;
+      }
+      stopTimer();
+
+      checksum ^= checksum(out);
+    }
+
+    logResults("benchmarkExpandingWindowLongArray", checksum);
+  }
+
   void benchmarkAll() {
+    benchmarkHasNullLongSeries();
+    benchmarkDropNullLongSeries();
+    benchmarkDropNullLongArray();
+    benchmarkAggregateLongSeries();
+    benchmarkAggregateLongArray();
     benchmarkMinMaxLongSeries();
     benchmarkMinMaxLongArray();
     benchmarkEqualsLongSeries();
-    benchmarkEqualsLongSeriesOperation();
     benchmarkEqualsLongArray();
+    benchmarkEqLongSeries();
     benchmarkShiftLongSeries();
     benchmarkShiftLongArray();
     benchmarkSortLongSeries();
     benchmarkSortLongArray();
     benchmarkUniqueLongSeries();
     benchmarkUniqueLongArrayWithObjects();
+    //benchmarkExpandingWindowLongSeries(); // TODO out of heap space
+    benchmarkExpandingWindowLongArray();
     benchmarkMapDoubleSeries();
     benchmarkMapDoubleSeriesOperation();
     benchmarkMapDoubleArray();
     benchmarkMapLongSeries();
     benchmarkMapLongSeriesOperation();
     benchmarkMapLongArray();
+    benchmarkMapLongObjectArray();
     benchmarkMapTwoSeries();
     benchmarkMapTwoSeriesOperation();
     benchmarkMapTwoArrays();
@@ -665,6 +839,16 @@ public class DataFrameBenchmark {
     LOG.info("done.");
   }
 
+  static int[] randomIndices(int upperBound, int n) {
+    Random r = new Random();
+    r.setSeed(SEED);
+    int[] values = new int[n];
+    for(int i=0; i<n; i++) {
+      values[i] = r.nextInt(upperBound);
+    }
+    return values;
+  }
+
   static double[] generateDoubleData(int n) {
     Random r = new Random();
     r.setSeed(SEED);
@@ -685,12 +869,14 @@ public class DataFrameBenchmark {
     return values;
   }
 
-  static long checksum(long... values) {
-    long bits = 0;
-    for(long v : values) {
-      bits ^= v;
+  static Long[] generateLongObjectData(int n) {
+    Random r = new Random();
+    r.setSeed(SEED);
+    Long[] values = new Long[n];
+    for(int i=0; i<n; i++) {
+      values[i] = r.nextLong();
     }
-    return bits;
+    return values;
   }
 
   static long checksum(double... values) {
@@ -701,4 +887,11 @@ public class DataFrameBenchmark {
     return bits;
   }
 
+  static long checksum(long... values) {
+    long bits = 0;
+    for(long v : values) {
+      bits ^= v;
+    }
+    return bits;
+  }
 }
