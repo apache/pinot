@@ -74,6 +74,8 @@
               <filesets>
                 <fileset>
                   <directory>tmp</directory>
+                  <directory>node_modules</directory>
+                  <directory>bower_components</directory>
                 </fileset>
               </filesets>
             </configuration>
