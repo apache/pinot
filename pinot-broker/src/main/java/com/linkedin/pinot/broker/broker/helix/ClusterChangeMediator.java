@@ -16,9 +16,10 @@
 
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerTimer;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
