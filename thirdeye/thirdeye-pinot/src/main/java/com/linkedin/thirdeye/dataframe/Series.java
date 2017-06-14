@@ -664,7 +664,10 @@ public abstract class Series {
    * @return {@code true} if empty, {@code false} otherwise
    */
   public final boolean hasNull() {
-    return this.count() < this.size();
+    for(int i=0; i<this.size(); i++)
+      if(this.isNull(i))
+        return true;
+    return false;
   }
 
   /**
@@ -771,6 +774,8 @@ public abstract class Series {
    * @return series copy without {@code nulls}
    */
   public Series dropNull() {
+    if(!this.hasNull())
+      return this;
     int[] fromIndex = new int[this.size()];
     int count = 0;
     for(int i=0; i<this.size(); i++) {
