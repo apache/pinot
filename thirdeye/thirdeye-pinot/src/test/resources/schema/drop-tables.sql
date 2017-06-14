@@ -9,8 +9,6 @@ DROP TABLE IF EXISTS job_index;
 DROP TABLE IF EXISTS raw_anomaly_result_index;
 DROP TABLE IF EXISTS merged_anomaly_result_index;
 DROP TABLE IF EXISTS anomaly_feedback_index;
-DROP TABLE IF EXISTS ingraph_dashboard_config_index;
-DROP TABLE IF EXISTS ingraph_metric_config_index;
 DROP TABLE IF EXISTS override_config_index;
 DROP TABLE IF EXISTS alert_config_index;
 DROP TABLE IF EXISTS data_completeness_config_index;

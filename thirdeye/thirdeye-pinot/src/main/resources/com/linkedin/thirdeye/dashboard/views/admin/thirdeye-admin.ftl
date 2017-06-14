@@ -18,8 +18,6 @@
 
 
 <!-- custom scripts -->
-<script src="../../../assets/js/thirdeye/ingraph-metric-config.js"></script>
-<script src="../../../assets/js/thirdeye/ingraph-dashboard-config.js"></script>
 <script src="../../../assets/js/thirdeye/metric-config.js"></script>
 <script src="../../../assets/js/thirdeye/dataset-config.js"></script>
 <script src="../../../assets/js/thirdeye/job-info.js"></script>
@@ -34,8 +32,6 @@
 <script type="text/javascript">
   $(document).ready(function() {
     //compile templates
-    var ingraph_metric_config_template = $("#ingraph-metric-config-template").html();
-    ingraph_metric_config_template_compiled = Handlebars.compile(ingraph_metric_config_template);
 
     var metric_config_template = $("#metric-config-template").html();
     metric_config_template_compiled = Handlebars.compile(metric_config_template);
@@ -49,12 +45,6 @@
       e.relatedTarget // previous active tab
       tabId = $(e.target).attr("href")
       $(tabId).tab('show')
-      if (tabId == "#ingraph-metric-config") {
-        showIngraphDatasetSelection();
-      }
-      if (tabId == "#ingraph-dashboard-config") {
-        listIngraphDashboardConfigs();
-      }
       if (tabId == "#metric-config") {
         showMetricDatasetSelection();
       }
@@ -70,8 +60,6 @@
     })
   });
 </script>
-<#include "ingraph-metric-config.ftl"/>
-<#include "ingraph-dashboard-config.ftl"/>
 <#include "dataset-config.ftl"/>
 <#include "metric-config.ftl"/>
 <#include "job-info.ftl"/>
@@ -87,8 +75,6 @@
 			</div>
 			<div id="navbar" class="collapse navbar-collapse">
 				<ul class="nav navbar-nav">
-					<li class=""><a href="#ingraph-metric-config" data-toggle="tab">Ingraph Metric</a></li>
-					<li class=""><a href="#ingraph-dashboard-config" data-toggle="tab">Ingraph Dashboard</a></li>
 					<li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
 					<li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
 					<li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
@@ -104,12 +90,6 @@
 	</div>
 	<div class="container-fluid">
 		<div class="tab-content">
-			<div class="tab-pane" id="ingraph-metric-config">
-				<div id="ingraph-metric-config-place-holder"></div>
-			</div>
-			<div class="tab-pane" id="ingraph-dashboard-config">
-				<div id="ingraph-dashboard-config-place-holder"></div>
-			</div>
 			<div class="tab-pane" id="dataset-config">
 				<div id="dataset-config-place-holder"></div>
 			</div>

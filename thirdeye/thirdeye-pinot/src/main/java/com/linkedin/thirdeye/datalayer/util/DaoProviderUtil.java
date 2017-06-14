@@ -32,8 +32,6 @@ import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
 import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.EntityToEntityMappingIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
-import com.linkedin.thirdeye.datalayer.entity.IngraphDashboardConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.IngraphMetricConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.JobIndex;
 import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
@@ -126,10 +124,6 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(MetricConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, DashboardConfigIndex.class,
             convertCamelCaseToUnderscore(DashboardConfigIndex.class.getSimpleName()));
-        entityMappingHolder.register(conn, IngraphDashboardConfigIndex.class,
-            convertCamelCaseToUnderscore(IngraphDashboardConfigIndex.class.getSimpleName()));
-        entityMappingHolder.register(conn, IngraphMetricConfigIndex.class,
-            convertCamelCaseToUnderscore(IngraphMetricConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, OverrideConfigIndex.class,
             convertCamelCaseToUnderscore(OverrideConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, AlertConfigIndex.class,

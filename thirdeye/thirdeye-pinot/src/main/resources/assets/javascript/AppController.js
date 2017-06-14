@@ -44,8 +44,6 @@ AppController.prototype = {
 
   compileTemplates : function() {
     // compile templates
-    var ingraph_metric_config_template = $("#ingraph-metric-config-template").html();
-    Handlebars.compile(ingraph_metric_config_template);
 
     var metric_config_template = $("#metric-config-template").html();
     Handlebars.compile(metric_config_template);

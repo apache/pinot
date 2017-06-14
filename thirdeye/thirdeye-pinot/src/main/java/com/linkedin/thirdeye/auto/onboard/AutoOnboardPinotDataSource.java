@@ -28,7 +28,6 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 /**
  * This is a service to onboard datasets automatically to thirdeye from pinot
  * The run method is invoked periodically by the AutoOnboardService, and it checks for new tables in pinot, to add to thirdeye
- * If the table is an ingraph table, it loads metrics from the ingraph table
  * It also looks for any changes in dimensions or metrics to the existing tables
  */
 public class AutoOnboardPinotDataSource extends AutoOnboard {
@@ -36,9 +35,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-
-  private static final String DEFAULT_INGRAPH_METRIC_NAMES_COLUMN = "metricName";
-  private static final String DEFAULT_INGRAPH_METRIC_VALUES_COLUMN = "value";
 
   private AutoOnboardPinotMetricsUtils autoLoadPinotMetricsUtils;
 
@@ -65,10 +61,8 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
         LOG.info("Checking dataset {}", dataset);
 
         Schema schema = allSchemas.get(dataset);
-        if (!isIngraphDataset(schema)) {
-          DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
-          addPinotDataset(dataset, schema, datasetConfig);
-        }
+        DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+        addPinotDataset(dataset, schema, datasetConfig);
       }
     } catch (Exception e) {
       LOG.error("Exception in loading datasets", e);
@@ -239,15 +233,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     }
   }
 
-  // TODO: when all ingraph traces are cleaned, remove these checks for ingraphs
-  private boolean isIngraphDataset(Schema schema) {
-    boolean isIngraphDataset = false;
-    if ((schema.getDimensionNames().contains(DEFAULT_INGRAPH_METRIC_NAMES_COLUMN)
-        && schema.getMetricNames().contains(DEFAULT_INGRAPH_METRIC_VALUES_COLUMN))) {
-      isIngraphDataset = true;
-    }
-    return isIngraphDataset;
-  }
 
   private List<String> fetchMetricAsADimensionMetrics(String dataset, String metricNamesColumn) {
     List<String> distinctMetricNames = new ArrayList<>();
