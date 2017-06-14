@@ -1,0 +1,89 @@
+@import "../shared/variable";
+
+.te-nav {
+  background-color: $anolaly-nav-background;
+  padding: 0 $te-content-padding-sides;
+  position: fixed;
+  z-index: 999;
+  width: 100%;
+  font-size: $te-font-size-tiny;
+  letter-spacing: $te-nav-letter-spacing;
+
+  &__logo {
+    color: white;
+    margin-right: 50px;
+    padding-left: 31px;
+    background: url('/assets/images/li-logo.svg') left no-repeat;
+  }
+
+  &__link {
+    color: app-shade(white, 6);
+    display: inline-block;
+    height: $te-nav-link-height;
+    line-height: $te-nav-link-height;
+    text-decoration: none;
+
+    &--home,
+    &--active {
+      color: white;
+
+      &:hover {
+        box-shadow: none;
+      }
+    }
+
+    &--home {
+      font-weight: lighter;
+      font-size: 12px;
+    }
+
+    &.active:not(.te-nav__link--home) {
+      color: white;
+      box-shadow: inset 0 -3px 0 white;
+    }
+
+
+    &:hover:not(.te-nav__link--home):not(.active) {
+      color: white;
+      box-shadow: inset 0 -3px 0 app-shade(white, 3);
+    }
+  }
+
+  &__list {
+    padding: 0;
+    margin: 0;
+    margin-bottom: 2px;
+  }
+
+  &__item {
+    display: inline-block;
+    margin: 0 10px 0 20px;
+  }
+
+  &__photo {
+
+  }
+}
+
+.te-nav--sub {
+  margin-left: -$te-content-padding-sides;
+  background-color: white;
+
+  .te-nav__list {
+    margin-left: -19px;
+
+    .te-nav__link {
+      color: app-shade(black, 4);
+
+      &.active {
+        color: black;
+        box-shadow: inset 0 -3px 0 black;
+      }
+
+      &:hover:not(.te-nav__link--home):not(.active) {
+        color: black;
+        box-shadow: inset 0 -3px 0 app-shade(black, 2);
+      }
+    }
+  }
+}

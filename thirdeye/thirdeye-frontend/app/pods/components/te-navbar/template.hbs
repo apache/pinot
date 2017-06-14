@@ -1,0 +1,33 @@
+{{#if isGlobalNav}}
+  <div class="te-nav__logo pull-left">
+    {{#link-to "index" class="te-nav__link te-nav__link--home"}}
+      {{webappName}}
+    {{/link-to}}
+  </div>
+{{/if}}
+
+<ul class="te-nav__list pull-left {{navClass}}">
+  {{#each navItems as |navItem|}}
+    <li class="te-nav__item te-nav__item--{{navItem.className}}">
+      {{#if navItem.isCustomLink}}
+        <a class="te-nav__link text--xxsmall" href="{{navItem.link}}">
+          {{navItem.title}}
+        </a>
+      {{else if navItem.id}}
+        {{#link-to navItem.link navItem.id class="te-nav__link app-text--xxsmall"}}
+          {{navItem.title}}
+        {{/link-to}}
+      {{else}}
+        {{#link-to navItem.link class="te-nav__link app-text--xxsmall"}}
+          {{navItem.title}}
+        {{/link-to}}
+      {{/if}}
+    </li>
+  {{/each}}
+</ul>
+
+{{#if isGlobalNav}}
+  <div class="te-nav__user pull-right">
+    <div class="te-nav__photo"></div>
+  </div>
+{{/if}}

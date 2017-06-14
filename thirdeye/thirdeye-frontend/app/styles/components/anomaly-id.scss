@@ -1,9 +1,10 @@
 .anomaly-id {
   list-style: none;
-  font-size: $te-font-size-default;
+  font-size: $te-font-size-small;
   font-weight: lighter;
   width: 100%;
-  padding: $te-header-component-padding;
+  margin-top: $te-nav-link-height;
+  padding: 0;
 
   &__item {
     line-height: $te-list-line-height;

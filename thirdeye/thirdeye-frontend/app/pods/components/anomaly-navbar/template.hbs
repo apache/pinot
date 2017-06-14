@@ -1,0 +1,21 @@
+<div class="anomaly-nav__wrapper">
+  <div class="anomaly-nav__logo">
+    {{#link-to "index" class="anomaly-nav__link anomaly-nav__link--home"}}
+      <span class="logo">{{webappName}}</span>
+    {{/link-to}}
+  </div>
+
+  <div class="anomaly-nav__wrapper anomaly-nav__wrapper--left">
+    <ul class="anomaly-nav__list">
+      <li class="anomaly-nav__item">
+        {{#link-to "eventTracker" class="anomaly-nav__link"}}
+          <span>Event Tracker</span>
+        {{/link-to}}
+      </li>
+    </ul>
+  </div>
+
+  <div class="anomaly-nav__wrapper anomaly-nav__wrapper--right">
+    {{!-- Placeholer for authenticated user logout --}}
+  </div>
+</div>

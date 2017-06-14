@@ -1,0 +1,93 @@
+@import "shared/variable";
+
+hr {
+  margin: 0;
+}
+
+.hide {
+  display: none;
+}
+
+.truncate {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.pull-left {
+  float: left;
+}
+
+.pull-right {
+  float: right;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.title {
+  font-size: 25px;
+  color: app-shade(black, 6);
+  font-weight: normal;
+}
+
+.tt-menu {
+  background-color: get-color(white);
+  border: 1px solid get-color(gray2);
+  border-radius: 8px;
+  box-shadow: 0 5px 10px get-color(gray2);
+  margin: 12px 0;
+  padding: 8px 0;
+  text-align: left;
+  width: 132%;
+}
+
+.tt-suggestion {
+  font-size: 15px;
+  color: get-color(gray6);
+  line-height: 24px;
+  padding: 3px 20px;
+
+  &.tt-cursor,
+  &:hover {
+    background-color: get-color(blue4);
+    color: get-color(white);
+    cursor: pointer;
+
+    .description,
+    .fabric {
+      color: get-color(white);
+    }
+  }
+
+  &.tt-cursor {
+    background-color: get-color(blue4);
+    color: get-color(white);
+  }
+}
+
+.text {
+
+  &--xxsmall {
+    font-size: $te-font-size-tiny;
+  }
+
+  &--small {
+
+  }
+
+  &--medium {
+
+  }
+
+  &--large {
+
+  }
+
+  &--bold {
+    font-weight: bold;
+  }
+}
