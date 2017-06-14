@@ -15,12 +15,13 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
+import java.util.List;
+import java.util.Map;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
 
 
@@ -81,21 +82,27 @@ public abstract class AbstractSegmentPruner implements SegmentPruner {
    * @param input Input String for which to get the value
    * @param dataType Data type to construct from the String.
    * @return Comparable value of specified data type built from the input String.
+   * @note It is assumed that the 'input' here is a value taken from the query, so this method
+   * should not be used to for other internal purposes.
    */
   protected static Comparable getValue(@Nonnull String input, @Nonnull FieldSpec.DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return Integer.valueOf(input);
-      case LONG:
-        return Long.valueOf(input);
-      case FLOAT:
-        return Float.valueOf(input);
-      case DOUBLE:
-        return Double.valueOf(input);
-      case STRING:
-        return input;
-      default:
-        throw new IllegalStateException("Unsupported data type: " + dataType);
+    try {
+      switch (dataType) {
+        case INT:
+          return Integer.valueOf(input);
+        case LONG:
+          return Long.valueOf(input);
+        case FLOAT:
+          return Float.valueOf(input);
+        case DOUBLE:
+          return Double.valueOf(input);
+        case STRING:
+          return input;
+        default:
+          throw new IllegalStateException("Unsupported data type: " + dataType);
+      }
+    } catch (NumberFormatException e) {
+      throw new BadQueryRequestException(e);
     }
   }
 }
