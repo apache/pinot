@@ -15,15 +15,11 @@
  */
 package com.linkedin.pinot.routing;
 
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
@@ -48,7 +44,10 @@ public class RoutingTableBuilderFactory {
   }
 
   public RoutingTableBuilder createRoutingTableBuilder(TableConfig tableConfig) {
-    String builderName = tableConfig.getRoutingConfig().getRoutingTableBuilderName();
+    String builderName = null;
+    if (tableConfig.getRoutingConfig() != null) {
+      builderName = tableConfig.getRoutingConfig().getRoutingTableBuilderName();
+    }
     RoutingTableBuilderName buildNameEnum = null;
 
     if (builderName != null) {
