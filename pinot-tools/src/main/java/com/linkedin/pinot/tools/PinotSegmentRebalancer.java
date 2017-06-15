@@ -186,6 +186,8 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
               public IdealState apply(@Nullable IdealState idealState) {
                 for (String segmentId : newMapping.keySet()) {
                   Map<String, String> instanceStateMap = newMapping.get(segmentId);
+
+                  idealState.getInstanceStateMap(segmentId).clear();
                   for (String instanceId : instanceStateMap.keySet()) {
                     idealState.setPartitionState(segmentId, instanceId, instanceStateMap.get(instanceId));
                   }
