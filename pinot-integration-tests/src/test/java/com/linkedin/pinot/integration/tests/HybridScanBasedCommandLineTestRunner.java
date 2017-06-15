@@ -199,6 +199,11 @@ public class HybridScanBasedCommandLineTestRunner {
     }
 
     @Override
+    protected int getRealtimeSegmentFlushSize(boolean useLlc) {
+      return super.getRealtimeSegmentFlushSize(useLlc) * 10;
+    }
+
+    @Override
     @BeforeClass
     public void setUp() throws Exception {
       if (!_inCmdLine) {

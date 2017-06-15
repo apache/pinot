@@ -15,6 +15,23 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -42,24 +59,7 @@ import com.linkedin.pinot.minion.MinionStarter;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -374,10 +374,10 @@ public abstract class ClusterTest extends ControllerTest {
     if (useLlc) {
       addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit,
           KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile,
-          LLC_SEGMENT_FLUSH_SIZE, sortedColumn, invertedIndexColumns, loadMode, noDictionaryColumns, taskConfig);
+          getRealtimeSegmentFlushSize(true), sortedColumn, invertedIndexColumns, loadMode, noDictionaryColumns, taskConfig);
     } else {
       addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, HLC_SEGMENT_FLUSH_SIZE, sortedColumn,
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(false), sortedColumn,
           invertedIndexColumns, loadMode, noDictionaryColumns, taskConfig);
     }
     addOfflineTable(timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant,
