@@ -6,7 +6,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.lang.ArrayUtils;
 
 
 /**
@@ -185,6 +184,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return builder().fillValues(size, value).build();
   }
 
+  public static LongSeries sequence(long from, int count) {
+    long[] values = new long[count];
+    for(int i=0; i<count; i++) {
+      values[i] = from + i;
+    }
+    return buildFrom(values);
+  }
+
   // CAUTION: The array is final, but values are inherently modifiable
   final long[] values;
 
@@ -333,45 +340,45 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return String.valueOf(this.values[index]);
   }
 
-  public SeriesGrouping groupByInterval(long interval) {
-    if(interval <= 0)
-      throw new IllegalArgumentException("interval must be greater than 0");
-    if(this.size() <= 0)
-      return new SeriesGrouping(this);
-
-    long start = this.min() / interval; // align with interval
-    long stop = this.max() / interval + 1;
-
-    List<Range> ranges = new ArrayList<>();
-    for(long i=start; i<stop; i++) {
-      ranges.add(new Range(i * interval, (i+1) * interval));
-    }
-
-    // turn ranges into buckets from original series
-    // TODO use nlogm solution to find matching range, e.g. ordered tree
-    long[] keys = new long[ranges.size()];
-    List<Bucket> buckets = new ArrayList<>();
-
-    int i = 0;
-    for(Range r : ranges) {
-      ArrayList<Integer> ind = new ArrayList<>();
-      for(int j=0; j<this.size(); j++) {
-        if(this.values[j] >= r.lower && this.values[j] < r.upper) {
-          ind.add(j);
-        }
-      }
-
-      int[] fromIndex = new int[ind.size()];
-      for(int j=0; j<ind.size(); j++) {
-        fromIndex[j] = ind.get(j);
-      }
-
-      buckets.add(new Bucket(fromIndex));
-      keys[i++] = r.lower;
-    }
-
-    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
-  }
+//  public SeriesGrouping groupByInterval(long interval) {
+//    if(interval <= 0)
+//      throw new IllegalArgumentException("interval must be greater than 0");
+//    if(this.size() <= 0)
+//      return new SeriesGrouping(this);
+//
+//    long start = this.min() / interval; // align with interval
+//    long stop = this.max() / interval + 1;
+//
+//    List<Range> ranges = new ArrayList<>();
+//    for(long i=start; i<stop; i++) {
+//      ranges.add(new Range(i * interval, (i+1) * interval));
+//    }
+//
+//    // turn ranges into buckets from original series
+//    // TODO use nlogm solution to find matching range, e.g. ordered tree
+//    long[] keys = new long[ranges.size()];
+//    List<Bucket> buckets = new ArrayList<>();
+//
+//    int i = 0;
+//    for(Range r : ranges) {
+//      ArrayList<Integer> ind = new ArrayList<>();
+//      for(int j=0; j<this.size(); j++) {
+//        if(this.values[j] >= r.lower && this.values[j] < r.upper) {
+//          ind.add(j);
+//        }
+//      }
+//
+//      int[] fromIndex = new int[ind.size()];
+//      for(int j=0; j<ind.size(); j++) {
+//        fromIndex[j] = ind.get(j);
+//      }
+//
+//      buckets.add(new ArrayBucket(fromIndex));
+//      keys[i++] = r.lower;
+//    }
+//
+//    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
+//  }
 
   public long min() {
     return this.aggregate(MIN).value();

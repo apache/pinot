@@ -759,7 +759,7 @@ public class DataFrameBenchmark {
     benchmarkSortLongArray();
     benchmarkUniqueLongSeries();
     benchmarkUniqueLongArrayWithObjects();
-    //benchmarkExpandingWindowLongSeries(); // TODO out of heap space
+    benchmarkExpandingWindowLongSeries();
     benchmarkExpandingWindowLongArray();
     benchmarkMapDoubleSeries();
     benchmarkMapDoubleSeriesOperation();
