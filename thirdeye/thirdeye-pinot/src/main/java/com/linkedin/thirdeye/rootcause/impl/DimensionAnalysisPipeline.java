@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -178,7 +179,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
       }
     }, KEY, DIMENSION, VALUE);
 
-    DataFrame.DataFrameGrouping grouping = dfScore.groupByValue(KEY);
+    Grouping.DataFrameGrouping grouping = dfScore.groupByValue(KEY);
     DataFrame sumCost = grouping.aggregate(COST, DoubleSeries.SUM).fillNull(COST);
     DataFrame dimension = grouping.aggregate(DIMENSION, StringSeries.FIRST);
     DataFrame value = grouping.aggregate(VALUE, StringSeries.FIRST);

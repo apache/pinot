@@ -17,6 +17,7 @@ import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -246,7 +247,7 @@ public class TimeSeriesResource {
    * @return cumulative time series
    */
   private DataFrame transformTimeSeriesCumulative(DataFrame data) {
-    DataFrame.DataFrameGrouping group = data.groupByExpandingWindow();
+    Grouping.DataFrameGrouping group = data.groupByExpandingWindow();
     for (String id : data.getSeriesNames()) {
       if (data.getIndexName().equals(id))
         continue;
