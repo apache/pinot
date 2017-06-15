@@ -33,7 +33,7 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
       Arrays.asList("FlightNum", "Origin", "Quarter", "DivActualElapsedTime");
   private static final String TEST_QUERY = "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
-  private static final long MAX_RELOAD_TIME_IN_MILLIS = 5000L;
+  private static final long MAX_RELOAD_TIME_IN_MILLIS = 60_000L;
 
   @Override
   protected void createTable()
@@ -59,10 +59,11 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
       // Total docs should not change during reload
       Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
       if (queryResponse.getLong("numEntriesScannedInFilter") == 0L) {
-        break;
+        return;
       }
+      Thread.sleep(1000L);
     }
-    Assert.assertTrue(System.currentTimeMillis() < endTime);
+    Assert.fail("Failed to generate inverted index in " + MAX_RELOAD_TIME_IN_MILLIS + "ms");
   }
 
   private void triggerReload()
