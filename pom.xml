@@ -649,6 +649,11 @@
           </exclusion>
         </exclusions>
       </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-math</artifactId>
+        <version>2.1</version>
+      </dependency>
     </dependencies>
 
   </dependencyManagement>
