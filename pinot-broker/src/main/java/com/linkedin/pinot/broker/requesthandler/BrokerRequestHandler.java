@@ -38,6 +38,7 @@ import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.BrokerResponseFactory.ResponseType;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
@@ -162,26 +163,62 @@ public class BrokerRequestHandler {
       LOGGER.debug("Debug options are set to: {} for requestId {}: {}", debugOptions, requestId, pql);
     }
 
-    // Compile and validate the request.
+    // Compile the request
     long compilationStartTime = System.nanoTime();
     BrokerRequest brokerRequest;
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
     } catch (Exception e) {
       LOGGER.info("Parsing error on requestId {}: {}, {}", requestId, pql, e.getMessage());
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1L);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
+
+    // Get the resources hit by the request
     String tableName = brokerRequest.getQuerySource().getTableName();
+    String offlineTableName = null;
+    String realtimeTableName = null;
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      // Offline table name
+      if (_routingTable.routingTableExists(tableName)) {
+        offlineTableName = tableName;
+      }
+    } else if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+      // Realtime table name
+      if (_routingTable.routingTableExists(tableName)) {
+        realtimeTableName = tableName;
+      }
+    } else {
+      // Raw table name (check both OFFLINE and REALTIME)
+      String offlineTableNameToCheck = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      if (_routingTable.routingTableExists(offlineTableNameToCheck)) {
+        offlineTableName = offlineTableNameToCheck;
+      }
+      String realtimeTableNameToCheck = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      if (_routingTable.routingTableExists(realtimeTableNameToCheck)) {
+        realtimeTableName = realtimeTableNameToCheck;
+      }
+    }
+    if ((offlineTableName == null) && (realtimeTableName == null)) {
+      // No table matches the request
+      LOGGER.info("No table matches the name: {}", tableName);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1L);
+      return BrokerResponseFactory.getStaticNoTableHitBrokerResponse(ResponseType.BROKER_RESPONSE_TYPE_NATIVE);
+    }
+
+    // Validate the request
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     try {
       validateRequest(brokerRequest);
     } catch (Exception e) {
       LOGGER.info("Validation error on requestId {}: {}, {}", requestId, pql, e.getMessage());
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1L);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
+
     if (isTraceEnabled) {
       brokerRequest.setEnableTrace(true);
     }
@@ -189,15 +226,17 @@ public class BrokerRequestHandler {
       brokerRequest.setDebugOptions(debugOptions);
     }
     brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name());
-    _brokerMetrics.addPhaseTiming(tableName, BrokerQueryPhase.REQUEST_COMPILATION,
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         System.nanoTime() - compilationStartTime);
-    _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.QUERIES, 1);
+    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1L);
 
     // Execute the query.
     long executionStartTime = System.nanoTime();
     ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
-    BrokerResponse brokerResponse = processBrokerRequest(brokerRequest, scatterGatherStats, requestId);
-    _brokerMetrics.addPhaseTiming(tableName, BrokerQueryPhase.QUERY_EXECUTION, System.nanoTime() - executionStartTime);
+    BrokerResponse brokerResponse =
+        processBrokerRequest(brokerRequest, offlineTableName, realtimeTableName, scatterGatherStats, requestId);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
+        System.nanoTime() - executionStartTime);
 
     // Set total query processing time.
     long totalTimeMs = TimeUnit.MILLISECONDS.convert(System.nanoTime() - compilationStartTime, TimeUnit.NANOSECONDS);
@@ -255,61 +294,44 @@ public class BrokerRequestHandler {
    * </ul>
    *
    * @param brokerRequest broker request to be processed.
+   * @param offlineTableName offline table hit by the request.
+   * @param realtimeTableName realtime table hit by the request.
    * @param scatterGatherStats scatter-gather statistics.
    * @param requestId broker request ID.
    * @return broker response.
    * @throws InterruptedException
    */
   @Nonnull
-  public BrokerResponse processBrokerRequest(@Nonnull BrokerRequest brokerRequest,
-      @Nonnull ScatterGatherStats scatterGatherStats, long requestId)
+  public BrokerResponse processBrokerRequest(@Nonnull BrokerRequest brokerRequest, @Nullable String offlineTableName,
+      @Nullable String realtimeTableName, @Nonnull ScatterGatherStats scatterGatherStats, long requestId)
       throws InterruptedException {
-    String tableName = brokerRequest.getQuerySource().getTableName();
     ResponseType responseType = BrokerResponseFactory.getResponseType(brokerRequest.getResponseFormat());
     LOGGER.debug("Broker Response Type: {}", responseType.name());
 
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    if (!_routingTable.routingTableExists(offlineTableName)) {
-      offlineTableName = null;
-    }
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    if (!_routingTable.routingTableExists(realtimeTableName)) {
-      realtimeTableName = null;
-    }
+    // TODO: get time column name from schema or table config so that we can apply it in realtime only use case.
+    // We get timeColumnName from time boundary service currently, which only exists for offline table.
+    String timeColumnName = (offlineTableName != null) ? getTimeColumnName(offlineTableName) : null;
 
-    if ((offlineTableName == null) && (realtimeTableName == null)) {
-      // No table matches the broker request.
-      LOGGER.info("No table matches the name: {}", tableName);
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
-      return BrokerResponseFactory.getStaticNoTableHitBrokerResponse(responseType);
+    BrokerRequest offlineBrokerRequest = null;
+    BrokerRequest realtimeBrokerRequest = null;
+    if ((offlineTableName != null) && (realtimeTableName != null)) {
+      // Hybrid
+      offlineBrokerRequest = _optimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumnName);
+      realtimeBrokerRequest = _optimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumnName);
+    } else if (offlineTableName != null) {
+      // Offline only
+      brokerRequest.getQuerySource().setTableName(offlineTableName);
+      offlineBrokerRequest = _optimizer.optimize(brokerRequest, timeColumnName);
     } else {
-      // At least one table matches the broker request.
-      BrokerRequest offlineBrokerRequest = null;
-      BrokerRequest realtimeBrokerRequest = null;
-
-      // TODO: get time column name from schema or table config so that we can apply it in realtime only use case.
-      // We get timeColumnName from time boundary service currently, which only exists for offline table.
-      String timeColumnName = (offlineTableName != null) ? getTimeColumnName(offlineTableName) : null;
-
-      if ((offlineTableName != null) && (realtimeTableName != null)) {
-        // Hybrid table.
-        offlineBrokerRequest = _optimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumnName);
-        realtimeBrokerRequest = _optimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumnName);
-      } else if (offlineTableName != null) {
-        // Offline table only.
-        brokerRequest.getQuerySource().setTableName(offlineTableName);
-        offlineBrokerRequest = _optimizer.optimize(brokerRequest, timeColumnName);
-      } else {
-        // Realtime table only.
-        brokerRequest.getQuerySource().setTableName(realtimeTableName);
-        realtimeBrokerRequest = _optimizer.optimize(brokerRequest, timeColumnName);
-      }
-
-      ReduceService reduceService = _reduceServiceRegistry.get(responseType);
-      // TODO: wire up the customized BucketingSelection.
-      return processOptimizedBrokerRequests(brokerRequest, offlineBrokerRequest, realtimeBrokerRequest, reduceService,
-          scatterGatherStats, null, requestId);
+      // Realtime only
+      brokerRequest.getQuerySource().setTableName(realtimeTableName);
+      realtimeBrokerRequest = _optimizer.optimize(brokerRequest, timeColumnName);
     }
+
+    ReduceService reduceService = _reduceServiceRegistry.get(responseType);
+    // TODO: wire up the customized BucketingSelection.
+    return processOptimizedBrokerRequests(brokerRequest, offlineBrokerRequest, realtimeBrokerRequest, reduceService,
+        scatterGatherStats, null, requestId);
   }
 
   /**
@@ -431,7 +453,6 @@ public class BrokerRequestHandler {
       @Nonnull ReduceService reduceService, @Nonnull ScatterGatherStats scatterGatherStats,
       @Nullable BucketingSelection bucketingSelection, long requestId)
       throws InterruptedException {
-    String originalTableName = originalBrokerRequest.getQuerySource().getTableName();
     ResponseType serverResponseType = BrokerResponseFactory.getResponseType(originalBrokerRequest.getResponseFormat());
     PhaseTimes phaseTimes = new PhaseTimes();
 
@@ -509,14 +530,14 @@ public class BrokerRequestHandler {
     brokerResponse.setNumServersResponded(numServersResponded);
 
     // Update broker metrics.
-    phaseTimes.addPhaseTimesToBrokerMetrics(_brokerMetrics, originalTableName);
+    String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
+    phaseTimes.addPhaseTimesToBrokerMetrics(_brokerMetrics, rawTableName);
     if (brokerResponse.getExceptionsSize() > 0) {
-      _brokerMetrics.addMeteredTableValue(originalTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS,
-          1);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1L);
     }
     if (numServersQueried > numServersResponded) {
-      _brokerMetrics.addMeteredTableValue(originalTableName,
-          BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED,
+          1L);
     }
 
     return brokerResponse;
@@ -538,9 +559,9 @@ public class BrokerRequestHandler {
     Map<ServerInstance, SegmentIdSet> segmentServices = findCandidateServers(brokerRequest);
     phaseTimes.addToRoutingTime(System.nanoTime() - routingStartTime);
     if (segmentServices == null || segmentServices.isEmpty()) {
-      String tableName = brokerRequest.getQuerySource().getTableName();
-      LOGGER.info("No server found for table: {}", tableName);
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
+      String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+      LOGGER.info("No server found for table: {}", tableNameWithType);
+      _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1L);
       return null;
     }
 
@@ -583,22 +604,22 @@ public class BrokerRequestHandler {
    * @param compositeFuture composite future returned from scatter phase.
    * @param scatterGatherStats scatter-gather statistics.
    * @param isOfflineTable whether the scatter-gather target is an OFFLINE table.
-   * @param tableName table name.
+   * @param tableNameWithType table name with type suffix.
    * @param processingExceptions list of processing exceptions.
    * @return server response map.
    */
   @Nullable
-  private Map<ServerInstance, ByteBuf> gatherServerResponses(
-      @Nonnull CompositeFuture<ByteBuf> compositeFuture, @Nonnull ScatterGatherStats scatterGatherStats,
-      boolean isOfflineTable, @Nonnull String tableName, @Nonnull List<ProcessingException> processingExceptions) {
+  private Map<ServerInstance, ByteBuf> gatherServerResponses(@Nonnull CompositeFuture<ByteBuf> compositeFuture,
+      @Nonnull ScatterGatherStats scatterGatherStats, boolean isOfflineTable, @Nonnull String tableNameWithType,
+      @Nonnull List<ProcessingException> processingExceptions) {
     try {
       Map<ServerInstance, ByteBuf> serverResponseMap = compositeFuture.get();
       Map<ServerInstance, Long> responseTimes = compositeFuture.getResponseTimes();
       scatterGatherStats.setResponseTimeMillis(responseTimes, isOfflineTable);
       return serverResponseMap;
     } catch (Exception e) {
-      LOGGER.error("Caught exception while fetching responses for table: {}", tableName, e);
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESPONSE_FETCH_EXCEPTIONS, 1);
+      LOGGER.error("Caught exception while fetching responses for table: {}", tableNameWithType, e);
+      _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.RESPONSE_FETCH_EXCEPTIONS, 1L);
       processingExceptions.add(QueryException.getException(QueryException.BROKER_GATHER_ERROR, e));
       return null;
     }
@@ -613,11 +634,11 @@ public class BrokerRequestHandler {
    * @param responseMap map from server to response.
    * @param isOfflineTable whether the responses are from an OFFLINE table.
    * @param dataTableMap map from server to data table.
-   * @param tableName table name.
+   * @param tableNameWithType table name with type suffix.
    * @param processingExceptions list of processing exceptions.
    */
   private void deserializeServerResponses(@Nonnull Map<ServerInstance, ByteBuf> responseMap, boolean isOfflineTable,
-      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull String tableName,
+      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull String tableNameWithType,
       @Nonnull List<ProcessingException> processingExceptions) {
     for (Entry<ServerInstance, ByteBuf> entry : responseMap.entrySet()) {
       ServerInstance serverInstance = entry.getKey();
@@ -630,9 +651,9 @@ public class BrokerRequestHandler {
         byteBuf.readBytes(byteArray);
         dataTableMap.put(serverInstance, DataTableFactory.getDataTable(byteArray));
       } catch (Exception e) {
-        LOGGER.error("Caught exceptions while deserializing response for table: {} from server: {}", tableName,
+        LOGGER.error("Caught exceptions while deserializing response for table: {} from server: {}", tableNameWithType,
             serverInstance, e);
-        _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1L);
         processingExceptions.add(QueryException.getException(QueryException.DATA_TABLE_DESERIALIZATION_ERROR, e));
       }
     }
