@@ -66,7 +66,6 @@ public class TableConfig {
     _quotaConfig = quotaConfig;
     _taskConfig = taskConfig;
     _routingConfig = routingConfig;
-
   }
 
   // For backward compatible
@@ -102,7 +101,8 @@ public class TableConfig {
     }
     RoutingConfig routingConfig = null;
     if (jsonConfig.has(ROUTING_CONFIG_KEY)) {
-      routingConfig = OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(ROUTING_CONFIG_KEY).toString(), RoutingConfig.class);
+      routingConfig =
+          OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(ROUTING_CONFIG_KEY).toString(), RoutingConfig.class);
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
@@ -157,7 +157,7 @@ public class TableConfig {
       taskConfig = OBJECT_MAPPER.readValue(taskConfigString, TableTaskConfig.class);
     }
     String routingConfigString = simpleFields.get(ROUTING_CONFIG_KEY);
-    
+
     RoutingConfig routingConfig = null;
     if (routingConfigString != null) {
       routingConfig = OBJECT_MAPPER.readValue(routingConfigString, RoutingConfig.class);
@@ -263,7 +263,6 @@ public class TableConfig {
     _taskConfig = taskConfig;
   }
 
-  
   public RoutingConfig getRoutingConfig() {
     return _routingConfig;
   }
@@ -304,6 +303,7 @@ public class TableConfig {
     private String _timeType;
     private String _retentionTimeUnit;
     private String _retentionTimeValue;
+    private String _segmentPushFrequency;
     private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
     private String _segmentAssignmentStrategy = DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY;
     private String _schemaName;
@@ -367,6 +367,11 @@ public class TableConfig {
       } else {
         _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
       }
+      return this;
+    }
+
+    public Builder setSegmentPushFrequency(String segmentPushFrequency) {
+      _segmentPushFrequency = segmentPushFrequency;
       return this;
     }
 
@@ -445,7 +450,7 @@ public class TableConfig {
       _taskConfig = taskConfig;
       return this;
     }
-    
+
     public Builder setRoutingConfig(RoutingConfig routingConfig) {
       _routingConfig = routingConfig;
       return this;
@@ -459,6 +464,7 @@ public class TableConfig {
       validationConfig.setTimeType(_timeType);
       validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
       validationConfig.setRetentionTimeValue(_retentionTimeValue);
+      validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
       validationConfig.setSegmentPushType(_segmentPushType);
       validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
       validationConfig.setSchemaName(_schemaName);
@@ -488,7 +494,7 @@ public class TableConfig {
         _customConfig = new TableCustomConfig();
         _customConfig.setCustomConfigs(new HashMap<String, String>());
       }
-      
+
       if (_routingConfig == null) {
         _routingConfig = new RoutingConfig();
       }
