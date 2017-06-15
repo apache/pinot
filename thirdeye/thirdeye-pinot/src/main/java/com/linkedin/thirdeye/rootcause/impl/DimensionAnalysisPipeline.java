@@ -188,8 +188,8 @@ public class DimensionAnalysisPipeline extends Pipeline {
     // truncate results to most important dimensions
     DataFrame trunc = sumCost.sortedBy(COST);
 
-    final double total = sumCost.getDoubles(COST).sum();
-    final double truncTotal = trunc.getDoubles(COST).sum();
+    final double total = sumCost.getDoubles(COST).sum().value();
+    final double truncTotal = trunc.getDoubles(COST).sum().value();
     LOG.info("Using {} out of {} scored dimensions, explaining {} of total differences", trunc.size(), sumCost.size(), truncTotal / total);
 
     DataFrame result = trunc.joinLeft(dimension).joinLeft(value);
@@ -270,7 +270,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
     df.addSeries(DIMENSION, dim);
     df.addSeries(VALUE, value);
 
-    if(sCost.sum() > 0.0) {
+    if(sCost.sum().value() > 0.0) {
       df.addSeries(COST, sCost.divide(sCost.sum()));
     } else {
       df.addSeries(COST, sCost);
