@@ -522,6 +522,13 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   @Test(enabled = false)
+  public void testBrokerDebugOutput()
+      throws Exception {
+    super.testBrokerDebugOutput();
+  }
+
+  @Override
+  @Test(enabled = false)
   public void testInstanceShutdown() {
     // jfim: Doesn't like this is working properly
     super.testInstanceShutdown();

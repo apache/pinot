@@ -78,10 +78,12 @@
             <configuration>
               <skipTests>false</skipTests>
               <excludes>
-                <!-- Those 3 tests are covered by the MinionClusterIntegrationTest -->
+                <!-- Covered by the MinionClusterIntegrationTest -->
                 <exclude>**/OfflineClusterIntegrationTest.java</exclude>
                 <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/HybridClusterIntegrationTest.java</exclude>
+                <!-- Covered by DefaultColumnsTriggerClusterIntegrationTest -->
+                <exclude>**/DefaultColumnsClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
           </plugin>

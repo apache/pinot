@@ -24,7 +24,6 @@ import org.testng.annotations.Test;
  * enables indexes on a bunch of columns
  *
  */
-@Test
 public class InvertedIndexRealtimeIntegrationTest extends RealtimeClusterIntegrationTest {
 
   @Override

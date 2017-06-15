@@ -23,7 +23,6 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 
-@Test
 public class NoDictionaryIntegrationTest extends OfflineClusterIntegrationTest {
 
   @Override
