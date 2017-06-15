@@ -1,27 +1,26 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import java.net.URLDecoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.ws.rs.GET;
@@ -218,7 +217,7 @@ public class DataResource {
    * @return
    */
   @GET
-  @Path("autocomplete/function")
+  @Path("autocomplete/functionByName")
   public List<AnomalyFunctionDTO> getFunctionsWhereNameLike(@QueryParam("name") String name) {
     List<AnomalyFunctionDTO> functions = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
@@ -226,6 +225,57 @@ public class DataResource {
     }
     return functions;
   }
+
+
+  /**
+   * Returns list of AnomalyFunction object matching given AlertConfigName
+   * @param alertName
+   * @return
+   */
+  @GET
+  @Path("autocomplete/functionByAlertName")
+  public List<AnomalyFunctionDTO> getAlertsWhereAlertNameLike(@QueryParam("alertName") String alertName) {
+    List<AlertConfigDTO> alerts = Collections.emptyList();
+    if (StringUtils.isNotBlank(alertName)) {
+      alerts = alertConfigDAO.findWhereNameLike("%" + alertName + "%");
+    }
+    return getFunctionsFromAlertConfigs(alerts);
+  }
+
+  /**
+   * Returns list of AnomalyFunction object matching given appName
+   * @param appname
+   * @return
+   */
+  @GET
+  @Path("autocomplete/functionsByAppname")
+  public List<AnomalyFunctionDTO> getAlertsWhereAppNameLike(@QueryParam("appname") String appname) {
+    List<AlertConfigDTO> alerts = Collections.emptyList();
+    if (StringUtils.isNotBlank(appname)) {
+      alerts = alertConfigDAO.findWhereApplicationLike("%" + appname + "%");
+    }
+   return getFunctionsFromAlertConfigs(alerts);
+  }
+
+  private List<AnomalyFunctionDTO> getFunctionsFromAlertConfigs(List<AlertConfigDTO> alerts) {
+    Set<AnomalyFunctionDTO> functionsSet = new HashSet<>();
+    List<AnomalyFunctionDTO> functions = new ArrayList<>();
+
+    for (AlertConfigDTO alertConfigDTO : alerts) {
+      if(alertConfigDTO.getEmailConfig() != null) {
+        List<Long> functionIds = alertConfigDTO.getEmailConfig().getFunctionIds();
+        for (Long functionId : functionIds) {
+          AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
+          if (anomalyFunctionDTO != null) {
+            functionsSet.add(anomalyFunctionDTO);
+          }
+        }
+      }
+    }
+    functions.addAll(functionsSet);
+    return functions;
+  }
+
 
   /**
    * Returns list of AlertConfig object matching given name
@@ -238,21 +288,6 @@ public class DataResource {
     List<AlertConfigDTO> alerts = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
       alerts = alertConfigDAO.findWhereNameLike("%" + name + "%");
-    }
-    return alerts;
-  }
-
-  /**
-   * Returns list of AlertConfig object matching given appName
-   * @param appname
-   * @return
-   */
-  @GET
-  @Path("autocomplete/alertByAppname")
-  public List<AlertConfigDTO> getAlertsWhereAppNameLike(@QueryParam("appname") String appname) {
-    List<AlertConfigDTO> alerts = Collections.emptyList();
-    if (StringUtils.isNotBlank(appname)) {
-      alerts = alertConfigDAO.findWhereApplicationLike("%" + appname + "%");
     }
     return alerts;
   }
