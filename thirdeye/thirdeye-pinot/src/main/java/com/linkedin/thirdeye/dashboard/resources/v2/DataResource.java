@@ -1,23 +1,26 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import java.net.URLDecoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.ws.rs.GET;
@@ -90,6 +93,8 @@ public class DataResource {
   private final MetricConfigManager metricConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
   private final DashboardConfigManager dashboardConfigDAO;
+  private final AnomalyFunctionManager anomalyFunctionDAO;
+  private final AlertConfigManager alertConfigDAO;
 
   private final LoadingCache<String, Long> collectionMaxDataTimeCache;
   private final LoadingCache<String, String> dimensionsFilterCache;
@@ -98,9 +103,11 @@ public class DataResource {
   private AnomaliesResource anomaliesResoure;
 
   public DataResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
-    metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-    datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
+    this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.alertConfigDAO = DAO_REGISTRY.getAlertConfigDAO();
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
@@ -183,6 +190,7 @@ public class DataResource {
     }
     return Collections.emptyList();
   }
+
   @GET
   @Path("autocomplete/dashboard")
   public List<DashboardConfigDTO> getDashboardsWhereNameLike(@QueryParam("name") String name) {
@@ -201,6 +209,87 @@ public class DataResource {
       metricConfigs = metricConfigDAO.findWhereNameOrAliasLikeAndActive("%" + name + "%");
     }
     return metricConfigs;
+  }
+
+  /**
+   * Returns list of Anomaly functions matching given name
+   * @param name
+   * @return
+   */
+  @GET
+  @Path("autocomplete/functionByName")
+  public List<AnomalyFunctionDTO> getFunctionsWhereNameLike(@QueryParam("name") String name) {
+    List<AnomalyFunctionDTO> functions = Collections.emptyList();
+    if (StringUtils.isNotBlank(name)) {
+      functions = anomalyFunctionDAO.findWhereNameLike("%" + name + "%");
+    }
+    return functions;
+  }
+
+
+  /**
+   * Returns list of AnomalyFunction object matching given AlertConfigName
+   * @param alertName
+   * @return
+   */
+  @GET
+  @Path("autocomplete/functionByAlertName")
+  public List<AnomalyFunctionDTO> getAlertsWhereAlertNameLike(@QueryParam("alertName") String alertName) {
+    List<AlertConfigDTO> alerts = Collections.emptyList();
+    if (StringUtils.isNotBlank(alertName)) {
+      alerts = alertConfigDAO.findWhereNameLike("%" + alertName + "%");
+    }
+    return getFunctionsFromAlertConfigs(alerts);
+  }
+
+  /**
+   * Returns list of AnomalyFunction object matching given appName
+   * @param appname
+   * @return
+   */
+  @GET
+  @Path("autocomplete/functionsByAppname")
+  public List<AnomalyFunctionDTO> getAlertsWhereAppNameLike(@QueryParam("appname") String appname) {
+    List<AlertConfigDTO> alerts = Collections.emptyList();
+    if (StringUtils.isNotBlank(appname)) {
+      alerts = alertConfigDAO.findWhereApplicationLike("%" + appname + "%");
+    }
+   return getFunctionsFromAlertConfigs(alerts);
+  }
+
+  private List<AnomalyFunctionDTO> getFunctionsFromAlertConfigs(List<AlertConfigDTO> alerts) {
+    Set<AnomalyFunctionDTO> functionsSet = new HashSet<>();
+    List<AnomalyFunctionDTO> functions = new ArrayList<>();
+
+    for (AlertConfigDTO alertConfigDTO : alerts) {
+      if(alertConfigDTO.getEmailConfig() != null) {
+        List<Long> functionIds = alertConfigDTO.getEmailConfig().getFunctionIds();
+        for (Long functionId : functionIds) {
+          AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
+          if (anomalyFunctionDTO != null) {
+            functionsSet.add(anomalyFunctionDTO);
+          }
+        }
+      }
+    }
+    functions.addAll(functionsSet);
+    return functions;
+  }
+
+
+  /**
+   * Returns list of AlertConfig object matching given name
+   * @param name
+   * @return
+   */
+  @GET
+  @Path("autocomplete/alert")
+  public List<AlertConfigDTO> getAlertsWhereNameLike(@QueryParam("name") String name) {
+    List<AlertConfigDTO> alerts = Collections.emptyList();
+    if (StringUtils.isNotBlank(name)) {
+      alerts = alertConfigDAO.findWhereNameLike("%" + name + "%");
+    }
+    return alerts;
   }
 
   @GET
