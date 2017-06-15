@@ -15,11 +15,12 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
@@ -36,8 +37,7 @@ public class DictionaryPerfRunner {
    * <p>We first index all values into the dictionary, then fetch dictIds and values from it.
    * <p>Test both CPU (including random) and memory usage.
    */
-  private static void readWritePerfOnCardinality(int cardinality) {
-    IntOnHeapMutableDictionary intOnHeapMutableDictionary = new IntOnHeapMutableDictionary();
+  private static void readWritePerfOnCardinality(int cardinality, final MutableDictionary dictionary) {
 
     System.out.println("Starting read write perf on cardinality: " + cardinality + " for " + NUM_VALUES + " values");
     RUNTIME.gc();
@@ -45,29 +45,28 @@ public class DictionaryPerfRunner {
     long usedMemory = RUNTIME.totalMemory();
     long start = System.currentTimeMillis();
     for (int i = 0; i < NUM_VALUES; i++) {
-      intOnHeapMutableDictionary.index(i % cardinality);
+      dictionary.index(i % cardinality);
     }
-    System.out.println("Index time for IntOnHeapMutableDictionary: " + (System.currentTimeMillis() - start));
+    System.out.println("Index time for " + dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis() - start));
     start = System.currentTimeMillis();
     for (int i = 0; i < NUM_VALUES; i++) {
-      intOnHeapMutableDictionary.indexOf(i % cardinality);
+      dictionary.indexOf(i % cardinality);
     }
-    System.out.println("DictId fetching time for IntOnHeapMutableDictionary: " + (System.currentTimeMillis() - start));
+    System.out.println("DictId fetching time for " +  dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis() - start));
     start = System.currentTimeMillis();
     for (int i = 0; i < NUM_VALUES; i++) {
-      intOnHeapMutableDictionary.get(i % cardinality);
+      dictionary.get(i % cardinality);
     }
-    System.out.println("Value fetching time for IntOnHeapMutableDictionary: " + (System.currentTimeMillis() - start));
-    System.out.println("Memory usage for IntOnHeapMutableDictionary: " + (RUNTIME.totalMemory() - usedMemory));
+    System.out.println("Value fetching time for " + dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis() - start));
+    System.out.println("Memory usage for " + dictionary.getClass().getSimpleName() + ": " + (RUNTIME.totalMemory() - usedMemory));
   }
 
   /**
    * Test the performance for multi-readers dictId fetching and value fetching.
    * <p>We first index all values into the dictionary, then fetch dictIds and values from it.
    */
-  private static void multiReadersPerfOnCardinality(final int cardinality)
+  private static void multiReadersPerfOnCardinality(final int cardinality, final MutableDictionary dictionary)
       throws InterruptedException {
-    final IntOnHeapMutableDictionary intOnHeapMutableDictionary = new IntOnHeapMutableDictionary();
 
     System.out.println(
         "Starting multi-readers perf on cardinality: " + cardinality + " for " + NUM_VALUES + " values with "
@@ -75,11 +74,11 @@ public class DictionaryPerfRunner {
 
     // Index all values
     for (int i = 0; i < cardinality; i++) {
-      intOnHeapMutableDictionary.index(i);
+      dictionary.index(i);
     }
 
     // Count dictId and value fetching time
-    countMultiReadersFetchingTime(cardinality, intOnHeapMutableDictionary);
+    countMultiReadersFetchingTime(cardinality, dictionary);
   }
 
   private static void countMultiReadersFetchingTime(final int cardinality, final Dictionary dictionary)
@@ -113,14 +112,18 @@ public class DictionaryPerfRunner {
   }
 
   public static void main(String[] args)
-      throws InterruptedException {
-    int cardinality = Integer.parseInt(args[0]);
+      throws InterruptedException, IOException {
+    final int cardinality = Integer.parseInt(args[0]);
 
     System.out.println("--------------------------------------------------------------------------------");
-    readWritePerfOnCardinality(cardinality);
+    try (MutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
+      readWritePerfOnCardinality(cardinality, dictionary);
+    }
     System.out.println("--------------------------------------------------------------------------------");
     System.out.println("--------------------------------------------------------------------------------");
-    multiReadersPerfOnCardinality(cardinality);
+    try (MutableDictionary dictionary = new IntOnHeapMutableDictionary()) {
+      multiReadersPerfOnCardinality(cardinality, dictionary);
+    }
     System.out.println("--------------------------------------------------------------------------------");
 
     EXECUTOR_SERVICE.shutdown();
