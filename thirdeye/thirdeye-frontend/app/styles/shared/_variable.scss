@@ -1,9 +1,62 @@
 /* -----------------------------------------------------------------------------
  * TE shared style values and sizes
  * ---------------------------------------------------------------------------*/
-$te-font-size-default: 15px;
-$te-font-size-medium: 17px;
+$te-nav-link-height: 48px;
+$te-nav-letter-spacing: .8px;
+
+$te-content-padding-sides: 140px;
+$te-content-padding-top: 20px;
+
+$te-font-size-medium: 18px;
+$te-font-size-small: 15px;
+$te-font-size-tiny: 13px;
 $te-font-size-component-title: 25px;
 
 $te-list-line-height: 28px;
 $te-header-component-padding: 25px;
+
+
+/* -----------------------------------------------------------------------------
+ * TE functions and mixins
+ * ---------------------------------------------------------------------------*/
+// Helper for opacity-based rgb color shorthand
+@function app-shade($color: default, $num: default) {
+  @if $num != nil {
+    @if $num >= 1 {
+      $num: $num / 10;
+    }
+    @if $color == w {
+      $color: white;
+    }
+    @if $color == b {
+      $color: black;
+    }
+    @return rgba($color, $num);
+  }
+  @return nil;
+}
+
+@mixin clearfix-mixin() {
+    &:before,
+    &:after {
+        content: "";
+        display: table;
+    }
+    &:after {
+        clear: both;
+    }
+}
+
+@mixin truncate-mixin() {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+@mixin app-title-mixin() {
+  font-size: 22px;
+  color: app-shade(black, 6);
+  font-weight: normal;
+}

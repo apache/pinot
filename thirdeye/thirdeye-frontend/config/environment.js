@@ -1,20 +1,30 @@
 /* eslint-env node */
 
 module.exports = function(environment) {
+
   var ENV = {
+
+    appName: 'ThirdEye',
+
     modulePrefix: 'thirdeye-frontend',
+
     environment: environment,
+
     podModulePrefix: 'thirdeye-frontend/pods',
+
     rootURL: '/app/',
-    locationType: 'hash',
-    'ember-cli-mirage': {
+
+    locationType: 'hash', 'ember-cli-mirage': {
       directory: 'app/mirage'
     },
+
     EmberENV: {
+
       FEATURES: {
         // Here you can enable experimental features on an ember canary build
         // e.g. 'with-controller': true
       },
+
       EXTEND_PROTOTYPES: {
         // Prevent Ember Data from overriding Date.parse.
         Date: false
@@ -38,6 +48,7 @@ module.exports = function(environment) {
 
   if (environment === 'test') {
     ENV.rootURL = '/';
+
     // Testem prefers this...
     ENV.locationType = 'none';
 
@@ -48,7 +59,7 @@ module.exports = function(environment) {
     ENV.APP.rootElement = '#ember-testing';
   }
 
-  if (environment === 'production') {
-  }
+  if (environment === 'production') {}
+
   return ENV;
 };

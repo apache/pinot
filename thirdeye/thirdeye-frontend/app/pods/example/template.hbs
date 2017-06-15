@@ -1,26 +1,24 @@
-<section class="meta-bar">
-  {{#containers/anomaly-container as |anomalyList actions|}}
-    {{#if anomalyList.loading}}
-      Loading...
-    {{/if}}
+{{#containers/anomaly-container as |anomalyList actions|}}
+  {{#if anomalyList.loading}}
+    Loading...
+  {{/if}}
 
-    {{#if anomalyList.failed}}
-      Oops, something went wrong...
-    {{/if}}
+  {{#if anomalyList.failed}}
+    Oops, something went wrong...
+  {{/if}}
 
-    {{#if anomalyList.loaded}}
-      {{#each anomalyList.anomalies as |anomaly|}}
-        <div class="meta-bar__card">
+  {{#if anomalyList.loaded}}
+    {{#each anomalyList.anomalies as |anomaly|}}
+        <section class="anomaly-title-bar">
           {{anomaly-id anomaly=anomaly}}
-        </div>
-      {{else}}
-        No anomalies found.
-      {{/each}}
-    {{/if}}
-  {{/containers/anomaly-container}}
-</section>
-
-<main class="content">
-  <h1>Example</h1>
-  <p>This is a placeholder example page for the new ember app utilizing ember-redux and connecting to the back end at localhost:1426</p>
-</main>
+        </section>
+        <main class="anomaly-content container">
+          <h1>Example</h1>
+          <p>This is a placeholder example page for the new ember app utilizing ember-redux and connecting to the back end at localhost:1426</p>
+          {{anomaly-graph anomaly=anomaly}}
+        </main>
+    {{else}}
+      No anomalies found.
+    {{/each}}
+  {{/if}}
+{{/containers/anomaly-container}}
