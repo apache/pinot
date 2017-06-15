@@ -1,11 +1,10 @@
-@import "../shared/variable";
-
 .te-nav {
   background-color: $anolaly-nav-background;
   font-size: $te-font-size-tiny;
   letter-spacing: $te-nav-letter-spacing;
 
   &__logo {
+    float: left;
     color: white;
     margin-right: 60px;
     padding-left: 31px;
@@ -51,6 +50,7 @@
   }
 
   &__list {
+    float: left;
     padding: 0;
     margin: 0;
     margin-bottom: 2px;
@@ -78,7 +78,6 @@
   a:hover,
   a:visited {
     text-decoration: none;
-    color: white;
   }
 
   .glyphicon {

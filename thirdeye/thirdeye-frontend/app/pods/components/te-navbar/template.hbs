@@ -1,13 +1,13 @@
 <div class="container">
   {{#if isGlobalNav}}
-    <div class="te-nav__logo pull-left">
+    <div class="te-nav__logo">
       {{#link-to "index" class="te-nav__link te-nav__link--home"}}
         {{webappName}}
       {{/link-to}}
     </div>
   {{/if}}
 
-  <ul class="te-nav__list pull-left {{navClass}}">
+  <ul class="te-nav__list">
     {{#each navItems as |navItem|}}
       <li class="te-nav__item te-nav__item--{{navItem.className}}">
         {{#if navItem.isCustomLink}}
@@ -15,11 +15,11 @@
             {{navItem.title}}
           </a>
         {{else if navItem.id}}
-          {{#link-to navItem.link navItem.id class="te-nav__link app-text--xxsmall"}}
+          {{#link-to navItem.link navItem.id class="te-nav__link"}}
             {{navItem.title}}
           {{/link-to}}
         {{else}}
-          {{#link-to navItem.link class="te-nav__link app-text--xxsmall"}}
+          {{#link-to navItem.link class="te-nav__link"}}
             {{navItem.title}}
           {{/link-to}}
         {{/if}}

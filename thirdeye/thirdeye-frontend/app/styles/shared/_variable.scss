@@ -36,7 +36,7 @@ $te-header-component-padding: 25px;
   @return nil;
 }
 
-@mixin clearfix() {
+@mixin clearfix-mixin() {
     &:before,
     &:after {
         content: "";
@@ -45,4 +45,18 @@ $te-header-component-padding: 25px;
     &:after {
         clear: both;
     }
+}
+
+@mixin truncate-mixin() {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+@mixin app-title-mixin() {
+  font-size: 22px;
+  color: app-shade(black, 6);
+  font-weight: normal;
 }
