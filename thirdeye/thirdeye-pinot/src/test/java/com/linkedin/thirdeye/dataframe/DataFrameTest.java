@@ -739,23 +739,23 @@ public class DataFrameTest {
   @Test
   public void testAggregateWithoutData() {
     DoubleSeries s = DataFrame.toSeries(new double[0]);
-    Assert.assertEquals(s.sum(), DNULL);
+    assertEquals(s.sum(), DNULL);
   }
 
   @Test
   public void testDoubleAggregateWithNull() {
     DoubleSeries s = DataFrame.toSeries(1.0, 2.0, DNULL, 4.0);
-    Assert.assertEquals(s.sum(), 7.0);
-    Assert.assertEquals(s.fillNull().sum(), 7.0);
-    Assert.assertEquals(s.dropNull().sum(), 7.0);
+    assertEquals(s.sum(), 7.0);
+    assertEquals(s.fillNull().sum(), 7.0);
+    assertEquals(s.dropNull().sum(), 7.0);
   }
 
   @Test
   public void testLongAggregateWithNull() {
     LongSeries s = DataFrame.toSeries(1, 2, LNULL, 4);
-    Assert.assertEquals(s.sum(), 7);
-    Assert.assertEquals(s.fillNull().sum(), 7);
-    Assert.assertEquals(s.dropNull().sum(), 7);
+    assertEquals(s.sum(), 7);
+    assertEquals(s.fillNull().sum(), 7);
+    assertEquals(s.dropNull().sum(), 7);
   }
 
   @Test
@@ -930,11 +930,11 @@ public class DataFrameTest {
   @Test
   public void testDoubleAccessorsEmpty() {
     DoubleSeries s = DoubleSeries.empty();
-    Assert.assertTrue(DoubleSeries.isNull(s.sum()));
-    Assert.assertTrue(DoubleSeries.isNull(s.min()));
-    Assert.assertTrue(DoubleSeries.isNull(s.max()));
-    Assert.assertTrue(DoubleSeries.isNull(s.mean()));
-    Assert.assertTrue(DoubleSeries.isNull(s.std()));
+    Assert.assertTrue(DoubleSeries.isNull(s.sum().value()));
+    Assert.assertTrue(DoubleSeries.isNull(s.min().value()));
+    Assert.assertTrue(DoubleSeries.isNull(s.max().value()));
+    Assert.assertTrue(DoubleSeries.isNull(s.mean().value()));
+    Assert.assertTrue(DoubleSeries.isNull(s.std().value()));
 
     try {
       s.first();
@@ -977,9 +977,9 @@ public class DataFrameTest {
   @Test
   public void testLongAccessorsEmpty() {
     LongSeries s = LongSeries.empty();
-    Assert.assertTrue(LongSeries.isNull(s.sum()));
-    Assert.assertTrue(LongSeries.isNull(s.min()));
-    Assert.assertTrue(LongSeries.isNull(s.max()));
+    Assert.assertTrue(LongSeries.isNull(s.sum().value()));
+    Assert.assertTrue(LongSeries.isNull(s.min().value()));
+    Assert.assertTrue(LongSeries.isNull(s.max().value()));
 
     try {
       s.first();
@@ -1800,7 +1800,7 @@ public class DataFrameTest {
   @Test
   public void testDoubleZScore() {
     DoubleSeries s = DataFrame.toSeries(0.0, 1.0, 2.0).zscore();
-    assertEquals(s, -0.707, 0.0, 0.707);
+    assertEquals(s, -1, 0.0, 1);
   }
 
   @Test
@@ -1976,6 +1976,20 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleAggregation() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
+    assertEquals(base.sum(), 3.503);
+    assertEquals(base.product(), 0.0045);
+    assertEquals(base.min(), 0.003);
+    assertEquals(base.max(), 1.5);
+    assertEquals(base.first(), DNULL);
+    assertEquals(base.last(), 0.003);
+    assertEquals(base.mean(), 0.87575);
+    assertEquals(base.median(), 1);
+    assertEquals(base.std(), 0.62776236215094);
+  }
+
+  @Test
   public void testLongOperationsSeries() {
     LongSeries base = DataFrame.toSeries(LNULL, 0, 1, 5, 10);
     LongSeries mod = DataFrame.toSeries(1, 1, 1, 0, LNULL);
@@ -2131,6 +2145,20 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testLongAggregation() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, 0, 5, 10);
+    assertEquals(base.sum(), 15);
+    assertEquals(base.product(), 0);
+    assertEquals(base.min(), 0);
+    assertEquals(base.max(), 10);
+    assertEquals(base.first(), LNULL);
+    assertEquals(base.last(), 10);
+    assertEquals(base.mean(), 3.75);
+    assertEquals(base.median(), 2.5);
+    assertEquals(base.std(), 4.7871355387817);
+  }
+
+  @Test
   public void testStringOperationsSeries() {
     StringSeries base = DataFrame.toSeries(SNULL, "a", "b", "c", "d");
     StringSeries mod = DataFrame.toSeries("A", "A", "b", "B", SNULL);
@@ -2219,6 +2247,44 @@ public class DataFrameTest {
         return values[0].equals("a") || values[0].equals("A");
       }
     }), SNULL, "a", "a", SNULL, "A");
+  }
+
+  @Test
+  public void testStringAggregation() {
+    StringSeries base = DataFrame.toSeries(SNULL, "a", "1", "A", "0.003");
+    assertEquals(base.sum(), "a1A0.003");
+    assertEquals(base.min(), "0.003");
+    assertEquals(base.max(), "a");
+    assertEquals(base.first(), SNULL);
+    assertEquals(base.last(), "0.003");
+
+    try {
+      base.product();
+      Assert.fail();
+    } catch(NumberFormatException ignore) {
+      // left  blank
+    }
+
+    try {
+      base.mean();
+      Assert.fail();
+    } catch(NumberFormatException ignore) {
+      // left  blank
+    }
+
+    try {
+      base.median();
+      Assert.fail();
+    } catch(NumberFormatException ignore) {
+      // left  blank
+    }
+
+    try {
+      base.std();
+      Assert.fail();
+    } catch(NumberFormatException ignore) {
+      // left  blank
+    }
   }
 
   @Test
@@ -2356,6 +2422,20 @@ public class DataFrameTest {
         return values[0];
       }
     }), BNULL, TRUE, BNULL, TRUE, BNULL);
+  }
+
+  @Test
+  public void testBooleanAggregation() {
+    BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
+    assertEquals(base.sum(), 2);
+    assertEquals(base.product(), FALSE);
+    assertEquals(base.min(), FALSE);
+    assertEquals(base.max(), TRUE);
+    assertEquals(base.first(), BNULL);
+    assertEquals(base.last(), FALSE);
+    assertEquals(base.mean(), 0.5);
+    assertEquals(base.median(), 0.5);
+    assertEquals(base.std(), 0.57735026918963);
   }
 
   @Test

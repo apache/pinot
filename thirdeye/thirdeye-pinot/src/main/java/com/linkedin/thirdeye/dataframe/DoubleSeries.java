@@ -30,6 +30,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   public static final DoubleFunction MIN = new DoubleMin();
   public static final DoubleFunction MAX = new DoubleMax();
   public static final DoubleFunction MEAN = new DoubleMean();
+  public static final DoubleFunction MEDIAN = new DoubleMedian();
   public static final DoubleFunction STD = new DoubleStandardDeviation();
   public static final DoubleFunction NEGATIVE = new DoubleNegative();
 
@@ -73,6 +74,23 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
         count++;
       }
       return sum / count;
+    }
+  }
+
+  public static final class DoubleMedian implements DoubleFunction {
+    @Override
+    public double apply(double[] values) {
+      if(values.length <= 0)
+        return NULL;
+
+      Arrays.sort(values);
+
+      // odd N, return mid
+      if(values.length % 2 == 1)
+        return values[values.length / 2];
+
+      // even N, return mean of mid
+      return (values[values.length / 2 - 1] + values[values.length / 2]) / 2;
     }
   }
 
@@ -136,7 +154,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
       double var = 0.0;
       for(double v : values)
         var += (v - mean) * (v - mean);
-      return Math.sqrt(var);
+      return Math.sqrt(var / (values.length - 1));
     }
   }
 
@@ -366,28 +384,6 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return Arrays.asList(values);
   }
 
-  /**
-   * Returns the value of the first element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return first element in the series
-   */
-  public double first() {
-    assertNotEmpty(this.values);
-    return this.values[0];
-  }
-
-  /**
-   * Returns the value of the last element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return last element in the series
-   */
-  public double last() {
-    assertNotEmpty(this.values);
-    return this.values[this.values.length-1];
-  }
-
   @Override
   public DoubleSeries slice(int from, int to) {
     return buildFrom(Arrays.copyOfRange(this.values, from, to));
@@ -416,28 +412,32 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return String.valueOf(this.values[index]);
   }
 
-  public double min() {
-    return this.aggregate(MIN).value();
+  public DoubleSeries sum() {
+    return this.aggregate(SUM);
   }
 
-  public double max() {
-    return this.aggregate(MAX).value();
+  public DoubleSeries product() {
+    return this.aggregate(PRODUCT);
   }
 
-  public double sum() {
-    return this.aggregate(SUM).value();
+  public DoubleSeries min() {
+    return this.aggregate(MIN);
   }
 
-  public double product() {
-    return this.aggregate(PRODUCT).value();
+  public DoubleSeries max() {
+    return this.aggregate(MAX);
   }
 
-  public double mean() {
-    return this.aggregate(MEAN).value();
+  public DoubleSeries mean() {
+    return this.aggregate(MEAN);
   }
 
-  public double std() {
-    return this.aggregate(STD).value();
+  public DoubleSeries median() {
+    return this.aggregate(MEDIAN);
+  }
+
+  public DoubleSeries std() {
+    return this.aggregate(STD);
   }
 
   public double corr(Series other) {
@@ -450,7 +450,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
   public DoubleSeries normalize() {
     try {
-      return this.map(new DoubleMapNormalize(this.min(), this.max()));
+      return this.map(new DoubleMapNormalize(this.min().value(), this.max().value()));
     } catch (Exception e) {
       return DoubleSeries.builder().fillValues(this.size(), NULL).build();
     }
@@ -458,7 +458,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
   public DoubleSeries zscore() {
     try {
-      return this.map(new DoubleMapZScore(this.mean(), this.std()));
+      return this.map(new DoubleMapZScore(this.mean().value(), this.std().value()));
     } catch (Exception e) {
       return DoubleSeries.builder().fillValues(this.size(), NULL).build();
     }

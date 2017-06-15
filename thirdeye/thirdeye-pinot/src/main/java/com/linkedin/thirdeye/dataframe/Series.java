@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.NotImplementedException;
 
 
 /**
@@ -17,6 +18,9 @@ import org.apache.commons.lang.ArrayUtils;
  * the underlying data structures.
  */
 public abstract class Series {
+  private static final String IS_EMPTY = "Series is empty";
+  private static final String NOT_SUPPORTED = "Operation not supported";
+
   public static final String TOSTRING_NULL = "null";
 
   public enum SeriesType {
@@ -275,6 +279,50 @@ public abstract class Series {
    * @return filtered series copy
    */
   public abstract Series filter(BooleanSeries mask);
+
+  /* *************************************************************************
+   * Public optional operations
+   * *************************************************************************/
+
+  public Series first() {
+    if(this.isEmpty())
+      throw new IllegalStateException(IS_EMPTY);
+    return this.sliceTo(1);
+  }
+
+  public Series last() {
+    if(this.isEmpty())
+      throw new IllegalStateException(IS_EMPTY);
+    return this.sliceFrom(this.size() - 1);
+  }
+
+  public Series sum() {
+    throw new RuntimeException(NOT_SUPPORTED);
+  }
+
+  public Series product() {
+    throw new RuntimeException(NOT_SUPPORTED);
+  }
+
+  public Series min() {
+    throw new RuntimeException(NOT_SUPPORTED);
+  }
+
+  public Series max() {
+    throw new RuntimeException(NOT_SUPPORTED);
+  }
+
+  public Series mean() {
+    throw new RuntimeException(NOT_SUPPORTED);
+  }
+
+  public Series median() {
+    throw new RuntimeException(NOT_SUPPORTED);
+  }
+
+  public Series std() {
+    throw new RuntimeException(NOT_SUPPORTED);
+  }
 
   /* *************************************************************************
    * Internal abstract interface

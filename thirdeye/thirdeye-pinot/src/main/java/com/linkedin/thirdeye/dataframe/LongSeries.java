@@ -290,28 +290,6 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return Arrays.asList(values);
   }
 
-  /**
-   * Returns the value of the first element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return first element in the series
-   */
-  public long first() {
-    assertNotEmpty(this.values);
-    return this.values[0];
-  }
-
-  /**
-   * Returns the value of the last element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return last element in the series
-   */
-  public long last() {
-    assertNotEmpty(this.values);
-    return this.values[this.values.length-1];
-  }
-
   @Override
   public LongSeries slice(int from, int to) {
     return buildFrom(Arrays.copyOfRange(this.values, from, to));
@@ -380,20 +358,32 @@ public final class LongSeries extends TypedSeries<LongSeries> {
 //    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
 //  }
 
-  public long min() {
-    return this.aggregate(MIN).value();
+  public LongSeries sum() {
+    return this.aggregate(SUM);
   }
 
-  public long max() {
-    return this.aggregate(MAX).value();
+  public LongSeries product() {
+    return this.aggregate(PRODUCT);
   }
 
-  public long sum() {
-    return this.aggregate(SUM).value();
+  public LongSeries min() {
+    return this.aggregate(MIN);
   }
 
-  public long product() {
-    return this.aggregate(PRODUCT).value();
+  public LongSeries max() {
+    return this.aggregate(MAX);
+  }
+
+  public DoubleSeries mean() {
+    return this.aggregate(DoubleSeries.MEAN);
+  }
+
+  public DoubleSeries median() {
+    return this.aggregate(DoubleSeries.MEDIAN);
+  }
+
+  public DoubleSeries std() {
+    return this.aggregate(DoubleSeries.STD);
   }
 
   public LongSeries add(Series other) {

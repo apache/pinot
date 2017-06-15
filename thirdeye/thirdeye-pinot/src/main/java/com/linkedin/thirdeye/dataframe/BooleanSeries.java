@@ -328,26 +328,32 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return Arrays.asList(values);
   }
 
-  /**
-   * Returns the value of the first element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return first element in the series
-   */
-  public byte first() {
-    assertNotEmpty(this.values);
-    return this.values[0];
+  public LongSeries sum() {
+    return this.aggregate(LongSeries.SUM);
   }
 
-  /**
-   * Returns the value of the last element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return last element in the series
-   */
-  public byte last() {
-    assertNotEmpty(this.values);
-    return this.values[this.values.length-1];
+  public BooleanSeries product() {
+    return this.aggregate(ALL_TRUE);
+  }
+
+  public BooleanSeries min() {
+    return this.aggregate(ALL_TRUE);
+  }
+
+  public BooleanSeries max() {
+    return this.aggregate(HAS_TRUE);
+  }
+
+  public DoubleSeries mean() {
+    return this.aggregate(DoubleSeries.MEAN);
+  }
+
+  public DoubleSeries median() {
+    return this.aggregate(DoubleSeries.MEDIAN);
+  }
+
+  public DoubleSeries std() {
+    return this.aggregate(DoubleSeries.STD);
   }
 
   @Override

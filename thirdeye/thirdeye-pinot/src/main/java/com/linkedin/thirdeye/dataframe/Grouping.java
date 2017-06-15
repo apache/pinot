@@ -339,8 +339,8 @@ public abstract class Grouping {
         return new GroupingByInterval(series.getBuilder().build(), new ArrayList<int[]>());
 
       LongSeries s = series.getLongs();
-      int start = (int)(s.min() / interval);
-      int stop = (int)(s.max() / interval + 1);
+      int start = (int)(s.min().value() / interval);
+      int stop = (int)(s.max().value() / interval + 1);
       int count = stop - start;
 
       long[] keys = new long[count];

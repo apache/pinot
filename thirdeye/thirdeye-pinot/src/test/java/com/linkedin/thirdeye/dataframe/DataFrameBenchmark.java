@@ -389,8 +389,8 @@ public class DataFrameBenchmark {
       LongSeries s = LongSeries.buildFrom(longValues);
 
       startTimer();
-      long min = s.min();
-      long max = s.max();
+      long min = s.min().value();
+      long max = s.max().value();
       stopTimer();
 
       checksum ^= checksum(min, max);
@@ -655,7 +655,7 @@ public class DataFrameBenchmark {
       LongSeries series = LongSeries.buildFrom(longValues);
 
       startTimer();
-      long out = series.sum();
+      long out = series.sum().value();
       stopTimer();
 
       checksum ^= checksum(out);

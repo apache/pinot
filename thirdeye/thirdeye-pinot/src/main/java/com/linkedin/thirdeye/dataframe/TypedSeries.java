@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dataframe;
 
+@SuppressWarnings("unchecked")
 public abstract class TypedSeries<T extends Series> extends Series {
   @Override
   public T head(int n) {
@@ -64,5 +65,15 @@ public abstract class TypedSeries<T extends Series> extends Series {
   @Override
   public T filter(Conditional conditional) {
     return (T)super.filter(conditional);
+  }
+
+  @Override
+  public T first() {
+    return (T)super.first();
+  }
+
+  @Override
+  public T last() {
+    return (T)super.last();
   }
 }

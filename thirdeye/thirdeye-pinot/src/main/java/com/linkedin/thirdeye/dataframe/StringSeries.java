@@ -22,6 +22,8 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   public static final StringFunction CONCAT = new StringConcat();
   public static final StringFunction FIRST = new StringFirst();
   public static final StringFunction LAST = new StringLast();
+  public static final StringFunction MIN = new StringMin();
+  public static final StringFunction MAX = new StringMax();
 
   public static final class StringConcat implements StringFunction {
     final String delimiter;
@@ -64,6 +66,24 @@ public final class StringSeries extends TypedSeries<StringSeries> {
       if(values.length <= 0)
         return NULL;
       return values[values.length-1];
+    }
+  }
+
+  public static final class StringMin implements StringFunction {
+    @Override
+    public String apply(String[] values) {
+      if(values.length <= 0)
+        return NULL;
+      return Collections.min(Arrays.asList(values));
+    }
+  }
+
+  public static final class StringMax implements StringFunction {
+    @Override
+    public String apply(String[] values) {
+      if(values.length <= 0)
+        return NULL;
+      return Collections.max(Arrays.asList(values));
     }
   }
 
@@ -267,31 +287,38 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return this.get(this.inferType());
   }
 
-  /**
-   * Returns the value of the first element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return first element in the series
-   */
-  public String first() {
-    assertNotEmpty(this.values);
-    return this.values[0];
-  }
-
-  /**
-   * Returns the value of the last element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return last element in the series
-   */
-  public String last() {
-    assertNotEmpty(this.values);
-    return this.values[this.values.length-1];
-  }
-
   @Override
   public StringSeries slice(int from, int to) {
     return StringSeries.buildFrom(Arrays.copyOfRange(this.values, from, to));
+  }
+
+  // TODO validate design decision
+  public StringSeries sum() {
+    return this.aggregate(CONCAT);
+  }
+
+  public DoubleSeries product() {
+    return this.aggregate(DoubleSeries.PRODUCT);
+  }
+
+  public StringSeries min() {
+    return this.aggregate(MIN);
+  }
+
+  public StringSeries max() {
+    return this.aggregate(MAX);
+  }
+
+  public DoubleSeries mean() {
+    return this.aggregate(DoubleSeries.MEAN);
+  }
+
+  public DoubleSeries median() {
+    return this.aggregate(DoubleSeries.MEDIAN);
+  }
+
+  public DoubleSeries std() {
+    return this.aggregate(DoubleSeries.STD);
   }
 
   public String join() {
