@@ -2,16 +2,12 @@
 
 .te-nav {
   background-color: $anolaly-nav-background;
-  padding: 0 $te-content-padding-sides;
-  position: fixed;
-  z-index: 999;
-  width: 100%;
   font-size: $te-font-size-tiny;
   letter-spacing: $te-nav-letter-spacing;
 
   &__logo {
     color: white;
-    margin-right: 50px;
+    margin-right: 60px;
     padding-left: 31px;
     background: url('/assets/images/li-logo.svg') left no-repeat;
   }
@@ -22,6 +18,7 @@
     height: $te-nav-link-height;
     line-height: $te-nav-link-height;
     text-decoration: none;
+    font-size: $te-font-size-tiny;
 
     &--home,
     &--active {
@@ -33,18 +30,22 @@
     }
 
     &--home {
-      font-weight: lighter;
       font-size: 12px;
     }
 
     &.active:not(.te-nav__link--home) {
       color: white;
       box-shadow: inset 0 -3px 0 white;
+
+      &:hover {
+        text-decoration: none;
+      }
     }
 
 
     &:hover:not(.te-nav__link--home):not(.active) {
       color: white;
+      text-decoration: none;
       box-shadow: inset 0 -3px 0 app-shade(white, 3);
     }
   }
@@ -57,31 +58,38 @@
 
   &__item {
     display: inline-block;
-    margin: 0 10px 0 20px;
+    margin-right: 45px;
   }
 
   &__user {
-    margin-right: 280px;
-    margin-top: 3px;
-    width: 60px;
-    height: auto;
+    float: right;
+    margin-top: 10px;
   }
 
-  &__photo {
-    width: 30px;
-    height: 30px;
-    margin: 5px;
-    border-radius: 50%;
-    background: app-shade(white, 6);
+  &__user-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+/**
+ * Override bootstrap styles for nav
+ */
+  a.active,
+  a:hover,
+  a:visited {
+    text-decoration: none;
+    color: white;
+  }
+
+  .glyphicon {
+    color: white;
   }
 }
 
 .te-nav--sub {
-  margin-left: -$te-content-padding-sides;
   background-color: white;
 
   .te-nav__list {
-    margin-left: -19px;
 
     .te-nav__link {
       color: app-shade(black, 4);
@@ -93,6 +101,7 @@
 
       &:hover:not(.te-nav__link--home):not(.active) {
         color: black;
+        text-decoration: none;
         box-shadow: inset 0 -3px 0 app-shade(black, 2);
       }
     }

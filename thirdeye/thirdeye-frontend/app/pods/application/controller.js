@@ -19,14 +19,14 @@ export default Ember.Controller.extend({
     },
     {
       className: 'anomalies',
-      link: '/1426/thirdeye',
+      link: '/thirdeye#anomalies',
       isCustomLink: true,
       title: 'Anomalies'
     },
     {
       className: 'rca',
-      link: 'example',
-      id: '1',
+      link: '/thirdeye#analysis',
+      isCustomLink: true,
       title: 'Root Cause Analysis'
     },
     {
