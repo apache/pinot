@@ -19,9 +19,6 @@ import java.util.concurrent.TimeUnit;
 import com.alibaba.fastjson.JSONObject;
 
 /*
- * TODO Add unit tests for this after we finalize the protocol elements.
- * TODO Finalize the protocol elements.
- *
  * This class encapsulates the segment completion protocol used by the server and the controller for
  * low-level kafka consumer realtime segments. The protocol has two requests: SegmentConsumedRequest
  * and SegmentCommitRequest.It has a response that may contain different status codes depending on the state machine
@@ -167,7 +164,8 @@ public class SegmentCompletionProtocol {
           (_params.getBuildTimeMillis() <= 0 ? "" :("&" + PARAM_BUILD_TIME_MILLIS + "=" + _params.getBuildTimeMillis())) +
           (_params.getWaitTimeMillis() <= 0 ? "" : ("&" + PARAM_WAIT_TIME_MILLIS + "=" + _params.getWaitTimeMillis())) +
           (_params.getExtraTimeSec() <= 0 ? "" : ("&" + PARAM_EXTRA_TIME_SEC + "=" + _params.getExtraTimeSec())) +
-          (_params.getNumRows() <= 0 ? "" : ("&" + PARAM_ROW_COUNT + "=" + _params.getNumRows()));
+          (_params.getNumRows() <= 0 ? "" : ("&" + PARAM_ROW_COUNT + "=" + _params.getNumRows())) +
+          (_params.getSegmentLocation() == null ? "" : ("&" + PARAM_SEGMENT_LOCATION + "=" + _params.getSegmentLocation()));
     }
 
     public static class Params {
@@ -191,10 +189,12 @@ public class SegmentCompletionProtocol {
         _extraTimeSec = -1;
         _segmentLocation = null;
       }
+
       public Params withOffset(long offset) {
         _offset = offset;
         return this;
       }
+
       public Params withSegmentName(String segmentName) {
         _segmentName = segmentName;
         return this;
@@ -203,26 +203,32 @@ public class SegmentCompletionProtocol {
         _instanceId = instanceId;
         return this;
       }
+
       public Params withReason(String reason) {
         _reason = reason;
         return this;
       }
+
       public Params withNumRows(int numRows) {
         _numRows = numRows;
         return this;
       }
+
       public Params withBuildTimeMillis(long buildTimeMillis) {
         _buildTimeMillis = buildTimeMillis;
         return this;
       }
+
       public Params withWaitTimeMillis(long waitTimeMillis) {
         _waitTimeMillis = waitTimeMillis;
         return this;
       }
+
       public Params withExtraTimeSec(int extraTimeSec) {
         _extraTimeSec = extraTimeSec;
         return this;
       }
+
       public Params withSegmentLocation(String segmentLocation) {
         _segmentLocation = segmentLocation;
         return this;
@@ -231,30 +237,39 @@ public class SegmentCompletionProtocol {
       public String getSegmentName() {
         return _segmentName;
       }
+
       public long getOffset() {
         return _offset;
       }
+
       public String getReason() {
         return _reason;
       }
+
       public String getInstanceId() {
         return _instanceId;
       }
+
       public int getNumRows() {
         return _numRows;
       }
+
       public long getBuildTimeMillis() {
         return _buildTimeMillis;
       }
+
       public long getWaitTimeMillis() {
         return _waitTimeMillis;
       }
+
       public int getExtraTimeSec() {
         return _extraTimeSec;
       }
+
       public String getSegmentLocation() {
         return _segmentLocation;
       }
+
       public String toString() {
         return "Offset: " + _offset + ",Segment name: " + _segmentName
             + ",Instance Id: " + _instanceId
@@ -329,7 +344,7 @@ public class SegmentCompletionProtocol {
       }
       _isSplitCommit = isSplitCommit;
 
-      String segmentLocation = "";
+      String segmentLocation = null;
       if (jsonObject.containsKey(SEGMENT_LOCATION_KEY)) {
         segmentLocation = jsonObject.getString(SEGMENT_LOCATION_KEY);
       }
@@ -356,12 +371,20 @@ public class SegmentCompletionProtocol {
       return _buildTimeSeconds;
     }
 
+    public boolean getIsSplitCommit() {
+      return _isSplitCommit;
+    }
+
+    public String getSegmentLocation() {
+      return _segmentLocation;
+    }
+
     public String toJsonString() {
       StringBuilder builder = new StringBuilder();
       builder.append("{\"" + STATUS_KEY + "\":" + "\"" + _status.name() + "\"," + "\""
           + OFFSET_KEY + "\":" + _offset + ",\""
           + COMMIT_TYPE_KEY + "\":" + _isSplitCommit + ",\""
-          + SEGMENT_LOCATION_KEY + "\":" + _segmentLocation);
+          + SEGMENT_LOCATION_KEY + "\":\"" + _segmentLocation + "\"");
       builder.append("}");
       return builder.toString();
     }
@@ -385,10 +408,12 @@ public class SegmentCompletionProtocol {
         _offset = offset;
         return this;
       }
+
       public Params withStatus(ControllerResponseStatus status) {
         _status = status;
         return this;
       }
+
       public Params withBuildTimeSeconds(long buildTimeSeconds) {
         _buildTimeSec = buildTimeSeconds;
         return this;

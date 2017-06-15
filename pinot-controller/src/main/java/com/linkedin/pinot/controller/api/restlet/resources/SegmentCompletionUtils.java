@@ -16,10 +16,7 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import java.io.File;
-import java.io.FileFilter;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.restlet.data.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +24,8 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentCompletionUtils {
   private static Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionUtils.class);
+  // Used to create temporary segment file names
+  private static final String TMP = ".tmp.";
 
   static SegmentCompletionProtocol.Request.Params extractParams(Reference reference) {
     final String offsetStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
@@ -52,28 +51,17 @@ public class SegmentCompletionUtils {
         .withSegmentLocation(segmentLocation);
   }
 
-  public static String generateSegmentNamePrefix(String segmentName) {
-    return segmentName + ".tmp.";
+  /**
+   * Takes in a segment name, and returns a file name prefix that is used to store all attempted uploads of this
+   * segment when a segment is uploaded using split commit. Each attempt has a unique file name suffix
+   * @param segmentName segment name
+   * @return
+   */
+  public static String getSegmentNamePrefix(String segmentName) {
+    return segmentName + TMP;
   }
 
   public static String generateSegmentFileName(String segmentNameStr) {
-    return generateSegmentNamePrefix(segmentNameStr) + SegmentCompletionUtils.generateUUID();
-  }
-
-  public static String generateUUID() {
-    return UUID.randomUUID().toString();
-  }
-
-  public static File[] listFilesMatching(File root, String segmentName) {
-    if(!root.isDirectory()) {
-      throw new IllegalArgumentException(root+" is no directory.");
-    }
-    final Pattern p = Pattern.compile(segmentName + "*");
-    return root.listFiles(new FileFilter(){
-      @Override
-      public boolean accept(File file) {
-        return p.matcher(file.getName()).matches();
-      }
-    });
+    return getSegmentNamePrefix(segmentNameStr) + UUID.randomUUID().toString();
   }
 }

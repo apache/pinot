@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.httpclient.URI;
 import org.apache.commons.io.FileUtils;
 import org.restlet.ext.fileupload.RestletFileUpload;
 import org.restlet.representation.Representation;
@@ -36,7 +37,9 @@ import org.slf4j.LoggerFactory;
 
 public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
   private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCommitUpload.class);
-  private String _generatedSegmentName;
+  public static final String SCHEME = "file://";
+  // Format of location starts with file://
+  private String _segmentLocation;
 
   public LLCSegmentCommitUpload()
       throws IOException {
@@ -53,25 +56,15 @@ public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
 
-    LOGGER.info(params.toString());
-
     boolean success = uploadSegment(params.getInstanceId(), params.getSegmentName());
     if (success) {
-      LOGGER.info("Uploaded segment successfully");
       SegmentCompletionProtocol.Response.Params successParams = new SegmentCompletionProtocol.Response.Params()
           .withOffset(params.getOffset())
-          .withSplitCommit(true)
-          .withSegmentLocation(_generatedSegmentName)
+          .withSegmentLocation(_segmentLocation)
           .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
       return new StringRepresentation(new SegmentCompletionProtocol.Response(successParams).toJsonString());
     } else {
-      LOGGER.info("Failed to upload segment");
-      SegmentCompletionProtocol.Response.Params failureParams = new SegmentCompletionProtocol.Response.Params()
-          .withOffset(params.getOffset())
-          .withSplitCommit(true)
-          .withSegmentLocation(_generatedSegmentName)
-          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
-      return new StringRepresentation(new SegmentCompletionProtocol.Response(failureParams).toJsonString());
+      return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
   }
 
@@ -100,10 +93,10 @@ public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
             dataFile = new File(tempDir, fieldName);
             fileItem.write(dataFile);
           } else {
-            LOGGER.warn("Invalid field name: {}", fieldName);
+            LOGGER.warn("Invalid field name {} in segment {}", fieldName, segmentNameStr);
           }
         } else {
-          LOGGER.warn("Got extra file item while uploading LLC segments: {}", fieldName);
+          LOGGER.warn("Got extra file item while uploading LLC segments {} in segment {}", fieldName, segmentNameStr);
         }
 
         // Remove the temp file
@@ -121,14 +114,12 @@ public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
 
       final String rawTableName = segmentName.getTableName();
       final File tableDir = new File(baseDataDir, rawTableName);
-      // For split commit, generate a new segment name with offset, instanceId, and UUID
-      _generatedSegmentName = SegmentCompletionUtils.generateSegmentFileName(segmentNameStr);
-      final File segmentFile = new File(tableDir, _generatedSegmentName);
-      if (segmentFile.exists()) {
-        LOGGER.warn("Segment file exists " + segmentFile);
-      }
+      // For split commit, generate a new segment name with UUID
+      String segmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentNameStr);
+      final File segmentFile = new File(tableDir, segmentFileName);
       FileUtils.moveFile(dataFile, segmentFile);
-      LOGGER.info("Generated segment name " + _generatedSegmentName);
+      _segmentLocation = new URI(SCHEME + segmentFile.getAbsolutePath(), /* boolean escaped */ false).toString();
+      LOGGER.info("Moved segment file to {} successfully", _segmentLocation);
 
       return true;
     } catch (Exception e) {

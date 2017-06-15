@@ -16,10 +16,43 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.MinMaxPriorityQueue;
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
-import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,39 +79,8 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.MinMaxPriorityQueue;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.restlet.resources.SegmentCompletionUtils;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
+
+import static com.linkedin.pinot.controller.api.restlet.resources.SegmentCompletionUtils.getSegmentNamePrefix;
 
 
 public class PinotLLCRealtimeSegmentManager {
@@ -469,25 +471,35 @@ public class PinotLLCRealtimeSegmentManager {
     return HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
   }
 
-  public boolean commitSegmentFile(String rawTableName, String temporarySegmentName, String segmentName) {
+  public boolean commitSegmentFile(String tableName, String segmentLocation, String segmentName) {
+    File segmentFile = convertURIToSegmentLocation(segmentLocation);
 
-    File baseDataDir = new File(_controllerConf.getDataDir());
-    File tableDir = new File(baseDataDir, rawTableName);
+    File baseDir = new File(_controllerConf.getDataDir());
+    File tableDir = new File(baseDir, tableName);
+    File fileToMoveTo = new File(tableDir, segmentName);
 
     try {
-      FileUtils.moveFile(new File(tableDir, temporarySegmentName), new File(tableDir, segmentName));
-    } catch (IOException e) {
-      LOGGER.error("Could not move file {} to {}", temporarySegmentName, segmentName);
+      com.linkedin.pinot.common.utils.FileUtils.moveFileWithOverwrite(segmentFile, fileToMoveTo);
+    } catch (Exception e) {
+      LOGGER.error("Could not move {} to {}, Exception {}", segmentFile, segmentName, e);
       return false;
     }
-    // Try to delete similar files
-    File[] filesToDelete = SegmentCompletionUtils.listFilesMatching(/* parent directory*/new File(""),
-        SegmentCompletionUtils.generateSegmentNamePrefix(segmentName) + "*");
-    for (File file : filesToDelete) {
-      LOGGER.warn("Deleting " + file);
-      FileUtils.deleteQuietly(file);
+    for (File file : tableDir.listFiles()) {
+      if (file.getName().startsWith(getSegmentNamePrefix(segmentName))) {
+        LOGGER.warn("Deleting " + file);
+        FileUtils.deleteQuietly(file);
+      }
     }
     return true;
+  }
+
+  private static File convertURIToSegmentLocation(String segmentLocation) {
+    try {
+      URI uri = new URI(segmentLocation);
+      return new File(uri.getPath());
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("Could not convert URI " + segmentLocation + " to segment location", e);
+    }
   }
 
   /**
@@ -500,7 +512,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param nextOffset The offset with which the next segment should start.
    * @return
    */
-  public boolean commitZkSegment(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
+  public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
     final long now = System.currentTimeMillis();
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
