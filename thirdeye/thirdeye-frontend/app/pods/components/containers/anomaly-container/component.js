@@ -1,15 +1,20 @@
 import Ember from 'ember';
-import connect from 'ember-redux/components/connect';
+import { connect } from 'ember-redux';
 import { Actions } from 'thirdeye-frontend/actions/anomaly';
 
 function select(store) {
-  const { ids, entities, loading, loaded, failed } = store.anomaly;
+  const { 
+    entity, 
+    loading, 
+    loaded, 
+    failed,
+  } = store.anomaly;
 
   return {
     loading,
     loaded,
     failed,
-    anomalies: ids.map(id => entities[id])
+    entity
   };
 }
 
@@ -25,7 +30,7 @@ function actions(dispatch) {
       const params = {};
 
       dispatch(Actions.request(params));
-    }
+    },
   };
 }
 

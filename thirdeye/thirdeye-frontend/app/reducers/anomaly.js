@@ -1,5 +1,5 @@
 import { ActionTypes } from '../actions/anomaly';
-
+import moment from 'moment';
 /**
  * Define the schema
  */
@@ -21,37 +21,76 @@ const INITIAL_STATE = {
   failed: false,
 
   /**
-   * List the anomaly ids in order
+   * The primary metric Id
    */
-  ids: [],
+  id: null,
 
   /**
-   * Items in hash map
+   * The primary anomaly
    */
-  entities: {}
+  entity: {},
+
+  /**
+   * filters
+   */
+  filters: {},
+
+  /**
+   * anomaly Start date
+   */
+  startDate: moment(),
+
+  /**
+   * anomaly end date
+   */
+  endDate: moment(),
+
+  /**
+   * 
+   */
+  granularity: 'DAYS'
 };
 
 export default function reducer(state = INITIAL_STATE, action = {}) {
   switch (action.type) {
     case ActionTypes.LOAD: {
-      const anomalyList = action.payload.anomalyDetailsList;
-      const ids = anomalyList.map((anomaly) => anomaly.anomalyId);
-      const entities = anomalyList.reduce((entities, anomaly) => {
-        entities[anomaly.anomalyId] = anomaly;
-        return entities;
-      }, {});
+      const entity = action.payload.pop() || {};
+      const {
+        metricId,
+        currentStart,
+        currentEnd,
+        anomalyRegionStart,
+        anomalyRegionEnd,
+        anomalyFunctionDimension,
+        timeUnit
+      } = entity;
+
+      const offset = {
+        'MINUTES': 3,
+        'HOURS': 24,
+        'DAY': 72,
+      }[timeUnit] || 3;
 
       return Object.assign(state, {
         loading: false,
         loaded: true,
-        ids,
-        entities,
+        failed: false,
+        id: metricId,
+        entity,
+        primaryMetricId: metricId,
+        granularity: timeUnit,
+        filters: anomalyFunctionDimension,
+        currentEnd: moment(currentEnd).add(offset, 'hours').valueOf(),
+        currentStart: moment(currentStart).subtract(offset,'hours').valueOf(),
+        anomalyRegionStart: moment(anomalyRegionStart).valueOf(),
+        anomalyRegionEnd: moment(anomalyRegionEnd).valueOf()
       });
     }
     case ActionTypes.LOADING:
       return Object.assign(state, {
         loading: true,
-        loaded: false
+        loaded: false,
+        failed: false
       });
 
     case ActionTypes.REQUEST_FAIL:
@@ -60,5 +99,6 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
         failed: true
       });
   }
+  
   return state;
 }

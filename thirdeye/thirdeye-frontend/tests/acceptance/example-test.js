@@ -4,7 +4,8 @@ import { faker } from 'ember-cli-mirage';
 
 moduleForAcceptance('Acceptance | example');
 
-test('visiting /example', function(assert) {
+test('visiting /example', (assert) =>{
+  server.createList('anomaly', 1)
   const id = faker.random.number();
 
   visit(`/example/${id}`);
