@@ -28,6 +28,7 @@ public class SegmentsValidationAndRetentionConfig {
 
   private String retentionTimeUnit;
   private String retentionTimeValue;
+  private String segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
   private String segmentPushType;
   private String replication; // For high-level kafka consumers, the number of replicas should be same as num server instances
   private String schemaName;
@@ -78,6 +79,14 @@ public class SegmentsValidationAndRetentionConfig {
 
   public void setRetentionTimeValue(String retentionTimeValue) {
     this.retentionTimeValue = retentionTimeValue;
+  }
+
+  public String getSegmentPushFrequency() {
+    return segmentPushFrequency;
+  }
+
+  public void setSegmentPushFrequency(String segmentPushFrequency) {
+    this.segmentPushFrequency = segmentPushFrequency;
   }
 
   public String getSegmentPushType() {
