@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
  * TE shared style values and sizes
  * ---------------------------------------------------------------------------*/
-
 $te-nav-link-height: 48px;
 $te-nav-letter-spacing: .8px;
 
@@ -16,6 +15,10 @@ $te-font-size-component-title: 25px;
 $te-list-line-height: 28px;
 $te-header-component-padding: 25px;
 
+
+/* -----------------------------------------------------------------------------
+ * TE functions and mixins
+ * ---------------------------------------------------------------------------*/
 // Helper for opacity-based rgb color shorthand
 @function app-shade($color: default, $num: default) {
   @if $num != nil {

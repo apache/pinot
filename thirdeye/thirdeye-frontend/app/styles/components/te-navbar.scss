@@ -60,8 +60,19 @@
     margin: 0 10px 0 20px;
   }
 
-  &__photo {
+  &__user {
+    margin-right: 280px;
+    margin-top: 3px;
+    width: 60px;
+    height: auto;
+  }
 
+  &__photo {
+    width: 30px;
+    height: 30px;
+    margin: 5px;
+    border-radius: 50%;
+    background: app-shade(white, 6);
   }
 }
 

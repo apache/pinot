@@ -26,20 +26,5 @@ export default Ember.Component.extend({
   /**
    * App name from environment settings (string)
    */
-  webappName: config.appName,
-
-  /**
-   * Boolean to distinguish nav-bar types
-   */
-  isGlobalNav: Ember.computed('navMode', function() {
-    return this.get('navMode') === 'globalNav';
-  }),
-
-  /**
-   * Fetch array of navbar items from configs
-   */
-  navItems: Ember.computed('navMode', function() {
-    const env = Ember.getOwner(this).resolveRegistration('config:environment');
-    return env.navigation[this.get('navMode')];
-  })
+  webappName: config.appName
 });
