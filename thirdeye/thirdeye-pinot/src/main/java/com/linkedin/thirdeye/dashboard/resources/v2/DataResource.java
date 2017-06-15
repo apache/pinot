@@ -189,14 +189,9 @@ public class DataResource {
     if("dashboard".equalsIgnoreCase(mode)){
       return getDashboardsWhereNameLike(name);
     }
-    if ("alert".equalsIgnoreCase(mode)) {
-      return getAlertsWhereNameLike(name);
-    }
-    if ("function".equalsIgnoreCase(mode)) {
-      return getFunctionsWhereNameLike(name);
-    }
     return Collections.emptyList();
   }
+
   @GET
   @Path("autocomplete/dashboard")
   public List<DashboardConfigDTO> getDashboardsWhereNameLike(@QueryParam("name") String name) {
@@ -217,6 +212,11 @@ public class DataResource {
     return metricConfigs;
   }
 
+  /**
+   * Returns list of Anomaly functions matching given name
+   * @param name
+   * @return
+   */
   @GET
   @Path("autocomplete/function")
   public List<AnomalyFunctionDTO> getFunctionsWhereNameLike(@QueryParam("name") String name) {
@@ -227,6 +227,11 @@ public class DataResource {
     return functions;
   }
 
+  /**
+   * Returns list of AlertConfig object matching given name
+   * @param name
+   * @return
+   */
   @GET
   @Path("autocomplete/alert")
   public List<AlertConfigDTO> getAlertsWhereNameLike(@QueryParam("name") String name) {
@@ -237,12 +242,17 @@ public class DataResource {
     return alerts;
   }
 
+  /**
+   * Returns list of AlertConfig object matching given appName
+   * @param appname
+   * @return
+   */
   @GET
-  @Path("autocomplete/alert")
-  public List<AlertConfigDTO> getAlertsWhereAppNameLike(@QueryParam("appname") String name) {
+  @Path("autocomplete/alertByAppname")
+  public List<AlertConfigDTO> getAlertsWhereAppNameLike(@QueryParam("appname") String appname) {
     List<AlertConfigDTO> alerts = Collections.emptyList();
-    if (StringUtils.isNotBlank(name)) {
-      alerts = alertConfigDAO.findWhereApplicationLike("%" + name + "%");
+    if (StringUtils.isNotBlank(appname)) {
+      alerts = alertConfigDAO.findWhereApplicationLike("%" + appname + "%");
     }
     return alerts;
   }
