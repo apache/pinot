@@ -2,8 +2,10 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -14,6 +16,7 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 @Singleton
 public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunctionDTO>
     implements AnomalyFunctionManager {
+  private static final String FIND_BY_NAME_LIKE = " WHERE name like :name";
 
   public AnomalyFunctionManagerImpl() {
     super(AnomalyFunctionDTO.class, AnomalyFunctionBean.class);
@@ -46,5 +49,18 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
   public List<AnomalyFunctionDTO> findAllActiveFunctions() {
     Predicate predicate = Predicate.EQ("active", true);
     return findByPredicate(predicate);
+  }
+
+  @Override
+  public List<AnomalyFunctionDTO> findWhereNameLike(String name) {
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("name", name);
+    List<AnomalyFunctionBean> list =
+        genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_LIKE, parameterMap, AnomalyFunctionBean.class);
+    List<AnomalyFunctionDTO> result = new ArrayList<>();
+    for (AnomalyFunctionBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, AnomalyFunctionDTO.class));
+    }
+    return result;
   }
 }

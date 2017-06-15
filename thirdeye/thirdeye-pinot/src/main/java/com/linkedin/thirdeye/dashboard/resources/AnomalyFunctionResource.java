@@ -8,7 +8,6 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
@@ -44,7 +43,6 @@ import org.slf4j.LoggerFactory;
 public class AnomalyFunctionResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyFunctionResource.class);
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final Map<String, Object> anomalyFunctionMetadata = new HashMap<>();
   private final AnomalyFunctionFactory anomalyFunctionFactory;

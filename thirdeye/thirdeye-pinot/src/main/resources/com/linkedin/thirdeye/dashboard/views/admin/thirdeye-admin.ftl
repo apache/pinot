@@ -27,7 +27,9 @@
 <!-- JSON Editor comes here-->
 <link rel="stylesheet" href="../../../assets/jsonedit/jsoneditor.min.css"/>
 <script src="../../../assets/jsonedit/jsoneditor.min.js" defer></script>
-<script src="../../../assets/js/lib/entity-editor.js"></script>
+<script src="../../../assets/js/lib/entity-editor.js" defer></script>
+
+<script src="../../../assets/js/lib/self-service-mappings.js" defer></script>
 
 <script type="text/javascript">
   $(document).ready(function() {
@@ -79,6 +81,7 @@
 					<li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
 					<li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
           <li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
+          <li class=""><a href="#mappings" data-toggle="tab">Mappings</a></li>
 				</ul>
 
 				<ul class="nav navbar-nav navbar-right">
@@ -99,9 +102,12 @@
 			<div class="tab-pane" id="job-info">
 				<div id="job-info-place-holder"></div>
 			</div>
-			<div class="tab-pane" id="entity-editor">
-      	<div id="entity-editor-place-holder"></div>
-    	</div>
+      <div class="tab-pane" id="entity-editor">
+        <div id="entity-editor-place-holder"></div>
+      </div>
+      <div class="tab-pane" id="mappings">
+        <div id="mappings-place-holder"></div>
+      </div>
 		</div>
 	</div>
 </body>

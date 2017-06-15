@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
@@ -16,7 +15,6 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -45,7 +43,6 @@ import org.slf4j.LoggerFactory;
 @Consumes(MediaType.APPLICATION_JSON)
 public class EntityManagerResource {
   private final AnomalyFunctionManager anomalyFunctionManager;
-  private final EmailConfigurationManager emailConfigurationManager;
   private final DashboardConfigManager dashboardConfigManager;
   private final MetricConfigManager metricConfigManager;
   private final DatasetConfigManager datasetConfigManager;
@@ -59,7 +56,6 @@ public class EntityManagerResource {
   private static final Logger LOG = LoggerFactory.getLogger(EntityManagerResource.class);
 
   public EntityManagerResource() {
-    this.emailConfigurationManager = DAO_REGISTRY.getEmailConfigurationDAO();
     this.anomalyFunctionManager = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.dashboardConfigManager = DAO_REGISTRY.getDashboardConfigDAO();
     this.metricConfigManager = DAO_REGISTRY.getMetricConfigDAO();
@@ -87,9 +83,6 @@ public class EntityManagerResource {
     switch (entityType) {
     case ANOMALY_FUNCTION:
       results.addAll(anomalyFunctionManager.findAllActiveFunctions());
-      break;
-    case EMAIL_CONFIGURATION:
-      results.addAll(emailConfigurationManager.findAll());
       break;
     case DASHBOARD_CONFIG:
       results.addAll(dashboardConfigManager.findAll());
@@ -130,11 +123,6 @@ public class EntityManagerResource {
         } else {
           anomalyFunctionManager.update(anomalyFunctionDTO);
         }
-        break;
-      case EMAIL_CONFIGURATION:
-        EmailConfigurationDTO emailConfigurationDTO =
-            OBJECT_MAPPER.readValue(jsonPayload, EmailConfigurationDTO.class);
-        emailConfigurationManager.update(emailConfigurationDTO);
         break;
       case DASHBOARD_CONFIG:
         DashboardConfigDTO dashboardConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, DashboardConfigDTO.class);

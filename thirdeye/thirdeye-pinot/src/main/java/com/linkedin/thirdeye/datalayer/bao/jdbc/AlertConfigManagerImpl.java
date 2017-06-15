@@ -22,4 +22,15 @@ public class AlertConfigManagerImpl extends AbstractManagerImpl<AlertConfigDTO>
     filters.put("active", active);
     return super.findByParams(filters);
   }
+
+  @Override
+  public List<AlertConfigDTO> findWhereNameLike(String name) {
+    return null;
+  }
+
+  @Override
+  public List<AlertConfigDTO> findWhereApplicationLike(String name) {
+    // TODO : implement this after adding app-name in the entity
+    return null;
+  }
 }
