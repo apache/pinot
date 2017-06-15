@@ -27,10 +27,9 @@ import org.testng.annotations.Test;
 public class DefaultColumnsTriggerClusterIntegrationTest extends DefaultColumnsClusterIntegrationTest {
   private static final String SCHEMA_WITH_MISSING_COLUMNS =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_missing_columns.schema";
-
-  private static final long MAX_RELOAD_TIME_IN_MILLIS = 5000L;
   private static final String RELOAD_VERIFICATION_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
   private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
+  private static final long MAX_RELOAD_TIME_IN_MILLIS = 60_000L;
 
   @BeforeClass
   @Override
@@ -60,11 +59,6 @@ public class DefaultColumnsTriggerClusterIntegrationTest extends DefaultColumnsC
     queryResponse = postQuery(SELECT_STAR_QUERY);
     Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 79);
-
-    triggerReload(true);
-    queryResponse = postQuery(SELECT_STAR_QUERY);
-    Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
-    Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 88);
   }
 
   private void triggerReload(boolean withExtraColumns)
@@ -84,14 +78,19 @@ public class DefaultColumnsTriggerClusterIntegrationTest extends DefaultColumnsC
       long count = queryResponse.getJSONArray("aggregationResults").getJSONObject(0).getLong("value");
       if (withExtraColumns) {
         if (count == TOTAL_DOCS) {
-          break;
+          return;
         }
       } else {
         if (count == 0) {
-          break;
+          return;
         }
       }
+      Thread.sleep(1000L);
     }
-    Assert.assertTrue(System.currentTimeMillis() < endTime);
+    if (withExtraColumns) {
+      Assert.fail("Failed to add default columns in " + MAX_RELOAD_TIME_IN_MILLIS + "ms");
+    } else {
+      Assert.fail("Failed to remove default columns in " + MAX_RELOAD_TIME_IN_MILLIS + "ms");
+    }
   }
 }
