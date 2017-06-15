@@ -26,13 +26,13 @@ public class DataFrameBenchmark {
 
   private static final long SEED = System.nanoTime();
 
-  long tStart;
-  long tStartOuter;
-  List<Long> times = new ArrayList<>();
-  long timeOuter;
-  DataFrame.Builder results = DataFrame.builder(SERIES_NAMES);
+  private long tStart;
+  private long tStartOuter;
+  private List<Long> times = new ArrayList<>();
+  private long timeOuter;
+  private DataFrame.Builder results = DataFrame.builder(SERIES_NAMES);
 
-  void benchmarkMapDoubleSeries() {
+  private void benchmarkMapDoubleSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -56,7 +56,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapDoubleSeries", checksum);
   }
 
-  void benchmarkMapDoubleSeriesOperation() {
+  private void benchmarkMapDoubleSeriesOperation() {
     startTimerOuter();
     long checksum = 0;
 
@@ -75,7 +75,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapDoubleSeriesOperation", checksum);
   }
 
-  void benchmarkMapDoubleArray() {
+  private void benchmarkMapDoubleArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -96,7 +96,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapDoubleArray", checksum);
   }
 
-  void benchmarkMapLongSeries() {
+  private void benchmarkMapLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -120,7 +120,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapLongSeries", checksum);
   }
 
-  void benchmarkMapLongSeriesOperation() {
+  private void benchmarkMapLongSeriesOperation() {
     startTimerOuter();
     long checksum = 0;
 
@@ -139,7 +139,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapLongSeriesOperation", checksum);
   }
 
-  void benchmarkMapLongArray() {
+  private void benchmarkMapLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -160,7 +160,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapLongArray", checksum);
   }
 
-  void benchmarkMapLongObjectArray() {
+  private void benchmarkMapLongObjectArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -181,7 +181,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapLongObjectArray", checksum);
   }
 
-  void benchmarkMapTwoSeriesExpression() {
+  private void benchmarkMapTwoSeriesExpression() {
     startTimerOuter();
     long checksum = 0;
 
@@ -203,7 +203,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapTwoSeriesExpression", checksum);
   }
 
-  void benchmarkMapTwoSeries() {
+  private void benchmarkMapTwoSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -230,7 +230,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapTwoSeries", checksum);
   }
 
-  void benchmarkMapTwoSeriesOperation() {
+  private void benchmarkMapTwoSeriesOperation() {
     startTimerOuter();
     long checksum = 0;
 
@@ -254,7 +254,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapTwoSeriesOperation", checksum);
   }
 
-  void benchmarkMapTwoArrays() {
+  private void benchmarkMapTwoArrays() {
     startTimerOuter();
     long checksum = 0;
 
@@ -275,7 +275,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapTwoArrays", checksum);
   }
 
-  void benchmarkMapThreeSeries() {
+  private void benchmarkMapThreeSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -304,7 +304,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapThreeSeries", checksum);
   }
 
-  void benchmarkMapThreeArrays() {
+  private void benchmarkMapThreeArrays() {
     startTimerOuter();
     long checksum = 0;
 
@@ -326,7 +326,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapThreeArrays", checksum);
   }
 
-  void benchmarkMapFourSeriesGeneric() {
+  private void benchmarkMapFourSeriesGeneric() {
     startTimerOuter();
     long checksum = 0;
 
@@ -357,7 +357,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapFourSeriesGeneric", checksum);
   }
 
-  void benchmarkMapFourArrays() {
+  private void benchmarkMapFourArrays() {
     startTimerOuter();
     long checksum = 0;
 
@@ -380,7 +380,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapFourArrays", checksum);
   }
 
-  void benchmarkMinMaxLongSeries() {
+  private void benchmarkMinMaxLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -399,7 +399,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMinMaxLongSeries", checksum);
   }
 
-  void benchmarkMinMaxLongArray() {
+  private void benchmarkMinMaxLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -422,7 +422,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMinMaxLongArray", checksum);
   }
 
-  void benchmarkEqualsLongArray() {
+  private void benchmarkEqualsLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -442,7 +442,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkEqualsLongArray", checksum);
   }
 
-  void benchmarkEqualsLongSeries() {
+  private void benchmarkEqualsLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -464,7 +464,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkEqualsLongSeries", checksum);
   }
 
-  void benchmarkEqLongSeries() {
+  private void benchmarkEqLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -488,7 +488,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkEqLongSeries", checksum);
   }
 
-  void benchmarkSortLongArray() {
+  private void benchmarkSortLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -505,7 +505,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkSortLongArray", checksum);
   }
 
-  void benchmarkSortLongSeries() {
+  private void benchmarkSortLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -523,7 +523,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkSortLongSeries", checksum);
   }
 
-  void benchmarkUniqueLongArrayWithObjects() {
+  private void benchmarkUniqueLongArrayWithObjects() {
     startTimerOuter();
     long checksum = 0;
 
@@ -543,7 +543,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkUniqueLongArrayWithObjects", checksum);
   }
 
-  void benchmarkUniqueLongSeries() {
+  private void benchmarkUniqueLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -561,7 +561,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkUniqueLongSeries", checksum);
   }
 
-  void benchmarkShiftLongArray() {
+  private void benchmarkShiftLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -580,7 +580,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkShiftLongArray", checksum);
   }
 
-  void benchmarkShiftLongSeries() {
+  private void benchmarkShiftLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -598,7 +598,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkShiftLongSeries", checksum);
   }
 
-  void benchmarkDropNullLongSeries() {
+  private void benchmarkDropNullLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -619,7 +619,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkDropNullLongSeries", checksum);
   }
 
-  void benchmarkDropNullLongArray() {
+  private void benchmarkDropNullLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -646,7 +646,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkDropNullLongArray", checksum);
   }
 
-  void benchmarkAggregateLongSeries() {
+  private void benchmarkAggregateLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -664,7 +664,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkAggregateLongSeries", checksum);
   }
 
-  void benchmarkAggregateLongArray() {
+  private void benchmarkAggregateLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -684,7 +684,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkAggregateLongArray", checksum);
   }
 
-  void benchmarkHasNullLongSeries() {
+  private void benchmarkHasNullLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -702,7 +702,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkHasNullLongSeries", checksum);
   }
 
-  void benchmarkExpandingWindowLongSeries() {
+  private void benchmarkExpandingWindowLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -720,7 +720,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkExpandingWindowLongSeries", checksum);
   }
 
-  void benchmarkExpandingWindowLongArray() {
+  private void benchmarkExpandingWindowLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -742,7 +742,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkExpandingWindowLongArray", checksum);
   }
 
-  void benchmarkAll() {
+  private void benchmarkAll() {
     benchmarkHasNullLongSeries();
     benchmarkDropNullLongSeries();
     benchmarkDropNullLongArray();
@@ -778,24 +778,24 @@ public class DataFrameBenchmark {
     benchmarkMapTwoSeriesExpression();
   }
 
-  void startTimer() {
+  private void startTimer() {
     this.tStart = System.nanoTime();
   }
 
-  void stopTimer() {
+  private void stopTimer() {
     long tDelta = System.nanoTime() - this.tStart;
     this.times.add(tDelta);
   }
 
-  void startTimerOuter() {
+  private void startTimerOuter() {
     this.tStartOuter = System.nanoTime();
   }
 
-  void stopTimerOuter() {
+  private void stopTimerOuter() {
     this.timeOuter = System.nanoTime() - this.tStartOuter;
   }
 
-  void logResults(String name, long checksum) {
+  private void logResults(String name, long checksum) {
     stopTimerOuter();
     Collections.sort(this.times);
     long tMid = this.times.get(this.times.size() / 2);
@@ -839,7 +839,7 @@ public class DataFrameBenchmark {
     LOG.info("done.");
   }
 
-  static int[] randomIndices(int upperBound, int n) {
+  private static int[] randomIndices(int upperBound, int n) {
     Random r = new Random();
     r.setSeed(SEED);
     int[] values = new int[n];
@@ -849,7 +849,7 @@ public class DataFrameBenchmark {
     return values;
   }
 
-  static double[] generateDoubleData(int n) {
+  private static double[] generateDoubleData(int n) {
     Random r = new Random();
     r.setSeed(SEED);
     double[] values = new double[n];
@@ -859,7 +859,7 @@ public class DataFrameBenchmark {
     return values;
   }
 
-  static long[] generateLongData(int n) {
+  private static long[] generateLongData(int n) {
     Random r = new Random();
     r.setSeed(SEED);
     long[] values = new long[n];
@@ -869,7 +869,7 @@ public class DataFrameBenchmark {
     return values;
   }
 
-  static Long[] generateLongObjectData(int n) {
+  private static Long[] generateLongObjectData(int n) {
     Random r = new Random();
     r.setSeed(SEED);
     Long[] values = new Long[n];
@@ -879,7 +879,7 @@ public class DataFrameBenchmark {
     return values;
   }
 
-  static long checksum(double... values) {
+  private static long checksum(double... values) {
     long bits = 0;
     for(double v : values) {
       bits ^= Double.doubleToLongBits(v);
@@ -887,7 +887,7 @@ public class DataFrameBenchmark {
     return bits;
   }
 
-  static long checksum(long... values) {
+  private static long checksum(long... values) {
     long bits = 0;
     for(long v : values) {
       bits ^= v;
