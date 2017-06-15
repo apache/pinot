@@ -237,35 +237,6 @@ public abstract class Grouping {
     }
   }
 
-//  public final SeriesGrouping groupByValue() {
-//    if(this.isEmpty())
-//      return new SeriesGrouping(this);
-//
-//    List<ArrayBucket> buckets = new ArrayList<>();
-//    int[] sref = this.sortedIndex();
-//
-//    int bucketOffset = 0;
-//    for(int i=1; i<sref.length; i++) {
-//      if(this.compare(this, sref[i-1], sref[i]) != 0) {
-//        int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, i);
-//        buckets.add(new ArrayBucket(fromIndex));
-//        bucketOffset = i;
-//      }
-//    }
-//
-//    int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, sref.length);
-//    buckets.add(new ArrayBucket(fromIndex));
-//
-//    // keys from buckets
-//    int[] keyIndex = new int[buckets.size()];
-//    int i = 0;
-//    for(ArrayBucket b : buckets) {
-//      keyIndex[i++] = b.indices[0];
-//    }
-//
-//    return new SeriesGrouping(this.project(keyIndex), this, buckets);
-//  }
-
   /**
    * Represents a Grouping based on value. Elements are grouped into separate buckets for each
    * distinct value in the series.
@@ -399,59 +370,6 @@ public abstract class Grouping {
     }
   }
 
-//  public final SeriesGrouping groupByCount(int bucketSize) {
-//    return groupByCount(this.size(), bucketSize).applyTo(this);
-//  }
-//
-//  /**
-//   * @see Series#groupByCount(int)
-//   */
-//  static final SeriesGrouping groupByCount(int size, int bucketSize) {
-//    if(bucketSize <= 0)
-//      throw new IllegalArgumentException("bucketSize must be greater than 0");
-//    if(size <= 0)
-//      return new SeriesGrouping(null);
-//
-//    bucketSize = Math.min(bucketSize, size);
-//
-//    int numBuckets = (size - 1) / bucketSize + 1;
-//    long[] keys = new long[numBuckets];
-//    List<Bucket> buckets = new ArrayList<>();
-//    for(int i=0; i<numBuckets; i++) {
-//      int from = i * bucketSize;
-//      int to = Math.min((i + 1) * bucketSize, size);
-//      buckets.add(new SequenceBucket(from, to));
-//      keys[i] = i;
-//    }
-//    return new SeriesGrouping(DataFrame.toSeries(keys), null, buckets);
-//  }
-
-//  public final SeriesGrouping groupByPartitions(int partitionCount) {
-//    return groupByPartitions(this.size(), partitionCount).applyTo(this);
-//  }
-//
-//  /**
-//   * @see Series#groupByPartitions(int)
-//   */
-//  static final SeriesGrouping groupByPartitions(int size, int partitionCount) {
-//    if(partitionCount <= 0)
-//      throw new IllegalArgumentException("partitionCount must be greater than 0");
-//    if(size <= 0)
-//      return new SeriesGrouping(null);
-//
-//    double perPartition = size /  (double)partitionCount;
-//
-//    long[] keys = new long[partitionCount];
-//    List<Bucket> buckets = new ArrayList<>();
-//    for(int i=0; i<partitionCount; i++) {
-//      int from = (int)Math.round(i * perPartition);
-//      int to = (int)Math.round((i+1) * perPartition);
-//      buckets.add(new SequenceBucket(from, to));
-//      keys[i] = i;
-//    }
-//    return new SeriesGrouping(DataFrame.toSeries(keys), null, buckets);
-//  }
-
   /**
    * Represents a Grouping based on a fixed number of buckets. Elements are grouped into buckets
    * based on a greedy algorithm to approximately evenly fill buckets. The number of buckets
@@ -482,29 +400,6 @@ public abstract class Grouping {
     }
   }
 
-//  public final SeriesGrouping groupByMovingWindow(int windowSize) {
-//    return groupByMovingWindow(this.size(), windowSize).applyTo(this);
-//  }
-//
-//  /**
-//   * @see Series#groupByMovingWindow(int)
-//   */
-//  static final SeriesGrouping groupByMovingWindow(int size, int windowSize) {
-//    if(windowSize <= 0)
-//      throw new IllegalArgumentException("windowSize must be greater than 0");
-//    if(size < windowSize)
-//      return new SeriesGrouping(null);
-//
-//    int windowCount = size - windowSize + 1;
-//    long[] keys = new long[windowCount];
-//    List<Bucket> buckets = new ArrayList<>();
-//    for(int i=0; i<windowCount; i++) {
-//      buckets.add(new SequenceBucket(i, i + windowSize));
-//      keys[i] = i;
-//    }
-//    return new SeriesGrouping(DataFrame.toSeries(keys), null, buckets);
-//  }
-
   /**
    * Represents an (overlapping) Grouping based on a moving window size. Elements are grouped
    * into overlapping buckets in sequences of {@code windowSize} consecutive items. The number
@@ -533,25 +428,6 @@ public abstract class Grouping {
     }
   }
 
-//  public final SeriesGrouping groupByExpandingWindow() {
-//    return groupByExpandingWindow(this.size()).applyTo(this);
-//  }
-//
-//  /**
-//   * @see Series#groupByExpandingWindow()
-//   */
-//  static final SeriesGrouping groupByExpandingWindow(int size) {
-//    if(size <= 0)
-//      return new SeriesGrouping(null);
-//
-//    long[] keys = new long[size];
-//    List<Bucket> buckets = new ArrayList<>();
-//    for(int i=0; i<size; i++) {
-//      buckets.add(new SequenceBucket(0, i + 1));
-//      keys[i] = i;
-//    }
-//    return new SeriesGrouping(DataFrame.toSeries(keys), null, buckets);
-//  }
   /**
    * Represents an (overlapping) Grouping based on an expanding window. Elements are grouped
    * into overlapping buckets in expanding sequences of consecutive items (always starting with
