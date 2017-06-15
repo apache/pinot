@@ -48,8 +48,6 @@ public class ServerToSegmentSetMap {
   private Map<String, Set<String>> _serverToSegmentSetMap;
   private Map<ServerInstance, SegmentIdSet> _routingTable;
 
-  public static final String NAME_PORT_DELIMITER = "_";
-
   public ServerToSegmentSetMap(Map<String, Set<String>> serverToSegmentSetMap) {
     _serverToSegmentSetMap = serverToSegmentSetMap;
     _routingTable = new HashMap<ServerInstance, SegmentIdSet>();

@@ -560,7 +560,7 @@ public class BrokerRequestHandler {
     phaseTimes.addToRoutingTime(System.nanoTime() - routingStartTime);
     if (segmentServices == null || segmentServices.isEmpty()) {
       String tableNameWithType = brokerRequest.getQuerySource().getTableName();
-      LOGGER.info("No server found for table: {}", tableNameWithType);
+      LOGGER.info("No server found or all segments are pruned for table: {}", tableNameWithType);
       _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1L);
       return null;
     }
@@ -594,7 +594,8 @@ public class BrokerRequestHandler {
       routingOptions =
           Splitter.on(",").omitEmptyStrings().trimResults().splitToList(debugOptions.get("routingOptions"));
     }
-    RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(tableName, routingOptions, brokerRequest);
+    RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(tableName, routingOptions,
+        brokerRequest);
     return _routingTable.findServers(routingTableLookupRequest);
   }
 

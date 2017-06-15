@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.broker.routing;
 
+import com.linkedin.pinot.broker.routing.builder.PartitionAwareOfflineRoutingTableBuilder;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
@@ -32,6 +35,7 @@ import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
+
 public class RoutingTableBuilderFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutingTableBuilderFactory.class);
 
@@ -41,7 +45,7 @@ public class RoutingTableBuilderFactory {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   enum RoutingTableBuilderName {
-    DefaultOffline, DefaultRealtime, BalancedRandom, KafkaLowLevel, KafkaHighLevel
+    DefaultOffline, DefaultRealtime, BalancedRandom, KafkaLowLevel, KafkaHighLevel, PartitionAwareOffline
   }
 
   public RoutingTableBuilderFactory(Configuration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -60,7 +64,8 @@ public class RoutingTableBuilderFactory {
       try {
         buildNameEnum = RoutingTableBuilderName.valueOf(builderName);
       } catch (Exception e) {
-        LOGGER.error("Unable to create routing table builder with name:{} for table:{}", builderName, tableConfig.getTableName());
+        LOGGER.error("Unable to create routing table builder with name:{} for table:{}", builderName,
+            tableConfig.getTableName());
         buildNameEnum = null;
       }
     }
@@ -76,27 +81,40 @@ public class RoutingTableBuilderFactory {
     }
     RoutingTableBuilder builder = null;
     switch (buildNameEnum) {
-    case BalancedRandom:
-      builder = new BalancedRandomRoutingTableBuilder();
-      break;
-    case DefaultOffline:
-      builder = new DefaultOfflineRoutingTableBuilder();
-      break;
-    case DefaultRealtime:
-      builder = new DefaultRealtimeRoutingTableBuilder();
-      break;
-    case KafkaHighLevel:
-      builder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
-      break;
-    case KafkaLowLevel:
-      builder = new KafkaLowLevelConsumerRoutingTableBuilder();
-      break;
+      case BalancedRandom:
+        builder = new BalancedRandomRoutingTableBuilder();
+        break;
+      case DefaultOffline:
+        builder = new DefaultOfflineRoutingTableBuilder();
+        break;
+      case DefaultRealtime:
+        builder = new DefaultRealtimeRoutingTableBuilder();
+        break;
+      case KafkaHighLevel:
+        builder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
+        break;
+      case KafkaLowLevel:
+        builder = new KafkaLowLevelConsumerRoutingTableBuilder();
+        break;
+      case PartitionAwareOffline:
+        // In order to use the partition aware routing for offline table, we assume the following conditions.
+        // 1. The replica group aware segment assignment strategy is used.
+        // 2. Table config contains the replica group segment assignment related configurations.
+        // 3. The table push type is not 'refresh'.
+        String segmentAssignmentStrategy = tableConfig.getValidationConfig().getSegmentAssignmentStrategy();
+        SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+        if (CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType.valueOf(segmentAssignmentStrategy)
+            != CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType.ReplicaGroupSegmentAssignmentStrategy ||
+            validationConfig.getReplicaGroupStrategyConfig() == null ||
+            (validationConfig.getSegmentPushType() != null && validationConfig.getSegmentPushType()
+                .equalsIgnoreCase("REFRESH"))) {
+          builder = new DefaultOfflineRoutingTableBuilder();
+        } else {
+          builder = new PartitionAwareOfflineRoutingTableBuilder();
+        }
+        break;
     }
     builder.init(_configuration, tableConfig, _propertyStore);
     return builder;
-  }
-
-  public static void main(String[] args) {
-    System.out.println(RoutingTableBuilderName.valueOf("asd"));
   }
 }

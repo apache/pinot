@@ -66,7 +66,8 @@ public class CommonConstants {
       public static enum SegmentAssignmentStrategyType {
         RandomAssignmentStrategy,
         BalanceNumSegmentAssignmentStrategy,
-        BucketizedSegmentAssignmentStrategy;
+        BucketizedSegmentAssignmentStrategy,
+        ReplicaGroupSegmentAssignmentStrategy;
       }
 
       public static class Schema {
