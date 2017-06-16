@@ -14,7 +14,8 @@ export default Ember.Controller.extend({
   globalNavItems: [
     {
       className: 'home',
-      link: 'index',
+      link: '/thirdeye',
+      isCustomLink: true,
       title: 'Home'
     },
     {
@@ -33,6 +34,7 @@ export default Ember.Controller.extend({
       className: 'alert',
       link: 'self-service',
       title: 'Self-Service'
+      //hidden: true
     }
   ]
 
