@@ -1,0 +1,94 @@
+// Overriding default c3
+.c3-lines {
+  stroke-width: 2px;
+}
+
+.c3-chart-line:nth-child(even) > .c3-lines {
+  stroke-dasharray: 1%;
+}
+
+.anomaly-graph {
+  box-sizing: border-box;
+  display: flex;
+  border: 1px solid #CCC;
+
+  &:not(:first-child) {
+      margin-top: 14px;
+  }
+}
+
+.anomaly-graph__filter-item {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.anomaly-graph__filter-label {
+  cursor: pointer;
+  color: #0091CA;
+  font-weight: normal;
+}
+
+.anomaly-graph__filter-group {
+  padding-left: 14px;
+  list-style: none;
+}
+
+.anomaly-graph__title {
+  @include margin-reset;
+  @include padding-reset;
+  font-size: initial;
+  font-weight: normal;
+  margin-bottom: 14px;
+}
+
+.legend-title {
+  padding: 14px;
+  color: lighten(black, 30%);
+  margin: 0;
+  background-color: #f3f6f8;
+  font-size: 14px;
+  font-weight: normal;
+}
+
+.anomaly-graph__left-panel { 
+  min-width: 250px;
+  flex-grow: 1;
+  overflow: scroll;
+  position: relative;
+  border-right: 1px solid #CCC;
+}
+
+.anomaly-graph__right-panel { 
+  flex-basis: 75%;
+  flex-grow: 1;
+  width: 75%;
+  padding: 14px;
+}
+
+.anomaly_graph__filters {
+  position: absolute;
+  top: 0; 
+  bottom: 0; 
+  right: 0;
+  left: 0;
+}
+
+$colors:
+  "blue" $te-blue,
+  "orange" $te-orange,
+  "teal" $te-teal,
+  "purple" $te-purple,
+  "red" $te-red,
+  "green" $te-green,
+  "pink" $te-pink;
+
+// creates .c3-region-"color" classes
+@each $i in $colors{
+  .c3-region--#{nth($i, 1)} {
+    fill: nth($i, 2);
+  }
+
+  .anomaly-graph__filter-label--#{nth($i, 1)} {
+  color: lighten(nth($i, 2), 10%);
+  }
+};

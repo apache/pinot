@@ -1,2 +1,37 @@
 // wrapper/custom style will go here
 @import 'font';
+
+body {
+  font-size: 14px;
+  background-color: lighten(#CCC, 15%);
+  color: lighten(black, 40%);
+}
+
+.thirdeye-link {
+  cursor: pointer;
+  color: #0084bf;
+  padding: 0 8px;
+  text-decoration: none;
+}
+
+.thirdeye-link:hover {
+  color: #0073b1;
+}
+
+.thirdeye-link--nav {
+  font-size: 14px;
+  color: lighten(black, 30%);
+}
+
+.thirdeye-link--active,
+.thirdeye-link--nav:hover {
+  color: #0073b1;
+  padding-bottom: 14px;
+  border-bottom: 2px solid #0073B0 !important;
+}
+
+.spinner-wrapper {
+  margin: 24px;
+  height: 250px;
+  position: relative;
+}

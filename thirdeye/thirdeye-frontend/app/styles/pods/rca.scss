@@ -1,0 +1,27 @@
+.spinner-wrapper {
+  margin: 24px;
+  height: 250px;
+  position: relative;
+}
+
+.paper-container {
+  background-color: white;
+  padding: 24px;
+  border: 1px solid #CCC;
+  margin-bottom: 24px;
+}
+
+.rca-title {
+  @include margin-reset;
+  @include padding-reset;
+
+  margin-bottom: 24px;
+  font-size: 24px;
+  font-weight: normal;
+  color: lighten(black, 25%)
+}
+
+.rca-header {
+  display: flex;
+  justify-content: space-between;
+}

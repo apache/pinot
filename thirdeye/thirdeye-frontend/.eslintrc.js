@@ -1,5 +1,8 @@
 module.exports = {
   "extends": "eslint:recommended",
+  globals: {
+    server: true,
+  },
   root: true,
   parserOptions: {
     ecmaVersion: 8,

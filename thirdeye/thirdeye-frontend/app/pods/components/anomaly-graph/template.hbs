@@ -1,3 +1,41 @@
-<li><strong>Name:</strong> {{anomaly.anomalyFunctionName}}</li>
-<li><strong>Current Start</strong> {{anomaly.currentStart}}</li>
-<li><strong>Current End</strong> {{anomaly.currentEnd}}</li>
+{{!-- TODO: move legend into own component--}}
+{{#if showGraphLegend}}
+  <section class="anomaly-graph__left-panel">
+    <div class="anomaly_graph__filters">
+      <h5 class="legend-title">Primary Metric</h5>
+      <ul class="anomaly-graph__filter-group">
+        <li class="anomaly-graph__filter-item">
+          {{input type="checkbox" id=(concat "metric-" metric.id) checked=true disabled=true click=(action "onSelection" anomaly)}}
+          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{primaryMetric.color}}" for="metric-{{primaryMetric.id}}" title={{primaryMetric.metricName}}> {{primaryMetric.metricName}} </label>
+        </li>
+      </ul>
+      <h5 class="legend-title">Related Metrics</h5>
+      <ul class="anomaly-graph__filter-group">
+      {{#each relatedMetrics as |metric index|}}
+        <li class="anomaly-graph__filter-item">{{input type="checkbox" id=(concat "related-metric-" index) checked=metric.isSelected}}
+          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{metric.color}}" for="related-metric-{{index}}" title={{metric.metricName}}> {{metric.metricName}} </label>
+        </li>
+      {{else}}
+        No Related Metrics.
+      {{/each}}
+      </ul>
+    </div>
+  </section>
+{{/if}}
+
+<section class="anomaly-graph__right-panel">
+  {{#unless showGraphLegend}}
+    <h3 class="anomaly-graph__title">#{{primaryMetric.metricId}} {{primaryMetric.metricName}}</h3>
+  {{/unless}}
+  {{thirdeye-chart 
+    data=data 
+    axis=axis 
+    legend=legend
+    regions=regions
+    size=size
+    color=color
+    zoom=zoom
+    point=point
+    subchart=subchart
+  }}
+</section>
