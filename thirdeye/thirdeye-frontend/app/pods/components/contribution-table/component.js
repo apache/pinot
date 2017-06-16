@@ -3,7 +3,7 @@ import Ember from 'ember';
 // TODO: save this in a constant file
 const GRANULARITY_MAPPING = {
   DAYS: 'M/D',
-  HOURS: 'M/D hh',
+  HOURS: 'M/D h a',
   MINUTES: 'M/D hh:mm a'
 };
 

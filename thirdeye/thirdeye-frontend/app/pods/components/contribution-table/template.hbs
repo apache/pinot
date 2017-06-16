@@ -2,16 +2,16 @@
   <table class="table table-bordered analysis-table">
 
     <thead>
-    <tr>
-      <th class="analysis-table__anchor analysis-table__anchor--white">
-        <h5 class="contribution-table__title">Primary Metric</h5>
-      </th>
-      {{#each dates as |date|}}
-        <th class="analysis-table__header">
-          {{moment-format date dateFormat}}
+      <tr>
+        <th class="analysis-table__anchor analysis-table__anchor--white">
+          <h5 class="contribution-table__title">Primary Metric</h5>
         </th>
-      {{/each}}
-    </tr>
+        {{#each dates as |date|}}
+          <th class="analysis-table__header">
+            {{moment-format date dateFormat}}
+          </th>
+        {{/each}}
+      </tr>
     </thead>
 
     <tbody>
@@ -80,86 +80,87 @@
           <div class="analysis-table__cell analysis-table__cell--primary"></div>
         </td>
       </tr>
-
-      <tr>
-        <td class="analysis-table__dimension analysis-table__anchor--white">
-          <h5 class="contribution-table__title">Related Metrics</h5>
-        </td>
-        {{#each dates as |date|}}
-          <td class="analysis-table__header">
-            {{moment-format date dateFormat}}
-          </td>
-        {{/each}}
-      </tr>
-
-      {{#if showDetails}}
-        <td class="analysis-table__anchor analysis-table__anchor--low"></td>
-        {{#each dates as |date|}}
-        <td class="analysis-table__subheader">
-          <div class="analysis-table__cell">
-            <div class="analysis-table__item">
-              Current
-            </div>
-            <div class="analysis-table__item">
-              Baseline
-            </div>
-            <div class="analysis-table__item analysis-table__item--small">
-              Ratio
-            </div>
-          </div>
-        </td>
-        {{/each}}
-      {{/if}}
-
-      {{#each relatedMetricRows as |metric|}}
+      {{#if relatedMetricRows.length}}
         <tr>
-          <td class="analysis-table__dimension">
-            <div class="analysis-table__cell analysis-table__cell--primary">{{metric.metricName}}</div>
+          <td class="analysis-table__dimension analysis-table__anchor--white">
+            <h5 class="contribution-table__title">Related Metrics</h5>
           </td>
+          {{#each dates as |date|}}
+            <td class="analysis-table__header">
+              {{moment-format date dateFormat}}
+            </td>
+          {{/each}}
+        </tr>
 
-          {{#if showDetails}}
-            {{#each-in metric.subDimensionContributionMap.All.percentageChange as |index percentChange|}}
-              {{!--TODO: remove inline styling--}}
-              <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}; color: {{compute-text-color percentChange}};">
-                <div class="analysis-table__cell">
-                  <div class="analysis-table__item">
-                    {{format-number (get metric.subDimensionContributionMap.All.currentValues index)}}
-                  </div>
-                  <div class="analysis-table__item">
-                    {{format-number (get metric.subDimensionContributionMap.All.baselineValues index)}}
-                  </div>
-                  <div class="analysis-table__item analysis-table__item--small">
-                    <div class="analysis-table__item  analysis-table__item--large">
-                        {{percentChange}}%
+        {{#if showDetails}}
+          <td class="analysis-table__anchor analysis-table__anchor--low"></td>
+          {{#each dates as |date|}}
+          <td class="analysis-table__subheader">
+            <div class="analysis-table__cell">
+              <div class="analysis-table__item">
+                Current
+              </div>
+              <div class="analysis-table__item">
+                Baseline
+              </div>
+              <div class="analysis-table__item analysis-table__item--small">
+                Ratio
+              </div>
+            </div>
+          </td>
+          {{/each}}
+        {{/if}}
+
+        {{#each relatedMetricRows as |metric|}}
+          <tr>
+            <td class="analysis-table__dimension">
+              <div class="analysis-table__cell analysis-table__cell--primary">{{metric.metricName}}</div>
+            </td>
+
+            {{#if showDetails}}
+              {{#each-in metric.subDimensionContributionMap.All.percentageChange as |index percentChange|}}
+                {{!--TODO: remove inline styling--}}
+                <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}; color: {{compute-text-color percentChange}};">
+                  <div class="analysis-table__cell">
+                    <div class="analysis-table__item">
+                      {{format-number (get metric.subDimensionContributionMap.All.currentValues index)}}
+                    </div>
+                    <div class="analysis-table__item">
+                      {{format-number (get metric.subDimensionContributionMap.All.baselineValues index)}}
+                    </div>
+                    <div class="analysis-table__item analysis-table__item--small">
+                      <div class="analysis-table__item  analysis-table__item--large">
+                          {{percentChange}}%
+                      </div>
                     </div>
                   </div>
-                </div>
-              </td>
-            {{/each-in}}
-          {{else}}
+                </td>
+              {{/each-in}}
+            {{else}}
 
-            {{#each metric.subDimensionContributionMap.All.percentageChange as |percentChange index|}}
-              <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}">
-                <div class="analysis-table__cell">
-                  <div class="analysis-table__item  analysis-table__item--large">
-                    <span style="color:{{compute-text-color percentChange}}">
-                      {{percentChange}}%
-                    </span>
+              {{#each metric.subDimensionContributionMap.All.percentageChange as |percentChange index|}}
+                <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}">
+                  <div class="analysis-table__cell">
+                    <div class="analysis-table__item  analysis-table__item--large">
+                      <span style="color:{{compute-text-color percentChange}}">
+                        {{percentChange}}%
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </td>
-            {{/each}}
-            
-          {{/if}}
+                </td>
+              {{/each}}
+              
+            {{/if}}
+          </tr>
+        {{/each}}
+
+        <tr>
+          <td class="analysis-table__dimension">
+            <div class="analysis-table__cell analysis-table__cell--primary"></div>
+          </td>
         </tr>
-      {{/each}}
-
-      <tr>
-        <td class="analysis-table__dimension">
-          <div class="analysis-table__cell analysis-table__cell--primary"></div>
-        </td>
-      </tr>
-
+      {{/if}}
     </tbody>
   </table>
 </div>
+

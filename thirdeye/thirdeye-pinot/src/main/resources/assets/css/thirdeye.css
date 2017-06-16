@@ -567,6 +567,21 @@ text {
 
 .thirdeye-link:hover {
   color: #0073b1;
+  text-decoration: none;
+}
+
+.thirdeye-link--nav {
+  text-decoration: none;
+  font-size: 16px;
+  color: gray;
+  padding: 14px 0;
+  margin-right: 8px;
+}
+
+.thirdeye-link--active,
+.thirdeye-link--nav:hover {
+  color: #0073b1;
+  border-bottom: 2px solid #0073B0 !important;
 }
 
 /* anomalies page Search Bar*/
@@ -1162,6 +1177,20 @@ text {
   background-color: white;
   border: 1px solid #CCC;
   border-radius: 2px;
+}
+
+.analysis-card__header {
+  background-color: white;
+  padding: 14px 24px;
+  border-bottom: 1px solid #CCC;
+}
+
+.analysis-card__header--small {
+  padding: 0px 24px;
+}
+
+.navbar--no-border {
+  border-bottom: 0
 }
 
 /* Accessibility */

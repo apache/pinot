@@ -25,12 +25,12 @@
 
     {{#if metricList.loaded}}
       {{#if splitView}}
-        <section class="paper-container">
+        <section>
           {{anomaly-graph primaryMetric=metricList.primaryMetric showGraphLegend=false}}
           {{#each metricList.relatedMetrics as |metric|}}
             {{anomaly-graph primaryMetric=metric showGraphLegend=false}}
           {{/each}}
-      </section>
+        </section>
       {{else}}
         {{anomaly-graph primaryMetric=metricList.primaryMetric relatedMetrics=metricList.relatedMetrics}}
       {{/if}}
