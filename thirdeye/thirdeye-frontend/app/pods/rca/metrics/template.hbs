@@ -1,0 +1,66 @@
+<main>
+  {{#containers/metric-container as |metricList actions|}}
+    <div class="rca-header">
+      <h3 class="rca-title">Metric Correlation</h3>
+      <div class="rca-actions">
+        <select onchange={{action "onModeChange" value="target.value"}}>
+          {{#each compareModeOptions as |compareMode|}}
+            <option value={{compareMode}} selected={{eq compareMode metricList.compareMode}}>{{compareMode}}</option>
+          {{/each}}
+        </select>
+        <a class="thirdeye-link" {{action "onSplitViewToggling"}}>{{if splitView 'Combine View' 'Split View'}}</a>
+      </div>
+    </div>
+    {{#if metricList.loading}}
+      <section class="paper-container">
+        <div class="spinner-wrapper">
+          {{ember-spinner}}
+        </div>
+      </section>
+    {{/if}}
+
+    {{#if metricList.failed}}
+      Oops, something went wrong...
+    {{/if}}
+
+    {{#if metricList.loaded}}
+      {{#if splitView}}
+        <section class="paper-container">
+          {{anomaly-graph primaryMetric=metricList.primaryMetric showGraphLegend=false}}
+          {{#each metricList.relatedMetrics as |metric|}}
+            {{anomaly-graph primaryMetric=metric showGraphLegend=false}}
+          {{/each}}
+      </section>
+      {{else}}
+        {{anomaly-graph primaryMetric=metricList.primaryMetric relatedMetrics=metricList.relatedMetrics}}
+      {{/if}}
+    {{/if}}
+
+    <div class="contribution-table">
+      <div class="contribution-table__header">
+        <div class="contribution-table__subnav">
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "change") "thirdeye-link--active"}}" href="#" {{action "onTabChange" "change"}}>% Change</a>
+        </div>
+        <div class="contribution-table__subnav">
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "number") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "number"}}>Raw Numbers</a>
+        </div>
+      </div>
+      <div class="contribution-table__body">
+        {{#if metricList.loading}}
+          <div class="spinner-wrapper">
+            {{ember-spinner}}
+          </div>
+        {{else}}
+          {{contribution-table 
+            title="Primary Metric"
+            granularity=metricList.granularity
+            primaryMetric=metricList.primaryMetric
+            relatedMetrics=metricList.relatedMetrics
+            showDetails=(eq selectedTab "number")
+          }}
+        {{/if}}
+      </div>
+    </div>
+  {{/containers/metric-container}}
+</main>
+
