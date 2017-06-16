@@ -21,6 +21,7 @@ public class DataFrameBenchmark {
   private static final int N_ROUNDS_SLOW = 3;
   private static final int N_ELEMENTS = 10_000_000;
   private static final int N_NULLS = 100_000;
+  private static final int N_WINDOW = 1000;
 
   private static final String[] SERIES_NAMES = new String[] { "task", "min", "mid", "max", "outer", "checksum", "samples" };
 
@@ -711,7 +712,7 @@ public class DataFrameBenchmark {
       LongSeries series = LongSeries.buildFrom(longValues);
 
       startTimer();
-      LongSeries out = series.groupByExpandingWindow().aggregate(LongSeries.SUM).getValues().getLongs();
+      LongSeries out = series.groupByExpandingWindow().sum().getValues().getLongs();
       stopTimer();
 
       checksum ^= checksum(out.values());
@@ -742,6 +743,52 @@ public class DataFrameBenchmark {
     logResults("benchmarkExpandingWindowLongArray", checksum);
   }
 
+  private void benchmarkMovingWindowLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      LongSeries out = series.groupByMovingWindow(N_WINDOW).sum().getValues().getLongs();
+      stopTimer();
+
+      checksum ^= checksum(out.values());
+    }
+
+    logResults("benchmarkMovingWindowLongSeries", checksum);
+  }
+
+  private void benchmarkMovingWindowLongArray() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+
+      startTimer();
+      long sum = 0;
+      long[] out = new long[N_ELEMENTS];
+      for(int i=0; i<N_WINDOW - 1; i++) {
+        sum += longValues[i];
+        out[i] = LongSeries.NULL;
+      }
+      sum += longValues[N_WINDOW - 1];
+      out[N_WINDOW - 1] = sum;
+      for(int i=N_WINDOW; i<N_ELEMENTS; i++) {
+        sum += longValues[i] - longValues[i - N_WINDOW];
+        out[i] = sum;
+      }
+      stopTimer();
+
+      checksum ^= checksum(out);
+    }
+
+    logResults("benchmarkMovingWindowLongArray", checksum);
+  }
+
   private void benchmarkAll() {
     benchmarkHasNullLongSeries();
     benchmarkDropNullLongSeries();
@@ -761,6 +808,8 @@ public class DataFrameBenchmark {
     benchmarkUniqueLongArrayWithObjects();
     benchmarkExpandingWindowLongSeries();
     benchmarkExpandingWindowLongArray();
+    benchmarkMovingWindowLongSeries();
+    benchmarkMovingWindowLongArray();
     benchmarkMapDoubleSeries();
     benchmarkMapDoubleSeriesOperation();
     benchmarkMapDoubleArray();
