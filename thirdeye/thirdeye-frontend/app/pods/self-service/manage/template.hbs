@@ -1,2 +1,48 @@
 <h1 class="te-title">Manage Alerts</h1>
 {{outlet}}
+
+<div>
+  Search Mode: 
+  <select onchange={{action "onModeChange" value="target.value"}}>
+    {{#each searchModes as |searchMode|}}
+      <option value={{searchMode}} selected={{eq searchMode selectedSearchMode}}>{{searchMode}}</option>
+    {{/each}}
+  </select>
+</div>
+
+Search for Alert:
+{{#if (eq selectedSearchMode 'function-name')}}
+  {{#power-select 
+    selected=primaryMetric
+    onchange=(action "onAlertChange")
+    search=(perform searchByFunctionName)
+    searchPlaceholder="Search for an Alert"
+    placeholder="Search by Alert Name"
+    allowClear=true
+    as |alert|
+  }}
+    {{alert.functionName}}
+  {{/power-select}}
+
+{{else if (eq selectedSearchMode 'alert-group')}}
+    {{#power-select 
+    selected=primaryMetric
+    onchange=(action "onAlertChange")
+    search=(perform searchByAlertGroup)
+    searchPlaceholder="Search for an Alert"
+    placeholder="Search by Alert Group"
+    allowClear=true
+    as |alert|
+  }}
+    {{alert.functionName}}
+  {{/power-select}}
+{{/if}}
+
+{{#each selectedAlerts as |alert|}}
+  <h4>{{alert.functionName}}</h4>
+  <ul>
+  {{#each-in alert as |key value|}}
+    <li>{{key}}: {{value}}</li>
+  {{/each-in}}
+  </ul>
+{{/each}}
