@@ -20,4 +20,9 @@ public abstract class AutoOnboard {
    * Method which contains implementation of what needs to be done as part of onboarding for this data source
    */
   public abstract void run();
+
+  /**
+   * Method for triggering adhoc run of the onboard logic
+   */
+  public abstract void runAdhoc();
 }
