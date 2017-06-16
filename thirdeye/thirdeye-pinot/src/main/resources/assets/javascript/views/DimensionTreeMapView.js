@@ -32,12 +32,48 @@ function DimensionTreeMapView(dimensionTreeMapModel) {
 DimensionTreeMapView.prototype = {
   render() {
     if (this.dimensionTreeMapModel.heatmapData) {
-      var compiledTemplate = this.compiledTemplate(this.dimensionTreeMapModel);
+      const dimensionTreeMapModel = this.makeUrl(this.dimensionTreeMapModel);
+
+      var compiledTemplate = this.compiledTemplate(dimensionTreeMapModel);
       $(this.placeHolderId).html(compiledTemplate);
       this.renderTreemapHeaderSection();
       this.renderTreemapSection();
       this.setupListenersForMode();
     }
+  },
+
+  /**
+   * Takes propertie from dimensionTreeMapModel 
+   * and creates an url to the new ember app
+   * @param {Object} dimensionTreeMapModel 
+   */
+  makeUrl(dimensionTreeMapModel) {
+    let { 
+      granularity,
+      currentStart,
+      currentEnd,
+      heatMapFilters,
+      compareMode,
+      metricId
+    } = dimensionTreeMapModel;
+
+    // needed because of inconsistency (5_MINUTES = MINUTES)
+    granularity = (granularity === '5_MINUTES') 
+      ? 'MINUTES' 
+      : granularity;
+
+    const offset = {
+      MINUTES: 6,
+      HOURS: 72,
+      DAYS: 168
+    }[granularity] || 0;
+
+    const startDate = currentStart.clone().subtract(offset, 'hours');
+    const endDate = currentEnd.clone().add(offset, 'hours');
+
+    const url = `app/#/rca/metrics/${metricId}?startDate=${startDate.valueOf()}&endDate=${endDate.valueOf()}&granularity=${granularity}&compareMode=${compareMode}&filters=${JSON.stringify(heatMapFilters)}`
+
+    return Object.assign({}, dimensionTreeMapModel, { rcaMetricUrl: url })
   },
 
   destroy() {
