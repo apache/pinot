@@ -619,19 +619,28 @@ public class DataFrameTest {
     LongSeries in = DataFrame.toSeries(3, 4, 5, 5, 3, 1, 5);
     Grouping.SeriesGrouping grouping = in.groupByMovingWindow(3);
 
-    Assert.assertEquals(grouping.size(), 5);
-    assertEquals(grouping.apply(0).getLongs(), 3, 4, 5);
-    assertEquals(grouping.apply(1).getLongs(), 4, 5, 5);
-    assertEquals(grouping.apply(2).getLongs(), 5, 5, 3);
-    assertEquals(grouping.apply(3).getLongs(), 5, 3, 1);
-    assertEquals(grouping.apply(4).getLongs(), 3, 1, 5);
+    Assert.assertEquals(grouping.size(), 7);
+    assertEmpty(grouping.apply(0).getLongs());
+    assertEmpty(grouping.apply(1).getLongs());
+    assertEquals(grouping.apply(2).getLongs(), 3, 4, 5);
+    assertEquals(grouping.apply(3).getLongs(), 4, 5, 5);
+    assertEquals(grouping.apply(4).getLongs(), 5, 5, 3);
+    assertEquals(grouping.apply(5).getLongs(), 5, 3, 1);
+    assertEquals(grouping.apply(6).getLongs(), 3, 1, 5);
   }
 
   @Test
   public void testLongGroupByMovingWindowTooLarge() {
     LongSeries in = DataFrame.toSeries(3, 4, 5, 5, 3, 1, 5);
     Grouping.SeriesGrouping grouping = in.groupByMovingWindow(8);
-    Assert.assertEquals(grouping.size(), 0);
+    Assert.assertEquals(grouping.size(), 7);
+    assertEmpty(grouping.apply(0).getLongs());
+    assertEmpty(grouping.apply(1).getLongs());
+    assertEmpty(grouping.apply(2).getLongs());
+    assertEmpty(grouping.apply(3).getLongs());
+    assertEmpty(grouping.apply(4).getLongs());
+    assertEmpty(grouping.apply(5).getLongs());
+    assertEmpty(grouping.apply(6).getLongs());
   }
 
   @Test
@@ -640,9 +649,20 @@ public class DataFrameTest {
     Grouping.SeriesGrouping grouping = in.groupByMovingWindow(3);
     DataFrame out = grouping.aggregate(LongSeries.SUM);
 
-    Assert.assertEquals(out.size(), 5);
-    assertEquals(out.getLongs(Grouping.GROUP_KEY), 0, 1, 2, 3, 4);
-    assertEquals(out.getLongs(Grouping.GROUP_VALUE), 12, 14, 13, 9, 9);
+    Assert.assertEquals(out.size(), 7);
+    assertEquals(out.getLongs(Grouping.GROUP_KEY), 0, 1, 2, 3, 4, 5, 6);
+    assertEquals(out.getLongs(Grouping.GROUP_VALUE), LNULL, LNULL, 12, 14, 13, 9, 9);
+  }
+
+  @Test
+  public void testLongGroupByMovingWindowSum() {
+    LongSeries in = DataFrame.toSeries(3, 4, 5, 5, 3, 1, 5);
+    Grouping.SeriesGrouping grouping = in.groupByMovingWindow(3);
+    DataFrame out = grouping.sum();
+
+    Assert.assertEquals(out.size(), 7);
+    assertEquals(out.getLongs(Grouping.GROUP_KEY), 0, 1, 2, 3, 4, 5, 6);
+    assertEquals(out.getLongs(Grouping.GROUP_VALUE), LNULL, LNULL, 12, 14, 13, 9, 9);
   }
 
   @Test
@@ -662,6 +682,17 @@ public class DataFrameTest {
     LongSeries in = DataFrame.toSeries(3, 4, 5, 5);
     Grouping.SeriesGrouping grouping = in.groupByExpandingWindow();
     DataFrame out = grouping.aggregate(LongSeries.SUM);
+
+    Assert.assertEquals(out.size(), 4);
+    assertEquals(out.getLongs(Grouping.GROUP_KEY), 0, 1, 2, 3);
+    assertEquals(out.getLongs(Grouping.GROUP_VALUE), 3, 7, 12, 17);
+  }
+
+  @Test
+  public void testLongGroupByExpandingWindowSum() {
+    LongSeries in = DataFrame.toSeries(3, 4, 5, 5);
+    Grouping.SeriesGrouping grouping = in.groupByExpandingWindow();
+    DataFrame out = grouping.sum();
 
     Assert.assertEquals(out.size(), 4);
     assertEquals(out.getLongs(Grouping.GROUP_KEY), 0, 1, 2, 3);

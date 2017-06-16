@@ -10,6 +10,7 @@ public abstract class Grouping {
   public static final String GROUP_KEY = "key";
   public static final String GROUP_VALUE = "value";
 
+  // TODO generate keys on-demand only
   final Series keys;
 
   Grouping(Series keys) {
@@ -43,7 +44,7 @@ public abstract class Grouping {
    * @param s input series to apply grouping to
    * @return group sizes
    */
-  public GroupingDataFrame count(Series s) {
+  GroupingDataFrame count(Series s) {
     long[] values = new long[this.size()];
     for(int i=0; i<this.size(); i++) {
       values[i++] = this.apply(s, i).size();
@@ -51,12 +52,20 @@ public abstract class Grouping {
     return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, LongSeries.buildFrom(values));
   }
 
+  GroupingDataFrame sum(Series s) {
+    Series.Builder builder = s.getBuilder();
+    for(int i=0; i<this.size(); i++) {
+      builder.addSeries(this.apply(s, i).sum());
+    }
+    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+  }
+
   /**
    * Returns the number of groups
    *
    * @return group count
    */
-  public int size() {
+  int size() {
     return this.keys.size();
   }
 
@@ -65,7 +74,7 @@ public abstract class Grouping {
    *
    * @return key series
    */
-  public Series keys() {
+  Series keys() {
     return this.keys;
   }
 
@@ -74,7 +83,7 @@ public abstract class Grouping {
    *
    * @return {@code true} is empty, {@code false} otherwise.
    */
-  public boolean isEmpty() {
+  boolean isEmpty() {
     return this.keys.isEmpty();
   }
 
@@ -94,14 +103,21 @@ public abstract class Grouping {
    * Grouping container referencing a single series. Holds group keys and the indices of group
    * elements in the source series. Enables aggregation with custom user functions.
    */
-  public static class SeriesGrouping extends Grouping {
+  public static class SeriesGrouping {
     final Series source;
     final Grouping grouping;
 
     SeriesGrouping(Series source, Grouping grouping) {
-      super(grouping.keys);
       this.source = source;
       this.grouping = grouping;
+    }
+
+    public int size() {
+      return this.grouping.size();
+    }
+
+    public boolean isEmpty() {
+      return this.grouping.isEmpty();
     }
 
     /**
@@ -117,19 +133,18 @@ public abstract class Grouping {
      * @see Grouping#aggregate(Series, Series.Function)
      */
     public GroupingDataFrame aggregate(Series.Function function) {
-      return super.aggregate(this.source, function);
+      return this.grouping.aggregate(this.source, function);
     }
 
     /**
      * @see Grouping#count(Series)
      */
     public GroupingDataFrame count() {
-      return super.count(this.source);
+      return this.grouping.count(this.source);
     }
 
-    @Override
-    Series apply(Series s, int groupIndex) {
-      return this.grouping.apply(s, groupIndex);
+    public GroupingDataFrame sum() {
+      return this.grouping.sum(this.source);
     }
 
     Series apply(int groupIndex) {
@@ -141,16 +156,23 @@ public abstract class Grouping {
    * Container object for the grouping of multiple rows across different series
    * based on a common key.
    */
-  public static class DataFrameGrouping extends Grouping {
+  public static class DataFrameGrouping {
     final String keyName;
     final DataFrame source;
     final Grouping grouping;
 
     DataFrameGrouping(String keyName, DataFrame source, Grouping grouping) {
-      super(grouping.keys);
       this.keyName = keyName;
       this.source = source;
       this.grouping = grouping;
+    }
+
+    public int size() {
+      return this.grouping.size();
+    }
+
+    public boolean isEmpty() {
+      return this.grouping.isEmpty();
     }
 
     /**
@@ -166,7 +188,7 @@ public abstract class Grouping {
      * @see Grouping#aggregate(Series, Series.Function)
      */
     public GroupingDataFrame aggregate(String seriesName, Series.Function function) {
-      return super.aggregate(this.source.get(seriesName), function)
+      return this.grouping.aggregate(this.source.get(seriesName), function)
           .withKeyName(this.keyName).withValueName(seriesName);
     }
 
@@ -177,16 +199,8 @@ public abstract class Grouping {
      * @return group sizes
      */
     public GroupingDataFrame count() {
-      if(this.source.isEmpty()) {
-        return new GroupingDataFrame(this.keyName, GROUP_VALUE, this.keys, LongSeries.zeros(this.size()));
-      }
       // TODO data frames without index
       return this.grouping.count(this.source.getIndex());
-    }
-
-    @Override
-    Series apply(Series s, int groupIndex) {
-      return this.grouping.apply(s, groupIndex);
     }
 
     Series apply(String seriesName, int groupIndex) {
@@ -418,13 +432,109 @@ public abstract class Grouping {
 
     @Override
     Series apply(Series s, int groupIndex) {
-      return s.slice(groupIndex, groupIndex + this.windowSize);
+      int start = groupIndex + 1 - this.windowSize;
+      if(start < 0)
+        return s.getBuilder().build();
+      return s.slice(start, groupIndex + 1);
+    }
+
+    @Override
+    GroupingDataFrame sum(Series s) {
+      if(super.isEmpty())
+        return super.makeResult(s.getBuilder().build());
+
+      switch(s.type()) {
+        case BOOLEAN:
+        case LONG:
+          return this.sum(s.getLongs());
+        case DOUBLE:
+          return this.sum(s.getDoubles());
+        case STRING:
+          return this.sum(s.getStrings());
+      }
+      return super.sum(s);
+    }
+
+    private GroupingDataFrame sum(LongSeries s) {
+      long[] values = new long[super.size()];
+      long rollingSum = 0;
+
+      // null prefix
+      int nNulls = Math.min(this.windowSize - 1, s.size());
+      for(int i=0; i<nNulls; i++) {
+        rollingSum += s.getLong(i);
+        values[i] = LongSeries.NULL;
+      }
+
+      // first element
+      if(s.size() < this.windowSize)
+        return super.makeResult(LongSeries.buildFrom(values));
+      rollingSum += s.getLong(this.windowSize - 1);
+      values[this.windowSize - 1] = rollingSum;
+
+      // rolling sum
+      for(int i=this.windowSize; i<super.size(); i++) {
+        rollingSum += s.getLong(i) - s.getLong(i - this.windowSize);
+        values[i] = rollingSum;
+      }
+      return super.makeResult(LongSeries.buildFrom(values));
+    }
+
+    private GroupingDataFrame sum(DoubleSeries s) {
+      double[] values = new double[super.size()];
+      double rollingSum = 0;
+
+      // null prefix
+      int nNulls = Math.min(this.windowSize - 1, s.size());
+      for(int i=0; i<nNulls; i++) {
+        rollingSum += s.getDouble(i);
+        values[i] = DoubleSeries.NULL;
+      }
+
+      // first element
+      if(s.size() < this.windowSize)
+        return super.makeResult(DoubleSeries.buildFrom(values));
+      rollingSum += s.getDouble(this.windowSize - 1);
+      values[this.windowSize - 1] = rollingSum;
+
+      // rolling sum
+      for(int i=this.windowSize; i<super.size(); i++) {
+        rollingSum += s.getDouble(i) - s.getDouble(i - this.windowSize);
+        values[i] = rollingSum;
+      }
+      return super.makeResult(DoubleSeries.buildFrom(values));
+    }
+
+    private GroupingDataFrame sum(StringSeries s) {
+      String[] values = new String[super.size()];
+      StringBuilder sb = new StringBuilder();
+
+      // null prefix
+      int nNulls = Math.min(this.windowSize - 1, s.size());
+      for(int i=0; i<nNulls; i++) {
+        sb.append(s.getString(i));
+        values[i] = StringSeries.NULL;
+      }
+
+      // first element
+      if(s.size() < this.windowSize)
+        return super.makeResult(StringSeries.buildFrom(values));
+      sb.append(s.getString(this.windowSize - 1));
+      values[this.windowSize - 1] = sb.toString();
+
+      // rolling sum
+      for(int i=this.windowSize; i<super.size(); i++) {
+        sb.deleteCharAt(0);
+        sb.append(s.getString(i));
+        values[i] = sb.toString();
+      }
+      return super.makeResult(StringSeries.buildFrom(values));
     }
 
     public static GroupingByMovingWindow from(int windowSize, int size) {
       if(windowSize <= 0)
         throw new IllegalArgumentException("windowSize must be > 0");
-      return new GroupingByMovingWindow(LongSeries.sequence(0, size - windowSize + 1), windowSize, size);
+      return new GroupingByMovingWindow(LongSeries.sequence(0, size), windowSize, size);
     }
   }
 
@@ -444,6 +554,53 @@ public abstract class Grouping {
     @Override
     Series apply(Series s, int groupIndex) {
       return s.slice(0, groupIndex + 1);
+    }
+
+    @Override
+    GroupingDataFrame sum(Series s) {
+      if(super.isEmpty())
+        return super.makeResult(s.getBuilder().build());
+
+      switch(s.type()) {
+        case BOOLEAN:
+        case LONG:
+          return this.sum(s.getLongs());
+        case DOUBLE:
+          return this.sum(s.getDoubles());
+        case STRING:
+          return this.sum(s.getStrings());
+      }
+      return super.sum(s);
+    }
+
+    private GroupingDataFrame sum(LongSeries s) {
+      long[] values = new long[super.size()];
+      long rollingSum = 0;
+      for(int i=0; i<super.size(); i++) {
+        rollingSum += s.getLong(i);
+        values[i] = rollingSum;
+      }
+      return super.makeResult(LongSeries.buildFrom(values));
+    }
+
+    private GroupingDataFrame sum(DoubleSeries s) {
+      double[] values = new double[super.size()];
+      double rollingSum = 0;
+      for(int i=0; i<super.size(); i++) {
+        rollingSum += s.getDouble(i);
+        values[i] = rollingSum;
+      }
+      return super.makeResult(DoubleSeries.buildFrom(values));
+    }
+
+    private GroupingDataFrame sum(StringSeries s) {
+      String[] values = new String[super.size()];
+      StringBuilder sb = new StringBuilder();
+      for(int i=0; i<super.size(); i++) {
+        sb.append(s.getString(i));
+        values[i] = sb.toString();
+      }
+      return super.makeResult(StringSeries.buildFrom(values));
     }
 
     public static GroupingByExpandingWindow from(int size) {
@@ -474,5 +631,9 @@ public abstract class Grouping {
     public static GroupingStatic from(Series keys, int[]... buckets) {
       return from(keys, Arrays.asList(buckets));
     }
+  }
+
+  private GroupingDataFrame makeResult(Series s) {
+    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, s);
   }
 }
