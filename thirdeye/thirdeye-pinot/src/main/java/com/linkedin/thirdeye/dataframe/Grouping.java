@@ -440,9 +440,6 @@ public abstract class Grouping {
 
     @Override
     GroupingDataFrame sum(Series s) {
-      if(super.isEmpty())
-        return super.makeResult(s.getBuilder().build());
-
       switch(s.type()) {
         case BOOLEAN:
         case LONG:
@@ -458,24 +455,21 @@ public abstract class Grouping {
     private GroupingDataFrame sum(LongSeries s) {
       long[] values = new long[super.size()];
       long rollingSum = 0;
+      int valueCount = 0;
 
-      // null prefix
-      int nNulls = Math.min(this.windowSize - 1, s.size());
-      for(int i=0; i<nNulls; i++) {
-        rollingSum += s.getLong(i);
-        values[i] = LongSeries.NULL;
-      }
-
-      // first element
-      if(s.size() < this.windowSize)
-        return super.makeResult(LongSeries.buildFrom(values));
-      rollingSum += s.getLong(this.windowSize - 1);
-      values[this.windowSize - 1] = rollingSum;
-
-      // rolling sum
-      for(int i=this.windowSize; i<super.size(); i++) {
-        rollingSum += s.getLong(i) - s.getLong(i - this.windowSize);
-        values[i] = rollingSum;
+      for(int i=0; i<super.size(); i++) {
+        if(!s.isNull(i)) {
+          rollingSum += s.getLong(i);
+          valueCount += 1;
+        } else {
+          valueCount -= 1;
+        }
+        if(i >= this.windowSize && !s.isNull(i - this.windowSize))
+          rollingSum -= s.getLong(i - this.windowSize);
+        if(i >= this.windowSize - 1 && valueCount > 0)
+          values[i] = rollingSum;
+        else
+          values[i] = LongSeries.NULL;
       }
       return super.makeResult(LongSeries.buildFrom(values));
     }
@@ -483,24 +477,21 @@ public abstract class Grouping {
     private GroupingDataFrame sum(DoubleSeries s) {
       double[] values = new double[super.size()];
       double rollingSum = 0;
+      int valueCount = 0;
 
-      // null prefix
-      int nNulls = Math.min(this.windowSize - 1, s.size());
-      for(int i=0; i<nNulls; i++) {
-        rollingSum += s.getDouble(i);
-        values[i] = DoubleSeries.NULL;
-      }
-
-      // first element
-      if(s.size() < this.windowSize)
-        return super.makeResult(DoubleSeries.buildFrom(values));
-      rollingSum += s.getDouble(this.windowSize - 1);
-      values[this.windowSize - 1] = rollingSum;
-
-      // rolling sum
-      for(int i=this.windowSize; i<super.size(); i++) {
-        rollingSum += s.getDouble(i) - s.getDouble(i - this.windowSize);
-        values[i] = rollingSum;
+      for(int i=0; i<super.size(); i++) {
+        if(!s.isNull(i)) {
+          rollingSum += s.getDouble(i);
+          valueCount += 1;
+        } else {
+          valueCount -= 1;
+        }
+        if(i >= this.windowSize && !s.isNull(i - this.windowSize))
+          rollingSum -= s.getDouble(i - this.windowSize);
+        if(i >= this.windowSize - 1 && valueCount > 0)
+          values[i] = rollingSum;
+        else
+          values[i] = DoubleSeries.NULL;
       }
       return super.makeResult(DoubleSeries.buildFrom(values));
     }
@@ -508,25 +499,21 @@ public abstract class Grouping {
     private GroupingDataFrame sum(StringSeries s) {
       String[] values = new String[super.size()];
       StringBuilder sb = new StringBuilder();
+      int valueCount = 0;
 
-      // null prefix
-      int nNulls = Math.min(this.windowSize - 1, s.size());
-      for(int i=0; i<nNulls; i++) {
-        sb.append(s.getString(i));
-        values[i] = StringSeries.NULL;
-      }
-
-      // first element
-      if(s.size() < this.windowSize)
-        return super.makeResult(StringSeries.buildFrom(values));
-      sb.append(s.getString(this.windowSize - 1));
-      values[this.windowSize - 1] = sb.toString();
-
-      // rolling sum
-      for(int i=this.windowSize; i<super.size(); i++) {
-        sb.deleteCharAt(0);
-        sb.append(s.getString(i));
-        values[i] = sb.toString();
+      for(int i=0; i<super.size(); i++) {
+        if(!s.isNull(i)) {
+          sb.append(s.getString(i));
+          valueCount += 1;
+        } else {
+          valueCount -= 1;
+        }
+        if(i >= this.windowSize && !s.isNull(i - this.windowSize))
+          sb.deleteCharAt(0);
+        if(i >= this.windowSize - 1 && valueCount > 0)
+          values[i] = sb.toString();
+        else
+          values[i] = StringSeries.NULL;
       }
       return super.makeResult(StringSeries.buildFrom(values));
     }
@@ -558,9 +545,6 @@ public abstract class Grouping {
 
     @Override
     GroupingDataFrame sum(Series s) {
-      if(super.isEmpty())
-        return super.makeResult(s.getBuilder().build());
-
       switch(s.type()) {
         case BOOLEAN:
         case LONG:
@@ -576,8 +560,15 @@ public abstract class Grouping {
     private GroupingDataFrame sum(LongSeries s) {
       long[] values = new long[super.size()];
       long rollingSum = 0;
-      for(int i=0; i<super.size(); i++) {
-        rollingSum += s.getLong(i);
+      int first = 0;
+      for(; first<super.size(); first++) {
+        if(!s.isNull(first))
+          break;
+        values[first] = LongSeries.NULL;
+      }
+      for(int i=first; i<super.size(); i++) {
+        if(!s.isNull(i))
+          rollingSum += s.getLong(i);
         values[i] = rollingSum;
       }
       return super.makeResult(LongSeries.buildFrom(values));
@@ -586,8 +577,15 @@ public abstract class Grouping {
     private GroupingDataFrame sum(DoubleSeries s) {
       double[] values = new double[super.size()];
       double rollingSum = 0;
-      for(int i=0; i<super.size(); i++) {
-        rollingSum += s.getDouble(i);
+      int first = 0;
+      for(; first<super.size(); first++) {
+        if(!s.isNull(first))
+          break;
+        values[first] = DoubleSeries.NULL;
+      }
+      for(int i=first; i<super.size(); i++) {
+        if(!s.isNull(i))
+          rollingSum += s.getDouble(i);
         values[i] = rollingSum;
       }
       return super.makeResult(DoubleSeries.buildFrom(values));
@@ -596,8 +594,15 @@ public abstract class Grouping {
     private GroupingDataFrame sum(StringSeries s) {
       String[] values = new String[super.size()];
       StringBuilder sb = new StringBuilder();
-      for(int i=0; i<super.size(); i++) {
-        sb.append(s.getString(i));
+      int first = 0;
+      for(; first<super.size(); first++) {
+        if(!s.isNull(first))
+          break;
+        values[first] = StringSeries.NULL;
+      }
+      for(int i=first; i<super.size(); i++) {
+        if(!s.isNull(i))
+          sb.append(s.getString(i));
         values[i] = sb.toString();
       }
       return super.makeResult(StringSeries.buildFrom(values));

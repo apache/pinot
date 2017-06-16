@@ -318,46 +318,6 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return String.valueOf(this.values[index]);
   }
 
-//  public SeriesGrouping groupByInterval(long interval) {
-//    if(interval <= 0)
-//      throw new IllegalArgumentException("interval must be greater than 0");
-//    if(this.size() <= 0)
-//      return new SeriesGrouping(this);
-//
-//    long start = this.min() / interval; // align with interval
-//    long stop = this.max() / interval + 1;
-//
-//    List<Range> ranges = new ArrayList<>();
-//    for(long i=start; i<stop; i++) {
-//      ranges.add(new Range(i * interval, (i+1) * interval));
-//    }
-//
-//    // turn ranges into buckets from original series
-//    // TODO use nlogm solution to find matching range, e.g. ordered tree
-//    long[] keys = new long[ranges.size()];
-//    List<Bucket> buckets = new ArrayList<>();
-//
-//    int i = 0;
-//    for(Range r : ranges) {
-//      ArrayList<Integer> ind = new ArrayList<>();
-//      for(int j=0; j<this.size(); j++) {
-//        if(this.values[j] >= r.lower && this.values[j] < r.upper) {
-//          ind.add(j);
-//        }
-//      }
-//
-//      int[] fromIndex = new int[ind.size()];
-//      for(int j=0; j<ind.size(); j++) {
-//        fromIndex[j] = ind.get(j);
-//      }
-//
-//      buckets.add(new ArrayBucket(fromIndex));
-//      keys[i++] = r.lower;
-//    }
-//
-//    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
-//  }
-
   public LongSeries sum() {
     return this.aggregate(SUM);
   }
