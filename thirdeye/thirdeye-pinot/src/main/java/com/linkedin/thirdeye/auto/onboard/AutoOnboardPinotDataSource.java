@@ -69,8 +69,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     }
   }
 
-
-
   /**
    * Adds a dataset to the thirdeye database
    * @param dataset
@@ -311,6 +309,12 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
       LOG.info("Creating dashboard config for {}", dashboardName);
       DAO_REGISTRY.getDashboardConfigDAO().update(dashboardConfig);
     }
+  }
+
+  @Override
+  public void runAdhoc() {
+    LOG.info("Triggering adhoc run for AutoOnboard Pinot data source");
+    run();
   }
 
 }
