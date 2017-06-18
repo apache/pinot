@@ -11,3 +11,35 @@
   margin-bottom: 0;
   margin-top: 0;
 }
+
+@mixin clearfix-mixin() {
+    &:before,
+    &:after {
+        content: "";
+        display: table;
+    }
+    &:after {
+        clear: both;
+    }
+}
+
+@mixin truncate-mixin() {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+@mixin app-title-mixin() {
+  font-size: 22px;
+  margin-top: 24px;
+  color: app-shade(black, 6);
+  font-weight: normal;
+}
+
+@mixin app-sub-title-mixin() {
+  font-size: 18px;
+  color: app-shade(black, 6);
+  font-weight: 600;
+}

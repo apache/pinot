@@ -1,14 +1,11 @@
 .te-nav {
   background-color: $anolaly-nav-background;
-  font-size: $te-font-size-tiny;
   letter-spacing: $te-nav-letter-spacing;
 
   &__logo {
     float: left;
     color: white;
     margin-right: 60px;
-    padding-left: 31px;
-    background: url('/assets/images/li-logo.svg') left no-repeat;
   }
 
   &__link {
@@ -17,7 +14,6 @@
     height: $te-nav-link-height;
     line-height: $te-nav-link-height;
     text-decoration: none;
-    font-size: $te-font-size-tiny;
 
     &--home,
     &--active {
@@ -31,6 +27,15 @@
 
     &--home {
       font-size: 12px;
+
+      &:before {
+        content: "";
+        width: 30px;
+        height: 30px;
+        display: inline-block;
+        vertical-align: middle;
+        background: url('/app/assets/images/li-logo.svg') left no-repeat;
+      }
     }
 
     &.active:not(.te-nav__link--home) {
@@ -65,11 +70,16 @@
   &__user {
     float: right;
     margin-top: 10px;
+    text-align: right;
   }
 
   &__user-avatar {
     width: 28px;
     height: 28px;
+    float: left;
+    margin-right: 5px;
+    border-radius: 50%;
+    vertical-align: center;
   }
 
 /**
@@ -82,7 +92,8 @@
   }
 
   .glyphicon {
-    color: white;
+    color: app-shade(white, 7);
+    float: left;
   }
 }
 

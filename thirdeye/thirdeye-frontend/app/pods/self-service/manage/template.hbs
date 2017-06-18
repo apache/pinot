@@ -1,48 +1,64 @@
-<h1 class="te-title">Manage Alerts</h1>
-{{outlet}}
+<div class="te-title">Manage Alerts</div>
+<main class="manage-alert-search paper-container">
 
-<div>
-  Search Mode: 
-  <select onchange={{action "onModeChange" value="target.value"}}>
-    {{#each searchModes as |searchMode|}}
-      <option value={{searchMode}} selected={{eq searchMode selectedSearchMode}}>{{searchMode}}</option>
+  <div class="te-sub-title">Search for an existing alert</div>
+
+  <div class="manage-alert-search__wrapper">
+    <div class="manage-alert-search__wrapper--filter">
+      <div class="manage-alert-search__label">Search Mode:</div>
+      {{#power-select
+        selected=selectedSearchMode
+        options=searchModes
+        searchEnabled=false
+        onchange=(action (mut selectedSearchMode))
+        as |name|
+      }}
+        {{name}}
+      {{/power-select}}
+    </div>
+
+    <div class="manage-alert-search__wrapper--search">
+      <div class="manage-alert-search__label">Search for Alert:</div>
+      {{#if (eq selectedSearchMode 'function-name')}}
+        {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          search=(perform searchByFunctionName)
+          searchPlaceholder="Search for an Alert"
+          placeholder="Search by Alert Name"
+          allowClear=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+
+      {{else if (eq selectedSearchMode 'alert-group')}}
+          {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          search=(perform searchByAlertGroup)
+          searchPlaceholder="Search for an Alert"
+          placeholder="Search by Alert Group"
+          allowClear=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="manage-alert-search__results">
+    {{#each selectedAlerts as |alert|}}
+      <h4>{{alert.functionName}}</h4>
+      <ul>
+      {{#each-in alert as |key value|}}
+        <li>{{key}}: {{value}}</li>
+      {{/each-in}}
+      </ul>
     {{/each}}
-  </select>
-</div>
+  </div>
 
-Search for Alert:
-{{#if (eq selectedSearchMode 'function-name')}}
-  {{#power-select 
-    selected=primaryMetric
-    onchange=(action "onAlertChange")
-    search=(perform searchByFunctionName)
-    searchPlaceholder="Search for an Alert"
-    placeholder="Search by Alert Name"
-    allowClear=true
-    as |alert|
-  }}
-    {{alert.functionName}}
-  {{/power-select}}
+  {{outlet}}
 
-{{else if (eq selectedSearchMode 'alert-group')}}
-    {{#power-select 
-    selected=primaryMetric
-    onchange=(action "onAlertChange")
-    search=(perform searchByAlertGroup)
-    searchPlaceholder="Search for an Alert"
-    placeholder="Search by Alert Group"
-    allowClear=true
-    as |alert|
-  }}
-    {{alert.functionName}}
-  {{/power-select}}
-{{/if}}
-
-{{#each selectedAlerts as |alert|}}
-  <h4>{{alert.functionName}}</h4>
-  <ul>
-  {{#each-in alert as |key value|}}
-    <li>{{key}}: {{value}}</li>
-  {{/each-in}}
-  </ul>
-{{/each}}
+</main>

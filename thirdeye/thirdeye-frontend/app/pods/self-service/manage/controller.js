@@ -6,7 +6,7 @@ export default Ember.Controller.extend({
   /**
    * Alerts Search Mode
    */
-  searchModes: ['function-name', 'alert-group'], 
+  searchModes: ['function-name', 'alert-group'],
 
   /**
    * Default Search Mode
@@ -17,7 +17,6 @@ export default Ember.Controller.extend({
    * Array of Alerts we're displaying
    */
   selectedAlerts: [],
-  
 
   /**
    * Handler for serach by function name
@@ -27,7 +26,7 @@ export default Ember.Controller.extend({
     yield timeout(600);
     const url = `/data/autocomplete/functionByName?name=${alert}`;
     return fetch(url)
-      .then(res => res.json()) 
+      .then(res => res.json())
   }),
 
   /**
@@ -38,20 +37,16 @@ export default Ember.Controller.extend({
     yield timeout(600);
     const url = `/data/autocomplete/functionByAlertName?alertName=${alert}`;
     return fetch(url)
-      .then(res => res.json()) 
+      .then(res => res.json())
   }),
 
   actions: {
-    /**
-     * Handles alert selection from type ahead
-     */
+    // Handles alert selection from type ahead
     onAlertChange(alerts) {
-      this.set('selectedAlerts', [alerts]);
+      this.get('selectedAlerts').pushObject(alerts);
     },
-    
-    /**
-     * Handles UI mode change
-     */
+
+    // Handles UI mode change
     onModeChange(mode) {
       this.set('selectedSearchMode', mode);
     },

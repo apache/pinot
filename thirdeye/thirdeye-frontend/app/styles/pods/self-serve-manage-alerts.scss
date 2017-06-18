@@ -1,0 +1,32 @@
+.manage-alert-search {
+  min-height: 200px;
+  letter-spacing: 0.5px;
+
+  &__wrapper {
+    margin-top: 15px;
+
+    &--filter {
+      float: left;
+      min-width: 180px;
+      margin-right: 24px;
+    }
+
+    &--search {
+      float: left;
+      width: 60%;
+      min-width: 300px;
+    }
+  }
+
+  &__label {
+    line-height: 24px;
+    text-transform: uppercase;
+    font-size: 13px;
+  }
+
+  &__results {
+    clear: left;
+  }
+
+}
+
