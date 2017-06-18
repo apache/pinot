@@ -1,7 +1,7 @@
 <main class="container">
   {{#containers/metric-container as |metricList actions|}}
     <div class="rca-header">
-      <div class="te-title">Metric Correlation</div>
+      <h1 class="te-title">Metric Correlation</h1>
       <div class="rca-actions">
         <select onchange={{action "onModeChange" value="target.value"}} class="selectpicker">
           {{#each compareModeOptions as |compareMode|}}
