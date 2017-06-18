@@ -19,10 +19,15 @@
   margin-bottom: 24px;
   font-size: 24px;
   font-weight: normal;
-  color: lighten(black, 25%)
+  color: lighten(black, 25%);
 }
 
 .rca-header {
   display: flex;
   justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.rca-actions {
+  margin-top: 24px;
 }
