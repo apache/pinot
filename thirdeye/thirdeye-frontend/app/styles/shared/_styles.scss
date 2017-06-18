@@ -1,0 +1,16 @@
+/**
+ * Base page styles common to all
+ */
+
+body {
+  background-color: $te-main-background;
+  margin: 0;
+}
+
+.te-title {
+  @include app-title-mixin;
+}
+
+.te-sub-title {
+  @include app-sub-title-mixin;
+}

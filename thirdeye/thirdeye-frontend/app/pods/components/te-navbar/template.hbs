@@ -9,21 +9,23 @@
 
   <ul class="te-nav__list">
     {{#each navItems as |navItem|}}
-      <li class="te-nav__item te-nav__item--{{navItem.className}}">
-        {{#if navItem.isCustomLink}}
-          <a class="te-nav__link nounderline" href="{{navItem.link}}">
-            {{navItem.title}}
-          </a>
-        {{else if navItem.id}}
-          {{#link-to navItem.link navItem.id class="te-nav__link"}}
-            {{navItem.title}}
-          {{/link-to}}
-        {{else}}
-          {{#link-to navItem.link class="te-nav__link"}}
-            {{navItem.title}}
-          {{/link-to}}
-        {{/if}}
-      </li>
+      {{#unless navItem.hidden}}
+        <li class="te-nav__item te-nav__item--{{navItem.className}}">
+          {{#if navItem.isCustomLink}}
+            <a class="te-nav__link nounderline" href="{{navItem.link}}">
+              {{navItem.title}}
+            </a>
+          {{else if navItem.id}}
+            {{#link-to navItem.link navItem.id class="te-nav__link"}}
+              {{navItem.title}}
+            {{/link-to}}
+          {{else}}
+            {{#link-to navItem.link class="te-nav__link"}}
+              {{navItem.title}}
+            {{/link-to}}
+          {{/if}}
+        </li>
+      {{/unless}}
     {{/each}}
   </ul>
 
@@ -31,7 +33,7 @@
     <div class="te-nav__user" role="menu">
       <li class="dropdown">
         <a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
-          <img src="/assets/images/default-avatar.png" alt="User Avatar" class="img-circle te-nav__user-avatar">
+          <img src="/assets/images/default-avatar.png" alt="User Avatar" class="te-nav__user-avatar">
           <i class="glyphicon glyphicon-menu-down"></i>
         </a>
       </li>
