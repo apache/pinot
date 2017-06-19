@@ -858,6 +858,4 @@ public class DataResource {
     }
     return dataGranularity;
   }
-
-
 }

@@ -38,7 +38,6 @@ import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +51,6 @@ public abstract class AbstractManagerTestBase {
   protected RawAnomalyResultManager rawAnomalyResultDAO;
   protected JobManager jobDAO;
   protected TaskManager taskDAO;
-  protected EmailConfigurationManager emailConfigurationDAO;
   protected MergedAnomalyResultManager mergedAnomalyResultDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
@@ -68,6 +66,7 @@ public abstract class AbstractManagerTestBase {
   protected GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   protected OnboardDatasetMetricManager onboardDatasetMetricDAO;
   protected ConfigManager configDAO;
+  protected ApplicationManager applicationDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -88,7 +87,6 @@ public abstract class AbstractManagerTestBase {
       rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
       jobDAO = daoRegistry.getJobDAO();
       taskDAO = daoRegistry.getTaskDAO();
-      emailConfigurationDAO = daoRegistry.getEmailConfigurationDAO();
       mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
       datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
       metricConfigDAO = daoRegistry.getMetricConfigDAO();
@@ -105,6 +103,7 @@ public abstract class AbstractManagerTestBase {
       groupedAnomalyResultsDAO = daoRegistry.getGroupedAnomalyResultsDAO();
       onboardDatasetMetricDAO = daoRegistry.getOnboardDatasetMetricDAO();
       configDAO = daoRegistry.getConfigDAO();
+      applicationDAO = daoRegistry.getApplicationDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

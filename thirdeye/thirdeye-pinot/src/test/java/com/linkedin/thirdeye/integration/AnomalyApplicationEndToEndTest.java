@@ -43,7 +43,6 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -189,9 +188,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // create test anomaly function
     functionId = anomalyFunctionDAO.save(getTestFunctionSpec(metric, collection));
-
-    // create test email configuration
-    emailConfigurationDAO.save(getTestEmailConfiguration(metric, collection));
 
     // create test alert configuration
     alertConfigDAO.save(getTestAlertConfiguration("test alert v2"));

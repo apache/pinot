@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -12,6 +13,7 @@ import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -49,6 +51,7 @@ public class EntityManagerResource {
   private final OverrideConfigManager overrideConfigManager;
   private final AlertConfigManager alertConfigManager;
   private final ClassificationConfigManager classificationConfigManager;
+  private final ApplicationManager applicationManager;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -63,11 +66,12 @@ public class EntityManagerResource {
     this.overrideConfigManager = DAO_REGISTRY.getOverrideConfigDAO();
     this.alertConfigManager = DAO_REGISTRY.getAlertConfigDAO();
     this.classificationConfigManager = DAO_REGISTRY.getClassificationConfigDAO();
+    this.applicationManager = DAO_REGISTRY.getApplicationDAO();
   }
 
   private enum EntityType {
-    ANOMALY_FUNCTION, EMAIL_CONFIGURATION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG,
-    OVERRIDE_CONFIG, ALERT_CONFIG, CLASSIFICATION_CONFIG
+    ANOMALY_FUNCTION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG,
+    OVERRIDE_CONFIG, ALERT_CONFIG, CLASSIFICATION_CONFIG, APPLICATION
   }
 
   @GET
@@ -101,6 +105,9 @@ public class EntityManagerResource {
       break;
     case CLASSIFICATION_CONFIG:
       results.addAll(classificationConfigManager.findAll());
+      break;
+    case APPLICATION:
+      results.addAll(applicationManager.findAll());
       break;
     default:
       throw new WebApplicationException("Unknown entity type : " + entityType);
@@ -159,6 +166,14 @@ public class EntityManagerResource {
           classificationConfigManager.save(classificationConfigDTO);
         } else {
           classificationConfigManager.update(classificationConfigDTO);
+        }
+        break;
+      case APPLICATION:
+        ApplicationDTO applicationDTO = OBJECT_MAPPER.readValue(jsonPayload, ApplicationDTO.class);
+        if (applicationDTO.getId() == null) {
+          applicationManager.save(applicationDTO);
+        } else {
+          applicationManager.update(applicationDTO);
         }
         break;
       }

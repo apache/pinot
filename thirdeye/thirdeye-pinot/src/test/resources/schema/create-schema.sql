@@ -326,3 +326,9 @@ create table if not exists config_index (
 ALTER TABLE `config_index` ADD UNIQUE `config_unique_index`(`namespace`, `name`);
 create index config_namespace_idx on config_index(namespace);
 create index config_name_idx on config_index(name);
+
+create table application_index (
+  application VARCHAR (200) not null,
+  recipients VARCHAR(1000) NOT NULL,
+  base_id bigint(20) not null
+);
