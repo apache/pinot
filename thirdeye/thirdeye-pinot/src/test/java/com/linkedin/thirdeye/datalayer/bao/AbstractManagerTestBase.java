@@ -210,22 +210,6 @@ public abstract class AbstractManagerTestBase {
     return alertConfigDTO;
   }
 
-  protected EmailConfigurationDTO getTestEmailConfiguration(String metricName, String collection) {
-    EmailConfigurationDTO emailConfiguration = new EmailConfigurationDTO();
-    emailConfiguration.setCollection(collection);
-    emailConfiguration.setActive(true);
-    emailConfiguration.setCron("0/10 * * * * ?");
-    emailConfiguration.setFromAddress("thirdeye@linkedin.com");
-    emailConfiguration.setMetric(metricName);
-    emailConfiguration.setSendZeroAnomalyEmail(true);
-    emailConfiguration.setToAddresses("anomaly@linkedin.com");
-    emailConfiguration.setWindowDelay(2);
-    emailConfiguration.setWindowSize(10);
-    emailConfiguration.setWindowUnit(TimeUnit.HOURS);
-    emailConfiguration.setWindowDelayUnit(TimeUnit.HOURS);
-    return emailConfiguration;
-  }
-
   protected ClassificationConfigDTO getTestGroupingConfiguration(List<Long> mainFunctionIdList) {
     ClassificationConfigDTO configDTO = new ClassificationConfigDTO();
     configDTO.setName("classificationJob");

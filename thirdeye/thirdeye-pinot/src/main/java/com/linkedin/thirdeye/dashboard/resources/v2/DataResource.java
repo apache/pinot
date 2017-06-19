@@ -248,7 +248,7 @@ public class DataResource {
    * @return
    */
   @GET
-  @Path("autocomplete/functionsByAppname")
+  @Path("autocomplete/functionByAppname")
   public List<AnomalyFunctionDTO> getAlertsWhereAppNameLike(@QueryParam("appname") String appname) {
     List<AlertConfigDTO> alerts = Collections.emptyList();
     if (StringUtils.isNotBlank(appname)) {
