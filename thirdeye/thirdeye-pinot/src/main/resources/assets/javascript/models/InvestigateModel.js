@@ -37,11 +37,15 @@ InvestigateModel.prototype = {
     return this.anomaly;
   },
 
-  updateFeedback(userFeedback) {
+  updateFeedback(userFeedback, comment) {
     const feedbackString = this.getFeedbackString(userFeedback);
-    this.anomaly.anomalyFeedback = feedbackString;
+    if (this.anomaly.anomalyFeedbackComments === comment
+      && this.anomaly.anomalyFeedback === feedbackString) { return; }
 
-    dataService.updateFeedback(this.anomalyId, userFeedback);
+    this.anomaly.anomalyFeedback = feedbackString;
+    this.anomaly.anomalyFeedbackComments = comment;
+
+    dataService.updateFeedback(this.anomalyId, userFeedback, comment);
   },
 
   getFeedbackString(userFeedback){

@@ -563,6 +563,8 @@ text {
   cursor: pointer;
   color: #0084bf;
   padding: 0 8px;
+  text-shadow: none;
+  opacity: 1;
 }
 
 .thirdeye-link:hover {
@@ -877,12 +879,27 @@ text {
 
 
 /* Investigate */
-.anomaly-feedback{
+.anomaly-feedback {
   background-color: white;
   position: sticky;
   top: 0;
   z-index: 1;
   border-bottom: 1px solid #CCC;
+}
+
+.anomaly-feedback__comment {
+  overflow: hidden;
+  max-height:0;
+  transition: max-height 0.3s ease-out;
+}
+
+.anomaly-feedback:hover .anomaly-feedback__comment {
+  max-height: 200px;
+  transition: max-height 0.3s ease-in;
+}
+
+.anomaly-feedback__comment--show {
+  max-height: 200px;
 }
 
 .anomaly-feedback-title {

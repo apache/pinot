@@ -90,10 +90,17 @@ InvestigateView.prototype = {
     $("#investigate-place-holder").html(template_with_anomaly);
 
     const anomalyFeedback = this.investigateModel.getFeedbackType();
+    const comment = this.investigateModel.anomaly.anomalyFeedbackComments;
 
     if (anomalyFeedback) {
       $(`input[name=feedback-radio][value=${anomalyFeedback}]`).prop('checked', true);
+      $('#anomaly-feedback-comment').removeClass('hidden');
     }
+
+    if (comment && comment.length) {
+      $('#feedback-comment').val(comment);
+    }
+
     this.renderAnomalyChart(this.investigateModel.getAnomaly());
     // this.setupListenerOnViewContributionLink();
     this.setupListenerOnUserFeedback();
@@ -102,6 +109,7 @@ InvestigateView.prototype = {
 
   destroy() {
     $("#investigate-place-holder").children().remove();
+    $(window).unbind('scroll');
   },
 
   signalPhantomJs() {
@@ -111,13 +119,36 @@ InvestigateView.prototype = {
   },
 
   setupListenerOnUserFeedback() {
-    $("input[name=feedback-radio]").change((event) => {
-      const userFeedback = event.target.value;
-      const feedbackString = this.investigateModel.getFeedbackString(userFeedback);
-      this.investigateModel.updateFeedback(userFeedback);
+    const updateFeedback = this.setupUpdateFeedbackEvent.bind(this);
 
-      $('#anomaly-feedback').html(`Resolved (${feedbackString})`);
-    });
+    $("input[name=feedback-radio]").change(updateFeedback);
+    $("#feedback-comment").focusout(updateFeedback);
+    this.setupFeedBackEvent();
+  },
+
+  setupFeedBackEvent() {
+    const navbarHeight = $('.navbar').height();
+    const $window = $(window);
+    const $feedbackElement = $("#anomaly-feedback-comment");
+
+    $window.scroll(function() {
+      if (($window).scrollTop() === 0) {
+        $feedbackElement.addClass('anomaly-feedback__comment--show');
+      } else {
+        $feedbackElement.removeClass('anomaly-feedback__comment--show');
+      }
+    })
+  },
+
+  setupUpdateFeedbackEvent() {
+    const userFeedback = $('input[name=feedback-radio]:checked').val();
+    const comment = $('#feedback-comment').val();
+    const feedbackString = this.investigateModel.getFeedbackString(userFeedback);
+
+    this.investigateModel.updateFeedback(userFeedback, comment);
+
+    $('#anomaly-feedback-comment').removeClass('hidden');
+    $('#anomaly-feedback').html(`Resolved (${feedbackString})`);
   },
 
   renderAnomalyChart(anomaly){
