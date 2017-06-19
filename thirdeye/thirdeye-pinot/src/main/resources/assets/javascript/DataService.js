@@ -170,7 +170,7 @@ DataService.prototype = {
         functionName,
         filterOnly
       };
-      return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+      return this.getDataAsynchronous(url, data, callback, spinner);
     },
 
     // Fetch anomalies for group ids in array
