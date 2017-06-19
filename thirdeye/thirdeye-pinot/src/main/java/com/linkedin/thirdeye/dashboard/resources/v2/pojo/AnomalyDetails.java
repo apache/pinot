@@ -33,6 +33,8 @@ public class AnomalyDetails {
   private String anomalyFunctionProps;
   private String anomalyFunctionDimension;
   private String anomalyFeedback;
+  private String anomalyFeedbackStatus;
+  private String anomalyFeedbackComments;
   private String issueType;
 
   public Long getAnomalyId() {
@@ -219,6 +221,22 @@ public class AnomalyDetails {
     this.anomalyFeedback = anomalyFeedback;
   }
 
+
+  public String getAnomalyFeedbackStatus() {
+    return anomalyFeedbackStatus;
+  }
+
+  public void setAnomalyFeedbackStatus(String anomalyFeedbackStatus) {
+    this.anomalyFeedbackStatus = anomalyFeedbackStatus;
+  }
+
+  public String getAnomalyFeedbackComments() {
+    return anomalyFeedbackComments;
+  }
+
+  public void setAnomalyFeedbackComments(String anomalyFeedbackComments) {
+    this.anomalyFeedbackComments = anomalyFeedbackComments;
+  }
 
   public static String getFeedbackStringFromFeedbackType(AnomalyFeedbackType feedbackType) {
     String feedback = null;

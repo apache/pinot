@@ -924,8 +924,13 @@ public class AnomaliesResource {
           newFilterSet, mergedAnomaly.getDimensions());
       anomalyDetails.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
     }
-    if (mergedAnomaly.getFeedback() != null) {
-      anomalyDetails.setAnomalyFeedback(AnomalyDetails.getFeedbackStringFromFeedbackType(mergedAnomaly.getFeedback().getFeedbackType()));
+    AnomalyFeedback mergedAnomalyFeedback = mergedAnomaly.getFeedback();
+    if (mergedAnomalyFeedback != null) {
+      anomalyDetails.setAnomalyFeedback(AnomalyDetails.getFeedbackStringFromFeedbackType(mergedAnomalyFeedback.getFeedbackType()));
+      if (mergedAnomalyFeedback.getStatus() != null) {
+        anomalyDetails.setAnomalyFeedbackStatus(mergedAnomalyFeedback.getStatus().toString());
+      }
+      anomalyDetails.setAnomalyFeedbackComments(mergedAnomalyFeedback.getComment());
     }
     anomalyDetails.setExternalUrl(externalUrl);
     if (MapUtils.isNotEmpty(mergedAnomaly.getProperties()) && mergedAnomaly.getProperties()
