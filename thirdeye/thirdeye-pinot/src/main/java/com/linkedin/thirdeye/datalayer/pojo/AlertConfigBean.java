@@ -9,6 +9,7 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertConfigBean extends AbstractBean {
   String name;
+  String application;
   String cronExpression;
   boolean active;
   EmailConfig emailConfig;
@@ -16,6 +17,14 @@ public class AlertConfigBean extends AbstractBean {
   AlertGroupConfig alertGroupConfig;
   String recipients;
   String fromAddress;
+
+  public String getApplication() {
+    return application;
+  }
+
+  public void setApplication(String application) {
+    this.application = application;
+  }
 
   public String getCronExpression() {
     return cronExpression;

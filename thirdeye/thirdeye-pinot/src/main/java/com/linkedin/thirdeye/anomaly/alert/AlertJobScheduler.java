@@ -36,6 +36,8 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 /**
  * Scheduler for anomaly detection jobs
  */
+@Deprecated
+// By Alert Job Scheduler V2
 public class AlertJobScheduler implements JobScheduler, Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertJobScheduler.class);

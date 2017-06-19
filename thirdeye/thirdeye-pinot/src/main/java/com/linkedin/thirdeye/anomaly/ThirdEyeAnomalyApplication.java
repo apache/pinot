@@ -38,7 +38,7 @@ public class ThirdEyeAnomalyApplication
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
-  private AlertJobScheduler alertJobScheduler = null;
+//  private AlertJobScheduler alertJobScheduler = null;
   private AlertJobSchedulerV2 alertJobSchedulerV2;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
@@ -113,15 +113,14 @@ public class ThirdEyeAnomalyApplication
           monitorJobScheduler.start();
         }
         if (config.isAlert()) {
-          alertJobScheduler = new AlertJobScheduler();
-          alertJobScheduler.start();
+          // Replaced by AlertJobScheduler V2
+          //alertJobScheduler = new AlertJobScheduler();
+          //alertJobScheduler.start();
+          //environment.jersey().register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
 
           // start alert scheduler v2
           alertJobSchedulerV2 = new AlertJobSchedulerV2();
           alertJobSchedulerV2.start();
-
-          environment.jersey()
-          .register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
         }
         if (config.isMerger()) {
           // anomalyFunctionFactory might have initiated if current machine is also a worker
@@ -159,7 +158,7 @@ public class ThirdEyeAnomalyApplication
           monitorJobScheduler.shutdown();
         }
         if (config.isAlert()) {
-          alertJobScheduler.shutdown();
+          // alertJobScheduler.shutdown();
           alertJobSchedulerV2.shutdown();
         }
         if (config.isMerger()) {

@@ -4,7 +4,7 @@ import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
@@ -43,7 +43,6 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -71,7 +70,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
-  private AlertJobScheduler alertJobScheduler = null;
+  private AlertJobSchedulerV2 alertJobScheduler = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
   private ClassificationJobScheduler classificationJobScheduler = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
@@ -190,9 +189,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     // create test anomaly function
     functionId = anomalyFunctionDAO.save(getTestFunctionSpec(metric, collection));
 
-    // create test email configuration
-    emailConfigurationDAO.save(getTestEmailConfiguration(metric, collection));
-
     // create test alert configuration
     alertConfigDAO.save(getTestAlertConfiguration("test alert v2"));
 
@@ -296,7 +292,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     for (TaskDTO task : tasks) {
       if (task.getTaskType().equals(TaskType.ANOMALY_DETECTION)) {
         detectionCount ++;
-      } else if (task.getTaskType().equals(TaskType.ALERT)) {
+      } else if (task.getTaskType().equals(TaskType.ALERT2)) {
         alertCount ++;
       }
     }
@@ -406,9 +402,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     taskDriver.start();
   }
 
-
   private void startAlertScheduler() throws SchedulerException {
-    alertJobScheduler = new AlertJobScheduler();
+    alertJobScheduler = new AlertJobSchedulerV2();
     alertJobScheduler.start();
   }
 
