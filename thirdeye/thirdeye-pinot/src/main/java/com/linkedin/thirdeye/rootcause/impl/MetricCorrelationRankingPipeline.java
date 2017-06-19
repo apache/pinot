@@ -60,6 +60,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
   private static final String STRATEGY_CORRELATION = "correlation";
   private static final String STRATEGY_EUCLIDEAN = "euclidean";
+  private static final String STRATEGY_STATIC = "static";
 
   private final QueryCache cache;
   private final MetricConfigManager metricDAO;
@@ -343,6 +344,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         return new CorrelationStrategy();
       case STRATEGY_EUCLIDEAN:
         return new EuclideanStrategy();
+      case STRATEGY_STATIC:
+        return new StaticStrategy();
       default:
         throw new IllegalArgumentException(String.format("Unknown strategy '%s'", strategy));
     }
@@ -375,6 +378,13 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     public double score(DoubleSeries target, DoubleSeries candidate) {
       // NOTE: closer is better
       return 1.0 / Math.sqrt(candidate.subtract(target).pow(2).sum().value());
+    }
+  }
+
+  private static class StaticStrategy implements  ScoringStrategy {
+    @Override
+    public double score(DoubleSeries target, DoubleSeries candidate) {
+      return 1.0;
     }
   }
 }
