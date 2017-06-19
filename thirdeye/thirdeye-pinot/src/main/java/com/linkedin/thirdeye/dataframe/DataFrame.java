@@ -38,7 +38,7 @@ public class DataFrame {
    * strategy.
    */
   public interface ResamplingStrategy {
-    DataFrame apply(Series.SeriesGrouping grouping, Series s);
+    Grouping.GroupingDataFrame apply(Grouping grouping, Series s);
   }
 
   /**
@@ -46,65 +46,19 @@ public class DataFrame {
    */
   public static final class ResampleLast implements ResamplingStrategy {
     @Override
-    public DataFrame apply(Series.SeriesGrouping grouping, Series s) {
+    public Grouping.GroupingDataFrame apply(Grouping grouping, Series s) {
       switch(s.type()) {
         case DOUBLE:
-          return grouping.applyTo(s).aggregate(new DoubleSeries.DoubleLast());
+          return grouping.aggregate(s, new DoubleSeries.DoubleLast());
         case LONG:
-          return grouping.applyTo(s).aggregate(new LongSeries.LongLast());
+          return grouping.aggregate(s, new LongSeries.LongLast());
         case STRING:
-          return grouping.applyTo(s).aggregate(new StringSeries.StringLast());
+          return grouping.aggregate(s, new StringSeries.StringLast());
         case BOOLEAN:
-          return grouping.applyTo(s).aggregate(new BooleanSeries.BooleanLast());
+          return grouping.aggregate(s, new BooleanSeries.BooleanLast());
         default:
           throw new IllegalArgumentException(String.format("Cannot resample series type '%s'", s.type()));
       }
-    }
-  }
-
-  /**
-   * Container object for the grouping of multiple rows across different series
-   * based on a common key.
-   */
-  public static final class DataFrameGrouping {
-    final String keyName;
-    final Series keys;
-    final List<Series.Bucket> buckets;
-    final DataFrame source;
-
-    DataFrameGrouping(String keyName, Series keys, DataFrame source, List<Series.Bucket> buckets) {
-      this.keyName = keyName;
-      this.keys = keys;
-      this.buckets = buckets;
-      this.source = source;
-    }
-
-    DataFrameGrouping(Series keys, DataFrame source, List<Series.Bucket> buckets) {
-      this(Series.GROUP_KEY, keys, source, buckets);
-    }
-
-    public int size() {
-      return this.keys.size();
-    }
-
-    public DataFrame source() {
-      return this.source;
-    }
-
-    public boolean isEmpty() {
-      return this.keys.isEmpty();
-    }
-
-    public Series.SeriesGrouping get(String seriesName) {
-      return new Series.SeriesGrouping(this.keys, this.source.get(seriesName), this.buckets);
-    }
-
-    public Series.GroupingDataFrame count() {
-      return new Series.SeriesGrouping(this.keys, null, this.buckets).count();
-    }
-
-    public Series.GroupingDataFrame aggregate(String seriesName, Series.Function function) {
-      return new Series.GroupingDataFrame(this.keyName, seriesName, this.keys, this.get(seriesName).aggregate(function).getValues());
     }
   }
 
@@ -1148,6 +1102,7 @@ public class DataFrame {
   public DataFrame sortedBy(String... seriesNames) {
     DataFrame df = this;
     for(int i=seriesNames.length-1; i>=0; i--) {
+      // TODO support "-series" order inversion
       df = df.project(assertSeriesExists(seriesNames[i]).sortedIndex());
     }
     return df;
@@ -1179,10 +1134,10 @@ public class DataFrame {
    * @throws IllegalArgumentException if the series does not exist
    * @return resampled DataFrame copy
    */
-  public DataFrame resampledBy(String seriesName, long interval, ResamplingStrategy strategy) {
+  public DataFrame resample(String seriesName, long interval, ResamplingStrategy strategy) {
     DataFrame baseDataFrame = this.sortedBy(seriesName);
 
-    Series.SeriesGrouping grouping = baseDataFrame.getLongs(seriesName).groupByInterval(interval);
+    Grouping grouping = Grouping.GroupingByInterval.from(baseDataFrame.get(seriesName), interval);
 
     // resample series
     DataFrame newDataFrame = new DataFrame(this);
@@ -1191,7 +1146,7 @@ public class DataFrame {
     for(Map.Entry<String, Series> e : baseDataFrame.getSeries().entrySet()) {
       if(e.getKey().equals(seriesName))
         continue;
-      newDataFrame.addSeries(e.getKey(), strategy.apply(grouping, e.getValue()).get(Series.GROUP_VALUE));
+      newDataFrame.addSeries(e.getKey(), strategy.apply(grouping, e.getValue()).getValues());
     }
 
     // new series
@@ -1274,75 +1229,99 @@ public class DataFrame {
    * Returns a DataFrameGrouping based on the labels provided by {@code labels} row by row.
    * The size of {@code labels} must match the size of the DataFrame.
    *
+   * @see Grouping.GroupingByValue
+   *
    * @param labels grouping labels
    * @return DataFrameGrouping
    */
-  public DataFrameGrouping groupByValue(Series labels) {
-    Series.SeriesGrouping grouping = labels.groupByValue();
-    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
+  public Grouping.DataFrameGrouping groupByValue(Series labels) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByValue.from(labels));
   }
 
   /**
    * Returns a DataFrameGrouping based on the labels provided by the series referenced by
    * {@code seriesName} row by row.
    *
+   * @see Grouping.GroupingByValue
+   *
    * @param seriesName series containing grouping labels
    * @return DataFrameGrouping
    */
-  public DataFrameGrouping groupByValue(String seriesName) {
-    Series.SeriesGrouping grouping = this.get(seriesName).groupByValue();
-    return new DataFrameGrouping(seriesName, grouping.keys(), this, grouping.buckets);
+  public Grouping.DataFrameGrouping groupByValue(String seriesName) {
+    return new Grouping.DataFrameGrouping(seriesName, this, Grouping.GroupingByValue.from(this.get(seriesName)));
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on the labels provided by {@code labels} row by row.
+   * The size of {@code labels} must match the size of the DataFrame.
+   *
+   * @see Grouping.GroupingByInterval
+   *
+   * @param labels grouping labels
+   * @return DataFrameGrouping
+   */
+  public Grouping.DataFrameGrouping groupByInterval(Series labels, long interval) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByInterval.from(labels, interval));
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on the labels provided by the series referenced by
+   * {@code seriesName} row by row.
+   *
+   * @see Grouping.GroupingByInterval
+   *
+   * @param seriesName series containing grouping labels
+   * @return DataFrameGrouping
+   */
+  public Grouping.DataFrameGrouping groupByValue(String seriesName, long interval) {
+    return new Grouping.DataFrameGrouping(seriesName, this, Grouping.GroupingByInterval.from(this.get(seriesName), interval));
   }
 
   /**
    * Returns a DataFrameGrouping based on items counts.
    *
-   * @see Series#groupByCount(int)
+   * @see Grouping.GroupingByCount
    *
    * @param count item count
    * @return DataFrameGrouping
    */
-  public DataFrameGrouping groupByCount(int count) {
-    Series.SeriesGrouping grouping = Series.groupByCount(this.size(), count);
-    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
+  public Grouping.DataFrameGrouping groupByCount(int count) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByCount.from(count, this.size()));
   }
 
   /**
    * Returns a DataFrameGrouping based on partition counts.
    *
-   * @see Series#groupByPartitions(int)
+   * @see Grouping.GroupingByPartitions
    *
    * @param partitionCount item count
    * @return DataFrameGrouping
    */
-  public DataFrameGrouping groupByPartitions(int partitionCount) {
-    Series.SeriesGrouping grouping = Series.groupByPartitions(this.size(), partitionCount);
-    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
+  public Grouping.DataFrameGrouping groupByPartitions(int partitionCount) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByPartitions.from(partitionCount, this.size()));
   }
 
   /**
    * Returns a DataFrameGrouping based on a moving window.
    *
-   * @see Series#groupByMovingWindow(int)
+   * @see Grouping.GroupingByMovingWindow
    *
    * @param windowSize moving window size
    * @return DataFrameGrouping
    */
-  public DataFrameGrouping groupByMovingWindow(int windowSize) {
-    Series.SeriesGrouping grouping = Series.groupByMovingWindow(this.size(), windowSize);
-    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
+  public Grouping.DataFrameGrouping groupByMovingWindow(int windowSize) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByMovingWindow.from(windowSize, this.size()));
   }
 
   /**
    * Returns a DataFrameGrouping based on an expanding window.
    *
-   * @see Series#groupByExpandingWindow()
+   * @see Grouping.GroupingByExpandingWindow
    *
    * @return DataFrameGrouping
    */
-  public DataFrameGrouping groupByExpandingWindow() {
-    Series.SeriesGrouping grouping = Series.groupByExpandingWindow(this.size());
-    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
+  public Grouping.DataFrameGrouping groupByExpandingWindow() {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByExpandingWindow.from(this.size()));
   }
 
   /**

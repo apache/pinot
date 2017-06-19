@@ -6,7 +6,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.lang.ArrayUtils;
 
 
 /**
@@ -185,6 +184,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return builder().fillValues(size, value).build();
   }
 
+  public static LongSeries sequence(long from, int count) {
+    long[] values = new long[count];
+    for(int i=0; i<count; i++) {
+      values[i] = from + i;
+    }
+    return buildFrom(values);
+  }
+
   // CAUTION: The array is final, but values are inherently modifiable
   final long[] values;
 
@@ -283,28 +290,6 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return Arrays.asList(values);
   }
 
-  /**
-   * Returns the value of the first element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return first element in the series
-   */
-  public long first() {
-    assertNotEmpty(this.values);
-    return this.values[0];
-  }
-
-  /**
-   * Returns the value of the last element in the series
-   *
-   * @throws IllegalStateException if the series is empty
-   * @return last element in the series
-   */
-  public long last() {
-    assertNotEmpty(this.values);
-    return this.values[this.values.length-1];
-  }
-
   @Override
   public LongSeries slice(int from, int to) {
     return buildFrom(Arrays.copyOfRange(this.values, from, to));
@@ -333,60 +318,32 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return String.valueOf(this.values[index]);
   }
 
-  public SeriesGrouping groupByInterval(long interval) {
-    if(interval <= 0)
-      throw new IllegalArgumentException("interval must be greater than 0");
-    if(this.size() <= 0)
-      return new SeriesGrouping(this);
-
-    long start = this.min() / interval; // align with interval
-    long stop = this.max() / interval + 1;
-
-    List<Range> ranges = new ArrayList<>();
-    for(long i=start; i<stop; i++) {
-      ranges.add(new Range(i * interval, (i+1) * interval));
-    }
-
-    // turn ranges into buckets from original series
-    // TODO use nlogm solution to find matching range, e.g. ordered tree
-    long[] keys = new long[ranges.size()];
-    List<Bucket> buckets = new ArrayList<>();
-
-    int i = 0;
-    for(Range r : ranges) {
-      ArrayList<Integer> ind = new ArrayList<>();
-      for(int j=0; j<this.size(); j++) {
-        if(this.values[j] >= r.lower && this.values[j] < r.upper) {
-          ind.add(j);
-        }
-      }
-
-      int[] fromIndex = new int[ind.size()];
-      for(int j=0; j<ind.size(); j++) {
-        fromIndex[j] = ind.get(j);
-      }
-
-      buckets.add(new Bucket(fromIndex));
-      keys[i++] = r.lower;
-    }
-
-    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
+  public LongSeries sum() {
+    return this.aggregate(SUM);
   }
 
-  public long min() {
-    return this.aggregate(MIN).value();
+  public LongSeries product() {
+    return this.aggregate(PRODUCT);
   }
 
-  public long max() {
-    return this.aggregate(MAX).value();
+  public LongSeries min() {
+    return this.aggregate(MIN);
   }
 
-  public long sum() {
-    return this.aggregate(SUM).value();
+  public LongSeries max() {
+    return this.aggregate(MAX);
   }
 
-  public long product() {
-    return this.aggregate(PRODUCT).value();
+  public DoubleSeries mean() {
+    return this.aggregate(DoubleSeries.MEAN);
+  }
+
+  public DoubleSeries median() {
+    return this.aggregate(DoubleSeries.MEDIAN);
+  }
+
+  public DoubleSeries std() {
+    return this.aggregate(DoubleSeries.STD);
   }
 
   public LongSeries add(Series other) {

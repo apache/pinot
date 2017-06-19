@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -178,7 +179,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
       }
     }, KEY, DIMENSION, VALUE);
 
-    DataFrame.DataFrameGrouping grouping = dfScore.groupByValue(KEY);
+    Grouping.DataFrameGrouping grouping = dfScore.groupByValue(KEY);
     DataFrame sumCost = grouping.aggregate(COST, DoubleSeries.SUM).fillNull(COST);
     DataFrame dimension = grouping.aggregate(DIMENSION, StringSeries.FIRST);
     DataFrame value = grouping.aggregate(VALUE, StringSeries.FIRST);
@@ -187,8 +188,8 @@ public class DimensionAnalysisPipeline extends Pipeline {
     // truncate results to most important dimensions
     DataFrame trunc = sumCost.sortedBy(COST);
 
-    final double total = sumCost.getDoubles(COST).sum();
-    final double truncTotal = trunc.getDoubles(COST).sum();
+    final double total = sumCost.getDoubles(COST).sum().value();
+    final double truncTotal = trunc.getDoubles(COST).sum().value();
     LOG.info("Using {} out of {} scored dimensions, explaining {} of total differences", trunc.size(), sumCost.size(), truncTotal / total);
 
     DataFrame result = trunc.joinLeft(dimension).joinLeft(value);
@@ -269,7 +270,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
     df.addSeries(DIMENSION, dim);
     df.addSeries(VALUE, value);
 
-    if(sCost.sum() > 0.0) {
+    if(sCost.sum().value() > 0.0) {
       df.addSeries(COST, sCost.divide(sCost.sum()));
     } else {
       df.addSeries(COST, sCost);

@@ -374,7 +374,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     @Override
     public double score(DoubleSeries target, DoubleSeries candidate) {
       // NOTE: closer is better
-      return 1.0 / Math.sqrt(candidate.subtract(target).pow(2).sum());
+      return 1.0 / Math.sqrt(candidate.subtract(target).pow(2).sum().value());
     }
   }
 }
