@@ -356,7 +356,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         int dictId = iBuf.get(i);
         if (dictId != NULL_VALUE_INDEX) {
-          if (rawValue.equals(get(dictId))) {
+          if (equalsValueAt(dictId, rawValue)) {
             return dictId;
           }
         }
@@ -387,7 +387,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
           iBuf.put(i, _numEntries++);
           return;
         }
-        if (value.equals(get(dictId))) {
+        if (equalsValueAt(dictId, value)) {
           return;
         }
       }
@@ -474,6 +474,12 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return rowsWith1Col;
   }
 
+  protected boolean equalsValueAt(int dictId, Object value) {
+    if (value.equals(get(dictId))) {
+      return true;
+    }
+    return false;
+  }
 
   public abstract void doClose() throws IOException;
 

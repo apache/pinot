@@ -117,7 +117,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   public static PinotByteBuffer allocateDirect(long size, String context) {
-    Preconditions.checkArgument(size >= 0 && size < Integer.MAX_VALUE);
+    Preconditions.checkArgument(size >= 0 && size < Integer.MAX_VALUE, "bad value for size " + size);
     Preconditions.checkNotNull(context);
 
     ByteBuffer bb = MmapUtils.allocateDirectByteBuffer( (int)size, null, context);
