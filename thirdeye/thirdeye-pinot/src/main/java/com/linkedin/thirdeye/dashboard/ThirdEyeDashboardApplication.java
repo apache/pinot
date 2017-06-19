@@ -130,7 +130,7 @@ public class ThirdEyeDashboardApplication
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     if(config.getRootCause() != null) {
-//      env.jersey().register(makeRootCauseResource(config));
+      env.jersey().register(makeRootCauseResource(config));
     }
   }
 
