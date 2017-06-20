@@ -86,14 +86,26 @@ public class DataFrameTest {
     Assert.assertEquals(dfChained, dfSeparate);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class, dataProvider = "testSeriesNameFailProvider")
-  public void testSeriesNameFail(String name) {
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSeriesNameNullFail() {
+    df.addSeries(null, VALUES_DOUBLE);
+  }
+
+  @Test(dataProvider = "testSeriesNameExceptionalProvider")
+  public void testSeriesNameExceptional(String name) {
     df.addSeries(name, VALUES_DOUBLE);
   }
 
-  @DataProvider(name = "testSeriesNameFailProvider")
+  @Test(dataProvider = "testSeriesNameExceptionalProvider")
+  public void testSeriesNameExceptionalExpression(String name) {
+    df.addSeries(name, 1, 2, 3, 4, 5);
+    DoubleSeries s = df.map(String.format("${%s}", name));
+    assertEquals(s, 1, 2, 3, 4, 5);
+  }
+
+  @DataProvider(name = "testSeriesNameExceptionalProvider")
   public Object[][] testSeriesNameFailProvider() {
-    return new Object[][] { { null }, { "" }, { "1a" }, { "a,b" }, { "a-b" }, { "a+b" }, { "a*b" }, { "a/b" }, { "a=b" }, { "a>b" } };
+    return new Object[][] { { "" }, { "1a" }, { "a,b" }, { "a-b" }, { "a+b" }, { "a*b" }, { "a/b" }, { "a=b" }, { "a>b" } };
   }
 
   @Test
@@ -1238,7 +1250,7 @@ public class DataFrameTest {
 
   @Test
   public void testMapExpression() {
-    DoubleSeries s = df.map("(double * 2 + long + boolean) / 2");
+    DoubleSeries s = df.map("(${double} * 2 + ${long} + ${boolean}) / 2");
     assertEquals(s, -2.6, 0.9, 0.0, 1.5, 2.8);
   }
 
@@ -1246,7 +1258,7 @@ public class DataFrameTest {
   public void testMapExpressionNull() {
     DataFrame mdf = new DataFrame(VALUES_LONG)
         .addSeries("null", 1.0, 1.0, DNULL, 1.0, 1.0);
-    DoubleSeries out = mdf.map("null + 1");
+    DoubleSeries out = mdf.map("${null} + 1");
     assertEquals(out, 2.0, 2.0, DNULL, 2.0, 2.0);
   }
 
@@ -1255,14 +1267,14 @@ public class DataFrameTest {
     DataFrame mdf = new DataFrame(VALUES_LONG)
         .addSeries("null", 1.0, 1.0, DNULL, 1.0, 1.0)
         .addSeries("notnull", 1.0, 1.0, 1.0, 1.0, 1.0);
-    mdf.map("notnull + 1");
+    mdf.map("${notnull} + 1");
   }
 
   @Test
   public void testMapExpressionWithNull() {
     DataFrame mdf = new DataFrame(VALUES_LONG)
         .addSeries("null", 1.0, 1.0, DNULL, 1.0, 1.0);
-    DoubleSeries s = mdf.map("null + 1");
+    DoubleSeries s = mdf.map("${null} + 1");
     assertEquals(s, 2.0, 2.0, DNULL, 2.0, 2.0);
   }
 
@@ -2536,7 +2548,7 @@ public class DataFrameTest {
 
   private static void assertEquals(double[] actual, double... expected) {
     if(actual.length != expected.length)
-      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+      Assert.fail(String.format("expected array length [%d] but found [%d]", expected.length, actual.length));
     for(int i=0; i<actual.length; i++) {
       if(Double.isNaN(actual[i]) && Double.isNaN(expected[i]))
         continue;
@@ -2550,7 +2562,7 @@ public class DataFrameTest {
 
   private static void assertEquals(long[] actual, long... expected) {
     if(actual.length != expected.length)
-      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+      Assert.fail(String.format("expected array length [%d] but found [%d]", expected.length, actual.length));
     for(int i=0; i<actual.length; i++) {
       Assert.assertEquals(actual[i], expected[i], "index=" + i);
     }
@@ -2562,7 +2574,7 @@ public class DataFrameTest {
 
   private static void assertEquals(String[] actual, String... expected) {
     if(actual.length != expected.length)
-      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+      Assert.fail(String.format("expected array length [%d] but found [%d]", expected.length, actual.length));
     for(int i=0; i<actual.length; i++) {
       Assert.assertEquals(actual[i], expected[i], "index=" + i);
     }
@@ -2581,7 +2593,7 @@ public class DataFrameTest {
 
   private static void assertEquals(byte[] actual, byte... expected) {
     if(actual.length != expected.length)
-      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+      Assert.fail(String.format("expected array length [%d] but found [%d]", expected.length, actual.length));
     for(int i=0; i<actual.length; i++) {
       Assert.assertEquals(actual[i], expected[i], "index=" + i);
     }
@@ -2589,7 +2601,7 @@ public class DataFrameTest {
 
   private static void assertEquals(boolean[] actual, boolean... expected) {
     if(actual.length != expected.length)
-      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+      Assert.fail(String.format("expected array length [%d] but found [%d]", expected.length, actual.length));
     for(int i=0; i<actual.length; i++) {
       Assert.assertEquals(actual[i], expected[i], "index=" + i);
     }

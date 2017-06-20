@@ -26,7 +26,7 @@ import org.apache.commons.csv.CSVRecord;
  * Container class for a data frame with multiple typed series with equivalent row count.
  */
 public class DataFrame {
-  public static Pattern SERIES_NAME_PATTERN = Pattern.compile("([A-Za-z_]\\w*)");
+  public static final Pattern PATTERN_FORMULA_VARIABLE = Pattern.compile("\\$\\{([^}]*)}");
 
   public static final String COLUMN_INDEX_DEFAULT = "index";
   public static final String COLUMN_JOIN_LEFT = "_left";
@@ -530,8 +530,8 @@ public class DataFrame {
    * @return reference to the modified DataFrame (this)
    */
   public DataFrame addSeries(String seriesName, Series series) {
-    if(seriesName == null || !SERIES_NAME_PATTERN.matcher(seriesName).matches())
-      throw new IllegalArgumentException(String.format("Series name must match pattern '%s'", SERIES_NAME_PATTERN));
+    if(seriesName == null)
+      throw new IllegalArgumentException("series name must not be null");
     if(!this.series.isEmpty() && series.size() != this.size())
       throw new IllegalArgumentException("DataFrame index and series must be of same length");
     this.series.put(seriesName, series);
@@ -1040,13 +1040,22 @@ public class DataFrame {
    * @return series with evaluation results
    */
   public DoubleSeries map(String doubleExpression, final String... seriesNames) {
+    // TODO support escaping of "}"
+    final String[] vars = new String[seriesNames.length];
+    for(int i=0; i<seriesNames.length; i++) {
+      String pattern = String.format("${%s}", seriesNames[i]);
+      String replace = String.format("__%d", i);
+      vars[i] = replace;
+      doubleExpression = doubleExpression.replace(pattern, replace);
+    }
+
     final Expression e = new Expression(doubleExpression);
 
     return (DoubleSeries)this.map(new Series.DoubleFunction() {
       @Override
       public double apply(double[] values) {
         for(int i=0; i<values.length; i++) {
-          e.with(seriesNames[i], new BigDecimal(values[i]));
+          e.with(vars[i], new BigDecimal(values[i]));
         }
         return e.eval().doubleValue();
       }
@@ -1653,12 +1662,15 @@ public class DataFrame {
   }
 
   Set<String> extractSeriesNames(String doubleExpression) {
-    Matcher m = SERIES_NAME_PATTERN.matcher(doubleExpression);
+    Matcher m = PATTERN_FORMULA_VARIABLE.matcher(doubleExpression);
 
     Set<String> variables = new HashSet<>();
     while(m.find()) {
-      if(this.series.keySet().contains(m.group()))
-        variables.add(m.group());
+      if(this.series.keySet().contains(m.group(1))) {
+        variables.add(m.group(1));
+      } else {
+        throw new IllegalArgumentException(String.format("Could not resolve variable '%s'", m.group()));
+      }
     }
 
     return variables;
@@ -1699,9 +1711,6 @@ public class DataFrame {
       if(Pattern.compile("\\A[0-9]").matcher(name).find())
         name = "_" + name;
 
-      if(!SERIES_NAME_PATTERN.matcher(name).matches()) {
-        throw new IllegalArgumentException(String.format("Series name must match pattern '%s'", SERIES_NAME_PATTERN));
-      }
       header2name.put(h, name);
     }
 
