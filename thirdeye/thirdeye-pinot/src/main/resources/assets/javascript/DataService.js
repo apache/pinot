@@ -246,7 +246,7 @@ DataService.prototype = {
   },
 
   fetchRootCauseData(currentEnd, baselineEnd, windowSize, inputUrn) {
-    const url = `/rootcause/queryRootCause?current=${currentEnd}&baseline=${baselineEnd}&windowSize=${windowSize}&urn=${inputUrn}`;
+    const url = `/rootcause/query?framework=rootCause&current=${currentEnd}&baseline=${baselineEnd}&windowSize=${windowSize}&urns=${inputUrn}`;
     return this.getDataAsynchronous(url, {}, null, 'rootcause-table-spin-area');
   }
 };

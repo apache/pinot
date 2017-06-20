@@ -3,7 +3,7 @@ import fetch from 'fetch';
 import Ember from 'ember';
 import moment from 'moment'
 /**
- * Define the metric action types 
+ * Define the metric action types
  */
 export const ActionTypes = {
   LOADING: type('[Metric] Loading'),
@@ -79,8 +79,8 @@ function fetchRelatedMetricIds() {
     const store = getState();
 
     let {
-      primaryMetricId: metricId, 
-      currentStart: startDate, 
+      primaryMetricId: metricId,
+      currentStart: startDate,
       currentEnd: endDate
     } = store.metrics;
 
@@ -89,12 +89,12 @@ function fetchRelatedMetricIds() {
 
     const baselineStart = moment(startDate).subtract(1, 'week').valueOf();
     const windowSize = Math.max(endDate - startDate, 0);
- 
+
     if (!metricId) {
       return Promise.reject(new Error("Must provide a metricId"));
     }
     // todo: identify better way for query params
-    return fetch(`/rootcause/queryRelatedMetrics?current=${startDate}&baseline=${baselineStart}&windowSize=${windowSize}&metricUrn=thirdeye:metric:${metricId}`)
+    return fetch(`/rootcause/query?framework=relatedMetrics&current=${startDate}&baseline=${baselineStart}&windowSize=${windowSize}&urns=thirdeye:metric:${metricId}`)
       .then(res => res.json())
       .then(res => dispatch(loadRelatedMetricIds(res)))
       .catch(() => {
@@ -105,7 +105,7 @@ function fetchRelatedMetricIds() {
 
 /**
  * Initialize store with metric data from query params
- * @param {*} metric 
+ * @param {*} metric
  */
 function setPrimaryMetric(metric) {
   return (dispatch) => {
@@ -120,12 +120,12 @@ function setPrimaryMetric(metric) {
 function fetchRegions() {
   return (dispatch, getState) => {
     const store = getState();
-    const { 
-      primaryMetricId, 
-      relatedMetricIds, 
-      filters, 
-      currentStart, 
-      currentEnd 
+    const {
+      primaryMetricId,
+      relatedMetricIds,
+      filters,
+      currentStart,
+      currentEnd
     } = store.metrics;
 
     const metricIds = [primaryMetricId, ...relatedMetricIds].join(',');
@@ -146,12 +146,12 @@ function fetchRegions() {
 function fetchRelatedMetricData() {
   return (dispatch, getState) => {
     const store = getState();
-    const { 
-      primaryMetricId, 
-      filters, 
-      granularity, 
-      currentStart, 
-      currentEnd, 
+    const {
+      primaryMetricId,
+      filters,
+      granularity,
+      currentStart,
+      currentEnd,
       relatedMetricIds,
       compareMode
     } = store.metrics;
