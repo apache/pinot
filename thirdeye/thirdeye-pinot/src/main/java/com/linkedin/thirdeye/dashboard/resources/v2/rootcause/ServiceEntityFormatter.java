@@ -7,6 +7,8 @@ import com.linkedin.thirdeye.rootcause.impl.ServiceEntity;
 
 
 public class ServiceEntityFormatter extends RootCauseEntityFormatter {
+  public static final String TYPE_SERVICE = "service";
+
   @Override
   public boolean applies(Entity entity) {
     return entity instanceof ServiceEntity;
@@ -15,6 +17,6 @@ public class ServiceEntityFormatter extends RootCauseEntityFormatter {
   @Override
   public RootCauseEntity format(Entity entity) {
     ServiceEntity e = (ServiceEntity) entity;
-    return makeRootCauseEntity(entity, "service", e.getName(), "javascript:void(0);");
+    return makeRootCauseEntity(entity, TYPE_SERVICE, e.getName(), null);
   }
 }

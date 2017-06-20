@@ -10,6 +10,8 @@ import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 
 
 public class MetricEntityFormatter extends RootCauseEntityFormatter {
+  public static final String TYPE_METRIC = "metric";
+
   private final MetricConfigManager metricDAO;
 
   public MetricEntityFormatter(MetricConfigManager metricDAO) {
@@ -32,6 +34,6 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
     MetricConfigDTO dto = this.metricDAO.findById(e.getId());
     String label = String.format("%s::%s", dto.getDataset(), dto.getName());
 
-    return makeRootCauseEntity(entity, "metric", label, "javascript:void(0);");
+    return makeRootCauseEntity(entity, TYPE_METRIC, label, null);
   }
 }

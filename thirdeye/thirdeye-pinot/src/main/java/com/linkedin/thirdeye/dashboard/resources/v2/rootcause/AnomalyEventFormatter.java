@@ -41,9 +41,8 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
 
     MergedAnomalyResultDTO dto = e.getDto();
     String label = dto.getFunction().getFunctionName();
-    String link =  "javascript:void(0);";
 
-    RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, dto.getStartTime(), dto.getEndTime(), "");
+    RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, null, dto.getStartTime(), dto.getEndTime(), null);
 
     // TODO use metric id when available
     String metric = dto.getMetric();

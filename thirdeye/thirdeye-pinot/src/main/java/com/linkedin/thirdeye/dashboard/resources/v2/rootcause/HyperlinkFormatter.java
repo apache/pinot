@@ -7,6 +7,8 @@ import com.linkedin.thirdeye.rootcause.impl.HyperlinkEntity;
 
 
 public class HyperlinkFormatter extends RootCauseEntityFormatter {
+  public static final String TYPE_HYPERLINK = "hyperlink";
+
   @Override
   public boolean applies(Entity entity) {
     return entity instanceof HyperlinkEntity;
@@ -15,6 +17,6 @@ public class HyperlinkFormatter extends RootCauseEntityFormatter {
   @Override
   public RootCauseEntity format(Entity entity) {
     HyperlinkEntity e = (HyperlinkEntity) entity;
-    return makeRootCauseEntity(entity, "hyperlink", e.getUrl(), e.getUrl());
+    return makeRootCauseEntity(entity, TYPE_HYPERLINK, e.getUrl(), e.getUrl());
   }
 }

@@ -15,6 +15,6 @@ public class DefaultEventEntityFormatter extends RootCauseEventEntityFormatter {
   @Override
   public RootCauseEventEntity format(EventEntity entity) {
     String label = String.format("%s %d", entity.getEventType(), entity.getId());
-    return makeRootCauseEventEntity(entity, label, "javascript:void(0);", -1, -1, "");
+    return makeRootCauseEventEntity(entity, label, null, -1, -1, null);
   }
 }

@@ -10,6 +10,8 @@ import com.linkedin.thirdeye.rootcause.Entity;
  * a fallback.
  */
 public class DefaultEntityFormatter extends RootCauseEntityFormatter {
+  public static final String TYPE_OTHER = "other";
+
   @Override
   public boolean applies(Entity entity) {
     return true;
@@ -17,6 +19,6 @@ public class DefaultEntityFormatter extends RootCauseEntityFormatter {
 
   @Override
   public RootCauseEntity format(Entity entity) {
-    return makeRootCauseEntity(entity, "Other", "(none)", "javascript:void(0);");
+    return makeRootCauseEntity(entity, TYPE_OTHER, entity.getUrn(), null);
   }
 }
