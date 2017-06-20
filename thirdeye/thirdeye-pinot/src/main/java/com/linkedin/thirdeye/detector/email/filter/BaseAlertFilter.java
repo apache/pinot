@@ -27,14 +27,12 @@ public abstract class BaseAlertFilter implements AlertFilter {
     Class c = this.getClass();
     for (String fieldName : getPropertyNames()) {
       Double value = null;
-      String strVal = null;
+      String fieldVal = null;
       // Get user's value for the specified field
       if (parameterSetting.containsKey(fieldName)) {
-        String fieldVal = parameterSetting.get(fieldName);
+        fieldVal = parameterSetting.get(fieldName);
         if (NumberUtils.isNumber(fieldVal)) {
           value = Double.parseDouble(parameterSetting.get(fieldName));
-        } else {
-          strVal = fieldVal;
         }
       } else {
         // If user's value does not exist, try to get the default value from Class definition
@@ -45,7 +43,7 @@ public abstract class BaseAlertFilter implements AlertFilter {
           if (field.getType().equals(Double.class) || field.getType().equals(double.class)) {
             value = (Double) field.get(this);
           } else {
-            strVal = field.get(this).toString();
+            fieldVal = field.get(this).toString();
           }
           field.setAccessible(accessible);
         } catch (NoSuchFieldException | IllegalAccessException e) {
@@ -53,7 +51,7 @@ public abstract class BaseAlertFilter implements AlertFilter {
               c.getSimpleName(), e.toString());
         }
         // If failed to get the default value from Class definition, then use value 0d
-        if (value == null && strVal == null) {
+        if (value == null && fieldVal == null) {
           value = 0d;
         }
         LOG.warn("Unable to read the setting for the field {} of class {}; the value {} is used.", fieldName,
@@ -68,7 +66,7 @@ public abstract class BaseAlertFilter implements AlertFilter {
           field.set(this, value);
         }
         else if (field.getType().equals(String.class)) {
-            field.set(this, strVal);
+            field.set(this, fieldVal);
           }
         else {
          throw new IllegalAccessException ("Field type is neither Double or String, cannot set value!");
