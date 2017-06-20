@@ -8,8 +8,6 @@ public class RootCauseConfiguration {
   int parallelism = 1;
   String definitionsPath = "rca.yml";
   List<String> formatters = Collections.emptyList();
-  String rootCauseFramework;
-  String relatedMetricsFramework;
 
   public int getParallelism() {
     return parallelism;
@@ -35,19 +33,4 @@ public class RootCauseConfiguration {
     this.formatters = formatters;
   }
 
-  public String getRootCauseFramework() {
-    return rootCauseFramework;
-  }
-
-  public void setRootCauseFramework(String rootCauseFramework) {
-    this.rootCauseFramework = rootCauseFramework;
-  }
-
-  public String getRelatedMetricsFramework() {
-    return relatedMetricsFramework;
-  }
-
-  public void setRelatedMetricsFramework(String relatedMetricsFramework) {
-    this.relatedMetricsFramework = relatedMetricsFramework;
-  }
 }

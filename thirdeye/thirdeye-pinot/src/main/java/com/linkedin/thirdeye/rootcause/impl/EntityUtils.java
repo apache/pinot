@@ -81,6 +81,38 @@ public class EntityUtils {
   }
 
   /**
+   * Normalizes scores among a set of entities to a range between {@code 0.0} and {@code 1.0}.
+   *
+   * @param entities entities
+   * @return entities with normalized scores
+   */
+  public static Set<Entity> normalizeScores(Set<? extends Entity> entities) {
+    double min = Double.MAX_VALUE;
+    double max = Double.MIN_VALUE;
+
+    for(Entity e : entities) {
+      min = Math.min(e.getScore(), min);
+      max = Math.max(e.getScore(), max);
+    }
+
+    double range = max - min;
+    Set<Entity> out = new HashSet<>();
+
+    if(range <= 0) {
+      for(Entity e : entities) {
+        out.add(e.withScore(1.0));
+      }
+      return out;
+    }
+
+    for(Entity e : entities) {
+      out.add(e.withScore((e.getScore() - min) / range));
+    }
+
+    return out;
+  }
+
+  /**
    * Attemps to parse {@code urn} and return a specific Entity subtype with the given {@code score}
    * Supports {@code MetricEntity}, {@code DimensionEntity}, {@code TimeRangeEntity}, and
    * {@code ServiceEntity}.
