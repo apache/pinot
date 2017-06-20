@@ -1,0 +1,115 @@
+<h1 class="te-title">Manage Alerts</h1>
+<main class="manage-alert-search paper-container">
+
+  <div class="te-sub-title">Search for an existing alert</div>
+
+  <div class="manage-alert-search__wrapper">
+    <div class="manage-alert-search__wrapper--filter">
+      <div class="manage-alert-search__label">Search By:</div>
+      {{#power-select
+        selected=selectedSearchMode
+        options=searchModes
+        searchEnabled=false
+        onchange=(action (mut selectedSearchMode))
+        as |name|
+      }}
+        {{name}}
+      {{/power-select}}
+    </div>
+
+    <div class="manage-alert-search__wrapper--search">
+      <div class="manage-alert-search__label">Search for Alert:</div>
+      {{#if (eq selectedSearchMode 'Function Name')}}
+        {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          search=(perform searchByFunctionName)
+          searchPlaceholder="Search for an Alert"
+          placeholder="Search by Function Name"
+          allowClear=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+
+      {{else if (eq selectedSearchMode 'Alert Name')}}
+          {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          search=(perform searchByAlertGroup)
+          searchPlaceholder="Search for an Alert"
+          placeholder="Search by Alert Name"
+          allowClear=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+      {{/if}}
+    </div>
+
+  </div>
+
+  <div class="manage-alert-results">
+    <a {{action "removeAll"}} class="thirdeye-link {{if resultsActive "te-link--show" "te-link--hide"}}">
+      Remove All
+    </a>
+    {{#accordion-list allowManyActiveItems=true as |accordion|}}
+      {{#each selectedAlerts as |alert|}}
+        <!-- For each element in list create an 'accordion.item' -->
+        <section class="te-search-results">
+          {{#accordion.item as |accordionItem|}}
+            <!-- Create a 'toggle' and a 'panel' for the item -->
+            {{#accordionItem.toggle}}
+              <div class="te-search-results__summary-block">
+                <i class="glyphicon glyphicon-menu-down te-search-results__icon"></i>
+                <h4 class="te-search-results__title">{{alert.functionName}}</h4>
+                <ul class="te-search-results__list-top">
+                  <li><strong>Id:</strong> {{alert.id}}</li>
+                  <li><strong>Collection:</strong> {{alert.collection}}</li>
+                </ul>
+              </div>
+            {{/accordionItem.toggle}}
+            <!-- Clicking on the 'toggle' will display the contents of the 'panel' -->
+            {{#accordionItem.panel}}
+              <ul class="te-search-results__details-block">
+                {{#each-in alert as |key value|}}
+                  <li>{{key}}: {{value}}</li>
+                {{/each-in}}
+              </ul>
+            {{/accordionItem.panel}}
+          {{/accordion.item}}
+        </section>
+      {{/each}}
+    {{/accordion-list}}
+  </div>
+
+  {{outlet}}
+
+
+{{#containers/anomaly-container as |alertList actions|}}
+  {{#if alertList.loading}}
+    Loading...
+  {{/if}}
+
+  {{#if alertList.failed}}
+    Oops, something went wrong...
+  {{/if}}
+
+  {{#if alertList.loaded}}
+    {{#if alertList.alerts}}
+      {{#each-in alertList.alerts as |key value|}}
+        <li>{{key}}: {{value}}</li>
+      {{/each-in}}
+    {{else}}
+      No anomalies found.
+    {{/if}}
+  {{/if}}
+{{/containers/anomaly-container}}
+
+
+
+</main>
+
+
+
+

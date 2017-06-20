@@ -54,6 +54,11 @@ body {
       margin: 0;
     }
   }
+/*=======
+.te-search-results {
+  width: 60%;
+  border-bottom: 1px app-shade(black, 2) solid;
+>>>>>>> TE self-serve1*/
 
   &__icon {
     float: right;
@@ -72,12 +77,19 @@ body {
 
   &:last-child {
     border: none;
+/*=======
+  &__title {
+    margin: 5px 0;
+>>>>>>> TE self-serve1*/
   }
 }
 
 .te-link--show {
   display: block;
   float: right;
+/*=======
+  margin-left: 780px;
+>>>>>>> TE self-serve1*/
 }
 
 .te-link--hide {
