@@ -40,20 +40,6 @@ public class NormalizationPipeline extends Pipeline {
 
   @Override
   public PipelineResult run(PipelineContext context) {
-    List<Entity> entities = new ArrayList<>(context.filter(Entity.class));
-
-    double[] score = new double[entities.size()];
-    for(int i=0; i<entities.size(); i++) {
-      score[i] = entities.get(i).getScore();
-    }
-
-    double[] normalized = DoubleSeries.buildFrom(score).normalize().values();
-
-    List<Entity> output = new ArrayList<>(entities.size());
-    for(int i=0; i<entities.size(); i++) {
-      output.add(entities.get(i).withScore(normalized[i]));
-    }
-
-    return new PipelineResult(context, new HashSet<>(output));
+    return new PipelineResult(context, EntityUtils.normalizeScores(context.filter(Entity.class)));
   }
 }

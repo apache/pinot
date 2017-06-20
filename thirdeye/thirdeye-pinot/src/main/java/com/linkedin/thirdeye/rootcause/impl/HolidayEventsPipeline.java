@@ -26,14 +26,14 @@ import org.slf4j.LoggerFactory;
  * Holiday pipeline will add a buffer of 2 days to the time range provided
  */
 public class HolidayEventsPipeline extends Pipeline {
-  private static final int HOLIDAY_DAYS_BUFFER = 2;
+  private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
+
+  private static final int START_OFFSET_HOURS = 72;
 
   private static final String PROP_STRATEGY = "strategy";
 
   private static final String STRATEGY_TIME = "time";
   private static final String STRATEGY_DIMENSION = "dimension";
-
-  private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
 
   private final EventDataProviderManager eventDataProvider;
 
@@ -73,18 +73,18 @@ public class HolidayEventsPipeline extends Pipeline {
   @Override
   public PipelineResult run(PipelineContext context) {
     TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
-    TimeRangeEntity baseline = TimeRangeEntity.getContextBaseline(context);
+    //TimeRangeEntity baseline = TimeRangeEntity.getContextBaseline(context);
 
     Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
-    List<EventDTO> events = getHolidayEvents(current, dimensionEntities);
-
     // TODO evaluate use of baseline events
     //events.addAll(getHolidayEvents(baseline, dimensionEntities));
 
-    long start = new DateTime(current.getStart()).minusDays(HOLIDAY_DAYS_BUFFER).getMillis();
+    long start = new DateTime(current.getStart()).minusHours(START_OFFSET_HOURS).getMillis();
     long end = current.getEnd();
+
+    List<EventDTO> events = getHolidayEvents(start, end, dimensionEntities);
 
     Set<HolidayEventEntity> entities = new HashSet<>();
     for(EventDTO ev : events) {
@@ -93,13 +93,10 @@ public class HolidayEventsPipeline extends Pipeline {
       entities.add(entity);
     }
 
-    return new PipelineResult(context, entities);
+    return new PipelineResult(context, EntityUtils.normalizeScores(entities));
   }
 
-  private List<EventDTO> getHolidayEvents(TimeRangeEntity timerangeEntity, Set<DimensionEntity> dimensionEntities) {
-    long start = new DateTime(timerangeEntity.getStart()).minusDays(HOLIDAY_DAYS_BUFFER).getMillis();
-    long end = timerangeEntity.getEnd();
-
+  private List<EventDTO> getHolidayEvents(long start, long end, Set<DimensionEntity> dimensionEntities) {
     EventFilter filter = new EventFilter();
     filter.setEventType(EventType.HOLIDAY.toString());
     filter.setStartTime(start);
@@ -139,7 +136,8 @@ public class HolidayEventsPipeline extends Pipeline {
     @Override
     public double score(EventDTO dto, long start, long end, Map<String, DimensionEntity> urn2entity) {
       long duration = end - start;
-      return (dto.getStartTime() - start) / (double) duration;
+      long offset = dto.getStartTime() - start;
+      return Math.max(offset / (double)duration, 0);
     }
   }
 

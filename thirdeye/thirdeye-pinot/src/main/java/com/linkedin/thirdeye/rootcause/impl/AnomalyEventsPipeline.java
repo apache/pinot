@@ -1,23 +1,15 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
-import com.linkedin.thirdeye.anomaly.events.EventFilter;
-import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +24,7 @@ import org.slf4j.LoggerFactory;
 public class AnomalyEventsPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyEventsPipeline.class);
 
-  public static final int START_OFFSET_HOURS = 6;
+  private static final int START_OFFSET_HOURS = 6;
 
   private final MergedAnomalyResultManager anomalyDAO;
 
@@ -78,12 +70,12 @@ public class AnomalyEventsPipeline extends Pipeline {
       }
     }
 
-    return new PipelineResult(context, entities);
+    return new PipelineResult(context, EntityUtils.normalizeScores(entities));
   }
 
   private double getScore(MergedAnomalyResultDTO dto, long start, long end) {
     long duration = end - start;
-    long distance = dto.getEndTime() - start;
-    return distance / (double)duration;
+    long offset = dto.getEndTime() - start;
+    return Math.max(offset / (double)duration, 0);
   }
 }

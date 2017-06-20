@@ -35,6 +35,7 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
+import com.linkedin.thirdeye.rootcause.impl.PipelineConfiguration;
 import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
 
 import io.dropwizard.assets.AssetsBundle;
@@ -45,7 +46,10 @@ import io.dropwizard.views.ViewBundle;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.servlet.DispatcherType;
@@ -141,29 +145,13 @@ public class ThirdEyeDashboardApplication
 
     RootCauseConfiguration rcConfig = config.getRootCause();
     return new RootCauseResource(
-        makeRootCauseFramework(rcConfig, definitionsFile),
-        makeRelatedMetricsFramework(rcConfig, definitionsFile),
+        makeRootCauseFrameworks(rcConfig, definitionsFile),
         makeRootCauseFormatters(rcConfig));
   }
 
-  private static RCAFramework makeRootCauseFramework(RootCauseConfiguration config, File definitionsFile) throws Exception {
-    String rootCause = config.getRootCauseFramework();
-    if(rootCause == null) {
-      LOG.warn("Configuration for 'rootCauseFramework' not found. Skipping.");
-      return null;
-    }
-    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(definitionsFile, rootCause);
-    return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getParallelism()));
-  }
-
-  private static RCAFramework makeRelatedMetricsFramework(RootCauseConfiguration config, File definitionsFile) throws Exception {
-    String relatedMetrics = config.getRelatedMetricsFramework();
-    if(relatedMetrics == null) {
-      LOG.warn("Configuration for 'relatedMetricsFramework' not found. Skipping.");
-      return null;
-    }
-    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(definitionsFile, relatedMetrics);
-    return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getParallelism()));
+  private static Map<String, RCAFramework> makeRootCauseFrameworks(RootCauseConfiguration config, File definitionsFile) throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(config.getParallelism());
+    return RCAFrameworkLoader.getFrameworksFromConfig(definitionsFile, executor);
   }
 
   private static List<RootCauseEntityFormatter> makeRootCauseFormatters(RootCauseConfiguration config) throws Exception {
