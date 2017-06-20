@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.rootcause.Entity;
 
 
@@ -11,17 +10,17 @@ import com.linkedin.thirdeye.rootcause.Entity;
 public class EventEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:event:");
 
-  private final String type;
+  private final String eventType;
   private final long id;
 
-  protected EventEntity(String urn, double score, String type, long id) {
+  protected EventEntity(String urn, double score, String eventType, long id) {
     super(urn, score);
     this.id = id;
-    this.type = type;
+    this.eventType = eventType;
   }
 
-  public String getType() {
-    return type;
+  public String getEventType() {
+    return eventType;
   }
 
   public long getId() {
@@ -30,12 +29,7 @@ public class EventEntity extends Entity {
 
   @Override
   public EventEntity withScore(double score) {
-    return new EventEntity(this.getUrn(), score, this.type, this.id);
-  }
-
-  public static EventEntity fromDTO(double score, EventDTO dto) {
-    String urn = TYPE.formatURN(dto.getEventType(), dto.getId());
-    return new EventEntity(urn, score, dto.getEventType(), dto.getId());
+    return new EventEntity(this.getUrn(), score, this.eventType, this.id);
   }
 
   public static EventEntity fromURN(String urn, double score) {

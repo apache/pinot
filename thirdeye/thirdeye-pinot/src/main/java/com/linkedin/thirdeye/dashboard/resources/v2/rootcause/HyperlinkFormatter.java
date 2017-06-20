@@ -7,14 +7,16 @@ import com.linkedin.thirdeye.rootcause.impl.HyperlinkEntity;
 
 
 public class HyperlinkFormatter extends RootCauseEntityFormatter {
+  public static final String TYPE_HYPERLINK = "hyperlink";
+
   @Override
   public boolean applies(Entity entity) {
-    return HyperlinkEntity.TYPE.isType(entity);
+    return entity instanceof HyperlinkEntity;
   }
 
   @Override
   public RootCauseEntity format(Entity entity) {
     HyperlinkEntity e = (HyperlinkEntity) entity;
-    return makeRootCauseEntity(entity, "LINK", e.getUrl(), e.getUrl());
+    return makeRootCauseEntity(entity, TYPE_HYPERLINK, e.getUrl(), e.getUrl());
   }
 }

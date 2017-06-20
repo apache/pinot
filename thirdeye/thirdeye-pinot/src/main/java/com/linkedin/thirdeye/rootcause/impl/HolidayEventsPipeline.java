@@ -7,14 +7,12 @@ import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -30,9 +28,16 @@ import org.slf4j.LoggerFactory;
 public class HolidayEventsPipeline extends Pipeline {
   private static final int HOLIDAY_DAYS_BUFFER = 2;
 
+  private static final String PROP_STRATEGY = "strategy";
+
+  private static final String STRATEGY_TIME = "time";
+  private static final String STRATEGY_DIMENSION = "dimension";
+
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
 
   private final EventDataProviderManager eventDataProvider;
+
+  private final ScoringStrategy strategy;
 
   /**
    * Constructor for dependency injection
@@ -40,10 +45,12 @@ public class HolidayEventsPipeline extends Pipeline {
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
    * @param eventDataProvider event data provider manager
+   * @param strategy scoring strategy
    */
-  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager eventDataProvider) {
+  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager eventDataProvider, ScoringStrategy strategy) {
     super(outputName, inputNames);
     this.eventDataProvider = eventDataProvider;
+    this.strategy = strategy;
   }
 
   /**
@@ -51,11 +58,16 @@ public class HolidayEventsPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param ignore configuration properties (none)
+   * @param properties configuration properties ({@code PROP_STRATEGY})
    */
-  public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> ignore) {
+  public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.eventDataProvider = EventDataProviderManager.getInstance();
+
+    String propStrategy = STRATEGY_TIME;
+    if(properties.containsKey(PROP_STRATEGY))
+      propStrategy = properties.get(PROP_STRATEGY).toString();
+    this.strategy = parseStrategy(propStrategy);
   }
 
   @Override
@@ -67,13 +79,17 @@ public class HolidayEventsPipeline extends Pipeline {
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
     List<EventDTO> events = getHolidayEvents(current, dimensionEntities);
-    events.addAll(getHolidayEvents(baseline, dimensionEntities));
 
-    Set<EventEntity> entities = new HashSet<>();
+    // TODO evaluate use of baseline events
+    //events.addAll(getHolidayEvents(baseline, dimensionEntities));
+
+    long start = new DateTime(current.getStart()).minusDays(HOLIDAY_DAYS_BUFFER).getMillis();
+    long end = current.getEnd();
+
+    Set<HolidayEventEntity> entities = new HashSet<>();
     for(EventDTO ev : events) {
-      double dimensionScore = makeDimensionScore(urn2entity, ev.getTargetDimensionMap());
-      EventEntity entity = EventEntity.fromDTO(dimensionScore, ev);
-      LOG.debug("{}: dimension={}, filter={}", entity.getUrn(), dimensionScore, ev.getTargetDimensionMap());
+      double score = this.strategy.score(ev, start, end, urn2entity);
+      HolidayEventEntity entity = HolidayEventEntity.fromDTO(score, ev);
       entities.add(entity);
     }
 
@@ -105,24 +121,54 @@ public class HolidayEventsPipeline extends Pipeline {
     return eventDataProvider.getEvents(filter);
   }
 
-  static double makeDimensionScore(Map<String, DimensionEntity> urn2entity, Map<String, List<String>> dimensionFilterMap) {
-    double sum = 0.0;
-    Set<String> urns = filter2urns(dimensionFilterMap);
-    for(String urn : urns) {
-      if(urn2entity.containsKey(urn)) {
-        sum += urn2entity.get(urn).getScore();
-      }
+  private static ScoringStrategy parseStrategy(String strategy) {
+    switch(strategy) {
+      case STRATEGY_TIME:
+        return new TimeStrategy();
+      case STRATEGY_DIMENSION:
+        return new DimensionStrategy();
     }
-    return sum;
+    throw new IllegalArgumentException(String.format("Unknown strategy '%s'", strategy));
   }
 
-  static Set<String> filter2urns(Map<String, List<String>> dimensionFilterMap) {
-    Set<String> urns = new HashSet<>();
-    for(Map.Entry<String, List<String>> e : dimensionFilterMap.entrySet()) {
-      for(String val : e.getValue()) {
-        urns.add(DimensionEntity.TYPE.formatURN(e.getKey(), val.toLowerCase()));
-      }
+  private interface ScoringStrategy {
+    double score(EventDTO dto, long start, long end, Map<String, DimensionEntity> urn2entity);
+  }
+
+  private static class TimeStrategy implements ScoringStrategy {
+    @Override
+    public double score(EventDTO dto, long start, long end, Map<String, DimensionEntity> urn2entity) {
+      long duration = end - start;
+      return (dto.getStartTime() - start) / (double) duration;
     }
-    return urns;
+  }
+
+  private static class DimensionStrategy implements ScoringStrategy {
+    @Override
+    public double score(EventDTO dto, long start, long end, Map<String, DimensionEntity> urn2entity) {
+      return makeDimensionScore(urn2entity, dto.getTargetDimensionMap());
+    }
+
+    static double makeDimensionScore(Map<String, DimensionEntity> urn2entity, Map<String, List<String>> dimensionFilterMap) {
+      double sum = 0.0;
+      Set<String> urns = filter2urns(dimensionFilterMap);
+      for(String urn : urns) {
+        if(urn2entity.containsKey(urn)) {
+          sum += urn2entity.get(urn).getScore();
+        }
+      }
+      return sum;
+    }
+
+    static Set<String> filter2urns(Map<String, List<String>> dimensionFilterMap) {
+      Set<String> urns = new HashSet<>();
+      for(Map.Entry<String, List<String>> e : dimensionFilterMap.entrySet()) {
+        for(String val : e.getValue()) {
+          urns.add(DimensionEntity.TYPE.formatURN(e.getKey(), val.toLowerCase()));
+        }
+      }
+      return urns;
+    }
+
   }
 }

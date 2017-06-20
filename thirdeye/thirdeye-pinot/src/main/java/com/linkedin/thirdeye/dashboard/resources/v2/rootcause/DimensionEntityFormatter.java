@@ -7,18 +7,17 @@ import com.linkedin.thirdeye.rootcause.impl.DimensionEntity;
 
 
 public class DimensionEntityFormatter extends RootCauseEntityFormatter {
+  public static final String TYPE_DIMENSION = "dimension";
+
   @Override
   public boolean applies(Entity entity) {
-    return DimensionEntity.TYPE.isType(entity.getUrn());
+    return entity instanceof DimensionEntity;
   }
 
   @Override
   public RootCauseEntity format(Entity entity) {
-    DimensionEntity e = DimensionEntity.fromURN(entity.getUrn(), entity.getScore());
-
+    DimensionEntity e = (DimensionEntity) entity;
     String label = String.format("%s=%s", e.getName(), e.getValue());
-    String link = String.format("javascript:alert('%s');", e.getUrn());
-
-    return makeRootCauseEntity(entity, "Dimension", label, link);
+    return makeRootCauseEntity(entity, TYPE_DIMENSION, label, null);
   }
 }
