@@ -17,8 +17,6 @@ public class DefaultEntityFormatter extends RootCauseEntityFormatter {
 
   @Override
   public RootCauseEntity format(Entity entity) {
-    String link = String.format("javascript:alert('%s');", entity.getUrn());
-
-    return makeRootCauseEntity(entity, "Other", "(none)", link);
+    return makeRootCauseEntity(entity, "Other", "(none)", "javascript:void(0);");
   }
 }

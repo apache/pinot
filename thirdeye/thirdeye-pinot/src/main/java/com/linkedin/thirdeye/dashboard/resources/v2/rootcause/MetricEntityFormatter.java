@@ -22,21 +22,16 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
 
   @Override
   public boolean applies(Entity entity) {
-    return MetricEntity.TYPE.isType(entity.getUrn());
+    return entity instanceof MetricEntity;
   }
 
   @Override
   public RootCauseEntity format(Entity entity) {
-    MetricEntity e = MetricEntity.fromURN(entity.getUrn(), entity.getScore());
+    MetricEntity e = (MetricEntity) entity;
 
-    MetricConfigDTO metricDTO = this.metricDAO.findById(e.getId());
+    MetricConfigDTO dto = this.metricDAO.findById(e.getId());
+    String label = String.format("%s::%s", dto.getDataset(), dto.getName());
 
-    String label = String.format("unknown (id=%d)", e.getId());
-    if(metricDTO != null)
-        label = String.format("%s/%s", metricDTO.getDataset(), metricDTO.getName());
-
-    String link = String.format("javascript:alert('%s');", e.getUrn());
-
-    return makeRootCauseEntity(entity, "Metric", label, link);
+    return makeRootCauseEntity(entity, "metric", label, "javascript:void(0);");
   }
 }

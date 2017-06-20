@@ -3,8 +3,10 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.rootcause.Pipeline;
@@ -12,9 +14,11 @@ import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,21 +32,20 @@ import org.slf4j.LoggerFactory;
 public class AnomalyEventsPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyEventsPipeline.class);
 
-  private final EventDataProviderManager manager;
-  private final MetricConfigManager metricDAO;
+  public static final int START_OFFSET_HOURS = 6;
+
+  private final MergedAnomalyResultManager anomalyDAO;
 
   /**
    * Constructor for dependency injection
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param manager event data provider manager
-   * @param metricDAO metric config DAO
+   * @param anomalyDAO anomaly config DAO
    */
-  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager manager, MetricConfigManager metricDAO) {
+  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, MergedAnomalyResultManager anomalyDAO) {
     super(outputName, inputNames);
-    this.manager = manager;
-    this.metricDAO = metricDAO;
+    this.anomalyDAO = anomalyDAO;
   }
 
   /**
@@ -54,8 +57,7 @@ public class AnomalyEventsPipeline extends Pipeline {
    */
   public AnomalyEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> ignore) {
     super(outputName, inputNames);
-    this.manager = EventDataProviderManager.getInstance();
-    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
+    this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
   }
 
   @Override
@@ -63,38 +65,25 @@ public class AnomalyEventsPipeline extends Pipeline {
     Set<MetricEntity> metrics = context.filter(MetricEntity.class);
 
     TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
+    long start = new DateTime(current.getStart()).minusHours(START_OFFSET_HOURS).getMillis();
+    long end = current.getEnd();
 
-    Set<EventEntity> entities = new HashSet<>();
+    Set<AnomalyEventEntity> entities = new HashSet<>();
     for(MetricEntity me : metrics) {
-      MetricConfigDTO metricDTO = this.metricDAO.findById(me.getId());
-      if(metricDTO == null) {
-        LOG.warn("Could not resolve metric id {}. Skipping.", me.getId());
-        continue;
-      }
+      List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), start, end);
 
-      EventFilter filter = new EventFilter();
-      filter.setEventType(EventType.HISTORICAL_ANOMALY.toString());
-      filter.setMetricName(metricDTO.getName());
-
-      for(EventDTO eventDTO : manager.getEvents(filter)) {
-        double score = getScore(current, eventDTO);
-        entities.add(EventEntity.fromDTO(score, eventDTO));
+      for(MergedAnomalyResultDTO dto : anomalies) {
+        double score = getScore(dto, start, end);
+        entities.add(AnomalyEventEntity.fromDTO(score, dto));
       }
     }
 
     return new PipelineResult(context, entities);
   }
 
-  /**
-   * Compute event score based on distance to the end of the current time window. Closer is better.
-   *
-   * @param current current time range
-   * @param dto event dto
-   * @return event entity score
-   */
-  private double getScore(TimeRangeEntity current, EventDTO dto) {
-    long duration = current.getEnd() - current.getStart();
-    long distance = dto.getEndTime() - current.getEnd();
-    return 1.0 - distance / (double)duration;
+  private double getScore(MergedAnomalyResultDTO dto, long start, long end) {
+    long duration = end - start;
+    long distance = dto.getEndTime() - start;
+    return distance / (double)duration;
   }
 }
