@@ -2522,6 +2522,64 @@ public class DataFrameTest {
     assertEquals(res.getStrings("B"), "a", "b", "c", "d", null, null, null, null, null);
   }
 
+  @Test
+  public void testToString() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", DNULL, 1.0, 2.0, 3.0, 4.0);
+    df.addSeries("two", LNULL, 1, 2, 3, 4);
+    df.addSeries("three", SNULL, "1", "2", "3", "4");
+    df.addSeries("four", BNULL, FALSE, TRUE, FALSE, TRUE);
+
+    String expected =
+          " one   two  three   four\n"
+        + "null  null  null    null\n"
+        + " 1.0     1  1      false\n"
+        + " 2.0     2  2       true\n"
+        + " 3.0     3  3      false\n"
+        + " 4.0     4  4       true\n";
+
+    Assert.assertEquals(df.toString(), expected);
+  }
+
+  @Test
+  public void testToStringSelective() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", DNULL, 1.0, 2.0, 3.0, 4.0);
+    df.addSeries("two", LNULL, 1, 2, 3, 4);
+    df.addSeries("three", SNULL, "1", "2", "3", "4");
+    df.addSeries("four", BNULL, FALSE, TRUE, FALSE, TRUE);
+
+    String expected =
+          "three   one\n"
+        + "null   null\n"
+        + "1       1.0\n"
+        + "2       2.0\n"
+        + "3       3.0\n"
+        + "4       4.0\n";
+
+    Assert.assertEquals(df.toString("three", "one"), expected);
+  }
+
+  @Test
+  public void testToStringWithIndex() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", DNULL, 1.0, 2.0, 3.0, 4.0);
+    df.addSeries("two", LNULL, 1, 2, 3, 4);
+    df.addSeries("three", SNULL, "1", "2", "3", "4");
+    df.addSeries("four", BNULL, FALSE, TRUE, FALSE, TRUE);
+    df.setIndex("three");
+
+    String expected =
+          "three   one   two   four\n"
+        + "null   null  null   null\n"
+        + "1       1.0     1  false\n"
+        + "2       2.0     2   true\n"
+        + "3       3.0     3  false\n"
+        + "4       4.0     4   true\n";
+
+    Assert.assertEquals(df.toString(), expected);
+  }
+
   /* **************************************************************************
    * Helpers
    ***************************************************************************/

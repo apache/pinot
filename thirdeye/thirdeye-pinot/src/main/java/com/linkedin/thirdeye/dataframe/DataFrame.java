@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -206,7 +207,7 @@ public class DataFrame {
   }
 
   String indexName = null;
-  Map<String, Series> series = new HashMap<>();
+  Map<String, Series> series = new LinkedHashMap<>();
 
   /**
    * Returns a DoubleSeries wrapping the values array
@@ -1541,10 +1542,18 @@ public class DataFrame {
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
-    builder.append("DataFrame{\n");
-    builder.append(this.toString(DEFAULT_MAX_COLUMN_WIDTH, this.getSeriesNames().toArray(new String[0])));
-    builder.append("}");
-    return builder.toString();
+
+    List<String> names = new ArrayList<>(this.getSeriesNames());
+    if(this.hasIndex()) {
+      names.remove(this.getIndexName());
+      names.add(0, this.getIndexName());
+    }
+
+    return this.toString(DEFAULT_MAX_COLUMN_WIDTH, names.toArray(new String[names.size()]));
+  }
+
+  public String toString(String... seriesNames) {
+    return this.toString(DEFAULT_MAX_COLUMN_WIDTH, seriesNames);
   }
 
   public String toString(int maxColumnWidth, String... seriesNames) {
@@ -1567,6 +1576,8 @@ public class DataFrame {
       sb.append(String.format("%" + width[i] + "s", truncateToString(seriesNames[i], maxColumnWidth)));
       sb.append("  ");
     }
+    if(sb.length() > 0)
+      sb.delete(sb.length() - 2, sb.length());
     sb.append("\n");
 
     // values
@@ -1589,6 +1600,8 @@ public class DataFrame {
         sb.append(item);
         sb.append("  ");
       }
+      if(sb.length() > 0)
+        sb.delete(sb.length() - 2, sb.length());
       sb.append("\n");
     }
 
