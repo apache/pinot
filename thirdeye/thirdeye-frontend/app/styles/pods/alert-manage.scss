@@ -3,7 +3,8 @@
   letter-spacing: 0.5px;
 
   &__wrapper {
-    margin-top: 15px;
+    @include group-clearfix;
+    margin: 24px 0;
 
     &--filter {
       float: left;
@@ -24,9 +25,12 @@
     font-size: 13px;
   }
 
-  &__results {
-    clear: left;
+  &__button-remove {
+    display: none;
   }
 
 }
 
+.manage-alert-results {
+  clear: left;
+}

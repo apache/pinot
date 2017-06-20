@@ -18,12 +18,12 @@ export default Ember.Controller.extend({
     {
       className: 'menu-item--create',
       link: 'self-service.create',
-      title: 'Create Alert'
+      title: 'Manage Alert Subscription'
     },
     {
       className: 'menu-item--onboard',
       link: 'self-service.onboard',
-      title: 'Onboard Metric'
+      title: 'Onboard Metrics'
     }
   ]
 });

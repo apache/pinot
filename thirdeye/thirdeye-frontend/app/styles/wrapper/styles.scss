@@ -7,6 +7,14 @@ body {
   color: lighten(black, 40%);
 }
 
+.paper-container {
+  background-color: white;
+  padding: 24px 24px 12px 24px;
+  border: 1px solid #CCC;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
 .thirdeye-link {
   cursor: pointer;
   color: #0084bf;
@@ -39,4 +47,53 @@ body {
 .anomaly-title-bar {
   background: white;
   border-bottom: 1px #e9e9e9 solid;
+}
+
+.te-search-results {
+
+  ul {
+    list-style: none;
+  }
+
+  &__summary-block {
+    padding: 5px 10px 15px 15px;
+
+    &:hover {
+      background-color: #f7f7f7;
+    }
+  }
+
+  &__list-top {
+    padding: 0;
+    margin: 0;
+  }
+
+  &__icon {
+    padding: 15px 15px 0 0;
+    color: app-shade(black, 4);
+  }
+
+  &__title {
+    color: $te-blue;
+    font-size: 16px;
+    font-weight: 400;
+  }
+
+  &__details-block {
+    padding: 0 15px;
+  }
+}
+
+.te-form {
+
+  &__section-fields {
+
+  }
+
+  &__section-submit {
+    margin: 24px 0 15px 0;
+    padding-top: 24px;
+    text-align: right;
+    border-top: 2px app-shade(black, 2) dotted;
+  }
 }

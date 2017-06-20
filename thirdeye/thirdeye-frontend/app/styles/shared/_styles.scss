@@ -14,3 +14,25 @@ body {
 .te-sub-title {
   @include app-sub-title-mixin;
 }
+
+.te-search-results {
+  width: 60%;
+  border-bottom: 1px app-shade(black, 2) solid;
+
+  &__icon {
+    float: right;
+  }
+
+  &__title {
+    margin: 5px 0;
+  }
+}
+
+.te-link--show {
+  display: block;
+  margin-left: 780px;
+}
+
+.te-link--hide {
+  display: none;
+}

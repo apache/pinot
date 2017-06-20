@@ -32,4 +32,6 @@
 @import 'pods/rca';
 @import 'ember-power-select/themes/bootstrap';
 @import "ember-power-select";
-@import "pods/self-serve-manage-alerts";
+@import "pods/alert-manage";
+@import "pods/alert-create";
+@import "pods/alert-onboard";

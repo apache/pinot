@@ -12,15 +12,14 @@
   margin-top: 0;
 }
 
-@mixin clearfix-mixin() {
-    &:before,
-    &:after {
-        content: "";
-        display: table;
-    }
-    &:after {
-        clear: both;
-    }
+@mixin group-clearfix() {
+  &:after {
+  visibility: hidden;
+  display: block;
+  content: "";
+  clear: both;
+  height: 0;
+  }
 }
 
 @mixin truncate-mixin() {

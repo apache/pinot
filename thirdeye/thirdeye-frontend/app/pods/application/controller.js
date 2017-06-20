@@ -33,8 +33,8 @@ export default Ember.Controller.extend({
     {
       className: 'alert',
       link: 'self-service',
-      title: 'Self-Service',
-      hidden: true
+      title: 'Self-Service'
+      // hidden: true
     }
   ]
 
