@@ -193,7 +193,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   // CAUTION: The array is final, but values are inherently modifiable
-  final long[] values;
+  private final long[] values;
 
   private LongSeries(long... values) {
     this.values = values;
@@ -235,7 +235,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public static byte getBoolean(long value) {
-    if(LongSeries.isNull(value))
+    if(isNull(value))
       return BooleanSeries.NULL;
     return BooleanSeries.valueOf(value != 0L);
   }
@@ -246,9 +246,20 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public static String getString(long value) {
-    if(LongSeries.isNull(value))
+    if(isNull(value))
       return StringSeries.NULL;
     return String.valueOf(value);
+  }
+
+  @Override
+  public Object getObject(int index) {
+    return getObject(this.values[index]);
+  }
+
+  public static Object getObject(long value) {
+    if(isNull(value))
+      return ObjectSeries.NULL;
+    return value;
   }
 
   @Override
@@ -670,16 +681,6 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
     return values;
-  }
-
-  static class Range {
-    final long lower;
-    final long upper; // exclusive
-
-    Range(long lower, long upper) {
-      this.lower = lower;
-      this.upper = upper;
-    }
   }
 
   @Override

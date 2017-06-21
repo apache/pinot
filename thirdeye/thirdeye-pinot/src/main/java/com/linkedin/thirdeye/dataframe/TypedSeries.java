@@ -33,11 +33,6 @@ public abstract class TypedSeries<T extends Series> extends Series {
   }
 
   @Override
-  public T shift(int offset) {
-    return (T)super.shift(offset);
-  }
-
-  @Override
   public T copy() {
     return (T)super.copy();
   }

@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.NotImplementedException;
 
 
 /**
@@ -29,7 +28,8 @@ public abstract class Series {
     DOUBLE,
     LONG,
     STRING,
-    BOOLEAN
+    BOOLEAN,
+    OBJECT
   }
 
   enum JoinType {
@@ -77,6 +77,11 @@ public abstract class Series {
   }
 
   //  @FunctionalInterface
+  public interface ObjectConditional extends Conditional {
+    boolean apply(Object... values);
+  }
+
+  //  @FunctionalInterface
   public interface DoubleFunction extends Function {
     double NULL = DoubleSeries.NULL;
     double apply(double... values);
@@ -106,6 +111,11 @@ public abstract class Series {
     byte NULL = BooleanSeries.NULL;
 
     byte apply(byte... values);
+  }
+
+  //  @FunctionalInterface
+  public interface ObjectFunction extends Function {
+    Object apply(Object... values);
   }
 
   /**
@@ -231,6 +241,17 @@ public abstract class Series {
   public abstract String getString(int index);
 
   /**
+   * Returns the value referenced by {@code index} as Object. The value is converted
+   * transparently if the native type of the underlying series is different. The
+   * {@code index} must be between {@code 0} and the size of the series.
+   *
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return object value
+   */
+  public abstract Object getObject(int index);
+
+  /**
    * Returns {@code true} if the value referenced by {@code index} is null. Otherwise,
    * returns {@code false}.
    *
@@ -281,6 +302,19 @@ public abstract class Series {
    * @return filtered series copy
    */
   public abstract Series filter(BooleanSeries mask);
+
+  /**
+   * Returns a copy of the series with all values' indices
+   * shifted by {@code offset} positions while
+   * leaving the series size unchanged. Values shifted outside to upper (or lower)
+   * bounds of the series are dropped. Vacated positions are padded with {@code null}.
+   *
+   * <br/><b>NOTE:</b> for each value, newIndex = oldIndex + offset
+   *
+   * @param offset offset to shift values by. Can be positive or negative.
+   * @return shifted series copy
+   */
+  public abstract Series shift(int offset);
 
   /* *************************************************************************
    * Public optional operations
@@ -366,6 +400,16 @@ public abstract class Series {
     return assertSingleValue().getString(0);
   }
 
+  /**
+   * Returns the object representation of a single value series.
+   *
+   * @return object value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
+  public final Object objectValue() {
+    return assertSingleValue().getObject(0);
+  }
+
   private Series assertSingleValue() {
     if(this.size() != 1)
       throw new IllegalStateException(ONE_ELEMENT);
@@ -435,6 +479,8 @@ public abstract class Series {
         return this.getBooleans();
       case STRING:
         return this.getStrings();
+      case OBJECT:
+        return this.getObjects();
       default:
         throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
     }
@@ -497,6 +543,20 @@ public abstract class Series {
   }
 
   /**
+   * Returns the series as ObjectSeries. The underlying series is converted
+   * transparently if the series' native type is different.
+   *
+   * @return StringSeries equivalent
+   */
+  public ObjectSeries getObjects() {
+    Object[] values = new Object[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      values[i] = this.getObject(i);
+    }
+    return ObjectSeries.buildFrom(values);
+  }
+
+  /**
    * Returns as copy of the series with the same native type.
    *
    * @return series copy
@@ -551,33 +611,6 @@ public abstract class Series {
       if(!isNull(i))
         lastValueIndex = i;
       fromIndex[i] = lastValueIndex;
-    }
-    return this.project(fromIndex);
-  }
-
-  /**
-   * Returns a copy of the series with all values' indices
-   * shifted by {@code offset} positions while
-   * leaving the series size unchanged. Values shifted outside to upper (or lower)
-   * bounds of the series are dropped. Vacated positions are padded with {@code null}.
-   *
-   * <br/><b>NOTE:</b> for each value, newIndex = oldIndex + offset
-   *
-   * @param offset offset to shift values by. Can be positive or negative.
-   * @return shifted series copy
-   */
-  // NOTE: override for performance
-  public Series shift(int offset) {
-    int[] fromIndex = new int[this.size()];
-    int from = 0;
-    for(int i=0; i<Math.min(offset, this.size()); i++) {
-      fromIndex[from++] = -1;
-    }
-    for(int i=Math.max(offset, 0); i<Math.max(Math.min(this.size() + offset, this.size()), 0); i++) {
-      fromIndex[from++] = i - offset;
-    }
-    for(int i=Math.max(this.size() + offset, 0); i<this.size(); i++) {
-      fromIndex[from++] = -1;
     }
     return this.project(fromIndex);
   }
@@ -771,6 +804,8 @@ public abstract class Series {
       return BooleanSeries.map((BooleanFunction)function, series);
     } else if(function instanceof BooleanFunctionEx) {
       return BooleanSeries.map((BooleanFunctionEx)function, series);
+    } else if(function instanceof ObjectFunction) {
+      return ObjectSeries.map((ObjectFunction)function, series);
     } else if(function instanceof DoubleConditional) {
       return DoubleSeries.map((DoubleConditional)function, series);
     } else if(function instanceof LongConditional) {
@@ -779,6 +814,8 @@ public abstract class Series {
       return StringSeries.map((StringConditional)function, series);
     } else if(function instanceof BooleanConditional) {
       return BooleanSeries.map((BooleanConditional)function, series);
+    } else if(function instanceof ObjectConditional) {
+      return BooleanSeries.map((ObjectConditional)function, series);
     }
     throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
   }
@@ -834,6 +871,13 @@ public abstract class Series {
   /**
    * @see Series#map(Function)
    */
+  public final ObjectSeries map(ObjectFunction function) {
+    return (ObjectSeries)map(function, this);
+  }
+
+  /**
+   * @see Series#map(Function)
+   */
   public final BooleanSeries map(Conditional conditional) {
     return (BooleanSeries)map(conditional, this);
   }
@@ -863,6 +907,8 @@ public abstract class Series {
       return BooleanSeries.aggregate((BooleanFunction)function, this);
     } else if(function instanceof BooleanFunctionEx) {
       return BooleanSeries.aggregate((BooleanFunctionEx)function, this);
+    } else if(function instanceof ObjectFunction) {
+      return ObjectSeries.aggregate((ObjectFunction)function, this);
     } else if(function instanceof DoubleConditional) {
       return DoubleSeries.aggregate((DoubleConditional)function, this);
     } else if(function instanceof LongConditional) {
@@ -871,6 +917,8 @@ public abstract class Series {
       return StringSeries.aggregate((StringConditional)function, this);
     } else if(function instanceof BooleanConditional) {
       return BooleanSeries.aggregate((BooleanConditional)function, this);
+    } else if(function instanceof ObjectConditional) {
+      return ObjectSeries.aggregate((ObjectConditional)function, this);
     }
     throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
   }
@@ -908,6 +956,13 @@ public abstract class Series {
    */
   public final BooleanSeries aggregate(BooleanFunctionEx function) {
     return (BooleanSeries)this.aggregate((Function)function);
+  }
+
+  /**
+   * @see Series#aggregate(Function)
+   */
+  public final ObjectSeries aggregate(ObjectFunction function) {
+    return (ObjectSeries)this.aggregate((Function)function);
   }
 
   /**
@@ -1108,12 +1163,12 @@ public abstract class Series {
    * Code grave
    ***************************************************************************/
 
-// NOTE: too slow
+//  // NOTE: too slow
 //  public Series sorted() {
 //    return this.project(this.sortedIndex());
 //  }
 
-// NOTE: too slow
+//  // NOTE: too slow
 //  int[] sortedIndex() {
 //    Integer[] fromIndex = new Integer[this.size()];
 //    for(int i=0; i<this.size(); i++)
@@ -1129,4 +1184,21 @@ public abstract class Series {
 //
 //    return ArrayUtils.toPrimitive(fromIndex);
 //  }
+
+//  // NOTE: too slow
+//  public Series shift(int offset) {
+//    int[] fromIndex = new int[this.size()];
+//    int from = 0;
+//    for(int i=0; i<Math.min(offset, this.size()); i++) {
+//      fromIndex[from++] = -1;
+//    }
+//    for(int i=Math.max(offset, 0); i<Math.max(Math.min(this.size() + offset, this.size()), 0); i++) {
+//      fromIndex[from++] = i - offset;
+//    }
+//    for(int i=Math.max(this.size() + offset, 0); i<this.size(); i++) {
+//      fromIndex[from++] = -1;
+//    }
+//    return this.project(fromIndex);
+//  }
+
 }

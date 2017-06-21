@@ -20,6 +20,7 @@ public class DataFrameTest {
   private final static long LNULL = LongSeries.NULL;
   private final static String SNULL = StringSeries.NULL;
   private final static byte BNULL = BooleanSeries.NULL;
+  private final static Object ONULL = ObjectSeries.NULL;
 
   private final static double COMPARE_DOUBLE_DELTA = 0.001;
 
@@ -28,6 +29,7 @@ public class DataFrameTest {
   private final static long[] VALUES_LONG = new long[] { -2, 1, 0, 1, 2 };
   private final static String[] VALUES_STRING = new String[] { "-2.3", "-1", "0.0", "0.5", "0.13e1" };
   private final static byte[] VALUES_BOOLEAN = new byte[] { 1, 1, 0, 1, 1 };
+  private final static Object[] VALUES_OBJECT = new Object[] { "-2.3", 1, 0, 0.5d, true };
 
   // TODO test double batch function
   // TODO test string batch function
