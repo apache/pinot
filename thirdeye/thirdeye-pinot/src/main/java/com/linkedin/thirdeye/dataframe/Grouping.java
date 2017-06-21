@@ -463,6 +463,7 @@ public abstract class Grouping {
           valueCount += 1;
         } else {
           valueCount -= 1;
+          valueCount = Math.max(valueCount, 0);
         }
         if(i >= this.windowSize && !s.isNull(i - this.windowSize))
           rollingSum -= s.getLong(i - this.windowSize);
@@ -485,6 +486,7 @@ public abstract class Grouping {
           valueCount += 1;
         } else {
           valueCount -= 1;
+          valueCount = Math.max(valueCount, 0);
         }
         if(i >= this.windowSize && !s.isNull(i - this.windowSize))
           rollingSum -= s.getDouble(i - this.windowSize);
@@ -507,6 +509,7 @@ public abstract class Grouping {
           valueCount += 1;
         } else {
           valueCount -= 1;
+          valueCount = Math.max(valueCount, 0);
         }
         if(i >= this.windowSize && !s.isNull(i - this.windowSize))
           sb.deleteCharAt(0);

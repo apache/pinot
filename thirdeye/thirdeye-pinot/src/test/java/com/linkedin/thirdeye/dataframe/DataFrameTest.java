@@ -698,6 +698,13 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testLongGroupByMovingWindowLongNullSequenceSum() {
+    LongSeries in = LongSeries.builder().fillValues(5, LNULL).addValues(1, 2, 3).build();
+    Grouping.SeriesGrouping grouping = in.groupByMovingWindow(3);
+    Assert.assertEquals(grouping.sum(), grouping.aggregate(LongSeries.SUM));
+  }
+
+  @Test
   public void testLongGroupByExpandingWindow() {
     LongSeries in = DataFrame.toSeries(3, 4, 5, 5, LNULL);
     Grouping.SeriesGrouping grouping = in.groupByExpandingWindow();
