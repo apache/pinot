@@ -2580,6 +2580,25 @@ public class DataFrameTest {
     Assert.assertEquals(df.toString(), expected);
   }
 
+  @Test
+  public void testToStringNoSeries() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", DNULL, 1.0, 2.0, 3.0, 4.0);
+
+    Assert.assertEquals(df.toString(new String[0]), "");
+  }
+
+  @Test
+  public void testToStringNoData() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", LongSeries.empty());
+    df.addSeries("two", LongSeries.empty());
+
+    String expected = "one  two\n";
+
+    Assert.assertEquals(df.toString(), expected);
+  }
+
   /* **************************************************************************
    * Helpers
    ***************************************************************************/

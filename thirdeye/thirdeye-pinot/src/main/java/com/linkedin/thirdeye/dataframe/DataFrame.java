@@ -1557,6 +1557,9 @@ public class DataFrame {
   }
 
   public String toString(int maxColumnWidth, String... seriesNames) {
+    if(seriesNames.length <= 0)
+      return "";
+
     String[][] values = new String[this.size()][seriesNames.length];
     int[] width = new int[seriesNames.length];
     for(int i=0; i<seriesNames.length; i++) {
@@ -1576,8 +1579,7 @@ public class DataFrame {
       sb.append(String.format("%" + width[i] + "s", truncateToString(seriesNames[i], maxColumnWidth)));
       sb.append("  ");
     }
-    if(sb.length() > 0)
-      sb.delete(sb.length() - 2, sb.length());
+    sb.delete(sb.length() - 2, sb.length());
     sb.append("\n");
 
     // values
@@ -1600,8 +1602,7 @@ public class DataFrame {
         sb.append(item);
         sb.append("  ");
       }
-      if(sb.length() > 0)
-        sb.delete(sb.length() - 2, sb.length());
+      sb.delete(sb.length() - 2, sb.length());
       sb.append("\n");
     }
 
