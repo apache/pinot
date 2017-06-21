@@ -35,7 +35,6 @@ public class LLCSegmentCommitEnd extends ServerResource {
   @Description("Segment commit end for a LLC segment using split commit")
   @Summary("Segment commit end for a LLC segment using split commit")
   @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_COMMIT_END})
-  // TODO: Add parameters to extract and verify file name in the Request
   public Representation get() {
     SegmentCompletionProtocol.Request.Params requestParams = SegmentCompletionUtils.extractParams(getReference());
     if (requestParams == null) {

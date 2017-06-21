@@ -16,35 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.helix.AccessOption;
-import org.apache.helix.ControllerChangeListener;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.NotificationContext;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MinMaxPriorityQueue;
@@ -77,6 +48,39 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ControllerChangeListener;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static com.linkedin.pinot.controller.api.restlet.resources.SegmentCompletionUtils.getSegmentNamePrefix;
 
 
 public class PinotLLCRealtimeSegmentManager {
@@ -467,6 +471,37 @@ public class PinotLLCRealtimeSegmentManager {
     return HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
   }
 
+  public boolean commitSegmentFile(String tableName, String segmentLocation, String segmentName) {
+    File segmentFile = convertURIToSegmentLocation(segmentLocation);
+
+    File baseDir = new File(_controllerConf.getDataDir());
+    File tableDir = new File(baseDir, tableName);
+    File fileToMoveTo = new File(tableDir, segmentName);
+
+    try {
+      com.linkedin.pinot.common.utils.FileUtils.moveFileWithOverwrite(segmentFile, fileToMoveTo);
+    } catch (Exception e) {
+      LOGGER.error("Could not move {} to {}, Exception {}", segmentFile, segmentName, e);
+      return false;
+    }
+    for (File file : tableDir.listFiles()) {
+      if (file.getName().startsWith(getSegmentNamePrefix(segmentName))) {
+        LOGGER.warn("Deleting " + file);
+        FileUtils.deleteQuietly(file);
+      }
+    }
+    return true;
+  }
+
+  private static File convertURIToSegmentLocation(String segmentLocation) {
+    try {
+      URI uri = new URI(segmentLocation);
+      return new File(uri.getPath());
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("Could not convert URI " + segmentLocation + " to segment location", e);
+    }
+  }
+
   /**
    * This method is invoked after the realtime segment is uploaded but before a response is sent to the server.
    * It updates the propertystore segment metadata from IN_PROGRESS to DONE, and also creates new propertystore
@@ -477,7 +512,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param nextOffset The offset with which the next segment should start.
    * @return
    */
-  public boolean commitSegment(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
+  public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
     final long now = System.currentTimeMillis();
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 

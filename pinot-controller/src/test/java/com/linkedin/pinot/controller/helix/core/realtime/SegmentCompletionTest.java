@@ -618,7 +618,6 @@ public class SegmentCompletionTest {
   public void testLeaseTooLong() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
-    final String tableName = new LLCSegmentName(segmentNameStr).getTableName();
     // s1 sends offset of 20, gets HOLD at t = 5s;
     final long startTime = 5;
     segmentCompletionMgr._secconds = startTime;
@@ -772,7 +771,7 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    public boolean commitSegment(String rawTableName, String committingSegmentName, long nextOffset) {
+    public boolean commitSegmentMetadata(String rawTableName, String committingSegmentName, long nextOffset) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       _segmentMetadata.setEndOffset(nextOffset);
       _segmentMetadata.setDownloadUrl(

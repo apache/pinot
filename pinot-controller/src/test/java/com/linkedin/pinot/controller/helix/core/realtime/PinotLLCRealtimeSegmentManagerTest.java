@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.google.common.io.Files;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -28,11 +29,15 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentCommitUpload;
+import com.linkedin.pinot.controller.api.restlet.resources.SegmentCompletionUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,10 +47,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.joda.time.Interval;
 import org.testng.Assert;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -56,7 +63,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private static final String clusterName = "testCluster";
   private static final String DUMMY_HOST = "dummyHost:1234";
   private static final String KAFKA_OFFSET = "testDummy";
+  private static final String SCHEME = LLCSegmentCommitUpload.SCHEME;
   private String[] serverNames;
+  private static File baseDir;
 
   private List<String> getInstanceList(final int nServers) {
     Assert.assertTrue(nServers <= serverNames.length);
@@ -71,6 +80,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
     for (int i = 0; i < maxInstances; i++) {
       serverNames[i] = "Server_" + i;
     }
+    try {
+      baseDir = Files.createTempDir();
+      baseDir.deleteOnExit();
+    } catch (Exception e) {
+
+    }
+  }
+
+  @AfterTest
+  public void cleanUp() throws IOException {
+    FileUtils.deleteDirectory(baseDir);
   }
 
   @Test
@@ -248,7 +268,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     LLCRealtimeSegmentZKMetadata committingSegmentMetadata =  new LLCRealtimeSegmentZKMetadata(segmentManager._records.get(committingPartition));
     segmentManager._paths.clear();
     segmentManager._records.clear();
-    boolean status = segmentManager.commitSegment(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset);
+    boolean status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
+        nextOffset);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
 
@@ -713,6 +734,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
       CONTROLLER_CONF.setControllerVipHost("vip");
       CONTROLLER_CONF.setControllerPort("9000");
+      CONTROLLER_CONF.setDataDir(baseDir.toString());
     }
 
     @Override
@@ -843,6 +865,44 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   private String makeFakeSegmentName(int id) {
     return new LLCSegmentName("fakeTable_REALTIME", id, 0, 1234L).getSegmentName();
+  }
+
+  @Test
+  public void testCommitSegmentFile() throws Exception {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = new FakePinotLLCRealtimeSegmentManager(false, Collections.<String>emptyList());
+    String tableName = "fakeTable_REALTIME";
+    String segmentName = "segment";
+    String temporarySegmentLocation = SegmentCompletionUtils.generateSegmentFileName(segmentName);
+
+    File temporaryDirectory = new File(baseDir, tableName);
+    temporaryDirectory.mkdirs();
+    String segmentLocation = SCHEME + temporaryDirectory.toString() + "/" + temporarySegmentLocation;
+
+    FileUtils.write(new File(temporaryDirectory, temporarySegmentLocation), "temporary file contents");
+    Assert.assertTrue(realtimeSegmentManager.commitSegmentFile(tableName, segmentLocation, segmentName));
+  }
+
+  @Test
+  public void testSegmentAlreadyThereAndExtraneousFilesDeleted() throws Exception {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = new FakePinotLLCRealtimeSegmentManager(false, Collections.<String>emptyList());
+    String tableName = "fakeTable_REALTIME";
+    String segmentName = "segment";
+
+    File temporaryDirectory = new File(baseDir, tableName);
+    temporaryDirectory.mkdirs();
+
+    String segmentFileLocation = SegmentCompletionUtils.generateSegmentFileName(segmentName);
+    String segmentLocation = SCHEME + temporaryDirectory + "/" + segmentFileLocation;
+    String extraSegmentFileLocation = SegmentCompletionUtils.generateSegmentFileName(segmentName);
+    String extraSegmentLocation = SCHEME + temporaryDirectory + "/" + extraSegmentFileLocation;
+    String otherSegmentNotToBeDeleted = "segmentShouldStay";
+    FileUtils.write(new File(temporaryDirectory, segmentFileLocation), "temporary file contents");
+    FileUtils.write(new File(temporaryDirectory, extraSegmentFileLocation), "temporary file contents");
+    FileUtils.write(new File(temporaryDirectory, otherSegmentNotToBeDeleted), "temporary file contents");
+    FileUtils.write(new File(temporaryDirectory, segmentName), "temporary file contents");
+    Assert.assertTrue(realtimeSegmentManager.commitSegmentFile(tableName, segmentLocation, segmentName));
+    Assert.assertTrue(new File(temporaryDirectory, otherSegmentNotToBeDeleted).exists());
+    Assert.assertFalse(new File(temporaryDirectory, extraSegmentLocation).exists());
   }
 
   @Test

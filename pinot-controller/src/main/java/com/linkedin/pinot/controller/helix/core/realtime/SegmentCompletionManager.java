@@ -193,7 +193,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitStart(instanceId, offset, isSplitCommit);
+      response = fsm.segmentCommitStart(instanceId, offset);
     } catch (Exception e) {
       // Return failed response
     }
@@ -269,6 +269,7 @@ public class SegmentCompletionManager {
    * @return
    */
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit) {
+    String segmentLocation = reqParams.getSegmentLocation();
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -280,7 +281,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit);
+      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit, segmentLocation);
     } catch (Exception e) {
       // Return failed response
     }
@@ -470,7 +471,7 @@ public class SegmentCompletionManager {
      * from the map, and things start over. In this case, we respond to the server with a 'hold' so
      * that they re-transmit their segmentConsumed() message and start over.
      */
-    public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, long offset, boolean isSplitCommit) {
+    public SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, long offset) {
       long now = _segmentCompletionManager.getCurrentTimeMs();
       if (_excludedServerStateMap.contains(instanceId)) {
         LOGGER.warn("Not accepting commit from {} since it had stoppd consuming", instanceId);
@@ -570,7 +571,7 @@ public class SegmentCompletionManager {
      * We can get this call only when the state is COMMITTER_UPLOADING. Also, the instanceId should be equal to
      * the _winner.
      */
-    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommit) {
+    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommit, String segmentLocation) {
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
@@ -591,12 +592,8 @@ public class SegmentCompletionManager {
           _state = State.ABORTED;
           return SegmentCompletionProtocol.RESP_FAILED;
         }
-        SegmentCompletionProtocol.Response response = updateZk(instanceId, offset);
-        if (response != null) {
-          return response;
-        }
+        return commitSegment(instanceId, offset, isSplitCommit, segmentLocation);
       }
-      return SegmentCompletionProtocol.RESP_FAILED;
     }
 
 
@@ -960,7 +957,8 @@ public class SegmentCompletionManager {
       return response;
     }
 
-    private SegmentCompletionProtocol.Response updateZk(String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response commitSegment(String instanceId, long offset, boolean isSplitCommit,
+        String segmentLocation) {
       boolean success;
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
         // State changed while we were out of sync. return a failed commit.
@@ -970,14 +968,19 @@ public class SegmentCompletionManager {
       }
       LOGGER.info("Committing segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
       _state = State.COMMITTING;
-      success = _segmentManager.commitSegment(_segmentName.getTableName(), _segmentName.getSegmentName(),
+      // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
+      // so we need to move the segment file to its permanent location first before committing the metadata.
+      if (isSplitCommit) {
+        _segmentManager.commitSegmentFile(_segmentName.getTableName(), segmentLocation, _segmentName.getSegmentName());
+      }
+      success = _segmentManager.commitSegmentMetadata(_segmentName.getTableName(), _segmentName.getSegmentName(),
           _winningOffset);
       if (success) {
         _state = State.COMMITTED;
         LOGGER.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
         return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
       }
-      return null;
+      return SegmentCompletionProtocol.RESP_FAILED;
     }
 
 

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import java.util.UUID;
 import org.restlet.data.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,11 +24,14 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentCompletionUtils {
   private static Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionUtils.class);
+  // Used to create temporary segment file names
+  private static final String TMP = ".tmp.";
 
   static SegmentCompletionProtocol.Request.Params extractParams(Reference reference) {
     final String offsetStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
     final String segmentName = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
     final String instanceId = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
+    final String segmentLocation = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION);
 
     if (offsetStr == null || segmentName == null || instanceId == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offsetStr, segmentName, instanceId);
@@ -43,10 +47,21 @@ public class SegmentCompletionUtils {
     return new SegmentCompletionProtocol.Request.Params()
         .withInstanceId(instanceId)
         .withOffset(offset)
-        .withSegmentName(segmentName);
+        .withSegmentName(segmentName)
+        .withSegmentLocation(segmentLocation);
   }
 
-  public static String generateSegmentFileName(String segmentNameStr, long offset, String instanceId) {
-    return segmentNameStr + "##" + offset + "##" +  instanceId;
+  /**
+   * Takes in a segment name, and returns a file name prefix that is used to store all attempted uploads of this
+   * segment when a segment is uploaded using split commit. Each attempt has a unique file name suffix
+   * @param segmentName segment name
+   * @return
+   */
+  public static String getSegmentNamePrefix(String segmentName) {
+    return segmentName + TMP;
+  }
+
+  public static String generateSegmentFileName(String segmentNameStr) {
+    return getSegmentNamePrefix(segmentNameStr) + UUID.randomUUID().toString();
   }
 }
