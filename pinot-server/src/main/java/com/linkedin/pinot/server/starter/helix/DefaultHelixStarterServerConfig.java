@@ -45,6 +45,8 @@ public class DefaultHelixStarterServerConfig {
         CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
         CommonConstants.Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR);
+    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_SPLIT_COMMIT,
+        CommonConstants.Server.DEFAULT_SPLIT_COMMIT);
 
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_READ_MODE,
         CommonConstants.Server.DEFAULT_READ_MODE);
