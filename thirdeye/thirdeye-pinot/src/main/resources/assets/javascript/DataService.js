@@ -194,10 +194,13 @@ DataService.prototype = {
       return this.getDataAsynchronous(url, data, callback, spinner);
     },
     // Update anomaly feedback for anomaly id
-    updateFeedback : function(anomalyId, feedbackType) {
+    updateFeedback : function(anomalyId, feedbackType, comment) {
       var url = constants.UPDATE_ANOMALY_FEEDBACK + anomalyId;
-      var data = '{ "feedbackType": "' + feedbackType + '","comment": ""}';
-      var response = this.postData(url, data);
+      const data = {
+        feedbackType,
+        comment
+      };
+      var response = this.postData(url, JSON.stringify(data));
     },
 
     fetchGranularityForMetric(metricId) {

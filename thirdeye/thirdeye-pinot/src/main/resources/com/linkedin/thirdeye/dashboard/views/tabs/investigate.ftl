@@ -1,22 +1,28 @@
 {{#with anomaly}}
   <div class="anomaly-feedback padding-all">
     <div class="container">
+      <div class="row">
         <h3 class="anomaly-feedback-title">Is this an anomaly?</h3>
-          <form class="anomaly-feedback-radio" id="anomaly-feedback-radio">
-              <label class="radio-inline" for="feedback-radio-yes">
-                <input type="radio" id="feedback-radio-yes" name="feedback-radio" value="ANOMALY">
-                <span class="label-medium-semibold">Yes</span> (True Anomaly)
-              </label>
-              <label for=feedback-radio-na class="radio-inline">
-                <input class="" type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NO_ACTION">
-                <span class="label-medium-semibold">Yes </span> <span>(but non-actionable)<span>
-              </label>
-              <label for=feedback-radio-no class="radio-inline">
-                <input class="" type="radio" id="feedback-radio-no" name="feedback-radio" value="NOT_ANOMALY">
-                <span class="label-medium-semibold">No</span> (False Alarm)
-              </label>
-          </form>
-        <p>Your feedback will help us improve the accuracy of our anomaly detection techniques.</p>
+      </div>
+      <form class="anomaly-feedback-radio" id="anomaly-feedback-radio">
+          <label class="radio-inline" for="feedback-radio-yes">
+            <input type="radio" id="feedback-radio-yes" name="feedback-radio" value="ANOMALY">
+            <span class="label-medium-semibold">Yes</span> (True Anomaly)
+          </label>
+          <label for=feedback-radio-na class="radio-inline">
+            <input class="" type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NO_ACTION">
+            <span class="label-medium-semibold">Yes </span> <span>(but non-actionable)<span>
+          </label>
+          <label for=feedback-radio-no class="radio-inline">
+            <input class="" type="radio" id="feedback-radio-no" name="feedback-radio" value="NOT_ANOMALY">
+            <span class="label-medium-semibold">No</span> (False Alarm)
+          </label><br>
+      </form>
+      <div id="anomaly-feedback-comment" class="anomaly-feedback__comment anomaly-feedback__comment--show form-group hidden">
+        <label for="feedback-comment"><span class="label-medium-semibold">Comment</span> (optional)</label>
+        <textarea placeholder="Enter a comment" class="form-control" rows="2" id="feedback-comment"></textarea>
+      </div>
+      <p>Your feedback will help us improve the accuracy of our anomaly detection techniques.</p>
     </div>
   </div>
 
