@@ -301,6 +301,24 @@ public class SegmentCompletionProtocol {
     }
   }
 
+  public static class SegmentCommitStartRequest extends Request {
+    public SegmentCommitStartRequest(Params params) {
+      super(params, MSG_TYPE_COMMIT_START);
+    }
+  }
+
+  public static class SegmentCommitUploadRequest extends Request {
+    public SegmentCommitUploadRequest(Params params) {
+      super(params, MSG_TYPE_SEGMENT_UPLOAD);
+    }
+  }
+
+  public static class SegmentCommitEndRequest extends Request {
+    public SegmentCommitEndRequest(Params params) {
+      super(params, MSG_TYPE_COMMIT_END);
+    }
+  }
+
   public static class SegmentStoppedConsuming extends Request {
     public SegmentStoppedConsuming(Params params) {
       super(params, MSG_TYPE_STOPPED_CONSUMING);
