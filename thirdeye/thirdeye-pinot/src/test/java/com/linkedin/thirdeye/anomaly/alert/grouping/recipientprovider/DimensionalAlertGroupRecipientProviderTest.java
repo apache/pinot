@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.BaseAlertGrouper;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -59,17 +61,27 @@ public class DimensionalAlertGroupRecipientProviderTest {
     // Test AlertGroupKey to auxiliary recipients
     DimensionMap alertGroupKey1 = new DimensionMap();
     alertGroupKey1.put(GROUP_BY_DIMENSION_NAME, "V1");
-    Assert.assertEquals(recipientProvider.getAlertGroupRecipients(alertGroupKey1), EMAIL1);
+    Assert.assertEquals(
+        recipientProvider.getAlertGroupRecipients(alertGroupKey1, Collections.<MergedAnomalyResultDTO>emptyList()),
+        EMAIL1);
 
     DimensionMap alertGroupKey2 = new DimensionMap();
     alertGroupKey2.put(GROUP_BY_DIMENSION_NAME, "V1");
-    Assert.assertEquals(recipientProvider.getAlertGroupRecipients(alertGroupKey2), EMAIL1);
+    Assert.assertEquals(
+        recipientProvider.getAlertGroupRecipients(alertGroupKey2, Collections.<MergedAnomalyResultDTO>emptyList()),
+        EMAIL1);
 
     // Test empty recipients
-    Assert.assertEquals(recipientProvider.getAlertGroupRecipients(new DimensionMap()), BaseAlertGrouper.EMPTY_RECIPIENTS);
-    Assert.assertEquals(recipientProvider.getAlertGroupRecipients(null), BaseAlertGrouper.EMPTY_RECIPIENTS);
+    Assert.assertEquals(
+        recipientProvider.getAlertGroupRecipients(new DimensionMap(), Collections.<MergedAnomalyResultDTO>emptyList()),
+        BaseAlertGrouper.EMPTY_RECIPIENTS);
+    Assert
+        .assertEquals(recipientProvider.getAlertGroupRecipients(null, Collections.<MergedAnomalyResultDTO>emptyList()),
+            BaseAlertGrouper.EMPTY_RECIPIENTS);
     DimensionMap dimensionMapNonExist = new DimensionMap();
     dimensionMapNonExist.put("K2", "V1");
-    Assert.assertEquals(recipientProvider.getAlertGroupRecipients(dimensionMapNonExist), BaseAlertGrouper.EMPTY_RECIPIENTS);
+    Assert.assertEquals(recipientProvider
+            .getAlertGroupRecipients(dimensionMapNonExist, Collections.<MergedAnomalyResultDTO>emptyList()),
+        BaseAlertGrouper.EMPTY_RECIPIENTS);
   }
 }

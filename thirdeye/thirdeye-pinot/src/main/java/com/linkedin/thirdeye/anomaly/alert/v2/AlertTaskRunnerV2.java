@@ -181,7 +181,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           //   Get auxiliary email recipient from provider
           AlertGroupRecipientProvider recipientProvider =
               alertGroupRecipientProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
-          String auxiliaryRecipients = recipientProvider.getAlertGroupRecipients(dimensions);
+          String auxiliaryRecipients = recipientProvider.getAlertGroupRecipients(dimensions, anomalyResultListOfGroup);
           if (StringUtils.isNotBlank(auxiliaryRecipients)) {
             recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
           }
