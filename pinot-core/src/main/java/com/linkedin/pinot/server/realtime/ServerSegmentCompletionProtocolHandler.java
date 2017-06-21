@@ -50,7 +50,7 @@ public class ServerSegmentCompletionProtocolHandler {
     _instanceId = instanceId;
   }
 
-  private Part[] separateRequest(final String segmentName, final File segmentTarFile) {
+  private Part[] createFileParts(final String segmentName, final File segmentTarFile) {
     InputStream fileInputStream;
     try {
       fileInputStream = new FileInputStream(segmentTarFile);
@@ -79,20 +79,20 @@ public class ServerSegmentCompletionProtocolHandler {
     };
     return parts;
   }
-  public SegmentCompletionProtocol.Response segmentCommitStart(long offset, final String segmentName, final File segmentTarFile) {
+  public SegmentCompletionProtocol.Response segmentCommitStart(long offset, final String segmentName) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
     SegmentCompletionProtocol.SegmentCommitStartRequest request = new SegmentCompletionProtocol.SegmentCommitStartRequest(params);
 
-    return doHttp(request, separateRequest(segmentName, segmentTarFile));
+    return doHttp(request, null);
   }
 
-  public SegmentCompletionProtocol.Response segmentCommitUpload(long offset, final String segmentName, final File segmentTarFile) {
+  public SegmentCompletionProtocol.Response segmentCommitUpload(long offset, final String segmentName, final File segmentTarFile, final String segmentLocation) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
+    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName).withSegmentLocation(segmentLocation);
     SegmentCompletionProtocol.SegmentCommitUploadRequest request = new SegmentCompletionProtocol.SegmentCommitUploadRequest(params);
 
-    return doHttp(request, separateRequest(segmentName, segmentTarFile));
+    return doHttp(request, createFileParts(segmentName, segmentTarFile));
   }
 
   public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, final File segmentTarFile) {
@@ -100,7 +100,7 @@ public class ServerSegmentCompletionProtocolHandler {
     params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
     SegmentCompletionProtocol.SegmentCommitEndRequest request = new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
 
-    return doHttp(request, separateRequest(segmentName, segmentTarFile));
+    return doHttp(request, null);
   }
 
   public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) {
@@ -108,7 +108,7 @@ public class ServerSegmentCompletionProtocolHandler {
     params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
     SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
 
-    return doHttp(request, separateRequest(segmentName, segmentTarFile));
+    return doHttp(request, createFileParts(segmentName, segmentTarFile));
   }
 
   public SegmentCompletionProtocol.Response extendBuildTime(SegmentCompletionProtocol.Request.Params params) {
