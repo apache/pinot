@@ -322,57 +322,6 @@ public class OnboardResource {
     return returnInfo;
   }
 
-  /**
-   * Show the content of merged anomalies whose start time is located in the given time ranges
-   *
-   * @param functionId id of the anomaly function
-   * @param startTimeIso The start time of the monitoring window
-   * @param endTimeIso The start time of the monitoring window
-   * @param anomalyType type of anomaly: "raw" or "merged"
-   * @return list of anomalyIds (Long)
-   */
-  @GET
-  @Path("function/{id}/anomalies")
-  public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso,
-      @QueryParam("type") @DefaultValue("merged") String anomalyType) {
-
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    if (anomalyFunction == null) {
-      LOG.info("Anomaly functionId {} is not found", functionId);
-      return null;
-    }
-
-    long startTime;
-    long endTime;
-    try {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
-    } catch (Exception e) {
-      throw new WebApplicationException("Unable to parse strings, " + startTimeIso + " and " + endTimeIso
-          + ", in ISO DateTime format", e);
-    }
-
-    LOG.info("Retrieving {} anomaly results for function {} in the time range: {} -- {}",
-        anomalyType, functionId, startTimeIso, endTimeIso);
-
-    ArrayList<Long> idList = new ArrayList<>();
-    if (anomalyType.equals("raw")) {
-      List<RawAnomalyResultDTO> rawDTO = rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime, endTime, functionId);
-      for (RawAnomalyResultDTO dto : rawDTO) {
-        idList.add(dto.getId());
-      }
-    } else if (anomalyType.equals("merged")) {
-      List<MergedAnomalyResultDTO> mergedResults = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime,
-          endTime, functionId, true);
-      for (MergedAnomalyResultDTO dto : mergedResults) {
-        idList.add(dto.getId());
-      }
-    }
-    return idList;
-  }
-
   // Delete merged anomaly results from mergedAnomalyResultDAO
   private int deleteMergedResults(List<MergedAnomalyResultDTO> mergedResults) {
     LOG.info("Deleting merged results");

@@ -56,14 +56,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
+import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -551,6 +544,72 @@ public class AnomalyResource {
       }
     }
     return reorderedExploreDimensions.toString();
+  }
+
+  /**
+   * Show the content of merged anomalies whose start time is located in the given time ranges
+   *
+   * @param functionId id of the anomaly function
+   * @param startTimeIso The start time of the monitoring window
+   * @param endTimeIso The start time of the monitoring window
+   * @param anomalyType type of anomaly: "raw" or "merged"
+   * @param applyAlertFiler can choose apply alert filter when query merged anomaly results
+   * @return list of anomalyIds (Long)
+   */
+  @GET
+  @Path("anomaly-function/{id}/anomalies")
+  public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId,
+      @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso,
+      @QueryParam("type") @DefaultValue("merged") String anomalyType,
+      @QueryParam("apply-alert-filter") @DefaultValue("false") boolean applyAlertFiler) {
+
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if (anomalyFunction == null) {
+      LOG.info("Anomaly functionId {} is not found", functionId);
+      return null;
+    }
+
+    long startTime;
+    long endTime;
+    try {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+    } catch (Exception e) {
+      throw new WebApplicationException("Unable to parse strings, " + startTimeIso + " and " + endTimeIso
+          + ", in ISO DateTime format", e);
+    }
+
+    LOG.info("Retrieving {} anomaly results for function {} in the time range: {} -- {}",
+        anomalyType, functionId, startTimeIso, endTimeIso);
+
+    ArrayList<Long> idList = new ArrayList<>();
+    if (anomalyType.equals("raw")) {
+      List<RawAnomalyResultDTO> rawDTO = rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime, endTime, functionId);
+      for (RawAnomalyResultDTO dto : rawDTO) {
+        idList.add(dto.getId());
+      }
+    } else if (anomalyType.equals("merged")) {
+      List<MergedAnomalyResultDTO> mergedResults = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime,
+          endTime, functionId, true);
+
+      // apply alert filter
+      if (applyAlertFiler) {
+        try {
+          mergedResults = AlertFilterHelper.applyFiltrationRule(mergedResults, alertFilterFactory);
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to apply alert filters on {} anomalies for function id:{}, start:{}, end:{}, exception:{}",
+              anomalyType, functionId, startTimeIso, endTimeIso, e);
+        }
+      }
+
+      for (MergedAnomalyResultDTO dto : mergedResults) {
+        idList.add(dto.getId());
+      }
+    }
+
+      return idList;
   }
 
   // Activate anomaly function
