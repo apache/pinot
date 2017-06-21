@@ -347,13 +347,13 @@ public abstract class Series {
   }
 
   /**
-   * Returns the boolean (primitive byte) representation of a single value series.
+   * Returns the primitive boolean representation of a single value series.
    *
-   * @return byte value
+   * @return boolean value
    * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
    */
-  public final byte booleanValue() {
-    return assertSingleValue().getBoolean(0);
+  public final boolean booleanValue() {
+    return BooleanSeries.booleanValueOf(assertSingleValue().getBoolean(0));
   }
 
   /**

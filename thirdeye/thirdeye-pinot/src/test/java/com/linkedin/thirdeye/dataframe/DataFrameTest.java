@@ -976,8 +976,8 @@ public class DataFrameTest {
     Series s = LongSeries.buildFrom(1);
     Assert.assertEquals(s.doubleValue(), 1.0d);
     Assert.assertEquals(s.longValue(), 1);
-    Assert.assertEquals(s.booleanValue(), 0x1);
     Assert.assertEquals(s.stringValue(), "1");
+    Assert.assertEquals(s.booleanValue(), true);
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
@@ -991,13 +991,13 @@ public class DataFrameTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testBooleanValueFailNull() {
-    LongSeries.buildFrom(LNULL).booleanValue();
+  public void testStringValueFailNull() {
+    LongSeries.buildFrom(LNULL).stringValue();
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testStringValueFailNull() {
-    LongSeries.buildFrom(LNULL).stringValue();
+  public void testBooleanValueFailNull() {
+    LongSeries.buildFrom(LNULL).booleanValue();
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
@@ -1011,13 +1011,13 @@ public class DataFrameTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testBooleanValueFailMultiple() {
-    LongSeries.buildFrom(1, 2, 3).booleanValue();
+  public void testStringValueFailMultiple() {
+    LongSeries.buildFrom(1, 2, 3).stringValue();
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testStringValueFailMultiple() {
-    LongSeries.buildFrom(1, 2, 3).stringValue();
+  public void testBooleanValueFailMultiple() {
+    LongSeries.buildFrom(1, 2, 3).booleanValue();
   }
 
   @Test
