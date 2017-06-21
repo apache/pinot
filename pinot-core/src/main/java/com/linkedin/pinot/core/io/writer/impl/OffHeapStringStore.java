@@ -27,14 +27,14 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
- * @class OffHeaStringStore
+ * @class OffHeapStringStore
  *
  * An off-heap string store that provides APIs to add a string, retrieve a string, and compare string at an index
  * No verification is made as to whether the string added already exists or not. Strings are stored by
  * copying one 'char' at a time into a CharBuffer, and keeping the offsets in the CharBuffer in another IntBuffer.
  * Empty strings are supported.
  *
- * @note The class is thread-unsafe.
+ * @note The class is thread-safe for single writer and multiple readers.
  *
  * This class has a list of OffHeapStringStore.Buffer objects. As Buffer objects get filled, new Buffer objects
  * are added to the list. New Buffers objects have twice the capacity of the previous Buffer
@@ -81,21 +81,23 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  *
  */
 public class OffHeapStringStore implements Closeable {
+  private static final int START_SIZE = 32 * 1024;
+
   private static class Buffer implements Closeable {
     private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
     private static final int CHAR_SIZE = Character.SIZE / 8;
 
-    final PinotDataBuffer _pinotDataBuffer;
-    final ByteBuffer _byteBuffer;
-    final int _startIndex;
-    final long _size;
+    private final PinotDataBuffer _pinotDataBuffer;
+    private final ByteBuffer _byteBuffer;
+    private final int _startIndex;
+    private final long _size;
 
-    int _numStrings = 0;
-    int _availEndOffset;  // Exclusive
+    private int _numStrings = 0;
+    private int _availEndOffset;  // Exclusive
 
     private Buffer(long size, int startIndex) {
-      if (size > Integer.MAX_VALUE) {
-        size = Integer.MAX_VALUE;
+      if (size >= Integer.MAX_VALUE) {
+        size = Integer.MAX_VALUE - 1;
       }
       _pinotDataBuffer = PinotDataBuffer.allocateDirect(size);
       _pinotDataBuffer.order(ByteOrder.nativeOrder());
@@ -164,11 +166,12 @@ public class OffHeapStringStore implements Closeable {
     }
   }
 
-  volatile List<Buffer> _buffers = new ArrayList<Buffer>();
-  int _numElements = 0;
+  private volatile List<Buffer> _buffers = new ArrayList<Buffer>();
+  private int _numElements = 0;
+  private volatile Buffer _currentBuffer;
 
   public OffHeapStringStore() {
-    expand(32 * 1024);
+    expand(START_SIZE);
   }
 
   // Expand the buffer size, allocating a min of 32k for strings.
@@ -180,6 +183,7 @@ public class OffHeapStringStore implements Closeable {
     }
     newList.add(buffer);
     _buffers = newList;
+    _currentBuffer = buffer;
     return buffer;
   }
 
@@ -191,19 +195,20 @@ public class OffHeapStringStore implements Closeable {
 
   // Returns a string, given an index
   public String get(int index) {
-    for (int x = _buffers.size()-1; x >= 0; x--) {
-      Buffer buffer = _buffers.get(x);
-      // Assumed that we will never ask for a
+    List<Buffer> bufList = _buffers;
+    for (int x = bufList.size()-1; x >= 0; x--) {
+      Buffer buffer = bufList.get(x);
       if (index >= buffer.getStartIndex()) {
         return buffer.get(index - buffer.getStartIndex());
       }
     }
+    // Assumed that we will never ask for an index that does not exist.
     throw new RuntimeException("dictionary ID '" + index + "' too low");
   }
 
   // Adds a string and returns the index. No verification is made as to whether the string already exists or not
   public int add(String string) {
-    Buffer buffer = _buffers.get(_buffers.size() - 1);
+    Buffer buffer = _currentBuffer;
     int index = buffer.add(string);
     while (index < 0) {
       buffer = expand();
@@ -214,8 +219,9 @@ public class OffHeapStringStore implements Closeable {
   }
 
   public boolean equalsStringAt(String string, int index) {
-    for (int x = _buffers.size()-1; x >= 0; x--) {
-      Buffer buffer = _buffers.get(x);
+    List<Buffer> bufList = _buffers;
+    for (int x = bufList.size()-1; x >= 0; x--) {
+      Buffer buffer = bufList.get(x);
       // Assumed that we will never ask for a
       if (index >= buffer.getStartIndex()) {
         return buffer.equalsStringAt(string, index- buffer.getStartIndex());
