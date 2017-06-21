@@ -17,6 +17,7 @@
 package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import java.lang.reflect.Constructor;
 import javax.annotation.Nonnull;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public class QuerySchedulerFactory {
   private static final String FCFS_ALGORITHM = "fcfs";
   private static final String DEFAULT_QUERY_SCHEDULER_ALGORITHM = FCFS_ALGORITHM;
-  private static final String ALGORITHM_NAME_CONFIG_KEY = "name";
+  public static final String ALGORITHM_NAME_CONFIG_KEY = "name";
   private static Logger LOGGER = LoggerFactory.getLogger(QuerySchedulerFactory.class);
 
   /**
@@ -38,10 +39,10 @@ public class QuerySchedulerFactory {
    * Besides known instances, 'name' can be a classname
    * @param schedulerConfig scheduler specific configuration
    * @param queryExecutor QueryExecutor to use
-   * @return
+   * @return returns an instance of query scheduler
    */
   public static @Nonnull  QueryScheduler create(@Nonnull Configuration schedulerConfig,
-      @Nonnull QueryExecutor queryExecutor) {
+      @Nonnull QueryExecutor queryExecutor, ServerMetrics serverMetrics) {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
 
@@ -50,7 +51,7 @@ public class QuerySchedulerFactory {
 
     if (schedulerName.equals(FCFS_ALGORITHM)) {
       LOGGER.info("Using FCFS query scheduler");
-      return new FCFSQueryScheduler(schedulerConfig, queryExecutor);
+      return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics);
     }
 
     // didn't find by name so try by classname
@@ -65,7 +66,7 @@ public class QuerySchedulerFactory {
     // will provide degraded service
 
     LOGGER.warn("Scheduler {} not found. Using default FCFS query scheduler", schedulerName);
-    return new FCFSQueryScheduler(schedulerConfig, queryExecutor);
+    return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics);
   }
 
   private static @Nullable QueryScheduler getQuerySchedulerByClassName(String className, Configuration schedulerConfig,
@@ -74,7 +75,7 @@ public class QuerySchedulerFactory {
       Constructor<?> constructor =
           Class.forName(className).getDeclaredConstructor(Configuration.class, QueryExecutor.class);
       constructor.setAccessible(true);
-      return (QueryScheduler) constructor.newInstance(new Object[]{schedulerConfig, queryExecutor});
+      return (QueryScheduler) constructor.newInstance(schedulerConfig, queryExecutor);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate scheduler class by name: {}", className, e);
       return null;

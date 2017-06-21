@@ -148,7 +148,7 @@ public class ServerBuilder {
       throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
              InstantiationException {
     Configuration schedulerConfig = _serverConf.getSchedulerConfig();
-    return QuerySchedulerFactory.create(schedulerConfig, queryExecutor);
+    return QuerySchedulerFactory.create(schedulerConfig, queryExecutor, _serverMetrics);
   }
 
   public RequestHandlerFactory buildRequestHandlerFactory(final QueryScheduler queryScheduler) {

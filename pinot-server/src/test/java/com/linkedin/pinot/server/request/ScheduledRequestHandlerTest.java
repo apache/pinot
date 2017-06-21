@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.server.request;
 
+import com.google.common.base.Function;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
@@ -42,6 +44,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -117,16 +120,37 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testQueryProcessingException()
       throws Exception {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor) {
+    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor, serverMetrics) {
       @Override
-      public ListenableFuture<DataTable> submit(ServerQueryRequest queryRequest) {
-        return queryWorkers.submit(new Callable<DataTable>() {
+      public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+        ListenableFuture<DataTable> dataTable = queryWorkers.submit(new Callable<DataTable>() {
           @Override
           public DataTable call()
               throws Exception {
             throw new RuntimeException("query processing error");
           }
         });
+        ListenableFuture<DataTable> queryResponse =
+            Futures.catching(dataTable, Throwable.class, new Function<Throwable, DataTable>() {
+              @Nullable
+              @Override
+              public DataTable apply(@Nullable Throwable input) {
+                DataTable result = new DataTableImplV2();
+                result.addException(QueryException.INTERNAL_ERROR);
+                return result;
+              }
+            });
+        return serializeData(queryResponse);
+      }
+
+      @Override
+      public void start() {
+
+      }
+
+      @Override
+      public String name() {
+        return "test";
       }
     }, serverMetrics);
 
@@ -143,20 +167,17 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testValidQueryResponse()
       throws InterruptedException, ExecutionException, TimeoutException, IOException {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor) {
+    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor, serverMetrics) {
       @Override
-      public ListenableFuture<DataTable> submit(ServerQueryRequest queryRequest) {
-        return queryRunners.submit(new Callable<DataTable>() {
+      public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+        ListenableFuture<DataTable> response = queryRunners.submit(new Callable<DataTable>() {
           @Override
           public DataTable call()
               throws Exception {
-            String[] columns = new String[] { "foo", "bar"};
-            FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[] {
-              FieldSpec.DataType.STRING,
-              FieldSpec.DataType.INT
-            };
-            DataSchema dataSchema = new DataSchema(
-                columns, columnTypes);
+            String[] columns = new String[]{"foo", "bar"};
+            FieldSpec.DataType[] columnTypes =
+                new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.INT};
+            DataSchema dataSchema = new DataSchema(columns, columnTypes);
             DataTableBuilder dtBuilder = new DataTableBuilder(dataSchema);
             dtBuilder.startRow();
             dtBuilder.setColumn(0, "mars");
@@ -169,6 +190,17 @@ public class ScheduledRequestHandlerTest {
             return dtBuilder.build();
           }
         });
+       return serializeData(response);
+      }
+
+      @Override
+      public void start() {
+
+      }
+
+      @Override
+      public String name() {
+        return "test";
       }
     }, serverMetrics);
 
@@ -183,4 +215,18 @@ public class ScheduledRequestHandlerTest {
     Assert.assertEquals(responseDT.getInt(1, 1), 100);
   }
 
+  private ListenableFuture<byte[]> serializeData(ListenableFuture<DataTable> dataTable) {
+    return Futures.transform(dataTable, new Function<DataTable, byte[]>() {
+      @Nullable
+      @Override
+      public byte[] apply(@Nullable DataTable input) {
+        try {
+          return input.toBytes();
+        } catch (IOException e) {
+          LOGGER.error("Failed to transform");
+          return new byte[0];
+        }
+      }
+    });
+  }
 }
