@@ -326,18 +326,42 @@ public abstract class Series {
     throw new RuntimeException(NOT_SUPPORTED);
   }
 
+  /**
+   * Returns the primitive double representation of a single value series.
+   *
+   * @return double value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
   public final double doubleValue() {
     return assertSingleValue().getDouble(0);
   }
 
+  /**
+   * Returns the primitive long representation of a single value series.
+   *
+   * @return long value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
   public final long longValue() {
     return assertSingleValue().getLong(0);
   }
 
+  /**
+   * Returns the boolean (primitive byte) representation of a single value series.
+   *
+   * @return byte value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
   public final byte booleanValue() {
     return assertSingleValue().getBoolean(0);
   }
 
+  /**
+   * Returns the string representation of a single value series.
+   *
+   * @return string value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
   public final String stringValue() {
     return assertSingleValue().getString(0);
   }
