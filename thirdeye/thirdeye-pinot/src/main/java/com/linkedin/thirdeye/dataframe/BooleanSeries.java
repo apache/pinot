@@ -358,6 +358,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
 
   @Override
   public BooleanSeries slice(int from, int to) {
+    from = Math.max(Math.min(this.size(), from), 0);
+    to = Math.max(Math.min(this.size(), to), 0);
     return buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 

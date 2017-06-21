@@ -289,6 +289,8 @@ public final class StringSeries extends TypedSeries<StringSeries> {
 
   @Override
   public StringSeries slice(int from, int to) {
+    from = Math.max(Math.min(this.size(), from), 0);
+    to = Math.max(Math.min(this.size(), to), 0);
     return StringSeries.buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 

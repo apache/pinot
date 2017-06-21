@@ -476,6 +476,23 @@ public class DataFrame {
   }
 
   /**
+   * Returns a copy of the DataFrame including only the series in {@code seriesNames}.
+   *
+   * @param seriesNames series names
+   * @return sliced DataFrame copy
+   */
+  public DataFrame slice(String... seriesNames) {
+    DataFrame df = new DataFrame();
+    df.series.clear();
+    for(String name : seriesNames) {
+      df.addSeries(name, this.get(name).copy());
+      if(name.equals(this.getIndexName()))
+        df.setIndex(name);
+    }
+    return df;
+  }
+
+  /**
    * Returns a copy of the DataFrame containing (up to) {@code n} first rows.
    *
    * @param n number of rows to include

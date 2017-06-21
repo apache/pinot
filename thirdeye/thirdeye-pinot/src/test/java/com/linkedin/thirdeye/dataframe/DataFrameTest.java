@@ -2667,6 +2667,111 @@ public class DataFrameTest {
     Assert.assertEquals(df.toString(), expected);
   }
 
+  @Test
+  public void testSliceRows() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", 1, 2, 3, 4);
+    df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
+    df.addSeries("three", "1", "2", "3", "4");
+    df.addSeries("four", false, true, false, true);
+
+    DataFrame out = df.slice(1, 3);
+
+    Assert.assertEquals(out.size(), 2);
+    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    assertEquals(out.getLongs("one"), 2, 3);
+    assertEquals(out.getDoubles("two"), 2.0, 3.0);
+    assertEquals(out.getStrings("three"), "2", "3");
+    assertEquals(out.getBooleans("four"), true, false);
+  }
+
+  @Test
+  public void testSliceRowsTooLow() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", 1, 2, 3, 4);
+    df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
+    df.addSeries("three", "1", "2", "3", "4");
+    df.addSeries("four", false, true, false, true);
+
+    DataFrame out = df.slice(-2, 3);
+
+    Assert.assertEquals(out.size(), 3);
+    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    assertEquals(out.getLongs("one"), 1, 2, 3);
+    assertEquals(out.getDoubles("two"), 1.0, 2.0, 3.0);
+    assertEquals(out.getStrings("three"), "1", "2", "3");
+    assertEquals(out.getBooleans("four"), false, true, false);
+  }
+
+  @Test
+  public void testSliceRowsTooHigh() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", 1, 2, 3, 4);
+    df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
+    df.addSeries("three", "1", "2", "3", "4");
+    df.addSeries("four", false, true, false, true);
+
+    DataFrame out = df.slice(1, 7);
+
+    Assert.assertEquals(out.size(), 3);
+    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    assertEquals(out.getLongs("one"), 2, 3, 4);
+    assertEquals(out.getDoubles("two"), 2.0, 3.0, 4.0);
+    assertEquals(out.getStrings("three"), "2", "3", "4");
+    assertEquals(out.getBooleans("four"), true, false, true);
+  }
+
+  @Test
+  public void testSliceRowsEmpty() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", 1, 2, 3, 4);
+    df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
+    df.addSeries("three", "1", "2", "3", "4");
+    df.addSeries("four", false, true, false, true);
+
+    DataFrame out = df.slice(4, 4);
+
+    Assert.assertEquals(out.size(), 0);
+    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    assertEmpty(out.getLongs("one"));
+    assertEmpty(out.getDoubles("two"));
+    assertEmpty(out.getStrings("three"));
+    assertEmpty(out.getBooleans("four"));
+  }
+
+  @Test
+  public void testSliceColumns() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", 1, 2, 3, 4);
+    df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
+    df.addSeries("three", "1", "2", "3", "4");
+    df.addSeries("four", false, true, false, true);
+    df.setIndex("one");
+
+    DataFrame out = df.slice("three", "one");
+
+    Assert.assertEquals(out.size(), 4);
+    Assert.assertEquals(out.getSeriesNames().size(), 2);
+    Assert.assertEquals(out.getIndexName(), "one");
+    assertEquals(out.getStrings("three"), "1", "2", "3", "4");
+    assertEquals(out.getLongs("one"), 1, 2, 3, 4);
+  }
+
+  @Test
+  public void testSliceColumnsNoIndex() {
+    DataFrame df = new DataFrame();
+    df.addSeries("one", 1, 2, 3, 4);
+    df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
+    df.setIndex("two");
+
+    DataFrame out = df.slice("one");
+
+    Assert.assertEquals(out.size(), 4);
+    Assert.assertEquals(out.getSeriesNames().size(), 1);
+    Assert.assertEquals(out.getIndexName(), null);
+    assertEquals(out.getLongs("one"), 1, 2, 3, 4);
+  }
+
   /* **************************************************************************
    * Helpers
    ***************************************************************************/
