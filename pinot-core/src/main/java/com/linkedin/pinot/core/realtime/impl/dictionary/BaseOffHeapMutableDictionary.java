@@ -475,10 +475,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   protected boolean equalsValueAt(int dictId, Object value) {
-    if (value.equals(get(dictId))) {
-      return true;
-    }
-    return false;
+    return value.equals(get(dictId));
   }
 
   public abstract void doClose() throws IOException;

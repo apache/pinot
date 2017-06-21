@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -177,7 +178,7 @@ public class OffHeapStringStore implements Closeable {
   // Expand the buffer size, allocating a min of 32k for strings.
   private Buffer expand(long size) {
     Buffer buffer = new Buffer(size, _numElements);
-    List<Buffer> newList = new ArrayList<>(_buffers.size() + 1);
+    List<Buffer> newList = new LinkedList<>();
     for (Buffer b : _buffers) {
       newList.add(b);
     }

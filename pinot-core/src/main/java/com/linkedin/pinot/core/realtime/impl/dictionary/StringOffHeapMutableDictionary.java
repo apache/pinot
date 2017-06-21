@@ -64,10 +64,14 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
     }
   }
 
+  private String getInternal(int dictId) {
+    return _stringStore.get(dictId);
+  }
+
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    String valueToCompare = (String) get(dictIdToCompare);
+    String valueToCompare = getInternal(dictIdToCompare);
 
     if (includeLower) {
       if (valueToCompare.compareTo(lower) < 0) {
@@ -124,10 +128,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   protected boolean equalsValueAt(int dictId, Object value) {
-    if (_stringStore.equalsStringAt(value.toString(), dictId)) {
-      return true;
-    }
-    return false;
+    return _stringStore.equalsStringAt(value.toString(), dictId);
   }
 
   private void updateMinMax(String value) {
