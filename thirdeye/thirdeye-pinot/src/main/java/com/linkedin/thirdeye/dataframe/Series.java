@@ -19,6 +19,8 @@ import org.apache.commons.lang.NotImplementedException;
  */
 public abstract class Series {
   private static final String IS_EMPTY = "Series is empty";
+  private static final String IS_NULL = "Value is null";
+  private static final String ONE_ELEMENT = "Series must contain exactly one element";
   private static final String NOT_SUPPORTED = "Operation not supported";
 
   public static final String TOSTRING_NULL = "null";
@@ -322,6 +324,54 @@ public abstract class Series {
 
   public Series std() {
     throw new RuntimeException(NOT_SUPPORTED);
+  }
+
+  /**
+   * Returns the primitive double representation of a single value series.
+   *
+   * @return double value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
+  public final double doubleValue() {
+    return assertSingleValue().getDouble(0);
+  }
+
+  /**
+   * Returns the primitive long representation of a single value series.
+   *
+   * @return long value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
+  public final long longValue() {
+    return assertSingleValue().getLong(0);
+  }
+
+  /**
+   * Returns the primitive boolean representation of a single value series.
+   *
+   * @return boolean value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
+  public final boolean booleanValue() {
+    return BooleanSeries.booleanValueOf(assertSingleValue().getBoolean(0));
+  }
+
+  /**
+   * Returns the string representation of a single value series.
+   *
+   * @return string value
+   * @throws IllegalStateException if the series does not contain exactly one element, or the value is {@code NULL}.
+   */
+  public final String stringValue() {
+    return assertSingleValue().getString(0);
+  }
+
+  private Series assertSingleValue() {
+    if(this.size() != 1)
+      throw new IllegalStateException(ONE_ELEMENT);
+    if(this.isNull(0))
+      throw new IllegalStateException(IS_NULL);
+    return this;
   }
 
   /* *************************************************************************
