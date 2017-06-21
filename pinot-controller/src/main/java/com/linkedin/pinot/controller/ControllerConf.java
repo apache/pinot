@@ -47,6 +47,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   private static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
   private static final String TABLE_MIN_REPLICAS = "table.minReplicas";
+  private static final String ACCEPT_SPLIT_COMMIT = "controller.accept.split.commit";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -57,6 +58,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
+  private static final boolean DEFAULT_ACCEPT_SPLIT_COMMIT = false;
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -73,6 +75,10 @@ public class ControllerConf extends PropertiesConfiguration {
       // Shouldn't happen
       throw new AssertionError("UTF-8 encoding should always be supported", e);
     }
+  }
+
+  public void setSplitCommit(boolean isSplitCommit) {
+    setProperty(ACCEPT_SPLIT_COMMIT, isSplitCommit);
   }
 
   public void setQueryConsolePath(String path) {
@@ -179,6 +185,10 @@ public class ControllerConf extends PropertiesConfiguration {
   @Override
   public String toString() {
     return super.toString();
+  }
+
+  public boolean getAcceptSplitCommit() {
+    return getBoolean(ACCEPT_SPLIT_COMMIT, DEFAULT_ACCEPT_SPLIT_COMMIT);
   }
 
   public String getControllerVipHost() {
