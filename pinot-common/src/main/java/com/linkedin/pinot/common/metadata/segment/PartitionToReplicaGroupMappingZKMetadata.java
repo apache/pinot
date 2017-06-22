@@ -32,7 +32,7 @@ public class PartitionToReplicaGroupMappingZKMetadata implements ZKMetadata {
 
   private Map<String, List<String>> _partitionToReplicaGroupMapping;
   private String _tableName;
-
+  
   public PartitionToReplicaGroupMappingZKMetadata(ZNRecord znRecord) {
     _partitionToReplicaGroupMapping = znRecord.getListFields();
     _tableName = znRecord.getId();

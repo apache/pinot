@@ -21,13 +21,16 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 
@@ -45,7 +48,7 @@ public class DefaultOfflineRoutingTableBuilder extends AbstractRoutingTableBuild
   RoutingTableBuilder _routingTableBuilder;
 
   @Override
-  public void init(Configuration configuration) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _largeClusterRoutingTableBuilder = new LargeClusterRoutingTableBuilder();
     _smallClusterRoutingTableBuilder = new BalancedRandomRoutingTableBuilder();
     if (configuration.containsKey("minServerCountForLargeCluster")) {
@@ -74,8 +77,8 @@ public class DefaultOfflineRoutingTableBuilder extends AbstractRoutingTableBuild
       LOGGER.info("Using default value for large cluster min replica count of {}", MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER);
     }
 
-    _largeClusterRoutingTableBuilder.init(configuration);
-    _smallClusterRoutingTableBuilder.init(configuration);
+    _largeClusterRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
+    _smallClusterRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
   }
 
   @Override

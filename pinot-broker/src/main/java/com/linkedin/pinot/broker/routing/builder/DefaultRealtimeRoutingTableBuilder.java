@@ -23,13 +23,16 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
@@ -45,11 +48,11 @@ public class DefaultRealtimeRoutingTableBuilder extends AbstractRoutingTableBuil
   boolean _hasHLC;
 
   @Override
-  public void init(Configuration configuration) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _realtimeHLCRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
     _realtimeLLCRoutingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
-    _realtimeHLCRoutingTableBuilder.init(configuration);
-    _realtimeLLCRoutingTableBuilder.init(configuration);
+    _realtimeHLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
+    _realtimeLLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
   }
 
   @Override

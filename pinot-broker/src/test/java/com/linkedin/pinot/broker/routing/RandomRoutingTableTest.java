@@ -74,7 +74,7 @@ public class RandomRoutingTableTest {
     double[] globalArrays = new double[9];
 
     for (int numRun = 0; numRun < totalRuns; ++numRun) {
-      RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableName, Collections.<String>emptyList());
+      RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableName, Collections.<String>emptyList(), null);
       Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
       TreeSet<ServerInstance> serverInstances = new TreeSet<ServerInstance>(serversMap.keySet());
 

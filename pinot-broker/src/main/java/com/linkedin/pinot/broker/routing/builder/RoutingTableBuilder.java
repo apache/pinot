@@ -19,12 +19,15 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 import com.linkedin.pinot.broker.routing.RoutingTable;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 
@@ -39,7 +42,7 @@ public interface RoutingTableBuilder {
    *
    * @param configuration The configuration to use
    */
-  void init(Configuration configuration);
+  void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore);
 
   /**
    * Builds one or more routing tables (maps of servers to segment lists) that are used for query routing. The union of
@@ -66,6 +69,8 @@ public interface RoutingTableBuilder {
    * @return List of routing tables used to route queries
    */
   List<ServerToSegmentSetMap> getRoutingTables();
+  
+  boolean isPartitionAware();
 
 
 }

@@ -24,10 +24,13 @@ import java.util.Random;
 import java.util.Set;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.common.config.TableConfig;
 
 
 /**
@@ -46,7 +49,7 @@ public class RandomRoutingTableBuilder extends AbstractRoutingTableBuilder {
   }
 
   @Override
-  public void init(Configuration configuration) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _numberOfRoutingTables = configuration.getInt("numOfRoutingTables", 10);
   }
 

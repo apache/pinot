@@ -167,7 +167,7 @@ public class RoutingTableTest {
 
   private void assertResourceRequest(HelixExternalViewBasedRouting routingTable, String resource,
       String expectedSegmentList, int expectedNumSegment) {
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList());
+    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList(), null);
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
@@ -281,7 +281,7 @@ public class RoutingTableTest {
 
   private void assertResourceRequest(HelixExternalViewBasedRouting routingTable, String resource,
       String[] expectedSegmentLists, int expectedNumSegment) {
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList());
+    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList(), null);
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
@@ -344,7 +344,7 @@ public class RoutingTableTest {
     ev.setState(llcSegment2.getSegmentName(), helixInstance2, consuming);
     routingTable.markDataResourceOnline(generateTableConfig(resourceName), ev, instanceConfigs);
 
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resourceName, Collections.<String>emptyList());
+    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resourceName, Collections.<String>emptyList(), null);
     for (int i = 0; i < 100; i++) {
       Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
       Assert.assertEquals(routingMap.size(), 1);
@@ -407,7 +407,7 @@ public class RoutingTableTest {
     Assert.assertTrue(llc >= 10, "Got low values hlc=" + hlc + ",llc="  + llc);
 
     // Check that force HLC works
-    request = new RoutingTableLookupRequest(resourceName, Collections.singletonList("FORCE_HLC"));
+    request = new RoutingTableLookupRequest(resourceName, Collections.singletonList("FORCE_HLC"), null);
     hlc = 0;
     llc = 0;
     for (int i = 0; i < 100; i++) {
@@ -432,7 +432,7 @@ public class RoutingTableTest {
     Assert.assertEquals(llc, 0);
 
     // Check that force LLC works
-    request = new RoutingTableLookupRequest(resourceName, Collections.singletonList("FORCE_LLC"));
+    request = new RoutingTableLookupRequest(resourceName, Collections.singletonList("FORCE_LLC"), null);
     hlc = 0;
     llc = 0;
     for (int i = 0; i < 100; i++) {

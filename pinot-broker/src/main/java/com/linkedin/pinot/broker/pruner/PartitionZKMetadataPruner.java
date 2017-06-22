@@ -60,6 +60,10 @@ public class PartitionZKMetadataPruner implements SegmentZKMetadataPruner {
    */
   private boolean pruneSegment(FilterQueryTree filterQueryTree,
       Map<String, ColumnPartitionMetadata> columnMetadataMap) {
+    if (filterQueryTree == null) {
+      return false;
+    }
+
     List<FilterQueryTree> children = filterQueryTree.getChildren();
 
     // Non-leaf node

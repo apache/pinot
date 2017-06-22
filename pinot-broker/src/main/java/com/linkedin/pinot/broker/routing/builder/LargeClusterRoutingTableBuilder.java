@@ -18,6 +18,7 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
@@ -33,8 +34,10 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,7 +156,7 @@ public class LargeClusterRoutingTableBuilder extends GeneratorBasedRoutingTableB
   }
 
   @Override
-  public void init(Configuration configuration) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     // TODO jfim This is a broker-level configuration for now, until we refactor the configuration of the routing table to allow per-table routing settings
     if (configuration.containsKey("offlineTargetServerCountPerQuery")) {
       final String targetServerCountPerQuery = configuration.getString("offlineTargetServerCountPerQuery");
