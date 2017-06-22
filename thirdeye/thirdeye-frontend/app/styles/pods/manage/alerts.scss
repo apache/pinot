@@ -1,19 +1,19 @@
 .manage-alert-filters {
   padding: 0;
-  margin-top: 32px;
+  margin-top: $te-content-container-margin;
 
   &__wrapper {
     background-color: white;
-    margin-right: 32px;
-    border: 1px solid #CCC;
+    margin-right: $te-content-container-margin;
+    border: 1px solid $te-grey;
   }
 
   &__row {
     margin: 0;
-    padding: 12px 24px;
+    padding: 12px $te-default-element-spacing;
     font-size: 16px;
-    border-top: 1px solid #CCC;
-    background-color: #f2f2f2;
+    border-top: 1px solid $te-grey;
+    background-color: $te-alerts-row-color;
 
     &--title {
       border: none;
@@ -25,7 +25,7 @@
 
   &__options {
     margin: 0;
-    padding: 12px 24px;
+    padding: 12px $te-default-element-spacing;
     background-color: white;
   }
 }
@@ -33,7 +33,7 @@
 .manage-alert-container {
   min-height: 200px;
   letter-spacing: 0.5px;
-  margin-top: 32px;
+  margin-top: $te-content-container-margin;
 
   &__title {
     @include app-sub-title-mixin;
@@ -46,12 +46,12 @@
 
 .manage-alert-search {
   @include group-clearfix;
-  margin: 24px 0;
+  margin: $te-default-element-spacing 0;
 
   &__filter {
     float: left;
     min-width: 180px;
-    margin-right: 24px;
+    margin-right: $te-default-element-spacing;
   }
 
   &__input {
@@ -61,7 +61,7 @@
   }
 
   &__label {
-    line-height: 24px;
+    line-height: $te-default-element-spacing;
     text-transform: uppercase;
     font-size: 13px;
   }

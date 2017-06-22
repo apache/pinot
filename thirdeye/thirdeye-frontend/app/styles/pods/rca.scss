@@ -1,5 +1,5 @@
 .spinner-wrapper {
-  margin: 24px;
+  margin: $te-default-element-spacing;
   height: 250px;
   position: relative;
 }
@@ -8,8 +8,8 @@
   @include margin-reset;
   @include padding-reset;
 
-  margin-bottom: 24px;
-  font-size: 24px;
+  margin-bottom: $te-default-element-spacing;
+  font-size: $te-default-element-spacing;
   font-weight: normal;
   color: lighten(black, 25%);
 }
@@ -17,9 +17,9 @@
 .rca-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: $te-default-element-spacing;
 }
 
 .rca-actions {
-  margin-top: 24px;
+  margin-top: $te-default-element-spacing;
 }

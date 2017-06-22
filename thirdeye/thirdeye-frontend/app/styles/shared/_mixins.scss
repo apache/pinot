@@ -32,7 +32,7 @@
 
 @mixin app-title-mixin() {
   font-size: 22px;
-  margin-top: 24px;
+  margin-top: $te-default-element-spacing;
   color: app-shade(black, 6);
   font-weight: normal;
 }

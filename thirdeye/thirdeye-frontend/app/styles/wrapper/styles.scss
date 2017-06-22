@@ -3,16 +3,17 @@
 
 body {
   font-size: 14px;
-  background-color: lighten(#CCC, 15%);
+  background-color: lighten($te-grey, 15%);
   color: lighten(black, 40%);
 }
 
 .paper-container {
   background-color: white;
-  padding: 24px 24px 12px 24px;
-  border: 1px solid #CCC;
-  margin-top: 24px;
-  margin-bottom: 24px;
+  padding: $te-default-element-spacing;
+  padding-bottom: 12px;
+  border: 1px solid $te-grey;
+  margin-top: $te-default-element-spacing;
+  margin-bottom: $te-default-element-spacing;
 }
 
 .thirdeye-link {
@@ -54,7 +55,7 @@ body {
 }
 
 .spinner-wrapper {
-  margin: 24px;
+  margin: $te-default-element-spacing;
   height: 250px;
   position: relative;
 }
@@ -99,14 +100,9 @@ body {
 }
 
 .te-form {
-
-  &__section-fields {
-
-  }
-
   &__section-submit {
-    margin: 24px 0 15px 0;
-    padding-top: 24px;
+    margin: $te-default-element-spacing 0 15px 0;
+    padding-top: $te-default-element-spacing;
     text-align: right;
     border-top: 2px app-shade(black, 2) dotted;
   }
