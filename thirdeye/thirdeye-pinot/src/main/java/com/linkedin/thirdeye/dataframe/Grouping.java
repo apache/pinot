@@ -2,7 +2,10 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang.ArrayUtils;
 
 
@@ -272,13 +275,15 @@ public abstract class Grouping {
     public static GroupingByValue from(Series series) {
       if(series.isEmpty())
         return new GroupingByValue(series.getBuilder().build(), new ArrayList<int[]>());
+      if(Series.SeriesType.OBJECT.equals(series.type()))
+        return from(series.getObjects());
 
       List<int[]> buckets = new ArrayList<>();
       int[] sref = series.sortedIndex();
 
       int bucketOffset = 0;
       for(int i=1; i<sref.length; i++) {
-        if(series.compare(series, sref[i-1], sref[i]) != 0) {
+        if(!series.equals(series, sref[i-1], sref[i])) {
           int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, i);
           buckets.add(fromIndex);
           bucketOffset = i;
@@ -287,6 +292,32 @@ public abstract class Grouping {
 
       int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, sref.length);
       buckets.add(fromIndex);
+
+      // keys from buckets
+      int[] keyIndex = new int[buckets.size()];
+      int i = 0;
+      for(int[] b : buckets) {
+        keyIndex[i++] = b[0];
+      }
+
+      return new GroupingByValue(series.project(keyIndex), buckets);
+    }
+
+    public static GroupingByValue from(ObjectSeries series) {
+      Map<Object, List<Integer>> dynBuckets = new LinkedHashMap<>();
+
+      for(int i=0; i<series.size(); i++) {
+        Object key = series.getObject(i);
+        if(!dynBuckets.containsKey(key))
+          dynBuckets.put(key, new ArrayList<Integer>());
+        dynBuckets.get(key).add(i);
+      }
+
+      List<int[]> buckets = new ArrayList<>();
+      for(Map.Entry<Object, List<Integer>> entry : dynBuckets.entrySet()) {
+        buckets.add(ArrayUtils.toPrimitive(
+            entry.getValue().toArray(new Integer[entry.getValue().size()])));
+      }
 
       // keys from buckets
       int[] keyIndex = new int[buckets.size()];

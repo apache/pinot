@@ -281,7 +281,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   public static Object getObject(byte value) {
     if(isNull(value))
       return ObjectSeries.NULL;
-    return value;
+    return booleanValueOf(value);
   }
 
   @Override

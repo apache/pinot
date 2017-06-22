@@ -459,6 +459,23 @@ public abstract class Series {
    */
   abstract int[] sortedIndex();
 
+  /**
+   * Compares values for equality across two series with potentially different types based on
+   * index. If the types are different the values in {@code that} are transparently converted to the
+   * native type of this series.
+   *
+   * <br/><b>Note:</b> the transparent conversion may cause different behavior between
+   * {@code this.compare(that)} and {@code that.compare(this)}.
+   *
+   * @param that other series with same native type (may reference itself)
+   * @param indexThis index in this series
+   * @param indexThat index in the other series
+   * @return {@code true} if the referenced values are equal, {@code false} otherwise
+  */
+  boolean equals(Series that, int indexThis, int indexThat) {
+    return this.compare(that, indexThis, indexThat) == 0;
+  }
+
   /* *************************************************************************
    * Public interface
    * *************************************************************************/
@@ -729,7 +746,7 @@ public abstract class Series {
 
     indices.add(0);
     for(int i=1; i<this.size(); i++) {
-      if(sorted.compare(sorted, i-1, i) != 0)
+      if(!sorted.equals(sorted, i-1, i))
         indices.add(i);
     }
 
@@ -815,7 +832,7 @@ public abstract class Series {
     } else if(function instanceof BooleanConditional) {
       return BooleanSeries.map((BooleanConditional)function, series);
     } else if(function instanceof ObjectConditional) {
-      return BooleanSeries.map((ObjectConditional)function, series);
+      return ObjectSeries.map((ObjectConditional)function, series);
     }
     throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
   }
@@ -1135,13 +1152,13 @@ public abstract class Series {
 
         // count similar values on the left
         int lcount = 1;
-        while(i + lcount < this.size() && this.compare(this, lref[i + lcount], lref[i + lcount - 1]) == 0) {
+        while(i + lcount < this.size() && this.equals(this, lref[i + lcount], lref[i + lcount - 1])) {
           lcount++;
         }
 
         // count similar values on the right
         int rcount = 1;
-        while(j + rcount < other.size() && other.compare(other, rref[j + rcount], rref[j + rcount - 1]) == 0) {
+        while(j + rcount < other.size() && other.equals(other, rref[j + rcount], rref[j + rcount - 1])) {
           rcount++;
         }
 
