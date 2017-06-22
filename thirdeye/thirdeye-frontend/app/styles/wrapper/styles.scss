@@ -104,35 +104,37 @@ body {
 
   ul {
     list-style: none;
+    margin-bottom: 0;
   }
 
   &__summary-block {
-    padding: 5px 10px 15px 15px;
-
-    &:hover {
-      background-color: #f7f7f7;
-    }
+    padding: 5px 10px 10px 0;
   }
 
-  &__list-top {
-    padding: 0;
-    margin: 0;
+  &__summary-item {
+    &--title {
+      color: $te-title-blue;
+      font-size: 18px;
+      font-weight: 400;
+    }
   }
 
   &__icon {
     padding: 15px 15px 0 0;
-    color: app-shade(black, 4);
+    color: app-shade(black, 2);
   }
 
-  &__title {
-    color: $te-blue;
-    font-size: 16px;
+  &__tag {
     font-weight: 400;
-  }
+    letter-spacing: 1px;
 
+<<<<<<< HEAD
   &__details-block {
     padding: 0 15px;
 >>>>>>> TE self-serve1*/
+    &--active {
+      background-color: $te-blue;
+    }
   }
 }
 

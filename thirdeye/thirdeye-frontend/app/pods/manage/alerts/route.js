@@ -12,7 +12,7 @@ export default Ember.Route.extend({
     const isSearchModeAll = !queryParams.selectedSearchMode
       || (queryParams.selectedSearchMode === 'All');
 
-    controller.set('model', model); 
+    controller.set('model', model);
 
     if (isSearchModeAll) {
       controller.setProperties({
@@ -22,5 +22,3 @@ export default Ember.Route.extend({
     }
   }
 });
-
-
