@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
 
@@ -277,6 +278,20 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     return this;
   }
 
+  public List<Object> toList() {
+    return this.toListTyped();
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> T getObjectTyped(int index) {
+    return (T) getObject(this.values[index]);
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> List<T> toListTyped() {
+    return (List<T>)Arrays.asList(this.values);
+  }
+
   @Override
   public boolean isNull(int index) {
     return isNull(this.values[index]);
@@ -288,6 +303,13 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
 
   @Override
   public String toString(int index) {
+    if(this.isNull(index))
+      return TOSTRING_NULL;
+    return String.valueOf(this.values[index]);
+  }
+
+  @Override
+  public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append("ObjectSeries{");
     for(Object o : this.values) {
@@ -322,7 +344,7 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
 
   @Override
   public ObjectSeries unique() {
-    HashSet<Object> objects = new HashSet<>();
+    HashSet<Object> objects = new LinkedHashSet<>();
     objects.addAll(Arrays.asList(this.values));
     return buildFrom(objects.toArray());
   }
@@ -539,7 +561,7 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
 
   private static Method findCompareMethod(Object object) throws NoSuchMethodException {
     Class<?> clazz = object.getClass();
-    return clazz.getMethod(METHOD_COMPARE, clazz);
+    return clazz.getMethod(METHOD_COMPARE, Object.class);
   }
 
   private static int callCompareMethod(Object a, Object b) {

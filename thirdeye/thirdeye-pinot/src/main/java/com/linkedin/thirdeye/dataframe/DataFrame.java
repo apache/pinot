@@ -1192,7 +1192,7 @@ public class DataFrame {
 
     final Expression e = new Expression(doubleExpression);
 
-    return (DoubleSeries)this.map(new Series.DoubleFunction() {
+    return this.map(new Series.DoubleFunction() {
       @Override
       public double apply(double[] values) {
         for(int i=0; i<values.length; i++) {

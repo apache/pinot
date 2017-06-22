@@ -733,9 +733,11 @@ public abstract class Series {
 
   /**
    * Returns a copy of the series with each distinct value of the
-   * source series appearing exactly once. The values are further sorted in ascending order.
+   * source series appearing exactly once.
    *
-   * @return sorted series copy with distinct unique values
+   * <br/><b>NOTE:</b> the values may be reordered
+   *
+   * @return series copy with distinct unique values
    */
   public Series unique() {
     if(this.size() <= 1)

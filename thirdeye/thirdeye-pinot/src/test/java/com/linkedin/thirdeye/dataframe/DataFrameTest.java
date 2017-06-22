@@ -1273,6 +1273,18 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testObjectUnique() {
+    ObjectSeries s1 = DataFrame.toSeriesObjects();
+    assertEmpty(s1.unique());
+
+    ObjectSeries s2 = DataFrame.toSeriesObjects("1", 1, 1, 1L, "1");
+    assertEquals(s2.unique(), "1", 1, 1L);
+
+    ObjectSeries s3 = DataFrame.toSeriesObjects(1, tup(1, 2), 2, 1, tup(1, 2), tup(3, 3));
+    assertEquals(s3.unique(), 1, tup(1, 2), 2, tup(3, 3));
+  }
+
+  @Test
   public void testStringFillNull() {
     StringSeries s = DataFrame.toSeries("a", SNULL, SNULL, "b", SNULL);
     assertEquals(s.fillNull("N"), "a", "N", "N", "b", "N");
@@ -2776,11 +2788,11 @@ public class DataFrameTest {
 
   @Test
   public void testObjectAggregation() {
-    ObjectSeries base = DataFrame.toSeriesObjects(ONULL, 0x01, 0x11, 0x00, 0x10);
+    ObjectSeries base = DataFrame.toSeriesObjects(ONULL, 1, 3, 0, 2);
     assertEquals(base.first(), ONULL);
-    assertEquals(base.last(), 0x10);
-    assertEquals(base.min(), 0x00);
-    assertEquals(base.max(), 0x11);
+    assertEquals(base.last(), 2);
+    assertEquals(base.min(), 0);
+    assertEquals(base.max(), 3);
 
     try {
       base.sum();
@@ -2819,6 +2831,36 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testObjectListTyped() {
+    ObjectSeries base = DataFrame.toSeriesObjects(ONULL, 1, 3, 0, 2);
+
+    List<Integer> list = base.toListTyped();
+    Assert.assertEquals(list.get(0), null);
+    Assert.assertEquals(list.get(1), (Integer)1);
+    Assert.assertEquals(list.get(2), (Integer)3);
+    Assert.assertEquals(list.get(3), (Integer)0);
+    Assert.assertEquals(list.get(4), (Integer)2);
+  }
+
+  @Test
+  public void testObjectSortMap() {
+    ObjectSeries base = DataFrame.toSeriesObjects(tup(1, 1), tup(2, 3), tup(0, 6), tup(1, 0));
+    StringSeries out = base.sorted().map(new Series.StringFunction() {
+      @Override
+      public String apply(String... values) {
+        return values[0] + "!";
+      }
+    });
+    Assert.assertEquals(out.join(), "(0,6)!(1,0)!(1,1)!(2,3)!");
+  }
+
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testObjectSortedFail() {
+    ObjectSeries base = DataFrame.toSeriesObjects("A", tup(1, 1));
+    base.sorted();
+  }
+
+  @Test
   public void testAppend() {
     DataFrame base = new DataFrame();
     base.addSeries("A", 1, 2, 3, 4);
@@ -2849,14 +2891,15 @@ public class DataFrameTest {
     df.addSeries("two", LNULL, 1, 2, 3, 4);
     df.addSeries("three", SNULL, "1", "2", "3", "4");
     df.addSeries("four", BNULL, FALSE, TRUE, FALSE, TRUE);
+    df.addSeriesObjects("five", ONULL, tup(1, 1), tup(1, 2), tup(1, 3), tup(1, 4));
 
     String expected =
-          " one   two  three   four\n"
-        + "null  null  null    null\n"
-        + " 1.0     1  1      false\n"
-        + " 2.0     2  2       true\n"
-        + " 3.0     3  3      false\n"
-        + " 4.0     4  4       true\n";
+          " one   two  three   four   five\n"
+        + "null  null  null    null  null \n"
+        + " 1.0     1  1      false  (1,1)\n"
+        + " 2.0     2  2       true  (1,2)\n"
+        + " 3.0     3  3      false  (1,3)\n"
+        + " 4.0     4  4       true  (1,4)\n";
 
     Assert.assertEquals(df.toString(), expected);
   }
@@ -2868,6 +2911,7 @@ public class DataFrameTest {
     df.addSeries("two", LNULL, 1, 2, 3, 4);
     df.addSeries("three", SNULL, "1", "2", "3", "4");
     df.addSeries("four", BNULL, FALSE, TRUE, FALSE, TRUE);
+    df.addSeriesObjects("five", ONULL, tup(1, 1), tup(1, 2), tup(1, 3), tup(1, 4));
 
     String expected =
           "three   one\n"
@@ -2887,15 +2931,16 @@ public class DataFrameTest {
     df.addSeries("two", LNULL, 1, 2, 3, 4);
     df.addSeries("three", SNULL, "1", "2", "3", "4");
     df.addSeries("four", BNULL, FALSE, TRUE, FALSE, TRUE);
+    df.addSeriesObjects("five", ONULL, tup(1, 1), tup(1, 2), tup(1, 3), tup(1, 4));
     df.setIndex("three");
 
     String expected =
-          "three   one   two   four\n"
-        + "null   null  null   null\n"
-        + "1       1.0     1  false\n"
-        + "2       2.0     2   true\n"
-        + "3       3.0     3  false\n"
-        + "4       4.0     4   true\n";
+          "three   one   two   four   five\n"
+        + "null   null  null   null  null \n"
+        + "1       1.0     1  false  (1,1)\n"
+        + "2       2.0     2   true  (1,2)\n"
+        + "3       3.0     3  false  (1,3)\n"
+        + "4       4.0     4   true  (1,4)\n";
 
     Assert.assertEquals(df.toString(), expected);
   }
@@ -2926,15 +2971,17 @@ public class DataFrameTest {
     df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
     df.addSeries("three", "1", "2", "3", "4");
     df.addSeries("four", false, true, false, true);
+    df.addSeriesObjects("five", true, 2.0, 3L, 4);
 
     DataFrame out = df.slice(1, 3);
 
     Assert.assertEquals(out.size(), 2);
-    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    Assert.assertEquals(out.getSeriesNames().size(), 5);
     assertEquals(out.getLongs("one"), 2, 3);
     assertEquals(out.getDoubles("two"), 2.0, 3.0);
     assertEquals(out.getStrings("three"), "2", "3");
     assertEquals(out.getBooleans("four"), true, false);
+    assertEquals(out.getObjects("five"), 2.0, 3L);
   }
 
   @Test
@@ -2944,15 +2991,17 @@ public class DataFrameTest {
     df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
     df.addSeries("three", "1", "2", "3", "4");
     df.addSeries("four", false, true, false, true);
+    df.addSeriesObjects("five", true, 2.0, 3L, 4);
 
     DataFrame out = df.slice(-2, 3);
 
     Assert.assertEquals(out.size(), 3);
-    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    Assert.assertEquals(out.getSeriesNames().size(), 5);
     assertEquals(out.getLongs("one"), 1, 2, 3);
     assertEquals(out.getDoubles("two"), 1.0, 2.0, 3.0);
     assertEquals(out.getStrings("three"), "1", "2", "3");
     assertEquals(out.getBooleans("four"), false, true, false);
+    assertEquals(out.getObjects("five"), true, 2.0, 3L);
   }
 
   @Test
@@ -2962,15 +3011,17 @@ public class DataFrameTest {
     df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
     df.addSeries("three", "1", "2", "3", "4");
     df.addSeries("four", false, true, false, true);
+    df.addSeriesObjects("five", true, 2.0, 3L, 4);
 
     DataFrame out = df.slice(1, 7);
 
     Assert.assertEquals(out.size(), 3);
-    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    Assert.assertEquals(out.getSeriesNames().size(), 5);
     assertEquals(out.getLongs("one"), 2, 3, 4);
     assertEquals(out.getDoubles("two"), 2.0, 3.0, 4.0);
     assertEquals(out.getStrings("three"), "2", "3", "4");
     assertEquals(out.getBooleans("four"), true, false, true);
+    assertEquals(out.getObjects("five"), 2.0, 3L, 4);
   }
 
   @Test
@@ -2980,15 +3031,17 @@ public class DataFrameTest {
     df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
     df.addSeries("three", "1", "2", "3", "4");
     df.addSeries("four", false, true, false, true);
+    df.addSeriesObjects("five", true, 2.0, 3L, 4);
 
     DataFrame out = df.slice(4, 4);
 
     Assert.assertEquals(out.size(), 0);
-    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    Assert.assertEquals(out.getSeriesNames().size(), 5);
     assertEmpty(out.getLongs("one"));
     assertEmpty(out.getDoubles("two"));
     assertEmpty(out.getStrings("three"));
     assertEmpty(out.getBooleans("four"));
+    assertEmpty(out.getObjects("five"));
   }
 
   @Test
@@ -2998,6 +3051,7 @@ public class DataFrameTest {
     df.addSeries("two", 1.0, 2.0, 3.0, 4.0);
     df.addSeries("three", "1", "2", "3", "4");
     df.addSeries("four", false, true, false, true);
+    df.addSeriesObjects("five", true, 2.0, 3L, 4);
     df.setIndex("one");
 
     DataFrame out = df.slice("three", "one");
@@ -3139,20 +3193,37 @@ public class DataFrameTest {
     public int hashCode() {
       return Objects.hash(a, b);
     }
+
+    @Override
+    public String toString() {
+      return "(" + a + "," + b + ')';
+    }
+
+    public double doubleValue() {
+      return a * 10 + b;
+    }
+
+    public long longValue() {
+      return a * 100 + b;
+    }
   }
 
-  private static class CompTuple extends Tuple implements Comparable<Tuple> {
+  private static class CompTuple extends Tuple implements Comparable<CompTuple> {
     public CompTuple(int a, int b) {
       super(a, b);
     }
 
     @Override
-    public int compareTo(Tuple o) {
+    public int compareTo(CompTuple o) {
       if(o == null)
         return 1;
       if(this.a == o.a)
         return Integer.compare(this.b, o.b);
       return Integer.compare(this.a, o.a);
     }
+  }
+
+  private static CompTuple tup(int a, int b) {
+    return new CompTuple(a, b);
   }
 }
