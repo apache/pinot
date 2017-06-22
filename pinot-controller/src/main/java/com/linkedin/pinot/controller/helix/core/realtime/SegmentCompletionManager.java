@@ -578,7 +578,7 @@ public class SegmentCompletionManager {
           return SegmentCompletionProtocol.RESP_FAILED;
         }
         LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
-        if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner)) {
+        if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner) || offset != _winningOffset) {
           // State changed while we were out of sync. return a failed commit.
           LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}",
               _state, _segmentName.getSegmentName(), _winner, _winningOffset);

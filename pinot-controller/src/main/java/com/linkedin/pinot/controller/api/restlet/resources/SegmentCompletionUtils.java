@@ -32,6 +32,11 @@ public class SegmentCompletionUtils {
     final String segmentName = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
     final String instanceId = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
     final String segmentLocation = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION);
+    final String reason = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_REASON);
+    final String extraTimeSecStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC);
+    final String rowCountStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_ROW_COUNT);
+    final String buildTimeMillisStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS);
+    final String waitTimeMillisStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS);
 
     if (offsetStr == null || segmentName == null || instanceId == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offsetStr, segmentName, instanceId);
@@ -44,11 +49,54 @@ public class SegmentCompletionUtils {
       LOGGER.error("Invalid offset {} for segment {} from instance {}", offsetStr, segmentName, instanceId);
       return null;
     }
+
+    int extraTimeSec = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds();
+    if (extraTimeSecStr != null) {
+      try {
+        extraTimeSec = Integer.valueOf(extraTimeSecStr);
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid extraTimeSec {} for segment {} from instance {}", extraTimeSecStr, segmentName, instanceId);
+      }
+    }
+
+    int rowCount = 0;
+    if (rowCountStr != null) {
+      try {
+        rowCount = Integer.valueOf(rowCountStr);
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid rowCount {} for segment {} from instance {}", rowCountStr, segmentName, instanceId);
+      }
+    }
+
+    long buildTimeMillis = 0;
+    if (buildTimeMillisStr != null) {
+      try {
+        buildTimeMillis = Long.valueOf(buildTimeMillisStr);
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid buildTimeMillis {} for segment {} from instance {}", buildTimeMillisStr, segmentName, instanceId);
+      }
+    }
+
+    long waitTimeMillis = 0;
+    if (waitTimeMillisStr != null) {
+      try {
+        waitTimeMillis = Long.valueOf(waitTimeMillisStr);
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid waitTimeMillis {} for segment {} from instance {}", waitTimeMillisStr, segmentName, instanceId);
+      }
+    }
+
+
     return new SegmentCompletionProtocol.Request.Params()
         .withInstanceId(instanceId)
         .withOffset(offset)
         .withSegmentName(segmentName)
-        .withSegmentLocation(segmentLocation);
+        .withSegmentLocation(segmentLocation)
+        .withReason(reason)
+        .withExtraTimeSec(extraTimeSec)
+        .withNumRows(rowCount)
+        .withBuildTimeMillis(buildTimeMillis)
+        .withWaitTimeMillis(waitTimeMillis);
   }
 
   /**

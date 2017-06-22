@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.HelixManager;
 import org.restlet.Application;
 import org.restlet.Context;
+import org.restlet.data.Reference;
 import org.restlet.representation.Representation;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -100,11 +101,10 @@ public class LLCSegmentCommitTest {
     }
 
     @Override
-    boolean extractParams() {
-      _offset = 1235L;
-      _segmentNameStr = _segmentName.getSegmentName();
-      _instanceId = "Server_0";
-      return true;
+    public Reference getReference() {
+      return new Reference().addQueryParameter("offset", "1235")
+          .addQueryParameter("instance", "Server_0")
+          .addQueryParameter("name", _segmentName.getSegmentName());
     }
 
     Context createMockContext() {

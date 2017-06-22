@@ -54,18 +54,10 @@ public class SegmentCompletionProtocolDeserTest {
     Assert.assertEquals(params.getInstanceId(), INSTANCE);
     Assert.assertEquals(params.getSegmentName(), SEGMENT_NAME);
     Assert.assertEquals(params.getSegmentLocation(), SEGMENT_LOCATION);
-
-    final String buildTimeMillisStr =
-        reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS);
-    final String reason = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_REASON);
-    final String extraTimeSecStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC);
-    final String waitTimeMillisStr =
-        reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS);
-
-    Assert.assertEquals(Integer.parseInt(buildTimeMillisStr), BUILD_TIME_MILLIS);
-    Assert.assertEquals(reason, REASON);
-    Assert.assertEquals(Integer.parseInt(extraTimeSecStr), EXTRA_TIME_SEC);
-    Assert.assertEquals(Long.parseLong(waitTimeMillisStr), WAIT_TIME_MILLIS);
+    Assert.assertEquals(params.getBuildTimeMillis(), BUILD_TIME_MILLIS);
+    Assert.assertEquals(params.getReason(), REASON);
+    Assert.assertEquals(params.getExtraTimeSec(), EXTRA_TIME_SEC);
+    Assert.assertEquals(params.getWaitTimeMillis(), WAIT_TIME_MILLIS);
   }
 
   @Test
@@ -90,18 +82,10 @@ public class SegmentCompletionProtocolDeserTest {
     Assert.assertEquals(params.getInstanceId(), INSTANCE);
     Assert.assertEquals(params.getSegmentName(), SEGMENT_NAME);
     Assert.assertEquals(params.getSegmentLocation(), null);
-
-    final String buildTimeMillisStr =
-        reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS);
-    final String reason = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_REASON);
-    final String extraTimeSecStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC);
-    final String waitTimeMillisStr =
-        reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS);
-
-    Assert.assertEquals(Integer.parseInt(buildTimeMillisStr), BUILD_TIME_MILLIS);
-    Assert.assertEquals(reason, REASON);
-    Assert.assertEquals(Integer.parseInt(extraTimeSecStr), EXTRA_TIME_SEC);
-    Assert.assertEquals(Long.parseLong(waitTimeMillisStr), WAIT_TIME_MILLIS);
+    Assert.assertEquals(params.getBuildTimeMillis(), BUILD_TIME_MILLIS);
+    Assert.assertEquals(params.getReason(), REASON);
+    Assert.assertEquals(params.getExtraTimeSec(), EXTRA_TIME_SEC);
+    Assert.assertEquals(params.getWaitTimeMillis(), WAIT_TIME_MILLIS);
   }
 
   @Test
@@ -121,18 +105,10 @@ public class SegmentCompletionProtocolDeserTest {
     Assert.assertEquals(params.getInstanceId(), INSTANCE);
     Assert.assertEquals(params.getSegmentName(), SEGMENT_NAME);
     Assert.assertEquals(params.getSegmentLocation(), null);
-
-    final String buildTimeMillisStr =
-        reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS);
-    final String reason = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_REASON);
-    final String extraTimeSecStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC);
-    final String waitTimeMillisStr =
-        reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS);
-
-    Assert.assertEquals(buildTimeMillisStr, null);
-    Assert.assertEquals(reason, null);
-    Assert.assertEquals(extraTimeSecStr, null);
-    Assert.assertEquals(waitTimeMillisStr, null);
+    Assert.assertEquals(params.getBuildTimeMillis(), 0);
+    Assert.assertEquals(params.getReason(), null);
+    Assert.assertEquals(params.getExtraTimeSec(), SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
+    Assert.assertEquals(params.getWaitTimeMillis(), 0);
   }
 
   @Test
