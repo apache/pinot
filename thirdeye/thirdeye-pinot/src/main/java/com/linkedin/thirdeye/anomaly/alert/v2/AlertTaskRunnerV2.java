@@ -90,7 +90,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       throws Exception {
     List<TaskResult> taskResult = new ArrayList<>();
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
-    alertConfig = alertTaskInfo.getAlertConfigDTO();
+    // Fetch the latest alert config instead of the one provided by task context, which could be out-of-dated.
+    alertConfig = alertConfigDAO.findById(alertTaskInfo.getAlertConfigDTO().getId());
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
     alertFilterFactory = new AlertFilterFactory(thirdeyeConfig.getAlertFilterConfigPath());
     alertGroupRecipientProviderFactory =
@@ -124,8 +125,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       List<MergedAnomalyResultDTO> mergedAnomaliesAllResults = new ArrayList<>();
       long lastNotifiedAnomaly = emailConfig.getAnomalyWatermark();
       for (Long functionId : functionIds) {
-        List<MergedAnomalyResultDTO> resultsForFunction = anomalyMergedResultDAO
-            .findUnNotifiedByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly, false);
+        List<MergedAnomalyResultDTO> resultsForFunction =
+            anomalyMergedResultDAO.findByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly, false);
         if (CollectionUtils.isNotEmpty(resultsForFunction)) {
           mergedAnomaliesAllResults.addAll(resultsForFunction);
         }

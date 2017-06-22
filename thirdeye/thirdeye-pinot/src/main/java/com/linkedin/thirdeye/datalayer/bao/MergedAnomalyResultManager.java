@@ -42,7 +42,7 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   List<MergedAnomalyResultDTO> findByFunctionId(Long functionId, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId, boolean loadRawAnomalies);
+  List<MergedAnomalyResultDTO> findByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId, boolean loadRawAnomalies);
 
   List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long endTime,
       long functionId, boolean loadRawAnomalies);
