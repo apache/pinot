@@ -18,12 +18,21 @@ package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.common.query.context.TimerContext;
+import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -51,9 +60,10 @@ public abstract class QueryScheduler {
   private static final int QUERY_RUNNER_THREAD_PRIORITY = 7;
   public static final int DEFAULT_QUERY_RUNNER_THREADS;
   public static final int DEFAULT_QUERY_WORKER_THREADS;
+  protected final ServerMetrics serverMetrics;
 
-  int numQueryRunnerThreads;
-  int numQueryWorkerThreads;
+  protected int numQueryRunnerThreads;
+  protected int numQueryWorkerThreads;
 
   // This executor service will run the "main" operation of query processing
   // including planning, distributing operators across threads, waiting and
@@ -69,7 +79,8 @@ public abstract class QueryScheduler {
   // across groups of segments.
   protected ListeningExecutorService queryWorkers;
 
-  final QueryExecutor queryExecutor;
+  protected final QueryExecutor queryExecutor;
+
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
     // arbitrary...but not completely arbitrary
@@ -87,9 +98,13 @@ public abstract class QueryScheduler {
    * Actual work of parallel processing of a query on each segment is done by these threads.
    * (Default: 2 * number of cores)
    */
-  public QueryScheduler(@Nonnull Configuration schedulerConfig, @Nonnull  QueryExecutor queryExecutor) {
+  public QueryScheduler(@Nonnull Configuration schedulerConfig, QueryExecutor queryExecutor,
+      @Nonnull ServerMetrics serverMetrics) {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
+    Preconditions.checkNotNull(serverMetrics);
+
+    this.serverMetrics = serverMetrics;
 
     numQueryRunnerThreads = schedulerConfig.getInt(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
     numQueryWorkerThreads = schedulerConfig.getInt(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
@@ -111,16 +126,94 @@ public abstract class QueryScheduler {
     this.queryExecutor = queryExecutor;
   }
 
-  public QueryScheduler(@Nullable QueryExecutor queryExecutor) {
-    this(new PropertiesConfiguration(), queryExecutor);
+  public QueryScheduler(@Nullable QueryExecutor queryExecutor, @Nonnull ServerMetrics serverMetrics) {
+    this(new PropertiesConfiguration(), queryExecutor, serverMetrics);
   }
 
+  public abstract @Nonnull ListenableFuture<byte[]> submit(@Nullable ServerQueryRequest queryRequest);
 
-  public abstract ListenableFuture<DataTable> submit(@Nonnull ServerQueryRequest queryRequest);
+  public abstract String name();
 
-  public @Nullable QueryExecutor getQueryExecutor() {
+  public abstract void start();
+
+  public @Nonnull QueryExecutor getQueryExecutor() {
     return queryExecutor;
   }
 
   public ExecutorService getWorkerExecutorService() { return queryWorkers; }
+
+  protected Callable<byte[]> getQueryCallable(final ServerQueryRequest request, final ExecutorService e) {
+    return new Callable<byte[]>() {
+      @Override
+      public byte[] call()
+          throws Exception {
+        return processQueryAndSerialize(request, e);
+      }
+    };
+  }
+
+  protected ListenableFutureTask<byte[]> getQueryFutureTask(final ServerQueryRequest request) {
+    return ListenableFutureTask.create(getQueryCallable(request, getWorkerExecutorService()));
+  }
+
+  protected ListenableFutureTask<byte[]> getQueryFutureTask(final ServerQueryRequest request, ExecutorService e) {
+    return ListenableFutureTask.create(getQueryCallable(request, e));
+  }
+
+  protected byte[] processQueryAndSerialize(final ServerQueryRequest request, final ExecutorService e) {
+    DataTable result;
+    try {
+      result = queryExecutor.processQuery(request, e);
+    } catch (Throwable t) {
+      // this is called iff queryTask fails with unhandled exception
+      serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
+      result = new DataTableImplV2();
+      result.addException(QueryException.INTERNAL_ERROR);
+    }
+    byte[] responseData = serializeDataTable(request, result);
+    TimerContext timerContext = request.getTimerContext();
+    LOGGER.info("Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},sched={}",
+        request.getInstanceRequest().getRequestId(),
+        request.getTableName(),
+        request.getInstanceRequest().getSearchSegments().size(),
+        request.getSegmentCountAfterPruning(),
+        timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+        timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME),
+        request.getBrokerId(),
+        name());
+    return responseData;
+  }
+
+
+
+  public static byte[] serializeDataTable(ServerQueryRequest queryRequest, DataTable instanceResponse) {
+    byte[] responseByte;
+
+    InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
+    ServerMetrics metrics = queryRequest.getServerMetrics();
+    TimerContext timerContext = queryRequest.getTimerContext();
+    timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
+    long requestId = instanceRequest != null ? instanceRequest.getRequestId() : -1;
+    String brokerId = instanceRequest != null ? instanceRequest.getBrokerId() : "null";
+
+    try {
+      if (instanceResponse == null) {
+        LOGGER.warn("Instance response is null for requestId: {}, brokerId: {}", requestId, brokerId);
+        responseByte = new byte[0];
+      } else {
+        responseByte = instanceResponse.toBytes();
+      }
+    } catch (Exception e) {
+      metrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+      LOGGER.error("Got exception while serializing response for requestId: {}, brokerId: {}",
+          requestId, brokerId, e);
+      responseByte = null;
+    }
+    // we assume these phase timers are guaranteed to be started elsewhere..so ignore potential NPE
+    timerContext.getPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION).stopAndRecord();
+    timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.TOTAL_QUERY_TIME, timerContext.getQueryArrivalTimeNs());
+    timerContext.getPhaseTimer(ServerQueryPhase.TOTAL_QUERY_TIME).stopAndRecord();
+
+    return responseByte;
+  }
 }
