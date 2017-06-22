@@ -15,22 +15,69 @@ body {
   @include app-sub-title-mixin;
 }
 
+.te-form {
+  margin-top: 24px;
+}
+
+.te-hide {
+  @include app-hide;
+}
+
+.te-page-right {
+  float: right;
+  margin-top: -24px;
+
+  &--inside {
+    margin-top: 0;
+  }
+}
+
 .te-search-results {
-  width: 60%;
-  border-bottom: 1px app-shade(black, 2) solid;
+  border-bottom: 1px app-shade(black, 1) solid;
+
+  ul {
+    list-style: none;
+  }
+
+  &__summary-item {
+    line-height: 22px;
+
+    &--tag {
+      margin-top: 4px;
+    }
+
+    &--title {
+      margin: 0;
+    }
+  }
 
   &__icon {
     float: right;
   }
 
-  &__title {
-    margin: 5px 0;
+  &__tag {
+    background-color: app-shade(black, 3);
+    border-radius: 5px;
+    padding: 4px 8px;
+    color: app-shade(white, 8);
+
+    &--active {
+      background-color: app-shade(black, 7);
+    }
+  }
+
+  &__details-block {
+    padding: 0 15px 15px 15px;
+  }
+
+  &:last-child {
+    border: none;
   }
 }
 
 .te-link--show {
   display: block;
-  margin-left: 780px;
+  float: right;
 }
 
 .te-link--hide {

@@ -42,3 +42,7 @@
   color: app-shade(black, 6);
   font-weight: 600;
 }
+
+@mixin app-hide() {
+  display: none;
+}

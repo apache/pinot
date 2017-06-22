@@ -1,0 +1,34 @@
+<h1 class="te-title">Import Metrics: inGraph</h1>
+
+<div class="te-page-right">
+  <a class="thirdeye-link thirdeye-link-secondary" href="https://ingraphs.prod.linkedin.com/" target="_blank">Go to InGraphs</a>
+</div>
+
+<main class="alert-onboard paper-container">
+
+  {{#bs-form model=this class="te-form" onSubmit=(action "submit") as |form|}}
+    <section class="te-form__section-fields">
+      {{form.element
+        controlType="text"
+        label="Onboard InGraph Dashboard"
+        placeholder="Type inGraph dashboard name..."
+        property="dashboard-name"
+        required=true
+      }}
+      <p class="te-form-text">Or</p>
+      {{form.element
+        controlType="text"
+        label="Provide RRD"
+        placeholder="RRD here"
+        property="dashboard-id"
+        required=true
+      }}
+    </section>
+    <section class="te-form__section-submit">
+      {{bs-button defaultText="Cancel" type="outline-primary" buttonType="cancel" class="te-submit-button"}}
+      {{bs-button defaultText="Import" type="primary" buttonType="submit" class="te-submit-button"}}
+    </section>
+  {{/bs-form}}
+
+  {{outlet}}
+</main>

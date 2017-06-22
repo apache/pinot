@@ -1,0 +1,92 @@
+<h1 class="te-title">Create An Alert</h1>
+<main class="alert-create paper-container">
+
+  {{#bs-form model=this class="te-form alert-create__form" onSubmit=(action "submit") as |form|}}
+
+    <fieldset class="te-form__section">
+      <legend class="te-form__section-title">Metric:</legend>
+      <div class="te-page-right te-page-right--inside">
+        {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
+          Import a Metric From InGraphs
+        {{/link-to}}
+      </div>
+      {{form.element controlType="text"
+        label="Search for a Metric"
+        placeholder="Search for a Metric..."
+        property="metric"
+      }}
+      {{form.element controlType="text"
+        label="Filters"
+        placeholder="Add a dimension filter..."
+        property="metric"
+      }}
+      <div class="te-graph-anomaly"></div>
+    </fieldset>
+
+    <fieldset class="te-form__section">
+      <legend class="te-form__section-title">Detection:</legend>
+      <div class="form-group">
+        <label for="select-pattern" class="control-label">Pattern of Interest</label>
+        {{#power-select
+          loadingMessage="Waiting for the server...."
+          triggerId="select-pattern"
+          options=patternsOfInterest
+          searchEnabled=false
+          selected=selectedPattern
+          onchange=(action (mut selectedPattern))
+          as |name|
+        }}
+          {{name}}
+        {{/power-select}}
+      </div>
+      <div class="form-group">
+        <label for="select-dimension" class="control-label">Dimension Exploration</label>
+        {{#power-select
+          loadingMessage="Waiting for the server...."
+          triggerId="select-dimension"
+          options=dimensionExploration
+          searchEnabled=false
+          selected=selectedDimension
+          onchange=(action (mut selectedDimension))
+          as |name|
+        }}
+          {{name}}
+        {{/power-select}}
+      </div>
+      <div class="form-group">
+        <label for="tune-sensitivity" class="control-label">Tune Sensitivity</label>
+        <div class="form-slider"></div>
+      </div>
+    </fieldset>
+
+    <fieldset class="te-form__section">
+      <legend class="te-form__section-title">Alert Details:</legend>
+      <div class="form-group">
+        <div class="te-page-right te-page-right--inside">
+          {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
+            Create a New Alert Subscription Group
+          {{/link-to}}
+        </div>
+        <label for="sub-group" class="control-label">Search for existing subscription group</label>
+        {{#power-select
+          loadingMessage="Waiting for the server...."
+          triggerId="sub-group"
+          searchEnabled=false
+          options=allAlertsConfigGroups
+          selected=selectedGroup
+          onchange=(action (mut selectedGroup))
+          as |alertConfig|
+        }}
+          {{alertConfig.name}}
+        {{/power-select}}
+      </div>
+    </fieldset>
+
+    <fieldset class="te-form__section-submit">
+      {{bs-button defaultText="Cancel" type="outline-primary" buttonType="cancel" class="te-submit-button"}}
+      {{bs-button defaultText="Create Alert" type="primary" buttonType="submit" class="te-submit-button"}}
+    </fieldset>
+  {{/bs-form}}
+
+  {{outlet}}
+</main>

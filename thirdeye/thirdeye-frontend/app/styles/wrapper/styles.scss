@@ -26,6 +26,21 @@ body {
   color: #0073b1;
 }
 
+.thirdeye-link-secondary {
+  color: #369ece;
+  font-weight: 600;
+  letter-spacing: .1px;
+  font-size: 16px;
+
+  &--inside {
+    font-size: 15px;
+  }
+
+  &:hover {
+    color: #369ece;
+  }
+}
+
 .thirdeye-link--nav {
   font-size: 14px;
   color: lighten(black, 30%);
@@ -53,34 +68,33 @@ body {
 
   ul {
     list-style: none;
+    margin-bottom: 0;
   }
 
   &__summary-block {
-    padding: 5px 10px 15px 15px;
-
-    &:hover {
-      background-color: #f7f7f7;
-    }
+    padding: 5px 10px 10px 0;
   }
 
-  &__list-top {
-    padding: 0;
-    margin: 0;
+  &__summary-item {
+    &--title {
+      color: $te-title-blue;
+      font-size: 18px;
+      font-weight: 400;
+    }
   }
 
   &__icon {
     padding: 15px 15px 0 0;
-    color: app-shade(black, 4);
+    color: app-shade(black, 2);
   }
 
-  &__title {
-    color: $te-blue;
-    font-size: 16px;
+  &__tag {
     font-weight: 400;
-  }
+    letter-spacing: 1px;
 
-  &__details-block {
-    padding: 0 15px;
+    &--active {
+      background-color: $te-blue;
+    }
   }
 }
 
