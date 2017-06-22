@@ -16,6 +16,19 @@
 
 package com.linkedin.pinot.broker.routing;
 
+import com.google.common.collect.Sets;
+import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerTimer;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,7 +38,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
@@ -40,21 +52,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.Sets;
-import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.BrokerTimer;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 /*
@@ -94,7 +91,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     _routingTableBuilderMap = new HashMap<>();
     _helixManager = helixManager;
-    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration); 
+    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration);
   }
 
   @Override
@@ -128,7 +125,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   public void markDataResourceOnline(TableConfig tableConfig, ExternalView externalView,
       List<InstanceConfig> instanceConfigList) {
     String tableName = tableConfig.getTableName();
-    
+
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig);
     routingTableBuilder.init(_configuration);
     LOGGER.info("Initialized routingTableBuilder:%s for table:%", routingTableBuilder.getClass().getName(), tableName);
@@ -233,31 +230,32 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     return false;
   }
 
-  private void buildRoutingTable(String tableName, ExternalView externalView, List<InstanceConfig> instanceConfigs) {
+  private void buildRoutingTable(String tableNameWithType, ExternalView externalView,
+      List<InstanceConfig> instanceConfigs) {
     // Save the current version number of the external view to avoid unnecessary routing table updates
     int externalViewRecordVersion = externalView.getRecord().getVersion();
-    _lastKnownExternalViewVersionMap.put(tableName, externalViewRecordVersion);
+    _lastKnownExternalViewVersionMap.put(tableNameWithType, externalViewRecordVersion);
 
-    RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
+    RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableNameWithType);
     if(routingTableBuilder == null) {
       //TODO: warn
       return;
     }
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
 
-    LOGGER.info("Trying to compute routing table for table {} using {}", tableName, routingTableBuilder);
+    LOGGER.info("Trying to compute routing table for table {} using {}", tableNameWithType, routingTableBuilder);
     long startTimeMillis = System.currentTimeMillis();
 
     try {
       Map<String, InstanceConfig> relevantInstanceConfigs = new HashMap<>();
 
-      routingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      routingTableBuilder.computeRoutingTableFromExternalView(tableNameWithType, externalView, instanceConfigs);
 
       // Keep track of the instance configs that are used in that routing table
       updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs, externalView);
 
       // Save the instance configs used so that we can avoid unnecessary routing table updates later
-      _lastKnownInstanceConfigsForTable.put(tableName, relevantInstanceConfigs);
+      _lastKnownInstanceConfigsForTable.put(tableNameWithType, relevantInstanceConfigs);
       for (InstanceConfig instanceConfig : relevantInstanceConfigs.values()) {
         _lastKnownInstanceConfigs.put(instanceConfig.getInstanceName(), instanceConfig);
       }
@@ -280,14 +278,14 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         }
 
         // Add the table to the set of tables for this instance
-        tablesForCurrentInstance.add(tableName);
+        tablesForCurrentInstance.add(tableNameWithType);
       }
     } catch (Exception e) {
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.ROUTING_TABLE_REBUILD_FAILURES, 1L);
+      _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_REBUILD_FAILURES, 1L);
       LOGGER.error("Failed to compute/update the routing table", e);
 
       // Mark the routing table as needing a rebuild
-      _lastKnownExternalViewVersionMap.put(tableName, INVALID_EXTERNAL_VIEW_VERSION);
+      _lastKnownExternalViewVersionMap.put(tableNameWithType, INVALID_EXTERNAL_VIEW_VERSION);
     }
 
     try {
@@ -301,9 +299,9 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
         // Does a realtime table exist?
         String realtimeTableName =
-            TableNameBuilder.REALTIME.tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
+            TableNameBuilder.REALTIME.tableNameWithType(TableNameBuilder.extractRawTableName(tableNameWithType));
         if (_routingTableBuilderMap.containsKey(realtimeTableName)) {
-          tableForTimeBoundaryUpdate = tableName;
+          tableForTimeBoundaryUpdate = tableNameWithType;
           externalViewForTimeBoundaryUpdate = externalView;
         }
       }
@@ -311,7 +309,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       if (tableType == CommonConstants.Helix.TableType.REALTIME) {
         // Does an offline table exist?
         String offlineTableName =
-            TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
+            TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableNameWithType));
         if (_routingTableBuilderMap.containsKey(offlineTableName)) {
           // Is there no time boundary?
           if (_timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName) == null) {
@@ -324,7 +322,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       if (tableForTimeBoundaryUpdate != null) {
         updateTimeBoundary(tableForTimeBoundaryUpdate, externalViewForTimeBoundaryUpdate);
       } else {
-        LOGGER.info("No need to update time boundary for table {}", tableName);
+        LOGGER.info("No need to update time boundary for table {}", tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.error("Failed to update the TimeBoundaryService", e);
@@ -336,7 +334,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       _brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTime, TimeUnit.MILLISECONDS);
     }
 
-    LOGGER.info("Routing table update for table {} completed in {} ms", tableName, updateTime);
+    LOGGER.info("Routing table update for table {} completed in {} ms", tableNameWithType, updateTime);
   }
 
   protected void updateTimeBoundary(String tableName, ExternalView externalView) {

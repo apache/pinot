@@ -15,14 +15,7 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -44,9 +37,17 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUti
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -147,10 +148,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     // Update broker metrics.
     String tableName = brokerRequest.getQuerySource().getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (brokerMetrics != null) {
-      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
-      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
-      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
+          numEntriesScannedInFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
           numEntriesScannedPostFilter);
     }
 
@@ -182,7 +185,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
                     + " from servers: " + droppedServers + " got dropped due to data schema inconsistency.";
             LOGGER.info(errorMessage);
             if (brokerMetrics != null) {
-              brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
+              brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
             }
             brokerResponseNative.addToExceptions(
                 new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));

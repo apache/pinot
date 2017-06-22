@@ -32,10 +32,11 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // These metrics track the exceptions caught during query execution in broker side.
   // PQL compile phase.
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
+  // Get resource phase.
+  RESOURCE_MISSING_EXCEPTIONS("exceptions", true),
   // Query validation phase.
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
   // Scatter phase.
-  RESOURCE_MISSING_EXCEPTIONS("exceptions", false),
   NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
   // Gather phase.
   RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
