@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -19,9 +21,11 @@ public interface AlertGroupRecipientProvider {
   /**
    * Returns a list of email recipients (separated by commas) for the given dimension.
    *
-   * @param dimensions the dimension to look for the recipients.
+   * @param dimensions the dimension of the group, which is used to look for the recipients.
+   * @param anomalyResultList the list of anomalies of this group, whose information could be used to determine the
+   *                          recipients.
    *
    * @return a list of email recipients (separated by commas).
    */
-  String getAlertGroupRecipients(DimensionMap dimensions);
+  String getAlertGroupRecipients(DimensionMap dimensions, List<MergedAnomalyResultDTO> anomalyResultList);
 }

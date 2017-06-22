@@ -2,8 +2,10 @@ package com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -44,7 +46,7 @@ public class DimensionalAlertGroupRecipientProvider extends BaseAlertGroupRecipi
   }
 
   @Override
-  public String getAlertGroupRecipients(DimensionMap dimensions) {
+  public String getAlertGroupRecipients(DimensionMap dimensions, List<MergedAnomalyResultDTO> anomalyResultList) {
     if (dimensions == null || !auxiliaryEmailRecipients.containsKey(dimensions)) {
       return EMPTY_RECIPIENTS;
     } else {
