@@ -10,17 +10,31 @@
           Import a Metric From InGraphs
         {{/link-to}}
       </div>
-      {{form.element controlType="text"
-        label="Search for a Metric"
-        placeholder="Search for a Metric..."
-        property="metric"
+      <label for="select-metric" class="control-label">Searh for a Metric</label>
+      {{#power-select
+        search=(perform searchMetricsList)
+        selected=selectorVal
+        onchange=(action "onChangeDropdown")
+        loadingMessage="Waiting for the server...."
+        placeholder="Search by Metric Name"
+        searchPlaceholder="Type to filter..."
+        triggerId="select-metric"
+        as |metric|
       }}
+        {{metric.alias}}
+      {{/power-select}}
+
       {{form.element controlType="text"
         label="Filters"
         placeholder="Add a dimension filter..."
         property="metric"
       }}
-      <div class="te-graph-anomaly"></div>
+      <div class="te-graph-alert te-graph-alert--pending">
+        <div class="te-graph-alert__content">
+          <div class="glyphicon glyphicon-equalizer te-graph-alert__icon"></div>
+          <p class="te-graph-alert__pre-text">Once a metric is selected, the graph replay will show here</p>
+        </div>
+      </div>
     </fieldset>
 
     <fieldset class="te-form__section">
