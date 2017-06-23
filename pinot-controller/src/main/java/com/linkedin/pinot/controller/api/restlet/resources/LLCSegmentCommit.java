@@ -42,9 +42,6 @@ import org.slf4j.LoggerFactory;
  */
 public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
   private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCommit.class);
-  long _offset;
-  String _segmentNameStr;
-  String _instanceId;
 
   public LLCSegmentCommit()
       throws IOException {
@@ -56,46 +53,24 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
   @Summary("Uploads an LLC segment coming in from a server")
   @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_COMMIT})
   public Representation post(Representation entity) {
-    if (!extractParams()) {
+    SegmentCompletionProtocol.Request.Params requestParams = SegmentCompletionUtils.extractParams(getReference());
+    if (requestParams == null) {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
-    LOGGER.info("segment={} offset={} instance={} ", _segmentNameStr, _offset, _instanceId);
+    LOGGER.info(requestParams.toString());
     final SegmentCompletionManager segmentCompletionManager = getSegmentCompletionManager();
-
-    final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    reqParams.withInstanceId(_instanceId).withSegmentName(_segmentNameStr).withOffset(_offset);
-    SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(reqParams, false);
+    SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams, false);
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
 
       // Get the segment and put it in the right place.
-      boolean success = uploadSegment(_instanceId, _segmentNameStr);
+      boolean success = uploadSegment(requestParams.getInstanceId(), requestParams.getSegmentName());
 
-      response = segmentCompletionManager.segmentCommitEnd(reqParams, success, false);
+      response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false);
     }
 
-    LOGGER.info("Response: instance={}  segment={} status={} offset={}", _instanceId, _segmentNameStr,
+    LOGGER.info("Response: instance={}  segment={} status={} offset={}", requestParams.getInstanceId(), requestParams.getSegmentName(),
         response.getStatus(), response.getOffset());
     return new StringRepresentation(response.toJsonString());
-  }
-
-  boolean extractParams() {
-    final String offsetStr = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
-    final String segmentName = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
-    final String instanceId = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
-
-    if (offsetStr == null || segmentName == null || instanceId == null) {
-      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offsetStr, segmentName, instanceId);
-      return false;
-    }
-    _segmentNameStr = segmentName;
-    _instanceId = instanceId;
-    try {
-      _offset = Long.valueOf(offsetStr);
-    } catch (NumberFormatException e) {
-      LOGGER.error("Invalid offset {} for segment {} from instance {}", offsetStr, segmentName, instanceId);
-      return false;
-    }
-    return true;
   }
 
   boolean uploadSegment(final String instanceId, final String segmentNameStr) {

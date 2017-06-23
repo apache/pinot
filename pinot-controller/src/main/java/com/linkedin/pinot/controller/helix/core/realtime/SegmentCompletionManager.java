@@ -575,24 +575,26 @@ public class SegmentCompletionManager {
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
-          return SegmentCompletionProtocol.RESP_FAILED;
+          return abortAndReturnFailed();
         }
         LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
-        if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner)) {
+        if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner) || offset != _winningOffset) {
           // State changed while we were out of sync. return a failed commit.
           LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}",
               _state, _segmentName.getSegmentName(), _winner, _winningOffset);
-          _state = State.ABORTED;
-          _segmentCompletionManager._controllerMetrics.addMeteredTableValue(_segmentName.getTableName(),
-              ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
-          return SegmentCompletionProtocol.RESP_FAILED;
+          return abortAndReturnFailed();
         }
         if (!success) {
           LOGGER.error("Segment upload failed");
-          _state = State.ABORTED;
-          return SegmentCompletionProtocol.RESP_FAILED;
+          return abortAndReturnFailed();
+
         }
-        return commitSegment(instanceId, offset, isSplitCommit, segmentLocation);
+        SegmentCompletionProtocol.Response response = commitSegment(instanceId, offset, isSplitCommit, segmentLocation);
+        if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
+          return abortAndReturnFailed();
+        } else {
+          return response;
+        }
       }
     }
 
@@ -640,7 +642,7 @@ public class SegmentCompletionManager {
       return hold(instanceId, offset);
     }
 
-    private SegmentCompletionProtocol.Response abortAndReturnFailed(long now, String instanceId, long offset) {
+    private SegmentCompletionProtocol.Response abortAndReturnFailed() {
       _state = State.ABORTED;
       _segmentCompletionManager._controllerMetrics.addMeteredTableValue(_segmentName.getTableName(),
           ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
@@ -856,7 +858,7 @@ public class SegmentCompletionManager {
         long maxTimeAllowedToCommitMs = now + extTimeSec * 1000;
         if (maxTimeAllowedToCommitMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS * 1000) {
           LOGGER.warn("Not accepting lease extension from {} startTime={} requestedTime={}", instanceId, _startTimeMs, maxTimeAllowedToCommitMs);
-          return abortAndReturnFailed(now, instanceId, offset);
+          return abortAndReturnFailed();
         }
         _maxTimeAllowedToCommitMs = maxTimeAllowedToCommitMs;
         response = SegmentCompletionProtocol.RESP_PROCESSED;
@@ -971,7 +973,9 @@ public class SegmentCompletionManager {
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
       if (isSplitCommit) {
-        _segmentManager.commitSegmentFile(_segmentName.getTableName(), segmentLocation, _segmentName.getSegmentName());
+        if (!_segmentManager.commitSegmentFile(_segmentName.getTableName(), segmentLocation, _segmentName.getSegmentName())) {
+          return SegmentCompletionProtocol.RESP_FAILED;
+        }
       }
       success = _segmentManager.commitSegmentMetadata(_segmentName.getTableName(), _segmentName.getSegmentName(),
           _winningOffset);

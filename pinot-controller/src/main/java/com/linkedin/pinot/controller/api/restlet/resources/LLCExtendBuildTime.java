@@ -38,29 +38,14 @@ public class LLCExtendBuildTime extends ServerResource {
   @Summary("Receives the request for extending build time")
   @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_EXTEND_BUILD_TIME})
   public Representation get() {
-    final String offset = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
-    final String segmentName = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
-    final String instanceId = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
-    final String extraTimeSecStr =
-        getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC);
-    if (offset == null || segmentName == null || instanceId == null) {
+    SegmentCompletionProtocol.Request.Params requestParams = SegmentCompletionUtils.extractParams(getReference());
+    if (requestParams == null) {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
-    int extraTimeSec = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds();
-    try {
-      extraTimeSec = Integer.valueOf(extraTimeSec);
-    } catch (Exception e) {
-      LOGGER.warn("Could not parse extraTime '{}'. Setting extra time to {}s", extraTimeSecStr, extraTimeSec);
-    }
+    LOGGER.info(requestParams.toString());
 
-    SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    reqParams.withSegmentName(segmentName).withInstanceId(instanceId).withOffset(Long.valueOf(offset))
-        .withExtraTimeSec(extraTimeSec);
-    LOGGER.info("Request: segment={} offset={} instance={} extraTimeSec={}", segmentName, offset, instanceId,
-        extraTimeSec);
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().extendBuildTime(reqParams);
-    LOGGER.info("Response: instance={} segment={} status={} offset={}", instanceId, segmentName, response.getStatus(),
-        response.getOffset());
+    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().extendBuildTime(requestParams);
+    LOGGER.info(response.toJsonString());
     return new StringRepresentation(response.toJsonString());
   }
 }

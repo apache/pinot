@@ -32,23 +32,76 @@ public class SegmentCompletionUtils {
     final String segmentName = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
     final String instanceId = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
     final String segmentLocation = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION);
+    final String reason = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_REASON);
+    final String extraTimeSecStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC);
+    final String rowCountStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_ROW_COUNT);
+    final String buildTimeMillisStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS);
+    final String waitTimeMillisStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS);
 
     if (offsetStr == null || segmentName == null || instanceId == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offsetStr, segmentName, instanceId);
       return null;
     }
-    long offset;
+
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withSegmentName(segmentName).withInstanceId(instanceId);
+
     try {
-      offset = Long.valueOf(offsetStr);
+      long offset = Long.valueOf(offsetStr);
+      params.withOffset(offset);
+
     } catch (NumberFormatException e) {
       LOGGER.error("Invalid offset {} for segment {} from instance {}", offsetStr, segmentName, instanceId);
       return null;
     }
-    return new SegmentCompletionProtocol.Request.Params()
-        .withInstanceId(instanceId)
-        .withOffset(offset)
-        .withSegmentName(segmentName)
-        .withSegmentLocation(segmentLocation);
+
+    int extraTimeSec = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds();
+    if (extraTimeSecStr != null) {
+      try {
+        extraTimeSec = Integer.valueOf(extraTimeSecStr);
+
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid extraTimeSec {} for segment {} from instance {}", extraTimeSecStr, segmentName, instanceId);
+      }
+    }
+    params.withExtraTimeSec(extraTimeSec);
+
+    if (rowCountStr != null) {
+      try {
+        int rowCount = Integer.valueOf(rowCountStr);
+        params.withNumRows(rowCount);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid rowCount {} for segment {} from instance {}", rowCountStr, segmentName, instanceId);
+      }
+    }
+
+    if (buildTimeMillisStr != null) {
+      try {
+        long buildTimeMillis = Long.valueOf(buildTimeMillisStr);
+        params.withBuildTimeMillis(buildTimeMillis);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid buildTimeMillis {} for segment {} from instance {}", buildTimeMillisStr, segmentName, instanceId);
+      }
+    }
+
+    if (waitTimeMillisStr != null) {
+      try {
+        long waitTimeMillis = Long.valueOf(waitTimeMillisStr);
+        params.withWaitTimeMillis(waitTimeMillis);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid waitTimeMillis {} for segment {} from instance {}", waitTimeMillisStr, segmentName, instanceId);
+      }
+    }
+
+    if (reason != null) {
+      params.withReason(reason);
+    }
+
+    if (segmentLocation != null) {
+      params.withSegmentLocation(segmentLocation);
+    }
+
+    return params;
   }
 
   /**
