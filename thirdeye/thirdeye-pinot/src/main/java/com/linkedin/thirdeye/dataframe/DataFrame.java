@@ -21,7 +21,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.lang.math.NumberUtils;
 
 
 /**
@@ -102,19 +101,20 @@ public class DataFrame {
       for(int i=0; i<seriesNames.size(); i++) {
         String rawName = seriesNames.get(i);
 
-        String name = rawName;
-
-        Series.SeriesType type = null;
         String[] parts = rawName.split(":", 2);
         if(parts.length == 2) {
-          name = parts[0];
-          type = Series.SeriesType.valueOf(parts[1].toUpperCase());
-        } else {
-          type = inferType(i);
-        }
+          // user specified type
+          String name = parts[0];
+          Series.SeriesType type = Series.SeriesType.valueOf(parts[1].toUpperCase());
+          Series series = buildSeries(type, i);
+          df.addSeries(name, series);
 
-        Series series = buildSeries(type, i);
-        df.addSeries(name, series);
+        } else {
+          // dynamic type
+          ObjectSeries series = buildObjectSeries(i);
+          Series.SeriesType type = series.inferType();
+          df.addSeries(rawName, series.get(type));
+        }
       }
 
       return df;
@@ -211,46 +211,6 @@ public class DataFrame {
         values[i++] = r[columnIndex];
       }
       return ObjectSeries.buildFrom(values);
-    }
-
-    private Series.SeriesType inferType(int columnIndex) {
-      boolean isBoolean = true;
-      boolean isLong = true;
-      boolean isDouble = true;
-
-      for(int i=0; i<this.rows.size(); i++) {
-        Object o = this.rows.get(i)[columnIndex];
-        if(o == null)
-          continue;
-
-        if(!(o instanceof Number) && !(o instanceof String) && !(o instanceof Boolean))
-          return Series.SeriesType.OBJECT;
-
-        if(o instanceof Boolean) {
-          isDouble = false;
-          isLong = false;
-        }
-
-        if(o instanceof Number) {
-          isBoolean = false;
-          isLong &= ((Number)o).longValue() == ((Number)o).doubleValue();
-        }
-
-        if(o instanceof String) {
-          String s = o.toString();
-          isBoolean &= (s.length() <= 0) || (s.compareToIgnoreCase("true") == 0 || s.compareToIgnoreCase("false") == 0);
-          isLong &= (s.length() <= 0) || (NumberUtils.isNumber(s) && !s.contains(".") && !s.contains("e"));
-          isDouble &= (s.length() <= 0) || NumberUtils.isNumber(s);
-        }
-      }
-
-      if(isBoolean)
-        return Series.SeriesType.BOOLEAN;
-      if(isLong)
-        return Series.SeriesType.LONG;
-      if(isDouble)
-        return Series.SeriesType.DOUBLE;
-      return Series.SeriesType.STRING;
     }
   }
 

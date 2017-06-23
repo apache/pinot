@@ -5,7 +5,6 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -2861,6 +2860,75 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testObjectInferTypeLong() {
+    ObjectSeries base = DataFrame.toSeriesObjects(1L, 2, 3.0, 0b100, "5", ONULL);
+    Assert.assertEquals(base.inferType(), Series.SeriesType.LONG);
+
+    ObjectSeries base2 = DataFrame.toSeriesObjects("1", "2", "3", "100", "5", ONULL);
+    Assert.assertEquals(base2.inferType(), Series.SeriesType.LONG);
+  }
+
+  @Test
+  public void testObjectInferTypeDouble() {
+    ObjectSeries base = DataFrame.toSeriesObjects(1L, 2, 3.1, 0b100, "5", ONULL);
+    Assert.assertEquals(base.inferType(), Series.SeriesType.DOUBLE);
+
+    ObjectSeries base2 = DataFrame.toSeriesObjects("1", "2", "3.1", "100", "5", ONULL);
+    Assert.assertEquals(base2.inferType(), Series.SeriesType.DOUBLE);
+  }
+
+  @Test
+  public void testObjectInferTypeString() {
+    ObjectSeries base = DataFrame.toSeriesObjects(1L, "true", false, "0b100", "5", ONULL);
+    Assert.assertEquals(base.inferType(), Series.SeriesType.STRING);
+  }
+
+  @Test
+  public void testObjectInferTypeBoolean() {
+    ObjectSeries base = DataFrame.toSeriesObjects("false", "true", false, true, ONULL);
+    Assert.assertEquals(base.inferType(), Series.SeriesType.BOOLEAN);
+  }
+
+  @Test
+  public void testObjectInferTypeObject() {
+    ObjectSeries base = DataFrame.toSeriesObjects("false", "true", tup(1, 2), true, ONULL);
+    Assert.assertEquals(base.inferType(), Series.SeriesType.OBJECT);
+  }
+
+  @Test
+  public void testObjectMapExpression() {
+    ObjectSeries base = DataFrame.toSeriesObjects(tup(1, 2), tup(0, 3), tup(3, -2), ONULL);
+    assertEquals(base.map("this.myself.a"), 1, 0, 3, ONULL);
+    assertEquals(base.map("this.myself.b"), 2, 3, -2, ONULL);
+    assertEquals(base.map("this.myself.a"), base.map("myself.getA()"));
+    assertEquals(base.map("this.myself.b"), base.map("getB()"));
+  }
+
+  @Test
+  public void testObjectLongConversion() {
+    ObjectSeries base = DataFrame.toSeriesObjects(tup(1, 2), tup(0, 3), tup(3, -2), ONULL);
+    assertEquals(base.getLongs(), 102, 3, 298, LNULL);
+  }
+
+  @Test
+  public void testObjectDoubleConversion() {
+    ObjectSeries base = DataFrame.toSeriesObjects(tup(1, 2), tup(0, 3), tup(3, -2), ONULL);
+    assertEquals(base.getDoubles(), 12.0, 3.0, 28.0, DNULL);
+  }
+
+  @Test
+  public void testObjectBooleanConversion() {
+    ObjectSeries base = DataFrame.toSeriesObjects(tup(1, 2), tup(0, 3), tup(3, -2), ONULL);
+    assertEquals(base.getBooleans(), TRUE, TRUE, FALSE, BNULL);
+  }
+
+  @Test
+  public void testObjectStringConversion() {
+    ObjectSeries base = DataFrame.toSeriesObjects(tup(1, 2), tup(0, 3), tup(3, -2), ONULL);
+    assertEquals(base.getStrings(), "(1,2)", "(0,3)", "(3,-2)", SNULL);
+  }
+
+  @Test
   public void testAppend() {
     DataFrame base = new DataFrame();
     base.addSeries("A", 1, 2, 3, 4);
@@ -3168,13 +3236,27 @@ public class DataFrameTest {
       Assert.fail("expected series to be empty, but wasn't");
   }
 
+  /* **************************************************************************
+   * Test classes
+   ***************************************************************************/
+
   private static class Tuple {
     final int a;
     final int b;
+    final Tuple myself;
 
     public Tuple(int a, int b) {
       this.a = a;
       this.b = b;
+      this.myself = this;
+    }
+
+    public int getA() {
+      return a;
+    }
+
+    public int getB() {
+      return b;
     }
 
     @Override
@@ -3205,6 +3287,10 @@ public class DataFrameTest {
 
     public long longValue() {
       return a * 100 + b;
+    }
+
+    public boolean booleanValue() {
+      return a <= b;
     }
   }
 

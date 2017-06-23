@@ -10,6 +10,8 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.math.NumberUtils;
+import org.apache.commons.lang.reflect.FieldUtils;
 
 
 public class ObjectSeries extends TypedSeries<ObjectSeries> {
@@ -142,6 +144,14 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     return new ObjectSeries();
   }
 
+  public static ObjectSeries nulls(int n) {
+    return builder().fillValues(n, NULL).build();
+  }
+
+  public static ObjectSeries fillValues(int n, Object value) {
+    return builder().fillValues(n, value).build();
+  }
+
   // CAUTION: The array is final, but values are inherently modifiable
   private final Object[] values;
 
@@ -192,13 +202,13 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
       return StringSeries.getDouble(value.toString());
 
     try {
-      return (double) callValueMethod(value, METHOD_DOUBLE);
+      return (double) invokeMethod(value, METHOD_DOUBLE);
     } catch (Exception ignore) {
       // ignore
     }
 
     try {
-      return (double) callValueMethod(value, METHOD_DOUBLE_FROM_FLOAT);
+      return (double) invokeMethod(value, METHOD_DOUBLE_FROM_FLOAT);
     } catch (Exception ignore) {
       // ignore
     }
@@ -222,13 +232,13 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
       return StringSeries.getLong(value.toString());
 
     try {
-      return (long) callValueMethod(value, METHOD_LONG);
+      return (long) invokeMethod(value, METHOD_LONG);
     } catch (Exception ignore) {
       // ignore
     }
 
     try {
-      return (long) callValueMethod(value, METHOD_LONG_FROM_INT);
+      return (long) invokeMethod(value, METHOD_LONG_FROM_INT);
     } catch (Exception ignore) {
       // ignore
     }
@@ -250,7 +260,11 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
       return DoubleSeries.getBoolean(((Number)value).doubleValue());
     if(value instanceof String)
       return StringSeries.getBoolean(value.toString());
-    return BooleanSeries.valueOf((boolean) callValueMethod(value, METHOD_BOOLEAN));
+    try {
+      return BooleanSeries.valueOf((boolean) invokeMethod(value, METHOD_BOOLEAN));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -454,6 +468,46 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     return buildFrom(values);
   }
 
+  public SeriesType inferType() {
+    boolean isBoolean = true;
+    boolean isLong = true;
+    boolean isDouble = true;
+
+    for(int i=0; i<this.size(); i++) {
+      Object o = this.getObject(i);
+      if(o == null)
+        continue;
+
+      if(!(o instanceof Number) && !(o instanceof String) && !(o instanceof Boolean))
+        return Series.SeriesType.OBJECT;
+
+      if(o instanceof Boolean) {
+        isDouble = false;
+        isLong = false;
+      }
+
+      if(o instanceof Number) {
+        isBoolean = false;
+        isLong &= ((Number)o).longValue() == ((Number)o).doubleValue();
+      }
+
+      if(o instanceof String) {
+        String s = o.toString();
+        isBoolean &= (s.length() <= 0) || (s.compareToIgnoreCase("true") == 0 || s.compareToIgnoreCase("false") == 0);
+        isLong &= (s.length() <= 0) || (NumberUtils.isNumber(s) && !s.contains(".") && !s.contains("e"));
+        isDouble &= (s.length() <= 0) || NumberUtils.isNumber(s);
+      }
+    }
+
+    if(isBoolean)
+      return Series.SeriesType.BOOLEAN;
+    if(isLong)
+      return Series.SeriesType.LONG;
+    if(isDouble)
+      return Series.SeriesType.DOUBLE;
+    return Series.SeriesType.STRING;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -490,7 +544,11 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
       return -1;
     if(isNull(b))
       return 1;
-    return callCompareMethod(a, b);
+    try {
+      return (int) invokeMethod(a, METHOD_COMPARE, b);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static boolean nullSafeObjectEquals(Object a, Object b) {
@@ -501,6 +559,17 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     if(isNull(b))
       return false;
     return a.equals(b);
+  }
+
+  private static Object invokeMethod(Object o, String name, Object... args) {
+    try {
+      Class<?>[] argTypes = new Class<?>[args.length];
+      Arrays.fill(argTypes, Object.class);
+      Method m = o.getClass().getMethod(name, argTypes);
+      return m.invoke(o, args);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -544,31 +613,6 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     ObjectSortTuple(Object value, int index) {
       this.value = value;
       this.index = index;
-    }
-  }
-
-  private static Method findValueMethod(Object object, String name) throws NoSuchMethodException {
-    return object.getClass().getMethod(name);
-  }
-
-  private static Object callValueMethod(Object object, String name) {
-    try {
-      return findValueMethod(object, name).invoke(object);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private static Method findCompareMethod(Object object) throws NoSuchMethodException {
-    Class<?> clazz = object.getClass();
-    return clazz.getMethod(METHOD_COMPARE, Object.class);
-  }
-
-  private static int callCompareMethod(Object a, Object b) {
-    try {
-      return (int) findCompareMethod(a).invoke(a, b);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -642,4 +686,68 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getObjects().values)).build();
   }
 
+  /**
+   * Returns an object series of values extracted from the original values in the object series.
+   * Allows field and method access to nested objects, with names separated by {@code "."} (dot).
+   *
+   * <br/><b>EXAMPLE:</b> {@code "this.myMethod().myResultField"}
+   *
+   * <br/><b>NOTE:</b> only no-args methods are supported
+   *
+   * @param objectExpression expression to extract values with
+   * @return series of extracted values
+   */
+  public ObjectSeries map(String objectExpression) {
+    return map(objectExpression, this);
+  }
+
+  public static ObjectSeries map(String objectExpression, Series... series) {
+    if(series.length <= 0)
+      return empty();
+    if(series.length > 1)
+      throw new IllegalArgumentException("Must provide at most 1 series");
+
+    DataFrame.assertSameLength(series);
+
+    // TODO support escaping of "."
+    List<String> expressions = Arrays.asList(objectExpression.split("\\."));
+    if(expressions.isEmpty())
+      return ObjectSeries.nulls(series[0].size());
+
+    try {
+      Object[] out = new Object[series[0].size()];
+      for(int i=0; i<series[0].size(); i++) {
+        if(series[0].isNull(i)) {
+          out[i] = NULL;
+        } else {
+          out[i] = mapExpression(expressions, series[0].getObject(i));
+        }
+      }
+
+      return buildFrom(out);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static Object mapExpression(List<String> expressions, Object value) throws Exception {
+    if(expressions.isEmpty())
+      return value;
+
+    String head = expressions.get(0);
+    List<String> tail = expressions.subList(1, expressions.size());
+
+    if(head.equals("this"))
+      return mapExpression(tail, value);
+
+    if(head.endsWith("()")) {
+      head = head.substring(0, head.length() - 2);
+      // method call
+      return mapExpression(tail, invokeMethod(value, head));
+
+    } else {
+      // field access
+      return mapExpression(tail, FieldUtils.readField(value, head, true));
+    }
+  }
 }
