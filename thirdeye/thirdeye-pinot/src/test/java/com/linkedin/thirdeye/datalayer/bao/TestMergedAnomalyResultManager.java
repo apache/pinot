@@ -11,7 +11,6 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -85,7 +84,6 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
     feedback.setComment("this is a good find");
     feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
-    feedback.setStatus(FeedbackStatus.NEW);
     anomalyMergedResult.setFeedback(feedback);
     // now we need to make explicit call to anomaly update in order to update the feedback
     mergedAnomalyResultDAO.updateAnomalyFeedback(anomalyMergedResult);

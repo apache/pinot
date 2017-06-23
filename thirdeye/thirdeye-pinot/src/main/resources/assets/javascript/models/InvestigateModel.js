@@ -52,7 +52,7 @@ InvestigateModel.prototype = {
     return {
       [constants.FEEDBACK_TYPE_ANOMALY]: constants.FEEDBACK_STRING_CONFIRMED_ANOMALY,
       [constants.FEEDBACK_TYPE_NOT_ANOMALY]: constants.FEEDBACK_STRING_FALSE_ALARM,
-      [constants.FEEDBACK_TYPE_ANOMALY_NO_ACTION]: constants.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE
+      [constants.FEEDBACK_TYPE_ANOMALY_NEW_TREND]: constants.FEEDBACK_STRING_CONFIRMED_NEW_TREND
     }[userFeedback];
   },
 
@@ -60,7 +60,7 @@ InvestigateModel.prototype = {
     return {
       [constants.FEEDBACK_STRING_CONFIRMED_ANOMALY]: constants.FEEDBACK_TYPE_ANOMALY ,
       [constants.FEEDBACK_STRING_FALSE_ALARM]: constants.FEEDBACK_TYPE_NOT_ANOMALY,
-      [constants.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE]: constants.FEEDBACK_TYPE_ANOMALY_NO_ACTION
+      [constants.FEEDBACK_STRING_CONFIRMED_NEW_TREND]: constants.FEEDBACK_TYPE_ANOMALY_NEW_TREND
     }[this.anomaly.anomalyFeedback];
   },
 

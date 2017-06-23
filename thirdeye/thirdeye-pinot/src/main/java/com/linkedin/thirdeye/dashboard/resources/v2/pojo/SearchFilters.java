@@ -128,7 +128,7 @@ public class SearchFilters {
     if (searchFilters == null) {
       return anomalies;
     }
-    Map<String, List<Long>> statusFilterMap = searchFilters.getStatusFilterMap();
+    Map<String, List<Long>> feedbackFilterMap = searchFilters.getStatusFilterMap();
     Map<String, List<Long>> functionFilterMap = searchFilters.getFunctionFilterMap();
     Map<String, List<Long>> datasetFilterMap = searchFilters.getDatasetFilterMap();
     Map<String, List<Long>> metricFilterMap = searchFilters.getMetricFilterMap();
@@ -137,11 +137,11 @@ public class SearchFilters {
     List<MergedAnomalyResultDTO> filteredAnomalies = new ArrayList<>();
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalies) {
       boolean passed = true;
-      // check status filter
+      // check feedback filter
       AnomalyFeedback feedback = mergedAnomalyResultDTO.getFeedback();
       if (feedback != null) {
-        String status = feedback.getStatus().toString();
-        passed = passed && checkFilter(statusFilterMap, status);
+        String status = feedback.getFeedbackType().toString();
+        passed = passed && checkFilter(feedbackFilterMap, status);
       }
       // check status filter
       String functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
@@ -184,7 +184,7 @@ public class SearchFilters {
 
   public static SearchFilters fromAnomalies(List<MergedAnomalyResultDTO> anomalies) {
 
-    Map<String, List<Long>> statusFilterMap = new HashMap<>();
+    Map<String, List<Long>> feedbackFilterMap = new HashMap<>();
     Map<String, List<Long>> functionFilterMap = new HashMap<>();
     Map<String, List<Long>> datasetFilterMap = new HashMap<>();
     Map<String, List<Long>> metricFilterMap = new HashMap<>();
@@ -192,11 +192,11 @@ public class SearchFilters {
     Map<String, List<Long>> issueTypeFilterMap = new HashMap<>();
 
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalies) {
-      // update status filter
+      // update feedback filter
       AnomalyFeedback feedback = mergedAnomalyResultDTO.getFeedback();
       if (feedback != null) {
-        String status = feedback.getStatus().toString();
-        update(statusFilterMap, status, mergedAnomalyResultDTO.getId());
+        String status = feedback.getFeedbackType().toString();
+        update(feedbackFilterMap, status, mergedAnomalyResultDTO.getId());
       }
       // update status filter
       String functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
@@ -224,7 +224,7 @@ public class SearchFilters {
       }
     }
 
-    return new SearchFilters(statusFilterMap, functionFilterMap, datasetFilterMap, metricFilterMap, dimensionFilterMap,
+    return new SearchFilters(feedbackFilterMap, functionFilterMap, datasetFilterMap, metricFilterMap, dimensionFilterMap,
         issueTypeFilterMap);
   }
 

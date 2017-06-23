@@ -325,8 +325,8 @@ public class AnomalyReportGenerator {
         case NOT_ANOMALY:
           feedbackVal = "Resolved (False Alarm)";
           break;
-        case ANOMALY_NO_ACTION:
-          feedbackVal = "Not Actionable";
+        case ANOMALY_NEW_TREND:
+          feedbackVal = "Resolved (New Trend)";
           break;
       case NO_FEEDBACK:
       default:

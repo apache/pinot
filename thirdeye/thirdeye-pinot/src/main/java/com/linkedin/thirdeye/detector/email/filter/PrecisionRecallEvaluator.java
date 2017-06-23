@@ -8,8 +8,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -17,7 +15,6 @@ import org.slf4j.LoggerFactory;
  */
 public class PrecisionRecallEvaluator {
   private AlertFilter alertFilter;
-  private static final Logger LOG = LoggerFactory.getLogger(PrecisionRecallEvaluator.class);
 
   private int qualifiedTrueAnomaly; // Anomaly is labeled as true and is qualified
   private int qualifiedTrueAnomalyNotActionable; // Anomaly is labeled as TRUE_BUT_NOT_ACTIONABLE and is qualified
@@ -144,7 +141,7 @@ public class PrecisionRecallEvaluator {
       AnomalyFeedback feedback = anomaly.getFeedback();
       boolean isLabeledTrueAnomaly = false;
       boolean isLabeledTrueAnomalyNotActionable = false;
-      if(feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NO_ACTION)) {
+      if(feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
         isLabeledTrueAnomalyNotActionable = true;
       } else if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
         isLabeledTrueAnomaly = true;

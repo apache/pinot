@@ -199,8 +199,8 @@ public class GenerateAnomalyReport {
       return "Confirmed Anomaly";
     case "NOT_ANOMALY":
       return "False Alarm";
-    case "ANOMALY_NO_ACTION":
-      return "Not Actionable";
+    case "ANOMALY_NEW_TREND":
+      return "Anomaly New Trend";
     }
     return "NA";
   }

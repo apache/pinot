@@ -10,8 +10,8 @@
             <span class="label-medium-semibold">Yes</span> (True Anomaly)
           </label>
           <label for=feedback-radio-na class="radio-inline">
-            <input class="" type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NO_ACTION">
-            <span class="label-medium-semibold">Yes </span> <span>(but non-actionable)<span>
+            <input class="" type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NEW_TREND">
+            <span class="label-medium-semibold">Yes </span> <span>(But New Trend)<span>
           </label>
           <label for=feedback-radio-no class="radio-inline">
             <input class="" type="radio" id="feedback-radio-no" name="feedback-radio" value="NOT_ANOMALY">

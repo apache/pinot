@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.context;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
 
 public interface AnomalyFeedback {
   /**
@@ -15,18 +14,6 @@ public interface AnomalyFeedback {
    * @return feedback type
    */
   AnomalyFeedbackType getFeedbackType();
-
-  /**
-   * Set status (e.g., in progress, resolve, etc.) of this feedback.
-   * @param status status of this feedback
-   */
-  void setStatus(FeedbackStatus status);
-
-  /**
-   * Get status (e.g., in progress, resolve, etc.) of this feedback.
-   * @return status of this feedback
-   */
-  FeedbackStatus getStatus();
 
   /**
    * Set comment for this feedback.
