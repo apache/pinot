@@ -33,8 +33,8 @@ export default Ember.Controller.extend({
     {
       className: 'manage',
       link: 'manage',
-      title: 'Manage'
-      // hidden: true
+      title: 'Manage',
+      hidden: true
     }
   ]
 
