@@ -17,55 +17,59 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Arrays;
-import com.linkedin.pinot.core.io.writer.impl.OffHeapStringStore;
+import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import javax.annotation.Nonnull;
 
 
 public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
-  private final OffHeapStringStore _stringStore;
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
+  private final MutableOffHeapByteArrayStore _byteStore;
   private String _min = null;
   private String _max = null;
 
   public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize) {
     super(estimatedCardinality, maxOverflowHashSize);
-    _stringStore = new OffHeapStringStore();
+    _byteStore = new MutableOffHeapByteArrayStore();
   }
 
   @Override
   public void doClose() throws IOException {
-    _stringStore.close();
+    _byteStore.close();
   }
 
   @Override
-  protected void setRawValueAt(int dictId, Object rawValue) {
-    _stringStore.add(rawValue.toString());
+  protected void setRawValueAt(int dictId, Object rawValue, byte[] serializedValue) {
+    _byteStore.add(serializedValue);
   }
 
   @Override
   public Object get(int dictionaryId) {
-    return _stringStore.get(dictionaryId);
+    return new String(_byteStore.get(dictionaryId));
   }
 
   @Override
   public void index(@Nonnull Object rawValue) {
     if (rawValue instanceof String) {
       // Single value
-      indexValue(rawValue);
+      byte[] serializedValue =  ((String)rawValue).getBytes(UTF_8);
+      indexValue(rawValue, serializedValue);
       updateMinMax((String) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        indexValue(value);
+        byte[] serializedValue =  ((String)value).getBytes(UTF_8);
+        indexValue(value, serializedValue);
         updateMinMax((String) value);
       }
     }
   }
 
   private String getInternal(int dictId) {
-    return _stringStore.get(dictId);
+    return new String(_byteStore.get(dictId));
   }
 
   @Override
@@ -98,7 +102,8 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public int indexOf(Object rawValue) {
-    return getDictId(rawValue);
+    byte[] serializedValue = ((String)rawValue).getBytes(UTF_8);
+    return getDictId(rawValue, serializedValue);
   }
 
   @Nonnull
@@ -120,15 +125,15 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
     String[] sortedValues = new String[numValues];
 
     for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = (String) get(i);
+      sortedValues[i] = new String(getInternal(i));
     }
 
     Arrays.sort(sortedValues);
     return sortedValues;
   }
 
-  protected boolean equalsValueAt(int dictId, Object value) {
-    return _stringStore.equalsStringAt(value.toString(), dictId);
+  protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
+    return _byteStore.equalsValueAt(serializedValue, dictId);
   }
 
   private void updateMinMax(String value) {

@@ -42,9 +42,9 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getDictId(Integer.valueOf((String) rawValue));
+      return getDictId(Integer.valueOf((String) rawValue), null);
     } else {
-      return getDictId(rawValue);
+      return getDictId(rawValue, null);
     }
   }
 
@@ -52,13 +52,13 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   public void index(@Nonnull Object rawValue) {
     if (rawValue instanceof Integer) {
       // Single value
-      indexValue(rawValue);
+      indexValue(rawValue, null);
       updateMinMax((Integer) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        indexValue(value);
+        indexValue(value, null);
         updateMinMax((Integer) value);
       }
     }
@@ -122,7 +122,7 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
-  protected void setRawValueAt(int dictId, Object value) {
+  protected void setRawValueAt(int dictId, Object value, byte[] serializedValue) {
     _dictIdToValue.setInt(dictId, (Integer) value);
   }
 
