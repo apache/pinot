@@ -638,6 +638,14 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
 
     DataFrame.assertSameLength(series);
 
+    // Note: code-specialization to help hot-spot vm
+    if(series.length == 1)
+      return mapUnrolled(function, series[0]);
+    if(series.length == 2)
+      return mapUnrolled(function, series[0], series[1]);
+    if(series.length == 3)
+      return mapUnrolled(function, series[0], series[1], series[2]);
+
     Object[] input = new Object[series.length];
     Object[] output = new Object[series[0].size()];
     for(int i=0; i<series[0].size(); i++) {
@@ -655,6 +663,42 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
       input[j] = value;
     }
     return function.apply(input);
+  }
+
+  private static ObjectSeries mapUnrolled(ObjectFunction function, Series a) {
+    Object[] output = new Object[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i)) {
+        output[i] = NULL;
+      } else {
+        output[i] = function.apply(a.getObject(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  private static ObjectSeries mapUnrolled(ObjectFunction function, Series a, Series b) {
+    Object[] output = new Object[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i) || b.isNull(i)) {
+        output[i] = NULL;
+      } else {
+        output[i] = function.apply(a.getObject(i), b.getObject(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  private static ObjectSeries mapUnrolled(ObjectFunction function, Series a, Series b, Series c) {
+    Object[] output = new Object[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {
+        output[i] = NULL;
+      } else {
+        output[i] = function.apply(a.getObject(i), b.getObject(i), c.getObject(i));
+      }
+    }
+    return buildFrom(output);
   }
 
   /**
