@@ -267,7 +267,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
    */
   public SeriesType inferType() {
     if(this.isEmpty())
-      return SeriesType.OBJECT;
+      return SeriesType.STRING;
 
     boolean isBoolean = true;
     boolean isLong = true;

@@ -469,6 +469,9 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
   }
 
   public SeriesType inferType() {
+    if(this.isEmpty())
+      return SeriesType.OBJECT;
+
     boolean isBoolean = true;
     boolean isLong = true;
     boolean isDouble = true;
@@ -506,6 +509,16 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     if(isDouble)
       return Series.SeriesType.DOUBLE;
     return Series.SeriesType.STRING;
+  }
+
+  /**
+   * Attempts to infer a tighter native series type based on pattern matching against individual
+   * values in the series. Returns a copy of the series with the inferred type.
+   *
+   * @return series copy of inferred type
+   */
+  public Series toInferredType() {
+    return this.get(this.inferType());
   }
 
   @Override

@@ -2562,6 +2562,11 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testStringInferEmpty() {
+    Assert.assertEquals(StringSeries.empty().inferType(), Series.SeriesType.STRING);
+  }
+
+  @Test
   public void testBooleanOperationsSeries() {
     BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
     BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
@@ -2857,6 +2862,11 @@ public class DataFrameTest {
   public void testObjectSortedFail() {
     ObjectSeries base = DataFrame.toSeriesObjects("A", tup(1, 1));
     base.sorted();
+  }
+
+  @Test
+  public void testObjectInferEmpty() {
+    Assert.assertEquals(ObjectSeries.empty().inferType(), Series.SeriesType.OBJECT);
   }
 
   @Test
