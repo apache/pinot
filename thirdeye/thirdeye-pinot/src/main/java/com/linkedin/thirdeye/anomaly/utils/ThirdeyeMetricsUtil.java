@@ -52,6 +52,12 @@ public class ThirdeyeMetricsUtil {
   public static final Counter datasourceDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "datasourceDurationCounter");
 
+  public static final Counter pinotCallCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "pinotCallCounter");
+
+  public static final Counter pinotDurationCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "pinotDurationCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }
