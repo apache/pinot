@@ -195,6 +195,7 @@ AnomalyResultModel.prototype = {
     params.anomaliesSearchMode = constants.MODE_ID;
     params.updateModelAndNotifyView = this.updateModelAndNotifyView;
     params.anomalyIds = anomalyIds;
+    params.spinner = this.spinner;
     this.ajaxCall = dataService.fetchAnomalies(params);
   },
   /**
