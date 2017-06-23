@@ -59,8 +59,8 @@
                   </tr>
                   <tr>
                     <td colspan="100%" style="width: 100%; padding-bottom:8px;">
-                      <div style="color: #737373">Non Actionable</div>
-                      <div style="color: #737373">${nonActionableCount}</div>
+                      <div style="color: #737373">New Trend</div>
+                      <div style="color: #737373">${newTrendCount}</div>
                     </td>
                   </tr>
                 </table>
