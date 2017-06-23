@@ -28,6 +28,24 @@ public class ThirdeyeMetricsUtil {
   public static final Counter dbCallCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbCallCounter");
 
+  public static final Counter dbReadCallCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbReadCallCounter");
+
+  public static final Counter dbReadByteCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbReadByteCounter");
+
+  public static final Counter dbReadDurationCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbReadDurationCounter");
+
+  public static final Counter dbWriteCallCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbWriteCallCounter");
+
+  public static final Counter dbWriteByteCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbWriteByteCounter");
+
+  public static final Counter dbWriteDurationCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbWriteDurationCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }
