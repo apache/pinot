@@ -58,6 +58,18 @@ public class ThirdeyeMetricsUtil {
   public static final Counter pinotDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "pinotDurationCounter");
 
+  public static final Counter rcaPipelineCallCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaPipelineCallCounter");
+
+  public static final Counter rcaPipelineDurationCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaPipelineDurationCounter");
+
+  public static final Counter rcaFrameworkCallCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaFrameworkCallCounter");
+
+  public static final Counter rcaFrameworkDurationCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaFrameworkDurationCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }

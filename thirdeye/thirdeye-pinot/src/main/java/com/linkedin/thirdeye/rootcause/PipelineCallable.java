@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.rootcause;
 
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -35,11 +36,17 @@ class PipelineCallable implements Callable<PipelineResult> {
       inputs.put(e.getKey(), r.getEntities());
     }
 
-    LOG.info("Executing pipeline '{}'", this.pipeline.getOutputName());
-    PipelineContext context = new PipelineContext(inputs);
-    PipelineResult result = this.pipeline.run(context);
+    long tStart = System.nanoTime();
+    try {
+      LOG.info("Executing pipeline '{}'", this.pipeline.getOutputName());
+      PipelineContext context = new PipelineContext(inputs);
+      PipelineResult result = this.pipeline.run(context);
 
-    LOG.info("Completed pipeline '{}'. Got {} results", this.pipeline.getOutputName(), result.getEntities().size());
-    return result;
+      LOG.info("Completed pipeline '{}'. Got {} results", this.pipeline.getOutputName(), result.getEntities().size());
+      return result;
+    } finally {
+      ThirdeyeMetricsUtil.rcaPipelineCallCounter.inc();
+      ThirdeyeMetricsUtil.rcaPipelineDurationCounter.inc(System.nanoTime() - tStart);
+    }
   }
 }
