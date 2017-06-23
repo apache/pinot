@@ -1,0 +1,121 @@
+<aside class="manage-alert-filters col-md-3">
+  <div class="manage-alert-filters__wrapper">
+    <h1 class="manage-alert-filters__row manage-alert-filters__row--title">Manage Alerts</h1>
+    {{#accordion-list allowManyActiveItems=true as |accordion|}}
+      {{#accordion.item as |accordionItem|}}
+        {{#accordionItem.toggle}}
+          <div class="manage-alert-filters__row te-hide">All Alerts</div>
+        {{/accordionItem.toggle}}
+        {{#accordionItem.panel}}
+          <div class="manage-alert-filters__options te-hide">Options go here</div>
+        {{/accordionItem.panel}}
+      {{/accordion.item}}
+    {{/accordion-list}}
+  </div>
+</aside>
+
+<main class="manage-alert-container paper-container col-md-9">
+  <div class="manage-alert-container__title">Search for an existing alert</div>
+  <div class="manage-alert-container__reset">
+    <a {{action "removeAll"}} class="thirdeye-link {{if resultsActive "te-link--show" "te-link--hide"}}">
+      Remove Results
+    </a>
+  </div>
+  <div class="manage-alert-search">
+    <div class="manage-alert-search__filter">
+      <div class="manage-alert-search__label">Search By:</div>
+      {{#power-select
+        selected=selectedSearchMode
+        options=searchModes
+        searchEnabled=false
+        onchange=(action (mut selectedSearchMode))
+        as |name|
+      }}
+        {{name}}
+      {{/power-select}}
+    </div>
+
+    <div class="manage-alert-search__input">
+      <div class="manage-alert-search__label">Search for Alert:</div>
+      {{#if (eq selectedSearchMode 'Alert Name')}}
+        {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          search=(perform searchByFunctionName)
+          searchPlaceholder="Search for an Alert"
+          placeholder="Search by Alert Name"
+          allowClear=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+
+      {{else if (eq selectedSearchMode 'Application Name')}}
+          {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          search=(perform searchByApplicationName)
+          searchPlaceholder="Search for an Alert"
+          placeholder="Search by Application Name"
+          allowClear=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+
+      {{else if (eq selectedSearchMode 'Dataset Name')}}
+          {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          search=(perform searchByDatasetName)
+          searchPlaceholder="Search for an Alert"
+          placeholder="Search by Dataset Name"
+          allowClear=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="manage-alert-results">
+    {{#accordion-list allowManyActiveItems=true as |accordion|}}
+      {{#each selectedAlerts as |alert|}}
+        <!-- For each element in list create an 'accordion.item' -->
+        <section class="te-search-results">
+          {{#accordion.item as |accordionItem|}}
+            <!-- Create a 'toggle' and a 'panel' for the item -->
+            {{#accordionItem.toggle}}
+              <ul class="te-search-results__list te-search-results__list--summary-block">
+                <li class="te-search-results__summary-item te-search-results__summary-item--title">
+                  <i class="glyphicon glyphicon-menu-down te-search-results__icon"></i>
+                  {{alert.functionName}}
+                </li>
+                <li class="te-search-results__summary-item te-search-results__summary-item--subt">
+                  <strong>Dataset: </strong>{{alert.collection}}
+                </li>
+                <li class="te-search-results__summary-item te-search-results__summary-item--tag">
+                  <span class="te-search-results__tag {{if alert.isActive "te-search-results__tag--active"}}">
+                    {{if alert.isActive "Active" "Inactive"}}
+                  </span>
+                </li>
+              </ul>
+            {{/accordionItem.toggle}}
+            <!-- Clicking on the 'toggle' will display the contents of the 'panel' -->
+            {{#accordionItem.panel}}
+              <ul class="te-search-results__list te-search-results__list--details-block">
+                <li>Metric: {{alert.metric}}</li>
+                <li>Dataset: {{alert.collection}}</li>
+                <li>Type: {{alert.type}}</li>
+                <li>Is Active: {{alert.isActive}}</li>
+                <li>Data Filter: {{alert.dataFilter}}</li>
+                <li>Explore Dimensions: {{alert.exploreDimensions}}</li>
+              </ul>
+            {{/accordionItem.panel}}
+          {{/accordion.item}}
+        </section>
+      {{/each}}
+    {{/accordion-list}}
+  </div>
+</main>

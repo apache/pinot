@@ -1,6 +1,6 @@
 import { moduleFor, test } from 'ember-qunit';
 
-moduleFor('route:self-service/manage', 'Unit | Route | self service/manage', {
+moduleFor('route:self-serve/create-alert', 'Unit | Route | self serve/create alert', {
   // Specify the other units that are required for this test.
   // needs: ['controller:foo']
 });

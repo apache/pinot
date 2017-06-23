@@ -1,17 +1,27 @@
+/**
+ * Handles alert list and filter settings
+ * @module manage/alerts/controller
+ * @exports alerts controller
+ */
 import Ember from 'ember';
 import { task, timeout } from 'ember-concurrency';
 import fetch from 'fetch';
 
 export default Ember.Controller.extend({
   /**
-   * Alerts Search Mode
+   * Alerts Search Mode options
    */
-  searchModes: ['function-name', 'alert-group'],
+  searchModes: ['Alert Name', 'Dataset Name', 'Application Name'],
+
+  /**
+   * True when results appear
+   */
+  resultsActive: false,
 
   /**
    * Default Search Mode
    */
-  selectedSearchMode: 'function-name',
+  selectedSearchMode: 'Alert Name',
 
   /**
    * Array of Alerts we're displaying
@@ -19,7 +29,7 @@ export default Ember.Controller.extend({
   selectedAlerts: [],
 
   /**
-   * Handler for serach by function name
+   * Handler for search by function name
    * Utilizing ember concurrency (task)
    */
   searchByFunctionName: task(function* (alert) {
@@ -30,10 +40,21 @@ export default Ember.Controller.extend({
   }),
 
   /**
-   * Handler for serach by alert group name
+   * Handler for search by application name
    * Utilizing ember concurrency (task)
    */
-  searchByAlertGroup: task(function* (alert) {
+  searchByApplicationName: task(function* (alert) {
+    yield timeout(600);
+    const url = `/data/autocomplete/functionByAppname?appname=${alert}`;
+    return fetch(url)
+      .then(res => res.json())
+  }),
+
+  /**
+   * Handler for search by alert dataset name
+   * Utilizing ember concurrency (task)
+   */
+  searchByDatasetName: task(function* (alert) {
     yield timeout(600);
     const url = `/data/autocomplete/functionByAlertName?alertName=${alert}`;
     return fetch(url)
@@ -44,11 +65,17 @@ export default Ember.Controller.extend({
     // Handles alert selection from type ahead
     onAlertChange(alerts) {
       this.get('selectedAlerts').pushObject(alerts);
+      this.set('resultsActive', true);
     },
 
     // Handles UI mode change
     onModeChange(mode) {
       this.set('selectedSearchMode', mode);
     },
+
+    removeAll() {
+      $('.te-search-results').remove();
+      this.set('resultsActive', false);
+    }
   }
 });

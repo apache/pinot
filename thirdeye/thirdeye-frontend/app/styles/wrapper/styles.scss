@@ -3,8 +3,17 @@
 
 body {
   font-size: 14px;
-  background-color: lighten(#CCC, 15%);
+  background-color: lighten($te-grey, 15%);
   color: lighten(black, 40%);
+}
+
+.paper-container {
+  background-color: white;
+  padding: $te-default-element-spacing;
+  padding-bottom: 12px;
+  border: 1px solid $te-grey;
+  margin-top: $te-default-element-spacing;
+  margin-bottom: $te-default-element-spacing;
 }
 
 .thirdeye-link {
@@ -16,6 +25,21 @@ body {
 
 .thirdeye-link:hover {
   color: #0073b1;
+}
+
+.thirdeye-link-secondary {
+  color: #369ece;
+  font-weight: 600;
+  letter-spacing: .1px;
+  font-size: 16px;
+
+  &--inside {
+    font-size: 15px;
+  }
+
+  &:hover {
+    color: #369ece;
+  }
 }
 
 .thirdeye-link--nav {
@@ -31,7 +55,7 @@ body {
 }
 
 .spinner-wrapper {
-  margin: 24px;
+  margin: $te-default-element-spacing;
   height: 250px;
   position: relative;
 }
@@ -39,4 +63,45 @@ body {
 .anomaly-title-bar {
   background: white;
   border-bottom: 1px #e9e9e9 solid;
+}
+
+.te-search-results {
+  &__list {
+    margin-bottom: 0;
+
+    &--summary-block {
+      padding: 5px 10px 10px 0;
+    }
+  }
+
+  &__summary-item {
+    &--title {
+      color: $te-title-blue;
+      font-size: 18px;
+      font-weight: 400;
+    }
+  }
+
+  &__icon {
+    padding: 15px 15px 0 0;
+    color: app-shade(black, 2);
+  }
+
+  &__tag {
+    font-weight: 400;
+    letter-spacing: 1px;
+
+    &--active {
+      background-color: $te-blue;
+    }
+  }
+}
+
+.te-form {
+  &__section-submit {
+    margin: $te-default-element-spacing 0 15px 0;
+    padding-top: $te-default-element-spacing;
+    text-align: right;
+    border-top: 2px app-shade(black, 2) dotted;
+  }
 }

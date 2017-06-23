@@ -9,14 +9,16 @@ const Router = Ember.Router.extend({
 Router.map(function() {
   this.route('example', { path: 'example/:id' });
 
-  this.route('self-service', function() {
-    this.route('manage');
-    this.route('create');
-    this.route('onboard');
+  this.route('manage', function() {
+    this.route('alerts');
   });
 
   this.route('rca', function() {
     this.route('metrics', { path: '/metrics/:id' });
+  });
+  this.route('self-serve', function() {
+    this.route('create-alert');
+    this.route('import-metric');
   });
 });
 

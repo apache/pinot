@@ -1,8 +1,8 @@
 /* analysis table css*/
 
 .contribution-table {
-  border: 1px solid #CCC;
-  margin-top: 24px;
+  border: 1px solid $te-grey;
+  margin-top: $te-default-element-spacing;
 }
 
 .contribution-table__body {
@@ -23,7 +23,7 @@
 
 .contribution-table__header {
   display: flex;
-  border-bottom: 1px solid #CCC;
+  border-bottom: 1px solid $te-grey;
   padding: 14px 0;
 }
 
@@ -87,7 +87,7 @@
   border: 0;
 }
 
-.analysis-table__cell--primary { 
+.analysis-table__cell--primary {
   justify-content: flex-start;
   min-width: 220px;
 }
@@ -111,7 +111,7 @@
   justify-content: center;
 }
 
-.analysis-table__anchor--white { 
+.analysis-table__anchor--white {
   background-color: white;
   z-index: 2;
 }

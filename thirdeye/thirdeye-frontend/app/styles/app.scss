@@ -2,7 +2,7 @@
   box-sizing: border-box;
 }
 
-// Bootstrap
+/* Individual bootstrap components (as needed)
 @import "ember-bootstrap/bootstrap/variables.scss";
 @import "ember-bootstrap/bootstrap/normalize.scss";
 @import "ember-bootstrap/bootstrap/mixins.scss";
@@ -10,12 +10,16 @@
 @import "ember-bootstrap/bootstrap/forms.scss";
 @import "ember-bootstrap/bootstrap/grid.scss";
 @import "ember-bootstrap/bootstrap/tables.scss";
+*/
+
+// All-in-one Bootstrap
+@import "ember-bootstrap/bootstrap.scss";
 
 // Shared
 @import "shared/functions";
-@import "shared/mixins";
 @import "shared/color";
 @import "shared/variable";
+@import "shared/mixins";
 @import "shared/styles";
 
 // Wrapper
@@ -29,7 +33,9 @@
 @import 'components/te-navbar';
 
 // Pod Pages
-@import 'pods/rca';
 @import 'ember-power-select/themes/bootstrap';
 @import "ember-power-select";
-@import "pods/self-serve-manage-alerts";
+@import "pods/manage/alerts";
+@import "pods/self-serve/create-alert";
+@import "pods/self-serve/import-metric";
+@import 'pods/rca';

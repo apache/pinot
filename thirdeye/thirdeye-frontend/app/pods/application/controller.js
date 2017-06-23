@@ -31,9 +31,9 @@ export default Ember.Controller.extend({
       title: 'Root Cause Analysis'
     },
     {
-      className: 'alert',
-      link: 'self-service',
-      title: 'Self-Service',
+      className: 'manage',
+      link: 'manage',
+      title: 'Manage',
       hidden: true
     }
   ]

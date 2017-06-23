@@ -1,5 +1,5 @@
 .te-nav {
-  background-color: $anolaly-nav-background;
+  background-color: $te-nav-background;
   letter-spacing: $te-nav-letter-spacing;
 
   &__logo {
@@ -9,7 +9,7 @@
   }
 
   &__link {
-    color: app-shade(white, 6);
+    color: $te-nav-item-color;
     display: inline-block;
     height: $te-nav-link-height;
     line-height: $te-nav-link-height;
@@ -64,13 +64,18 @@
 
   &__item {
     display: inline-block;
-    margin-right: 45px;
+    margin-right: $te-nav-link-spacing;
   }
 
   &__user {
     float: right;
+    width: auto;
     margin-top: 10px;
     text-align: right;
+  }
+
+  &__user-dropdown {
+    float: right;
   }
 
   &__user-avatar {
@@ -80,6 +85,23 @@
     margin-right: 5px;
     border-radius: 50%;
     vertical-align: center;
+  }
+
+  &__button {
+    float: left;
+    margin: 2px $te-nav-link-spacing 0 0;
+    cursor: pointer;
+    background: none;
+    padding: 2px 15px;
+    border-radius: 3px;
+    border: 1px solid $te-nav-item-color;
+    color: $te-nav-item-color;
+    letter-spacing: $te-nav-letter-spacing;
+
+    &:hover {
+      border-color: white;
+      color: white;
+    }
   }
 
 /**

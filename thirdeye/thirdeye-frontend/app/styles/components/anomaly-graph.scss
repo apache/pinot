@@ -10,7 +10,7 @@
 .anomaly-graph {
   box-sizing: border-box;
   display: flex;
-  border: 1px solid #CCC;
+  border: 1px solid $te-grey;
 
   &:not(:first-child) {
       margin-top: 14px;
@@ -50,15 +50,15 @@
   font-weight: normal;
 }
 
-.anomaly-graph__left-panel { 
+.anomaly-graph__left-panel {
   min-width: 250px;
   flex-grow: 1;
   overflow: scroll;
   position: relative;
-  border-right: 1px solid #CCC;
+  border-right: 1px solid $te-grey;
 }
 
-.anomaly-graph__right-panel { 
+.anomaly-graph__right-panel {
   flex-basis: 75%;
   flex-grow: 1;
   width: 75%;
@@ -67,8 +67,8 @@
 
 .anomaly_graph__filters {
   position: absolute;
-  top: 0; 
-  bottom: 0; 
+  top: 0;
+  bottom: 0;
   right: 0;
   left: 0;
 }

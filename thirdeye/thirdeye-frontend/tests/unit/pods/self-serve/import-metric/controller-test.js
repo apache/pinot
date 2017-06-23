@@ -1,6 +1,6 @@
 import { moduleFor, test } from 'ember-qunit';
 
-moduleFor('controller:self-service/manage', 'Unit | Controller | self service/manage', {
+moduleFor('controller:self-serve/import-metric', 'Unit | Controller | self serve/import metric', {
   // Specify the other units that are required for this test.
   // needs: ['controller:foo']
 });
