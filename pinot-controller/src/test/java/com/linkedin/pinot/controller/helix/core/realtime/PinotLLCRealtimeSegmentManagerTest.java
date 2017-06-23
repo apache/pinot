@@ -792,7 +792,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _nCallsToUpdateHelix++;
     }
 
-    protected void writeKafkaPartitionAssignemnt(final String realtimeTableName, ZNRecord znRecord) {
+    protected void writeKafkaPartitionAssignment(final String realtimeTableName, ZNRecord znRecord) {
       _partitionAssignment = znRecord;
     }
 
