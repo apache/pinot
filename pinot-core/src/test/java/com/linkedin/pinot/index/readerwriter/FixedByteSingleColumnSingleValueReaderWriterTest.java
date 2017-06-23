@@ -43,7 +43,7 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   private void testInt(final Random r, final int rows, final int div) throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Integer.SIZE / 8;
-    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes);
+    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, "testInt");
     int[] data = new int[rows];
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextInt();
@@ -87,7 +87,7 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   private void testLong(final Random r, final int rows, final int div) throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Long.SIZE / 8;
-    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes);
+    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, "testLong");
     long[] data = new long[rows];
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextLong();

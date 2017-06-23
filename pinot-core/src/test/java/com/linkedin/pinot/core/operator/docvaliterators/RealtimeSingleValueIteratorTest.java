@@ -43,10 +43,14 @@ public class RealtimeSingleValueIteratorTest {
   public void initData() {
     final long _seed = new Random().nextLong();
     _random = new Random(_seed);
-    _intReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.INTEGER_SIZE);
-    _longReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.LONG_SIZE);
-    _floatReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.FLOAT_SIZE);
-    _doubleReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.DOUBLE_SIZE);
+    _intReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.INTEGER_SIZE,
+        "intReader");
+    _longReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.LONG_SIZE,
+        "longReader");
+    _floatReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.FLOAT_SIZE,
+        "floatReader");
+    _doubleReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.DOUBLE_SIZE,
+        "doubleReader");
 
     for (int i = 0; i < NUM_ROWS; i++) {
       _intVals[i] = _random.nextInt();

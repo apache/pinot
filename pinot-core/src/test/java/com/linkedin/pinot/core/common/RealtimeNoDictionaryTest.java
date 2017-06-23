@@ -48,13 +48,13 @@ public class RealtimeNoDictionaryTest {
     _random = new Random(seed);
 
     FixedByteSingleColumnSingleValueReaderWriter intRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Integer.SIZE/8);
+        _random.nextInt(NUM_ROWS)+1, Integer.SIZE/8, "int");
     FixedByteSingleColumnSingleValueReaderWriter longRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Long.SIZE/8);
+        _random.nextInt(NUM_ROWS)+1, Long.SIZE/8, "long");
     FixedByteSingleColumnSingleValueReaderWriter floatRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Float.SIZE/8);
+        _random.nextInt(NUM_ROWS)+1, Float.SIZE/8, "float");
     FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Double.SIZE/8);
+        _random.nextInt(NUM_ROWS)+1, Double.SIZE/8, "double");
 
     for (int i = 0; i < NUM_ROWS; i++) {
       _intVals[i] = _random.nextInt();

@@ -54,7 +54,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     int columnSizeInBytes = Integer.SIZE / 8;
     int maxNumberOfMultiValuesPerRow = 2000;
     readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows/2, columnSizeInBytes);
+        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows/2, columnSizeInBytes,
+            "testIntArray");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -82,7 +83,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     // Keep the rowsPerChunk as a multiple of multiValuesPerRow to check the cases when both data and header buffers
     // transition to new ones
     readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2, columnSizeInBytes);
+        new FixedByteSingleColumnMultiValueReaderWriter(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2, columnSizeInBytes,
+            "testIntArrayFixedSize");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -109,7 +111,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     int columnSizeInBytes = Integer.SIZE / 8;
     Random r = new Random(seed);
     readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes);
+        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
+            "testWithZeroSize");
 
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
@@ -141,7 +144,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
 
     FixedByteSingleColumnMultiValueReaderWriter readerWriter =
         new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, avgMultiValueCount,
-            rowCountPerChunk, columnSize);
+            rowCountPerChunk, columnSize, "readerWriter");
 
     return readerWriter;
   }

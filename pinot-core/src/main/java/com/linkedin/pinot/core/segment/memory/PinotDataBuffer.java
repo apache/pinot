@@ -105,11 +105,18 @@ public abstract class PinotDataBuffer implements AutoCloseable {
   }
 
   public static PinotDataBuffer allocateDirect(long size) {
+    return allocateDirect(size, " direct allocation");
+
+  }
+
+  public static PinotDataBuffer allocateDirect(long size, String description) {
     if (USE_LBUFFER) {
       return PinotLByteBuffer.allocateDirect(size);
     } else {
-      // TODO: provide proper context
-      return PinotByteBuffer.allocateDirect(size, " direct allocation");
+      if (description == null || description.length() == 0) {
+        description = " no description";
+      }
+      return PinotByteBuffer.allocateDirect(size, description);
     }
   }
 

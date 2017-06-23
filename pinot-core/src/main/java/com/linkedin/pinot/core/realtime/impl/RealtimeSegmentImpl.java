@@ -165,12 +165,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
       if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
         columnIndexReaderWriterMap.put(dimension,
-            new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE));
+            new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE, segmentName + "." + dimension + ".fwd"));
       } else {
         // TODO Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
         columnIndexReaderWriterMap.put(dimension,
             new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgMultiValueCount,
-                capacity, V1Constants.Numbers.INTEGER_SIZE));
+                capacity, V1Constants.Numbers.INTEGER_SIZE, segmentName + "." + dimension + ".fwd"));
       }
     }
 
@@ -183,14 +183,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         colSize = getColWidth(schema.getFieldSpecFor(metric).getDataType());
       }
       columnIndexReaderWriterMap.put(metric,
-          new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize));
+          new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize, segmentName + "." + metric + ".fwd"));
     }
 
     if (invertedIndexColumns.contains(outgoingTimeColumnName)) {
       invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
     }
     columnIndexReaderWriterMap.put(outgoingTimeColumnName,
-        new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE));
+        new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE, segmentName + outgoingTimeColumnName + ".fwd"));
 
     tableAndStreamName = tableName + "-" + streamName;
   }

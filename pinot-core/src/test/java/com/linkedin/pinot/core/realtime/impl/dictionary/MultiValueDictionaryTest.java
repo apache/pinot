@@ -39,7 +39,7 @@ public class MultiValueDictionaryTest {
       throws Exception {
     final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
-        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8);
+        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8, "indexer");
 
     // Insert rows into the indexer and dictionary
     Random random = new Random(seed);

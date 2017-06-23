@@ -36,6 +36,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   private final long chunkSizeInBytes;
   private final int numRowsPerChunk;
   private final int columnSizesInBytes;
+  private final String description;
   private long numBytesInCurrentWriter = 0;
 
   private static class WriterWithOffset implements Closeable {
@@ -105,18 +106,20 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   /**
-   *  @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
+   * @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
    * @param columnSizesInBytes
+   * @param description
    */
-  public FixedByteSingleColumnSingleValueReaderWriter(int numRowsPerChunk, int columnSizesInBytes) {
+  public FixedByteSingleColumnSingleValueReaderWriter(int numRowsPerChunk, int columnSizesInBytes, String description) {
     chunkSizeInBytes = numRowsPerChunk * columnSizesInBytes;
     this.numRowsPerChunk = numRowsPerChunk;
     this.columnSizesInBytes = columnSizesInBytes;
+    this.description = description;
     addBuffer();
   }
 
   private void addBuffer() {
-    PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(chunkSizeInBytes);
+    PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(chunkSizeInBytes, description);
     buffer.order(ByteOrder.nativeOrder());
     buffers.add(buffer);
     FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(buffer, numRowsPerChunk, new int[]{columnSizesInBytes});

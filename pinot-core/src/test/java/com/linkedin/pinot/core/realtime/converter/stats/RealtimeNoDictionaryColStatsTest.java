@@ -53,13 +53,13 @@ public class RealtimeNoDictionaryColStatsTest {
     random = new Random(seed);
 
     FixedByteSingleColumnSingleValueReaderWriter intRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Integer.SIZE/8);
+        random.nextInt(NUM_ROWS)+1, Integer.SIZE/8, "int");
     FixedByteSingleColumnSingleValueReaderWriter longRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Long.SIZE/8);
+        random.nextInt(NUM_ROWS)+1, Long.SIZE/8, "long");
     FixedByteSingleColumnSingleValueReaderWriter floatRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Float.SIZE/8);
+        random.nextInt(NUM_ROWS)+1, Float.SIZE/8, "float");
     FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Double.SIZE/8);
+        random.nextInt(NUM_ROWS)+1, Double.SIZE/8, "double");
 
     _intMinVal = Integer.MAX_VALUE; _intMaxVal = Integer.MIN_VALUE;
     _longMinVal = Long.MAX_VALUE; _longMaxVal = Long.MIN_VALUE;
