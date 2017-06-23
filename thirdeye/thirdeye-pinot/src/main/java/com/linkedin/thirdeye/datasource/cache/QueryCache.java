@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datasource.cache;
 
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,9 +31,15 @@ public class QueryCache {
   }
 
   public ThirdEyeResponse getQueryResult(ThirdEyeRequest request) throws Exception {
-    String dataSource = request.getDataSource();
-    ThirdEyeResponse response = getDataSource(dataSource).execute(request);
-    return response;
+    long tStart = System.nanoTime();
+    try {
+      String dataSource = request.getDataSource();
+      ThirdEyeResponse response = getDataSource(dataSource).execute(request);
+      return response;
+    } finally {
+      ThirdeyeMetricsUtil.datasourceCallCounter.inc();
+      ThirdeyeMetricsUtil.datasourceDurationCounter.inc(System.nanoTime() - tStart);
+    }
   }
 
   public Future<ThirdEyeResponse> getQueryResultAsync(final ThirdEyeRequest request)

@@ -46,6 +46,12 @@ public class ThirdeyeMetricsUtil {
   public static final Counter dbWriteDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbWriteDurationCounter");
 
+  public static final Counter datasourceCallCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "datasourceCallCounter");
+
+  public static final Counter datasourceDurationCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "datasourceDurationCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }
