@@ -70,6 +70,12 @@ public class ThirdeyeMetricsUtil {
   public static final Counter rcaFrameworkDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaFrameworkDurationCounter");
 
+  public static final Counter cubeCallCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "cubeCallCounter");
+
+  public static final Counter cubeDurationCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "cubeDurationCounter");
+
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;
   }

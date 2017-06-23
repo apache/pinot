@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -93,30 +94,54 @@ public class Cube { // the cube (Ca|Cb)
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimension,
       List<List<String>> hierarchy, Multimap<String, String> filterSets)
       throws Exception {
-    if (dimensions == null || dimensions.size() == 0) {
-      throw new IllegalArgumentException("Dimensions cannot be empty.");
+    long tStart = System.nanoTime();
+    try {
+      if (dimensions == null || dimensions.size() == 0) {
+        throw new IllegalArgumentException("Dimensions cannot be empty.");
+      }
+      if (hierarchy == null) {
+        hierarchy = Collections.emptyList();
+      }
+
+      initializeBasicInfo(olapClient, filterSets);
+      Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
+      Dimensions shrankDimensions = shrinkDimensionsByFilterSets(sanitizedDimensions, filterSets);
+      this.costSet = computeOneDimensionCost(olapClient, topRatio, shrankDimensions, filterSets);
+      this.dimensions = sortDimensionOrder(costSet, shrankDimensions, topDimension, hierarchy);
+
+      LOG.info("Auto decided dimensions: " + this.dimensions);
+
+      buildWithManualDimensionOrderInternal(olapClient, this.dimensions, filterSets);
+    } finally {
+      ThirdeyeMetricsUtil.cubeCallCounter.inc();
+      ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
     }
-    if (hierarchy == null) {
-      hierarchy = Collections.emptyList();
+  }
+
+  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions,
+      Multimap<String, String> filterSets)
+      throws Exception {
+    long tStart = System.nanoTime();
+    try {
+      buildWithManualDimensionOrderInternal(olapClient, dimensions, filterSets);
+    } finally {
+      ThirdeyeMetricsUtil.cubeCallCounter.inc();
+      ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
     }
-
-    initializeBasicInfo(olapClient, filterSets);
-    Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
-    Dimensions shrankDimensions = shrinkDimensionsByFilterSets(sanitizedDimensions, filterSets);
-    this.costSet = computeOneDimensionCost(olapClient, topRatio, shrankDimensions, filterSets);
-    this.dimensions = sortDimensionOrder(costSet, shrankDimensions, topDimension, hierarchy);
-
-    LOG.info("Auto decided dimensions: " + this.dimensions);
-
-    buildWithManualDimensionOrder(olapClient, this.dimensions, filterSets);
   }
 
   public void buildDimensionCostSet(OLAPDataBaseClient olapClient, Dimensions dimensions,
       Multimap<String, String> filterSets)
       throws Exception {
-    Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
-    initializeBasicInfo(olapClient, filterSets);
-    this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions, filterSets);
+    long tStart = System.nanoTime();
+    try {
+      Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
+      initializeBasicInfo(olapClient, filterSets);
+      this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions, filterSets);
+    } finally {
+      ThirdeyeMetricsUtil.cubeCallCounter.inc();
+      ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
+    }
   }
 
   // TODO: Replace with method with an user configurable method
@@ -167,7 +192,7 @@ public class Cube { // the cube (Ca|Cb)
     return new Dimensions(dimensionsToRetain);
   }
 
-  public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions,
+  private void buildWithManualDimensionOrderInternal(OLAPDataBaseClient olapClient, Dimensions dimensions,
       Multimap<String, String> filterSets)
       throws Exception {
     if (dimensions == null || dimensions.size() == 0) {
