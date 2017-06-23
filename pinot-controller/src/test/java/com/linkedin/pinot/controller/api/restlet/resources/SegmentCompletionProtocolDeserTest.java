@@ -58,6 +58,7 @@ public class SegmentCompletionProtocolDeserTest {
     Assert.assertEquals(params.getReason(), REASON);
     Assert.assertEquals(params.getExtraTimeSec(), EXTRA_TIME_SEC);
     Assert.assertEquals(params.getWaitTimeMillis(), WAIT_TIME_MILLIS);
+    Assert.assertEquals(params.getNumRows(), NUM_ROWS);
   }
 
   @Test
@@ -86,6 +87,7 @@ public class SegmentCompletionProtocolDeserTest {
     Assert.assertEquals(params.getReason(), REASON);
     Assert.assertEquals(params.getExtraTimeSec(), EXTRA_TIME_SEC);
     Assert.assertEquals(params.getWaitTimeMillis(), WAIT_TIME_MILLIS);
+    Assert.assertEquals(params.getNumRows(), NUM_ROWS);
   }
 
   @Test
@@ -105,10 +107,11 @@ public class SegmentCompletionProtocolDeserTest {
     Assert.assertEquals(params.getInstanceId(), INSTANCE);
     Assert.assertEquals(params.getSegmentName(), SEGMENT_NAME);
     Assert.assertEquals(params.getSegmentLocation(), null);
-    Assert.assertEquals(params.getBuildTimeMillis(), 0);
+    Assert.assertEquals(params.getBuildTimeMillis(), -1);
     Assert.assertEquals(params.getReason(), null);
     Assert.assertEquals(params.getExtraTimeSec(), SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
-    Assert.assertEquals(params.getWaitTimeMillis(), 0);
+    Assert.assertEquals(params.getWaitTimeMillis(), -1);
+    Assert.assertEquals(params.getNumRows(), -1);
   }
 
   @Test

@@ -45,6 +45,7 @@ public class LLCExtendBuildTime extends ServerResource {
     LOGGER.info(requestParams.toString());
 
     SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().extendBuildTime(requestParams);
+    LOGGER.info(response.toJsonString());
     return new StringRepresentation(response.toJsonString());
   }
 }

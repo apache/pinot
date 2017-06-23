@@ -42,9 +42,14 @@ public class SegmentCompletionUtils {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offsetStr, segmentName, instanceId);
       return null;
     }
-    long offset;
+
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withSegmentName(segmentName).withInstanceId(instanceId);
+
     try {
-      offset = Long.valueOf(offsetStr);
+      long offset = Long.valueOf(offsetStr);
+      params.withOffset(offset);
+
     } catch (NumberFormatException e) {
       LOGGER.error("Invalid offset {} for segment {} from instance {}", offsetStr, segmentName, instanceId);
       return null;
@@ -54,49 +59,49 @@ public class SegmentCompletionUtils {
     if (extraTimeSecStr != null) {
       try {
         extraTimeSec = Integer.valueOf(extraTimeSecStr);
+
       } catch (NumberFormatException e) {
-        LOGGER.error("Invalid extraTimeSec {} for segment {} from instance {}", extraTimeSecStr, segmentName, instanceId);
+        LOGGER.warn("Invalid extraTimeSec {} for segment {} from instance {}", extraTimeSecStr, segmentName, instanceId);
       }
     }
+    params.withExtraTimeSec(extraTimeSec);
 
-    int rowCount = 0;
     if (rowCountStr != null) {
       try {
-        rowCount = Integer.valueOf(rowCountStr);
+        int rowCount = Integer.valueOf(rowCountStr);
+        params.withNumRows(rowCount);
       } catch (NumberFormatException e) {
-        LOGGER.error("Invalid rowCount {} for segment {} from instance {}", rowCountStr, segmentName, instanceId);
+        LOGGER.warn("Invalid rowCount {} for segment {} from instance {}", rowCountStr, segmentName, instanceId);
       }
     }
 
-    long buildTimeMillis = 0;
     if (buildTimeMillisStr != null) {
       try {
-        buildTimeMillis = Long.valueOf(buildTimeMillisStr);
+        long buildTimeMillis = Long.valueOf(buildTimeMillisStr);
+        params.withBuildTimeMillis(buildTimeMillis);
       } catch (NumberFormatException e) {
-        LOGGER.error("Invalid buildTimeMillis {} for segment {} from instance {}", buildTimeMillisStr, segmentName, instanceId);
+        LOGGER.warn("Invalid buildTimeMillis {} for segment {} from instance {}", buildTimeMillisStr, segmentName, instanceId);
       }
     }
 
-    long waitTimeMillis = 0;
     if (waitTimeMillisStr != null) {
       try {
-        waitTimeMillis = Long.valueOf(waitTimeMillisStr);
+        long waitTimeMillis = Long.valueOf(waitTimeMillisStr);
+        params.withWaitTimeMillis(waitTimeMillis);
       } catch (NumberFormatException e) {
-        LOGGER.error("Invalid waitTimeMillis {} for segment {} from instance {}", waitTimeMillisStr, segmentName, instanceId);
+        LOGGER.warn("Invalid waitTimeMillis {} for segment {} from instance {}", waitTimeMillisStr, segmentName, instanceId);
       }
     }
 
+    if (reason != null) {
+      params.withReason(reason);
+    }
 
-    return new SegmentCompletionProtocol.Request.Params()
-        .withInstanceId(instanceId)
-        .withOffset(offset)
-        .withSegmentName(segmentName)
-        .withSegmentLocation(segmentLocation)
-        .withReason(reason)
-        .withExtraTimeSec(extraTimeSec)
-        .withNumRows(rowCount)
-        .withBuildTimeMillis(buildTimeMillis)
-        .withWaitTimeMillis(waitTimeMillis);
+    if (segmentLocation != null) {
+      params.withSegmentLocation(segmentLocation);
+    }
+
+    return params;
   }
 
   /**

@@ -46,6 +46,7 @@ public class LLCSegmentStoppedConsuming extends PinotSegmentUploadRestletResourc
     }
     LOGGER.info(requestParams.toString());
     SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentStoppedConsuming(requestParams);
+    LOGGER.info(response.toJsonString());
     return new StringRepresentation(response.toJsonString());
   }
 

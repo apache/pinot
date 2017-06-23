@@ -49,6 +49,7 @@ public class LLCSegmentConsumed extends ServerResource {
     }
     LOGGER.info(requestParams.toString());
     SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentConsumed(requestParams);
+    LOGGER.info(response.toJsonString());
     return new StringRepresentation(response.toJsonString());
   }
 }
