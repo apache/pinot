@@ -66,14 +66,12 @@ body {
 }
 
 .te-search-results {
-
-  ul {
-    list-style: none;
+  &__list {
     margin-bottom: 0;
-  }
 
-  &__summary-block {
-    padding: 5px 10px 10px 0;
+    &--summary-block {
+      padding: 5px 10px 10px 0;
+    }
   }
 
   &__summary-item {

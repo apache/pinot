@@ -87,7 +87,7 @@
           {{#accordion.item as |accordionItem|}}
             <!-- Create a 'toggle' and a 'panel' for the item -->
             {{#accordionItem.toggle}}
-              <ul class="te-search-results__summary-block">
+              <ul class="te-search-results__list te-search-results__list--summary-block">
                 <li class="te-search-results__summary-item te-search-results__summary-item--title">
                   <i class="glyphicon glyphicon-menu-down te-search-results__icon"></i>
                   {{alert.functionName}}
@@ -104,7 +104,7 @@
             {{/accordionItem.toggle}}
             <!-- Clicking on the 'toggle' will display the contents of the 'panel' -->
             {{#accordionItem.panel}}
-              <ul class="te-search-results__details-block">
+              <ul class="te-search-results__list te-search-results__list--details-block">
                 <li>Metric: {{alert.metric}}</li>
                 <li>Dataset: {{alert.collection}}</li>
                 <li>Type: {{alert.type}}</li>
@@ -118,27 +118,4 @@
       {{/each}}
     {{/accordion-list}}
   </div>
-
-  {{outlet}}
-
-{{#containers/anomaly-container as |alertList actions|}}
-  {{#if alertList.loading}}
-    Loading...
-  {{/if}}
-
-  {{#if alertList.failed}}
-    Oops, something went wrong...
-  {{/if}}
-
-  {{#if alertList.loaded}}
-    {{#if alertList.alerts}}
-      {{#each-in alertList.alerts as |key value|}}
-        <li>{{key}}: {{value}}</li>
-      {{/each-in}}
-    {{else}}
-      No anomalies found.
-    {{/if}}
-  {{/if}}
-{{/containers/anomaly-container}}
-
 </main>

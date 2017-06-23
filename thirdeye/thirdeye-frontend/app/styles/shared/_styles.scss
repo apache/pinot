@@ -35,8 +35,12 @@ body {
 .te-search-results {
   border-bottom: 1px app-shade(black, 1) solid;
 
-  ul {
+  &__list {
     list-style: none;
+
+    &--details-block {
+      padding: 0 15px 15px 15px;
+    }
   }
 
   &__summary-item {
@@ -64,10 +68,6 @@ body {
     &--active {
       background-color: app-shade(black, 7);
     }
-  }
-
-  &__details-block {
-    padding: 0 15px 15px 15px;
   }
 
   &:last-child {
