@@ -836,6 +836,72 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testLongGroupByExpandingWindowMin() {
+    LongSeries in = DataFrame.toSeries(LNULL, 3, 4, 5, 2, 5, LNULL, LNULL, LNULL, 0);
+
+    Grouping.SeriesGrouping gBoolean = in.getBooleans().groupByExpandingWindow();
+    Assert.assertEquals(gBoolean.min(), gBoolean.aggregate(BooleanSeries.MIN));
+
+    Grouping.SeriesGrouping gLong = in.getLongs().groupByExpandingWindow();
+    Assert.assertEquals(gLong.min(), gLong.aggregate(LongSeries.MIN));
+
+    Grouping.SeriesGrouping gDouble = in.getDoubles().groupByExpandingWindow();
+    Assert.assertEquals(gDouble.min(), gDouble.aggregate(DoubleSeries.MIN));
+
+    Grouping.SeriesGrouping gString = in.getStrings().groupByExpandingWindow();
+    Assert.assertEquals(gString.min(), gString.aggregate(StringSeries.MIN));
+
+    Grouping.SeriesGrouping gObject = in.getObjects().groupByExpandingWindow();
+    Assert.assertEquals(gObject.min(), gObject.aggregate(ObjectSeries.MIN));
+  }
+
+  @Test
+  public void testLongGroupByExpandingWindowEmptyMin() {
+    Grouping.SeriesGrouping grouping = LongSeries.empty().groupByExpandingWindow();
+    Assert.assertEquals(grouping.min(), grouping.aggregate(LongSeries.MIN));
+  }
+
+  @Test
+  public void testLongGroupByExpandingWindowNullMin() {
+    LongSeries in = LongSeries.fillValues(3, LNULL);
+    Grouping.SeriesGrouping grouping = in.groupByExpandingWindow();
+    Assert.assertEquals(grouping.min(), grouping.aggregate(LongSeries.MIN));
+  }
+
+  @Test
+  public void testLongGroupByExpandingWindowMax() {
+    LongSeries in = DataFrame.toSeries(LNULL, 3, 4, 5, 2, 5, LNULL, LNULL, LNULL, 0);
+
+    Grouping.SeriesGrouping gBoolean = in.getBooleans().groupByExpandingWindow();
+    Assert.assertEquals(gBoolean.max(), gBoolean.aggregate(BooleanSeries.MAX));
+
+    Grouping.SeriesGrouping gLong = in.getLongs().groupByExpandingWindow();
+    Assert.assertEquals(gLong.max(), gLong.aggregate(LongSeries.MAX));
+
+    Grouping.SeriesGrouping gDouble = in.getDoubles().groupByExpandingWindow();
+    Assert.assertEquals(gDouble.max(), gDouble.aggregate(DoubleSeries.MAX));
+
+    Grouping.SeriesGrouping gString = in.getStrings().groupByExpandingWindow();
+    Assert.assertEquals(gString.max(), gString.aggregate(StringSeries.MAX));
+
+    Grouping.SeriesGrouping gObject = in.getObjects().groupByExpandingWindow();
+    Assert.assertEquals(gObject.max(), gObject.aggregate(ObjectSeries.MAX));
+  }
+
+  @Test
+  public void testLongGroupByExpandingWindowEmptyMax() {
+    Grouping.SeriesGrouping grouping = LongSeries.empty().groupByExpandingWindow();
+    Assert.assertEquals(grouping.max(), grouping.aggregate(LongSeries.MAX));
+  }
+
+  @Test
+  public void testLongGroupByExpandingWindowNullMax() {
+    LongSeries in = LongSeries.fillValues(3, LNULL);
+    Grouping.SeriesGrouping grouping = in.groupByExpandingWindow();
+    Assert.assertEquals(grouping.max(), grouping.aggregate(LongSeries.MAX));
+  }
+
+  @Test
   public void testBooleanGroupByValueEmpty() {
     Assert.assertTrue(BooleanSeries.empty().groupByValue().isEmpty());
   }

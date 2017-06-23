@@ -22,6 +22,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   public static final BooleanFunctionEx HAS_FALSE = new BooleanHasFalse();
   public static final BooleanFunctionEx FIRST = new BooleanFirst();
   public static final BooleanFunctionEx LAST = new BooleanLast();
+  public static final BooleanFunctionEx MIN = ALL_TRUE;
+  public static final BooleanFunctionEx MAX = HAS_TRUE;
 
   public static final class BooleanAllTrue implements BooleanFunctionEx {
     @Override
