@@ -32,7 +32,8 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   public LongOffHeapMutableDictionary(int estimatedCardinality, int overflowSize) {
     super(estimatedCardinality, overflowSize);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);
-    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.LONG_SIZE);
+    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.LONG_SIZE,
+        null);
   }
 
   public Object get(int dictionaryId) {

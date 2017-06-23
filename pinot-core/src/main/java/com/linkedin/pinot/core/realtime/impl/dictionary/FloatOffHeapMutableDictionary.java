@@ -32,7 +32,8 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   public FloatOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize) {
     super(estimatedCardinality, maxOverflowSize);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);
-    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.FLOAT_SIZE);
+    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.FLOAT_SIZE,
+        null);
   }
 
   public Object get(int dictionaryId) {

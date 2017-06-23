@@ -108,11 +108,13 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private int columnSizeInBytes;
   private int maxNumberOfMultiValuesPerRow;
   private final int rowCountPerChunk;
+  private final String description;
   private int prevRowStartIndex = 0;  // Offset in the databuffer for the last row added.
   private int prevRowLength = 0;  // Number of values in the column for the last row added.
 
   public FixedByteSingleColumnMultiValueReaderWriter(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
-      int columnSizeInBytes) {
+      int columnSizeInBytes, String description) {
+    this.description = description;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
     int incrementalCapacity =
         Math.max(maxNumberOfMultiValuesPerRow, (int) (initialCapacity * 1.0f * INCREMENT_PERCENTAGE / 100));
@@ -128,7 +130,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   }
 
   private void addHeaderBuffers() {
-    headerBuffer = PinotDataBuffer.allocateDirect(headerSize);
+    headerBuffer = PinotDataBuffer.allocateDirect(headerSize, description);
     // We know that these bufffers will not be copied directly into a file (or mapped from a file).
     // So, we can use native byte order here.
     headerBuffer.order(ByteOrder.nativeOrder());
@@ -151,7 +153,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private void addDataBuffers(int rowCapacity) throws RuntimeException {
     PinotDataBuffer dataBuffer;
     try {
-      dataBuffer = PinotDataBuffer.allocateDirect(rowCapacity * columnSizeInBytes);
+      dataBuffer = PinotDataBuffer.allocateDirect(rowCapacity * columnSizeInBytes, description);
       dataBuffer.order(ByteOrder.nativeOrder());
       dataBuffers.add(dataBuffer);
       currentDataWriter =

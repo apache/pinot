@@ -32,7 +32,8 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize) {
     super(estimatedCardinality, maxOverflowSize);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);
-    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.INTEGER_SIZE);
+    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.INTEGER_SIZE,
+        null);
   }
 
   public Object get(int dictionaryId) {
