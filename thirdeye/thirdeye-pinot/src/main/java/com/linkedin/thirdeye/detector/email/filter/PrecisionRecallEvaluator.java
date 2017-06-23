@@ -8,8 +8,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -17,13 +15,12 @@ import org.slf4j.LoggerFactory;
  */
 public class PrecisionRecallEvaluator {
   private AlertFilter alertFilter;
-  private static final Logger LOG = LoggerFactory.getLogger(PrecisionRecallEvaluator.class);
 
   private int qualifiedTrueAnomaly; // Anomaly is labeled as true and is qualified
-  private int qualifiedTrueAnomalyNotActionable; // Anomaly is labeled as TRUE_BUT_NOT_ACTIONABLE and is qualified
+  private int qualifiedTrueAnomalyNewTrend; // Anomaly is labeled as TRUE_BUT_NOT_ACTIONABLE and is qualified
   private int qualifiedFalseAlarm;  // Anomaly is labeled as false and is qualified
   private int invalidTrueAnomaly;   // Anomaly is labeled as true but is not qualified (not sent or not detected)
-  private int invalidTrueAnomalyNotActionable;   // Anomaly is labeled as TRUE_BUT_NOT_ACTIONABLE  but is not qualified (not sent or not detected)
+  private int invalidTrueAnomalyNewTrend;   // Anomaly is labeled as TRUE_BUT_NOT_ACTIONABLE  but is not qualified (not sent or not detected)
   private int invalidAnomaly;       // Anomaly is labeled as false and is not qualified
   private int qualifiedNotLabeled;  // Anomaly is qualified, but not labeled
 
@@ -35,7 +32,7 @@ public class PrecisionRecallEvaluator {
   public static final String TOTALRESPONSES = "totalResponses";
   public static final String TRUEANOMALIES = "trueAnomalies";
   public static final String FALSEALARM = "falseAlarm";
-  public static final String NONACTIONABLE = "nonActionable";
+  public static final String NEWTREND = "newTrend";
   public static final Double WEIGHT_OF_NULL_LABEL = 0.5; // the weight used for NA labeled data point when calculating precision
 
   public double getPrecision() {
@@ -76,40 +73,40 @@ public class PrecisionRecallEvaluator {
     return getTotalReports() + getTotalFiltered();
   }
   public int getTotalResponses() {
-    return qualifiedFalseAlarm + qualifiedTrueAnomaly + qualifiedTrueAnomalyNotActionable;
+    return qualifiedFalseAlarm + qualifiedTrueAnomaly + qualifiedTrueAnomalyNewTrend;
   }
   public int getTotalReports() {
     return getTotalResponses() + qualifiedNotLabeled;
   }
   public int getTotalFiltered() {
-    return invalidAnomaly + invalidTrueAnomalyNotActionable + invalidTrueAnomaly;
+    return invalidAnomaly + invalidTrueAnomalyNewTrend + invalidTrueAnomaly;
   }
   public int getTrueAnomalies() {
     return qualifiedTrueAnomaly + invalidTrueAnomaly;
   }
   public int getFalseNegatives() {
-    return invalidTrueAnomaly + invalidTrueAnomalyNotActionable;
+    return invalidTrueAnomaly + invalidTrueAnomalyNewTrend;
   }
   public int getFalseAlarm() {
     return qualifiedFalseAlarm;
   }
   public int getNonActionable() {
-    return qualifiedTrueAnomalyNotActionable + invalidTrueAnomalyNotActionable;
+    return qualifiedTrueAnomalyNewTrend + invalidTrueAnomalyNewTrend;
   }
   public int getTrueAlerts() {
-    return qualifiedTrueAnomaly + qualifiedTrueAnomalyNotActionable;
+    return qualifiedTrueAnomaly + qualifiedTrueAnomalyNewTrend;
   }
   public int getQualifiedTrueAnomaly() {
     return qualifiedTrueAnomaly;
   }
-  public int getQualifiedTrueAnomalyNotActionable() {
-    return qualifiedTrueAnomalyNotActionable;
+  public int getQualifiedTrueAnomalyNewTrend() {
+    return qualifiedTrueAnomalyNewTrend;
   }
   public int getInvalidTrueAnomaly() {
     return invalidTrueAnomaly;
   }
-  public int getInvalidTrueAnomalyNotActionable() {
-    return invalidTrueAnomalyNotActionable;
+  public int getInvalidTrueAnomalyNewTrend() {
+    return invalidTrueAnomalyNewTrend;
   }
   public int getInvalidAnomaly() {
     return invalidAnomaly;
@@ -129,9 +126,9 @@ public class PrecisionRecallEvaluator {
     }
 
     this.qualifiedTrueAnomaly = 0;
-    this.qualifiedTrueAnomalyNotActionable = 0;
+    this.qualifiedTrueAnomalyNewTrend = 0;
     this.invalidTrueAnomaly = 0;
-    this.invalidTrueAnomalyNotActionable = 0;
+    this.invalidTrueAnomalyNewTrend = 0;
     this.qualifiedNotLabeled = 0;
     this.qualifiedFalseAlarm = 0;
     this.invalidAnomaly = 0;
@@ -143,9 +140,9 @@ public class PrecisionRecallEvaluator {
     for(MergedAnomalyResultDTO anomaly : anomalies) {
       AnomalyFeedback feedback = anomaly.getFeedback();
       boolean isLabeledTrueAnomaly = false;
-      boolean isLabeledTrueAnomalyNotActionable = false;
-      if(feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NO_ACTION)) {
-        isLabeledTrueAnomalyNotActionable = true;
+      boolean isLabeledTrueAnomalyNewTrend = false;
+      if(feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
+        isLabeledTrueAnomalyNewTrend = true;
       } else if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
         isLabeledTrueAnomaly = true;
       }
@@ -158,16 +155,16 @@ public class PrecisionRecallEvaluator {
           this.qualifiedNotLabeled++;
         } else if (isLabeledTrueAnomaly) {
           qualifiedTrueAnomaly++;
-        } else if (isLabeledTrueAnomalyNotActionable) {
-          qualifiedTrueAnomalyNotActionable++;
+        } else if (isLabeledTrueAnomalyNewTrend) {
+          qualifiedTrueAnomalyNewTrend++;
         } else {
           qualifiedFalseAlarm++;
         }
       } else {
         if(isLabeledTrueAnomaly) {
           invalidTrueAnomaly++;
-        } else if (isLabeledTrueAnomalyNotActionable) {
-          invalidTrueAnomalyNotActionable++;
+        } else if (isLabeledTrueAnomalyNewTrend) {
+          invalidTrueAnomalyNewTrend++;
         } else {
           invalidAnomaly++;
         }
@@ -206,13 +203,13 @@ public class PrecisionRecallEvaluator {
     evals.put(TOTALRESPONSES, getTotalResponses());
     evals.put(TRUEANOMALIES, getTrueAnomalies());
     evals.put(FALSEALARM, getFalseAlarm());
-    evals.put(NONACTIONABLE, getNonActionable());
+    evals.put(NEWTREND, getNonActionable());
     return evals;
   }
 
   public static List<String> getPropertyNames() {
     return Collections.unmodifiableList(
         new ArrayList<>(Arrays.asList(RESPONSE_RATE, PRECISION, WEIGHTED_PRECISION, RECALL, TOTALANOMALIES,
-            TOTALRESPONSES, TRUEANOMALIES, FALSEALARM, NONACTIONABLE)));
+            TOTALRESPONSES, TRUEANOMALIES, FALSEALARM, NEWTREND)));
   }
 }

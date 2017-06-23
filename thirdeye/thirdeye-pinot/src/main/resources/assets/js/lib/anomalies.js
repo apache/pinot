@@ -11,8 +11,8 @@ function getFeedbackTypeString(feedbackType) {
             return "Confirmed Anomaly";
         case 'NOT_ANOMALY':
             return 'False Alarm';
-        case 'ANOMALY_NO_ACTION':
-            return 'Confirmed - Not Actionable';
+        case 'ANOMALY_NEW_TREND':
+            return 'Confirmed - New Trend';
         default:
             return feedbackType;
     }
@@ -24,8 +24,8 @@ function getFeedbackTypeFromString(feedbackTypeStr) {
             return "ANOMALY";
         case 'False Alarm':
             return 'NOT_ANOMALY';
-        case 'Confirmed - Not Actionable':
-            return 'ANOMALY_NO_ACTION';
+        case 'Confirmed - New Trend':
+            return 'ANOMALY_NEW_TREND';
         default:
             return feedbackTypeStr;
     }

@@ -110,7 +110,7 @@
                               <ul class="feedback-list uk-nav uk-nav-dropdown single-select">
                                 <li class="anomaly-feedback-option" value="NOT_ANOMALY"><a>False Alarm</a></li>
                                 <li class="anomaly-feedback-option" value="ANOMALY"><a>Confirmed Anomaly</a></li>
-                                <li class="anomaly-feedback-option" value="ANOMALY_NO_ACTION"><a>Confirmed - Not Actionable</a></li>
+                                <li class="anomaly-feedback-option" value="ANOMALY_NEW_TREND"><a>Confirmed - New Trend</a></li>
                               </ul>
                                 <textarea
                                         class="feedback-comment {{#if anomalyData/feedback/comment}}{{else}}hidden{{/if}}">{{#if

@@ -18,7 +18,6 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
@@ -31,7 +30,6 @@ import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
@@ -119,7 +117,6 @@ public class AnomaliesResource {
   private final MetricConfigManager metricConfigDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
-  private final OverrideConfigManager overrideConfigDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DashboardConfigManager dashboardConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
@@ -131,7 +128,6 @@ public class AnomaliesResource {
     metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     groupedAnomalyResultsDAO = DAO_REGISTRY.getGroupedAnomalyResultsDAO();
-    overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
     datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
@@ -155,7 +151,6 @@ public class AnomaliesResource {
     try {
       DatasetConfigDTO dataset = datasetConfigDAO.findByDataset(anomaly.getCollection());
       DateTimeZone dateTimeZone = Utils.getDataTimeZone(anomaly.getCollection());
-      TimeGranularity granularity = dataset.bucketTimeGranularity();
 
       // Lets compute currentTimeRange
       Pair<Long, Long> currentTimeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
@@ -453,11 +448,6 @@ public class AnomaliesResource {
         result.setFeedback(feedback);
       }
       AnomalyFeedbackDTO feedbackRequest = new ObjectMapper().readValue(payload, AnomalyFeedbackDTO.class);
-      if (feedbackRequest.getStatus() == null) {
-        feedback.setStatus(FeedbackStatus.NEW);
-      } else {
-        feedback.setStatus(feedbackRequest.getStatus());
-      }
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
       mergedAnomalyResultDAO.updateAnomalyFeedback(result);
@@ -927,9 +917,6 @@ public class AnomaliesResource {
     AnomalyFeedback mergedAnomalyFeedback = mergedAnomaly.getFeedback();
     if (mergedAnomalyFeedback != null) {
       anomalyDetails.setAnomalyFeedback(AnomalyDetails.getFeedbackStringFromFeedbackType(mergedAnomalyFeedback.getFeedbackType()));
-      if (mergedAnomalyFeedback.getStatus() != null) {
-        anomalyDetails.setAnomalyFeedbackStatus(mergedAnomalyFeedback.getStatus().toString());
-      }
       anomalyDetails.setAnomalyFeedbackComments(mergedAnomalyFeedback.getComment());
     }
     anomalyDetails.setExternalUrl(externalUrl);

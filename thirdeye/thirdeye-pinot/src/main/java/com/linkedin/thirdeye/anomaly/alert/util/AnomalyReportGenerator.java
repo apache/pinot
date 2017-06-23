@@ -195,7 +195,7 @@ public class AnomalyReportGenerator {
       templateData.put("feedbackCount", precisionRecallEvaluator.getTotalResponses());
       templateData.put("trueAlertCount", precisionRecallEvaluator.getQualifiedTrueAnomaly());
       templateData.put("falseAlertCount", precisionRecallEvaluator.getFalseAlarm());
-      templateData.put("nonActionableCount", precisionRecallEvaluator.getQualifiedTrueAnomalyNotActionable());
+      templateData.put("newTrendCount", precisionRecallEvaluator.getQualifiedTrueAnomalyNewTrend());
       templateData.put("anomalyDetails", anomalyReportDTOList);
       templateData.put("alertConfigName", alertConfigName);
       templateData.put("includeSummary", includeSummary);
@@ -325,8 +325,8 @@ public class AnomalyReportGenerator {
         case NOT_ANOMALY:
           feedbackVal = "Resolved (False Alarm)";
           break;
-        case ANOMALY_NO_ACTION:
-          feedbackVal = "Not Actionable";
+        case ANOMALY_NEW_TREND:
+          feedbackVal = "Resolved (New Trend)";
           break;
       case NO_FEEDBACK:
       default:

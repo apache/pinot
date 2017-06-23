@@ -244,8 +244,8 @@ public class AnomalyDetails {
       case ANOMALY:
         feedback = "Confirmed Anomaly";
         break;
-      case ANOMALY_NO_ACTION:
-        feedback = "Confirmed - Not Actionable";
+      case ANOMALY_NEW_TREND:
+        feedback = "Confirmed - New Trend";
         break;
       case NOT_ANOMALY:
         feedback = "False Alarm";

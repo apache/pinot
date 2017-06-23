@@ -6,7 +6,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -50,7 +49,6 @@ public class TestAnomalyResultManager extends AbstractManagerTestBase {
     AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
     feedback.setComment("this is a good find");
     feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
-    feedback.setStatus(FeedbackStatus.NEW);
     result.setFeedback(feedback);
     rawAnomalyResultDAO.save(result);
 

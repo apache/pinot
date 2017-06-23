@@ -33,7 +33,7 @@
           <th>Feedback Received</th>
           <th>True Alert</th>
           <th>False Alert</th>
-          <th>Non Actionable</th>
+          <th>New Trend</th>
         </tr>
         <tr>
           <td>${anomalyCount}</td>
@@ -42,7 +42,7 @@
           <td>${feedbackCount}</td>
           <td>${trueAlertCount}</td>
           <td>${falseAlertCount}</td>
-          <td>${nonActionableCount}</td>
+          <td>${newTrendCount}</td>
         </tr>
       </table>
     </td>

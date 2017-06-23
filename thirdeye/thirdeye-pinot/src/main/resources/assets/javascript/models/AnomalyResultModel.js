@@ -314,8 +314,8 @@ AnomalyResultModel.prototype = {
       return constants.FEEDBACK_TYPE_ANOMALY;
     case constants.FEEDBACK_STRING_FALSE_ALARM:
       return constants.FEEDBACK_TYPE_NOT_ANOMALY;
-    case constants.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE:
-      return constants.FEEDBACK_TYPE_ANOMALY_NO_ACTION;
+    case constants.FEEDBACK_STRING_CONFIRMED_NEW_TREND:
+      return constants.FEEDBACK_TYPE_ANOMALY_NEW_TREND;
     default:
       return feedbackTypeStr;
     }
@@ -326,8 +326,8 @@ AnomalyResultModel.prototype = {
       return constants.FEEDBACK_STRING_CONFIRMED_ANOMALY;
     case constants.FEEDBACK_TYPE_NOT_ANOMALY:
       return constants.FEEDBACK_STRING_FALSE_ALARM;
-    case constants.FEEDBACK_TYPE_ANOMALY_NO_ACTION:
-      return constants.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE;
+    case constants.FEEDBACK_TYPE_ANOMALY_NEW_TREND:
+      return constants.FEEDBACK_STRING_CONFIRMED_NEW_TREND;
     default:
       return feedbackType;
     }

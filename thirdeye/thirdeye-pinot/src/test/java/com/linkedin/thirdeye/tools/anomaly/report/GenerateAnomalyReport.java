@@ -117,7 +117,7 @@ public class GenerateAnomalyReport {
       int feedbackCollected = 0;
       int trueAlert = 0;
       int falseAlert = 0;
-      int nonActionable = 0;
+      int newTrend = 0;
 
       List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
 
@@ -131,7 +131,7 @@ public class GenerateAnomalyReport {
           } else if (feedback.getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
             falseAlert++;
           } else {
-            nonActionable++;
+            newTrend++;
           }
         }
         String feedbackVal = getFeedback(
@@ -161,7 +161,7 @@ public class GenerateAnomalyReport {
       templateData.put("feedbackCount", feedbackCollected);
       templateData.put("trueAlertCount", trueAlert);
       templateData.put("falseAlertCount", falseAlert);
-      templateData.put("nonActionableCount", nonActionable);
+      templateData.put("newTrendCount", newTrend);
       templateData.put("datasets", StringUtils.join(collections, ", "));
       templateData.put("anomalyDetails", anomalyReportDTOList);
       buildEmailTemplateAndSendAlert(templateData);
@@ -199,8 +199,8 @@ public class GenerateAnomalyReport {
       return "Confirmed Anomaly";
     case "NOT_ANOMALY":
       return "False Alarm";
-    case "ANOMALY_NO_ACTION":
-      return "Not Actionable";
+    case "ANOMALY_NEW_TREND":
+      return "Anomaly New Trend";
     }
     return "NA";
   }

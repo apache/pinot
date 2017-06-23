@@ -13,7 +13,6 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
@@ -524,7 +523,7 @@ public class AnomalyResource {
         continue;
       }
       if (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY) ||
-          feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NO_ACTION)) {
+          feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
         return true;
       }
     }
@@ -740,11 +739,6 @@ public class AnomalyResource {
         feedback = new AnomalyFeedbackDTO();
         result.setFeedback(feedback);
       }
-      if (feedbackRequest.getStatus() == null) {
-        feedback.setStatus(FeedbackStatus.NEW);
-      } else {
-        feedback.setStatus(feedbackRequest.getStatus());
-      }
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
       anomalyMergedResultDAO.updateAnomalyFeedback(result);
@@ -766,11 +760,6 @@ public class AnomalyResource {
       if (feedback == null) {
         feedback = new AnomalyFeedbackDTO();
         result.setFeedback(feedback);
-      }
-      if (feedbackRequest.getStatus() == null) {
-        feedback.setStatus(FeedbackStatus.NEW);
-      } else {
-        feedback.setStatus(feedbackRequest.getStatus());
       }
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
