@@ -146,9 +146,7 @@ public class SegmentDeletionManager {
       }
       segmentsToDelete.removeAll(propStoreFailedSegs);
 
-      for (String segmentId : segmentsToDelete) {
-        removeSegmentFromStore(tableName, segmentId);
-      }
+      removeSegmentsFromStore(tableName, segmentsToDelete);
     }
 
     LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
@@ -162,8 +160,14 @@ public class SegmentDeletionManager {
     }
   }
 
-  protected void removeSegmentFromStore(String tableName, String segmentId) {
-    final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
+    for (String segment : segments) {
+      removeSegmentFromStore(tableNameWithType, segment);
+    }
+  }
+
+  protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
+    final String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (_localDiskDir != null) {
       File fileToMove = new File(new File(_localDiskDir, rawTableName), segmentId);
       if (fileToMove.exists()) {
@@ -179,7 +183,7 @@ public class SegmentDeletionManager {
           LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(), targetDir.getAbsolutePath(), e);
         }
       } else {
-        CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+        CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
         switch (tableType) {
           case OFFLINE:
             LOGGER.warn("Not found local segment file for segment {}" + fileToMove.getAbsolutePath());
