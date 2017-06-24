@@ -11,7 +11,10 @@ export default Ember.Controller.extend({
   /**
    * Array of metrics we're displaying
    */
-  selectedMetrics: [],
+  selectedMetric: {},
+  selectedMetricDimensions: [],
+
+  isMetricSelected: false,
 
   /**
    * Handler for search by function name
@@ -24,17 +27,36 @@ export default Ember.Controller.extend({
       .then(res => res.json())
   }),
 
-  triggerGraphLoad(metricId) {
-    console.log('got metric id here: ', metricId);
-    console.log('fetching data : ', this.fetchAnomalyGraphData(metricId));
-  },
-
-  fetchAnomalyGraphData(metricId) {
-    const url = '/timeseries/compare/${metricId}/1497596399999/1498147199999/1496991599999/1497542399999?dimension=All&granularity=HOURS&filters={}';
+  /**
+   * Handler for search by function name
+   * Utilizing ember concurrency (task)
+   */
+  fetchMetricDimensions(metricId) {
+    const url = 'data/autocomplete/dimensions/metric/' + metricId;
     return fetch(url)
       .then(res => res.json())
   },
 
+  fetchAnomalyGraphData(metricId, dimension) {
+    const url = '/timeseries/compare/' + metricId + '/1492564800000/1492593000000/1491355200000/1491383400000?dimension=' + dimension + '&granularity=MINUTES&filters={}';
+    return fetch(url)
+      .then(res => res.json())
+  },
+
+  triggerGraphLoad(metric, dimension) {
+    let activeDimension = dimension || 'All';
+    let metricId = metric.id || metric.metricId;
+    console.log('got metric id here: ', metricId);
+    this.fetchAnomalyGraphData(metricId, activeDimension).then(metricData => {
+      this.set('isMetricSelected', true);
+      this.set('selectedMetric', metricData);
+      if (!dimension) {
+        this.fetchMetricDimensions(metricId).then(dimensionData => {
+          this.set('selectedMetricDimensions', dimensionData);
+        });
+      }
+    });
+  },
 
   /**
    * Placeholder for patterns of interest options
@@ -64,9 +86,20 @@ export default Ember.Controller.extend({
     onChangeDropdown(selectedObj) {
       if (selectedObj) {
         this.set('selectorVal', selectedObj);
-        this.triggerGraphLoad(selectedObj);
+        this.triggerGraphLoad(selectedObj, null);
       } else {
         this.set('selectorVal', '');
+      }
+    },
+
+    onChangeDimension(selectedObj) {
+      let currMetric = this.get('selectedMetric');
+      console.log('currMetric: ', currMetric.metricId);
+      if (selectedObj) {
+        this.set('dimensionSelectorVal', selectedObj);
+        this.triggerGraphLoad(currMetric, selectedObj);
+      } else {
+        this.set('dimensionSelectorVal', '');
       }
     },
 

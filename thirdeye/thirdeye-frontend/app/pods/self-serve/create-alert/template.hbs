@@ -30,10 +30,14 @@
         property="metric"
       }}
       <div class="te-graph-alert te-graph-alert--pending">
-        <div class="te-graph-alert__content">
-          <div class="glyphicon glyphicon-equalizer te-graph-alert__icon"></div>
-          <p class="te-graph-alert__pre-text">Once a metric is selected, the graph replay will show here</p>
-        </div>
+        {{#if isMetricSelected}}
+          {{anomaly-graph primaryMetric=selectedMetric}}
+        {{else}}
+          <div class="te-graph-alert__content">
+            <div class="glyphicon glyphicon-equalizer te-graph-alert__icon"></div>
+            <p class="te-graph-alert__pre-text">Once a metric is selected, the graph replay will show here</p>
+          </div>
+        {{/if}}
       </div>
     </fieldset>
 
@@ -56,15 +60,16 @@
       <div class="form-group">
         <label for="select-dimension" class="control-label">Dimension Exploration</label>
         {{#power-select
+          options=selectedMetricDimensions
+          selected=dimensionSelectorVal
+          onchange=(action "onChangeDimension")
           loadingMessage="Waiting for the server...."
+          placeholder="Select a Dimension"
+          searchPlaceholder="Type to filter..."
           triggerId="select-dimension"
-          options=dimensionExploration
-          searchEnabled=false
-          selected=selectedDimension
-          onchange=(action (mut selectedDimension))
-          as |name|
+          as |dimension|
         }}
-          {{name}}
+          {{dimension}}
         {{/power-select}}
       </div>
       <div class="form-group">

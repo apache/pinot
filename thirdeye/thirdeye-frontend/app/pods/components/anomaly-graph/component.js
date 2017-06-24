@@ -14,7 +14,7 @@ const COLOR_MAPPING = {
 export default Ember.Component.extend({
 
   /**
-   * Maps each metric to a color / class 
+   * Maps each metric to a color / class
    */
   didReceiveAttrs() {
     this._super(...arguments);
@@ -67,7 +67,7 @@ export default Ember.Component.extend({
    * Graph Point Config
    */
   point: Ember.computed(
-    'showGraphLegend', 
+    'showGraphLegend',
     function() {
       return {
         show: false,
@@ -79,12 +79,12 @@ export default Ember.Component.extend({
    * Graph axis config
    */
   axis: Ember.computed(
-    'primaryMetric', 
+    'primaryMetric',
     function () {
       return {
         y: {
           show: true
-        }, 
+        },
         x: {
           type: 'timeseries',
           show: true,
@@ -147,7 +147,7 @@ export default Ember.Component.extend({
     function() {
       const columns = [];
       const relatedMetrics = this.get('relatedMetrics') || [];
-      
+
       relatedMetrics
         .filterBy('isSelected')
         .forEach((metric)  => {
@@ -199,8 +199,9 @@ export default Ember.Component.extend({
    * and assigns color class
    */
   primaryRegions: Ember.computed('primaryMetric', function() {
-    const primaryMetric = this.get('primaryMetric');
-    return primaryMetric.regions.map((region) => {
+    const regions = this.get('primaryMetric.regions');
+    if (!regions) { return []; }
+    return regions.map((region) => {
       return {
         axis: 'x',
         start: region.start,
@@ -220,7 +221,7 @@ export default Ember.Component.extend({
    */
   relatedRegions: Ember.computed(
     'relatedMetrics',
-    'relatedMetrics.@each.isSelected', 
+    'relatedMetrics.@each.isSelected',
     function() {
       const relatedMetrics = this.get('relatedMetrics');
       const regions = [];
@@ -246,7 +247,7 @@ export default Ember.Component.extend({
 
 
   /**
-   * Aggregates chart regions 
+   * Aggregates chart regions
    */
   regions: Ember.computed('primaryRegions', 'relatedRegions', function() {
     return [...this.get('primaryRegions'), ...this.get('relatedRegions')];
