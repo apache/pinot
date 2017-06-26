@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datasource.pinot;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -99,42 +100,47 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
   @Override
   public PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
+    long tStart = System.nanoTime();
+    try {
+      LinkedHashMap<MetricFunction, List<ResultSet>> metricFunctionToResultSetList = new LinkedHashMap<>();
 
-    LinkedHashMap<MetricFunction, List<ResultSet>> metricFunctionToResultSetList = new LinkedHashMap<>();
+      TimeSpec timeSpec = null;
+      for (MetricFunction metricFunction : request.getMetricFunctions()) {
+        String dataset = metricFunction.getDataset();
+        DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
+        TimeSpec dataTimeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
+        if (timeSpec == null) {
+          timeSpec = dataTimeSpec;
+        }
 
-    TimeSpec timeSpec = null;
-    for (MetricFunction metricFunction : request.getMetricFunctions()) {
-      String dataset = metricFunction.getDataset();
-      DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
-      TimeSpec dataTimeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
-      if (timeSpec == null) {
-        timeSpec = dataTimeSpec;
+        // Decorate filter set for pre-computed (non-additive) dataset
+        Multimap<String, String> decoratedFilterSet = request.getFilterSet();
+        if (!datasetConfig.isAdditive()) {
+          decoratedFilterSet =
+              generateFilterSetWithPreAggregatedDimensionValue(request.getFilterSet(), request.getGroupBy(),
+                  datasetConfig.getDimensions(), datasetConfig.getDimensionsHaveNoPreAggregation(),
+                  datasetConfig.getPreAggregatedKeyword());
+        }
+
+        // By default, query only offline, unless dataset has been marked as realtime
+        String tableName = ThirdEyeUtils.computeTableName(dataset);
+        String pql = null;
+        if (datasetConfig.isMetricAsDimension()) {
+          pql = PqlUtils.getMetricAsDimensionPql(request, metricFunction, decoratedFilterSet, dataTimeSpec, datasetConfig);
+        } else {
+          pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
+        }
+        ResultSetGroup resultSetGroup = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(pql, tableName));
+        metricFunctionToResultSetList.put(metricFunction, getResultSetList(resultSetGroup));
       }
 
-      // Decorate filter set for pre-computed (non-additive) dataset
-      Multimap<String, String> decoratedFilterSet = request.getFilterSet();
-      if (!datasetConfig.isAdditive()) {
-        decoratedFilterSet =
-            generateFilterSetWithPreAggregatedDimensionValue(request.getFilterSet(), request.getGroupBy(),
-                datasetConfig.getDimensions(), datasetConfig.getDimensionsHaveNoPreAggregation(),
-                datasetConfig.getPreAggregatedKeyword());
-      }
-
-      // By default, query only offline, unless dataset has been marked as realtime
-      String tableName = ThirdEyeUtils.computeTableName(dataset);
-      String pql = null;
-      if (datasetConfig.isMetricAsDimension()) {
-        pql = PqlUtils.getMetricAsDimensionPql(request, metricFunction, decoratedFilterSet, dataTimeSpec, datasetConfig);
-      } else {
-        pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
-      }
-      ResultSetGroup resultSetGroup = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(pql, tableName));
-      metricFunctionToResultSetList.put(metricFunction, getResultSetList(resultSetGroup));
+      List<String[]> resultRows = parseResultSets(request, metricFunctionToResultSetList);
+      PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, timeSpec);
+      return resp;
+    } finally {
+      ThirdeyeMetricsUtil.pinotCallCounter.inc();
+      ThirdeyeMetricsUtil.pinotDurationCounter.inc(System.nanoTime() - tStart);
     }
-
-    List<String[]> resultRows = parseResultSets(request, metricFunctionToResultSetList);
-    PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, timeSpec);
-    return resp;
   }
 
   /**

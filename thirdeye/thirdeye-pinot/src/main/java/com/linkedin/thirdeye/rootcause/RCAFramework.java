@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.rootcause;
 
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -72,23 +73,29 @@ public class RCAFramework {
    * @return aggregated results
    */
   public RCAFrameworkExecutionResult run(Set<Entity> input) throws Exception {
-    Map<String, Pipeline> pipelines = new HashMap<>(this.pipelines);
-    pipelines.put(INPUT, new StaticPipeline(INPUT, Collections.<String>emptySet(), input));
+    long tStart = System.nanoTime();
+    try {
+      Map<String, Pipeline> pipelines = new HashMap<>(this.pipelines);
+      pipelines.put(INPUT, new StaticPipeline(INPUT, Collections.<String>emptySet(), input));
 
-    LOG.info("Constructing flow for input '{}'", input);
-    Map<String, Future<PipelineResult>> flow = constructDAG(pipelines);
+      LOG.info("Constructing flow for input '{}'", input);
+      Map<String, Future<PipelineResult>> flow = constructDAG(pipelines);
 
-    Map<String, PipelineResult> results = new HashMap<>();
-    for(Map.Entry<String, Future<PipelineResult>> e : flow.entrySet()) {
-      PipelineResult r = e.getValue().get(TIMEOUT, TimeUnit.MILLISECONDS);
-      if(LOG.isDebugEnabled()) {
-        LOG.debug("Results for pipeline '{}':", e.getKey());
-        logResultDetails(r);
+      Map<String, PipelineResult> results = new HashMap<>();
+      for(Map.Entry<String, Future<PipelineResult>> e : flow.entrySet()) {
+        PipelineResult r = e.getValue().get(TIMEOUT, TimeUnit.MILLISECONDS);
+        if(LOG.isDebugEnabled()) {
+          LOG.debug("Results for pipeline '{}':", e.getKey());
+          logResultDetails(r);
+        }
+        results.put(e.getKey(), r);
       }
-      results.put(e.getKey(), r);
-    }
 
-    return new RCAFrameworkExecutionResult(results.get(OUTPUT).getEntities(), results);
+      return new RCAFrameworkExecutionResult(results.get(OUTPUT).getEntities(), results);
+    } finally {
+      ThirdeyeMetricsUtil.rcaFrameworkCallCounter.inc();
+      ThirdeyeMetricsUtil.rcaFrameworkDurationCounter.inc(System.nanoTime() - tStart);
+    }
   }
 
   static void logResultDetails(PipelineResult result) {
