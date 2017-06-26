@@ -214,7 +214,7 @@ public class OffHeapStringStore implements Closeable {
     Buffer buffer = _currentBuffer;
     int index = buffer.add(string);
     while (index < 0) {
-      buffer = expand(0L);
+      buffer = expand(string.length());
       index = buffer.add(string);
     }
     _numElements++;
