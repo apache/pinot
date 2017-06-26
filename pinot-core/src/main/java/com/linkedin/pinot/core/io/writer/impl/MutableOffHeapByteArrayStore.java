@@ -217,7 +217,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   public int add(byte[] value) {
     Buffer buffer = _currentBuffer;
     int index = buffer.add(value);
-    while (index < 0) {
+    if (index < 0) {
       buffer = expand(value.length);
       index = buffer.add(value);
     }
