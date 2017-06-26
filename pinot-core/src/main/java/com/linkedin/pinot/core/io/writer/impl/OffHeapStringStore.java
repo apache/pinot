@@ -20,7 +20,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -167,7 +166,7 @@ public class OffHeapStringStore implements Closeable {
     }
   }
 
-  private volatile List<Buffer> _buffers = new ArrayList<Buffer>();
+  private volatile List<Buffer> _buffers = new LinkedList<>();
   private int _numElements = 0;
   private volatile Buffer _currentBuffer;
 
@@ -222,7 +221,6 @@ public class OffHeapStringStore implements Closeable {
     List<Buffer> bufList = _buffers;
     for (int x = bufList.size()-1; x >= 0; x--) {
       Buffer buffer = bufList.get(x);
-      // Assumed that we will never ask for a
       if (index >= buffer.getStartIndex()) {
         return buffer.equalsStringAt(string, index- buffer.getStartIndex());
       }
