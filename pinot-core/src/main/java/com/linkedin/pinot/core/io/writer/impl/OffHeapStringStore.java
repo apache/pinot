@@ -82,9 +82,13 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  */
 public class OffHeapStringStore implements Closeable {
   private static final int START_SIZE = 32 * 1024;
+  private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
+
+  public static int getStartSize() {
+    return START_SIZE;
+  }
 
   private static class Buffer implements Closeable {
-    private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
     private static final int CHAR_SIZE = Character.SIZE / 8;
 
     private final PinotDataBuffer _pinotDataBuffer;
@@ -109,7 +113,7 @@ public class OffHeapStringStore implements Closeable {
 
     private int add(String string) {
       int startOffset = _availEndOffset - string.length() * CHAR_SIZE;
-      if (startOffset <= (_numStrings + 1) * INT_SIZE) {
+      if (startOffset < (_numStrings + 1) * INT_SIZE) {
         // full
         return -1;
       }
@@ -171,12 +175,12 @@ public class OffHeapStringStore implements Closeable {
   private volatile Buffer _currentBuffer;
 
   public OffHeapStringStore() {
-    expand(START_SIZE);
+    expand(START_SIZE, 0L);
   }
 
   // Expand the buffer size, allocating a min of 32k for strings.
-  private Buffer expand(long size) {
-    Buffer buffer = new Buffer(size, _numElements);
+  private Buffer expand(long suggestedSize, long minSize) {
+    Buffer buffer = new Buffer(suggestedSize, _numElements);
     List<Buffer> newList = new LinkedList<>();
     for (Buffer b : _buffers) {
       newList.add(b);
@@ -187,8 +191,8 @@ public class OffHeapStringStore implements Closeable {
     return buffer;
   }
 
-  private Buffer expand() {
-    Buffer newBuffer = expand(_currentBuffer.getSize() * 2);
+  private Buffer expand(long sizeOfNewValue) {
+    Buffer newBuffer = expand(_currentBuffer.getSize() * 2, sizeOfNewValue + INT_SIZE);
     return newBuffer;
   }
 
@@ -210,7 +214,7 @@ public class OffHeapStringStore implements Closeable {
     Buffer buffer = _currentBuffer;
     int index = buffer.add(string);
     while (index < 0) {
-      buffer = expand();
+      buffer = expand(0L);
       index = buffer.add(string);
     }
     _numElements++;
