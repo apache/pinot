@@ -71,7 +71,7 @@ public class BenchmarkStringDictionary {
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public StringOffHeapMutableDictionary benchmarkOffStringDictionary() {
+  public StringOffHeapMutableDictionary benchmarkOffHeapStringDictionary() {
     StringOffHeapMutableDictionary dictionary = new StringOffHeapMutableDictionary(10, 10);
 
     for (int i = 0; i < stringValues.length; i++) {
@@ -96,7 +96,7 @@ public class BenchmarkStringDictionary {
 
   public static void main(String[] args) throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder()
-        .include(BenchmarkDictionary.class.getSimpleName())
+        .include(BenchmarkStringDictionary.class.getSimpleName())
         .addProfiler(GCProfiler.class)
         .addProfiler(HotspotMemoryProfiler.class)
         .warmupTime(TimeValue.seconds(60))
