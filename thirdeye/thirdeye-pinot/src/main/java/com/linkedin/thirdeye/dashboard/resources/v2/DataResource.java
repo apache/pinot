@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -857,5 +858,18 @@ public class DataResource {
       dataGranularity = String.format("%d_%s", dataTimeSize, dataTimeUnit);
     }
     return dataGranularity;
+  }
+
+  public enum EntityType {
+    METRIC,
+    DIMENSION,
+    DIMENSION_VAL,
+    CUSTOM
+  }
+
+  @GET
+  @Path("/entityTypes")
+  public List<EntityType> getEntityTypes() {
+    return Arrays.asList(EntityType.values());
   }
 }

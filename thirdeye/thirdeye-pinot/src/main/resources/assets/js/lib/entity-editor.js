@@ -56,6 +56,9 @@ function buildNameForEntity(entity, entityType) {
       return entity.id + " : " + entity.name;
     case "APPLICATION" :
       return entity.id + " : " + entity.application;
+    case "ENTITY_MAPPING" :
+        console.log(entity)
+      return entity.id + " : " + entity.fromURN + "--->" + entity.toURN;
     default:
       console.log("entity type not found : " + entityType);
       return entity.id;

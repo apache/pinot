@@ -9,6 +9,11 @@
 <script src="../../../assets/js/vendor/vendorplugins.compiled.js" type="text/javascript"></script>
 <script src="../../../assets/jtable/jquery.jtable.min.js" type="text/javascript"></script>
 
+<!-- select2 -->
+<link href="assets/select2/select2.min.css" rel="stylesheet" type="text/css" />
+<link href="assets/select2/select2-bootstrap.min.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="assets/select2/select2.min.js" defer></script>
+
 <!-- CSS -->
 <link href="../../../assets/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
 <link href="../../../assets/bootstrap/css/bootstrap-theme.min.css" rel="stylesheet" type="text/css" />
@@ -32,6 +37,7 @@
 <script src="../../../assets/js/lib/self-service-mappings.js" defer></script>
 
 <script type="text/javascript">
+
   $(document).ready(function() {
     //compile templates
 
@@ -45,22 +51,30 @@
     $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
       e.target // newly activated tab
       e.relatedTarget // previous active tab
-      tabId = $(e.target).attr("href")
-      $(tabId).tab('show')
-      if (tabId == "#metric-config") {
-        showMetricDatasetSelection();
-      }
-      if (tabId == "#dataset-config") {
-        listDatasetConfigs();
-      }
-      if(tabId == "#job-info"){
-        listJobs();
-      }
-      if(tabId == "#entity-editor"){
-        renderConfigSelector();
-      }
+      var tabId = $(e.target).attr("href")
+      resolveHash(tabId);
     })
   });
+
+	function resolveHash(tabId) {
+    $(tabId).tab('show');
+    if (tabId == "#metric-config") {
+      showMetricDatasetSelection();
+    }
+    if (tabId == "#dataset-config") {
+      listDatasetConfigs();
+    }
+    if(tabId == "#job-info"){
+      listJobs();
+    }
+    if(tabId == "#entity-editor"){
+      renderConfigSelector();
+    }
+    if(tabId=="#mappings") {
+      renderMappingsSelection();
+    }
+	}
+
 </script>
 <#include "dataset-config.ftl"/>
 <#include "metric-config.ftl"/>
