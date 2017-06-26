@@ -43,9 +43,9 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getDictId(Long.valueOf((String) rawValue));
+      return getDictId(Long.valueOf((String) rawValue), null);
     } else {
-      return getDictId(rawValue);
+      return getDictId(rawValue, null);
     }
   }
 
@@ -53,13 +53,13 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   public void index(@Nonnull Object rawValue) {
     if (rawValue instanceof Long) {
       // Single value
-      indexValue(rawValue);
+      indexValue(rawValue, null);
       updateMinMax((Long) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        indexValue(value);
+        indexValue(value, null);
         updateMinMax((Long) value);
       }
     }
@@ -123,7 +123,7 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
-  protected void setRawValueAt(int dictId, Object value) {
+  protected void setRawValueAt(int dictId, Object value, byte[] serializedValue) {
     _dictIdToValue.setLong(dictId, (Long) value);
   }
 

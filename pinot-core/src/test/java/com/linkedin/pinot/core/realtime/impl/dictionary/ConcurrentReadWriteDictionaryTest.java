@@ -45,12 +45,17 @@ public class ConcurrentReadWriteDictionaryTest {
     try {
       {
         MutableDictionary dictionary = new IntOnHeapMutableDictionary();
-        testSingleReaderSingleWriter(dictionary);
+        testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
         dictionary.close();
       }
       {
         MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000);
-        testSingleReaderSingleWriter(dictionary);
+        testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
+        dictionary.close();
+      }
+      {
+        MutableDictionary dictionary = new StringOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000);
+        testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.STRING);
         dictionary.close();
       }
     } catch (Throwable t) {
@@ -59,9 +64,9 @@ public class ConcurrentReadWriteDictionaryTest {
     }
   }
 
-  private void testSingleReaderSingleWriter(MutableDictionary dictionary) throws Exception {
-      Future<Void> readerFuture = EXECUTOR_SERVICE.submit(new Reader(dictionary));
-      Future<Void> writerFuture = EXECUTOR_SERVICE.submit(new Writer(dictionary));
+  private void testSingleReaderSingleWriter(MutableDictionary dictionary, FieldSpec.DataType dataType) throws Exception {
+      Future<Void> readerFuture = EXECUTOR_SERVICE.submit(new Reader(dictionary, dataType));
+      Future<Void> writerFuture = EXECUTOR_SERVICE.submit(new Writer(dictionary, dataType));
 
       writerFuture.get();
       readerFuture.get();
@@ -72,13 +77,15 @@ public class ConcurrentReadWriteDictionaryTest {
     try {
       {
         MutableDictionary dictionary = new IntOnHeapMutableDictionary();
-        testMultiReadersSingleWriter(dictionary);
-        dictionary.close();
+        testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
       {
         MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000);
-        testMultiReadersSingleWriter(dictionary);
-        dictionary.close();
+        testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
+      }
+      {
+        MutableDictionary dictionary = new StringOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000);
+        testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.STRING);
       }
     } catch (Throwable t) {
       t.printStackTrace();
@@ -90,7 +97,7 @@ public class ConcurrentReadWriteDictionaryTest {
   private void testRealtimeDictionary(boolean onHeap) throws Exception {
     final int estCardinality = 943;
     final int numValues = estCardinality * 107;
-    FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[] {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE};
+    FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[] {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING};
     int numEntries;
     final Map<Object, Integer> valueToDictId = new HashMap<>();
     final int[] overflowSizes = new int[] {0, 2000};
@@ -102,7 +109,7 @@ public class ConcurrentReadWriteDictionaryTest {
         numEntries = 0;
         for (int i = 0; i < numValues; i++) {
           try {
-            Object x = makeRandomNumber(dataType);
+            Object x = makeRandomObjectOfType(dataType);
             if (valueToDictId.containsKey(x)) {
               Assert.assertEquals(Integer.valueOf(dictionary.indexOf(x)), valueToDictId.get(x));
             } else {
@@ -116,6 +123,7 @@ public class ConcurrentReadWriteDictionaryTest {
             Assert.fail("Failed with seed " + SEED + " iteration " + i + " for dataType " + dataType.toString() + " overflowsize=" + overflowSize);
           }
         }
+        dictionary.close();
       }
     }
   }
@@ -149,11 +157,16 @@ public class ConcurrentReadWriteDictionaryTest {
           return new DoubleOnHeapMutableDictionary();
         }
         return new DoubleOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
+      case STRING:
+        if (onHeap) {
+          return new StringOnHeapMutableDictionary();
+        }
+        return new StringOffHeapMutableDictionary(estCaridinality, maxOverflowSize);
     }
     throw new UnsupportedOperationException("Unsupported type " + dataType.toString());
   }
 
-  private Object makeRandomNumber(FieldSpec.DataType dataType) {
+  private Object makeRandomObjectOfType(FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
         return RANDOM.nextInt();
@@ -163,21 +176,34 @@ public class ConcurrentReadWriteDictionaryTest {
         return RANDOM.nextFloat();
       case DOUBLE:
         return RANDOM.nextDouble();
+      case STRING:
+        int len = RANDOM.nextInt(1024);
+        return generateRandomString(len);
     }
     throw new UnsupportedOperationException("Unsupported type " + dataType.toString());
   }
 
-  private void testMultiReadersSingleWriter(MutableDictionary dictionary) throws Exception {
+  // Generates a ascii displayable string of given length
+  private String generateRandomString(final int len) {
+    byte[] bytes = new byte[len];
+    for (int i = 0; i < len; i++) {
+      bytes[i] = (byte)(RANDOM.nextInt(92) + 32);
+    }
+    return new String(bytes);
+  }
+
+  private void testMultiReadersSingleWriter(MutableDictionary dictionary, FieldSpec.DataType dataType) throws Exception {
       Future[] readerFutures = new Future[NUM_READERS];
       for (int i = 0; i < NUM_READERS; i++) {
-        readerFutures[i] = EXECUTOR_SERVICE.submit(new Reader(dictionary));
+        readerFutures[i] = EXECUTOR_SERVICE.submit(new Reader(dictionary, dataType));
       }
-      Future<Void> writerFuture = EXECUTOR_SERVICE.submit(new Writer(dictionary));
+      Future<Void> writerFuture = EXECUTOR_SERVICE.submit(new Writer(dictionary, dataType));
 
       writerFuture.get();
       for (int i = 0; i < NUM_READERS; i++) {
         readerFutures[i].get();
       }
+    dictionary.close();
   }
 
   @AfterClass
@@ -191,30 +217,31 @@ public class ConcurrentReadWriteDictionaryTest {
    */
   private class Reader implements Callable<Void> {
     private final MutableDictionary _dictionary;
-    private Reader(MutableDictionary dictionary) {
+    private final FieldSpec.DataType _dataType;
+    private Reader(MutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
+      _dataType = dataType;
     }
 
     @Override
-    public Void call()
-        throws Exception {
-      try {
-        for (int i = 0; i < NUM_ENTRIES; i++) {
+    public Void call() throws Exception {
+      for (int i = 0; i < NUM_ENTRIES; i++) {
+        try {
           int dictId;
           do {
-            dictId = _dictionary.indexOf(i + 1);
+            dictId = _dictionary.indexOf(makeObject(i+1, _dataType));
           } while (dictId < 0);
           Assert.assertEquals(dictId, i);
-          Assert.assertEquals(_dictionary.getIntValue(dictId), i + 1);
+          Assert.assertTrue(checkEquals(_dictionary, dictId, i + 1, _dataType));
 
           // Fetch value by a random existing dictId
           int randomDictId = RANDOM.nextInt(i + 1);
-          Assert.assertEquals(_dictionary.getIntValue(randomDictId), randomDictId + 1);
+          Assert.assertTrue(checkEquals(_dictionary, randomDictId, randomDictId + 1, _dataType));
+        } catch (Throwable t) {
+          throw new RuntimeException("Exception in iteration " + i, t);
         }
-        return null;
-      } catch (Throwable t) {
-        throw new RuntimeException(t);
       }
+      return null;
     }
   }
 
@@ -223,27 +250,51 @@ public class ConcurrentReadWriteDictionaryTest {
    */
   private class Writer implements Callable<Void> {
     private final MutableDictionary _dictionary;
-    private Writer(MutableDictionary dictionary) {
+    private final FieldSpec.DataType _dataType;
+    private Writer(MutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
+      _dataType = dataType;
     }
 
     @Override
-    public Void call()
-        throws Exception {
-      try {
-        for (int i = 0; i < NUM_ENTRIES; i++) {
-          _dictionary.index(i + 1);
-          Assert.assertEquals(_dictionary.indexOf(i + 1), i);
+    public Void call() throws Exception {
+      for (int i = 0; i < NUM_ENTRIES; i++) {
+        try {
+          _dictionary.index(makeObject(i + 1, _dataType));
+          Assert.assertEquals(_dictionary.indexOf(makeObject(i + 1, _dataType)), i);
 
           // Index a random existing value
           int randomValue = RANDOM.nextInt(i + 1) + 1;
-          _dictionary.index(randomValue);
-          Assert.assertEquals(_dictionary.indexOf(randomValue), randomValue - 1);
+          _dictionary.index(makeObject(randomValue, _dataType));
+          Assert.assertEquals(_dictionary.indexOf(makeObject(randomValue, _dataType)), randomValue - 1);
+        } catch (Throwable t) {
+          throw new RuntimeException("Exception in iteration " + i, t);
         }
-        return null;
-      } catch (Throwable t) {
-        throw new RuntimeException(t);
       }
+      return null;
+    }
+  }
+
+  private static Object makeObject(int i, FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return new Integer(i);
+      case STRING:
+        return Integer.toString(i);
+      default:
+        throw new UnsupportedOperationException("Unsupported type " + dataType);
+    }
+  }
+
+  // get the value from dictionary ID, and check that it is equal to 'i'
+  private static boolean checkEquals(MutableDictionary dictionary, int dictId, int i, FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return dictionary.getIntValue(dictId) == i;
+      case STRING:
+        return dictionary.getStringValue(dictId).equals(Integer.toString(i));
+      default:
+        throw new UnsupportedOperationException("Unsupported type " + dataType);
     }
   }
 }

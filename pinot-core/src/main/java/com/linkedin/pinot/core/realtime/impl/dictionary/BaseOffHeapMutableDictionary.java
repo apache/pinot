@@ -346,7 +346,18 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return 1 << power;
   }
 
-  protected int getDictId(@Nonnull Object rawValue) {
+  /**
+   * Given a raw value, get the dictionary ID from the reverse map.
+   *
+   * Since the dictionary IDs are stored in a hash map, multiple dictionary
+   * IDs may match to the same raw value. Use the methods provided by sub-class
+   * to compare the raw values with those in the forward map.
+   *
+   * @param rawValue value of object for which we need to get dictionary ID
+   * @param serializedValue serialized form of the
+   * @return dictionary ID if found, NULL_VALUE_INDEX otherwise.
+   */
+  protected int getDictId(@Nonnull Object rawValue, byte[] serializedValue) {
     final long hashVal = Math.abs(rawValue.hashCode());
     final ValueToDictId valueToDictId = _valueToDict;
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
@@ -356,7 +367,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         int dictId = iBuf.get(i);
         if (dictId != NULL_VALUE_INDEX) {
-          if (rawValue.equals(get(dictId))) {
+          if (equalsValueAt(dictId, rawValue, serializedValue)) {
             return dictId;
           }
         }
@@ -372,7 +383,16 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return dictId;
   }
 
-  protected void indexValue(@Nonnull Object value) {
+  /**
+   * Index a value into the forward map (dictionary ID to value) and the reverse map
+   * (value to dictionary). Take care to set the reverse map last so as to make it
+   * work correctly for single writer multiple reader threads. Insertion and comparison
+   * methods for the forward map are provided by sub-classes.
+   *
+   * @param value value to be inserted into the dictionary
+   * @param serializedValue serialized representation of the value, may be null.
+   */
+  protected void indexValue(@Nonnull Object value, byte[] serializedValue) {
     final long hashVal = Math.abs(value.hashCode());
     ValueToDictId valueToDictId = _valueToDict;
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
@@ -383,11 +403,11 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         final int dictId = iBuf.get(i);
         if (dictId == NULL_VALUE_INDEX) {
-          setRawValueAt(_numEntries, value);
+          setRawValueAt(_numEntries, value, serializedValue);
           iBuf.put(i, _numEntries++);
           return;
         }
-        if (value.equals(get(dictId))) {
+        if (equalsValueAt(dictId, value, serializedValue)) {
           return;
         }
       }
@@ -401,7 +421,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       }
     }
 
-    setRawValueAt(_numEntries, value);
+    setRawValueAt(_numEntries, value, serializedValue);
 
     if (_maxItemsInOverflowHash > 0) {
       if (overflowMap.size() < _maxItemsInOverflowHash) {
@@ -474,9 +494,12 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return rowsWith1Col;
   }
 
+  protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
+    return value.equals(get(dictId));
+  }
 
   public abstract void doClose() throws IOException;
 
-  protected abstract void setRawValueAt(int dictId, Object rawValue);
+  protected abstract void setRawValueAt(int dictId, Object rawValue, byte[] serializedValue);
 
 }
