@@ -180,7 +180,7 @@ public class OffHeapStringStore implements Closeable {
 
   // Expand the buffer size, allocating a min of 32k for strings.
   private Buffer expand(long suggestedSize, long minSize) {
-    Buffer buffer = new Buffer(suggestedSize, _numElements);
+    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements);
     List<Buffer> newList = new LinkedList<>();
     for (Buffer b : _buffers) {
       newList.add(b);
