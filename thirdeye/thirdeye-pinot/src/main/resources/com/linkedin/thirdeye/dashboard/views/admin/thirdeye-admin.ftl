@@ -20,7 +20,7 @@
 <link href="../../../assets/jquery-ui/jquery-ui.min.css" rel="stylesheet" type="text/css" />
 <link href="../../../assets/jtable/themes/metro/blue/jtable.min.css" rel="stylesheet" type="text/css" />
 <link href="../../../assets/css/thirdeye.css" rel="stylesheet" type="text/css" />
-
+<link rel="stylesheet" href="../../../assets/css/datatables.min.css"/>
 
 <!-- custom scripts -->
 <script src="../../../assets/js/thirdeye/metric-config.js"></script>
