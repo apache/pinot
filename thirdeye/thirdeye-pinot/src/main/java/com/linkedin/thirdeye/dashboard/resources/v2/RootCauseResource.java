@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +39,7 @@ public class RootCauseResource {
 
   @GET
   @Path("/query")
-  public List<RootCauseEntity> queryRootCause(
+  public List<RootCauseEntity> query(
       @QueryParam("framework") String framework,
       @QueryParam("current") Long current,
       @QueryParam("baseline") Long baseline,
@@ -59,10 +60,39 @@ public class RootCauseResource {
     if(windowSize == null)
       throw new IllegalArgumentException("Must provide windowSize (in milliseconds)");
 
+    // parse urns arg
+    urns = parseUrnsParam(urns);
+
     // format input
     Set<Entity> input = new HashSet<>();
     input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, current - windowSize, current));
     input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baseline - windowSize, baseline));
+    for(String urn : urns) {
+      input.add(EntityUtils.parseURN(urn, 1.0));
+    }
+
+    // run root-cause analysis
+    RCAFrameworkExecutionResult result = this.frameworks.get(framework).run(input);
+
+    // apply formatters
+    return applyFormatters(result.getResultsSorted());
+  }
+
+  @GET
+  @Path("/raw")
+  public List<RootCauseEntity> raw(
+      @QueryParam("framework") String framework,
+      @QueryParam("urns") List<String> urns) throws Exception {
+
+    // configuration validation
+    if(!this.frameworks.containsKey(framework))
+      throw new IllegalArgumentException(String.format("Could not resolve framework '%s'", framework));
+
+    // parse urns arg
+    urns = parseUrnsParam(urns);
+
+    // format input
+    Set<Entity> input = new HashSet<>();
     for(String urn : urns) {
       input.add(EntityUtils.parseURN(urn, 1.0));
     }
@@ -93,5 +123,19 @@ public class RootCauseResource {
       }
     }
     throw new IllegalArgumentException(String.format("No formatter for Entity '%s'", e.getUrn()));
+  }
+
+  /**
+   * Support both multi-entity notations:
+   * <br/><b>(1) comma-delimited:</b> {@code "urns=thirdeye:metric:123,thirdeye:metric:124"}
+   * <br/><b>(2) multi-param</b> {@code "urns=thirdeye:metric:123&urns=thirdeye:metric:124"}
+   *
+   * @param urns
+   * @return
+   */
+  private static List<String> parseUrnsParam(List<String> urns) {
+    if(urns.size() != 1)
+      return urns;
+    return Arrays.asList(urns.get(0).split(","));
   }
 }
