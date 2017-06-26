@@ -6,7 +6,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.math.stat.correlation.Covariance;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 
@@ -285,7 +284,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   public static DoubleSeries fillValues(int size, double value) { return builder().fillValues(size, value).build(); }
 
   // CAUTION: The array is final, but values are inherently modifiable
-  final double[] values;
+  private final double[] values;
 
   private DoubleSeries(double... values) {
     this.values = values;
@@ -316,7 +315,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public static long getLong(double value) {
-    if(DoubleSeries.isNull(value))
+    if(isNull(value))
       return LongSeries.NULL;
     if(value == NEGATIVE_INFINITY)
       return LongSeries.MIN_VALUE;
@@ -329,7 +328,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public static byte getBoolean(double value) {
-    if(DoubleSeries.isNull(value))
+    if(isNull(value))
       return BooleanSeries.NULL;
     return BooleanSeries.valueOf(value != 0.0d);
   }
@@ -340,9 +339,20 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public static String getString(double value) {
-    if(DoubleSeries.isNull(value))
+    if(isNull(value))
       return StringSeries.NULL;
     return String.valueOf(value);
+  }
+
+  @Override
+  public Object getObject(int index) {
+    return getObject(this.values[index]);
+  }
+
+  public static Object getObject(double value) {
+    if(isNull(value))
+      return ObjectSeries.NULL;
+    return value;
   }
 
   @Override

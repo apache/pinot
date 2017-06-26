@@ -161,6 +161,35 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapLongArray", checksum);
   }
 
+  private void benchmarkMapLongObjectSeriesOperation() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      Long[] longValues = generateLongObjectData(N_ELEMENTS);
+      final long delta = r;
+
+      startTimer();
+      ObjectSeries s = ObjectSeries.buildFrom((Object[])longValues);
+      ObjectSeries sResult = s.map(new Series.ObjectFunction() {
+        @Override
+        public Object apply(Object... values) {
+          return ((Long)values[0]) + delta;
+        }
+      });
+      stopTimer();
+
+      // to long array
+      long[] values = new long[N_ELEMENTS];
+      for(int i=0; i<N_ELEMENTS; i++)
+        values[i] = (Long)sResult.getObject(i);
+
+      checksum ^= checksum(values);
+    }
+
+    logResults("benchmarkMapLongObjectSeriesOperation", checksum);
+  }
+
   private void benchmarkMapLongObjectArray() {
     startTimerOuter();
     long checksum = 0;
@@ -703,7 +732,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkHasNullLongSeries", checksum);
   }
 
-  private void benchmarkExpandingWindowLongSeries() {
+  private void benchmarkExpandingWindowSumLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -718,10 +747,10 @@ public class DataFrameBenchmark {
       checksum ^= checksum(out.values());
     }
 
-    logResults("benchmarkExpandingWindowLongSeries", checksum);
+    logResults("benchmarkExpandingWindowSumLongSeries", checksum);
   }
 
-  private void benchmarkExpandingWindowLongArray() {
+  private void benchmarkExpandingWindowSumLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -740,10 +769,50 @@ public class DataFrameBenchmark {
       checksum ^= checksum(out);
     }
 
-    logResults("benchmarkExpandingWindowLongArray", checksum);
+    logResults("benchmarkExpandingWindowSumLongArray", checksum);
   }
 
-  private void benchmarkMovingWindowLongSeries() {
+  private void benchmarkExpandingWindowMaxLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      LongSeries out = series.groupByExpandingWindow().max().getValues().getLongs();
+      stopTimer();
+
+      checksum ^= checksum(out.values());
+    }
+
+    logResults("benchmarkExpandingWindowMaxLongSeries", checksum);
+  }
+
+  private void benchmarkExpandingWindowMaxLongArray() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+
+      startTimer();
+      long max = longValues[0];
+      long[] out = new long[N_ELEMENTS];
+      for(int i=0; i<N_ELEMENTS; i++) {
+        max = Math.max(longValues[i], max);
+        out[i] = max;
+      }
+      stopTimer();
+
+      checksum ^= checksum(out);
+    }
+
+    logResults("benchmarkExpandingWindowMaxLongArray", checksum);
+  }
+
+  private void benchmarkMovingWindowSumLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -758,10 +827,10 @@ public class DataFrameBenchmark {
       checksum ^= checksum(out.values());
     }
 
-    logResults("benchmarkMovingWindowLongSeries", checksum);
+    logResults("benchmarkMovingWindowSumLongSeries", checksum);
   }
 
-  private void benchmarkMovingWindowLongArray() {
+  private void benchmarkMovingWindowSumLongArray() {
     startTimerOuter();
     long checksum = 0;
 
@@ -786,7 +855,7 @@ public class DataFrameBenchmark {
       checksum ^= checksum(out);
     }
 
-    logResults("benchmarkMovingWindowLongArray", checksum);
+    logResults("benchmarkMovingWindowSumLongArray", checksum);
   }
 
   private void benchmarkAll() {
@@ -806,16 +875,19 @@ public class DataFrameBenchmark {
     benchmarkSortLongArray();
     benchmarkUniqueLongSeries();
     benchmarkUniqueLongArrayWithObjects();
-    benchmarkExpandingWindowLongSeries();
-    benchmarkExpandingWindowLongArray();
-    benchmarkMovingWindowLongSeries();
-    benchmarkMovingWindowLongArray();
+    benchmarkExpandingWindowSumLongSeries();
+    benchmarkExpandingWindowSumLongArray();
+    benchmarkExpandingWindowMaxLongSeries();
+    benchmarkExpandingWindowMaxLongArray();
+    benchmarkMovingWindowSumLongSeries();
+    benchmarkMovingWindowSumLongArray();
     benchmarkMapDoubleSeries();
     benchmarkMapDoubleSeriesOperation();
     benchmarkMapDoubleArray();
     benchmarkMapLongSeries();
     benchmarkMapLongSeriesOperation();
     benchmarkMapLongArray();
+    benchmarkMapLongObjectSeriesOperation();
     benchmarkMapLongObjectArray();
     benchmarkMapTwoSeries();
     benchmarkMapTwoSeriesOperation();

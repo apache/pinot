@@ -22,6 +22,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   public static final BooleanFunctionEx HAS_FALSE = new BooleanHasFalse();
   public static final BooleanFunctionEx FIRST = new BooleanFirst();
   public static final BooleanFunctionEx LAST = new BooleanLast();
+  public static final BooleanFunctionEx MIN = ALL_TRUE;
+  public static final BooleanFunctionEx MAX = HAS_TRUE;
 
   public static final class BooleanAllTrue implements BooleanFunctionEx {
     @Override
@@ -215,7 +217,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   // CAUTION: The array is final, but values are inherently modifiable
-  final byte[] values;
+  private final byte[] values;
 
   private BooleanSeries(byte... values) {
     this.values = values;
@@ -237,7 +239,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public static double getDouble(byte value) {
-    if(BooleanSeries.isNull(value))
+    if(isNull(value))
       return DoubleSeries.NULL;
     return (double) value;
   }
@@ -248,7 +250,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public static long getLong(byte value) {
-    if(BooleanSeries.isNull(value))
+    if(isNull(value))
       return LongSeries.NULL;
     return value;
   }
@@ -268,9 +270,20 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public static String getString(byte value) {
-    if(BooleanSeries.isNull(value))
+    if(isNull(value))
       return StringSeries.NULL;
     return isTrue(value) ? "true" : "false";
+  }
+
+  @Override
+  public Object getObject(int index) {
+    return getObject(this.values[index]);
+  }
+
+  public static Object getObject(byte value) {
+    if(isNull(value))
+      return ObjectSeries.NULL;
+    return booleanValueOf(value);
   }
 
   @Override

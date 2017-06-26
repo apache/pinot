@@ -50,13 +50,15 @@ public class DataFrame {
     public Grouping.GroupingDataFrame apply(Grouping grouping, Series s) {
       switch(s.type()) {
         case DOUBLE:
-          return grouping.aggregate(s, new DoubleSeries.DoubleLast());
+          return grouping.aggregate(s, DoubleSeries.LAST);
         case LONG:
-          return grouping.aggregate(s, new LongSeries.LongLast());
+          return grouping.aggregate(s, LongSeries.LAST);
         case STRING:
-          return grouping.aggregate(s, new StringSeries.StringLast());
+          return grouping.aggregate(s, StringSeries.LAST);
         case BOOLEAN:
-          return grouping.aggregate(s, new BooleanSeries.BooleanLast());
+          return grouping.aggregate(s, BooleanSeries.LAST);
+        case OBJECT:
+          return grouping.aggregate(s, ObjectSeries.LAST);
         default:
           throw new IllegalArgumentException(String.format("Cannot resample series type '%s'", s.type()));
       }
@@ -99,25 +101,20 @@ public class DataFrame {
       for(int i=0; i<seriesNames.size(); i++) {
         String rawName = seriesNames.get(i);
 
-        boolean isDynamicType = true;
-        String name = rawName;
-        Series.SeriesType type = Series.SeriesType.STRING;
-
         String[] parts = rawName.split(":", 2);
         if(parts.length == 2) {
-          name = parts[0];
-          type = Series.SeriesType.valueOf(parts[1].toUpperCase());
-          isDynamicType = false;
+          // user specified type
+          String name = parts[0];
+          Series.SeriesType type = Series.SeriesType.valueOf(parts[1].toUpperCase());
+          Series series = buildSeries(type, i);
+          df.addSeries(name, series);
+
+        } else {
+          // dynamic type
+          ObjectSeries series = buildObjectSeries(i);
+          Series.SeriesType type = series.inferType();
+          df.addSeries(rawName, series.get(type));
         }
-
-        Series series = buildSeries(type, i);
-
-        // infer type if not provided
-        if(isDynamicType) {
-          series = series.get(((StringSeries) series).inferType());
-        }
-
-        df.addSeries(name, series);
       }
 
       return df;
@@ -133,6 +130,8 @@ public class DataFrame {
           return buildStringSeries(columnIndex);
         case BOOLEAN:
           return buildBooleanSeries(columnIndex);
+        case OBJECT:
+          return buildObjectSeries(columnIndex);
         default:
           throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
       }
@@ -204,6 +203,15 @@ public class DataFrame {
         return BooleanSeries.valueOf(((Number)o).doubleValue() != 0.0d);
       return StringSeries.getBoolean(o.toString());
     }
+
+    private ObjectSeries buildObjectSeries(int columnIndex) {
+      Object[] values = new Object[this.rows.size()];
+      int i = 0;
+      for(Object[] r : this.rows) {
+        values[i++] = r[columnIndex];
+      }
+      return ObjectSeries.buildFrom(values);
+    }
   }
 
   String indexName = null;
@@ -260,6 +268,16 @@ public class DataFrame {
   }
 
   /**
+   * Returns a ObjectSeries wrapping the values array
+   *
+   * @param values base array
+   * @return ObjectSeries wrapping the array
+   */
+  public static ObjectSeries toSeriesObjects(Object... values) {
+    return ObjectSeries.builder().addValues(values).build();
+  }
+
+  /**
    * Returns a builder instance for DataFrame
    *
    * @param seriesNames series names of the DataFrame
@@ -313,6 +331,15 @@ public class DataFrame {
    */
   public static BooleanSeries.Builder buildBooleans() {
     return BooleanSeries.builder();
+  }
+
+  /**
+   * Returns a builder instance for ObjectSeries
+   *
+   * @return ObjectSeries builder
+   */
+  public static ObjectSeries.Builder buildObjects() {
+    return ObjectSeries.builder();
   }
 
   /**
@@ -617,6 +644,18 @@ public class DataFrame {
   }
 
   /**
+   * Adds a new series to the DataFrame in-place. Wraps {@code values} with a series before adding
+   * it to the DataFrame with semantics similar to {@code addSeries(String seriesName, Series series)}
+   *
+   * @param seriesName series name
+   * @param values series
+   * @return reference to the modified DataFrame (this)
+   */
+  public DataFrame addSeriesObjects(String seriesName, Object... values) {
+    return addSeries(seriesName, DataFrame.toSeriesObjects(values));
+  }
+
+  /**
    * Adds new series to the DataFrame in-place. The series are copied from a source DataFrame
    * and aligned based on the indexes. If the indexes match, the series are copied directly.
    * Otherwise, the method performs a left join to align series from the source with the
@@ -829,7 +868,19 @@ public class DataFrame {
    * @return BooleanSeries
    */
   public BooleanSeries getBooleans(String seriesName) {
-   return assertSeriesExists(seriesName).getBooleans();
+    return assertSeriesExists(seriesName).getBooleans();
+  }
+
+  /**
+   * Returns the series referenced by {@code seriesName}. If the series' native type is not
+   * {@code ObjectSeries} it is converted transparently.
+   *
+   * @param seriesName series name
+   * @throws IllegalArgumentException if the series does not exist
+   * @return ObjectSeries
+   */
+  public ObjectSeries getObjects(String seriesName) {
+    return assertSeriesExists(seriesName).getObjects();
   }
 
   public double getDouble(String seriesName, int index) {
@@ -846,6 +897,10 @@ public class DataFrame {
 
   public byte getBoolean(String seriesName, int index) {
     return assertSeriesExists(seriesName).getBoolean(index);
+  }
+
+  public Object getObject(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getObject(index);
   }
 
   /**
@@ -903,6 +958,13 @@ public class DataFrame {
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
+  public ObjectSeries map(Series.ObjectFunction function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
   public BooleanSeries map(Series.DoubleConditional function, String... seriesNames) {
     return map(function, names2series(seriesNames));
   }
@@ -925,6 +987,13 @@ public class DataFrame {
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanConditional function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.ObjectConditional function, String... seriesNames) {
     return map(function, names2series(seriesNames));
   }
 
@@ -1018,6 +1087,13 @@ public class DataFrame {
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
+  public static ObjectSeries map(Series.ObjectFunction function, Series... series) {
+    return (ObjectSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
   public static BooleanSeries map(Series.DoubleConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
@@ -1040,6 +1116,13 @@ public class DataFrame {
    * @see DataFrame#map(Series.Function, Series...)
    */
   public static BooleanSeries map(Series.BooleanConditional function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public static BooleanSeries map(Series.ObjectConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
@@ -1069,7 +1152,7 @@ public class DataFrame {
 
     final Expression e = new Expression(doubleExpression);
 
-    return (DoubleSeries)this.map(new Series.DoubleFunction() {
+    return this.map(new Series.DoubleFunction() {
       @Override
       public double apply(double[] values) {
         for(int i=0; i<values.length; i++) {
@@ -1194,7 +1277,7 @@ public class DataFrame {
 
     int[] fromIndex = new int[series.size()];
     for(int i=0; i<series.size(); i++) {
-      if(BooleanSeries.isTrue(series.values[i])) {
+      if(BooleanSeries.isTrue(series.getBoolean(i))) {
         fromIndex[i] = i;
       } else {
         fromIndex[i] = -1;
@@ -1217,39 +1300,23 @@ public class DataFrame {
   }
 
   public DataFrame filterEquals(String seriesName, final double value) {
-    return this.filter(new Series.DoubleConditional() {
-      @Override
-      public boolean apply(double... v) {
-        return value == v[0];
-      }
-    }, seriesName);
+    return this.filter(this.get(seriesName).getDoubles().eq(value));
   }
 
   public DataFrame filterEquals(String seriesName, final long value) {
-    return this.filter(new Series.LongConditional() {
-      @Override
-      public boolean apply(long... v) {
-        return value == v[0];
-      }
-    }, seriesName);
+    return this.filter(this.get(seriesName).getLongs().eq(value));
   }
 
   public DataFrame filterEquals(String seriesName, final String value) {
-    return this.filter(new Series.StringConditional() {
-      @Override
-      public boolean apply(String... v) {
-        return value.equals(v[0]);
-      }
-    }, seriesName);
+    return this.filter(this.get(seriesName).getStrings().eq(value));
   }
 
   public DataFrame filterEquals(String seriesName, final boolean value) {
-    return this.filter(new Series.BooleanConditional() {
-      @Override
-      public boolean apply(boolean... v) {
-        return value == v[0];
-      }
-    }, seriesName);
+    return this.filter(this.get(seriesName).getBooleans().eq(value));
+  }
+
+  public DataFrame filterEquals(String seriesName, final Object value) {
+    return this.filter(this.get(seriesName).getObjects().eq(value));
   }
 
   /**
@@ -1620,6 +1687,7 @@ public class DataFrame {
             item = String.format("%" + width[i] + "s", values[j][i]);
             break;
           case STRING:
+          case OBJECT:
             item = String.format("%-" + width[i] + "s", values[j][i]);
             break;
           default:
