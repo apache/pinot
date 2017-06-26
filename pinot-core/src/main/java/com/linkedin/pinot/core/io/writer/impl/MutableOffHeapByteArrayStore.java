@@ -80,9 +80,13 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  */
 public class MutableOffHeapByteArrayStore implements Closeable {
   private static final int START_SIZE = 32 * 1024;
+  private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
+
+  public static int getStartSize() {
+    return START_SIZE;
+  }
 
   private static class Buffer implements Closeable {
-    private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
 
     private final PinotDataBuffer _pinotDataBuffer;
     private final ByteBuffer _byteBuffer;
@@ -106,7 +110,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
 
     private int add(byte[] value) {
       int startOffset = _availEndOffset - value.length;
-      if (startOffset <= (_numValues + 1) * INT_SIZE) {
+      if (startOffset < (_numValues + 1) * INT_SIZE) {
         // full
         return -1;
       }
@@ -168,12 +172,19 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   private volatile Buffer _currentBuffer;
 
   public MutableOffHeapByteArrayStore() {
-    expand(START_SIZE);
+    expand(START_SIZE, 0L);
   }
 
-  // Expand the buffer size, allocating a min of 32k
-  private Buffer expand(long size) {
-    Buffer buffer = new Buffer(size, _numElements);
+  /**
+   * Expand the buffer list to add a new buffer, allocating a buffer that can definitely fit
+   * the new value.
+   *
+   * @param suggestedSize is the size of the new buffer to be allocated
+   * @param minSize is the new value that must fit into the new buffer.
+   * @return
+   */
+  private Buffer expand(long suggestedSize, long minSize) {
+    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements);
     List<Buffer> newList = new LinkedList<>();
     for (Buffer b : _buffers) {
       newList.add(b);
@@ -184,8 +195,8 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     return buffer;
   }
 
-  private Buffer expand() {
-    Buffer newBuffer = expand(_currentBuffer.getSize() * 2);
+  private Buffer expand(long sizeOfNewValue) {
+    Buffer newBuffer = expand(_currentBuffer.getSize() * 2, sizeOfNewValue + INT_SIZE);
     return newBuffer;
   }
 
@@ -207,7 +218,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     Buffer buffer = _currentBuffer;
     int index = buffer.add(value);
     while (index < 0) {
-      buffer = expand();
+      buffer = expand(value.length);
       index = buffer.add(value);
     }
     _numElements++;
