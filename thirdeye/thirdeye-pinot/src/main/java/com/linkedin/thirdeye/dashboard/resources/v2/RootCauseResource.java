@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
 import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 
 import java.util.ArrayList;
@@ -16,7 +15,6 @@ import java.util.Set;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -96,5 +94,4 @@ public class RootCauseResource {
     }
     throw new IllegalArgumentException(String.format("No formatter for Entity '%s'", e.getUrn()));
   }
-
 }

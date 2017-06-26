@@ -22,6 +22,8 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path(value = "/entityMapping")
 @Produces(MediaType.APPLICATION_JSON)
@@ -30,7 +32,7 @@ public class EntityMappingResource {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final EntityToEntityMappingManager entityMappingDAO = DAO_REGISTRY.getEntityToEntityMappingDAO();
-
+  private static final Logger LOG = LoggerFactory.getLogger(EntityMappingResource.class);
 
   public EntityMappingResource() {
   }
@@ -151,15 +153,24 @@ public class EntityMappingResource {
     Response response = null;
     try {
       entityToEntityMapping = OBJECT_MAPPER.readValue(payload, EntityToEntityMappingDTO.class);
-      Long id = entityMappingDAO.save(entityToEntityMapping);
-      response = Response.status(Status.OK).entity(String.format("Created mapping with id %d", id)).build();
+      EntityToEntityMappingDTO existingMapping = entityMappingDAO
+          .findByFromAndToURN(entityToEntityMapping.getFromURN(), entityToEntityMapping.getToURN());
+      Long id = null;
+      if (existingMapping != null) {
+        entityToEntityMapping.setId(id);
+        entityMappingDAO.update(entityToEntityMapping);
+      } else {
+        id = entityMappingDAO.save(entityToEntityMapping);
+      }
+      response = Response.status(Status.OK).entity(String.format("Created mapping with id %d", id))
+          .build();
     } catch (Exception e) {
       response = Response.status(Status.INTERNAL_SERVER_ERROR)
-          .entity(String.format("Invalid payload %s %s",  payload, e)).build();
+          .entity(String.format("Invalid payload %s %s", payload, e)).build();
+      LOG.error(e.getMessage(), e);
     }
     return response;
   }
-
 
   /**
    * Update the entity mapping by providing the changes in query params
@@ -213,5 +224,4 @@ public class EntityMappingResource {
     }
     return response;
   }
-
 }
