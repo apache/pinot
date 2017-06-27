@@ -32,6 +32,7 @@ import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -172,7 +173,8 @@ public abstract class QueryScheduler {
     }
     byte[] responseData = serializeDataTable(request, result);
     TimerContext timerContext = request.getTimerContext();
-    LOGGER.info("Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},sched={}",
+    @Nonnull Map<String, String> resultMeta = result.getMetadata();
+    LOGGER.info("Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
         request.getInstanceRequest().getRequestId(),
         request.getTableName(),
         request.getInstanceRequest().getSearchSegments().size(),
@@ -180,11 +182,17 @@ public abstract class QueryScheduler {
         timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME),
         request.getBrokerId(),
+        getMetadataValue(resultMeta, DataTable.NUM_DOCS_SCANNED_METADATA_KEY),
+        getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
+        getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
         name());
     return responseData;
   }
 
-
+  protected String getMetadataValue(Map<String, String> metadata, String key) {
+    String val = metadata.get(key);
+    return (val == null) ? "" : val;
+  }
 
   public static byte[] serializeDataTable(ServerQueryRequest queryRequest, DataTable instanceResponse) {
     byte[] responseByte;
