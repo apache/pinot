@@ -114,7 +114,7 @@ function submitData(url, data, tab) {
     })
 }
 
-function deleteData(url, data, tab) {
+function deleteData(url, data, tab, dataType = "json") {
     if (data === undefined) {
         data = ""
     }
@@ -125,7 +125,7 @@ function deleteData(url, data, tab) {
     return $.ajax({
         url: url,
         type: 'delete',
-        dataType: 'json',
+        dataType: dataType, // NOTE: expecting 'json' fails on empty 200 response
         data: data,
         statusCode: {
             404: function () {

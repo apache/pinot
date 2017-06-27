@@ -2,7 +2,8 @@ function renderMappingsSelection() {
   var html = "<table style='border: 1px;width: 80%'><tr><td>Select entity 1 </td><td><select name='entityTypeSelector1' id='entityTypeSelector1' onchange='renderEntityTypeSelector(this.id)'></select><div id='entityTypeSelector1_details'></div><br/>is affected by:<br/></td></tr>"
       + "<tr><td>Select entity 2 </td><td><select name='entityTypeSelector2' id='entityTypeSelector2' onchange='renderEntityTypeSelector(this.id)'></select><div id='entityTypeSelector2_details'></div></td></tr>"
       + "</table>" + "<input type='submit' onclick='updateEntityMapping()' />"
-      + "<hr/><div id = 'existing_mappings'></div>";
+      + "<hr/><div id='existing_mappings'></div>"
+      + "<hr/><table id='existing-mappings-data-table'></table>";
   $("#mappings-place-holder").html(html);
 
   getData("/data/entityTypes", "admin").done(function (data) {
@@ -129,30 +130,54 @@ function fetchAndDisplayMappings(entityType) {
   if (fromUrn == '') {
     return;
   }
-  getData("/entityMapping/view/fromURN/" + fromUrn, "admin").done(function (data) {
-    var html = "";
-    if (data.length > 0) {
-      var count = 0;
-      for (var i in data) {
-        if (html == "") {
-          html += "<div>List of affected entity URNs</div>";
-        }
-        if (count != 0) {
-          html += ', '
-        }
-        html += data[i].toURN + ' [<a href="#" onclick="deleteMapping(\'' + data[i].id
-            + '\')">X</a>]';
-        count++;
-      }
+
+  getData("/entityMapping/view/fromURN/" + fromUrn, "admin").success(function (urns) {
+    const urn2id = {};
+    for (var i = 0; i < urns.length; i++) {
+      const u = urns[i];
+      urn2id[u.toURN] = u.id;
     }
-    $("#existing_mappings").html(html);
+    console.log(urn2id);
+
+    const urnsString = urns.map(function (x) {
+      return (x.toURN)
+    }).join(",");
+    console.log(urnsString);
+
+    if ($.fn.dataTable.isDataTable( '#existing-mappings-data-table' )) {
+      // existing table
+      const table = $('#existing-mappings-data-table').DataTable();
+      table.clear();
+      table.ajax.url('/rootcause/raw?framework=identity&urns=' + urnsString).load();
+      table.draw();
+
+    } else {
+      // new table
+      $('#existing-mappings-data-table').DataTable({
+        ajax: {
+          url: '/rootcause/raw?framework=identity&urns=' + urnsString, dataSrc: ''
+        }, columns: [{
+          title: 'Type', data: null, render: function (data, type, row) {
+            return ("<a href=\"" + row.link + "\" target=\"_blank\">" + row.type + "</a>");
+          }
+        }, {
+          title: 'toURN', data: 'urn'
+        }, {
+          title: 'Label', data: 'label'
+        }, {
+          title: '', data: null, render: function (data, type, row) {
+            return ("<a href=\"#\" onclick=\"deleteMapping(\'" + urn2id[row.urn] + "\')\">delete</a>");
+          }
+        }], order: [[3, 'desc'], [2, 'asc'], [1, 'asc']], iDisplayLength: 50, retrieve: true
+      });
+    }
   });
 }
 
 function deleteMapping(id) {
-  deleteData("/entityMapping/delete/" + id, "", "mapping").done(function (data) {
+  deleteData("/entityMapping/delete/" + id, "", "mapping", "html").success(function (data) {
     console.log("deleted mapping with id : " + id);
+    const entityType1 = $("#entityTypeSelector1").find(':selected').val();
+    fetchAndDisplayMappings(entityType1);
   });
-  var entityType1 = $("#entityTypeSelector1").find(':selected').val();
-  fetchAndDisplayMappings(entityType1);
 }
