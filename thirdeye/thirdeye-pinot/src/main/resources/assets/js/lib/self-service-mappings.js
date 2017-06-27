@@ -147,30 +147,29 @@ function fetchAndDisplayMappings(entityType) {
     if ($.fn.dataTable.isDataTable( '#existing-mappings-data-table' )) {
       // existing table
       const table = $('#existing-mappings-data-table').DataTable();
-      table.clear();
-      table.ajax.url('/rootcause/raw?framework=identity&urns=' + urnsString).load();
-      table.draw();
-
-    } else {
-      // new table
-      $('#existing-mappings-data-table').DataTable({
-        ajax: {
-          url: '/rootcause/raw?framework=identity&urns=' + urnsString, dataSrc: ''
-        }, columns: [{
-          title: 'Type', data: null, render: function (data, type, row) {
-            return ("<a href=\"" + row.link + "\" target=\"_blank\">" + row.type + "</a>");
-          }
-        }, {
-          title: 'toURN', data: 'urn'
-        }, {
-          title: 'Label', data: 'label'
-        }, {
-          title: '', data: null, render: function (data, type, row) {
-            return ("<a href=\"#\" onclick=\"deleteMapping(\'" + urn2id[row.urn] + "\')\">delete</a>");
-          }
-        }], order: [[3, 'desc'], [2, 'asc'], [1, 'asc']], iDisplayLength: 50, retrieve: true
-      });
+      table.destroy();
+      $('#existing-mappings-data-table').empty();
     }
+
+    // new table
+    $('#existing-mappings-data-table').DataTable({
+      ajax: {
+        url: '/rootcause/raw?framework=identity&urns=' + urnsString, dataSrc: ''
+      }, columns: [{
+        title: 'Type', data: null, render: function (data, type, row) {
+          return ("<a href=\"" + row.link + "\" target=\"_blank\">" + row.type + "</a>");
+        }
+      }, {
+        title: 'toURN', data: 'urn'
+      }, {
+        title: 'Label', data: 'label'
+      }, {
+        title: '', data: null, render: function (data, type, row) {
+          return ("<a href=\"#\" onclick=\"deleteMapping(\'" + urn2id[row.urn] + "\')\">delete</a>");
+        }
+      }], order: [[3, 'desc'], [2, 'asc'], [1, 'asc']], iDisplayLength: 50, retrieve: true
+    });
+
   });
 }
 

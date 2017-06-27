@@ -140,5 +140,22 @@ public class EntityUtils {
     }
     throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
   }
+  /**
+   * Attemps to parse {@code urn} and return a specific Entity subtype with the given {@code score}
+   * Supports {@code MetricEntity}, {@code DimensionEntity}, {@code TimeRangeEntity}, and
+   * {@code ServiceEntity}.
+   * If Urn can't be parsed return raw entity
+   *
+   * @param urn entity urn
+   * @param score entity score
+   * @return entity subtype instance
+   */
+  public static Entity parseURNRaw(String urn, double score) {
+    try {
+      return parseURN(urn, score);
+    } catch (IllegalArgumentException e) {
+      return new Entity(urn, score);
+    }
+  }
 
 }
