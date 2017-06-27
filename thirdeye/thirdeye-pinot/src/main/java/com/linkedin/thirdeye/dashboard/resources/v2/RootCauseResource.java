@@ -94,7 +94,7 @@ public class RootCauseResource {
     // format input
     Set<Entity> input = new HashSet<>();
     for(String urn : urns) {
-      input.add(EntityUtils.parseURN(urn, 1.0));
+      input.add(EntityUtils.parseURNRaw(urn, 1.0));
     }
 
     // run root-cause analysis
