@@ -70,7 +70,7 @@ chmod +x bin/*.sh
 
 ### Run
 
-We will load BaseBall stats from 1878 to 2013 into Pinot and run queries against it. There are 100000 records and 15 columns ([schema](https://github.com/linkedin/pinot/blob/master/pinot-tools/src/main/resources/sample_data/baseball.schema)) in this dataset.
+We will load BaseBall stats from 1878 to 2013 into Pinot and run queries against it. There are 100000 records and 15 columns ([schema](https://github.com/linkedin/pinot/blob/master/pinot-tools/src/main/resources/sample_data/baseballStats_schema.json)) in this dataset.
 
 Execute the quick-start-offline.sh script in bin folder which performs the following:
 - Converts Baseball data in CSV format into Pinot Index Segments.
