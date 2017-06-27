@@ -13,21 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.helix.core.sharding;
+package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.integration.tests.UploadRefreshDeleteIntegrationTest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.io.FileUtils;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.json.JSONObject;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -38,22 +33,15 @@ import static org.testng.Assert.assertEquals;
 /**
  * Integration test for the balance num segment assignment strategy
  */
+// TODO: clean up this test
 public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRefreshDeleteIntegrationTest {
-
-  private ZKHelixAdmin _helixAdmin;
   private final String serverTenant = "DefaultTenant_OFFLINE";
   private final String hostName = "1.2.3.4";
   private final int basePort = 1234;
 
   @BeforeClass
   public void setUp() throws Exception {
-    // Start zk and controller
-    startZk();
-    startController();
-
-    // Start one server and one broker instance
-    startServer();
-    startBroker();
+    super.setUp();
 
     // Create eight dummy server instances
     for(int i = 0; i < 8; ++i) {
@@ -65,26 +53,6 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
       sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(),
           serverInstance.toString());
     }
-
-    // Create Helix connection
-    _helixAdmin = new ZKHelixAdmin(ZkStarter.DEFAULT_ZK_STR);
-
-    // BaseClass @BeforeMethod will setup tablex
-  }
-
-  @AfterClass
-  public void tearDown() {
-    // Close the Helix connection
-    _helixAdmin.close();
-
-    // Stop everything
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    // Delete temporary directory
-    FileUtils.deleteQuietly(_tmpDir);
   }
 
   @Test(dataProvider = "configProvider")

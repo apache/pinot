@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -49,12 +50,16 @@ import org.testng.annotations.Test;
  *
  * @author jfim
  */
-public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTestWithQueryGenerator {
+// TODO: clean up this test
+public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadRefreshDeleteIntegrationTest.class);
-  protected final File _tmpDir = new File("/tmp/" + getClass().getSimpleName());
-  protected final File _segmentsDir = new File(_tmpDir, "segments");
-  protected final File _tarsDir = new File(_tmpDir, "tars");
-  private String tableName = null;
+  private String _tableName;
+
+  @Nonnull
+  @Override
+  protected String getTableName() {
+    return _tableName;
+  }
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -68,25 +73,23 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   @BeforeMethod
   public void setupMethod(Object[] args)
       throws Exception {
-    ensureDirectoryExistsAndIsEmpty(_tmpDir);
-    ensureDirectoryExistsAndIsEmpty(_segmentsDir);
-    ensureDirectoryExistsAndIsEmpty(_tarsDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     if (args == null || args.length == 0) {
       return;
     }
-    this.tableName = (String) args[0];
+    _tableName = (String) args[0];
     SegmentVersion version = (SegmentVersion) args[1];
-    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, this.tableName, version);
-
+    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, null, null, null, _tableName, version);
   }
 
   @AfterMethod
   public void teardownMethod()
       throws Exception {
-    if (this.tableName != null) {
-      dropOfflineTable(this.tableName);
+    if (_tableName != null) {
+      dropOfflineTable(_tableName);
     }
   }
+
   protected void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
     Schema schema = new Schema.Parser().parse(
@@ -94,7 +97,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     GenericRecord record = new GenericData.Record(schema);
     GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
     DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<GenericRecord>(datumWriter);
-    File avroFile = new File(_tmpDir, segmentName + ".avro");
+    File avroFile = new File(_tempDir, segmentName + ".avro");
     fileWriter.create(schema, avroFile);
 
     for (int i = 0; i < rowCount; i++) {
@@ -106,11 +109,11 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
     int segmentIndex = Integer.parseInt(segmentName.split("_")[1]);
 
-    File segmentTarDir = new File(_tarsDir, segmentName);
-    ensureDirectoryExistsAndIsEmpty(segmentTarDir);
+    File segmentTarDir = new File(_tarDir, segmentName);
+    TestUtils.ensureDirectoriesExistAndEmpty(segmentTarDir);
     ExecutorService executor = MoreExecutors.sameThreadExecutor();
-    buildSegmentsFromAvro(Collections.singletonList(avroFile), executor, segmentIndex,
-        new File(_segmentsDir, segmentName), segmentTarDir, this.tableName, false, null);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex,
+        new File(_segmentDir, segmentName), segmentTarDir, this._tableName, false, null, null, executor);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 
@@ -130,7 +133,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     GenericRecord record = new GenericData.Record(schema);
     GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
     DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<GenericRecord>(datumWriter);
-    final File avroFile = new File(_tmpDir, segmentName + ".avro");
+    final File avroFile = new File(_tempDir, segmentName + ".avro");
     fileWriter.create(schema, avroFile);
 
     for (int i = 0; i < rowCount; i++) {
@@ -142,7 +145,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
     final int segmentIndex = Integer.parseInt(segmentName.split("_")[1]);
     final String TAR_GZ_FILE_EXTENTION = ".tar.gz";
-    File segmentTarDir = new File(_tarsDir, segmentName);
+    File segmentTarDir = new File(_tarDir, segmentName);
     buildSegment(segmentTarDir, avroFile, segmentIndex, segmentName, 0);
     String segmentFileName = segmentName;
     for (String name : segmentTarDir.list()) {
@@ -152,7 +155,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     }
     File file = new File(segmentTarDir, segmentFileName);
     long segmentLength = file.length();
-    final File segmentTarDir1 = new File(_tarsDir, segmentName);
+    final File segmentTarDir1 = new File(_tarDir, segmentName);
     FileUtils.deleteQuietly(segmentTarDir);
     new Thread(new Runnable() {
       @Override
@@ -173,10 +176,10 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   public void buildSegment(File segmentTarDir, File avroFile, int segmentIndex, String segmentName,
       int sleepTimeSec) throws Exception {
     Thread.sleep(sleepTimeSec * 1000);
-    ensureDirectoryExistsAndIsEmpty(segmentTarDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(segmentTarDir);
     ExecutorService executor = MoreExecutors.sameThreadExecutor();
-    buildSegmentsFromAvro(Collections.singletonList(avroFile), executor, segmentIndex,
-        new File(segmentTarDir, segmentName), segmentTarDir, this.tableName, false, null);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex,
+        new File(segmentTarDir, segmentName), segmentTarDir, this._tableName, false, null, null, executor);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
   }
@@ -222,15 +225,19 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   private void verifyNRows(int currentNrows, int finalNrows) throws Exception {
     int attempt = 0;
     long sleepTime = 100;
-    long nRows = -1;
+    long nRows;
     while (attempt < 10) {
       Thread.sleep(sleepTime);
-      nRows = getCurrentServingNumDocs(tableName);
+      try {
+        nRows = getCurrentCountStarResult();
+      } catch (Exception e) {
+        nRows = -1;
+      }
       //nRows can either be the current value or the final value, not any other.
       if (nRows == currentNrows || nRows == -1) {
         sleepTime *= 2;
         attempt++;
-      } else  if (nRows == finalNrows) {
+      } else if (nRows == finalNrows) {
         return;
       } else {
         Assert.fail("Found unexpected number of rows " + nRows);
@@ -326,14 +333,14 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
       // Wait for up to one minute for the row count to match the expected row count
       LOGGER.info("Awaiting for the row count to match {}", expectedRowCount);
-      int pinotRowCount = (int) getCurrentServingNumDocs(this.tableName);
+      int pinotRowCount = (int) getCurrentCountStarResult();
       long timeInOneMinute = System.currentTimeMillis() + 60 * 1000L;
       while (System.currentTimeMillis() < timeInOneMinute && pinotRowCount != expectedRowCount) {
         LOGGER.info("Row count is {}, expected {}, awaiting for row count to match", pinotRowCount, expectedRowCount);
         Thread.sleep(5000L);
 
         try {
-          pinotRowCount = (int) getCurrentServingNumDocs(this.tableName);
+          pinotRowCount = (int) getCurrentCountStarResult();
         } catch (Exception e) {
           LOGGER.warn("Caught exception while sending query to Pinot, retrying", e);
         }
@@ -344,45 +351,12 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     }
   }
 
-  @Override
-  @Test(enabled = false)
-  public void testHardcodedQueries()
-      throws Exception {
-    // Ignored.
-  }
-
-  @Override
-  @Test(enabled = false)
-  public void testHardcodedQuerySet()
-      throws Exception {
-    // Ignored.
-  }
-
-  @Override
-  @Test(enabled = false)
-  public void testGeneratedQueriesWithoutMultiValues()
-      throws Exception {
-    // Ignored.
-  }
-
-  @Override
-  @Test(enabled = false)
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
-    // Ignored.
-  }
-
-  @Override
-  protected String getTableName() {
-    return tableName;
-  }
-
   @AfterClass
   public void tearDown() {
     stopServer();
     stopBroker();
     stopController();
     stopZk();
-    FileUtils.deleteQuietly(_tmpDir);
+    FileUtils.deleteQuietly(_tempDir);
   }
 }

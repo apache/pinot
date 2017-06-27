@@ -276,7 +276,9 @@ public class HelixServerStarter {
   public void stop() {
     _adminApiApplication.stop();
     setShuttingDownStatus(true);
-    Uninterruptibles.sleepUninterruptibly(MAX_QUERY_TIME_MILLIS, TimeUnit.MILLISECONDS);
+    if (_pinotHelixProperties.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, true)) {
+      Uninterruptibles.sleepUninterruptibly(MAX_QUERY_TIME_MILLIS, TimeUnit.MILLISECONDS);
+    }
     _helixManager.disconnect();
     _serverInstance.shutDown();
   }

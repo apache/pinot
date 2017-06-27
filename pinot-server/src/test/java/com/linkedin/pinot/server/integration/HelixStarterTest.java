@@ -89,7 +89,7 @@ public class HelixStarterTest {
       throws Exception {
     String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, TimeUnit.DAYS,
+        SegmentTestUtils.getSegmentGeneratorConfig(new File(filePath), segmentDir, TimeUnit.DAYS,
             tableName, null);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);

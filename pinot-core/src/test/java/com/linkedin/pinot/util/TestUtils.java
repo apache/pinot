@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.util;
 
+import com.google.common.base.Function;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.response.broker.GroupByResult;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -26,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.json.JSONArray;
@@ -154,6 +156,60 @@ public class TestUtils {
           array.getJSONObject(i).getDouble("value"));
     }
     return map;
+  }
+
+  /**
+   * Ensure the given directories exist and are empty.
+   *
+   * @param dirs Directories to be cleared
+   * @throws IOException
+   */
+  public static void ensureDirectoriesExistAndEmpty(@Nonnull File... dirs)
+      throws IOException {
+    for (File dir : dirs) {
+      FileUtils.deleteDirectory(dir);
+      Assert.assertTrue(dir.mkdirs());
+    }
+  }
+
+  /**
+   * Wait for a condition to be met.
+   *
+   * @param condition Condition to be met
+   * @param checkIntervalMs Check interval in milliseconds
+   * @param timeoutMs Timeout in milliseconds
+   * @param errorMessage Error message if condition is not met before timed out
+   */
+  public static void waitForCondition(@Nonnull Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
+      @Nullable String errorMessage)
+      throws Exception {
+    long endTime = System.currentTimeMillis() + timeoutMs;
+    try {
+      while (System.currentTimeMillis() < endTime) {
+        Boolean isConditionMet = condition.apply(null);
+        if ((isConditionMet != null) && isConditionMet) {
+          return;
+        }
+        Thread.sleep(checkIntervalMs);
+      }
+      if (errorMessage != null) {
+        Assert.fail("Failed to meet condition in " + timeoutMs + "ms, error message: " + errorMessage);
+      } else {
+        Assert.fail("Failed to meet condition in " + timeoutMs + "ms");
+      }
+    } catch (Exception e) {
+      if (errorMessage != null) {
+        Assert.fail("Caught exception while checking the condition, error message: " + errorMessage, e);
+      } else {
+        Assert.fail("Caught exception while checking the condition", e);
+      }
+    }
+  }
+
+  public static void waitForCondition(@Nonnull Function<Void, Boolean> condition, long timeoutMs,
+      @Nullable String errorMessage)
+      throws Exception {
+    waitForCondition(condition, 1000L, timeoutMs, errorMessage);
   }
 
   /**

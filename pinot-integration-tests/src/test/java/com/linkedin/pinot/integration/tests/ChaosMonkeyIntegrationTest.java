@@ -38,6 +38,7 @@ import org.testng.annotations.Test;
 /**
  * Monkeys and chaos.
  */
+// TODO: clean up this test
 public class ChaosMonkeyIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChaosMonkeyIntegrationTest.class);
   private static final String TOTAL_RECORD_COUNT = "1000";

@@ -78,12 +78,10 @@
             <configuration>
               <skipTests>false</skipTests>
               <excludes>
-                <!-- Covered by the MinionClusterIntegrationTest -->
-                <exclude>**/OfflineClusterIntegrationTest.java</exclude>
+                <!-- Covered by FlakyConsumerRealtimeClusterIntegrationTest -->
                 <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
+                <!-- Covered by MinionClusterIntegrationTest -->
                 <exclude>**/HybridClusterIntegrationTest.java</exclude>
-                <!-- Covered by DefaultColumnsTriggerClusterIntegrationTest -->
-                <exclude>**/DefaultColumnsClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
           </plugin>
