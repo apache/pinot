@@ -1,7 +1,10 @@
 function renderMappingsSelection() {
-  var html = "<table style='border: 1px;width: 80%'><tr><td>Select entity 1 </td><td><select name='entityTypeSelector1' id='entityTypeSelector1' onchange='renderEntityTypeSelector(this.id)'></select><div id='entityTypeSelector1_details'></div><br/>is affected by:<br/></td></tr>"
-      + "<tr><td>Select entity 2 </td><td><select name='entityTypeSelector2' id='entityTypeSelector2' onchange='renderEntityTypeSelector(this.id)'></select><div id='entityTypeSelector2_details'></div></td></tr>"
-      + "</table>" + "<input type='submit' onclick='updateEntityMapping()' />"
+  var html = "<table style='border: 1px;width: 80%'>"
+      + "<tr><td>When showing this:</td><td><select name='entityTypeSelector1' id='entityTypeSelector1' onchange='renderEntityTypeSelector(this.id)'></select><div id='entityTypeSelector1_details'></div></td></tr>"
+      + "<tr><td>Also show this:</td><td><select name='entityTypeSelector2' id='entityTypeSelector2' onchange='renderEntityTypeSelector(this.id)'></select><div id='entityTypeSelector2_details'></div></td></tr>"
+      + "<tr><td>Priority (0.0 - 1.0)</td><td><input name='entityScore' id='entityScore' value='1.0'/></td></tr>"
+      + "</table>"
+      + "<input type='submit' onclick='updateEntityMapping()' />"
       + "<hr/><div id='existing_mappings'></div>"
       + "<hr/><table id='existing-mappings-data-table'></table>";
   $("#mappings-place-holder").html(html);
@@ -78,9 +81,11 @@ function getEntitySpecificSelectionOptions(baseId, entityType) {
   var html = "";
 
   var suffixHtml = "";
+  var onChange = "";
   if (baseId == "entityTypeSelector1") {
     suffixHtml = "<a href='#' onclick='fetchAndDisplayMappings(\"" + entityType
         + "\")'> refresh</a>";
+    onChange = " onchange='fetchAndDisplayMappings(\"" + entityType + "\")'";
   }
 
   switch (entityType) {
@@ -94,34 +99,30 @@ function getEntitySpecificSelectionOptions(baseId, entityType) {
       // do nothing
   }
   html += "<input style='width:100%' type='text' placeholder='provide urn' id='" + baseId + "_"
-      + entityType + "_urn'>" + suffixHtml;
+      + entityType + "_urn'" + onChange + "/>" + suffixHtml;
   return html;
 }
 
 function updateEntityMapping() {
-  var entityType1 = $("#entityTypeSelector1").find(':selected').val();
-  var entityType2 = $("#entityTypeSelector2").find(':selected').val();
-  var fromUrn = $("#entityTypeSelector1_" + entityType1 + "_urn").val();
-  var toUrn = $("#entityTypeSelector2_" + entityType2 + "_urn").val();
+  const entityType1 = $("#entityTypeSelector1").find(':selected').val();
+  const entityType2 = $("#entityTypeSelector2").find(':selected').val();
+  const fromUrn = $("#entityTypeSelector1_" + entityType1 + "_urn").val();
+  const toUrn = $("#entityTypeSelector2_" + entityType2 + "_urn").val();
+  const score = $("#entityScore").val();
 
-  console.log(entityType1)
-  console.log(entityType2)
-  console.log(fromUrn)
-  console.log(toUrn)
+  console.log(entityType1, entityType2, fromUrn, toUrn, score);
 
-  var payload = '{ "fromURN": "' + fromUrn + '",  "toURN": "' + toUrn + '", "mappingType": "'
-      + entityType1 + "_TO_" + entityType2 + '"}';
+  const payload = '{ "fromURN": "' + fromUrn + '", "toURN": "' + toUrn + '", "mappingType": "'
+      + entityType1 + "_TO_" + entityType2 + '", "score": "' + score + '"}';
 
-  if (entityType1 == 'select' || entityType2 == 'select' || fromUrn == '' || toUrn == '') {
+  if (entityType1 == 'select' || entityType2 == 'select' || fromUrn == '' || toUrn == '' || score == '') {
     return;
   }
 
-  submitData("/entityMapping/create", payload, "admin").done(function (data) {
-    console.log("Adding mapping : ")
-    console.log(payload)
+  submitData("/entityMapping/create", payload, "admin", "html").success(function (data) {
+    console.log("Adding mapping : ");
+    fetchAndDisplayMappings(entityType1);
   });
-
-  fetchAndDisplayMappings(entityType1);
 }
 
 function fetchAndDisplayMappings(entityType) {
@@ -132,22 +133,19 @@ function fetchAndDisplayMappings(entityType) {
   }
 
   getData("/entityMapping/view/fromURN/" + fromUrn, "admin").success(function (urns) {
-    const urn2id = {};
+    const urn2entity = {};
     for (var i = 0; i < urns.length; i++) {
       const u = urns[i];
-      urn2id[u.toURN] = u.id;
+      urn2entity[u.toURN] = u;
     }
-    console.log(urn2id);
 
     const urnsString = urns.map(function (x) {
       return (x.toURN)
     }).join(",");
-    console.log(urnsString);
 
     if ($.fn.dataTable.isDataTable( '#existing-mappings-data-table' )) {
       // existing table
-      const table = $('#existing-mappings-data-table').DataTable();
-      table.destroy();
+      $('#existing-mappings-data-table').DataTable().destroy();
       $('#existing-mappings-data-table').empty();
     }
 
@@ -164,8 +162,20 @@ function fetchAndDisplayMappings(entityType) {
       }, {
         title: 'Label', data: 'label'
       }, {
+        title: 'Priority', data: null, render: function (data, type, row) {
+          if (row.urn in urn2entity) {
+            return (urn2entity[row.urn].score);
+          } else {
+            return ('-')
+          }
+        }
+      }, {
         title: '', data: null, render: function (data, type, row) {
-          return ("<a href=\"#\" onclick=\"deleteMapping(\'" + urn2id[row.urn] + "\')\">delete</a>");
+          if (row.urn in urn2entity) {
+            return ("<a href=\"#\" onclick=\"deleteMapping(\'" + urn2entity[row.urn].id + "\')\">delete</a>");
+          } else {
+            return ('-')
+          }
         }
       }], order: [[3, 'desc'], [2, 'asc'], [1, 'asc']], iDisplayLength: 50, retrieve: true
     });
