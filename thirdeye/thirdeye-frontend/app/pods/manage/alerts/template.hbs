@@ -28,7 +28,7 @@
         selected=selectedSearchMode
         options=searchModes
         searchEnabled=false
-        onchange=(action (mut selectedSearchMode))
+        onchange=(action "onSearchModeChange")
         as |name|
       }}
         {{name}}
@@ -37,7 +37,17 @@
 
     <div class="manage-alert-search__input">
       <div class="manage-alert-search__label">Search for Alert:</div>
-      {{#if (eq selectedSearchMode 'Alert Name')}}
+      {{#if (eq selectedSearchMode 'All')}}
+        {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          placeholder="Search for All Alerts"
+          disabled=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+      {{else if (eq selectedSearchMode 'Alert Name')}}
         {{#power-select
           selected=primaryMetric
           onchange=(action "onAlertChange")

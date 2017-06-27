@@ -8,10 +8,11 @@ import { task, timeout } from 'ember-concurrency';
 import fetch from 'fetch';
 
 export default Ember.Controller.extend({
+  queryParams: ['selectedSearchMode'],
   /**
    * Alerts Search Mode options
    */
-  searchModes: ['Alert Name', 'Dataset Name', 'Application Name'],
+  searchModes: ['All','Alert Name', 'Dataset Name', 'Application Name'],
 
   /**
    * True when results appear
@@ -21,7 +22,7 @@ export default Ember.Controller.extend({
   /**
    * Default Search Mode
    */
-  selectedSearchMode: 'Alert Name',
+  selectedSearchMode: 'All',
 
   /**
    * Array of Alerts we're displaying
@@ -50,6 +51,8 @@ export default Ember.Controller.extend({
       .then(res => res.json())
   }),
 
+
+
   /**
    * Handler for search by alert dataset name
    * Utilizing ember concurrency (task)
@@ -69,12 +72,19 @@ export default Ember.Controller.extend({
     },
 
     // Handles UI mode change
-    onModeChange(mode) {
+    onSearchModeChange(mode) {
+      if (mode === 'All') { 
+        const allAlerts = this.get('model');
+        this.setProperties({
+          selectedAlerts: allAlerts,
+          resultsActive: true
+        });
+      }
       this.set('selectedSearchMode', mode);
     },
 
     removeAll() {
-      $('.te-search-results').remove();
+      this.set('selectedAlerts', []);
       this.set('resultsActive', false);
     }
   }
