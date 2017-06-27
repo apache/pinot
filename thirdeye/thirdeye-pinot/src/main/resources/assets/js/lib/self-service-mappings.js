@@ -132,22 +132,19 @@ function fetchAndDisplayMappings(entityType) {
   }
 
   getData("/entityMapping/view/fromURN/" + fromUrn, "admin").success(function (urns) {
-    const urn2id = {};
+    const urn2entity = {};
     for (var i = 0; i < urns.length; i++) {
       const u = urns[i];
-      urn2id[u.toURN] = u.id;
+      urn2entity[u.toURN] = u;
     }
-    console.log(urn2id);
 
     const urnsString = urns.map(function (x) {
       return (x.toURN)
     }).join(",");
-    console.log(urnsString);
 
     if ($.fn.dataTable.isDataTable( '#existing-mappings-data-table' )) {
       // existing table
-      const table = $('#existing-mappings-data-table').DataTable();
-      table.destroy();
+      $('#existing-mappings-data-table').DataTable().destroy();
       $('#existing-mappings-data-table').empty();
     }
 
@@ -164,8 +161,12 @@ function fetchAndDisplayMappings(entityType) {
       }, {
         title: 'Label', data: 'label'
       }, {
+        title: 'Score', data: null, render: function (data, type, row) {
+          return (urn2entity[row.urn].score);
+        }
+      }, {
         title: '', data: null, render: function (data, type, row) {
-          return ("<a href=\"#\" onclick=\"deleteMapping(\'" + urn2id[row.urn] + "\')\">delete</a>");
+          return ("<a href=\"#\" onclick=\"deleteMapping(\'" + urn2entity[row.urn].id + "\')\">delete</a>");
         }
       }], order: [[3, 'desc'], [2, 'asc'], [1, 'asc']], iDisplayLength: 50, retrieve: true
     });
