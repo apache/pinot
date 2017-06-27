@@ -72,7 +72,7 @@ function getDataCustomCallback(url, tab) {
     });
 };
 
-function submitData(url, data, tab) {
+function submitData(url, data, tab, dataType = "json") {
 
     if (data === undefined) {
         data = ""
@@ -88,7 +88,7 @@ function submitData(url, data, tab) {
             'Content-Type': 'application/json'
         },
         type: 'post',
-        dataType: 'json',
+        dataType: dataType, // NOTE: expecting 'json' fails on empty 200 response
         data: data,
         statusCode: {
             404: function () {
