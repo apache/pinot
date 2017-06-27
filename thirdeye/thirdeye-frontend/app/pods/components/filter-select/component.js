@@ -106,6 +106,7 @@ export default Ember.Component.extend({
   // Maximum total filter to display
   maxTotalFilters: 100,
 
+  triggerId: '',
   noMatchesMessage: '',
 
   // selected Filters JSON
