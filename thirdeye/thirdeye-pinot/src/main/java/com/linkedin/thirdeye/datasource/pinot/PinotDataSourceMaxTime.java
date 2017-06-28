@@ -54,7 +54,9 @@ public class PinotDataSourceMaxTime {
       PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, tableName);
       CACHE_REGISTRY.getResultSetGroupCache().refresh(maxTimePinotQuery);
       ResultSetGroup resultSetGroup = CACHE_REGISTRY.getResultSetGroupCache().get(maxTimePinotQuery);
-      if (resultSetGroup.getResultSetCount() == 0 || resultSetGroup.getResultSet(0).getRowCount() == 0) {
+      if (resultSetGroup.getResultSetCount() == 0
+          || resultSetGroup.getResultSet(0).getRowCount() == 0
+          || resultSetGroup.getResultSet(0).getDouble(0) <= 0) {
         LOGGER.info("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
         this.collectionToPrevMaxDataTimeMap.remove(dataset);
       } else {
