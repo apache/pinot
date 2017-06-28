@@ -183,7 +183,6 @@ public class AnomalyDetectionInputContextBuilder {
     return fetchTimeSeriesData(startEndTimeRanges, false);
   }
 
-
   /**
    * Fetch time series, known merged anomalies, and scaling factor for the specified dimension. Note that scaling
    * factor has no dimension information, so all scaling factor in the specified time range will be retrieved.
