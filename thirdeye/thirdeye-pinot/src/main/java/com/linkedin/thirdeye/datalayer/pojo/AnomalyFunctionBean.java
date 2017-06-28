@@ -33,6 +33,11 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private boolean isActive = true;
 
+  /**
+   * Define the metric and the filters of global metric
+   * TODO: 1) Define a metric node with the metric and filter information, and 2) Point the global metric to the id of the metric node.
+   *
+   */
   private String globalMetric;
 
   private String globalMetricFilters;
