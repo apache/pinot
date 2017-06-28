@@ -10,25 +10,30 @@
           Import a Metric From InGraphs
         {{/link-to}}
       </div>
-      <label for="select-metric" class="control-label">Searh for a Metric</label>
-      {{#power-select
-        search=(perform searchMetricsList)
-        selected=selectorVal
-        onchange=(action "onChangeDropdown")
-        loadingMessage="Waiting for the server...."
-        placeholder="Search by Metric Name"
-        searchPlaceholder="Type to filter..."
-        triggerId="select-metric"
-        as |metric|
-      }}
-        {{metric.alias}}
-      {{/power-select}}
+      <div class="form-group">
+      <label for="select-metric" class="control-label required">Searh for a Metric</label>
+        {{#power-select
+          search=(perform searchMetricsList)
+          selected=selectedMetricOption
+          onchange=(action "onSelectMetric")
+          loadingMessage="Waiting for the server...."
+          placeholder="Search by Metric Name"
+          searchPlaceholder="Type to filter..."
+          triggerId="select-metric"
+          onclose=(action "validateRequiredFields")
+          as |metric|
+        }}
+          {{metric.alias}}
+        {{/power-select}}
+      </div>
 
-      {{form.element controlType="text"
-        label="Filters"
-        placeholder="Add a dimension filter..."
-        property="metric"
-      }}
+      <div class="form-group">
+        {{form.element controlType="text"
+          label="Filters"
+          placeholder="Add a dimension filter..."
+          property="metric"
+        }}
+      </div>
       <div class="te-graph-alert te-graph-alert--pending">
         {{#if isMetricSelected}}
           {{anomaly-graph primaryMetric=selectedMetric}}
@@ -44,14 +49,17 @@
     <fieldset class="te-form__section">
       <legend class="te-form__section-title">Detection:</legend>
       <div class="form-group">
-        <label for="select-pattern" class="control-label">Pattern of Interest</label>
+        <label for="select-pattern" class="control-label required">Pattern of Interest</label>
         {{#power-select
           loadingMessage="Waiting for the server...."
           triggerId="select-pattern"
+          placeholder="Select a Pattern"
+          loadingMessage="Please select a metric first"
           options=patternsOfInterest
           searchEnabled=false
           selected=selectedPattern
-          onchange=(action (mut selectedPattern))
+          onchange=(action "onSelectPattern")
+          onclose=(action "validateRequiredFields")
           as |name|
         }}
           {{name}}
@@ -62,7 +70,7 @@
         {{#power-select
           options=selectedMetricDimensions
           selected=dimensionSelectorVal
-          onchange=(action "onChangeDimension")
+          onchange=(action "onSelectDimension")
           loadingMessage="Waiting for the server...."
           placeholder="Select a Dimension"
           searchPlaceholder="Type to filter..."
@@ -72,7 +80,7 @@
           {{dimension}}
         {{/power-select}}
       </div>
-      <div class="form-group">
+      <div class="form-group te-hide">
         <label for="tune-sensitivity" class="control-label">Tune Sensitivity</label>
         <div class="form-slider"></div>
       </div>
@@ -81,29 +89,101 @@
     <fieldset class="te-form__section">
       <legend class="te-form__section-title">Alert Details:</legend>
       <div class="form-group">
-        <div class="te-page-right te-page-right--inside">
-          {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
-            Create a New Alert Subscription Group
-          {{/link-to}}
-        </div>
-        <label for="sub-group" class="control-label">Search for existing subscription group</label>
-        {{#power-select
-          loadingMessage="Waiting for the server...."
-          triggerId="sub-group"
-          searchEnabled=false
-          options=allAlertsConfigGroups
-          selected=selectedGroup
-          onchange=(action (mut selectedGroup))
-          as |alertConfig|
-        }}
-          {{alertConfig.name}}
-        {{/power-select}}
+        <label for="anomaly-form-function-name" class="control-label required">Alert Name</label>
+        {{!-- <div class="form-group__instructions">department_metric-name_dimension-name_other-information</div> --}}
+        {{input type="text" id="anomaly-form-function-name" class="form-control" placeholder="Add a descriptive alert name" value=alertFunctionName focus-out="validateRequiredFields"}}
       </div>
+      <div class="form-group">
+        <div class="te-page-right te-page-right--inside">
+          <a href="#" class="thirdeye-link-secondary thirdeye-link-secondary--inside" {{action "onClickChangeGroupEditMode"}}>
+            {{if showAlertGroupEdit "Create a New Alert Subscription Group" "Add New Alert to Existing Subscription Group"}}
+          </a>
+        </div>
+        {{#if showAlertGroupEdit}}
+          <label for="config-group" class="control-label">Add This Alert To An Existing Subscription Group</label>
+          {{#power-select
+            options=allAlertsConfigGroups
+            selected=selectedConfigGroup
+            onchange=(action "onSelectConfigGroup")
+            loadingMessage="Waiting for the server...."
+            placeholder="Select an existing alert subscription group"
+            searchPlaceholder="Type to filter..."
+            triggerId="config-group"
+            as |group|
+          }}
+            {{group.name}}
+          {{/power-select}}
+        {{/if}}
+      </div>
+      {{!--  Fields for existing alert group edit --}}
+      {{#if showAlertGroupEdit}}
+        {{#if selectedConfigGroup}}
+          <div class="form-group">
+            <label for="config-group" class="control-label">Group Recipients</label>
+            {{textarea
+              id="alert-group-recipients"
+              disabled=true
+              class="form-control"
+              value=selectedGroupRecipients
+              name="alert-recipients"
+              classBinding="isShowEmptyDescriptionError:error"
+              aria-label="short test description"
+              aria-describedby="description-error-msg"}}
+          </div>
+          <div class="form-group">
+            <label for="config-group-add-recipients" class="control-label">Recipient(s) to Add</label>
+            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateRequiredFields"  key-up="validateRequiredFields" value=alertGroupNewRecipient}}
+          </div>
+          <div class="form-group">
+            <label class="control-label">Group Status</label>
+            <div class="form-group-text">{{if selectedGroupActive "Active" "Inactive"}}</div>
+          </div>
+          <div class="form-group">
+            <label for="config-group-functions" class="control-label">Other Alerts in this Group</label>
+            <ul class="alert-group-functions">
+            {{#if selectedGroupFunctions}}
+            {{#each selectedGroupFunctions as |function|}}
+              <li class="alert-group-functions__item">
+                <span class="alert-group-functions__item--id">{{function.id}}</span>
+                <span class="alert-group-functions__item--name">{{function.name}}</span>
+              </li>
+            {{/each}}
+            {{else}}
+              <span class="alert-group-functions__item--id">NONE</span>
+            {{/if}}
+            </ul>
+          </div>
+        {{/if}}
+      {{else}}
+        {{!--  Fields for alert group creation --}}
+        <div class="form-group">
+          <label for="config-group-new-name" class="control-label">Subscription Group Name</label>
+          {{input type="text" id="config-group-new-name" class="form-control" placeholder="Group Name" value=createGroupName}}
+        </div>
+        <div class="form-group">
+          <label for="config-group-new-recipients" class="control-label">Recipient(s) to Add</label>
+          {{input type="text" id="config-group-new-recipients" class="form-control" placeholder="Emails, comma-separated" focus-out="validateRequiredFields" key-up="validateRequiredFields" value=alertGroupNewRecipient}}
+        </div>
+        <div class="form-group">
+          <label for="config-group-new-activity" class="control-label">Set Group Status</label>
+          {{#bs-button-group id="config-group-new-activity" class="alert-group-buttons" value=createGroupActive type="radio" onChange=(action (mut createGroupActive)) as |bg|}}
+            {{#bg.button type="default" class="config-group-activity__button" value=true}}Active{{/bg.button}}
+            {{#bg.button type="default" class="config-group-activity__button" value=false}}Inactive{{/bg.button}}
+          {{/bs-button-group}}
+        </div>
+      {{/if}}
+
     </fieldset>
+
+    {{#if isCreateSuccess}}
+      {{#bs-alert type="success"}}
+        <strong>Success</strong> You have created anomaly function Id {{finalFunctionId}}.
+      {{/bs-alert}}
+    {{/if}}
 
     <fieldset class="te-form__section-submit">
       {{bs-button defaultText="Cancel" type="outline-primary" buttonType="cancel" class="te-submit-button"}}
-      {{bs-button defaultText="Create Alert" type="primary" buttonType="submit" class="te-submit-button"}}
+      {{bs-button defaultText="Create & Activate Alert" type="primary" buttonType="submit" disabled=isSubmitDisabled class="te-submit-button"}}
     </fieldset>
   {{/bs-form}}
 
