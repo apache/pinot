@@ -535,6 +535,11 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
     invertedIndexMap.clear();
     _segmentMetadata.close();
+    try {
+      memoryManager.close();
+    } catch (IOException e) {
+      LOGGER.error("Could not close memory manager", e);
+    }
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForStringColumn(final String columnToSortOn) {
