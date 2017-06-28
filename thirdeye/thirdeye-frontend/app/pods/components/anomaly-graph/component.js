@@ -199,7 +199,8 @@ export default Ember.Component.extend({
    * and assigns color class
    */
   primaryRegions: Ember.computed('primaryMetric', function() {
-    const regions = this.get('primaryMetric.regions');
+    const primaryMetric = this.get('primaryMetric');
+    const regions = primaryMetric.regions;
     if (!regions) { return []; }
     return regions.map((region) => {
       return {
