@@ -22,6 +22,8 @@ function TimeSeriesCompareModel() {
   this.heatMapCurrentStart;
   this.heatMapCurrentEnd;
 
+  this.inverseMetric = false;
+
   this.showTime = () => {
     return this.granularity !== constants.GRANULARITY_DAY;
   };
@@ -92,6 +94,7 @@ TimeSeriesCompareModel.prototype = {
           for (var i in timeSeriesResponse.timeBucketsCurrent) {
             dateColumn.push(timeSeriesResponse.timeBucketsCurrent[i]);
           }
+          this.inverseMetric = timeSeriesResponse.inverseMetric;
           if (timeSeriesResponse.subDimensionContributionMap) {
             this.subDimensions = [];
             this.subDimensionContributionDetails = {};

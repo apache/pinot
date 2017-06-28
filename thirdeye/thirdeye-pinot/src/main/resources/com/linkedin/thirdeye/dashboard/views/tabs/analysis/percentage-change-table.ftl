@@ -42,7 +42,7 @@
           <div class="analysis-table__cell">{{cKeyIndex}}</div>
         </td>
         {{#each cumulativePercentageChangeArr as |cPercentageChange cidx|}}
-        <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};">
+        <td style="background-color: {{computeColor cPercentageChange @root.inverseMetric}};color: {{computeTextColor cPercentageChange}};">
           <div class="analysis-table__cell">
             {{#if @root.showDetailsChecked}}
             <div class="analysis-table__item">
@@ -78,7 +78,7 @@
           <div class="analysis-table__cell">{{keyIndex}}</div>
         </td>
         {{#each percentageChangeArr as |percentageChange idx|}}
-        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};">
+        <td style="background-color: {{computeColor percentageChange @root.inverseMetric}};color: {{computeTextColor percentageChange}};">
           <div class="analysis-table__cell">
             {{#if @root.showDetailsChecked}}
             <div class="analysis-table__item">

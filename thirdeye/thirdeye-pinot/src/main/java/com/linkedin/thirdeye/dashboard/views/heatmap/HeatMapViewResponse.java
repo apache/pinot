@@ -24,6 +24,7 @@ public class HeatMapViewResponse implements ViewResponse {
   Info summary;
   Map<String, GenericResponse> data;
   Map<String, String> metricExpression;
+  boolean inverseMetric = false;
 
   public HeatMapViewResponse() {
     super();
@@ -68,6 +69,15 @@ public class HeatMapViewResponse implements ViewResponse {
 
   public void setMetricExpression(Map<String, String> metricExpression) {
     this.metricExpression = metricExpression;
+  }
+
+
+  public boolean isInverseMetric() {
+    return inverseMetric;
+  }
+
+  public void setInverseMetric(boolean inverseMetric) {
+    this.inverseMetric = inverseMetric;
   }
 
   private static Map<String, String> generateSummary(GenericResponse genericResponse) {
