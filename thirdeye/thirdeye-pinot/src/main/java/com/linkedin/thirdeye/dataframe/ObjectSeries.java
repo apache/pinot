@@ -384,6 +384,8 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
   }
 
   public BooleanSeries eq(Series other) {
+    if(other.size() == 1)
+      return this.eq(other.getObject(0));
     return map(new ObjectConditional() {
       @Override
       public boolean apply(Object... values) {
@@ -636,7 +638,7 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     if(series.length <= 0)
       return empty();
 
-    DataFrame.assertSameLength(series);
+    assertSameLength(series);
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
@@ -708,7 +710,7 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     if(series.length <= 0)
       return BooleanSeries.empty();
 
-    DataFrame.assertSameLength(series);
+    assertSameLength(series);
 
     Object[] input = new Object[series.length];
     byte[] output = new byte[series[0].size()];

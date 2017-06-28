@@ -477,6 +477,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries add(Series other) {
+    if(other.size() == 1)
+      return this.add(other.getDouble(0));
     return map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
@@ -497,6 +499,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries subtract(Series other) {
+    if(other.size() == 1)
+      return this.subtract(other.getDouble(0));
     return map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
@@ -517,6 +521,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries multiply(Series other) {
+    if(other.size() == 1)
+      return this.multiply(other.getDouble(0));
     return map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
@@ -537,6 +543,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries divide(Series other) {
+    if(other.size() == 1)
+      return this.divide(other.getDouble(0));
     DoubleSeries o = other.getDoubles();
     if(o.contains(0.0d))
       throw new ArithmeticException("/ by zero");
@@ -562,6 +570,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries pow(Series other) {
+    if(other.size() == 1)
+      return this.pow(other.getDouble(0));
     return map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
@@ -580,6 +590,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public BooleanSeries eq(Series other) {
+    if(other.size() == 1)
+      return this.eq(other.getDouble(0));
     return map(new DoubleConditional() {
       @Override
       public boolean apply(double... values) {
@@ -604,6 +616,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public BooleanSeries eq(Series other, final double epsilon) {
+    if(other.size() == 1)
+      return this.eq(other.getDouble(0), epsilon);
     return map(new DoubleConditional() {
       @Override
       public boolean apply(double... values) {
@@ -718,7 +732,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     if(series.length <= 0)
       return empty();
 
-    DataFrame.assertSameLength(series);
+    assertSameLength(series);
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
@@ -790,7 +804,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     if(series.length <= 0)
       return BooleanSeries.empty();
 
-    DataFrame.assertSameLength(series);
+    assertSameLength(series);
 
     double[] input = new double[series.length];
     byte[] output = new byte[series[0].size()];

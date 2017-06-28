@@ -360,6 +360,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries add(Series other) {
+    if(other.size() == 1)
+      return this.add(other.getLong(0));
     return map(new LongFunction() {
       @Override
       public long apply(long... values) {
@@ -380,6 +382,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries subtract(Series other) {
+    if(other.size() == 1)
+      return this.subtract(other.getLong(0));
     return map(new LongFunction() {
       @Override
       public long apply(long... values) {
@@ -400,6 +404,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries multiply(Series other) {
+    if(other.size() == 1)
+      return this.multiply(other.getLong(0));
     return map(new LongFunction() {
       @Override
       public long apply(long... values) {
@@ -420,6 +426,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries divide(Series other) {
+    if(other.size() == 1)
+      return this.divide(other.getLong(0));
     return map(new LongFunction() {
       @Override
       public long apply(long... values) {
@@ -440,6 +448,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public BooleanSeries eq(Series other) {
+    if(other.size() == 1)
+      return this.eq(other.getLong(0));
     return map(new LongConditional() {
       @Override
       public boolean apply(long... values) {
@@ -560,7 +570,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     if(series.length <= 0)
       return empty();
 
-    DataFrame.assertSameLength(series);
+    assertSameLength(series);
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
@@ -632,7 +642,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     if(series.length <= 0)
       return BooleanSeries.empty();
 
-    DataFrame.assertSameLength(series);
+    assertSameLength(series);
 
     long[] input = new long[series.length];
     byte[] output = new byte[series[0].size()];

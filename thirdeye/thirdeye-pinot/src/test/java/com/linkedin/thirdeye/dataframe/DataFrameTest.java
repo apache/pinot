@@ -2170,6 +2170,19 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleOperationsSeriesSingleton() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 0.0, 2.0);
+    DoubleSeries mod = DataFrame.toSeries(2.0);
+
+    assertEquals(base.add(mod), DNULL, 2, 4);
+    assertEquals(base.subtract(mod), DNULL, -2, 0);
+    assertEquals(base.multiply(mod), DNULL, 0, 4);
+    assertEquals(base.divide(mod), DNULL, 0, 1);
+    assertEquals(base.pow(mod), DNULL, 0, 4);
+    assertEquals(base.eq(mod), BNULL, FALSE, TRUE);
+  }
+
+  @Test
   public void testDoubleOperationsSeriesMisaligned() {
     DoubleSeries base = DataFrame.toSeries(DNULL, 0, 1, 1.5, 0.003);
     DoubleSeries mod = DataFrame.toSeries(1, 1, 1, DNULL);
@@ -2349,6 +2362,18 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testLongOperationsSeriesSingleton() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, 2);
+    LongSeries mod = DataFrame.toSeries(2);
+
+    assertEquals(base.add(mod), LNULL, 2, 4);
+    assertEquals(base.subtract(mod), LNULL, -2, 0);
+    assertEquals(base.multiply(mod), LNULL, 0, 4);
+    assertEquals(base.divide(mod), LNULL, 0, 1);
+    assertEquals(base.eq(mod), BNULL, FALSE, TRUE);
+  }
+
+  @Test
   public void testLongOperationsSeriesMisaligned() {
     LongSeries base = DataFrame.toSeries(LNULL, 0, 1, 5, 10);
     LongSeries mod = DataFrame.toSeries(1, 1, 1, LNULL);
@@ -2508,6 +2533,15 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testStringOperationsSeriesSingleton() {
+    StringSeries base = DataFrame.toSeries(SNULL, "a", "b");
+    StringSeries mod = DataFrame.toSeries("b");
+
+    assertEquals(base.concat(mod), SNULL, "ab", "bb");
+    assertEquals(base.eq(mod), BNULL, FALSE, TRUE);
+  }
+
+  @Test
   public void testStringOperationsSeriesMisaligned() {
     StringSeries base = DataFrame.toSeries(SNULL, "a", "b", "c", "d");
     StringSeries mod = DataFrame.toSeries("A", "A", "b", SNULL);
@@ -2642,6 +2676,18 @@ public class DataFrameTest {
     assertEquals(base.xor(mod), BNULL, FALSE, TRUE, TRUE, BNULL);
     assertEquals(base.implies(mod), BNULL, TRUE, TRUE, FALSE, BNULL);
     assertEquals(base.eq(mod), BNULL, TRUE, FALSE, FALSE, BNULL);
+  }
+
+  @Test
+  public void testBooleanOperationsSeriesSingleton() {
+    BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE);
+    BooleanSeries mod = DataFrame.toSeries(FALSE);
+
+    assertEquals(base.and(mod), BNULL, FALSE, FALSE);
+    assertEquals(base.or(mod), BNULL, TRUE, FALSE);
+    assertEquals(base.xor(mod), BNULL, TRUE, FALSE);
+    assertEquals(base.implies(mod), BNULL, FALSE, TRUE);
+    assertEquals(base.eq(mod), BNULL,FALSE, TRUE);
   }
 
   @Test
@@ -2789,6 +2835,14 @@ public class DataFrameTest {
     ObjectSeries mod = DataFrame.toSeriesObjects(1L, false, "b", 1, ONULL);
 
     assertEquals(base.eq(mod), BNULL, FALSE, TRUE, FALSE, BNULL);
+  }
+
+  @Test
+  public void testObjectOperationsSeriesSingleton() {
+    ObjectSeries base = DataFrame.toSeriesObjects(ONULL, true, "b", 1L);
+    ObjectSeries mod = DataFrame.toSeriesObjects(true);
+
+    assertEquals(base.eq(mod), BNULL, TRUE, FALSE, FALSE);
   }
 
   @Test
@@ -3321,16 +3375,18 @@ public class DataFrameTest {
     final int b;
     final Tuple myself;
 
-    public Tuple(int a, int b) {
+    Tuple(int a, int b) {
       this.a = a;
       this.b = b;
       this.myself = this;
     }
 
+    @SuppressWarnings("unused")
     public int getA() {
       return a;
     }
 
+    @SuppressWarnings("unused")
     public int getB() {
       return b;
     }
@@ -3357,21 +3413,24 @@ public class DataFrameTest {
       return "(" + a + "," + b + ')';
     }
 
+    @SuppressWarnings("unused")
     public double doubleValue() {
       return a * 10 + b;
     }
 
+    @SuppressWarnings("unused")
     public long longValue() {
       return a * 100 + b;
     }
 
+    @SuppressWarnings("unused")
     public boolean booleanValue() {
       return a <= b;
     }
   }
 
   private static class CompTuple extends Tuple implements Comparable<CompTuple> {
-    public CompTuple(int a, int b) {
+    CompTuple(int a, int b) {
       super(a, b);
     }
 
