@@ -72,7 +72,7 @@ public class SegmentAssignmentStrategyTest {
   private ZkClient _zkClient;
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
-  private final int _numServerInstance = 6;
+  private final int _numServerInstance = 10;
   private final int _numBrokerInstance = 1;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
@@ -204,7 +204,7 @@ public class SegmentAssignmentStrategyTest {
   @Test
   public void testTableLevelAndMirroringReplicaGroupSegmentAssignmentStrategy() throws Exception {
     // Create the configuration for segment assignment strategy.
-    int numInstancesPerPartition = 3;
+    int numInstancesPerPartition = 5;
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
     replicaGroupStrategyConfig.setNumInstancesPerPartition(numInstancesPerPartition);
     replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
@@ -273,7 +273,7 @@ public class SegmentAssignmentStrategyTest {
   @Test
   public void testPartitionLevelReplicaGroupSegmentAssignmentStrategy() throws Exception {
     int totalPartitionNumber = 2;
-    int numInstancesPerPartition = 3;
+    int numInstancesPerPartition = 5;
 
     // Create the configuration for segment assignment strategy.
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
@@ -332,7 +332,7 @@ public class SegmentAssignmentStrategyTest {
 
     // Fetch the replica group mapping table.
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixZkManager.getHelixPropertyStore();
-    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMaping =
+    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMapping =
         ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(propertyStore,
             TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP);
 
@@ -340,7 +340,7 @@ public class SegmentAssignmentStrategyTest {
     for (int partition = 0; partition < totalPartitionNumber; partition++) {
       for (int group = 0; group < NUM_REPLICA; group++) {
         List<String> serversInReplicaGroup =
-            partitionToReplicaGroupMaping.getInstancesfromReplicaGroup(partition, group);
+            partitionToReplicaGroupMapping.getInstancesfromReplicaGroup(partition, group);
         Set<String> segmentsInReplicaGroup = new HashSet<>();
         for (String server : serversInReplicaGroup) {
           segmentsInReplicaGroup.addAll(serverToSegments.get(server));
@@ -364,7 +364,8 @@ public class SegmentAssignmentStrategyTest {
     ExternalView externalView =
         _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
 
-    List<String> servers = _pinotHelixResourceManager.getServerInstancesForTable(tableName, CommonConstants.Helix.TableType.OFFLINE);
+    List<String> servers = _pinotHelixResourceManager.getServerInstancesForTable(tableName,
+        CommonConstants.Helix.TableType.OFFLINE);
     Map<String, Set<String>> serverToSegments = new HashMap<>();
 
     for (String server : servers) {
