@@ -34,7 +34,7 @@ export default Ember.Controller.extend({
       className: 'manage',
       link: 'manage',
       title: 'Manage',
-      hidden: true
+      hidden: false
     }
   ]
 });
