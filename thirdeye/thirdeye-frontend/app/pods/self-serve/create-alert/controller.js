@@ -15,6 +15,9 @@ export default Ember.Controller.extend({
   isMetricSelected: false,
   isValidated: false,
   showAlertGroupEdit: true,
+  filters: {},
+  selectedFilters: {},
+  graphConfig: {},
 
   init() {
     this._super(...arguments);
@@ -37,42 +40,67 @@ export default Ember.Controller.extend({
    * Utilizing ember concurrency (task)
    */
   fetchMetricDimensions(metricId) {
-    const url = `data/autocomplete/dimensions/metric/${metricId}`;
+    const url = `/data/autocomplete/dimensions/metric/${metricId}`;
     return fetch(url)
       .then(res => res.json())
   },
 
-  fetchMetricMaxTime(metricId) {
-    const url = `/data/maxDataTime/metricId/${metricId}`;
-    return fetch(url)
-      .then(res => res.json())
+  fetchMetricData(metricId) {
+    const promiseHash = {
+      granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => res.json()),
+      filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => res.json()),
+      maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => res.json()),
+      selectedMetricDimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res =>res.json()),
+    };
+
+    return Ember.RSVP.hash(promiseHash);
   },
 
   fetchAnomalyGraphData(config) {
-    console.log(config);
-    const url = `/timeseries/compare/${config.id}/${config.currentStart}/${config.maxTime}/${config.baselineStart}/${config.baselineEnd}?dimension=${config.dimension}&granularity=MINUTES&filters={}`;
+    this.set('loading', true);
+    const {
+      id,
+      dimension,
+      currentStart,
+      currentEnd,
+      baselineStart,
+      baselineEnd,
+      granularity
+    } = config;
+
+    const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters={}`;
     return fetch(url)
       .then(res => res.json())
   },
 
+
   triggerGraphFromMetric(metric) {
-    this.fetchMetricMaxTime(metric.id, 'All').then(maxTime => {
-      console.log('maxTime: ', maxTime);
-      const fixedMaxTime = maxTime || moment().subtract(1,'day').endOf('day').valueOf();
-      const currentStart = moment(fixedMaxTime).subtract(3, 'days');
-      const baselineStart = currentStart.clone().subtract(1, 'week');
-      this.graphConfig = {
-        id: metric.id,
-        dimension: 'All',
-        maxTime: fixedMaxTime,
-        currentStart: currentStart.valueOf(),
-        baselineStart: baselineStart.valueOf(),
-        baselineEnd: moment(fixedMaxTime).subtract(1, 'week').valueOf()
-      };
-      this.fetchAnomalyGraphData(this.graphConfig).then(metricData => {
-        this.set('isMetricSelected', true);
-        this.set('selectedMetric', metricData);
-      });
+    const maxTime = this.get('maxTime');
+    const currentEnd = moment(maxTime).isValid()
+      ? moment(maxTime).valueOf()
+      : moment().subtract(1,'day').endOf('day').valueOf();
+    const granularity = this.get('granularities.firstObject');
+
+    const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
+    const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
+    const baselineEnd = moment(currentEnd).subtract(1, 'week');
+    const { id } = metric;
+  
+    const graphConfig = {
+      id,
+      dimension: 'All',
+      currentStart,
+      currentEnd,
+      baselineStart,
+      baselineEnd,
+      granularity
+    };
+    this.set('graphConfig', graphConfig);
+
+    this.fetchAnomalyGraphData(graphConfig).then(metricData => {
+      this.set('isMetricSelected', true);
+      this.set('selectedMetric', metricData);
+      this.set('loading', false);
     });
   },
 
@@ -81,12 +109,7 @@ export default Ember.Controller.extend({
     this.fetchAnomalyGraphData(this.graphConfig).then(metricData => {
       this.set('isMetricSelected', true);
       this.set('selectedMetric', metricData);
-    });
-  },
-
-  loadDimensionOptions(metric) {
-    this.fetchMetricDimensions(metric.id).then(dimensionData => {
-      this.set('selectedMetricDimensions', dimensionData || []);
+      this.set('loading', false);
     });
   },
 
@@ -153,8 +176,11 @@ export default Ember.Controller.extend({
     onSelectMetric(selectedObj) {
       console.log(selectedObj);
       this.set('selectedMetricOption', selectedObj);
-      this.triggerGraphFromMetric(selectedObj);
-      this.loadDimensionOptions(selectedObj);
+      this.fetchMetricData(selectedObj.id).then((hash) => {
+        this.setProperties(hash);
+        this.triggerGraphFromMetric(selectedObj);
+      })
+      // this.loadDimensionOptions(selectedObj);
     },
 
     onSelectDimension(selectedObj) {

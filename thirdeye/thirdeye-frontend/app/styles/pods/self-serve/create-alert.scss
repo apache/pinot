@@ -4,11 +4,11 @@
 .ss-create-alert {}
 
 .te-graph-alert {
-  background-color: $te-light-grey;
   width: 100%;
-  height: 420px;
 
   &--pending {
+    background-color: $te-light-grey;
+    height: 420px;
     text-align: center;
     font-weight: bold;
     color: app-shade(black, 1);

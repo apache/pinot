@@ -36,11 +36,12 @@ export default Ember.Component.extend({
   classNames: ['anomaly-graph'],
   primaryMetric: {},
   relatedMetrics: [],
-  showGraphLegend: true,
   colors: {},
 
-
   showLegend: false,
+  showSubchart: false,
+  showTitle: false,
+  height: 0,
 
   /**
    * Graph Legend config
@@ -67,7 +68,7 @@ export default Ember.Component.extend({
    * Graph Point Config
    */
   point: Ember.computed(
-    'showGraphLegend',
+    'showLegend',
     function() {
       return {
         show: false,
@@ -83,7 +84,7 @@ export default Ember.Component.extend({
     function () {
       return {
         y: {
-          show: true
+          show: true,
         },
         x: {
           type: 'timeseries',
@@ -101,10 +102,12 @@ export default Ember.Component.extend({
   /**
    * Graph Subchart Config
    */
-  subchart: Ember.computed('showGraphLegend',
+  subchart: Ember.computed(
+    'showLegend',
+    'showSubchart',
     function() {
       return {
-        show: this.get('showGraphLegend')
+        show: this.get('showSubchart') || this.get('showLegend')
       }
     }
   ),
@@ -112,9 +115,12 @@ export default Ember.Component.extend({
   /**
    * Graph Height Config
    */
-  size: Ember.computed('showGraphLegend',
+  size: Ember.computed(
+    'showLegend',
+    'height',
     function() {
-      const height = this.get('showGraphLegend') ? 400 : 200;
+      const height = this.get('height')
+        || this.get('showLegend') ? 400 : 200;
       return {
         height
       }
@@ -259,7 +265,7 @@ export default Ember.Component.extend({
       this.attrs.onSelection(...arguments);
     },
     onToggle() {
-      this.toggleProperty('showGraphLegend');
+      this.toggleProperty('showLegend');
     },
   }
 });
