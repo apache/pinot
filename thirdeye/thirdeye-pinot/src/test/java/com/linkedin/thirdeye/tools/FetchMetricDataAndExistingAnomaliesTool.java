@@ -1,17 +1,12 @@
 package com.linkedin.thirdeye.tools;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import java.util.Iterator;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
@@ -19,21 +14,24 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,15 +49,76 @@ public class FetchMetricDataAndExistingAnomaliesTool {
   // Private class for storing and sorting results
   public class ResultNode implements Comparable<ResultNode>{
     long functionId;
+    long anomalyId;
     String functionName;
     private String filters;
     DimensionMap dimensions;
     DateTime startTime;
     DateTime endTime;
     double severity;
+    double score;
+    double impactToTotal;
     AnomalyFeedbackType feedbackType;
 
-    public ResultNode(){}
+    public String[] getProperties() {
+      return new String[] {
+          "functionId","functionName","anomalyId","filters","dimensions","startTime","endTime","severity","score","impactToTotal","feedbackType"
+      };
+    }
+
+    public String[] getPropertyValues() {
+      String[] properties = getProperties();
+      String[] propertiesValues =  new String[properties.length];
+
+      Class objectClass = this.getClass();
+      int index = 0;
+      for(String propertyKey : properties) {
+        String propertyValue = "";
+        try {
+          Field field = objectClass.getDeclaredField(propertyKey);
+          field.setAccessible(true);
+          Object object = field.get(this);
+          if (object != null) {
+            propertyValue = object.toString();
+          }
+
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+
+        }
+        propertiesValues[index++] = "\"" + propertyValue + "\"";
+      }
+      return propertiesValues;
+    }
+
+    public ResultNode(MergedAnomalyResultDTO result) {
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(result.getFunctionId());
+      functionId = anomalyFunction.getId();
+      anomalyId = result.getId();
+      functionName = anomalyFunction.getFunctionName();
+      startTime = new DateTime(result.getStartTime());
+      endTime = new DateTime(result.getEndTime());
+      dimensions = result.getDimensions();
+      setFilters(anomalyFunction.getFilters());
+      severity = result.getWeight();
+      score = result.getScore();
+      impactToTotal = result.getImpactToGlobal();
+      AnomalyFeedback feedback = result.getFeedback();
+      feedbackType = (feedback == null)? null : feedback.getFeedbackType();
+    }
+    public ResultNode(RawAnomalyResultDTO result) {
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(result.getFunctionId());
+      functionId = anomalyFunction.getId();
+      anomalyId = result.getId();
+      functionName = anomalyFunction.getFunctionName();
+      startTime = new DateTime(result.getStartTime());
+      endTime = new DateTime(result.getEndTime());
+      dimensions = result.getDimensions();
+      setFilters(anomalyFunction.getFilters());
+      severity = result.getWeight();
+      score = result.getScore();
+      AnomalyFeedback feedback = result.getFeedback();
+      feedbackType = (feedback == null)? null : feedback.getFeedbackType();
+    }
 
     public void setFilters(String filterStr){
       if(StringUtils.isBlank(filterStr)){
@@ -90,17 +149,11 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       sb.append("]");
       return sb.toString();
     }
-    public String[] getSchema(){
-      return new String[]{
-          "StartDate", "EndDate", "Dimensions", "Filters", "FunctionID", "FunctionName", "Severity, feedbackType"
-      };
+    public String getSchema() {
+      return StringUtils.join(getProperties(), ",");
     }
     public String toString(){
-      DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd");
-      return String.format("%s,%s,%s,%s,%s,%s,%s,%s", fmt.print(startTime), fmt.print(endTime),
-          dimensionString(), (filters == null)? "":filters,
-          Long.toString(functionId), functionName, Double.toString(severity*100.0),
-          (feedbackType == null)? "N/A" : feedbackType.toString());
+      return StringUtils.join(getPropertyValues(), ",");
     }
   }
 
@@ -131,19 +184,13 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     List<MergedAnomalyResultDTO> mergedResults =
         mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId, true);
     for(MergedAnomalyResultDTO mergedResult : mergedResults){
-      ResultNode res = new ResultNode();
-      res.functionId = functionId;
-      res.functionName = anomalyFunction.getFunctionName();
-      res.startTime = new DateTime(mergedResult.getStartTime());
-      res.endTime = new DateTime(mergedResult.getEndTime());
-      res.dimensions = mergedResult.getDimensions();
-      res.setFilters(anomalyFunction.getFilters());
-      res.severity = mergedResult.getWeight();
-      AnomalyFeedback feedback = mergedResult.getFeedback();
-      res.feedbackType = (feedback == null)? null : feedback.getFeedbackType();
+      ResultNode res = new ResultNode(mergedResult);
       resultNodes.add(res);
     }
     return resultNodes;
+  }
+  public AnomalyFunctionDTO getAnomalyFunctionDTO(long functionId) {
+    return anomalyFunctionDAO.findById(functionId);
   }
   /**
    * Fetch merged anomaly results from thirdeye db
@@ -178,16 +225,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     List<RawAnomalyResultDTO> rawResults =
         rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
     for(RawAnomalyResultDTO rawResult : rawResults){
-      ResultNode res = new ResultNode();
-      res.functionId = functionId;
-      res.functionName = anomalyFunction.getFunctionName();
-      res.startTime = new DateTime(rawResult.getStartTime());
-      res.endTime = new DateTime(rawResult.getEndTime());
-      res.dimensions = rawResult.getDimensions();
-      res.setFilters(anomalyFunction.getFilters());
-      res.severity = rawResult.getWeight();
-      AnomalyFeedbackDTO feedback = rawResult.getFeedback();
-      res.feedbackType = (feedback == null)? null : feedback.getFeedbackType();
+      ResultNode res = new ResultNode(rawResult);
       resultNodes.add(res);
     }
     return resultNodes;
