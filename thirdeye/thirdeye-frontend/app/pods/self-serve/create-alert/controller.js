@@ -43,7 +43,7 @@ export default Ember.Controller.extend({
     const url = `/data/autocomplete/dimensions/metric/${metricId}`;
     return fetch(url)
       .then(res => res.json())
-  }, ///onboard/function/{id}
+  },
 
   fetchFunctionById(functionId) {
     const url = `/onboard/function/${functionId}`;
@@ -91,7 +91,7 @@ export default Ember.Controller.extend({
     const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
     const baselineEnd = moment(currentEnd).subtract(1, 'week');
     const { id } = metric;
-  
+
     const graphConfig = {
       id,
       dimension: 'All',
