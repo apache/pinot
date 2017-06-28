@@ -31,6 +31,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.dictionary.StringOffHeapMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.StringOnHeapMutableDictionary;
 
@@ -72,7 +73,8 @@ public class BenchmarkStringDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public StringOffHeapMutableDictionary benchmarkOffHeapStringDictionary() {
-    StringOffHeapMutableDictionary dictionary = new StringOffHeapMutableDictionary(10, 10);
+    StringOffHeapMutableDictionary dictionary = new StringOffHeapMutableDictionary(10, 10,
+        new DirectMemoryManager("test"), "stringColumn");
 
     for (int i = 0; i < stringValues.length; i++) {
       dictionary.index(stringValues[i]);

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -36,7 +37,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   private final long chunkSizeInBytes;
   private final int numRowsPerChunk;
   private final int columnSizesInBytes;
-  private final String description;
+  private final OffHeapMemoryManager memoryManager;
+  private final String columnName;
   private long numBytesInCurrentWriter = 0;
 
   private static class WriterWithOffset implements Closeable {
@@ -108,18 +110,21 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   /**
    * @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
    * @param columnSizesInBytes
-   * @param description
+   * @param memoryManager
+   * @param columnName
    */
-  public FixedByteSingleColumnSingleValueReaderWriter(int numRowsPerChunk, int columnSizesInBytes, String description) {
+  public FixedByteSingleColumnSingleValueReaderWriter(int numRowsPerChunk, int columnSizesInBytes,
+      OffHeapMemoryManager memoryManager, String columnName) {
     chunkSizeInBytes = numRowsPerChunk * columnSizesInBytes;
     this.numRowsPerChunk = numRowsPerChunk;
     this.columnSizesInBytes = columnSizesInBytes;
-    this.description = description;
+    this.memoryManager = memoryManager;
+    this.columnName = columnName;
     addBuffer();
   }
 
   private void addBuffer() {
-    PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(chunkSizeInBytes, description);
+    PinotDataBuffer buffer = memoryManager.allocate(chunkSizeInBytes, columnName);
     buffer.order(ByteOrder.nativeOrder());
     buffers.add(buffer);
     FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(buffer, numRowsPerChunk, new int[]{columnSizesInBytes});

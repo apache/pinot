@@ -19,6 +19,7 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class MultiValueDictionaryTest {
@@ -39,7 +40,7 @@ public class MultiValueDictionaryTest {
       throws Exception {
     final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
-        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8, "indexer");
+        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8, new DirectMemoryManager("test"), "indexer");
 
     // Insert rows into the indexer and dictionary
     Random random = new Random(seed);

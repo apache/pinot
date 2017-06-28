@@ -21,6 +21,7 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriterTest {
@@ -43,7 +44,8 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   private void testInt(final Random r, final int rows, final int div) throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Integer.SIZE / 8;
-    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, "testInt");
+    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, new DirectMemoryManager("test"),
+        "Int");
     int[] data = new int[rows];
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextInt();
@@ -87,7 +89,8 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   private void testLong(final Random r, final int rows, final int div) throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Long.SIZE / 8;
-    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, "testLong");
+    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, new DirectMemoryManager("test"),
+        "Long");
     long[] data = new long[rows];
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextLong();

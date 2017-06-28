@@ -19,6 +19,7 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import javax.annotation.Nonnull;
 
@@ -30,9 +31,10 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   private String _min = null;
   private String _max = null;
 
-  public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize) {
-    super(estimatedCardinality, maxOverflowHashSize);
-    _byteStore = new MutableOffHeapByteArrayStore();
+  public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize, OffHeapMemoryManager memoryManager,
+      String columnName) {
+    super(estimatedCardinality, maxOverflowHashSize, memoryManager, columnName);
+    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, columnName);
   }
 
   @Override

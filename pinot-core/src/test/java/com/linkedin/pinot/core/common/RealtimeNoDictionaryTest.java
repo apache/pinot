@@ -24,6 +24,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 
@@ -48,13 +49,13 @@ public class RealtimeNoDictionaryTest {
     _random = new Random(seed);
 
     FixedByteSingleColumnSingleValueReaderWriter intRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Integer.SIZE/8, "int");
+        _random.nextInt(NUM_ROWS)+1, Integer.SIZE/8, new DirectMemoryManager("test"), "int");
     FixedByteSingleColumnSingleValueReaderWriter longRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Long.SIZE/8, "long");
+        _random.nextInt(NUM_ROWS)+1, Long.SIZE/8, new DirectMemoryManager("test"), "long");
     FixedByteSingleColumnSingleValueReaderWriter floatRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Float.SIZE/8, "float");
+        _random.nextInt(NUM_ROWS)+1, Float.SIZE/8, new DirectMemoryManager("test"), "float");
     FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Double.SIZE/8, "double");
+        _random.nextInt(NUM_ROWS)+1, Double.SIZE/8, new DirectMemoryManager("test"), "double");
 
     for (int i = 0; i < NUM_ROWS; i++) {
       _intVals[i] = _random.nextInt();

@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.perf;
 
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
 
@@ -45,7 +46,8 @@ public class BenchmarkOffHeapDictionaryMemory {
   }
 
   private BaseOffHeapMutableDictionary testMem(final int actualCardinality, final int initialCardinality, final int maxOverflowSize) throws Exception {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(initialCardinality, maxOverflowSize);
+    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(initialCardinality, maxOverflowSize,
+        new DirectMemoryManager("test"), "longColumn");
 
     for (int i = 0; i < colValues.length; i++) {
       dictionary.index(colValues[i]);

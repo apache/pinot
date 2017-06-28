@@ -19,6 +19,7 @@ package com.linkedin.pinot.core.indexsegment.utils;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.OffHeapStringStore;
 
 
@@ -26,7 +27,7 @@ public class OffHeapStringStoreTest {
   private static Random RANDOM = new Random();
   @Test
   public void maxValueTest() throws Exception {
-    OffHeapStringStore store = new OffHeapStringStore();
+    OffHeapStringStore store = new OffHeapStringStore(new DirectMemoryManager("test"), "stringColumn");
     final int arrSize = OffHeapStringStore.getStartSize() - 4;
     String dataIn = generateRandomString(arrSize);
     int index = store.add(dataIn);
@@ -37,7 +38,7 @@ public class OffHeapStringStoreTest {
 
   @Test
   public void overflowTest() throws Exception {
-    OffHeapStringStore store = new OffHeapStringStore();
+    OffHeapStringStore store = new OffHeapStringStore(new DirectMemoryManager("test"), "stringColumn");
     final int maxSize = OffHeapStringStore.getStartSize() - 4;
 
     String b1 = generateRandomString(3);

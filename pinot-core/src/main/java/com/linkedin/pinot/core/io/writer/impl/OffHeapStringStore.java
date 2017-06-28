@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
+import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -99,11 +100,11 @@ public class OffHeapStringStore implements Closeable {
     private int _numStrings = 0;
     private int _availEndOffset;  // Exclusive
 
-    private Buffer(long size, int startIndex) {
+    private Buffer(long size, int startIndex, OffHeapMemoryManager memoryManager, String columnName) {
       if (size >= Integer.MAX_VALUE) {
         size = Integer.MAX_VALUE - 1;
       }
-      _pinotDataBuffer = PinotDataBuffer.allocateDirect(size);
+      _pinotDataBuffer = memoryManager.allocate(size, columnName);
       _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
       _startIndex = startIndex;
@@ -173,14 +174,18 @@ public class OffHeapStringStore implements Closeable {
   private volatile List<Buffer> _buffers = new LinkedList<>();
   private int _numElements = 0;
   private volatile Buffer _currentBuffer;
+  private final OffHeapMemoryManager _memoryManager;
+  private final String _columnName;
 
-  public OffHeapStringStore() {
+  public OffHeapStringStore(OffHeapMemoryManager memoryManager, String columnName) {
+    _memoryManager = memoryManager;
+    _columnName = columnName;
     expand(START_SIZE, 0L);
   }
 
   // Expand the buffer size, allocating a min of 32k for strings.
   private Buffer expand(long suggestedSize, long minSize) {
-    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements);
+    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements, _memoryManager, _columnName);
     List<Buffer> newList = new LinkedList<>();
     for (Buffer b : _buffers) {
       newList.add(b);

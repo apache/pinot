@@ -23,6 +23,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
@@ -44,13 +45,13 @@ public class RealtimeSingleValueIteratorTest {
     final long _seed = new Random().nextLong();
     _random = new Random(_seed);
     _intReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.INTEGER_SIZE,
-        "intReader");
+        new DirectMemoryManager("test"), "intReader");
     _longReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.LONG_SIZE,
-        "longReader");
+        new DirectMemoryManager("test"), "longReader");
     _floatReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.FLOAT_SIZE,
-        "floatReader");
+        new DirectMemoryManager("test"), "floatReader");
     _doubleReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.DOUBLE_SIZE,
-        "doubleReader");
+        new DirectMemoryManager("test"), "doubleReader");
 
     for (int i = 0; i < NUM_ROWS; i++) {
       _intVals[i] = _random.nextInt();

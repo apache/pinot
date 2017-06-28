@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -108,13 +109,15 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private int columnSizeInBytes;
   private int maxNumberOfMultiValuesPerRow;
   private final int rowCountPerChunk;
-  private final String description;
+  private final OffHeapMemoryManager memoryManager;
+  private final String columnName;
   private int prevRowStartIndex = 0;  // Offset in the databuffer for the last row added.
   private int prevRowLength = 0;  // Number of values in the column for the last row added.
 
   public FixedByteSingleColumnMultiValueReaderWriter(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
-      int columnSizeInBytes, String description) {
-    this.description = description;
+      int columnSizeInBytes, OffHeapMemoryManager memoryManager, String columnName) {
+    this.memoryManager = memoryManager;
+    this.columnName = columnName;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
     int incrementalCapacity =
         Math.max(maxNumberOfMultiValuesPerRow, (int) (initialCapacity * 1.0f * INCREMENT_PERCENTAGE / 100));
@@ -130,7 +133,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   }
 
   private void addHeaderBuffers() {
-    headerBuffer = PinotDataBuffer.allocateDirect(headerSize, description);
+    headerBuffer = memoryManager.allocate(headerSize, columnName);
     // We know that these bufffers will not be copied directly into a file (or mapped from a file).
     // So, we can use native byte order here.
     headerBuffer.order(ByteOrder.nativeOrder());
@@ -153,7 +156,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private void addDataBuffers(int rowCapacity) throws RuntimeException {
     PinotDataBuffer dataBuffer;
     try {
-      dataBuffer = PinotDataBuffer.allocateDirect(rowCapacity * columnSizeInBytes, description);
+      dataBuffer = memoryManager.allocate(rowCapacity * columnSizeInBytes, columnName);
       dataBuffer.order(ByteOrder.nativeOrder());
       dataBuffers.add(dataBuffer);
       currentDataWriter =

@@ -22,6 +22,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class FixedByteSingleColumnMultiValueReaderWriterTest {
@@ -54,8 +55,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     int columnSizeInBytes = Integer.SIZE / 8;
     int maxNumberOfMultiValuesPerRow = 2000;
     readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows/2, columnSizeInBytes,
-            "testIntArray");
+        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows/2, columnSizeInBytes, new DirectMemoryManager("test"), "IntArray");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -84,7 +84,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     // transition to new ones
     readerWriter =
         new FixedByteSingleColumnMultiValueReaderWriter(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2, columnSizeInBytes,
-            "testIntArrayFixedSize");
+            new DirectMemoryManager("test"), "IntArrayFixedSize");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -112,7 +112,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     Random r = new Random(seed);
     readerWriter =
         new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
-            "testWithZeroSize");
+            new DirectMemoryManager("test"), "ZeroSize");
 
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
@@ -144,7 +144,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
 
     FixedByteSingleColumnMultiValueReaderWriter readerWriter =
         new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, avgMultiValueCount,
-            rowCountPerChunk, columnSize, "readerWriter");
+            rowCountPerChunk, columnSize, new DirectMemoryManager("test"), "ReaderWriter");
 
     return readerWriter;
   }
