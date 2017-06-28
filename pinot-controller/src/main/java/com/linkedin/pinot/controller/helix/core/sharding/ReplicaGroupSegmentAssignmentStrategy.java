@@ -61,7 +61,6 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
 
     // Fetch the segment assignment related configurations.
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, offlineTableName);
-    int numReplica = tableConfig.getValidationConfig().getReplicationNumber();
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
     boolean mirrorAssignmentAcrossReplicaGroups = replicaGroupStrategyConfig.getMirrorAssignmentAcrossReplicaGroups();
@@ -85,15 +84,15 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
     for (int groupId = 0; groupId < numReplicas; groupId++) {
       List<String> instancesInReplicaGroup =
           partitionToReplicaGroupMapping.getInstancesfromReplicaGroup(partitionNumber, groupId);
-
+      int numInstances = instancesInReplicaGroup.size();
       if (mirrorAssignmentAcrossReplicaGroups) {
         // Randomly pick the index and use the same index for all replica groups.
         if (groupId == 0) {
-          index = random.nextInt(numReplica);
+          index = random.nextInt(numInstances);
         }
       } else {
         // Randomly pick the index for all replica groups.
-        index = random.nextInt(numReplica);
+        index = random.nextInt(numInstances);
       }
       selectedInstanceList.add(instancesInReplicaGroup.get(index));
     }
