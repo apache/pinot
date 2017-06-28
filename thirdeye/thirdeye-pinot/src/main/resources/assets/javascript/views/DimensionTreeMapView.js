@@ -43,12 +43,12 @@ DimensionTreeMapView.prototype = {
   },
 
   /**
-   * Takes propertie from dimensionTreeMapModel 
+   * Takes propertie from dimensionTreeMapModel
    * and creates an url to the new ember app
-   * @param {Object} dimensionTreeMapModel 
+   * @param {Object} dimensionTreeMapModel
    */
   makeUrl(dimensionTreeMapModel) {
-    let { 
+    let {
       granularity,
       currentStart,
       currentEnd,
@@ -58,8 +58,8 @@ DimensionTreeMapView.prototype = {
     } = dimensionTreeMapModel;
 
     // needed because of inconsistency (5_MINUTES = MINUTES)
-    granularity = (granularity === '5_MINUTES') 
-      ? 'MINUTES' 
+    granularity = (granularity === '5_MINUTES')
+      ? 'MINUTES'
       : granularity;
 
     const offset = {
@@ -208,7 +208,8 @@ DimensionTreeMapView.prototype = {
 
     var getBackgroundColor = function (factor) {
       var opacity = Math.abs(factor / 25);
-      if(factor > 0){
+      var inverseMetric = self.dimensionTreeMapModel.inverseMetric;
+      if((factor > 0 && !inverseMetric) || (factor < 0 && inverseMetric)){
         return "rgba(0,0,234," + opacity + ")";
       } else{
         return "rgba(234,0,0,"  + opacity + ")" ;

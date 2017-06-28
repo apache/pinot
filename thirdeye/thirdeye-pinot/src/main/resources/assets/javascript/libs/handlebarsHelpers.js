@@ -99,12 +99,12 @@ Handlebars.registerHelper('if_no_anomalies', function(info, opts) {
 
 });
 
-Handlebars.registerHelper('computeColor', function(value) {
+Handlebars.registerHelper('computeColor', function(value, inverseMetric) {
  const opacity = Math.abs(value / 25);
- if(value > 0){
+ if((value > 0 && !inverseMetric) || (value < 0 && inverseMetric)) {
    return "rgba(0,0,234," + opacity + ")";
- } else{
-   return "rgba(234,0,0,"  + opacity + ")" ;
+ } else {
+   return "rgba(234,0,0,"  + opacity + ")";
  }
 });
 
@@ -181,7 +181,7 @@ Handlebars.registerHelper('displayFilterName', function(filter) {
 Handlebars.registerHelper('parseFilters', function(filters) {
   filters = JSON.parse(filters);
   const uiFilters = Object.keys(filters).map((filter) => {
-    return `${filter}: ${filters[filter].join(', ')}</br>` 
+    return `${filter}: ${filters[filter].join(', ')}</br>`
   }).join('');
   return new Handlebars.SafeString(uiFilters);
 });

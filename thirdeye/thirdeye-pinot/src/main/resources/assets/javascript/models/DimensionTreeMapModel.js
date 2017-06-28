@@ -6,6 +6,7 @@ function DimensionTreeMapModel() {
   this.currentEnd;
   this.baselineStart;
   this.baselineEnd;
+  this.inverseMetric = false;
 
   this.heatmapData;
 
@@ -55,6 +56,7 @@ DimensionTreeMapModel.prototype = {
 
   transformResponseData: function (heatMapData) {
     if (heatMapData) {
+      this.inverseMetric = heatMapData.inverseMetric;
       if (heatMapData.dimensions) {
         this.dimensions = heatMapData.dimensions;
         var treeMapData = [];

@@ -512,7 +512,7 @@ public class TimeSeriesResource {
     MetricConfigDTO metricConfigDTO = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
     TimeSeriesCompareMetricView timeSeriesCompareMetricView =
         new TimeSeriesCompareMetricView(metricConfigDTO.getName(), metricId, currentStart,
-            currentEnd);
+            currentEnd, metricConfigDTO.isInverseMetric());
 
     try {
       String dataset = metricConfigDTO.getDataset();
@@ -692,6 +692,7 @@ public class TimeSeriesResource {
         timeSeriesCompareView.setEnd(currentEnd);
         timeSeriesCompareView.setMetricId(metricConfigDTO.getId());
         timeSeriesCompareView.setMetricName(metricConfigDTO.getName());
+        timeSeriesCompareView.setInverseMetric(metricConfigDTO.isInverseMetric());
 
         List<Long> timeBucketsCurrent = new ArrayList<>();
         List<Long> timeBucketsBaseline = new ArrayList<>();

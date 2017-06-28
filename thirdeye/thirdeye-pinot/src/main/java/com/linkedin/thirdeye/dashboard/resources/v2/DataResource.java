@@ -408,6 +408,7 @@ public class DataResource {
 
     HeatMapViewHandler handler = new HeatMapViewHandler(queryCache);
     HeatMapViewResponse response = handler.process(request);
+    response.setInverseMetric(metricConfigDTO.isInverseMetric());
 
     return response;
   }
