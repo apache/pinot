@@ -131,7 +131,7 @@ public class AnomalyDetectionInputContextBuilder {
         LOG.warn("Insufficient data for {} to run anomaly detection function", dimensionMap);
       }
     }
-    this.anomalyDetectionInputContext.setDimensionKeyMetricTimeSeriesMap(dimensionMapMetricTimeSeriesMap);
+    this.anomalyDetectionInputContext.setDimensionMapMetricTimeSeriesMap(dimensionMapMetricTimeSeriesMap);
 
     return this;
   }
@@ -224,7 +224,7 @@ public class AnomalyDetectionInputContextBuilder {
         getTimeSeriesByDimension(anomalyFunctionSpec, startEndTimeRanges, dimensions, timeGranularity, endTimeInclusive);
     Map<DimensionMap, MetricTimeSeries> metricTimeSeriesMap = new HashMap<>();
     metricTimeSeriesMap.put(dimensions, metricTimeSeries);
-    this.anomalyDetectionInputContext.setDimensionKeyMetricTimeSeriesMap(metricTimeSeriesMap);
+    this.anomalyDetectionInputContext.setDimensionMapMetricTimeSeriesMap(metricTimeSeriesMap);
 
     return this;
   }

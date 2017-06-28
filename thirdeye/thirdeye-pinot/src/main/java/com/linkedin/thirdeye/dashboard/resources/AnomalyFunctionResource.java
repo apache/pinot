@@ -125,7 +125,7 @@ public class AnomalyFunctionResource {
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();
 
     Map<DimensionMap, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
-        anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap();
+        anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap();
 
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     List<RawAnomalyResultDTO> results = new ArrayList<>();

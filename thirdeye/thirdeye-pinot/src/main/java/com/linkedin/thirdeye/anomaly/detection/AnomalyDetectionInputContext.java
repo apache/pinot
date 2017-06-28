@@ -13,19 +13,19 @@ import java.util.Map;
 
 
 public class AnomalyDetectionInputContext {
-  Map<DimensionMap, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = Collections.emptyMap();
+  Map<DimensionMap, MetricTimeSeries> dimensionMapMetricTimeSeriesMap = Collections.emptyMap();
   MetricTimeSeries globalMetric;
   ListMultimap<DimensionMap, RawAnomalyResultDTO> existingRawAnomalies = ArrayListMultimap.create();;
   ListMultimap<DimensionMap, MergedAnomalyResultDTO> knownMergedAnomalies = ArrayListMultimap.create();;
   List<ScalingFactor> scalingFactors = Collections.emptyList();
 
-  public Map<DimensionMap, MetricTimeSeries> getDimensionKeyMetricTimeSeriesMap() {
-    return dimensionKeyMetricTimeSeriesMap;
+  public Map<DimensionMap, MetricTimeSeries> getDimensionMapMetricTimeSeriesMap() {
+    return dimensionMapMetricTimeSeriesMap;
   }
 
-  public void setDimensionKeyMetricTimeSeriesMap(
-      Map<DimensionMap, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap) {
-    this.dimensionKeyMetricTimeSeriesMap = dimensionKeyMetricTimeSeriesMap;
+  public void setDimensionMapMetricTimeSeriesMap(
+      Map<DimensionMap, MetricTimeSeries> dimensionMapMetricTimeSeriesMap) {
+    this.dimensionMapMetricTimeSeriesMap = dimensionMapMetricTimeSeriesMap;
   }
 
   public ListMultimap<DimensionMap, RawAnomalyResultDTO> getExistingRawAnomalies() {

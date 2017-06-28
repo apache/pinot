@@ -848,7 +848,7 @@ public class AnomalyResource {
 
       AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
 
-      MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
+      MetricTimeSeries metricTimeSeries = adInputContext.getDimensionMapMetricTimeSeriesMap().get(dimensions);
 
       if (metricTimeSeries == null) {
         // If this case happened, there was something wrong with anomaly detection because we are not able to retrieve

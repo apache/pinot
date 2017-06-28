@@ -260,7 +260,7 @@ public class AnomalyMergeExecutor implements Runnable {
         .fetchExistingMergedAnomaliesByDimension(anomalyResultStart, anomalyResultEnd, dimensions)
         .fetchScalingFactors(anomalyResultStart, anomalyResultEnd);
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();
-    MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
+    MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap().get(dimensions);
 
     if (metricTimeSeries != null) {
       DateTime windowStart = new DateTime(anomalyMergedResult.getStartTime());
