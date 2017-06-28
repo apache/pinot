@@ -43,6 +43,12 @@ export default Ember.Controller.extend({
     const url = `/data/autocomplete/dimensions/metric/${metricId}`;
     return fetch(url)
       .then(res => res.json())
+  }, ///onboard/function/{id}
+
+  fetchFunctionById(functionId) {
+    const url = `/onboard/function/${functionId}`;
+    return fetch(url)
+      .then(res => res.json())
   },
 
   fetchMetricData(metricId) {
@@ -113,17 +119,27 @@ export default Ember.Controller.extend({
     });
   },
 
-  prepareFunctions(configGroup) {
+  prepareFunctions: function(configGroup) {
     const newFunctionList = [];
     const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
-    for (var functionId of existingFunctionList) {
-      console.log(functionId);
-      newFunctionList.push({
-        id: functionId,
-        name: 'some name'
-      });
-    }
-    return newFunctionList;
+    let cnt = 0;
+    return new Ember.RSVP.Promise((resolve) => {
+      for (var functionId of existingFunctionList) {
+        this.fetchFunctionById(functionId).then(functionData => {
+          newFunctionList.push({
+            id: functionData.id,
+            name: functionData.functionName,
+            metric: functionData.metric,
+            type: functionData.type,
+            active: functionData.isActive
+          });
+          cnt ++;
+          if (existingFunctionList.length === cnt) {
+            resolve(newFunctionList);
+          }
+        });
+      }
+    });
   },
 
   saveThirdEyeEntity(alertData, entityType) {
@@ -197,8 +213,10 @@ export default Ember.Controller.extend({
         this.set('selectedConfigGroup', selectedObj);
         this.set('selectedGroupRecipients', selectedObj.recipients);
         this.set('selectedGroupActive', selectedObj.active);
-        this.set('selectedGroupFunctions', this.prepareFunctions(selectedObj));
         this.set('showAlertGroupEdit', true);
+        this.prepareFunctions(selectedObj).then(functionData => {
+          this.set('selectedGroupFunctions', functionData);
+        });
       } else {
         this.set('configSelectorVal', '');
       }
@@ -259,7 +277,7 @@ export default Ember.Controller.extend({
         if (isAlertGroupEditModeActive) {
           let recipientsArr = [];
           if (this.selectedConfigGroup.recipients.length) {
-            this.selectedConfigGroup.recipients.split(',');
+            recipientsArr = this.selectedConfigGroup.recipients.split(',');
           }
           recipientsArr.push(this.alertGroupNewRecipient);
           this.selectedConfigGroup.recipients = recipientsArr.join();

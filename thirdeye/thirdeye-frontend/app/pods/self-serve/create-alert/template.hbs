@@ -131,8 +131,10 @@
       {{#if showAlertGroupEdit}}
         {{#if selectedConfigGroup}}
           <div class="form-group">
-            <label for="config-group" class="control-label">Group Recipients</label>
-            {{textarea
+            <label for="config-group" class="control-label">Add Notification Recipients</label>
+            <div class="alert-group-addrecipients">Current recipients include: {{selectedGroupRecipients}}</div>
+            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateRequiredFields"  key-up="validateRequiredFields" value=alertGroupNewRecipient}}
+            {{!-- {{textarea
               id="alert-group-recipients"
               disabled=true
               class="form-control"
@@ -140,11 +142,7 @@
               name="alert-recipients"
               classBinding="isShowEmptyDescriptionError:error"
               aria-label="short test description"
-              aria-describedby="description-error-msg"}}
-          </div>
-          <div class="form-group">
-            <label for="config-group-add-recipients" class="control-label">Recipient(s) to Add</label>
-            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateRequiredFields"  key-up="validateRequiredFields" value=alertGroupNewRecipient}}
+              aria-describedby="description-error-msg"}} --}}
           </div>
           <div class="form-group">
             <label class="control-label">Group Status</label>
@@ -158,6 +156,9 @@
               <li class="alert-group-functions__item">
                 <span class="alert-group-functions__item--id">{{function.id}}</span>
                 <span class="alert-group-functions__item--name">{{function.name}}</span>
+                <span class="alert-group-functions__item--name">{{function.metric}}</span>
+                <span class="alert-group-functions__item--name">{{function.type}}</span>
+                <span class="alert-group-functions__item--name">{{function.active}}</span>
               </li>
             {{/each}}
             {{else}}
