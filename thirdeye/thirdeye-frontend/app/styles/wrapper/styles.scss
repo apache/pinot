@@ -14,12 +14,6 @@ body {
   border: 1px solid $te-grey;
   margin-top: $te-default-element-spacing;
   margin-bottom: $te-default-element-spacing;
-/*=======
-  padding: 24px 24px 12px 24px;
-  border: 1px solid #CCC;
-  margin-top: 24px;
-  margin-bottom: 24px;
->>>>>>> TE self-serve1*/
 }
 
 .thirdeye-link {
@@ -100,9 +94,8 @@ body {
     &--active {
       background-color: $te-blue;
     }
-/*=======
 
-  ul {
+/*  ul {
     list-style: none;
     margin-bottom: 0;
   }
@@ -128,10 +121,10 @@ body {
     font-weight: 400;
     letter-spacing: 1px;
 
-44<<<<<<< HEAD
+
   &__details-block {
-    padding: 0 15px;
->>>>>>> TE self-serve1*/
+    padding: 0 15px;*/
+
     &--active {
       background-color: $te-blue;
     }
@@ -142,16 +135,6 @@ body {
   &__section-submit {
     margin: $te-default-element-spacing 0 15px 0;
     padding-top: $te-default-element-spacing;
-/*=======
-
-  &__section-fields {
-
-  }
-
-  &__section-submit {
-    margin: 24px 0 15px 0;
-    padding-top: 24px;
->>>>>>> TE self-serve1*/
     text-align: right;
     border-top: 2px app-shade(black, 2) dotted;
   }

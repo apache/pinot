@@ -231,7 +231,10 @@ export default Ember.Controller.extend({
 
         // Add new email recipients if we are dealing with an existing Alert Group
         if (isAlertGroupEditModeActive) {
-          let recipientsArr = this.selectedConfigGroup.recipients.split(',');
+          let recipientsArr = [];
+          if (this.selectedConfigGroup.recipients.length) {
+            this.selectedConfigGroup.recipients.split(',');
+          }
           recipientsArr.push(this.alertGroupNewRecipient);
           this.selectedConfigGroup.recipients = recipientsArr.join();
           finalConfigObj = this.selectedConfigGroup;
