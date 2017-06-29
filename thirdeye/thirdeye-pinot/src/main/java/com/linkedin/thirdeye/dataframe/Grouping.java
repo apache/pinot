@@ -2,9 +2,11 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang.ArrayUtils;
 
 
@@ -13,10 +15,14 @@ public abstract class Grouping {
   public static final String GROUP_VALUE = "value";
 
   public static final String OP_SUM = "SUM";
+  public static final String OP_PRODUCT = "PRODUCT";
   public static final String OP_MIN = "MIN";
   public static final String OP_MAX = "MAX";
   public static final String OP_FIRST = "FIRST";
   public static final String OP_LAST = "LAST";
+  public static final String OP_MEAN = "MEAN";
+  public static final String OP_MEDIAN = "MEDIAN";
+  public static final String OP_STD = "STD";
 
   // TODO generate keys on-demand only
   final Series keys;
@@ -42,7 +48,7 @@ public abstract class Grouping {
     for(int i=0; i<this.size(); i++) {
       builder.addSeries(this.apply(s, i).aggregate(function));
     }
-    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+    return makeResult(builder.build());
   }
 
   /**
@@ -57,7 +63,7 @@ public abstract class Grouping {
     for(int i=0; i<this.size(); i++) {
       values[i++] = this.apply(s, i).size();
     }
-    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, LongSeries.buildFrom(values));
+    return makeResult(LongSeries.buildFrom(values));
   }
 
   GroupingDataFrame sum(Series s) {
@@ -65,7 +71,15 @@ public abstract class Grouping {
     for(int i=0; i<this.size(); i++) {
       builder.addSeries(this.apply(s, i).sum());
     }
-    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+    return makeResult(builder.build());
+  }
+
+  GroupingDataFrame product(Series s) {
+    Series.Builder builder = s.getBuilder();
+    for(int i=0; i<this.size(); i++) {
+      builder.addSeries(this.apply(s, i).product());
+    }
+    return makeResult(builder.build());
   }
 
   GroupingDataFrame min(Series s) {
@@ -73,7 +87,7 @@ public abstract class Grouping {
     for(int i=0; i<this.size(); i++) {
       builder.addSeries(this.apply(s, i).min());
     }
-    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+    return makeResult(builder.build());
   }
 
   GroupingDataFrame max(Series s) {
@@ -81,7 +95,7 @@ public abstract class Grouping {
     for(int i=0; i<this.size(); i++) {
       builder.addSeries(this.apply(s, i).max());
     }
-    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+    return makeResult(builder.build());
   }
 
   GroupingDataFrame first(Series s) {
@@ -89,7 +103,7 @@ public abstract class Grouping {
     for(int i=0; i<this.size(); i++) {
       builder.addSeries(this.apply(s, i).first());
     }
-    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+    return makeResult(builder.build());
   }
 
   GroupingDataFrame last(Series s) {
@@ -97,7 +111,31 @@ public abstract class Grouping {
     for(int i=0; i<this.size(); i++) {
       builder.addSeries(this.apply(s, i).last());
     }
-    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+    return makeResult(builder.build());
+  }
+
+  GroupingDataFrame mean(Series s) {
+    Series.Builder builder = DoubleSeries.builder();
+    for(int i=0; i<this.size(); i++) {
+      builder.addSeries(this.apply(s, i).mean());
+    }
+    return makeResult(builder.build());
+  }
+
+  GroupingDataFrame median(Series s) {
+    Series.Builder builder = DoubleSeries.builder();
+    for(int i=0; i<this.size(); i++) {
+      builder.addSeries(this.apply(s, i).median());
+    }
+    return makeResult(builder.build());
+  }
+
+  GroupingDataFrame std(Series s) {
+    Series.Builder builder = DoubleSeries.builder();
+    for(int i=0; i<this.size(); i++) {
+      builder.addSeries(this.apply(s, i).std());
+    }
+    return makeResult(builder.build());
   }
 
   /**
@@ -105,7 +143,7 @@ public abstract class Grouping {
    *
    * @return group count
    */
-  int size() {
+  public int size() {
     return this.keys.size();
   }
 
@@ -114,7 +152,7 @@ public abstract class Grouping {
    *
    * @return key series
    */
-  Series keys() {
+  public Series keys() {
     return this.keys;
   }
 
@@ -123,7 +161,7 @@ public abstract class Grouping {
    *
    * @return {@code true} is empty, {@code false} otherwise.
    */
-  boolean isEmpty() {
+  public boolean isEmpty() {
     return this.keys.isEmpty();
   }
 
@@ -138,6 +176,10 @@ public abstract class Grouping {
    * @return instance of group
    */
   abstract Series apply(Series s, int groupIndex);
+
+  private GroupingDataFrame makeResult(Series s) {
+    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, s);
+  }
 
   /**
    * Grouping container referencing a single series. Holds group keys and the indices of group
@@ -187,6 +229,10 @@ public abstract class Grouping {
       return this.grouping.sum(this.source);
     }
 
+    public GroupingDataFrame product() {
+      return this.grouping.product(this.source);
+    }
+
     public GroupingDataFrame min() {
       return this.grouping.min(this.source);
     }
@@ -201,6 +247,18 @@ public abstract class Grouping {
 
     public GroupingDataFrame last() {
       return this.grouping.last(this.source);
+    }
+
+    public GroupingDataFrame mean() {
+      return this.grouping.mean(this.source);
+    }
+
+    public GroupingDataFrame median() {
+      return this.grouping.median(this.source);
+    }
+
+    public GroupingDataFrame std() {
+      return this.grouping.std(this.source);
     }
 
     Series apply(int groupIndex) {
@@ -266,8 +324,19 @@ public abstract class Grouping {
       if(seriesNames.length != functions.length)
         throw new IllegalArgumentException("Must provide equal number of series names and functions");
 
+      // check for duplicate use of series name
+      Set<String> outNames = new HashSet<>();
+      outNames.add(this.keyName);
+
+      for(String seriesName : seriesNames) {
+        if(outNames.contains(seriesName))
+          throw new IllegalArgumentException(String.format("Duplicate use of seriesName '%s'", seriesName));
+        outNames.add(seriesName);
+      }
+
       DataFrame df = new DataFrame();
       df.addSeries(this.keyName, this.grouping.keys);
+      df.setIndex(this.keyName);
 
       for(int i=0; i<seriesNames.length; i++) {
         Series s = this.source.get(seriesNames[i]);
@@ -280,8 +349,9 @@ public abstract class Grouping {
     /**
      * Evaluates the {@code aggregationExpressions} and returns the result as a DataFrame with
      * the index corresponding to the grouping key column. Each expression takes the format
-     * {@code seriesName:operation}, where {@code seriesName} is a valid column name in the
-     * underlying DataFrame and {@code operation} is one of {@code SUM, MIN, MAX, FIRST, LAST}.
+     * {@code seriesName:operation[:outputName]}, where {@code seriesName} is a valid column name in the
+     * underlying DataFrame and {@code operation} is one of {@code SUM, PRODUCT, MIN, MAX,
+     * FIRST, LAST, MEAN, MEDIAN, STD} and {@code outputName} is the name of the result series.
      *
      * <br/><b>NOTE:</b> This method is generally faster than aggregating with explicit function
      * references, as it may take advantage of specialized code depending on the grouping.
@@ -294,13 +364,30 @@ public abstract class Grouping {
     public DataFrame aggregate(String... aggregationExpressions) {
       DataFrame df = new DataFrame();
       df.addSeries(this.keyName, this.grouping.keys);
+      df.setIndex(this.keyName);
+
+      Set<String> outNames = new HashSet<>();
+      outNames.add(this.keyName);
 
       for(String expression : aggregationExpressions) {
-        String[] parts = expression.split(":");
+        // parse expression
+        String[] parts = expression.split(":", 3);
+        if(parts.length < 2 || parts.length > 3)
+          throw new IllegalArgumentException(String.format("Could not parse expression '%s'", expression));
+
         String name = parts[0];
         String operation = parts[1];
+        String outName = name;
+        if (parts.length >= 3)
+          outName = parts[2];
 
-        df.addSeries(name, this.aggregateExpression(name, operation).getValues());
+        // check for duplicate use of output name
+        if(outNames.contains(outName))
+          throw new IllegalArgumentException(String.format("Duplicate use of outputName '%s'", outName));
+        outNames.add(outName);
+
+        // compute expression
+        df.addSeries(outName, this.aggregateExpression(name, operation).getValues());
       }
 
       return df;
@@ -310,6 +397,8 @@ public abstract class Grouping {
       switch(operation.toUpperCase()) {
         case OP_SUM:
           return this.sum(seriesName);
+        case OP_PRODUCT:
+          return this.product(seriesName);
         case OP_MIN:
           return this.min(seriesName);
         case OP_MAX:
@@ -318,6 +407,12 @@ public abstract class Grouping {
           return this.first(seriesName);
         case OP_LAST:
           return this.last(seriesName);
+        case OP_MEAN:
+          return this.mean(seriesName);
+        case OP_MEDIAN:
+          return this.median(seriesName);
+        case OP_STD:
+          return this.std(seriesName);
       }
       throw new IllegalArgumentException(String.format("Unknown operation '%s'", operation));
     }
@@ -337,6 +432,10 @@ public abstract class Grouping {
       return this.grouping.sum(this.source.get(seriesName));
     }
 
+    public GroupingDataFrame product(String seriesName) {
+      return this.grouping.product(this.source.get(seriesName));
+    }
+
     public GroupingDataFrame min(String seriesName) {
       return this.grouping.min(this.source.get(seriesName));
     }
@@ -351,6 +450,18 @@ public abstract class Grouping {
 
     public GroupingDataFrame last(String seriesName) {
       return this.grouping.last(this.source.get(seriesName));
+    }
+
+    public GroupingDataFrame mean(String seriesName) {
+      return this.grouping.mean(this.source.get(seriesName));
+    }
+
+    public GroupingDataFrame median(String seriesName) {
+      return this.grouping.median(this.source.get(seriesName));
+    }
+
+    public GroupingDataFrame std(String seriesName) {
+      return this.grouping.std(this.source.get(seriesName));
     }
 
     Series apply(String seriesName, int groupIndex) {
@@ -931,7 +1042,4 @@ public abstract class Grouping {
     }
   }
 
-  private GroupingDataFrame makeResult(Series s) {
-    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, s);
-  }
 }

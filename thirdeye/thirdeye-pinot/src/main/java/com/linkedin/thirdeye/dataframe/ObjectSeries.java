@@ -98,8 +98,8 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
       return this;
     }
 
-    public Builder addValues(Collection<Object> values) {
-      return this.addValues(values.toArray(new Object[values.size()]));
+    public Builder addValues(Collection<?> values) {
+      return this.addValues(values.toArray());
     }
 
     @Override
