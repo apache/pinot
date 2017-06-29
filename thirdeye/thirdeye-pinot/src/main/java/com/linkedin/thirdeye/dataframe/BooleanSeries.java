@@ -402,6 +402,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries or(Series other) {
+    if(other.size() == 1)
+      return this.or(other.getBoolean(0));
     return map(new BooleanFunctionEx() {
       @Override
       public byte apply(byte... values) {
@@ -426,6 +428,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries and(Series other) {
+    if(other.size() == 1)
+      return this.and(other.getBoolean(0));
     return map(new BooleanFunctionEx() {
       @Override
       public byte apply(byte... values) {
@@ -450,6 +454,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries xor(Series other) {
+    if(other.size() == 1)
+      return this.xor(other.getBoolean(0));
     return map(new BooleanFunctionEx() {
       @Override
       public byte apply(byte... values) {
@@ -474,6 +480,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries implies(Series other) {
+    if(other.size() == 1)
+      return this.implies(other.getBoolean(0));
     return map(new BooleanFunctionEx() {
       @Override
       public byte apply(byte... values) {
@@ -498,6 +506,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries eq(Series other) {
+    if(other.size() == 1)
+      return this.eq(other.getBoolean(0));
     return map(new BooleanFunctionEx() {
       @Override
       public byte apply(byte... values) {
@@ -769,7 +779,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     if(series.length <= 0)
       return empty();
 
-    DataFrame.assertSameLength(series);
+
+    assertSameLength(series);
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)

@@ -1178,6 +1178,13 @@ public abstract class Series {
     return pairs;
   }
 
+  static void assertSameLength(Series... series) {
+    for(int i=0; i<series.length-1; i++) {
+      if (series[i].size() != series[i+1].size())
+        throw new IllegalArgumentException("Series size must be of equal size");
+    }
+  }
+
   /* **************************************************************************
    * Code grave
    ***************************************************************************/

@@ -342,6 +342,17 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return this.aggregate(new StringConcat(delimiter)).value();
   }
 
+  public StringSeries concat(Series other) {
+    if(other.size() == 1)
+      return this.concat(other.getString(0));
+    return map(new StringFunction() {
+      @Override
+      public String apply(String... values) {
+        return values[0] + values[1];
+      }
+    }, this, other);
+  }
+
   public StringSeries concat(final String constant) {
     if(isNull(constant))
       return nulls(this.size());
@@ -353,11 +364,13 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     });
   }
 
-  public StringSeries concat(Series other) {
-    return map(new StringFunction() {
+  public BooleanSeries eq(Series other) {
+    if(other.size() == 1)
+      return this.eq(other.getString(0));
+    return map(new StringConditional() {
       @Override
-      public String apply(String... values) {
-        return values[0] + values[1];
+      public boolean apply(String... values) {
+        return values[1].equals(values[0]);
       }
     }, this, other);
   }
@@ -371,15 +384,6 @@ public final class StringSeries extends TypedSeries<StringSeries> {
         return constant.equals(values[0]);
       }
     });
-  }
-
-  public BooleanSeries eq(Series other) {
-    return map(new StringConditional() {
-      @Override
-      public boolean apply(String... values) {
-        return values[1].equals(values[0]);
-      }
-    }, this, other);
   }
 
   public StringSeries set(BooleanSeries where, String value) {
@@ -507,7 +511,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     if(series.length <= 0)
       return empty();
 
-    DataFrame.assertSameLength(series);
+    assertSameLength(series);
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
@@ -579,7 +583,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     if(series.length <= 0)
       return BooleanSeries.empty();
 
-    DataFrame.assertSameLength(series);
+    assertSameLength(series);
 
     String[] input = new String[series.length];
     byte[] output = new byte[series[0].size()];
