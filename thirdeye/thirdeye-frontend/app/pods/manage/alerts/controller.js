@@ -12,7 +12,7 @@ export default Ember.Controller.extend({
   /**
    * Alerts Search Mode options
    */
-  searchModes: ['All', 'Alert Name', 'Dataset Name', 'Application Name'],
+  searchModes: ['All Alerts', 'Alerts', 'Subscriber Groups', 'Applications'],
 
   /**
    * True when results appear
@@ -22,12 +22,15 @@ export default Ember.Controller.extend({
   /**
    * Default Search Mode
    */
-  selectedSearchMode: 'All',
+  selectedSearchMode: 'All Alerts',
 
   /**
    * Array of Alerts we're displaying
    */
   selectedAlerts: [],
+  selectedAll: [],
+  selectedSuscriberGroupName: [],
+  selectedApplicationName: [],
 
   // default current Page
   currentPage: 1,
@@ -36,7 +39,16 @@ export default Ember.Controller.extend({
   pageSize: 10,
 
   // Number of pages to display
-  paginationSize: 5,
+  paginationSize: Ember.computed(
+    'pagesNum',
+    'pageSize',
+    function() {
+      const pagesNum = this.get('pagesNum');
+      const pageSize = this.get('pageSize');
+
+      return Math.min(pagesNum, pageSize/2)
+    }
+  ),
 
   // Total Number of pages to display
   pagesNum: Ember.computed(
@@ -49,9 +61,27 @@ export default Ember.Controller.extend({
     }
   ),
 
+  suscriberGroupNames: Ember.computed('model.suscriberGroupNames', function() {
+    const groupNames = this.get('model.suscriberGroupNames');
+
+    return groupNames
+      .filterBy('name')
+      .map(group => group.name)
+      .uniq()
+      .sort();
+  }),
+
+  applicationNames: Ember.computed('model.applicationNames', function() {
+    const appNames = this.get('model.applicationNames');
+
+    return appNames
+      .map(app => app.application)
+      .sort();
+  }),
+
   // creates the page Array for view
   viewPages: Ember.computed(
-    'pages', 
+    'pages',
     'currentPage',
     'paginationSize',
     'pageNums',
@@ -63,17 +93,17 @@ export default Ember.Controller.extend({
 
       if (max === 1) { return; }
 
-      const startingNumber = ((max - currentPage) < step) 
-        ? max - size + 1
+      const startingNumber = ((max - currentPage) < step)
+        ? Math.max(max - size + 1, 1)
         : Math.max(currentPage - step, 1);
-      
+     
       return [...new Array(size)].map((page, index) =>  startingNumber + index);
     }
   ),
 
   // alerts with pagination
   paginatedSelectedAlerts: Ember.computed(
-    'selectedAlerts.@each', 
+    'selectedAlerts.@each',
     'pageSize',
     'currentPage',
     function() {
@@ -91,6 +121,7 @@ export default Ember.Controller.extend({
    */
   searchByFunctionName: task(function* (alert) {
     yield timeout(600);
+
     const url = `/data/autocomplete/functionByName?name=${alert}`;
     return fetch(url)
       .then(res => res.json())
@@ -100,47 +131,56 @@ export default Ember.Controller.extend({
    * Handler for search by application name
    * Utilizing ember concurrency (task)
    */
-  searchByApplicationName: task(function* (alert) {
+  searchByApplicationName: task(function* (appName) {
     yield timeout(600);
-    const url = `/data/autocomplete/functionByAppname?appname=${alert}`;
+    const url = `/data/autocomplete/functionByAppname?appname=${appName}`;
+
+    this.set('selectedApplicationName', appName)
+    this.set('currentPage', 1);
+
     return fetch(url)
       .then(res => res.json())
+      .then((alerts) => {
+        this.set('selectedAlerts', alerts);
+      });
   }),
 
   /**
-   * Handler for search by alert dataset name
+   * Handler for search by subscriber gropu name
    * Utilizing ember concurrency (task)
    */
-  searchByDatasetName: task(function* (alert) {
+  searchByDatasetName: task(function* (groupName) {
+    this.set('selectedsuscriberGroupNames', groupName);
+    this.set('currentPage', 1);
+
     yield timeout(600);
-    const url = `/data/autocomplete/functionByAlertName?alertName=${alert}`;
+    const url = `/data/autocomplete/functionByAlertName?alertName=${groupName}`;
     return fetch(url)
       .then(res => res.json())
+      .then((filters) => {
+        this.set('selectedAlerts', filters);
+      })
   }),
 
   actions: {
     // Handles alert selection from type ahead
-    onAlertChange(alerts) {
-      this.get('selectedAlerts').pushObject(alerts);
+    onAlertChange(alert) {
+      if (!alert) { return; }
+      this.set('selectedAlerts', [alert]);
+      this.set('primaryMetric', alert);
       this.set('resultsActive', true);
     },
 
     // Handles UI mode change
     onSearchModeChange(mode) {
-      if (mode === 'All') { 
-        const allAlerts = this.get('model');
+      if (mode === 'All Alerts') {
+        const allAlerts = this.get('model.filters');
         this.setProperties({
           selectedAlerts: allAlerts,
           resultsActive: true
         });
       }
       this.set('selectedSearchMode', mode);
-    },
-
-    // removes all
-    removeAll() {
-      this.set('selectedAlerts', []);
-      this.set('resultsActive', false);
     },
 
     /**

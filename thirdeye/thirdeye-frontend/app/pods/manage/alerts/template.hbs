@@ -4,7 +4,7 @@
     {{#accordion-list allowManyActiveItems=true as |accordion|}}
       {{#accordion.item as |accordionItem|}}
         {{#accordionItem.toggle}}
-          <div class="manage-alert-filters__row te-hide">All Alerts</div>
+          <div class="manage-alert-filters__row te-hide">Alerts </div>
         {{/accordionItem.toggle}}
         {{#accordionItem.panel}}
           <div class="manage-alert-filters__options te-hide">Options go here</div>
@@ -16,11 +16,6 @@
 
 <main class="manage-alert-container paper-container col-md-9">
   <div class="manage-alert-container__title">Search for an existing alert</div>
-  <div class="manage-alert-container__reset">
-    <a {{action "removeAll"}} class="thirdeye-link {{if resultsActive "te-link--show" "te-link--hide"}}">
-      Remove Results
-    </a>
-  </div>
   <div class="manage-alert-search">
     <div class="manage-alert-search__filter">
       <div class="manage-alert-search__label">Search By:</div>
@@ -37,9 +32,9 @@
 
     <div class="manage-alert-search__input">
       <div class="manage-alert-search__label">Search for Alert:</div>
-      {{#if (eq selectedSearchMode 'All')}}
+      {{#if (eq selectedSearchMode 'All Alerts')}}
         {{#power-select
-          selected=primaryMetric
+          selected=selectedAll
           onchange=(action "onAlertChange")
           placeholder="Show All Alerts"
           disabled=true
@@ -47,7 +42,7 @@
         }}
           {{alert.functionName}}
         {{/power-select}}
-      {{else if (eq selectedSearchMode 'Alert Name')}}
+      {{else if (eq selectedSearchMode 'Alerts')}}
         {{#power-select
           selected=primaryMetric
           onchange=(action "onAlertChange")
@@ -60,36 +55,47 @@
           {{alert.functionName}}
         {{/power-select}}
 
-      {{else if (eq selectedSearchMode 'Application Name')}}
-          {{#power-select
-          selected=primaryMetric
-          onchange=(action "onAlertChange")
-          search=(perform searchByApplicationName)
-          searchPlaceholder="Search for an Alert"
+      {{else if (eq selectedSearchMode 'Applications')}}
+        {{#power-select
+          selected=selectedApplicationName
+          onchange=(perform searchByApplicationName)
+          options=applicationNames
+          searchPlaceholder="Search for an Application Name"
           placeholder="Search by Application Name"
           allowClear=true
-          as |alert|
+          as |applicationName|
         }}
-          {{alert.functionName}}
+          {{applicationName}}
         {{/power-select}}
 
-      {{else if (eq selectedSearchMode 'Dataset Name')}}
-          {{#power-select
-          selected=primaryMetric
-          onchange=(action "onAlertChange")
-          search=(perform searchByDatasetName)
-          searchPlaceholder="Search for an Alert"
-          placeholder="Search by Dataset Name"
+      {{else if (eq selectedSearchMode 'Subscriber Groups')}}
+        {{#power-select
+          onchange=(perform searchByDatasetName)
+          selected=selectedsuscriberGroupNames
+          options=suscriberGroupNames
+          searchPlaceholder="Search for a dataset"
+          placeholder="Search by Subscriber Group Name"
           allowClear=true
-          as |alert|
+          as |groupName|
         }}
-          {{alert.functionName}}
+          {{groupName}}
         {{/power-select}}
       {{/if}}
     </div>
   </div>
 
   <div class="manage-alert-results">
+    {{#if paginatedSelectedAlerts}}
+      <section class="te-search-header"> 
+        <span class="te-search-title">
+          Alerts Found({{selectedAlerts.length}}) 
+        </span>
+        <span class="pull-right">
+          Showing {{paginatedSelectedAlerts.length}} of 
+          {{selectedAlerts.length}} {{if (gt selectedAlerts.length 1) 'alerts' 'alert'}}
+        </span>
+      </section>
+    {{/if}}
     {{#accordion-list allowManyActiveItems=true as |accordion|}}
       {{#each paginatedSelectedAlerts as |alert|}}
         <!-- For each element in list create an 'accordion.item' -->

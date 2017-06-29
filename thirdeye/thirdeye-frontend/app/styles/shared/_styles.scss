@@ -75,6 +75,17 @@ body {
   }
 }
 
+.te-search-header {
+  padding-bottom: $te-spacing--sm;
+  margin-bottom: $te-spacing--sm;
+  border-bottom: 1px app-shade(black, 1) solid;
+}
+
+.te-search-title {
+  font-size: 16px;
+  color: lighten(black, 25%);
+}
+
 .te-link--show {
   display: block;
   float: right;
