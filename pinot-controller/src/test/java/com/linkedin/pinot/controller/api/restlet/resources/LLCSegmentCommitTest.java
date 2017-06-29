@@ -148,7 +148,7 @@ public class LLCSegmentCommitTest {
     public boolean uploadSuccess;
 
     protected FakeSegmentCompletionManager() {
-      super(null, null, new ControllerMetrics(new MetricsRegistry()));
+      super(null, null, new ControllerMetrics(new MetricsRegistry()), null);
     }
 
     @Override

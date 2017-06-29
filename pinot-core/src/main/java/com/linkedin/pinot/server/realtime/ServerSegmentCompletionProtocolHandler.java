@@ -95,9 +95,9 @@ public class ServerSegmentCompletionProtocolHandler {
     return doHttp(request, createFileParts(segmentName, segmentTarFile));
   }
 
-  public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, final File segmentTarFile) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, final File segmentTarFile, String segmentLocation) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
+    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName).withSegmentLocation(segmentLocation);
     SegmentCompletionProtocol.SegmentCommitEndRequest request = new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
 
     return doHttp(request, null);

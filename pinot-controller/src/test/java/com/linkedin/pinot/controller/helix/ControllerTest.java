@@ -144,12 +144,12 @@ public abstract class ControllerTest {
     _propertyStore = helixResourceManager.getPropertyStore();
   }
 
-  protected void startController() {
-    startController(ControllerTestUtils.getDefaultControllerConfiguration());
+  protected void startController(boolean isSplitCommit) {
+    startController(ControllerTestUtils.getDefaultControllerConfigurationWithSplitCommit());
   }
 
-  protected void startControllerSplitCommit() {
-    startController(ControllerTestUtils.getDefaultControllerConfigurationWithSplitCommit());
+  protected void startController() {
+    startController(ControllerTestUtils.getDefaultControllerConfiguration());
   }
 
   protected ValidationManager getControllerValidationManager() throws Exception {

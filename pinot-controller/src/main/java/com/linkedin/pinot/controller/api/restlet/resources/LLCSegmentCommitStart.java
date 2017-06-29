@@ -45,6 +45,6 @@ public class LLCSegmentCommitStart extends ServerResource {
     SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentCommitStart(requestParams, true);
 
     LOGGER.info(response.toJsonString());
-    return new StringRepresentation(response.getStatus().toString());
+    return new StringRepresentation(response.toJsonString());
   }
 }

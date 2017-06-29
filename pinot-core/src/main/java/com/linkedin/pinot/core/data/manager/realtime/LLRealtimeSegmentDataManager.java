@@ -513,7 +513,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
-                success = commitSegment(segmentTarFile , response);
+                success = commitSegment(segmentTarFile, response);
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -627,14 +627,18 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   protected SegmentCompletionProtocol.Response doSplitCommit(File segmentTarFile, SegmentCompletionProtocol.Response response) {
-    if(!_protocolHandler.segmentCommitStart(_currentOffset, _segmentNameStr).equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_currentOffset, _segmentNameStr);
+    if(!segmentCommitStartResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
-    if (!_protocolHandler.segmentCommitUpload(_currentOffset, _segmentNameStr, segmentTarFile, response.getSegmentLocation())
-        .equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
+    SegmentCompletionProtocol.Response segmentCommitUploadResponse = _protocolHandler.segmentCommitUpload(_currentOffset, _segmentNameStr, segmentTarFile,
+        response.getSegmentLocation());
+    if (!segmentCommitUploadResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
-    return _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentTarFile);
+
+    SegmentCompletionProtocol.Response segmentCommitEndResponse = _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentTarFile, segmentCommitUploadResponse.getSegmentLocation());
+    return segmentCommitEndResponse;
   }
 
   protected boolean commitSegment(final String segTarFileName, SegmentCompletionProtocol.Response response) {
@@ -643,7 +647,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       throw new RuntimeException("Segment file does not exist:" + segTarFileName);
     }
     SegmentCompletionProtocol.Response returnedResponse;
-    if (response.getIsSplitCommit()) {
+    if (response.getIsSplitCommit() /* && */ ) { // TODO: PUT SERVER CONFIG HERE
       // Send segmentStart, segmentUpload, & segmentCommitEnd to the controller
       // if that succeeds, swap in-memory segment with the one built.
       returnedResponse = doSplitCommit(segTarFile, response);

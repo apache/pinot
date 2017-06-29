@@ -42,9 +42,10 @@ public class LLCSegmentCommitEnd extends ServerResource {
     }
     LOGGER.info(requestParams.toString());
 
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, true, true);
+    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams,
+        true, true);
 
     LOGGER.info(response.toJsonString());
-    return new StringRepresentation(response.getStatus().toString());
+    return new StringRepresentation(response.toJsonString());
   }
 }
