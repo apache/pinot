@@ -11,7 +11,7 @@
         {{/link-to}}
       </div>
       <div class="form-group">
-      <label for="select-metric" class="control-label required">Searh for a Metric</label>
+        <label for="select-metric" class="control-label required">Searh for a Metric</label>
         {{#power-select
           search=(perform searchMetricsList)
           selected=selectedMetricOption
@@ -27,18 +27,15 @@
         {{/power-select}}
       </div>
 
+      <label for="select-filters" class="control-label required">Filters</label>
       <div class="form-group">
-
-        {{!--{{filter-select
+        {{filter-select
           options=filters
-          selected=selectedFilters
-        }}--}}
-        
-        {{form.element controlType="text"
-          label="Filters"
-          placeholder="Add a dimension filter..."
-          property="metric"
+          triggerId="select-filters"
+          onChange=(action "onSelectFilter")
+          disabled=(not isMetricSelected)
         }}
+      
       </div>
       <div class="te-graph-alert {{unless isMetricSelected 'te-graph-alert--pending'}}">
         {{#if isMetricSelected}}
@@ -87,6 +84,7 @@
           placeholder="Select a Dimension"
           searchPlaceholder="Type to filter..."
           triggerId="select-dimension"
+          disabled=(not isMetricSelected)
           as |dimension|
         }}
           {{dimension}}

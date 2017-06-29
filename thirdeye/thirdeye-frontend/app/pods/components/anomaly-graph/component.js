@@ -85,6 +85,9 @@ export default Ember.Component.extend({
       return {
         y: {
           show: true,
+          tick: {
+            format: d3.format('.2s')
+          }
         },
         x: {
           type: 'timeseries',
@@ -159,8 +162,8 @@ export default Ember.Component.extend({
         .forEach((metric)  => {
           if (!metric) { return }
           const { baselineValues, currentValues } = metric.subDimensionContributionMap['All'];
-          columns.push([`${metric.metricName}-current`, ...currentValues])
-          columns.push([`${metric.metricName}-baseline`, ...baselineValues])
+          columns.push([`${metric.metricName}-current`, ...currentValues]);
+          columns.push([`${metric.metricName}-baseline`, ...baselineValues]);
         })
       return columns;
     }
@@ -194,7 +197,6 @@ export default Ember.Component.extend({
         type: 'line',
         x: 'date',
         xFormat: '%Y-%m-%d %H:%M',
-        style: 'dashed',
         colors: this.get('colors')
       }
     }

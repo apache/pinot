@@ -16,7 +16,6 @@ export default Ember.Controller.extend({
   isValidated: false,
   showAlertGroupEdit: true,
   filters: {},
-  selectedFilters: {},
   graphConfig: {},
 
   init() {
@@ -71,10 +70,11 @@ export default Ember.Controller.extend({
       currentEnd,
       baselineStart,
       baselineEnd,
-      granularity
+      granularity,
+      filters
     } = config;
 
-    const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters={}`;
+    const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters=${filters}`;
     return fetch(url)
       .then(res => res.json())
   },
@@ -99,11 +99,11 @@ export default Ember.Controller.extend({
       currentEnd,
       baselineStart,
       baselineEnd,
-      granularity
+      granularity,
     };
     this.set('graphConfig', graphConfig);
 
-    this.fetchAnomalyGraphData(graphConfig).then(metricData => {
+    this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
       this.set('isMetricSelected', true);
       this.set('selectedMetric', metricData);
       this.set('loading', false);
@@ -197,6 +197,16 @@ export default Ember.Controller.extend({
         this.triggerGraphFromMetric(selectedObj);
       })
       // this.loadDimensionOptions(selectedObj);
+    },
+    
+    onSelectFilter(filters) {
+
+      this.set('graphConfig.filters', filters);
+      this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
+        this.set('isMetricSelected', true);
+        this.set('selectedMetric', metricData);
+        this.set('loading', false);
+      });
     },
 
     onSelectDimension(selectedObj) {
