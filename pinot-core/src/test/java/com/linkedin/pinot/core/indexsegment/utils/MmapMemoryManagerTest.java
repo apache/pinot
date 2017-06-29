@@ -52,7 +52,7 @@ public class MmapMemoryManagerTest {
   public void testLargeBlocks() throws Exception {
     final String segmentName = "someSegment";
     RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
-    final long s1 = 1024*1024*1024;
+    final long s1 = 2 * MmapMemoryManager.getDefaultFileLength();
     final long s2 = 1000;
     final String col1 = "col1";
     final String col2 = "col2";
@@ -131,7 +131,7 @@ public class MmapMemoryManagerTest {
   public void testCornerConditions() throws Exception {
     final String segmentName = "someSegment";
     RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
-    final long s1 = 512*1024*1024 - 1;
+    final long s1 = MmapMemoryManager.getDefaultFileLength() - 1;
     final long s2 = 1;
     final long s3 = 100*1024*1024;
     final String colName = "col";
@@ -139,17 +139,34 @@ public class MmapMemoryManagerTest {
     final byte v2 = 11;
     final byte v3 = 32;
 
+    // Allocate a buffer 1 less than the default file length, and write the last byte of the buffer.
     PinotDataBuffer b1 = memoryManager.allocate(s1, colName);
     ByteBuffer bb1 = b1.toDirectByteBuffer(0, (int) s1);
     bb1.put((int)s1-1, v1);
+
+    // Allocate another buffer that is 1 byte in size, should be in the same file.
+    // Write a value in the byte.
     PinotDataBuffer b2 = memoryManager.allocate(s2, colName);
     ByteBuffer bb2 = b2.toDirectByteBuffer(0, (int) s2);
     bb2.put((int)s2-1, v2);
+
+    // Verify that there is only one file.
+    File dir = new File(_tmpDir);
+    Assert.assertEquals(dir.listFiles().length, 1);
+
+    // Now allocate another buffer that will open a second file, write a value in the first byte of the buffer.
     PinotDataBuffer b3 = memoryManager.allocate(s3, colName);
     ByteBuffer bb3 = b3.toDirectByteBuffer(0, (int) s3);
     bb3.put(0, v3);
+
+    // Ensure that there are 2 files.
+    Assert.assertEquals(dir.listFiles().length, 2);
+
+    // Make sure that the values written are preserved.
     Assert.assertEquals(bb1.get((int)s1-1), v1);
     Assert.assertEquals(bb2.get((int)s2-1), v2);
     Assert.assertEquals(bb3.get(0), v3);
+
+    memoryManager.close();
   }
 }

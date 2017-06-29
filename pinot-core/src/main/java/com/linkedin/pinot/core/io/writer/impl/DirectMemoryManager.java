@@ -23,10 +23,21 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 // Allocates memory using direct allocation
 public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
 
+  /**
+   * @see RealtimeIndexOffHeapMemoryManager
+   */
   public DirectMemoryManager(final String segmentName) {
     super(segmentName);
   }
 
+  /**
+   *
+   * @param size size of memory
+   * @param columnName Name of the column for which memory is being allocated
+   * @return PinotDataBuffer via direct allocation
+   *
+   * @see {@link RealtimeIndexOffHeapMemoryManager#allocate(long, String)}
+   */
   @Override
   public PinotDataBuffer allocate(long size, String columnName) {
     PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(size, getSegmentName() + "." + columnName);

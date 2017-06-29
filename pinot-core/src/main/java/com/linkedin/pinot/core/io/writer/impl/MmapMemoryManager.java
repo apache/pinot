@@ -35,7 +35,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  * allocating it via mmap.
  *
  * This class attempts to minimize the overall number of file handles used for mapping the files.
- * We create files of length 0.25g (or the requested buffer length, whichever is higher),
+ * We create files of length 0.5g (or the requested buffer length, whichever is higher),
  * and map areas of the file for each allocation request within a segment.
  *
  * @note Thread-unsafe. We expect to use this class only in a single writer case.
@@ -43,20 +43,26 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapMemoryManager.class);
 
-  private static final long FILE_LENGTH = 512 * 1024 * 1024L; // 0.5G per segment
+  private static final long DEFAULT_FILE_LENGTH = 512 * 1024 * 1024L; // 0.5G per segment
 
   private final String _dirPathName;
   // It is possible that one thread stops consumption, and another thread takes over consumption, in LLC.
   // So we should make numFiles as a volatile, in case buffer expansion happens in a different thread.
   private volatile int _numFiles = 0;
-  private long _availableOffset = FILE_LENGTH; // Available offset in this file.
+  private long _availableOffset = DEFAULT_FILE_LENGTH; // Available offset in this file.
   private long _curFileLen = -1;
   private final List<String> _paths = new LinkedList<>();
   PinotDataBuffer _currentBuffer;
 
+  public static long getDefaultFileLength() {
+    return DEFAULT_FILE_LENGTH;
+  }
+
   /**
    * @param dirPathName directory under which all mmap files are created.
    * @param segmentName Name of the segment for which this memory manager allocates memory
+   *
+   * @see RealtimeIndexOffHeapMemoryManager
    */
   public MmapMemoryManager(String dirPathName, String segmentName) {
     super(segmentName);
@@ -81,7 +87,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
     } catch (FileNotFoundException e) {
       throw new RuntimeException(e);
     }
-    long fileLen = Math.max(FILE_LENGTH, len);
+    long fileLen = Math.max(DEFAULT_FILE_LENGTH, len);
     try {
       raf.setLength(fileLen);
       raf.close();
@@ -98,7 +104,9 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   /**
    * @param size size of memory to be mmaped
    * @param columnName Name of the column for which memory is being allocated
-   * @return
+   * @return buffer allocated in mmap mode
+   *
+   * @see {@link RealtimeIndexOffHeapMemoryManager#allocate(long, String)}
    */
   @Override
   public PinotDataBuffer allocate(long size, String columnName) {
