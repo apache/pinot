@@ -50,6 +50,12 @@ export default Ember.Controller.extend({
       .then(res => res.json())
   },
 
+  fetchAnomalyByName(name) {
+    const url = `/data/autocomplete/functionByName?name=${name}`;
+    return fetch(url)
+      .then(res => res.json())
+  },
+
   fetchMetricData(metricId) {
     const promiseHash = {
       granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => res.json()),
@@ -78,7 +84,6 @@ export default Ember.Controller.extend({
     return fetch(url)
       .then(res => res.json())
   },
-
 
   triggerGraphFromMetric(metric) {
     const maxTime = this.get('maxTime');
@@ -119,7 +124,7 @@ export default Ember.Controller.extend({
     });
   },
 
-  prepareFunctions: function(configGroup) {
+  prepareFunctions(configGroup, newId = 0) {
     const newFunctionList = [];
     const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
     let cnt = 0;
@@ -131,7 +136,8 @@ export default Ember.Controller.extend({
             name: functionData.functionName,
             metric: functionData.metric,
             type: functionData.type,
-            active: functionData.isActive
+            active: functionData.isActive,
+            isNewId: functionData.id === newId
           });
           cnt ++;
           if (existingFunctionList.length === cnt) {
@@ -162,14 +168,6 @@ export default Ember.Controller.extend({
       .then(res => res.json());
   },
 
-  checkRequiredValues() {
-    if (this.get('selectedMetricOption') && this.get('selectedPattern') && this.get('alertFunctionName') && this.get('alertGroupNewRecipient')) {
-      return false;
-    } else {
-      return true;
-    }
-  },
-
   /**
    * Placeholder for patterns of interest options
    */
@@ -198,9 +196,8 @@ export default Ember.Controller.extend({
       })
       // this.loadDimensionOptions(selectedObj);
     },
-    
-    onSelectFilter(filters) {
 
+    onSelectFilter(filters) {
       this.set('graphConfig.filters', filters);
       this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
         this.set('isMetricSelected', true);
@@ -221,7 +218,7 @@ export default Ember.Controller.extend({
     onSelectConfigGroup(selectedObj) {
       if (selectedObj) {
         this.set('selectedConfigGroup', selectedObj);
-        this.set('selectedGroupRecipients', selectedObj.recipients);
+        this.set('selectedGroupRecipients', selectedObj.recipients.replace(/,+/g, ', '));
         this.set('selectedGroupActive', selectedObj.active);
         this.set('showAlertGroupEdit', true);
         this.prepareFunctions(selectedObj).then(functionData => {
@@ -236,9 +233,56 @@ export default Ember.Controller.extend({
       this.toggleProperty('showAlertGroupEdit');
     },
 
-    validateRequiredFields() {
-      console.log('validating: ', this.checkRequiredValues());
-      this.set('isSubmitDisabled', this.checkRequiredValues());
+    // Make sure alert name does not exist in system
+    validateAlertName(name) {
+      let isDuplicateName = false;
+      this.fetchAnomalyByName(name).then(anomaly => {
+        for (var resultObj of anomaly) {
+          if (resultObj.functionName === name) {
+            isDuplicateName = true;
+          }
+        }
+        this.set('isAlertNameDuplicate', isDuplicateName);
+      });
+    },
+
+    // Verify that email address does not already exist in alert group. If it does, remove it and alert user.
+    validateAlertEmail(emailInput) {
+      const existingEmailArr = this.get('selectedGroupRecipients');
+      const newEmailArr = emailInput.replace(/\s+/g, '').split(',');
+      let cleanEmailArr = [];
+      let badEmailArr = [];
+      let isDuplicateErr = false;
+
+      existingEmailArr.replace(/\s+/g, '').split(',');
+      for (var email of newEmailArr) {
+        console.log('existingEmailArr.includes(email) ', existingEmailArr.includes(email), email);
+        if (existingEmailArr.includes(email)) {
+          isDuplicateErr = true;
+          badEmailArr.push(email);
+        } else {
+          cleanEmailArr.push(email);
+        }
+      }
+
+      this.send('validateRequired');
+      this.set('isDuplicateEmail', isDuplicateErr);
+      this.set('duplicateEmails', badEmailArr.join());
+      this.set('alertGroupNewRecipient', cleanEmailArr.join(', '));
+    },
+
+    // Ensures presence of values for these fields. TODO: make this more efficient
+    validateRequired() {
+      const reqFields = ['selectedMetricOption', 'selectedPattern', 'alertFunctionName', 'alertGroupNewRecipient'];
+      let allFieldsReady = true;
+
+      for (var field of reqFields) {
+        if (Ember.isNone(this.get(field))) {
+          allFieldsReady = false;
+        }
+      }
+
+      this.set('isSubmitDisabled', !allFieldsReady);
     },
 
     /**
@@ -274,15 +318,10 @@ export default Ember.Controller.extend({
       const isAlertGroupEditModeActive = this.get('showAlertGroupEdit') && this.selectedConfigGroup;
       // A reference to whichever 'alert config' object will be sent. Let's default to the new one
       let finalConfigObj = newConfigObj;
+      let newFunctionId = 0;
 
       // First, save our new alert function
       this.saveThirdEyeFunction(newFunctionObj).then(functionResult => {
-        console.log('saving new function', newFunctionObj);
-        // Add our new Alert Function Id to the Alert Config Object
-        if (Ember.typeOf(functionResult) === 'number') {
-          finalConfigObj.emailConfig.functionIds.push(functionResult);
-        }
-
         // Add new email recipients if we are dealing with an existing Alert Group
         if (isAlertGroupEditModeActive) {
           let recipientsArr = [];
@@ -293,14 +332,20 @@ export default Ember.Controller.extend({
           this.selectedConfigGroup.recipients = recipientsArr.join();
           finalConfigObj = this.selectedConfigGroup;
         }
-
+        // Add our new Alert Function Id to the Alert Config Object
+        if (Ember.typeOf(functionResult) === 'number') {
+          newFunctionId = functionResult;
+          finalConfigObj.emailConfig.functionIds.push(newFunctionId);
+        }
         // Finally, save our Alert Config Group
         this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
-          console.log('saving alert config', newFunctionObj);
           if (alertResult.ok) {
             this.set('selectedGroupRecipients', finalConfigObj.recipients);
             this.set('isCreateSuccess', true);
             this.set('finalFunctionId', functionResult);
+            this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
+              this.set('selectedGroupFunctions', functionData);
+            });
           }
         });
       });

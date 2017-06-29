@@ -27,3 +27,11 @@
     line-height: 54px;
   }
 }
+
+.alert-group-functions {
+  &__item {
+    &--new {
+      font-weight: bold;
+    }
+  }
+}

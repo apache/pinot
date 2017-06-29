@@ -20,7 +20,7 @@
           placeholder="Search by Metric Name"
           searchPlaceholder="Type to filter..."
           triggerId="select-metric"
-          onclose=(action "validateRequiredFields")
+          onclose=(action "validateRequired")
           as |metric|
         }}
           {{metric.alias}}
@@ -68,7 +68,7 @@
           searchEnabled=false
           selected=selectedPattern
           onchange=(action "onSelectPattern")
-          onclose=(action "validateRequiredFields")
+          onclose=(action "validateRequired")
           as |name|
         }}
           {{name}}
@@ -98,11 +98,16 @@
 
     <fieldset class="te-form__section">
       <legend class="te-form__section-title">Alert Details:</legend>
+      {{!-- Field: New Alert Name --}}
       <div class="form-group">
         <label for="anomaly-form-function-name" class="control-label required">Alert Name</label>
         <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">department_metric-name_dimension-name_other-information</span></div>
-        {{input type="text" id="anomaly-form-function-name" class="form-control" placeholder="Add a descriptive alert name" value=alertFunctionName focus-out="validateRequiredFields"}}
+        {{#if isAlertNameDuplicate}}
+          <div class="alert alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
+        {{/if}}
+        {{input type="text" id="anomaly-form-function-name" class="form-control" placeholder="Add a descriptive alert name" value=alertFunctionName focus-out="validateAlertName" key-up="validateAlertName"}}
       </div>
+      {{!-- Field: Select Existing Subscription Group --}}
       <div class="form-group">
         <div class="te-page-right te-page-right--inside">
           <a href="#" class="thirdeye-link-secondary thirdeye-link-secondary--inside" {{action "onClickChangeGroupEditMode"}}>
@@ -128,26 +133,31 @@
       {{!--  Fields for existing alert group edit --}}
       {{#if showAlertGroupEdit}}
         {{#if selectedConfigGroup}}
+          {{!-- Field: new alert group recipient emails --}}
           <div class="form-group">
             <label for="config-group" class="control-label">Add Notification Recipients</label>
             <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "None"}}</span></div>
-            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateRequiredFields"  key-up="validateRequiredFields" placeholder="Add additional recipients (comma-separated email addresses)" value=alertGroupNewRecipient}}
+            {{#if isDuplicateEmail}}
+            <div class="alert alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included. Ommitting it.</div>
+            {{/if}}
+            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateAlertEmail" key-up="validateAlertEmail" placeholder="Add additional recipients (comma-separated email addresses)" autocomplete=false value=alertGroupNewRecipient}}
           </div>
+          {{!-- Alert Group Metadata --}}
           <div class="form-group">
             <label class="control-label">Group Status</label>
             <div class="form-group-text">{{if selectedGroupActive "Active" "Inactive"}}</div>
           </div>
           <div class="form-group">
-            <label for="config-group-functions" class="control-label">Other Alerts in this Group</label>
+            <label for="config-group-functions" class="control-label">Alerts Monitored by This Group</label>
             <ul class="alert-group-functions">
             {{#if selectedGroupFunctions}}
             {{#each selectedGroupFunctions as |function|}}
-              <li class="alert-group-functions__item">
+              <li class="alert-group-functions__item {{if function.isNewId 'alert-group-functions__item--new'}}">
                 <span class="alert-group-functions__item--id">{{function.id}}</span>
                 <span class="alert-group-functions__item--name">{{function.name}}</span>
-                <span class="alert-group-functions__item--name">{{function.metric}}</span>
-                <span class="alert-group-functions__item--name">{{function.type}}</span>
-                <span class="alert-group-functions__item--name">{{function.active}}</span>
+                <span class="alert-group-functions__item--prop">{{function.metric}}</span>
+                <span class="alert-group-functions__item--prop">{{function.type}}</span>
+                <span class="alert-group-functions__item--prop">{{function.active}}</span>
               </li>
             {{/each}}
             {{else}}
@@ -157,14 +167,14 @@
           </div>
         {{/if}}
       {{else}}
-        {{!--  Fields for alert group creation --}}
+      {{!--  Fields for new alert group creation --}}
         <div class="form-group">
           <label for="config-group-new-name" class="control-label">Subscription Group Name</label>
           {{input type="text" id="config-group-new-name" class="form-control" placeholder="Group Name" value=createGroupName}}
         </div>
         <div class="form-group">
           <label for="config-group-new-recipients" class="control-label">Recipient(s) to Add</label>
-          {{input type="text" id="config-group-new-recipients" class="form-control" placeholder="Emails, comma-separated" focus-out="validateRequiredFields" key-up="validateRequiredFields" value=alertGroupNewRecipient}}
+          {{input type="text" id="config-group-new-recipients" class="form-control" placeholder="Emails, comma-separated" focus-out="validateRequired" key-up="validateRequired" value=alertGroupNewRecipient}}
         </div>
         <div class="form-group">
           <label for="config-group-new-activity" class="control-label">Set Group Status</label>
@@ -174,7 +184,6 @@
           {{/bs-button-group}}
         </div>
       {{/if}}
-
     </fieldset>
 
     {{#if isCreateSuccess}}
