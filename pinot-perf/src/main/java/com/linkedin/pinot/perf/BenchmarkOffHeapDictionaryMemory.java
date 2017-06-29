@@ -16,6 +16,9 @@
 
 package com.linkedin.pinot.perf;
 
+import org.openjdk.jmh.annotations.Setup;
+import org.openjdk.jmh.annotations.TearDown;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
@@ -32,6 +35,17 @@ public class BenchmarkOffHeapDictionaryMemory {
   private final long[] totalMem = new long[nDivs+1];
   private final int[] nBufs = new int[nDivs+1];
   private final int [] overflowSize = new int[nDivs+1];
+  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+
+  @Setup
+  public void setUp() {
+    _memoryManager = new DirectMemoryManager(BenchmarkOffHeapDictionaryMemory.class.getName());
+  }
+
+  @TearDown
+  public void tearDown() throws Exception {
+    _memoryManager.close();
+  }
 
   private void setupValues(final int cardinality, final int nRows) {
     // Create a list of values to insert into the hash map
@@ -47,7 +61,7 @@ public class BenchmarkOffHeapDictionaryMemory {
 
   private BaseOffHeapMutableDictionary testMem(final int actualCardinality, final int initialCardinality, final int maxOverflowSize) throws Exception {
     LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(initialCardinality, maxOverflowSize,
-        new DirectMemoryManager("test"), "longColumn");
+        _memoryManager, "longColumn");
 
     for (int i = 0; i < colValues.length; i++) {
       dictionary.index(colValues[i]);

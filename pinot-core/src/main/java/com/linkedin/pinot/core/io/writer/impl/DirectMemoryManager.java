@@ -39,9 +39,8 @@ public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
    * @see {@link RealtimeIndexOffHeapMemoryManager#allocate(long, String)}
    */
   @Override
-  public PinotDataBuffer allocate(long size, String columnName) {
+  protected PinotDataBuffer allocateInternal(long size, String columnName) {
     PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(size, getSegmentName() + "." + columnName);
-    onBufferAdded(buffer);
     return buffer;
   }
 

@@ -25,12 +25,14 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.profile.HotspotMemoryProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.dictionary.StringOffHeapMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.StringOnHeapMutableDictionary;
@@ -43,9 +45,11 @@ public class BenchmarkStringDictionary {
   private String[] uniqueStrings;
   private final int CARDINALITY = 1_000_000;
   private final int MAX_STRING_LEN = 32;
+  private RealtimeIndexOffHeapMemoryManager _memoryManager;
 
   @Setup
   public void setUp() {
+    _memoryManager = new DirectMemoryManager(BenchmarkStringDictionary.class.getName());
     // Create a list of values to insert into the hash map
     uniqueStrings = new String[CARDINALITY];
     Random r = new Random();
@@ -57,6 +61,11 @@ public class BenchmarkStringDictionary {
       int u = r.nextInt(CARDINALITY);
       stringValues[i] = uniqueStrings[u];
     }
+  }
+
+  @TearDown
+  public void tearDown() throws Exception {
+    _memoryManager.close();
   }
 
   // Generates a ascii displayable string of given length
@@ -73,8 +82,7 @@ public class BenchmarkStringDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public StringOffHeapMutableDictionary benchmarkOffHeapStringDictionary() {
-    StringOffHeapMutableDictionary dictionary = new StringOffHeapMutableDictionary(10, 10,
-        new DirectMemoryManager("test"), "stringColumn");
+    StringOffHeapMutableDictionary dictionary = new StringOffHeapMutableDictionary(10, 10, _memoryManager, "stringColumn");
 
     for (int i = 0; i < stringValues.length; i++) {
       dictionary.index(stringValues[i]);

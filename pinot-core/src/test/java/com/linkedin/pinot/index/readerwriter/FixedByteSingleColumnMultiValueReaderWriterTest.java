@@ -19,13 +19,27 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class FixedByteSingleColumnMultiValueReaderWriterTest {
+  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+
+  @BeforeClass
+  public void setUp() {
+    _memoryManager = new DirectMemoryManager(FixedByteSingleColumnMultiValueReaderWriterTest.class.getName());
+  }
+
+  @AfterClass
+  public void tearDown() throws Exception {
+    _memoryManager.close();
+  }
 
   @Test
   public void testIntArray() {
@@ -55,7 +69,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     int columnSizeInBytes = Integer.SIZE / 8;
     int maxNumberOfMultiValuesPerRow = 2000;
     readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows/2, columnSizeInBytes, new DirectMemoryManager("test"), "IntArray");
+        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows/2, columnSizeInBytes, _memoryManager, "IntArray");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -84,7 +98,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     // transition to new ones
     readerWriter =
         new FixedByteSingleColumnMultiValueReaderWriter(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2, columnSizeInBytes,
-            new DirectMemoryManager("test"), "IntArrayFixedSize");
+            _memoryManager, "IntArrayFixedSize");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -112,7 +126,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     Random r = new Random(seed);
     readerWriter =
         new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
-            new DirectMemoryManager("test"), "ZeroSize");
+            _memoryManager, "ZeroSize");
 
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
@@ -144,7 +158,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
 
     FixedByteSingleColumnMultiValueReaderWriter readerWriter =
         new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, avgMultiValueCount,
-            rowCountPerChunk, columnSize, new DirectMemoryManager("test"), "ReaderWriter");
+            rowCountPerChunk, columnSize, _memoryManager, "ReaderWriter");
 
     return readerWriter;
   }

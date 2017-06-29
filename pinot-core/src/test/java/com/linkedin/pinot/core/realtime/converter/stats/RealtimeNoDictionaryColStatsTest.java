@@ -18,9 +18,12 @@ package com.linkedin.pinot.core.realtime.converter.stats;
 
 import java.util.Random;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
@@ -44,6 +47,17 @@ public class RealtimeNoDictionaryColStatsTest {
   private float _floatMaxVal;
   private double _doubleMinVal;
   private double _doubleMaxVal;
+  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+
+  @BeforeClass
+  public void setUp() {
+    _memoryManager = new DirectMemoryManager(RealtimeNoDictionaryColStatsTest.class.getName());
+  }
+
+  @AfterClass
+  public void tearDown() throws Exception {
+    _memoryManager.close();
+  }
 
   private void makeDataSources(long seed) {
     Random random;
@@ -54,13 +68,13 @@ public class RealtimeNoDictionaryColStatsTest {
     random = new Random(seed);
 
     FixedByteSingleColumnSingleValueReaderWriter intRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Integer.SIZE/8, new DirectMemoryManager("test"), "int");
+        random.nextInt(NUM_ROWS)+1, Integer.SIZE/8, _memoryManager, "int");
     FixedByteSingleColumnSingleValueReaderWriter longRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Long.SIZE/8, new DirectMemoryManager("test"), "long");
+        random.nextInt(NUM_ROWS)+1, Long.SIZE/8, _memoryManager, "long");
     FixedByteSingleColumnSingleValueReaderWriter floatRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Float.SIZE/8, new DirectMemoryManager("test"), "float");
+        random.nextInt(NUM_ROWS)+1, Float.SIZE/8, _memoryManager, "float");
     FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Double.SIZE/8, new DirectMemoryManager("test"), "double");
+        random.nextInt(NUM_ROWS)+1, Double.SIZE/8, _memoryManager, "double");
 
     _intMinVal = Integer.MAX_VALUE; _intMaxVal = Integer.MIN_VALUE;
     _longMinVal = Long.MAX_VALUE; _longMaxVal = Long.MIN_VALUE;

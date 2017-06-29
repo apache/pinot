@@ -24,8 +24,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
@@ -41,6 +43,13 @@ public class ConcurrentReadWriteDictionaryTest {
   private static final long SEED = new Random().nextLong();
   private static final Random RANDOM = new Random(SEED);
 
+  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+
+  @BeforeClass
+  public void setUp() {
+    _memoryManager = new DirectMemoryManager(ConcurrentReadWriteDictionaryTest.class.getName());
+  }
+
   @Test
   public void testSingleReaderSingleWriter() throws Exception {
     try {
@@ -51,13 +60,13 @@ public class ConcurrentReadWriteDictionaryTest {
       }
       {
         MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000,
-            new DirectMemoryManager("test"), "intColumn");
+            _memoryManager, "intColumn");
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.INT);
         dictionary.close();
       }
       {
         MutableDictionary dictionary = new StringOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000,
-            new DirectMemoryManager("test"), "stringColumn");
+            _memoryManager, "stringColumn");
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.STRING);
         dictionary.close();
       }
@@ -84,12 +93,12 @@ public class ConcurrentReadWriteDictionaryTest {
       }
       {
         MutableDictionary dictionary = new IntOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000,
-            new DirectMemoryManager("test"), "intColumn");
+            _memoryManager, "intColumn");
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.INT);
       }
       {
         MutableDictionary dictionary = new StringOffHeapMutableDictionary(NUM_ENTRIES / RANDOM.nextInt(NUM_ENTRIES/3), 2000,
-            new DirectMemoryManager("test"), "stringColumn");
+            _memoryManager, "stringColumn");
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.STRING);
       }
     } catch (Throwable t) {
@@ -146,32 +155,27 @@ public class ConcurrentReadWriteDictionaryTest {
         if (onHeap) {
           return new IntOnHeapMutableDictionary();
         }
-        return new IntOffHeapMutableDictionary(estCaridinality, maxOverflowSize, new DirectMemoryManager("test"),
-            "intColumn");
+        return new IntOffHeapMutableDictionary(estCaridinality, maxOverflowSize, _memoryManager, "intColumn");
       case LONG:
         if (onHeap) {
           return new LongOnHeapMutableDictionary();
         }
-        return new LongOffHeapMutableDictionary(estCaridinality, maxOverflowSize, new DirectMemoryManager("test"),
-            "longColumn");
+        return new LongOffHeapMutableDictionary(estCaridinality, maxOverflowSize, _memoryManager, "longColumn");
       case FLOAT:
         if (onHeap) {
           return new FloatOnHeapMutableDictionary();
         }
-        return new FloatOffHeapMutableDictionary(estCaridinality, maxOverflowSize,
-            new DirectMemoryManager("floatColumn"), "floatColumn");
+        return new FloatOffHeapMutableDictionary(estCaridinality, maxOverflowSize, _memoryManager, "floatColumn");
       case DOUBLE:
         if (onHeap) {
           return new DoubleOnHeapMutableDictionary();
         }
-        return new DoubleOffHeapMutableDictionary(estCaridinality, maxOverflowSize, new DirectMemoryManager("test"),
-            "doubleColumn");
+        return new DoubleOffHeapMutableDictionary(estCaridinality, maxOverflowSize, _memoryManager, "doubleColumn");
       case STRING:
         if (onHeap) {
           return new StringOnHeapMutableDictionary();
         }
-        return new StringOffHeapMutableDictionary(estCaridinality, maxOverflowSize, new DirectMemoryManager("test"),
-            "stringColumn");
+        return new StringOffHeapMutableDictionary(estCaridinality, maxOverflowSize, _memoryManager, "stringColumn");
     }
     throw new UnsupportedOperationException("Unsupported type " + dataType.toString());
   }
@@ -217,8 +221,9 @@ public class ConcurrentReadWriteDictionaryTest {
   }
 
   @AfterClass
-  public void tearDown() {
+  public void tearDown() throws Exception {
     EXECUTOR_SERVICE.shutdown();
+    _memoryManager.close();
   }
 
   /**

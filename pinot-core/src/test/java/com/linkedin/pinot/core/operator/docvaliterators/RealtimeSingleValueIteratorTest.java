@@ -18,10 +18,12 @@ package com.linkedin.pinot.core.operator.docvaliterators;
 
 import java.util.Random;
 import org.testng.Assert;
+import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -39,19 +41,26 @@ public class RealtimeSingleValueIteratorTest {
   FixedByteSingleColumnSingleValueReaderWriter _doubleReader;
   private Random _random;
   private long _seed;
+  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+
+  @AfterSuite
+  public void tearDown() throws Exception {
+    _memoryManager.close();
+  }
 
   @BeforeClass
   public void initData() {
+    _memoryManager = new DirectMemoryManager(RealtimeSingleValueIteratorTest.class.getName());
     final long _seed = new Random().nextLong();
     _random = new Random(_seed);
     _intReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.INTEGER_SIZE,
-        new DirectMemoryManager("test"), "intReader");
+        _memoryManager, "intReader");
     _longReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.LONG_SIZE,
-        new DirectMemoryManager("test"), "longReader");
+        _memoryManager, "longReader");
     _floatReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.FLOAT_SIZE,
-        new DirectMemoryManager("test"), "floatReader");
+        _memoryManager, "floatReader");
     _doubleReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.DOUBLE_SIZE,
-        new DirectMemoryManager("test"), "doubleReader");
+        _memoryManager, "doubleReader");
 
     for (int i = 0; i < NUM_ROWS; i++) {
       _intVals[i] = _random.nextInt();

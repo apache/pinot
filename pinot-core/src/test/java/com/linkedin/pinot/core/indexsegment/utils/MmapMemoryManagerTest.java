@@ -22,8 +22,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterSuite;
-import org.testng.annotations.BeforeSuite;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
@@ -34,7 +34,7 @@ public class MmapMemoryManagerTest {
 
   private String _tmpDir;
 
-  @BeforeSuite
+  @BeforeClass
   public void setUp() {
     _tmpDir = System.getProperty("java.io.tmpdir") + "/" + MmapMemoryManagerTest.class.getSimpleName();
     File dir = new File(_tmpDir);
@@ -43,7 +43,7 @@ public class MmapMemoryManagerTest {
     dir.deleteOnExit();
   }
 
-  @AfterSuite
+  @AfterClass
   public void tearDown() {
     new File(_tmpDir).delete();
   }
@@ -148,7 +148,7 @@ public class MmapMemoryManagerTest {
     // Write a value in the byte.
     PinotDataBuffer b2 = memoryManager.allocate(s2, colName);
     ByteBuffer bb2 = b2.toDirectByteBuffer(0, (int) s2);
-    bb2.put((int)s2-1, v2);
+    bb2.put((int) s2 - 1, v2);
 
     // Verify that there is only one file.
     File dir = new File(_tmpDir);
@@ -163,8 +163,8 @@ public class MmapMemoryManagerTest {
     Assert.assertEquals(dir.listFiles().length, 2);
 
     // Make sure that the values written are preserved.
-    Assert.assertEquals(bb1.get((int)s1-1), v1);
-    Assert.assertEquals(bb2.get((int)s2-1), v2);
+    Assert.assertEquals(bb1.get((int) s1 - 1), v1);
+    Assert.assertEquals(bb2.get((int) s2 - 1), v2);
     Assert.assertEquals(bb3.get(0), v3);
 
     memoryManager.close();

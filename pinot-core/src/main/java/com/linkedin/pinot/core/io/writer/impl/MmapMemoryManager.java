@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -49,11 +50,16 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   // It is possible that one thread stops consumption, and another thread takes over consumption, in LLC.
   // So we should make numFiles as a volatile, in case buffer expansion happens in a different thread.
   private volatile int _numFiles = 0;
+  // _availableOffset has the starting offset for the next allocation in _currentBuffer. When _currentBuffer
+  // is created, it is 0. After we allocate a buffer of size x, it is x. And if we allocate another buffer of size
+  // y, then it becomes x+y, etc. We try to fulfil as many allocate() calls as possible on the same _currentBuffer
+  // until the _currentBuffer cannot hold the new object anymore, and then we create a new _currentBuffer.
   private long _availableOffset = DEFAULT_FILE_LENGTH; // Available offset in this file.
   private long _curFileLen = -1;
   private final List<String> _paths = new LinkedList<>();
   PinotDataBuffer _currentBuffer;
 
+  @VisibleForTesting
   public static long getDefaultFileLength() {
     return DEFAULT_FILE_LENGTH;
   }
@@ -96,7 +102,6 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
       throw new RuntimeException(e);
     }
     _paths.add(filePath);
-    onBufferAdded(_currentBuffer);
     _availableOffset = 0;
     _curFileLen = fileLen;
   }
@@ -109,7 +114,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
    * @see {@link RealtimeIndexOffHeapMemoryManager#allocate(long, String)}
    */
   @Override
-  public PinotDataBuffer allocate(long size, String columnName) {
+  protected PinotDataBuffer allocateInternal(long size, String columnName) {
     addFileIfNecessary(size);
     PinotDataBuffer buffer = _currentBuffer.view(_availableOffset, _availableOffset+size);
     _availableOffset += size;

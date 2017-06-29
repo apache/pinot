@@ -19,12 +19,27 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriterTest {
+  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+
+  @BeforeClass
+  public void setUp() {
+    _memoryManager = new DirectMemoryManager(FixedByteSingleColumnSingleValueReaderWriterTest.class.getName());
+  }
+
+  @AfterClass
+  public void tearDown() throws Exception {
+    _memoryManager.close();
+  }
+
   @Test
   public void testInt() throws IOException {
     Random r = new Random();
@@ -44,8 +59,7 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   private void testInt(final Random r, final int rows, final int div) throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Integer.SIZE / 8;
-    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, new DirectMemoryManager("test"),
-        "Int");
+    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, _memoryManager, "Int");
     int[] data = new int[rows];
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextInt();
@@ -89,8 +103,7 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   private void testLong(final Random r, final int rows, final int div) throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Long.SIZE / 8;
-    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, new DirectMemoryManager("test"),
-        "Long");
+    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, _memoryManager, "Long");
     long[] data = new long[rows];
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextLong();
