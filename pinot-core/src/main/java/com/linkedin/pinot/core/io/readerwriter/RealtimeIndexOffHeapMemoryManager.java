@@ -32,11 +32,11 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  *
  * Closing the OffHeapMemoryManager also releases all the resources allocated by the OffHeapMemoryManager.
  */
-public abstract class OffHeapMemoryManager implements Closeable {
+public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
   protected final List<PinotDataBuffer> _buffers = new LinkedList<>();
   protected final String _segmentName;
 
-  protected OffHeapMemoryManager(String segmentName) {
+  protected RealtimeIndexOffHeapMemoryManager(String segmentName) {
     _segmentName = segmentName;
   }
 
@@ -55,7 +55,11 @@ public abstract class OffHeapMemoryManager implements Closeable {
    */
   public abstract  PinotDataBuffer allocate(long size, String columnName);
 
-  public abstract void doClose();
+  protected abstract void doClose();
+
+  protected void onBufferAdded(PinotDataBuffer buffer) {
+    _buffers.add(buffer);
+  }
 
   /**
    * Close out this memory manager and release all memory and resources

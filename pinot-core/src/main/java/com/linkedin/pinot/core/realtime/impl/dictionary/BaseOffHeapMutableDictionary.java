@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import javax.annotation.Nonnull;
@@ -158,7 +158,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   // that we can call close() on these.
   private List<PinotDataBuffer> _pinotDataBuffers = new ArrayList<>();
   private final int _initialRowCount;
-  protected final OffHeapMemoryManager _memoryManager;
+  protected final RealtimeIndexOffHeapMemoryManager _memoryManager;
   protected final String _columnName;
 
   /**
@@ -185,7 +185,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
 
   private volatile ValueToDictId _valueToDict;
 
-  protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize, OffHeapMemoryManager memoryManager,
+  protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize, RealtimeIndexOffHeapMemoryManager memoryManager,
       String columnName) {
     _memoryManager = memoryManager;
     _columnName = columnName;

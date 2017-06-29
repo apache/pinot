@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -100,7 +100,7 @@ public class OffHeapStringStore implements Closeable {
     private int _numStrings = 0;
     private int _availEndOffset;  // Exclusive
 
-    private Buffer(long size, int startIndex, OffHeapMemoryManager memoryManager, String columnName) {
+    private Buffer(long size, int startIndex, RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
       if (size >= Integer.MAX_VALUE) {
         size = Integer.MAX_VALUE - 1;
       }
@@ -174,10 +174,10 @@ public class OffHeapStringStore implements Closeable {
   private volatile List<Buffer> _buffers = new LinkedList<>();
   private int _numElements = 0;
   private volatile Buffer _currentBuffer;
-  private final OffHeapMemoryManager _memoryManager;
+  private final RealtimeIndexOffHeapMemoryManager _memoryManager;
   private final String _columnName;
 
-  public OffHeapStringStore(OffHeapMemoryManager memoryManager, String columnName) {
+  public OffHeapStringStore(RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
     _memoryManager = memoryManager;
     _columnName = columnName;
     expand(START_SIZE, 0L);

@@ -25,7 +25,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -51,7 +51,7 @@ public class MmapMemoryManagerTest {
   @Test
   public void testLargeBlocks() throws Exception {
     final String segmentName = "someSegment";
-    OffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = 1024*1024*1024;
     final long s2 = 1000;
     final String col1 = "col1";
@@ -63,7 +63,7 @@ public class MmapMemoryManagerTest {
     ByteBuffer b1 = buf1.toDirectByteBuffer(0, (int) s1);
     b1.putLong(0, s1);
     Assert.assertEquals(b1.getLong(0), s1);
-    b1.put((int)s1-1, value);
+    b1.put((int) s1 - 1, value);
     Assert.assertEquals(b1.get((int)s1-1), value);
 
     PinotDataBuffer buf2 = memoryManager.allocate(s2, col2);
@@ -99,7 +99,7 @@ public class MmapMemoryManagerTest {
   @Test
   public void testSmallBlocksForSameColumn() throws Exception {
     final String segmentName = "someSegment";
-    OffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = 500;
     final long s2 = 1000;
     final String col1 = "col1";
@@ -125,5 +125,31 @@ public class MmapMemoryManagerTest {
     memoryManager.close();
 
     Assert.assertEquals(dir.listFiles().length, 0);
+  }
+
+  @Test
+  public void testCornerConditions() throws Exception {
+    final String segmentName = "someSegment";
+    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    final long s1 = 512*1024*1024 - 1;
+    final long s2 = 1;
+    final long s3 = 100*1024*1024;
+    final String colName = "col";
+    final byte v1 = 56;
+    final byte v2 = 11;
+    final byte v3 = 32;
+
+    PinotDataBuffer b1 = memoryManager.allocate(s1, colName);
+    ByteBuffer bb1 = b1.toDirectByteBuffer(0, (int) s1);
+    bb1.put((int)s1-1, v1);
+    PinotDataBuffer b2 = memoryManager.allocate(s2, colName);
+    ByteBuffer bb2 = b2.toDirectByteBuffer(0, (int) s2);
+    bb2.put((int)s2-1, v2);
+    PinotDataBuffer b3 = memoryManager.allocate(s3, colName);
+    ByteBuffer bb3 = b3.toDirectByteBuffer(0, (int) s3);
+    bb3.put(0, v3);
+    Assert.assertEquals(bb1.get((int)s1-1), v1);
+    Assert.assertEquals(bb2.get((int)s2-1), v2);
+    Assert.assertEquals(bb3.get(0), v3);
   }
 }

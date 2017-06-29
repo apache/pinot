@@ -26,7 +26,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -40,7 +40,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  *
  * @note Thread-unsafe. We expect to use this class only in a single writer case.
  */
-public class MmapMemoryManager extends OffHeapMemoryManager {
+public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapMemoryManager.class);
 
   private static final long FILE_LENGTH = 512 * 1024 * 1024L; // 0.5G per segment
@@ -64,7 +64,7 @@ public class MmapMemoryManager extends OffHeapMemoryManager {
   }
 
   private void addFileIfNecessary(long len) {
-    if (len + _availableOffset < _curFileLen) {
+    if (len + _availableOffset <= _curFileLen) {
       return;
     }
     String thisContext = getSegmentName() + "." + _numFiles++;
@@ -90,7 +90,7 @@ public class MmapMemoryManager extends OffHeapMemoryManager {
       throw new RuntimeException(e);
     }
     _paths.add(filePath);
-    _buffers.add(_currentBuffer);
+    onBufferAdded(_currentBuffer);
     _availableOffset = 0;
     _curFileLen = fileLen;
   }
@@ -108,7 +108,8 @@ public class MmapMemoryManager extends OffHeapMemoryManager {
     return buffer;
   }
 
-  public void doClose() {
+  @Override
+  protected void doClose() {
     for (String path: _paths) {
       try {
         File file = new File(path);

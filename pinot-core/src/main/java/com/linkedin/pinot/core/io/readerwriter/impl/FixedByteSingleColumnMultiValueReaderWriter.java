@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -109,13 +109,13 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private int columnSizeInBytes;
   private int maxNumberOfMultiValuesPerRow;
   private final int rowCountPerChunk;
-  private final OffHeapMemoryManager memoryManager;
+  private final RealtimeIndexOffHeapMemoryManager memoryManager;
   private final String columnName;
   private int prevRowStartIndex = 0;  // Offset in the databuffer for the last row added.
   private int prevRowLength = 0;  // Number of values in the column for the last row added.
 
   public FixedByteSingleColumnMultiValueReaderWriter(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
-      int columnSizeInBytes, OffHeapMemoryManager memoryManager, String columnName) {
+      int columnSizeInBytes, RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
     this.memoryManager = memoryManager;
     this.columnName = columnName;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);

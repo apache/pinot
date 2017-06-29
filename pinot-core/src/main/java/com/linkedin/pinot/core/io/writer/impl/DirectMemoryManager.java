@@ -16,12 +16,12 @@
 
 package com.linkedin.pinot.core.io.writer.impl;
 
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 // Allocates memory using direct allocation
-public class DirectMemoryManager extends OffHeapMemoryManager {
+public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
 
   public DirectMemoryManager(final String segmentName) {
     super(segmentName);
@@ -29,11 +29,13 @@ public class DirectMemoryManager extends OffHeapMemoryManager {
 
   @Override
   public PinotDataBuffer allocate(long size, String columnName) {
-    return PinotDataBuffer.allocateDirect(size, getSegmentName() + "." + columnName);
+    PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(size, getSegmentName() + "." + columnName);
+    onBufferAdded(buffer);
+    return buffer;
   }
 
   @Override
-  public void doClose() {
+  protected void doClose() {
     // Nothing to do.
   }
 }

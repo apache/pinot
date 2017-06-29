@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import java.io.IOException;
 import java.util.Arrays;
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import javax.annotation.Nonnull;
@@ -30,7 +30,7 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   private final FixedByteSingleColumnSingleValueReaderWriter _dictIdToValue;
 
-  public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize, OffHeapMemoryManager memoryManager,
+  public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize, RealtimeIndexOffHeapMemoryManager memoryManager,
       String columnName) {
     super(estimatedCardinality, maxOverflowSize, memoryManager, columnName);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);

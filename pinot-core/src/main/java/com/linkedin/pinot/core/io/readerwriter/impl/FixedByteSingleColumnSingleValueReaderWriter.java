@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -37,7 +37,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   private final long chunkSizeInBytes;
   private final int numRowsPerChunk;
   private final int columnSizesInBytes;
-  private final OffHeapMemoryManager memoryManager;
+  private final RealtimeIndexOffHeapMemoryManager memoryManager;
   private final String columnName;
   private long numBytesInCurrentWriter = 0;
 
@@ -114,7 +114,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
    * @param columnName
    */
   public FixedByteSingleColumnSingleValueReaderWriter(int numRowsPerChunk, int columnSizesInBytes,
-      OffHeapMemoryManager memoryManager, String columnName) {
+      RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
     chunkSizeInBytes = numRowsPerChunk * columnSizesInBytes;
     this.numRowsPerChunk = numRowsPerChunk;
     this.columnSizesInBytes = columnSizesInBytes;

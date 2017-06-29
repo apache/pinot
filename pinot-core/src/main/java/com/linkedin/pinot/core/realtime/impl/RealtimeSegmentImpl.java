@@ -46,7 +46,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.io.readerwriter.OffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
@@ -100,7 +100,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private StarTreeIndexSpec starTreeIndexSpec = null;
   private SegmentPartitionConfig segmentPartitionConfig = null;
   private final List<String> consumingNoDictionaryColumns = new ArrayList<>();
-  private final OffHeapMemoryManager memoryManager;
+  private final RealtimeIndexOffHeapMemoryManager memoryManager;
 
   // TODO Dynamcally adjust these variables, maybe on a per column basis
 
