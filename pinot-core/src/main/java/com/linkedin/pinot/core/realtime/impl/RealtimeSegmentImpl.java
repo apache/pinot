@@ -46,8 +46,10 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
@@ -98,6 +100,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private StarTreeIndexSpec starTreeIndexSpec = null;
   private SegmentPartitionConfig segmentPartitionConfig = null;
   private final List<String> consumingNoDictionaryColumns = new ArrayList<>();
+  private final RealtimeIndexOffHeapMemoryManager memoryManager;
 
   // TODO Dynamcally adjust these variables, maybe on a per column basis
 
@@ -117,6 +120,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     dictionaryMap = new HashMap<String, MutableDictionary>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
     outgoingTimeColumnName = dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName();
+    this.memoryManager = new DirectMemoryManager(segmentName);
 
     for (final String column : noDictionaryColumns) {
       // Not all no-dictionary columns can be so while the segment is being consumed.
@@ -165,12 +169,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
       if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
         columnIndexReaderWriterMap.put(dimension,
-            new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE, segmentName + "." + dimension + ".fwd"));
+            new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE, memoryManager, dimension));
       } else {
         // TODO Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
         columnIndexReaderWriterMap.put(dimension,
             new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgMultiValueCount,
-                capacity, V1Constants.Numbers.INTEGER_SIZE, segmentName + "." + dimension + ".fwd"));
+                capacity, V1Constants.Numbers.INTEGER_SIZE, memoryManager, dimension));
       }
     }
 
@@ -183,14 +187,15 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         colSize = getColWidth(schema.getFieldSpecFor(metric).getDataType());
       }
       columnIndexReaderWriterMap.put(metric,
-          new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize, segmentName + "." + metric + ".fwd"));
+          new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize, memoryManager, metric));
     }
 
     if (invertedIndexColumns.contains(outgoingTimeColumnName)) {
       invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
     }
     columnIndexReaderWriterMap.put(outgoingTimeColumnName,
-        new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE, segmentName + outgoingTimeColumnName + ".fwd"));
+        new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE, memoryManager,
+            outgoingTimeColumnName));
 
     tableAndStreamName = tableName + "-" + streamName;
   }
@@ -530,6 +535,11 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
     invertedIndexMap.clear();
     _segmentMetadata.close();
+    try {
+      memoryManager.close();
+    } catch (IOException e) {
+      LOGGER.error("Could not close memory manager", e);
+    }
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForStringColumn(final String columnToSortOn) {

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import javax.annotation.Nonnull;
@@ -157,6 +158,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   // that we can call close() on these.
   private List<PinotDataBuffer> _pinotDataBuffers = new ArrayList<>();
   private final int _initialRowCount;
+  protected final RealtimeIndexOffHeapMemoryManager _memoryManager;
+  protected final String _columnName;
 
   /**
    * A class to hold all the objects needed for the reverse mapping.
@@ -182,7 +185,10 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
 
   private volatile ValueToDictId _valueToDict;
 
-  protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize) {
+  protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize, RealtimeIndexOffHeapMemoryManager memoryManager,
+      String columnName) {
+    _memoryManager = memoryManager;
+    _columnName = columnName;
     int initialRowCount = nearestPrime(estimatedCardinality);
     _numEntries = 0;
     _maxItemsInOverflowHash = maxOverflowHashSize;
@@ -288,7 +294,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     for (IntBuffer iBuf : oldList) {
       newList.add(iBuf);
     }
-    PinotDataBuffer buffer = PinotDataBuffer.allocateDirect(bbSize);
+    PinotDataBuffer buffer = _memoryManager.allocate(bbSize, _columnName);
     _pinotDataBuffers.add(buffer);
     buffer.order(ByteOrder.nativeOrder());
     IntBuffer iBuf = buffer.toDirectByteBuffer(0L, bbSize).asIntBuffer();

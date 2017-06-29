@@ -18,15 +18,31 @@ package com.linkedin.pinot.core.indexsegment.utils;
 
 import java.util.Random;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.OffHeapStringStore;
 
 
 public class OffHeapStringStoreTest {
   private static Random RANDOM = new Random();
+  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+
+  @BeforeClass
+  public void setUp() {
+    _memoryManager = new DirectMemoryManager(OffHeapStringStoreTest.class.getName());
+  }
+
+  @AfterClass
+  public void tearDown() throws Exception {
+    _memoryManager.close();
+  }
+
   @Test
   public void maxValueTest() throws Exception {
-    OffHeapStringStore store = new OffHeapStringStore();
+    OffHeapStringStore store = new OffHeapStringStore(_memoryManager, "stringColumn");
     final int arrSize = OffHeapStringStore.getStartSize() - 4;
     String dataIn = generateRandomString(arrSize);
     int index = store.add(dataIn);
@@ -37,7 +53,7 @@ public class OffHeapStringStoreTest {
 
   @Test
   public void overflowTest() throws Exception {
-    OffHeapStringStore store = new OffHeapStringStore();
+    OffHeapStringStore store = new OffHeapStringStore(_memoryManager, "stringColumn");
     final int maxSize = OffHeapStringStore.getStartSize() - 4;
 
     String b1 = generateRandomString(3);

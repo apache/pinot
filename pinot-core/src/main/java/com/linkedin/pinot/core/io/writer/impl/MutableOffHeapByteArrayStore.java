@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -96,11 +97,11 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     private int _numValues = 0;
     private int _availEndOffset;  // Exclusive
 
-    private Buffer(long size, int startIndex) {
+    private Buffer(long size, int startIndex, RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
       if (size >= Integer.MAX_VALUE) {
         size = Integer.MAX_VALUE - 1;
       }
-      _pinotDataBuffer = PinotDataBuffer.allocateDirect(size);
+      _pinotDataBuffer = memoryManager.allocate(size, columnName);
       _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
       _startIndex = startIndex;
@@ -170,8 +171,12 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   private volatile List<Buffer> _buffers = new LinkedList<>();
   private int _numElements = 0;
   private volatile Buffer _currentBuffer;
+  private final RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private final String _columnName;
 
-  public MutableOffHeapByteArrayStore() {
+  public MutableOffHeapByteArrayStore(RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
+    _memoryManager = memoryManager;
+    _columnName = columnName;
     expand(START_SIZE, 0L);
   }
 
@@ -184,7 +189,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
    * @return
    */
   private Buffer expand(long suggestedSize, long minSize) {
-    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements);
+    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements, _memoryManager, _columnName);
     List<Buffer> newList = new LinkedList<>();
     for (Buffer b : _buffers) {
       newList.add(b);
