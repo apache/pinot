@@ -107,6 +107,7 @@ export default Ember.Controller.extend({
       granularity,
     };
     this.set('graphConfig', graphConfig);
+    console.log(JSON.stringify(graphConfig));
 
     this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
       this.set('isMetricSelected', true);
@@ -123,6 +124,36 @@ export default Ember.Controller.extend({
       this.set('loading', false);
     });
   },
+
+  triggerReplay(functionObj, groupObj, newFuncId) {
+    const startTime = moment().subtract(1,'day').endOf('day').format("YYYY-MM-DD");
+    const startStamp = moment().subtract(1,'day').endOf('day').valueOf();
+    const endTime = moment().subtract(1,'month').endOf('day').format("YYYY-MM-DD");
+    const endStamp = moment().subtract(1,'month').endOf('day').valueOf();
+    const granularity = this.get('graphConfig.granularity').toLowerCase();
+    const postProps = {
+      method: 'post',
+      headers: { 'content-type': 'Application/Json' }
+    };
+    let gkey = '';
+
+    const replayApi = {
+      base: 'http://lva1-app0038.corp.linkedin.com:1867/api/detection-job',
+      minute: `/replay/singlefunction?functionId=${newFuncId}&start=${startTime}&end=${endTime}`,
+      hour: `/${newFuncId}/replay?start=${startTime}&end=${endTime}`,
+      day: `/replay/function/${newFuncId}?start=${startTime}&end=${endTime}&goal=1.0&evalMethod=F1_SCORE&includeOriginal=false&tune=\{"pValueThreshold":\[0.001,0.005,0.01,0.05\]\}`,
+      reports: `/thirdeye/email/generate/metrics/${startStamp}/${endStamp}?metrics=${functionObj.metric}&subject=Your%20Metric%20Has%20Onboarded%20To%20Thirdeye&from=thirdeye-noreply@linkedin.com&to=${groupObj.recipients}&teHost=http://lva1-app0583.corp.linkedin.com:1426&smtpHost=email.corp.linkedin.com&smtpPort=25&includeSentAnomaliesOnly=true&isApplyFilter=true`
+    };
+
+    if (granularity.includes('minute')) { gkey = 'minute'; }
+    if (granularity.includes('hour')) { gkey = 'hour'; }
+    if (granularity.includes('day')) { gkey = 'day'; }
+
+    return new Ember.RSVP.Promise((resolve) => {
+      fetch(replayApi.base + replayApi[gkey], postProps).then(res => resolve(res.json()));
+    });
+  },
+
 
   prepareFunctions(configGroup, newId = 0) {
     const newFunctionList = [];
@@ -176,7 +207,10 @@ export default Ember.Controller.extend({
    * Placeholder for alert groups options
    */
   allAlertsConfigGroups: Ember.computed.reads('model.allAlertsConfigGroups'),
-
+  /**
+   * Placeholder for app name options
+   */
+  allApplicationNames: Ember.computed.reads('model.allAppNames'),
   /**
    * Actions for create alert form view
    */
@@ -213,6 +247,10 @@ export default Ember.Controller.extend({
 
     onSelectPattern(selectedObj) {
       this.set('selectedPattern', selectedObj);
+    },
+
+    onSelectAppName(selectedObj) {
+      this.set('selectedAppName', selectedObj);
     },
 
     onSelectConfigGroup(selectedObj) {
@@ -309,9 +347,9 @@ export default Ember.Controller.extend({
         metricFunction: 'SUM',
         type: 'SIGN_TEST_VANILLA',
         windowSize: 6,
-        windowUnit: 'HOURS',
+        windowUnit: this.get('graphConfig.granularity'),
         isActive: false,
-        properties: 'signTestWindowSize=24;anomalyRemovalWeightThreshold=0.6;signTestPattern=' + this.get('selectedPattern') + 'UP;pValueThreshold=0.01;signTestBaselineShift=0.0;signTestBaselineLift=0.90;baseline=w/4wAvg;decayRate=0.5;signTestStepSize=1'
+        properties: 'signTestWindowSize=24;anomalyRemovalWeightThreshold=0.6;signTestPattern=' + this.get('selectedPattern') + ';pValueThreshold=0.01;signTestBaselineShift=0.0;signTestBaselineLift=0.90;baseline=w/4wAvg;decayRate=0.5;signTestStepSize=1'
       };
 
       // If these two conditions are true, we assume the user wants to edit an existing alert group
@@ -345,6 +383,10 @@ export default Ember.Controller.extend({
             this.set('finalFunctionId', functionResult);
             this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
               this.set('selectedGroupFunctions', functionData);
+            });
+            this.triggerReplay(newFunctionObj, finalConfigObj, newFunctionId).then(result => {
+              console.log('done with replay : ', result);
+              this.set('replayStatus', result);
             });
           }
         });

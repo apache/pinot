@@ -107,6 +107,22 @@
         {{/if}}
         {{input type="text" id="anomaly-form-function-name" class="form-control" placeholder="Add a descriptive alert name" value=alertFunctionName focus-out="validateAlertName" key-up="validateAlertName"}}
       </div>
+      {{!-- Field: App Name --}}
+      <div class="form-group">
+        <label for="anomaly-form-app-name" class="control-label required">Application Name</label>
+         {{#power-select
+            options=allApplicationNames
+            selected=selectedAppName
+            onchange=(action "onSelectAppName")
+            loadingMessage="Waiting for the server...."
+            placeholder="Select an existing application name"
+            searchPlaceholder="Type to filter..."
+            triggerId="anomaly-form-app-name"
+            as |app|
+          }}
+            {{app.application}}
+          {{/power-select}}
+      </div>
       {{!-- Field: Select Existing Subscription Group --}}
       <div class="form-group">
         <div class="te-page-right te-page-right--inside">
@@ -140,7 +156,7 @@
             {{#if isDuplicateEmail}}
             <div class="alert alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included. Ommitting it.</div>
             {{/if}}
-            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateAlertEmail" key-up="validateAlertEmail" placeholder="Add additional recipients (comma-separated email addresses)" autocomplete=false value=alertGroupNewRecipient}}
+            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateAlertEmail" placeholder="Add additional recipients (comma-separated email addresses)" autocomplete=false value=alertGroupNewRecipient}}
           </div>
           {{!-- Alert Group Metadata --}}
           <div class="form-group">
