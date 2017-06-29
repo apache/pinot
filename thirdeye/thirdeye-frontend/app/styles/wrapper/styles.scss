@@ -138,4 +138,12 @@ body {
     text-align: right;
     border-top: 2px app-shade(black, 2) dotted;
   }
+
+  &__sub-label {
+    margin: -5px 0 5px 0;
+
+    &--strong {
+      font-weight: 600;
+    }
+  }
 }

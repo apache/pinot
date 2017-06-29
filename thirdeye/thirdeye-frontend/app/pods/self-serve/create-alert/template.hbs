@@ -35,7 +35,7 @@
           onChange=(action "onSelectFilter")
           disabled=(not isMetricSelected)
         }}
-      
+
       </div>
       <div class="te-graph-alert {{unless isMetricSelected 'te-graph-alert--pending'}}">
         {{#if isMetricSelected}}
@@ -100,7 +100,7 @@
       <legend class="te-form__section-title">Alert Details:</legend>
       <div class="form-group">
         <label for="anomaly-form-function-name" class="control-label required">Alert Name</label>
-        {{!-- <div class="form-group__instructions">department_metric-name_dimension-name_other-information</div> --}}
+        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">department_metric-name_dimension-name_other-information</span></div>
         {{input type="text" id="anomaly-form-function-name" class="form-control" placeholder="Add a descriptive alert name" value=alertFunctionName focus-out="validateRequiredFields"}}
       </div>
       <div class="form-group">
@@ -130,17 +130,8 @@
         {{#if selectedConfigGroup}}
           <div class="form-group">
             <label for="config-group" class="control-label">Add Notification Recipients</label>
-            <div class="alert-group-addrecipients">Current recipients include: {{selectedGroupRecipients}}</div>
-            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateRequiredFields"  key-up="validateRequiredFields" value=alertGroupNewRecipient}}
-            {{!-- {{textarea
-              id="alert-group-recipients"
-              disabled=true
-              class="form-control"
-              value=selectedGroupRecipients
-              name="alert-recipients"
-              classBinding="isShowEmptyDescriptionError:error"
-              aria-label="short test description"
-              aria-describedby="description-error-msg"}} --}}
+            <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "None"}}</span></div>
+            {{input type="text" id="config-group-add-recipients" class="form-control" focus-out="validateRequiredFields"  key-up="validateRequiredFields" placeholder="Add additional recipients (comma-separated email addresses)" value=alertGroupNewRecipient}}
           </div>
           <div class="form-group">
             <label class="control-label">Group Status</label>
