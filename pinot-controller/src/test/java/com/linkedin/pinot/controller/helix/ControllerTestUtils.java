@@ -38,6 +38,19 @@ public class ControllerTestUtils {
     conf.setDataDir(DEFAULT_DATA_DIR);
     conf.setControllerVipHost("localhost");
     conf.setControllerVipProtocol("http");
+    conf.setSplitCommit(false);
+
+    return conf;
+  }
+
+  public static ControllerConf getDefaultControllerConfigurationWithSplitCommit() {
+    final ControllerConf conf = new ControllerConf();
+    conf.setControllerHost(DEFAULT_CONTROLLER_HOST_NAME);
+    conf.setControllerPort(DEFAULT_CONTROLLER_API_PORT);
+    conf.setDataDir(DEFAULT_DATA_DIR);
+    conf.setControllerVipHost("localhost");
+    conf.setControllerVipProtocol("http");
+    conf.setSplitCommit(true);
 
     return conf;
   }
