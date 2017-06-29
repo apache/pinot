@@ -321,7 +321,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     }
 
     LOG.info("Split order: {}", dimensionsSplitOrder);
-    LOG.info("Skip Materilazitaion For Dimensions: {}", skipMaterializationForDimensions);
+    LOG.info("Skip Materialization For Dimensions: {}", skipMaterializationForDimensions);
 
     long start = System.currentTimeMillis();
     dataBuffer.flush();
@@ -689,7 +689,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       rowsAdded++;
     }
     docsAdded += rowsAdded;
-    LOG.debug("Added {} additional records at level {}", rowsAdded, level);
+    LOG.debug("level {}, input docs:{},  additional records {}, aggRecordCount:{}", level, (endDocId -startDocId), rowsAdded, aggRecordCount);
     // flush
     dataBuffer.flush();
 

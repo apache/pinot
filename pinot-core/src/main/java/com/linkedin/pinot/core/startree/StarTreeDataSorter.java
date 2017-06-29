@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import xerial.larray.mmap.MMapBuffer;
 import xerial.larray.mmap.MMapMode;
 
-
 /**
  * A star tree data table optimized for in-place modifications/sorting
  * of data. This class allows for the following operations on a fixed size data table:
@@ -50,8 +49,7 @@ public class StarTreeDataSorter {
   private int metricSizeInBytes;
   private int totalSizeInBytes;
 
-  public StarTreeDataSorter(File file, int dimensionSizeInBytes, int metricSizeInBytes)
-      throws IOException {
+  public StarTreeDataSorter(File file, int dimensionSizeInBytes, int metricSizeInBytes) throws IOException {
     this.dimensionSizeInBytes = dimensionSizeInBytes;
     this.metricSizeInBytes = metricSizeInBytes;
     this.totalSizeInBytes = dimensionSizeInBytes + metricSizeInBytes;
@@ -60,13 +58,14 @@ public class StarTreeDataSorter {
 
   /**
    * Sort from to given start (inclusive) to end (exclusive) as per the provided sort order.
+   * 
    * @param startRecordId inclusive
    * @param endRecordId exclusive
    * @param sortOrder
    */
   public void sort(int startRecordId, int endRecordId, final int[] sortOrder) {
     int length = endRecordId - startRecordId;
-    final int startOffset = startRecordId * totalSizeInBytes;
+    final long startOffset = (long) startRecordId * totalSizeInBytes;
 
     List<Integer> idList = new ArrayList<Integer>();
     for (int i = startRecordId; i < endRecordId; i++) {
@@ -79,11 +78,11 @@ public class StarTreeDataSorter {
 
       @Override
       public int compare(Integer o1, Integer o2) {
-        int pos1 = startOffset + (o1) * totalSizeInBytes;
-        int pos2 = startOffset + (o2) * totalSizeInBytes;
+        long pos1 = startOffset + (o1) * totalSizeInBytes;
+        long pos2 = startOffset + (o2) * totalSizeInBytes;
 
-        mappedByteBuffer.copyTo(pos1, buf1, 0, dimensionSizeInBytes);
-        mappedByteBuffer.copyTo(pos2, buf2, 0, dimensionSizeInBytes);
+        copyTo(pos1, buf1, 0, dimensionSizeInBytes);
+        copyTo(pos2, buf2, 0, dimensionSizeInBytes);
 
         IntBuffer bb1 = ByteBuffer.wrap(buf1).asIntBuffer();
         IntBuffer bb2 = ByteBuffer.wrap(buf2).asIntBuffer();
@@ -119,8 +118,8 @@ public class StarTreeDataSorter {
       int thatRecordIdPos = currentPositions[thatRecordId];
 
       // swap the buffers
-      mappedByteBuffer.copyTo(startOffset + thisRecordIdPos * totalSizeInBytes, buf1, 0, totalSizeInBytes);
-      mappedByteBuffer.copyTo(startOffset + thatRecordIdPos * totalSizeInBytes, buf2, 0, totalSizeInBytes);
+      copyTo(startOffset + thisRecordIdPos * totalSizeInBytes, buf1, 0, totalSizeInBytes);
+      copyTo(startOffset + thatRecordIdPos * totalSizeInBytes, buf2, 0, totalSizeInBytes);
       mappedByteBuffer.readFrom(buf2, 0, startOffset + thisRecordIdPos * totalSizeInBytes, totalSizeInBytes);
       mappedByteBuffer.readFrom(buf1, 0, startOffset + thatRecordIdPos * totalSizeInBytes, totalSizeInBytes);
 
@@ -149,6 +148,7 @@ public class StarTreeDataSorter {
 
   /**
    * Perform group-by based on the 'count' for the given column.
+   * 
    * @param startDocId inclusive
    * @param endDocId exclusive
    * @param colIndex
@@ -157,14 +157,14 @@ public class StarTreeDataSorter {
   public Map<Integer, IntPair> groupByIntColumnCount(int startDocId, int endDocId, Integer colIndex) {
     int length = endDocId - startDocId;
     Map<Integer, IntPair> rangeMap = new LinkedHashMap<>();
-    final int startOffset = startDocId * totalSizeInBytes;
+    final long startOffset = (long) startDocId * totalSizeInBytes;
 
     int prevValue = -1;
     int prevStart = 0;
     byte[] dimBuff = new byte[dimensionSizeInBytes];
 
     for (int i = 0; i < length; i++) {
-      mappedByteBuffer.copyTo(startOffset + (i * totalSizeInBytes), dimBuff, 0, dimensionSizeInBytes);
+      copyTo(startOffset + (i * totalSizeInBytes), dimBuff, 0, dimensionSizeInBytes);
       int value = ByteBuffer.wrap(dimBuff).asIntBuffer().get(colIndex);
       if (prevValue != -1 && prevValue != value) {
         rangeMap.put(prevValue, new IntPair(startDocId + prevStart, startDocId + i));
@@ -185,10 +185,9 @@ public class StarTreeDataSorter {
    * @return
    * @throws IOException
    */
-  public Iterator<Pair<byte[], byte[]>> iterator(int startDocId, int endDocId)
-      throws IOException {
+  public Iterator<Pair<byte[], byte[]>> iterator(int startDocId, int endDocId) throws IOException {
     final int length = endDocId - startDocId;
-    final int startOffset = startDocId * totalSizeInBytes;
+    final long startOffset = (long) startDocId * totalSizeInBytes;
     return new Iterator<Pair<byte[], byte[]>>() {
       int pointer = 0;
 
@@ -207,15 +206,37 @@ public class StarTreeDataSorter {
         byte[] dimBuff = new byte[dimensionSizeInBytes];
         byte[] metBuff = new byte[metricSizeInBytes];
 
-        mappedByteBuffer.copyTo(startOffset + (pointer * totalSizeInBytes), dimBuff, 0, dimensionSizeInBytes);
+        copyTo(startOffset + (pointer * totalSizeInBytes), dimBuff, 0, dimensionSizeInBytes);
         if (metricSizeInBytes > 0) {
-          mappedByteBuffer
-              .copyTo(startOffset + (pointer * totalSizeInBytes) + dimensionSizeInBytes, metBuff, 0, metricSizeInBytes);
+          copyTo(startOffset + (pointer * totalSizeInBytes) + dimensionSizeInBytes, metBuff, 0, metricSizeInBytes);
         }
 
         pointer = pointer + 1;
         return Pair.of(dimBuff, metBuff);
       }
     };
+  }
+
+  /**
+   * Copied from LArray code and modified to support long offsets
+   * TODO:Remove this once the method is available in Larray library
+   * @param srcOffset
+   * @param destArray
+   * @param destOffset
+   * @param size
+   */
+  private void copyTo(long srcOffset, byte[] destArray, int destOffset, int size) {
+    if (srcOffset < 0) {
+      throw new ArrayIndexOutOfBoundsException("Invalid offset:" + srcOffset);
+    }
+    int cursor = destOffset;
+    for (ByteBuffer bb : mappedByteBuffer.toDirectByteBuffers(srcOffset, size)) {
+      int bbSize = bb.remaining();
+      if ((cursor + bbSize) > destArray.length) {
+        throw new ArrayIndexOutOfBoundsException(String.format("cursor + bbSize = %,d", cursor + bbSize));
+      }
+      bb.get(destArray, cursor, bbSize);
+      cursor += bbSize;
+    }
   }
 }
