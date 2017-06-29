@@ -2159,10 +2159,9 @@ public class DataFrameTest {
     assertEquals(s, 0, 0.25, 1.0);
   }
 
-  @Test
+  @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDoubleNormalizeFailInvalid() {
-    DoubleSeries s = DataFrame.toSeries(1.5, 1.5, 1.5).normalize();
-    assertEquals(s, DoubleSeries.nulls(3));
+    DataFrame.toSeries(1.5, 1.5, 1.5).normalize();
   }
 
   @Test
@@ -2171,10 +2170,9 @@ public class DataFrameTest {
     assertEquals(s, -1, 0.0, 1);
   }
 
-  @Test
+  @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDoubleZScoreFailInvalid() {
-    DoubleSeries s = DataFrame.toSeries(1.5, 1.5, 1.5).zscore();
-    assertEquals(s, DoubleSeries.nulls(3));
+    DataFrame.toSeries(1.5, 1.5, 1.5).zscore();
   }
 
   @Test

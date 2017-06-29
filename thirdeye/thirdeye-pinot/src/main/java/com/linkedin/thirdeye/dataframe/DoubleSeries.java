@@ -460,20 +460,35 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return cov(this, other);
   }
 
+  /**
+   * Returns a copy of the series with values normalized to within a range of {@code [0.0, 1.0]}.
+   *
+   * @return series copy with range normalized values
+   * @throws IllegalArgumentException if series min equals max
+   */
   public DoubleSeries normalize() {
-    try {
-      return this.map(new DoubleMapNormalize(this.min().value(), this.max().value()));
-    } catch (Exception e) {
-      return DoubleSeries.builder().fillValues(this.size(), NULL).build();
-    }
+    return this.map(new DoubleMapNormalize(this.min().value(), this.max().value()));
   }
 
+  /**
+   * Returns a copy of the series with values normalized to sum to {@code 1.0}.
+   *
+   * @return series copy with summation normalized values
+   * @throws ArithmeticException if series sums to zero
+   */
+  public DoubleSeries normalizeSum() {
+    return this.divide(this.sum());
+  }
+
+  /**
+   * Returns a copy of the series with values centered on their mean and range normalized via
+   * standard deviation.
+   *
+   * @return series copy with zscore normalized values
+   * @throws IllegalArgumentException if series standard deviation is zero
+   */
   public DoubleSeries zscore() {
-    try {
-      return this.map(new DoubleMapZScore(this.mean().value(), this.std().value()));
-    } catch (Exception e) {
-      return DoubleSeries.builder().fillValues(this.size(), NULL).build();
-    }
+    return this.map(new DoubleMapZScore(this.mean().value(), this.std().value()));
   }
 
   public DoubleSeries add(Series other) {
