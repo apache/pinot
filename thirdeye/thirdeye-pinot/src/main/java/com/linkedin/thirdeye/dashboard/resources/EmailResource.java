@@ -10,9 +10,12 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
+import java.util.Map;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -60,6 +63,24 @@ public class EmailResource {
   public Response deleteByAlertId(@PathParam("alertId") Long alertId) {
     alertDAO.deleteById(alertId);
     return Response.ok().build();
+  }
+
+  @GET
+  @Path("functions")
+  public Map<Long, List<AlertConfigDTO>> getAlertToSubscriberMapping() {
+    Map<Long, List<AlertConfigDTO>> mapping = new HashMap<>();
+    List<AlertConfigDTO> subscriberGroups = alertDAO.findAll();
+    for(AlertConfigDTO alertConfigDTO : subscriberGroups) {
+      if (null != alertConfigDTO.getEmailConfig()) {
+        for (Long alertFunctionId : alertConfigDTO.getEmailConfig().getFunctionIds()) {
+          if (!mapping.containsKey(alertFunctionId)) {
+            mapping.put(alertFunctionId, new ArrayList<AlertConfigDTO>());
+          }
+          mapping.get(alertFunctionId).add(alertConfigDTO);
+        }
+      }
+    }
+    return mapping;
   }
 
   /**
