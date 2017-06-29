@@ -20,6 +20,7 @@ import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFutureTask;
+import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -499,38 +500,33 @@ public class ClusterIntegrationTestUtils {
    *
    * @param pqlQuery Pinot PQL query
    * @param brokerUrl Pinot broker URL
+   * @param pinotConnection Pinot connection
    * @param sqlQueries H2 SQL queries
-   * @param h2Connection H2 Connection
+   * @param h2Connection H2 connection
    * @throws Exception
    */
-  public static void testQuery(@Nonnull String pqlQuery, @Nonnull String brokerUrl, @Nullable List<String> sqlQueries,
+  public static void testQuery(@Nonnull String pqlQuery, @Nonnull String brokerUrl,
+      @Nonnull com.linkedin.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
+    // Use broker response for metadata check, connection response for value check
     JSONObject pinotResponse = ControllerTest.postQuery(pqlQuery, brokerUrl);
-
-    // Check exceptions
-    JSONArray exceptions = pinotResponse.getJSONArray("exceptions");
-    if (exceptions.length() > 0) {
-      String failureMessage = "Got exceptions: " + exceptions + " in Pinot response";
-      failure(pqlQuery, sqlQueries, failureMessage, null);
-    }
+    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pqlQuery);
 
     // Skip comparison if SQL queries are not specified
     if (sqlQueries == null) {
       return;
     }
 
-    // Check results
     Assert.assertNotNull(h2Connection);
     Statement h2statement = h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    int numDocsScanned = pinotResponse.getInt("numDocsScanned");
+
+    int pinotNumRecordsSelected = pinotResponse.getInt("numDocsScanned");
 
     // Aggregation results
     if (pinotResponse.has("aggregationResults")) {
-
       // Check number of aggregation results
-      JSONArray aggregationResultsArray = pinotResponse.getJSONArray("aggregationResults");
-      int numAggregationResults = aggregationResultsArray.length();
+      int numAggregationResults = pinotResultSetGroup.getResultSetCount();
       int numSqlQueries = sqlQueries.size();
       if (numAggregationResults != numSqlQueries) {
         String failureMessage =
@@ -540,25 +536,23 @@ public class ClusterIntegrationTestUtils {
       }
 
       // Get aggregation type
-      JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
+      JSONObject pinotFirstAggregationResult = pinotResponse.getJSONArray("aggregationResults").getJSONObject(0);
 
       // Aggregation-only results
-      if (firstAggregationResult.has("value")) {
-
+      if (pinotFirstAggregationResult.has("value")) {
         // Check over all aggregation functions
-        for (int i = 0; i < numAggregationResults; i++) {
-
+        for (int aggregationIndex = 0; aggregationIndex < numAggregationResults; aggregationIndex++) {
           // Get expected value for the aggregation
-          h2statement.execute(sqlQueries.get(i));
-          ResultSet sqlResultSet = h2statement.getResultSet();
-          sqlResultSet.first();
-          String sqlValue = sqlResultSet.getString(1);
+          h2statement.execute(sqlQueries.get(aggregationIndex));
+          ResultSet h2ResultSet = h2statement.getResultSet();
+          h2ResultSet.first();
+          String h2Value = h2ResultSet.getString(1);
 
-          // If SQL value is null, it means no record selected in H2
-          if (sqlValue == null) {
-            // Check if number of documents scanned is 0.
-            if (numDocsScanned != 0) {
-              String failureMessage = "No record selected in H2 but " + numDocsScanned + " records selected in Pinot";
+          // If H2 value is null, it means no record selected in H2
+          if (h2Value == null) {
+            if (pinotNumRecordsSelected != 0) {
+              String failureMessage =
+                  "No record selected in H2 but " + pinotNumRecordsSelected + " records selected in Pinot";
               failure(pqlQuery, sqlQueries, failureMessage);
             }
 
@@ -567,11 +561,12 @@ public class ClusterIntegrationTestUtils {
           }
 
           // Fuzzy compare expected value and actual value
-          double expectedValue = Double.parseDouble(sqlValue);
-          String pqlValue = aggregationResultsArray.getJSONObject(i).getString("value");
-          double actualValue = Double.parseDouble(pqlValue);
+          double expectedValue = Double.parseDouble(h2Value);
+          String pinotValue = pinotResultSetGroup.getResultSet(aggregationIndex).getString(0);
+          double actualValue = Double.parseDouble(pinotValue);
           if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
-            String failureMessage = "Value: " + i + " does not match, expected: " + sqlValue + ", got: " + pqlValue;
+            String failureMessage =
+                "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue;
             failure(pqlQuery, sqlQueries, failureMessage);
           }
         }
@@ -580,52 +575,47 @@ public class ClusterIntegrationTestUtils {
       }
 
       // Group-by results
-      if (firstAggregationResult.has("groupByResult")) {
+      if (pinotFirstAggregationResult.has("groupByResult")) {
         // Get number of groups
-        JSONArray firstGroupByResults = aggregationResultsArray.getJSONObject(0).getJSONArray("groupByResult");
-        int numGroups = firstGroupByResults.length();
+        com.linkedin.pinot.client.ResultSet pinotFirstGroupByResultSet = pinotResultSetGroup.getResultSet(0);
+        int pinotNumGroups = pinotFirstGroupByResultSet.getRowCount();
 
         // Get number of group keys in each group
         // If no group-by result returned by Pinot, set numGroupKeys to 0 since no comparison needed
-        int numGroupKeys;
-        if (numGroups == 0) {
-          numGroupKeys = 0;
+        int pinotNumGroupKeys;
+        if (pinotNumGroups == 0) {
+          pinotNumGroupKeys = 0;
         } else {
-          numGroupKeys = firstGroupByResults.getJSONObject(0).getJSONArray("group").length();
+          pinotNumGroupKeys = pinotFirstGroupByResultSet.getGroupKeyLength();
         }
 
         // Check over all aggregation functions
-        for (int i = 0; i < numAggregationResults; i++) {
-          // Get number of group keys.
-          JSONArray groupByResults = aggregationResultsArray.getJSONObject(i).getJSONArray("groupByResult");
-
+        for (int aggregationIndex = 0; aggregationIndex < numAggregationResults; aggregationIndex++) {
           // Construct expected result map from concatenated group keys to value
-          h2statement.execute(sqlQueries.get(i));
-          ResultSet sqlResultSet = h2statement.getResultSet();
+          h2statement.execute(sqlQueries.get(aggregationIndex));
+          ResultSet h2ResultSet = h2statement.getResultSet();
           Map<String, String> expectedValues = new HashMap<>();
-          int sqlNumGroups;
-          for (sqlNumGroups = 0; sqlResultSet.next() && sqlNumGroups < MAX_NUM_ROWS_TO_COMPARE; sqlNumGroups++) {
-            if (numGroupKeys != 0) {
+          int h2NumGroups;
+          for (h2NumGroups = 0; h2ResultSet.next() && h2NumGroups < MAX_NUM_ROWS_TO_COMPARE; h2NumGroups++) {
+            if (pinotNumGroupKeys != 0) {
               StringBuilder groupKey = new StringBuilder();
-              for (int groupKeyIndex = 1; groupKeyIndex <= numGroupKeys; groupKeyIndex++) {
+              for (int groupKeyIndex = 1; groupKeyIndex <= pinotNumGroupKeys; groupKeyIndex++) {
                 // Convert boolean value to lower case
-                groupKey.append(convertBooleanToLowerCase(sqlResultSet.getString(groupKeyIndex))).append(' ');
+                groupKey.append(convertBooleanToLowerCase(h2ResultSet.getString(groupKeyIndex))).append(' ');
               }
-              expectedValues.put(groupKey.toString(), sqlResultSet.getString(numGroupKeys + 1));
+              expectedValues.put(groupKey.toString(), h2ResultSet.getString(pinotNumGroupKeys + 1));
             }
           }
 
           // No record selected in H2
-          if (sqlNumGroups == 0) {
-            // Check if no record selected in Pinot
-            if (numGroups != 0) {
-              String failureMessage = "No group returned in H2 but " + numGroups + " groups returned in Pinot";
+          if (h2NumGroups == 0) {
+            if (pinotNumGroups != 0) {
+              String failureMessage = "No group returned in H2 but " + pinotNumGroups + " groups returned in Pinot";
               failure(pqlQuery, sqlQueries, failureMessage);
             }
 
-            // Check if number of documents scanned is 0
-            if (numDocsScanned != 0) {
-              String failureMessage = "No group returned in Pinot but " + numDocsScanned + " records selected";
+            if (pinotNumRecordsSelected != 0) {
+              String failureMessage = "No group returned in Pinot but " + pinotNumRecordsSelected + " records selected";
               failure(pqlQuery, sqlQueries, failureMessage);
             }
 
@@ -634,32 +624,32 @@ public class ClusterIntegrationTestUtils {
           }
 
           // Only compare exhausted results
-          if (sqlNumGroups < MAX_NUM_ROWS_TO_COMPARE) {
+          if (h2NumGroups < MAX_NUM_ROWS_TO_COMPARE) {
             // Check if all Pinot results are contained in the H2 results
-            for (int resultIndex = 0; resultIndex < numGroups; resultIndex++) {
+            com.linkedin.pinot.client.ResultSet pinotGroupByResultSet =
+                pinotResultSetGroup.getResultSet(aggregationIndex);
+            for (int groupIndex = 0; groupIndex < pinotNumGroups; groupIndex++) {
               // Concatenate Pinot group keys
-              JSONObject groupByResult = groupByResults.getJSONObject(resultIndex);
-              JSONArray group = groupByResult.getJSONArray("group");
               StringBuilder groupKeyBuilder = new StringBuilder();
-              for (int groupKeyIndex = 0; groupKeyIndex < numGroupKeys; groupKeyIndex++) {
-                groupKeyBuilder.append(group.getString(groupKeyIndex)).append(' ');
+              for (int groupKeyIndex = 0; groupKeyIndex < pinotNumGroupKeys; groupKeyIndex++) {
+                groupKeyBuilder.append(pinotGroupByResultSet.getGroupKeyString(groupIndex, groupKeyIndex)).append(' ');
               }
               String groupKey = groupKeyBuilder.toString();
 
               // Fuzzy compare expected value and actual value
-              String sqlValue = expectedValues.get(groupKey);
-              if (sqlValue == null) {
+              String h2Value = expectedValues.get(groupKey);
+              if (h2Value == null) {
                 String failureMessage = "Group returned in Pinot but not in H2: " + groupKey;
                 failure(pqlQuery, sqlQueries, failureMessage);
                 return;
               }
-              double expectedValue = Double.parseDouble(sqlValue);
-              String pqlValue = groupByResult.getString("value");
-              double actualValue = Double.parseDouble(pqlValue);
+              double expectedValue = Double.parseDouble(h2Value);
+              String pinotValue = pinotGroupByResultSet.getString(groupIndex);
+              double actualValue = Double.parseDouble(pinotValue);
               if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
                 String failureMessage =
-                    "Value: " + i + " does not match, expected: " + sqlValue + ", got: " + pqlValue + ", for group: "
-                        + groupKey;
+                    "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue
+                        + ", for group: " + groupKey;
                 failure(pqlQuery, sqlQueries, failureMessage);
               }
             }
@@ -674,30 +664,29 @@ public class ClusterIntegrationTestUtils {
       failure(pqlQuery, sqlQueries, failureMessage);
     }
 
+    // Selection results
     if (pinotResponse.has("selectionResults")) {
-      // Selection results
-
       // Construct expected result set
       h2statement.execute(sqlQueries.get(0));
-      ResultSet sqlResultSet = h2statement.getResultSet();
-      ResultSetMetaData sqlMetaData = sqlResultSet.getMetaData();
+      ResultSet h2ResultSet = h2statement.getResultSet();
+      ResultSetMetaData h2MetaData = h2ResultSet.getMetaData();
 
       Set<String> expectedValues = new HashSet<>();
       Map<String, String> reusableExpectedValueMap = new HashMap<>();
       Map<String, List<String>> reusableMultiValuesMap = new HashMap<>();
       List<String> reusableColumnOrder = new ArrayList<>();
-      int numResults;
-      for (numResults = 0; sqlResultSet.next() && numResults < MAX_NUM_ROWS_TO_COMPARE; numResults++) {
+      int h2NumRows;
+      for (h2NumRows = 0; h2ResultSet.next() && h2NumRows < MAX_NUM_ROWS_TO_COMPARE; h2NumRows++) {
         reusableExpectedValueMap.clear();
         reusableMultiValuesMap.clear();
         reusableColumnOrder.clear();
 
-        int numColumns = sqlMetaData.getColumnCount();
-        for (int i = 1; i <= numColumns; i++) {
-          String columnName = sqlMetaData.getColumnName(i);
+        int numColumns = h2MetaData.getColumnCount();
+        for (int columnIndex = 1; columnIndex <= numColumns; columnIndex++) {
+          String columnName = h2MetaData.getColumnName(columnIndex);
 
           // Handle null result and convert boolean value to lower case
-          String columnValue = sqlResultSet.getString(i);
+          String columnValue = h2ResultSet.getString(columnIndex);
           if (columnValue == null) {
             columnValue = "null";
           } else {
@@ -740,50 +729,49 @@ public class ClusterIntegrationTestUtils {
         expectedValues.add(expectedValue.toString());
       }
 
-      JSONObject selectionColumnsAndResults = pinotResponse.getJSONObject("selectionResults");
-      JSONArray selectionColumns = selectionColumnsAndResults.getJSONArray("columns");
-      JSONArray selectionResults = selectionColumnsAndResults.getJSONArray("results");
-      int numSelectionResults = selectionResults.length();
+      com.linkedin.pinot.client.ResultSet pinotSelectionResultSet = pinotResultSetGroup.getResultSet(0);
+      int pinotNumRows = pinotSelectionResultSet.getRowCount();
 
-      if (numResults == 0) {
-        // No record selected in H2
-
-        // Check if no record selected in Pinot
-        if (numSelectionResults != 0) {
-          String failureMessage =
-              "No record selected in H2 but number of records selected in Pinot: " + numSelectionResults;
+      // No record selected in H2
+      if (h2NumRows == 0) {
+        if (pinotNumRows != 0) {
+          String failureMessage = "No record selected in H2 but number of records selected in Pinot: " + pinotNumRows;
           failure(pqlQuery, sqlQueries, failureMessage);
           return;
         }
 
-        // Check if number of documents scanned is 0
-        if (numDocsScanned != 0) {
+        if (pinotNumRecordsSelected != 0) {
           String failureMessage =
-              "No selection result returned in Pinot but number of records selected: " + numDocsScanned;
+              "No selection result returned in Pinot but number of records selected: " + pinotNumRecordsSelected;
           failure(pqlQuery, sqlQueries, failureMessage);
+          return;
         }
-      } else if (numResults < MAX_NUM_ROWS_TO_COMPARE) {
-        // Only compare exhausted results
 
+        // Skip further comparison
+        return;
+      }
+
+      // Only compare exhausted results
+      if (h2NumRows < MAX_NUM_ROWS_TO_COMPARE) {
         // Check that Pinot results are contained in the H2 results
-        int numColumns = selectionColumns.length();
-        for (int i = 0; i < numSelectionResults; i++) {
+        int numColumns = pinotSelectionResultSet.getColumnCount();
+
+        for (int rowIndex = 0; rowIndex < pinotNumRows; rowIndex++) {
           // Build actual value String.
           StringBuilder actualValueBuilder = new StringBuilder();
-          JSONArray selectionResult = selectionResults.getJSONArray(i);
-
           for (int columnIndex = 0; columnIndex < numColumns; columnIndex++) {
             // Convert column name to all uppercase to make it compatible with H2
-            String columnName = selectionColumns.getString(columnIndex).toUpperCase();
+            String columnName = pinotSelectionResultSet.getColumnName(columnIndex).toUpperCase();
+            String columnResult = pinotSelectionResultSet.getString(rowIndex, columnIndex);
 
-            Object columnResult = selectionResult.get(columnIndex);
-            if (columnResult instanceof JSONArray) {
+            // TODO: Find a better way to identify multi-value column
+            if (columnResult.charAt(0) == '[') {
               // Multi-value column
-              JSONArray columnResultsArray = (JSONArray) columnResult;
+              JSONArray columnValues = new JSONArray(columnResult);
               List<String> multiValue = new ArrayList<>();
-              int length = columnResultsArray.length();
+              int length = columnValues.length();
               for (int elementIndex = 0; elementIndex < length; elementIndex++) {
-                multiValue.add(columnResultsArray.getString(elementIndex));
+                multiValue.add(columnValues.getString(elementIndex));
               }
               for (int elementIndex = length; elementIndex < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE;
                   elementIndex++) {
@@ -793,7 +781,7 @@ public class ClusterIntegrationTestUtils {
               actualValueBuilder.append(columnName).append(':').append(multiValue.toString()).append(' ');
             } else {
               // Single-value column
-              actualValueBuilder.append(columnName).append(':').append((String) columnResult).append(' ');
+              actualValueBuilder.append(columnName).append(':').append(columnResult).append(' ');
             }
           }
           String actualValue = actualValueBuilder.toString();
