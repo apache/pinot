@@ -132,6 +132,7 @@ export default Ember.Controller.extend({
    * Utilizing ember concurrency (task)
    */
   searchByApplicationName: task(function* (appName) {
+    this.set('isLoading', true);
     yield timeout(600);
     const url = `/data/autocomplete/functionByAppname?appname=${appName}`;
 
@@ -141,6 +142,7 @@ export default Ember.Controller.extend({
     return fetch(url)
       .then(res => res.json())
       .then((alerts) => {
+        this.set('isLoading', false);
         this.set('selectedAlerts', alerts);
       });
   }),
@@ -150,14 +152,17 @@ export default Ember.Controller.extend({
    * Utilizing ember concurrency (task)
    */
   searchByDatasetName: task(function* (groupName) {
+    this.set('isLoading', true);
+    yield timeout(600);
+
     this.set('selectedsuscriberGroupNames', groupName);
     this.set('currentPage', 1);
 
-    yield timeout(600);
     const url = `/data/autocomplete/functionByAlertName?alertName=${groupName}`;
     return fetch(url)
       .then(res => res.json())
       .then((filters) => {
+        this.set('isLoading', false);
         this.set('selectedAlerts', filters);
       })
   }),

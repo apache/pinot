@@ -96,6 +96,11 @@
         </span>
       </section>
     {{/if}}
+    {{#if isLoading}}
+      <div class="spinner-wrapper">
+        {{ember-spinner}}
+      </div>
+    {{/if}}
     {{#accordion-list allowManyActiveItems=true as |accordion|}}
       {{#each paginatedSelectedAlerts as |alert|}}
         <!-- For each element in list create an 'accordion.item' -->
