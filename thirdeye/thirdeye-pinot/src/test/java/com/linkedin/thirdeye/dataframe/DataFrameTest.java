@@ -1045,6 +1045,34 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testGroupingMultiColumn() {
+    Grouping.DataFrameGrouping grouping = df.groupByInterval("index", 2);
+    DataFrame df = grouping.aggregate(new String[] { "double", "boolean", "long", "string", "object"},
+        new Series.Function[] { DoubleSeries.SUM, LongSeries.MIN, LongSeries.MAX, StringSeries.LAST, StringSeries.CONCAT});
+
+    Assert.assertEquals(df.size(), 4);
+    assertEquals(df.getDoubles("double"), -2.1, -0.1, 1.3, 0.5);
+    assertEquals(df.getLongs("boolean"), 0, 1, 1, 1);
+    assertEquals(df.getLongs("long"), 0, 1, 2, 1);
+    assertEquals(df.getStrings("string"), "0.0", "-1", "0.13e1", "0.5");
+    assertEquals(df.getStrings("object"), "-2.30", "1", "true", "0.5");
+  }
+
+  @Test
+  public void testGroupingMultiColumnExpression() {
+    Grouping.DataFrameGrouping grouping = df.groupByInterval("index", 2);
+    DataFrame df = grouping.aggregate(
+        "double:sum", "boolean:min", "long:max", "string:last", "object:first");
+
+    Assert.assertEquals(df.size(), 4);
+    assertEquals(df.getDoubles("double"), -2.1, -0.1, 1.3, 0.5);
+    assertEquals(df.getBooleans("boolean"), FALSE, TRUE, TRUE, TRUE);
+    assertEquals(df.getLongs("long"), 0, 1, 2, 1);
+    assertEquals(df.getStrings("string"), "0.0", "-1", "0.13e1", "0.5");
+    assertEquals(df.getObjects("object"), "-2.3", 1L, true, 0.5d);
+  }
+
+  @Test
   public void testStableMultiSortDoubleLong() {
     DataFrame mydf = new DataFrame(new long[] { 1, 2, 3, 4, 5, 6, 7, 8 })
         .addSeries("double", 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0)

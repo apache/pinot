@@ -12,6 +12,12 @@ public abstract class Grouping {
   public static final String GROUP_KEY = "key";
   public static final String GROUP_VALUE = "value";
 
+  public static final String OP_SUM = "SUM";
+  public static final String OP_MIN = "MIN";
+  public static final String OP_MAX = "MAX";
+  public static final String OP_FIRST = "FIRST";
+  public static final String OP_LAST = "LAST";
+
   // TODO generate keys on-demand only
   final Series keys;
 
@@ -74,6 +80,22 @@ public abstract class Grouping {
     Series.Builder builder = s.getBuilder();
     for(int i=0; i<this.size(); i++) {
       builder.addSeries(this.apply(s, i).max());
+    }
+    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+  }
+
+  GroupingDataFrame first(Series s) {
+    Series.Builder builder = s.getBuilder();
+    for(int i=0; i<this.size(); i++) {
+      builder.addSeries(this.apply(s, i).first());
+    }
+    return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
+  }
+
+  GroupingDataFrame last(Series s) {
+    Series.Builder builder = s.getBuilder();
+    for(int i=0; i<this.size(); i++) {
+      builder.addSeries(this.apply(s, i).last());
     }
     return new GroupingDataFrame(GROUP_KEY, GROUP_VALUE, this.keys, builder.build());
   }
@@ -173,6 +195,14 @@ public abstract class Grouping {
       return this.grouping.max(this.source);
     }
 
+    public GroupingDataFrame first() {
+      return this.grouping.first(this.source);
+    }
+
+    public GroupingDataFrame last() {
+      return this.grouping.last(this.source);
+    }
+
     Series apply(int groupIndex) {
       return this.grouping.apply(this.source, groupIndex);
     }
@@ -219,6 +249,80 @@ public abstract class Grouping {
     }
 
     /**
+     * Applies the aggregation {@code functions} to the series referenced by {@code seriesNames},
+     * and returns the result as a DataFrame with the index corresponding to the grouping key
+     * column.
+     *
+     * <br/><b>NOTE:</b> This method is generally slower than aggregating with implicit function
+     * references. It allows for the use of custom function implementations however.
+     *
+     * @see DataFrameGrouping#aggregate(String...)
+     *
+     * @param seriesNames
+     * @param functions
+     * @return
+     */
+    public DataFrame aggregate(String[] seriesNames, Series.Function[] functions) {
+      if(seriesNames.length != functions.length)
+        throw new IllegalArgumentException("Must provide equal number of series names and functions");
+
+      DataFrame df = new DataFrame();
+      df.addSeries(this.keyName, this.grouping.keys);
+
+      for(int i=0; i<seriesNames.length; i++) {
+        Series s = this.source.get(seriesNames[i]);
+        df.addSeries(seriesNames[i], this.grouping.aggregate(s, functions[i]).getValues());
+      }
+
+      return df;
+    }
+
+    /**
+     * Evaluates the {@code aggregationExpressions} and returns the result as a DataFrame with
+     * the index corresponding to the grouping key column. Each expression takes the format
+     * {@code seriesName:operation}, where {@code seriesName} is a valid column name in the
+     * underlying DataFrame and {@code operation} is one of {@code SUM, MIN, MAX, FIRST, LAST}.
+     *
+     * <br/><b>NOTE:</b> This method is generally faster than aggregating with explicit function
+     * references, as it may take advantage of specialized code depending on the grouping.
+     *
+     * @see DataFrameGrouping#aggregate(String[], Series.Function[])
+     *
+     * @param aggregationExpressions {@code seriesName:operation} tuples
+     * @return DataFrame with grouping results
+     */
+    public DataFrame aggregate(String... aggregationExpressions) {
+      DataFrame df = new DataFrame();
+      df.addSeries(this.keyName, this.grouping.keys);
+
+      for(String expression : aggregationExpressions) {
+        String[] parts = expression.split(":");
+        String name = parts[0];
+        String operation = parts[1];
+
+        df.addSeries(name, this.aggregateExpression(name, operation).getValues());
+      }
+
+      return df;
+    }
+
+    GroupingDataFrame aggregateExpression(String seriesName, String operation) {
+      switch(operation.toUpperCase()) {
+        case OP_SUM:
+          return this.sum(seriesName);
+        case OP_MIN:
+          return this.min(seriesName);
+        case OP_MAX:
+          return this.max(seriesName);
+        case OP_FIRST:
+          return this.first(seriesName);
+        case OP_LAST:
+          return this.last(seriesName);
+      }
+      throw new IllegalArgumentException(String.format("Unknown operation '%s'", operation));
+    }
+
+    /**
      * Counts the number of elements in each group and returns the result as a new DataFrame
      * with the number of elements equal to the size of the key series.
      *
@@ -227,6 +331,26 @@ public abstract class Grouping {
     public GroupingDataFrame count() {
       // TODO data frames without index
       return this.grouping.count(this.source.getIndex());
+    }
+
+    public GroupingDataFrame sum(String seriesName) {
+      return this.grouping.sum(this.source.get(seriesName));
+    }
+
+    public GroupingDataFrame min(String seriesName) {
+      return this.grouping.min(this.source.get(seriesName));
+    }
+
+    public GroupingDataFrame max(String seriesName) {
+      return this.grouping.max(this.source.get(seriesName));
+    }
+
+    public GroupingDataFrame first(String seriesName) {
+      return this.grouping.first(this.source.get(seriesName));
+    }
+
+    public GroupingDataFrame last(String seriesName) {
+      return this.grouping.last(this.source.get(seriesName));
     }
 
     Series apply(String seriesName, int groupIndex) {
