@@ -281,12 +281,17 @@ public class TimeBasedAnomalyMerger {
    * Calculate the impact to global metric for the MergedAnomalyResult instance
    *
    * impact_to_global = severity * traffic_contribution
-   * trafic_contribution = sum(subMetric)/sum(globalMetric)
+   *   \- severity is the change ratio in monitoring window
+   *   \- trafic_contribution is the ratio of the average traffic of subMetric and global metric in training window, that is
+   *        traffic_contribution = avg(subMetric)/avg(globalMetric)
    * @param globalMetricTimeSerise
-   * @param subMmetricTimeSeries
+   *      The time series data in global metric
+   * @param subMetricTimeSeries
+   *      The time series data in sub-metric
    * @param mergedAnomaly
+   *      The instance of merged anomaly
    */
-  public static double computeImpactToGlobalMetric(MetricTimeSeries globalMetricTimeSerise, MetricTimeSeries subMmetricTimeSeries,
+  public static double computeImpactToGlobalMetric(MetricTimeSeries globalMetricTimeSerise, MetricTimeSeries subMetricTimeSeries,
       MergedAnomalyResultDTO mergedAnomaly) {
     double impactToTotal = Double.NaN;
     if (globalMetricTimeSerise == null || globalMetricTimeSerise.getTimeWindowSet().isEmpty()) {
@@ -303,10 +308,11 @@ public class TimeBasedAnomalyMerger {
     double avgSub = 0.0;
     int countGlobal = 0;
     int countSub = 0;
+    // Calculate the average traffic
     for (long timestamp : globalMetricTimeSerise.getTimeWindowSet()) {
       if (timestamp < mergedAnomaly.getStartTime()) {
         double globalMetricValue = globalMetricTimeSerise.get(timestamp, globalMetric).doubleValue();
-        double subMetricValue = subMmetricTimeSeries.get(timestamp, anomalyMetric).doubleValue();
+        double subMetricValue = subMetricTimeSeries.get(timestamp, anomalyMetric).doubleValue();
         if (globalMetricValue != Double.NaN) {
           avgGlobal += globalMetricValue;
           countGlobal++;
