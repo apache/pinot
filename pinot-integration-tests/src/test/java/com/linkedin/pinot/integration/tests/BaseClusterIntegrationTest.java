@@ -16,11 +16,13 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
+import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.net.URL;
@@ -61,6 +63,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
 
+  private com.linkedin.pinot.client.Connection _pinotConnection;
   private Connection _h2Connection;
   private QueryGenerator _queryGenerator;
 
@@ -136,6 +139,19 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   @Nullable
   protected TableTaskConfig getTaskConfig() {
     return null;
+  }
+
+  /**
+   * Get the Pinot connection.
+   *
+   * @return Pinot connection
+   */
+  @Nonnull
+  protected com.linkedin.pinot.client.Connection getPinotConnection() {
+    if (_pinotConnection == null) {
+      _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.DEFAULT_ZK_STR + "/" + getHelixClusterName());
+    }
+    return _pinotConnection;
   }
 
   /**
@@ -258,9 +274,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected long getCurrentCountStarResult()
       throws Exception {
-    return postQuery("SELECT COUNT(*) FROM " + getTableName()).getJSONArray("aggregationResults")
-        .getJSONObject(0)
-        .getLong("value");
+    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName()).getResultSet(0).getLong(0);
   }
 
   /**
@@ -332,6 +346,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries)
       throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pqlQuery, BROKER_BASE_API_URL, sqlQueries, getH2Connection());
+    ClusterIntegrationTestUtils.testQuery(pqlQuery, BROKER_BASE_API_URL, getPinotConnection(), sqlQueries,
+        getH2Connection());
   }
 }
