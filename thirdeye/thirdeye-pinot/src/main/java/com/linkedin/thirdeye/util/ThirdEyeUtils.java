@@ -249,7 +249,8 @@ public abstract class ThirdEyeUtils {
     } else {
       expression = MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId();
     }
-    MetricExpression metricExpression = new MetricExpression(metricConfig.getName(), expression, metricConfig.getDataset());
+    MetricExpression metricExpression = new MetricExpression(metricConfig.getName(), expression,
+        metricConfig.getDefaultAggFunction(), metricConfig.getDataset());
     return metricExpression;
   }
 

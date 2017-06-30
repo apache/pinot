@@ -1,6 +1,18 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DataFrameUtils;
@@ -21,17 +33,6 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -303,7 +304,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
       throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
 
     List<MetricFunction> functions = new ArrayList<>();
-    List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(), MetricAggFunction.SUM, metric.getDataset());
+    List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
+        metric.getDefaultAggFunction(), metric.getDataset());
     for(MetricExpression exp : expressions) {
       functions.addAll(exp.computeMetricFunctions());
     }
