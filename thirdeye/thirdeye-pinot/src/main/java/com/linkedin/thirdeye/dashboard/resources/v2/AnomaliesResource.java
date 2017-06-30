@@ -160,7 +160,7 @@ public class AnomaliesResource {
           .fetchTimeSeriesDataByDimension(Arrays.asList(currentTimeRange), anomaly.getDimensions(), false);
 
       MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
-          .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
+          .getDimensionMapMetricTimeSeriesMap().get(anomaly.getDimensions());
       String metricName = anomaly.getMetric();
       double currentVal = getTotalFromTimeSeries(currentTimeSeries, metricName, dataset.isAdditive());
       response.setCurrentVal(currentVal);
@@ -174,7 +174,7 @@ public class AnomaliesResource {
         anomalyDetectionInputContextBuilder
             .fetchTimeSeriesDataByDimension(Arrays.asList(baselineTimeRange), anomaly.getDimensions(), false);
         MetricTimeSeries baselineTimeSeries = anomalyDetectionInputContextBuilder.build()
-            .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
+            .getDimensionMapMetricTimeSeriesMap().get(anomaly.getDimensions());
         AnomalyDataCompare.CompareResult compareResult = new AnomalyDataCompare.CompareResult();
         double baseLineval = getTotalFromTimeSeries(baselineTimeSeries, metricName, dataset.isAdditive());
         compareResult.setBaselineValue(baseLineval);
@@ -758,6 +758,67 @@ public class AnomaliesResource {
   }
 
   /**
+   * Generate AnomalyTimelinesView for given function with monitoring time range
+   *
+   * @param anomalyFunctionSpec
+   *      The DTO of the anomaly function
+   * @param datasetConfig
+   *      The dataset configuration which the anomalyFunctionSpec is monitoring
+   * @param windowStart
+   *      The start time of the monitoring window
+   * @param windowEnd
+   *      The end time of the monitoring window
+   * @param dimensions
+   *      The dimension map of the timelineview is surfacing
+   * @return
+   *      An AnomalyTimelinesView instance with current value and baseline values of given function
+   * @throws Exception
+   */
+  public AnomalyTimelinesView getTimelinesViewInMonitoringWindow(AnomalyFunctionDTO anomalyFunctionSpec,
+      DatasetConfigDTO datasetConfig, DateTime windowStart, DateTime windowEnd, DimensionMap dimensions) throws Exception {
+    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+
+    String aggGranularity = datasetConfig.bucketTimeGranularity().toAggregationGranularityString();
+
+    // get anomaly window range - this is the data to fetch (anomaly region + some offset if required)
+    // the function will tell us this range, as how much data we fetch can change depending on which function is being executed
+    TimeRange monitoringWindowRange = getAnomalyWindowOffset(windowStart, windowEnd, anomalyFunction, datasetConfig);
+    DateTime monitoringWindowStart = new DateTime(monitoringWindowRange.getStart());
+    DateTime monitoringWindowEnd = new DateTime(monitoringWindowRange.getEnd());
+
+    TimeGranularity timeGranularity =
+        Utils.getAggregationTimeGranularity(aggGranularity, anomalyFunctionSpec.getCollection());
+    long bucketMillis = timeGranularity.toMillis();
+
+    AnomalyTimelinesView anomalyTimelinesView = null;
+    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+    AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder
+        .setFunction(anomalyFunctionSpec)
+        .fetchTimeSeriesDataByDimension(monitoringWindowStart, monitoringWindowEnd, dimensions, true)
+        .fetchExistingMergedAnomalies(monitoringWindowStart, monitoringWindowEnd, false).build();
+
+    MetricTimeSeries metricTimeSeries = adInputContext.getDimensionMapMetricTimeSeriesMap().get(dimensions);
+
+    // Transform time series with scaling factor
+    List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
+    if (CollectionUtils.isNotEmpty(scalingFactors)) {
+      Properties properties = anomalyFunction.getProperties();
+      MetricTransfer.rescaleMetric(metricTimeSeries, monitoringWindowStart.getMillis(), scalingFactors,
+          anomalyFunctionSpec.getTopicMetric(), properties);
+    }
+
+    List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
+    // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
+    // data does not need to be as accurate as the one used for detecting anomalies
+    anomalyTimelinesView = anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
+        monitoringWindowStart.getMillis(), monitoringWindowEnd.getMillis(), knownAnomalies);
+
+
+    return anomalyTimelinesView;
+  }
+
+  /**
    * Generates Anomaly Details for each merged anomaly
    * @param mergedAnomaly
    * @param datasetConfig
@@ -773,18 +834,10 @@ public class AnomaliesResource {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(mergedAnomaly.getFunctionId());
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
-    String aggGranularity = datasetConfig.bucketTimeGranularity().toAggregationGranularityString();
-
-    // get anomaly window range - this is the data to fetch (anomaly region + some offset if required)
-    // the function will tell us this range, as how much data we fetch can change depending on which function is being executed
-    TimeRange anomalyWindowRange = getAnomalyWindowOffset(mergedAnomaly, anomalyFunction, datasetConfig);
-    DateTime anomalyWindowStart = new DateTime(anomalyWindowRange.getStart());
-    DateTime anomalyWindowEnd = new DateTime(anomalyWindowRange.getEnd());
+    DateTime anomalyStart = new DateTime(mergedAnomaly.getStartTime());
+    DateTime anomalyEnd = new DateTime(mergedAnomaly.getEndTime());
 
     DimensionMap dimensions = mergedAnomaly.getDimensions();
-    TimeGranularity timeGranularity =
-        Utils.getAggregationTimeGranularity(aggGranularity, anomalyFunctionSpec.getCollection());
-    long bucketMillis = timeGranularity.toMillis();
     AnomalyDetails anomalyDetails = null;
     try {
       AnomalyTimelinesView anomalyTimelinesView = null;
@@ -792,33 +845,13 @@ public class AnomaliesResource {
       if(anomalyProps.containsKey("anomalyTimelinesView")) {
         anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(anomalyProps.get("anomalyTimelinesView"));
       } else {
-        AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
-            new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-        AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder
-            .setFunction(anomalyFunctionSpec)
-            .fetchTimeSeriesDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions, true)
-            .fetchExistingMergedAnomalies(anomalyWindowStart, anomalyWindowEnd, false).build();
-
-        MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
-
-        // Transform time series with scaling factor
-        List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
-        if (CollectionUtils.isNotEmpty(scalingFactors)) {
-          Properties properties = anomalyFunction.getProperties();
-          MetricTransfer.rescaleMetric(metricTimeSeries, anomalyWindowStart.getMillis(), scalingFactors,
-              anomalyFunctionSpec.getTopicMetric(), properties);
-        }
-
-        List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
-        // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
-        // data does not need to be as accurate as the one used for detecting anomalies
-        anomalyTimelinesView = anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
-            anomalyWindowStart.getMillis(), anomalyWindowEnd.getMillis(), knownAnomalies);
+        anomalyTimelinesView = getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfig,
+            anomalyStart, anomalyEnd, dimensions);
       }
 
       // get viewing window range - this is the region to display along with anomaly, from all the fetched data.
       // the function will tell us this range, as how much data we display can change depending on which function is being executed
-      TimeRange viewWindowRange = getViewWindowOffset(mergedAnomaly, anomalyFunction, datasetConfig);
+      TimeRange viewWindowRange = getViewWindowOffset(anomalyStart, anomalyEnd, anomalyFunction, datasetConfig);
       long viewWindowStart = viewWindowRange.getStart();
       long viewWindowEnd = viewWindowRange.getEnd();
       anomalyDetails = constructAnomalyDetails(metricName, dataset, datasetConfig, mergedAnomaly, anomalyFunctionSpec,
@@ -971,20 +1004,44 @@ public class AnomaliesResource {
     return newFilterSet;
   }
 
-
-  private TimeRange getAnomalyWindowOffset(MergedAnomalyResultDTO mergedAnomaly, BaseAnomalyFunction anomalyFunction,
+  private TimeRange getAnomalyWindowOffset(DateTime windowStart, DateTime windowEnd, BaseAnomalyFunction anomalyFunction,
       DatasetConfigDTO datasetConfig) {
     AnomalyOffset anomalyWindowOffset = anomalyFunction.getAnomalyWindowOffset(datasetConfig);
-    TimeRange anomalyWindowRange = getAnomalyTimeRangeWithOffsets(anomalyWindowOffset, mergedAnomaly, datasetConfig);
+    TimeRange anomalyWindowRange = getTimeRangeWithOffsets(anomalyWindowOffset, windowStart, windowEnd, datasetConfig);
     return anomalyWindowRange;
   }
 
 
-  private TimeRange getViewWindowOffset(MergedAnomalyResultDTO mergedAnomaly, BaseAnomalyFunction anomalyFunction,
+  private TimeRange getViewWindowOffset(DateTime windowStart, DateTime windowEnd, BaseAnomalyFunction anomalyFunction,
       DatasetConfigDTO datasetConfig) {
     AnomalyOffset viewWindowOffset = anomalyFunction.getViewWindowOffset(datasetConfig);
-    TimeRange viewWindowRange = getAnomalyTimeRangeWithOffsets(viewWindowOffset, mergedAnomaly, datasetConfig);
+    TimeRange viewWindowRange = getTimeRangeWithOffsets(viewWindowOffset, windowStart, windowEnd, datasetConfig);
     return viewWindowRange;
+  }
+
+  private TimeRange getTimeRangeWithOffsets(AnomalyOffset offset, DateTime windowStart, DateTime windowEnd,
+      DatasetConfigDTO datasetConfig) {
+    Period preOffsetPeriod = offset.getPreOffsetPeriod();
+    Period postOffsetPeriod = offset.getPostOffsetPeriod();
+
+    DateTimeZone dateTimeZone = DateTimeZone.forID(datasetConfig.getTimezone());
+    DateTime windowStartDateTime = new DateTime(windowStart, dateTimeZone);
+    DateTime windowEndDateTime = new DateTime(windowEnd, dateTimeZone);
+    windowStartDateTime = windowStartDateTime.minus(preOffsetPeriod);
+    windowEndDateTime = windowEndDateTime.plus(postOffsetPeriod);
+    long windowStartTime = windowStartDateTime.getMillis();
+    long windowEndTime = windowEndDateTime.getMillis();
+    try {
+      Long maxDataTime = CACHE_REGISTRY.getCollectionMaxDataTimeCache().get(datasetConfig.getDataset());
+      if (windowEndTime > maxDataTime) {
+        windowEndTime = maxDataTime;
+      }
+    } catch (ExecutionException e) {
+      LOG.error("Exception when reading max time for {}", datasetConfig.getDataset(), e);
+    }
+    TimeRange range = new TimeRange(windowStartTime, windowEndTime);
+    return range;
+
   }
 
   private TimeRange getAnomalyTimeRangeWithOffsets(AnomalyOffset offset, MergedAnomalyResultDTO mergedAnomaly,

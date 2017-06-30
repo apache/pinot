@@ -367,7 +367,7 @@ public class ClassificationTaskRunner implements TaskRunner {
     }
     AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
 
-    MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
+    MetricTimeSeries metricTimeSeries = adInputContext.getDimensionMapMetricTimeSeriesMap().get(dimensions);
     if (metricTimeSeries != null) {
       List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
       // Transform time series with scaling factor
