@@ -424,10 +424,10 @@ public class DataTableImplV2 implements DataTable {
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
     ObjectType objectType = ObjectType.getObjectType(_variableSizeData.getInt());
-    byte[] bytes = new byte[size];
-    _variableSizeData.get(bytes);
+    ByteBuffer byteBuffer = _variableSizeData.slice();
+    byteBuffer.limit(size);
     try {
-      return ObjectCustomSerDe.deserialize(bytes, objectType);
+      return ObjectCustomSerDe.deserialize(byteBuffer, objectType);
     } catch (IOException e) {
       throw new RuntimeException("Caught exception while de-serializing object.", e);
     }

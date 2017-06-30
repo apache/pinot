@@ -65,7 +65,11 @@ public class MinMaxRangePair implements Comparable<MinMaxRangePair> {
 
   @Nonnull
   public static MinMaxRangePair fromBytes(byte[] bytes) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    return fromByteBuffer(ByteBuffer.wrap(bytes));
+  }
+
+  @Nonnull
+  public static MinMaxRangePair fromByteBuffer(ByteBuffer byteBuffer) {
     return new MinMaxRangePair(byteBuffer.getDouble(), byteBuffer.getDouble());
   }
 

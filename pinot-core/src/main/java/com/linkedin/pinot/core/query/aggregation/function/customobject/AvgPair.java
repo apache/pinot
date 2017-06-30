@@ -57,7 +57,11 @@ public class AvgPair implements Comparable<AvgPair> {
 
   @Nonnull
   public static AvgPair fromBytes(byte[] bytes) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    return fromByteBuffer(ByteBuffer.wrap(bytes));
+  }
+
+  @Nonnull
+  public static AvgPair fromByteBuffer(ByteBuffer byteBuffer) {
     return new AvgPair(byteBuffer.getDouble(), byteBuffer.getLong());
   }
 

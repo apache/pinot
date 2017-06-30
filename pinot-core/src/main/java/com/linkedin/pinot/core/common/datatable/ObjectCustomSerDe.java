@@ -110,6 +110,54 @@ public class ObjectCustomSerDe {
   }
 
   /**
+   * Given a ByteBuffer and the object type, de-serialize the ByteBuffer into an object.
+   */
+  @SuppressWarnings("unchecked")
+  @Nonnull
+  public static <T> T deserialize(@Nonnull ByteBuffer byteBuffer, @Nonnull ObjectType objectType)
+      throws IOException {
+    switch (objectType) {
+      case String:
+        byte[] bytes = getBytesFromByteBuffer(byteBuffer);
+        return (T) new String(bytes, UTF_8);
+      case Long:
+        return (T) new Long(byteBuffer.getLong());
+      case Double:
+        return (T) new Double(byteBuffer.getDouble());
+      case DoubleArrayList:
+        return (T) deserializeDoubleArray(byteBuffer);
+      case AvgPair:
+        return (T) AvgPair.fromByteBuffer(byteBuffer);
+      case MinMaxRangePair:
+        return (T) MinMaxRangePair.fromByteBuffer(byteBuffer);
+      case HyperLogLog:
+        bytes = getBytesFromByteBuffer(byteBuffer);
+        return (T) HyperLogLog.Builder.build(bytes);
+      case QuantileDigest:
+        bytes = getBytesFromByteBuffer(byteBuffer);
+        return (T) deserializeQuantileDigest(bytes);
+      case HashMap:
+        return (T) deserializeHashMap(byteBuffer);
+      case IntOpenHashSet:
+        return (T) deserializeIntOpenHashSet(byteBuffer);
+      default:
+        throw new IllegalArgumentException("Illegal object type for de-serialization: " + objectType);
+    }
+  }
+
+  /**
+   * Helper method to get a new byte[] from the given ByteBuffer.
+   *
+   * @param byteBuffer ByteBuffer for which to get the byte[] from.
+   * @return byte[] containing the contents of ByteBuffer.
+   */
+  private static byte[] getBytesFromByteBuffer(@Nonnull ByteBuffer byteBuffer) {
+    byte[] bytes = new byte[byteBuffer.limit()];
+    byteBuffer.get(bytes);
+    return bytes;
+  }
+
+  /**
    * Given an object, get its {@link ObjectType}.
    */
   @Nonnull
@@ -178,8 +226,10 @@ public class ObjectCustomSerDe {
    * Helper method to de-serialize a {@link DoubleArrayList}.
    */
   private static DoubleArrayList deserializeDoubleArray(byte[] bytes) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    return deserializeDoubleArray(ByteBuffer.wrap(bytes));
+  }
 
+  private static DoubleArrayList deserializeDoubleArray(ByteBuffer byteBuffer) {
     int size = byteBuffer.getInt();
     DoubleArrayList doubleArray = new DoubleArrayList(size);
     for (int i = 0; i < size; i++) {
@@ -224,12 +274,10 @@ public class ObjectCustomSerDe {
   }
 
   /**
-   * Helper method to de-serialize a {@link HashMap}.
+   * Helper method to de-serialize a {@link HashMap} from a byte buffer.
    */
-  private static HashMap<Object, Object> deserializeHashMap(byte[] bytes)
+  private static HashMap<Object, Object> deserializeHashMap(ByteBuffer byteBuffer)
       throws IOException {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-
     int size = byteBuffer.getInt();
     HashMap<Object, Object> hashMap = new HashMap<>(size);
     if (size == 0) {
@@ -241,18 +289,39 @@ public class ObjectCustomSerDe {
 
     for (int i = 0; i < size; i++) {
       int keyNumBytes = byteBuffer.getInt();
-      byte[] keyBytes = new byte[keyNumBytes];
-      byteBuffer.get(keyBytes);
-      Object key = deserialize(keyBytes, keyType);
+      ByteBuffer slice = getByteBufferSlice(byteBuffer, keyNumBytes);
+      Object key = deserialize(slice, keyType);
+      byteBuffer.position(byteBuffer.position() + keyNumBytes);
 
       int valueNumBytes = byteBuffer.getInt();
-      byte[] valueBytes = new byte[valueNumBytes];
-      byteBuffer.get(valueBytes);
-      Object value = deserialize(valueBytes, valueType);
+      slice = getByteBufferSlice(byteBuffer, valueNumBytes);
+      Object value = deserialize(slice, valueType);
+      byteBuffer.position(byteBuffer.position() + valueNumBytes);
 
       hashMap.put(key, value);
     }
     return hashMap;
+  }
+
+  /**
+   * Helper method to slice out a ByteBuffer of given size from the original ByteBuffer.
+   *
+   * @param byteBuffer Original ByteBuffer.
+   * @param numBytes Number of bytes to slice out.
+   * @return New ByteBuffer containing a slice of the original ByteBuffer.
+   */
+  private static ByteBuffer getByteBufferSlice(ByteBuffer byteBuffer, int numBytes) {
+    ByteBuffer slice = byteBuffer.slice();
+    slice.limit(numBytes);
+    return slice;
+  }
+
+  /**
+   * Helper method to de-serialize a {@link HashMap} from a byte[].
+   */
+  private static HashMap<Object, Object> deserializeHashMap(byte[] bytes)
+      throws IOException {
+    return deserializeHashMap(ByteBuffer.wrap(bytes));
   }
 
   /**
@@ -293,10 +362,9 @@ public class ObjectCustomSerDe {
   }
 
   /**
-   * Helper method to de-serialize an {@link IntOpenHashSet}.
+   * Helper method to de-serialize an {@link IntOpenHashSet} from a ByteBuffer.
    */
-  private static IntOpenHashSet deserializeIntOpenHashSet(byte[] bytes) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+  private static IntOpenHashSet deserializeIntOpenHashSet(ByteBuffer byteBuffer) {
 
     int size = byteBuffer.getInt();
     IntOpenHashSet intOpenHashSet = new IntOpenHashSet(size);
@@ -305,5 +373,12 @@ public class ObjectCustomSerDe {
     }
 
     return intOpenHashSet;
+  }
+
+  /**
+   * Helper method to de-serialize an {@link IntOpenHashSet} from a byte[].
+   */
+  private static IntOpenHashSet deserializeIntOpenHashSet(byte[] bytes) {
+    return deserializeIntOpenHashSet(ByteBuffer.wrap(bytes));
   }
 }
