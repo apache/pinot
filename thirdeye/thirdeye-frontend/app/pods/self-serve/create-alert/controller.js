@@ -15,13 +15,10 @@ export default Ember.Controller.extend({
   isMetricSelected: false,
   isValidated: false,
   showAlertGroupEdit: true,
+  isSubmitDisabled: true,
   filters: {},
+  filterPropNames: JSON.stringify({}),
   graphConfig: {},
-
-  init() {
-    this._super(...arguments);
-    this.set('isSubmitDisabled', true);
-  },
 
   /**
    * Handler for search by function name
@@ -126,24 +123,27 @@ export default Ember.Controller.extend({
   },
 
   triggerReplay(functionObj, groupObj, newFuncId) {
-    const startTime = moment().subtract(1,'day').endOf('day').format("YYYY-MM-DD");
+    console.log('in trigger replay');
+    const startTime = moment().subtract(1,'month').endOf('day').format("YYYY-MM-DD");
     const startStamp = moment().subtract(1,'day').endOf('day').valueOf();
-    const endTime = moment().subtract(1,'month').endOf('day').format("YYYY-MM-DD");
+    const endTime = moment().subtract(1,'day').endOf('day').format("YYYY-MM-DD");
     const endStamp = moment().subtract(1,'month').endOf('day').valueOf();
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const postProps = {
-      method: 'post',
-      headers: { 'content-type': 'Application/Json' }
+      method: 'POST',
+      headers: { 'Content-Type': 'Application/Json' }
     };
     let gkey = '';
 
     const replayApi = {
-      base: 'http://lva1-app0038.corp.linkedin.com:1867/api/detection-job',
+      base: 'http://knie-ld1.linkedin.biz:1867/api/detection-job',
       minute: `/replay/singlefunction?functionId=${newFuncId}&start=${startTime}&end=${endTime}`,
       hour: `/${newFuncId}/replay?start=${startTime}&end=${endTime}`,
       day: `/replay/function/${newFuncId}?start=${startTime}&end=${endTime}&goal=1.0&evalMethod=F1_SCORE&includeOriginal=false&tune=\{"pValueThreshold":\[0.001,0.005,0.01,0.05\]\}`,
       reports: `/thirdeye/email/generate/metrics/${startStamp}/${endStamp}?metrics=${functionObj.metric}&subject=Your%20Metric%20Has%20Onboarded%20To%20Thirdeye&from=thirdeye-noreply@linkedin.com&to=${groupObj.recipients}&teHost=http://lva1-app0583.corp.linkedin.com:1426&smtpHost=email.corp.linkedin.com&smtpPort=25&includeSentAnomaliesOnly=true&isApplyFilter=true`
     };
+
+    //http://localhost:4200/api/detection-job/9840886/replay?start=2017-06-28&end=2017-05-29
 
     if (granularity.includes('minute')) { gkey = 'minute'; }
     if (granularity.includes('hour')) { gkey = 'hour'; }
@@ -154,6 +154,53 @@ export default Ember.Controller.extend({
     });
   },
 
+  newAlertProperties: Ember.computed(
+    'alertFunctionName',
+    'selectedMetricOption',
+    function() {
+      let gkey = '';
+      const granularity = this.get('graphConfig.granularity').toLowerCase();
+      const settingsByGranularity = {
+        common: {
+          functionName: this.get('alertFunctionName'),
+          metric: this.get('selectedMetricOption').name,
+          dataset: this.get('selectedMetricOption').dataset,
+          metricFunction: 'SUM',
+          isActive: true
+        },
+        minute: {
+          type: 'SIGN_TEST_VANILLA',
+          windowSize: 6,
+          windowUnit: 'HOURS',
+          properties: 'signTestWindowSize=24;anomalyRemovalWeightThreshold=0.6;signTestPattern=UP,DOWN;pValueThreshold=0.01;signTestBaselineShift=0.0,0.0;signTestBaselineLift=1.10,0.90;baseline=w/4wAvg;decayRate=0.5;signTestStepSize=1'
+        },
+        hour: {
+          type: 'REGRESSION_GAUSSIAN_SCAN',
+          windowSize: 84,
+          windowUnit: 'HOURS',
+          windowDelay: 8,
+          windowDelayUnit: 'HOURS',
+          cron: '0%200%2014%201%2F1%20*%20%3F%20*',
+          properties: 'metricTimezone=America/Los_Angeles;anomalyRemovalWeightThreshold=1.0;scanMinWindowSize=1;continuumOffsetUnit=3600000;scanUseBootstrap=true;scanNumSimulations=500;scanTargetNumAnomalies=1;continuumOffsetSize=1440;scanMaxWindowSize=48;pValueThreshold=0.01;scanStepSize=1'
+        },
+        day: {
+          type: 'SPLINE_REGRESSION',
+          windowSize: 1,
+          windowUnit: 'DAYS',
+          windowDelay: 0,
+          windowDelayUnit: 'DAYS',
+          cron: '0%200%2014%201%2F1%20*%20%3F%20*',
+          properties: 'pValueThreshold=0.05;logTransform=true;weeklyEffectRemovedInPrediction=false'
+        }
+      };
+
+      if (granularity.includes('minute')) { gkey = 'minute'; }
+      if (granularity.includes('hour')) { gkey = 'hour'; }
+      if (granularity.includes('day')) { gkey = 'day'; }
+
+      return Object.assign(settingsByGranularity.common, settingsByGranularity[gkey]);
+    }
+  ),
 
   prepareFunctions(configGroup, newId = 0) {
     const newFunctionList = [];
@@ -190,11 +237,11 @@ export default Ember.Controller.extend({
   },
 
   saveThirdEyeFunction(functionData) {
+    const url = '/dashboard/anomaly-function/create?' + $.param(functionData);
     const postProps = {
       method: 'post',
       headers: { 'content-type': 'Application/Json' }
     };
-    const url = '/dashboard/anomaly-function/create?' + $.param(functionData);
     return fetch(url, postProps)
       .then(res => res.json());
   },
@@ -206,7 +253,23 @@ export default Ember.Controller.extend({
   /**
    * Placeholder for alert groups options
    */
-  allAlertsConfigGroups: Ember.computed.reads('model.allAlertsConfigGroups'),
+  filteredConfigGroups: Ember.computed(
+    'model',
+    'selectedApplication',
+    function() {
+      const appName = this.get('selectedApplication');
+      const allAlertsConfigGroups = this.get('model.allAlertsConfigGroups');
+      const activeGroups = allAlertsConfigGroups.filter(group => group.active);
+      const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
+
+      if (Ember.isPresent(appName)) {
+        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName));
+      } else {
+        return activeGroups;
+      }
+    }
+  ),
+
   /**
    * Placeholder for app name options
    */
@@ -227,8 +290,8 @@ export default Ember.Controller.extend({
       this.fetchMetricData(selectedObj.id).then((hash) => {
         this.setProperties(hash);
         this.triggerGraphFromMetric(selectedObj);
+        console.log('funcObj settings : ', this.get('newAlertProperties'));
       })
-      // this.loadDimensionOptions(selectedObj);
     },
 
     onSelectFilter(filters) {
@@ -242,7 +305,6 @@ export default Ember.Controller.extend({
 
     onSelectDimension(selectedObj) {
       this.set('dimensionSelectorVal', selectedObj);
-      this.triggerGraphFromDimensions(selectedObj);
     },
 
     onSelectPattern(selectedObj) {
@@ -251,13 +313,14 @@ export default Ember.Controller.extend({
 
     onSelectAppName(selectedObj) {
       this.set('selectedAppName', selectedObj);
+      this.set('selectedApplication', selectedObj.application);
+      this.set('alertGroupNewRecipient', selectedObj.recipients);
     },
 
     onSelectConfigGroup(selectedObj) {
       if (selectedObj) {
         this.set('selectedConfigGroup', selectedObj);
         this.set('selectedGroupRecipients', selectedObj.recipients.replace(/,+/g, ', '));
-        this.set('selectedGroupActive', selectedObj.active);
         this.set('showAlertGroupEdit', true);
         this.prepareFunctions(selectedObj).then(functionData => {
           this.set('selectedGroupFunctions', functionData);
@@ -281,37 +344,43 @@ export default Ember.Controller.extend({
           }
         }
         this.set('isAlertNameDuplicate', isDuplicateName);
+        console.log('funcObj settings : ', this.get('newAlertProperties'));
       });
     },
 
     // Verify that email address does not already exist in alert group. If it does, remove it and alert user.
     validateAlertEmail(emailInput) {
-      const existingEmailArr = this.get('selectedGroupRecipients');
       const newEmailArr = emailInput.replace(/\s+/g, '').split(',');
+      let existingEmailArr = this.get('selectedGroupRecipients');
       let cleanEmailArr = [];
       let badEmailArr = [];
       let isDuplicateErr = false;
 
-      existingEmailArr.replace(/\s+/g, '').split(',');
-      for (var email of newEmailArr) {
-        console.log('existingEmailArr.includes(email) ', existingEmailArr.includes(email), email);
-        if (existingEmailArr.includes(email)) {
-          isDuplicateErr = true;
-          badEmailArr.push(email);
-        } else {
-          cleanEmailArr.push(email);
+      if (emailInput.trim()) {
+        existingEmailArr = existingEmailArr.replace(/\s+/g, '').split(',');
+        for (var email of newEmailArr) {
+          if (existingEmailArr.includes(email)) {
+            isDuplicateErr = true;
+            badEmailArr.push(email);
+          } else {
+            cleanEmailArr.push(email);
+          }
         }
-      }
 
-      this.send('validateRequired');
-      this.set('isDuplicateEmail', isDuplicateErr);
-      this.set('duplicateEmails', badEmailArr.join());
-      this.set('alertGroupNewRecipient', cleanEmailArr.join(', '));
+        this.send('validateRequired');
+        this.set('isDuplicateEmail', isDuplicateErr);
+        this.set('duplicateEmails', badEmailArr.join());
+      }
     },
 
     // Ensures presence of values for these fields. TODO: make this more efficient
     validateRequired() {
-      const reqFields = ['selectedMetricOption', 'selectedPattern', 'alertFunctionName', 'alertGroupNewRecipient'];
+      const reqFields = [
+        'selectedMetricOption',
+        'selectedPattern',
+        'alertFunctionName',
+        'selectedAppName'
+      ];
       let allFieldsReady = true;
 
       for (var field of reqFields) {
@@ -321,6 +390,22 @@ export default Ember.Controller.extend({
       }
 
       this.set('isSubmitDisabled', !allFieldsReady);
+    },
+
+    clearAll() {
+      this.set('isMetricSelected', false);
+      this.set('selectedMetricOption', null);
+      this.set('selectedPattern', null);
+      this.set('dimensionSelectorVal', null);
+      this.set('alertFunctionName', null);
+      this.set('selectedAppName', null);
+      this.set('selectedConfigGroup', null);
+      this.set('alertGroupNewRecipient', null);
+      this.set('createGroupName', null);
+      this.set('showAlertGroupEdit', false);
+      this.set('isCreateSuccess', false);
+      this.set('isCreateError', false);
+      this.set('filterPropNames', JSON.stringify({}));
     },
 
     /**
@@ -335,31 +420,25 @@ export default Ember.Controller.extend({
       // This object contains the data for the new config group
       const newConfigObj = {
         name: this.get('createGroupName'),
-        active: this.get('createGroupActive') || false,
+        active: true,
+        application: this.get('selectedAppName').application || null,
         emailConfig: { "functionIds": [] },
         recipients: this.get('alertGroupNewRecipient')
       };
       // This object contains the data for the new alert function, with default fillers
-      const newFunctionObj = {
-        functionName: this.get('alertFunctionName'),
-        metric: this.get('selectedMetricOption').name,
-        dataset: this.get('selectedMetricOption').dataset,
-        metricFunction: 'SUM',
-        type: 'SIGN_TEST_VANILLA',
-        windowSize: 6,
-        windowUnit: this.get('graphConfig.granularity'),
-        isActive: false,
-        properties: 'signTestWindowSize=24;anomalyRemovalWeightThreshold=0.6;signTestPattern=' + this.get('selectedPattern') + ';pValueThreshold=0.01;signTestBaselineShift=0.0;signTestBaselineLift=0.90;baseline=w/4wAvg;decayRate=0.5;signTestStepSize=1'
-      };
-
+      const newFunctionObj = this.get('newAlertProperties');
       // If these two conditions are true, we assume the user wants to edit an existing alert group
       const isAlertGroupEditModeActive = this.get('showAlertGroupEdit') && this.selectedConfigGroup;
       // A reference to whichever 'alert config' object will be sent. Let's default to the new one
       let finalConfigObj = newConfigObj;
       let newFunctionId = 0;
 
+      // Disable submit
+      this.set('isSubmitDisabled', true);
+
       // First, save our new alert function
       this.saveThirdEyeFunction(newFunctionObj).then(functionResult => {
+
         // Add new email recipients if we are dealing with an existing Alert Group
         if (isAlertGroupEditModeActive) {
           let recipientsArr = [];
@@ -370,26 +449,30 @@ export default Ember.Controller.extend({
           this.selectedConfigGroup.recipients = recipientsArr.join();
           finalConfigObj = this.selectedConfigGroup;
         }
-        // Add our new Alert Function Id to the Alert Config Object
+        // Proceed only if function creation succeeds and returns an ID
         if (Ember.typeOf(functionResult) === 'number') {
+          // Add our new Alert Function Id to the Alert Config Object
           newFunctionId = functionResult;
           finalConfigObj.emailConfig.functionIds.push(newFunctionId);
+
+          // Finally, save our Alert Config Group
+          this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
+            if (alertResult.ok) {
+              this.set('selectedGroupRecipients', finalConfigObj.recipients);
+              this.set('isCreateSuccess', true);
+              this.set('finalFunctionId', functionResult);
+              this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
+                this.set('selectedGroupFunctions', functionData);
+              });
+              this.triggerReplay(newFunctionObj, finalConfigObj, newFunctionId).then(result => {
+                console.log('done with replay : ', result);
+                this.set('replayStatus', result);
+              });
+            }
+          });
+        } else {
+          this.set('isCreateError', true);
         }
-        // Finally, save our Alert Config Group
-        this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
-          if (alertResult.ok) {
-            this.set('selectedGroupRecipients', finalConfigObj.recipients);
-            this.set('isCreateSuccess', true);
-            this.set('finalFunctionId', functionResult);
-            this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
-              this.set('selectedGroupFunctions', functionData);
-            });
-            this.triggerReplay(newFunctionObj, finalConfigObj, newFunctionId).then(result => {
-              console.log('done with replay : ', result);
-              this.set('replayStatus', result);
-            });
-          }
-        });
       });
     }
   }
