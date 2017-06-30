@@ -49,6 +49,7 @@ import junit.framework.Assert;
  * and at least 3 offline segments.
  *
  */
+// TODO: clean up this test
 public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrationTest {
   private String TABLE_NAME;
   private long nOfflineRows;
@@ -105,7 +106,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   public void testGeneratedQueriesWithMultiValues() {}
 
   @Override // Leaving this out because it is done in the superclass
-  public void testHardcodedQuerySet() {}
+  public void testQueriesFromQueryFile() {}
 
   @Override // Leaving this out because it is done in the superclass
   public void testBrokerDebugOutput() {}

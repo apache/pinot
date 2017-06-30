@@ -15,15 +15,16 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.tools.query.comparison.QueryComparison;
 import com.linkedin.pinot.tools.scan.query.QueryResponse;
 import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -37,13 +38,14 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONObject;
@@ -70,13 +72,16 @@ import org.testng.annotations.Test;
  * To reuse this test, you need to implement getAvroFileCount, getAllAvroFiles, getOfflineAvroFiles and
  * getRealtimeAvroFiles, as well as the optional extractAvroIfNeeded. You'll also need to use one of the test methods.
  */
+// TODO: clean up this test
 public abstract class HybridClusterScanComparisonIntegrationTest extends HybridClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(HybridClusterScanComparisonIntegrationTest.class);
-  protected final File _offlineTarDir = new File("/tmp/HybridClusterIntegrationTest/offlineTarDir");
-  protected final File _realtimeTarDir = new File("/tmp/HybridClusterIntegrationTest/realtimeTarDir");
-  protected final File _unpackedSegments = new File("/tmp/HybridClusterIntegrationTest/unpackedSegments");
+
+  protected final File _offlineTarDir = new File(_tempDir, "offlineTarDir");
+  protected final File _realtimeTarDir = new File(_tempDir, "realtimeTarDir");
+  protected final File _unpackedSegments = new File(_tempDir, "unpackedSegments");
   protected final File _offlineSegmentDir = new File(_segmentDir, "offline");
   protected final File _realtimeSegmentDir = new File(_segmentDir, "realtime");
+  protected final String _kafkaTopic = getKafkaTopic();
   private Map<File, File> _offlineAvroToSegmentMap;
   private Map<File, File> _realtimeAvroToSegmentMap;
   private File _schemaFile;
@@ -90,6 +95,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
   private long startTimeMs;
   private boolean _logMatchingResults = false;
   private ThreadPoolExecutor _queryExecutor;
+  private long _countStarResult;
   protected List<String> invertedIndexColumns = new ArrayList<String>();
   protected boolean _createSegmentsInParallel = false;
   protected int _nQueriesRead = -1;
@@ -112,7 +118,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   protected void cleanup() throws Exception {
-    // Uncomment this to preserve segments for examination later.
+    // Comment this to preserve segments for examination later
     super.cleanup();
   }
 
@@ -128,40 +134,29 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     Schema schema = Schema.fromFile(schemaFile);
     addSchema(schemaFile, schema.getSchemaName());
     addHybridTable(tableName, timeColumnName, timeColumnType, kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP", shouldUseLlc(), null, null);
+        "TestTenant", "TestTenant", avroFile, sortedColumn, invertedIndexColumns, "MMAP", useLlc(), null, null);
   }
 
   @Override
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
-    ensureDirectoryExistsAndIsEmpty(_tmpDir);
-    ensureDirectoryExistsAndIsEmpty(_segmentDir);
-    ensureDirectoryExistsAndIsEmpty(_offlineSegmentDir);
-    ensureDirectoryExistsAndIsEmpty(_realtimeSegmentDir);
-    ensureDirectoryExistsAndIsEmpty(_offlineTarDir);
-    ensureDirectoryExistsAndIsEmpty(_realtimeTarDir);
-    ensureDirectoryExistsAndIsEmpty(_unpackedSegments);
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _offlineSegmentDir, _realtimeSegmentDir,
+        _offlineTarDir, _realtimeTarDir, _unpackedSegments);
 
     // Start Zk, Kafka and Pinot
-    startHybridCluster(getKafkaPartitionCount());
+    startHybridCluster();
 
     extractAvroIfNeeded();
 
-    int avroFileCount = getAvroFileCount();
-    Preconditions.checkArgument(3 <= avroFileCount, "Need at least three Avro files for this test");
-
-    setSegmentCount(avroFileCount);
-    setOfflineSegmentCount(2);
-    setRealtimeSegmentCount(avroFileCount - 1);
-
-    final List<File> avroFiles = getAllAvroFiles();
+    List<File> avroFiles = getAllAvroFiles();
+    Assert.assertTrue(avroFiles.size() >= 3, "Need at least three Avro files for this test");
 
     _schemaFile = getSchemaFile();
     _schema = Schema.fromFile(_schemaFile);
 
     // Create Pinot table
-    setUpTable("mytable", getTimeColumnName(), getTimeColumnType(), KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+    setUpTable("mytable", getTimeColumnName(), getTimeColumnType(), KafkaStarterUtils.DEFAULT_ZK_STR, _kafkaTopic,
         _schemaFile, avroFiles.get(0), getSortedColumn(), invertedIndexColumns);
 
     final List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
@@ -173,13 +168,13 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
       executor = Executors.newCachedThreadPool();
     } else {
       executor = Executors.newSingleThreadExecutor();
-
     }
     Future<Map<File, File>> offlineAvroToSegmentMapFuture =
-        buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _offlineSegmentDir, _offlineTarDir, "mytable", false, _schema);
+        ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, 0, _offlineSegmentDir,
+            _offlineTarDir, "mytable", false, null, _schema, executor);
     Future<Map<File, File>> realtimeAvroToSegmentMapFuture =
-        buildSegmentsFromAvro(realtimeAvroFiles, executor, 0, _realtimeSegmentDir, _realtimeTarDir, "mytable", false,
-            _schema);
+        ClusterIntegrationTestUtils.buildSegmentsFromAvro(realtimeAvroFiles, 0, _realtimeSegmentDir,
+            _realtimeTarDir, "mytable", false, null, _schema, executor);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);
@@ -194,9 +189,6 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
-    // Set up a Helix spectator to count the number of segments that are uploaded and unlock the latch once 12 segments are online
-    final CountDownLatch latch = setupSegmentCountCountDownLatch("mytable", getOfflineSegmentCount());
-
     // Upload the offline segments
     int i = 0;
     for (String segmentName : _offlineTarDir.list()) {
@@ -206,8 +198,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
       FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }
 
-    // Wait for all offline segments to be online
-    latch.await();
+    waitForAllSegmentsOnline(CommonConstants.Helix.TableType.OFFLINE, getNumOfflineSegments(), 600_000L);
 
     _compareStatusFileWriter = getLogWriter();
     _scanRspFileWriter = getScanRspRecordFileWriter();
@@ -222,9 +213,26 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
   }
 
   /**
-   * Returns the number of avro files to use in this test.
+   * The Avro files must be sorted as time series data.
+   *
+   * @return List of Avro files.
    */
-  protected abstract int getAvroFileCount();
+  protected abstract List<File> getAllAvroFiles();
+
+  @Override
+  protected long getCountStarResult() {
+    return _countStarResult;
+  }
+
+  @Override
+  protected int getNumOfflineSegments() {
+    return 2;
+  }
+
+  @Override
+  protected int getNumRealtimeSegments() {
+    return getAllAvroFiles().size() - 1;
+  }
 
   protected void setLogMatchingResults(boolean logMatchingResults) {
     _logMatchingResults = logMatchingResults;
@@ -325,7 +333,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
   }
 
   @Override
-  protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
+  protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries) throws Exception {
     runQuery(pqlQuery, _scanBasedQueryProcessor, false, null);
   }
 
@@ -359,15 +367,17 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
       // Push avro for the new segment
       LOGGER.info("Pushing Avro file {} into Kafka", avroFile);
-      pushAvroIntoKafka(Collections.singletonList(avroFile), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
+      ClusterIntegrationTestUtils.pushAvroIntoKafka(Collections.singletonList(avroFile),
+          KafkaStarterUtils.DEFAULT_KAFKA_BROKER, _kafkaTopic, getMaxNumKafkaMessagesPerBatch(),
+          getKafkaMessageHeader(), getPartitionColumn());
 
       // Configure the scan based comparator to use the distinct union of the offline and realtime segments
       configureScanBasedComparator(enabledRealtimeSegments);
 
       QueryResponse queryResponse = _scanBasedQueryProcessor.processQuery("select count(*) from mytable");
 
-      int expectedRecordCount = queryResponse.getNumDocsScanned();
-      waitForRecordCountToStabilizeToExpectedCount(expectedRecordCount, System.currentTimeMillis() + getStabilizationTimeMs());
+      _countStarResult = queryResponse.getNumDocsScanned();
+      waitForAllDocsLoaded(getStabilizationTimeMs());
 
       // Run the actual tests
       LOGGER.info("Running queries");
@@ -426,7 +436,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     LOGGER.info("Enabled Avro files {}", enabledAvroFiles);
 
     // Unpack enabled segments
-    ensureDirectoryExistsAndIsEmpty(_unpackedSegments);
+    TestUtils.ensureDirectoriesExistAndEmpty(_unpackedSegments);
     for (File file : segmentsToUnpack) {
       LOGGER.info("Unpacking file {}", file);
       TarGzCompressionUtils.unTar(file, _unpackedSegments);
@@ -453,13 +463,13 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
 
     // Drop and recreate the Kafka topic
-    KafkaStarterUtils.deleteTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
+    KafkaStarterUtils.deleteTopic(_kafkaTopic, KafkaStarterUtils.DEFAULT_ZK_STR);
     Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
+    KafkaStarterUtils.createTopic(_kafkaTopic, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Recreate the realtime table
     addRealtimeTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 900, "Days", KafkaStarterUtils.DEFAULT_ZK_STR,
-        KAFKA_TOPIC, _schema.getSchemaName(), "TestTenant", "TestTenant",
+        _kafkaTopic, _schema.getSchemaName(), "TestTenant", "TestTenant",
         _realtimeAvroToSegmentMap.keySet().iterator().next(), 1000000, getSortedColumn(), new ArrayList<String>(), null,
         null, null);
   }
@@ -480,13 +490,13 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
 
   @Override
   @Test(enabled = false)
-  public void testHardcodedQuerySet()
+  public void testQueriesFromQueryFile()
       throws Exception {
     runTestLoop(new Callable<Object>() {
       @Override
       public Object call()
           throws Exception {
-        HybridClusterScanComparisonIntegrationTest.super.testHardcodedQuerySet();
+        HybridClusterScanComparisonIntegrationTest.super.testQueriesFromQueryFile();
         return null;
       }
     });
@@ -520,22 +530,18 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     });
   }
 
+  @Test(enabled = false)
+  @Override
+  public void testInstanceShutdown()
+      throws Exception {
+    // Skipped
+  }
+
   @Override
   @Test(enabled = false)
   public void testBrokerDebugOutput()
       throws Exception {
-    super.testBrokerDebugOutput();
-  }
-
-  @Override
-  @Test(enabled = false)
-  public void testInstanceShutdown() {
-    // jfim: Doesn't like this is working properly
-    super.testInstanceShutdown();
-  }
-
-  protected int getKafkaPartitionCount() {
-    return 10;
+    // Skipped
   }
 
   @Override

@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -55,15 +56,16 @@ public abstract class ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
   protected String CONTROLLER_BASE_API_URL = "http://localhost:" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT;
   public static final int BROKER_PORT = 18099;
-  protected String BROKER_BASE_API_URL = "http://localhost:" + Integer.toString(BROKER_PORT);
+  protected String BROKER_BASE_API_URL = "http://localhost:" + BROKER_PORT;
   protected final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
   protected ZkClient _zkClient;
   protected ControllerStarter _controllerStarter;
+  protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
-  public JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
+  public static JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
     final JSONObject json = new JSONObject();
     json.put("pql", query);
     json.put("trace", isTraceEnabled);
@@ -91,7 +93,7 @@ public abstract class ControllerTest {
     return getBrokerReturnJson(conn);
   }
 
-  private JSONObject getBrokerReturnJson(URLConnection conn) throws Exception {
+  private static JSONObject getBrokerReturnJson(URLConnection conn) throws Exception {
     final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
     final StringBuilder sb = new StringBuilder();
     String line = null;
@@ -137,8 +139,10 @@ public abstract class ControllerTest {
       _zkClient.deleteRecursive("/" + getHelixClusterName());
     }
     _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, config);
-    _helixAdmin = _controllerStarter.getHelixResourceManager().getHelixAdmin();
-    _propertyStore = _controllerStarter.getHelixResourceManager().getPropertyStore();
+    PinotHelixResourceManager helixResourceManager = _controllerStarter.getHelixResourceManager();
+    _helixManager = helixResourceManager.getHelixZkManager();
+    _helixAdmin = helixResourceManager.getHelixAdmin();
+    _propertyStore = helixResourceManager.getPropertyStore();
   }
 
   protected void startController() {
@@ -271,6 +275,6 @@ public abstract class ControllerTest {
   }
 
   protected String getHelixClusterName() {
-    return this.getClass().getSimpleName();
+    return getClass().getSimpleName();
   }
 }

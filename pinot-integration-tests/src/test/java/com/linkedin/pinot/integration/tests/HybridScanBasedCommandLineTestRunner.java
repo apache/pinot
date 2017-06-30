@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.data.Schema;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -25,13 +26,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
+import javax.annotation.Nonnull;
 import org.testng.Assert;
 import org.testng.TestListenerAdapter;
 import org.testng.TestNG;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.Schema;
 
 
 /**
@@ -50,6 +51,7 @@ import com.linkedin.pinot.common.data.Schema;
  * The command can be invoked as follows:
  *    CLASSPATH_PREFIX=pinot-integration-tests/target/pinot-integration-tests-*-tests.jar pinot-integration-tests/target/pinot-integration-tests-pkg/bin/pinot-hybrid-cluster-test.sh args...
  */
+// TODO: clean up this test
 public class HybridScanBasedCommandLineTestRunner {
 
   public static void usage() {
@@ -169,6 +171,7 @@ public class HybridScanBasedCommandLineTestRunner {
       return _avroFiles;
     }
 
+    @Nonnull
     @Override
     public File getSchemaFile() {
       return _schemaFile;
@@ -190,7 +193,7 @@ public class HybridScanBasedCommandLineTestRunner {
     }
 
     @Override
-    protected int getKafkaPartitionCount() {
+    protected int getNumKafkaPartitions() {
       if (_useLlc) {
         return 2;
       } else {
@@ -249,18 +252,13 @@ public class HybridScanBasedCommandLineTestRunner {
     }
 
     @Override
-    protected boolean shouldUseLlc() {
+    protected boolean useLlc() {
       return _useLlc;
     }
 
     @Override
     protected long getStabilizationTimeMs() {
       return 5 * 60 * 1000L;
-    }
-
-    @Override
-    protected int getAvroFileCount() {
-      return _avroFiles.size();
     }
 
     @Override

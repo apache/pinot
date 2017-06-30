@@ -15,96 +15,75 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.base.Function;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.util.TestUtils;
+import javax.annotation.Nullable;
 import org.json.JSONObject;
-import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 /**
- * This test sets up the Pinot cluster and ensures the sanity/consistency of
- * cluster after modifications are performed on the cluster.
+ * This test sets up the Pinot cluster and ensures the sanity/consistency of cluster after modifications are performed
+ * on the cluster.
  */
 public class ClusterSanityTest extends ClusterTest {
-  private static final String tenantName = ControllerTenantNameBuilder.DEFAULT_TENANT_NAME;
-  private static final String brokerTenant = tenantName + "_BROKER";
+  private static final String TENANT_NAME = ControllerTenantNameBuilder.DEFAULT_TENANT_NAME;
+  private static final String BROKER_TENANT_NAME =
+      ControllerTenantNameBuilder.getBrokerTenantNameForTenant(TENANT_NAME);
   private static final String TABLE_NAME = "ClusterSanityTestTable";
-  private static final long WAIT_TIME_FOR_TENANT_UPDATE = 2000;
+  private static final int INITIAL_NUM_BROKERS = 2;
+  private static final int NEW_NUM_BROKERS = 1;
+  private static final int NUM_SERVERS = 1;
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    startZk();
+    startController();
+    startBrokers(INITIAL_NUM_BROKERS);
+    startServers(NUM_SERVERS);
+    addOfflineTable(null, null, -1, null, TENANT_NAME, TENANT_NAME, TABLE_NAME, SegmentVersion.v1);
+  }
 
   /**
-   * This test ensures that the cluster is in a consistent after the number of brokers
-   * is reduced.
+   * This test ensures that the cluster is in a consistent state after scaling down the brokers.
+   *
    * @throws Exception
    */
   @Test
   public void testBrokerScaleDown()
       throws Exception {
-    setupCluster(2, 1);
-    scaleDownBroker(1);
+    Tenant tenant =
+        new Tenant.TenantBuilder(TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(NEW_NUM_BROKERS).build();
 
-    try {
-      Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), brokerTenant).size(), 1);
-    } catch (Exception e) {
-      Assert.fail("Exception caught while getting all instances in cluster with tag: " + e);
-    } finally {
-      tearDownCluster();
-    }
-  }
-
-  /**
-   * Set up the Pinot cluster with provided number of brokers and servers.
-   *
-   * @param numBrokers
-   * @param numServers
-   * @throws Exception
-   */
-  public void setupCluster(int numBrokers, int numServers)
-      throws Exception {
-    startZk();
-    startController();
-    startBrokers(numBrokers);
-    startServers(numServers);
-    addOfflineTable("", "", -1, "", tenantName, tenantName, TABLE_NAME, SegmentVersion.v1);
-  }
-
-  /**
-   * Tear down the Pinot cluster.
-   *
-   * @throws Exception
-   */
-  public void tearDownCluster()
-      throws Exception {
-    stopBroker();
-    stopController();
-    stopServer();
-    stopZk();
-  }
-
-  /**
-   * Helper method to reduce the number of brokers to the provided value.
-   * Assumes that the number of existing brokers is greater then the desired number.
-   *
-   * @param newNumBrokers
-   * @return
-   * @throws Exception
-   */
-  private String scaleDownBroker(int newNumBrokers)
-      throws Exception {
-    Tenant tenant = new Tenant.TenantBuilder(tenantName).setRole(TenantRole.BROKER)
-        .setTotalInstances(newNumBrokers)
-        .setOfflineInstances(newNumBrokers)
-        .build();
-
-    // Send the 'put' (instead of 'post') request, that updates the tenants instead of creating.
+    // Send the 'put' (instead of 'post') request, that updates the tenants instead of creating
     JSONObject request = tenant.toJSON();
     sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantCreate(),
         request.toString());
-    Thread.sleep(WAIT_TIME_FOR_TENANT_UPDATE);
 
-    return brokerTenant;
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        return _helixAdmin.getInstancesInClusterWithTag(_clusterName, BROKER_TENANT_NAME).size() == 1;
+      }
+    }, 60_000L, "Failed to get in a consistent state after scaling down the brokers");
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    dropOfflineTable(TABLE_NAME);
+    stopServer();
+    stopBroker();
+    stopController();
+    stopZk();
   }
 }

@@ -15,23 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -59,7 +42,24 @@ import com.linkedin.pinot.minion.MinionStarter;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -70,7 +70,7 @@ public abstract class ClusterTest extends ControllerTest {
   private static final int LLC_SEGMENT_FLUSH_SIZE = 5000;
   private static final int HLC_SEGMENT_FLUSH_SIZE = 20000;
 
-  protected static String partitioningKey = null;
+  protected final String _clusterName = getHelixClusterName();
 
   private final ControllerRequestURLBuilder _controllerRequestURLBuilder =
       ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
@@ -94,13 +94,13 @@ public abstract class ClusterTest extends ControllerTest {
   protected void startBrokers(int brokerCount) {
     try {
       for (int i = 0; i < brokerCount; ++i) {
-        final String helixClusterName = getHelixClusterName();
         Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
         configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
         configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(BROKER_PORT + i));
         configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
+        configuration.setProperty("pinot.broker.delayShutdownTimeMs", 0);
         overrideBrokerConf(configuration);
-        _brokerStarters.add(BrokerTestUtils.startBroker(helixClusterName, ZkStarter.DEFAULT_ZK_STR, configuration));
+        _brokerStarters.add(BrokerTestUtils.startBroker(_clusterName, ZkStarter.DEFAULT_ZK_STR, configuration));
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -123,8 +123,10 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostnameOrAddress());
         configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
         configuration.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, "10000");
+        configuration.addProperty(Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
+        configuration.setProperty(Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, false);
         overrideOfflineServerConf(configuration);
-        _serverStarters.add(new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, configuration));
+        _serverStarters.add(new HelixServerStarter(_clusterName, ZkStarter.DEFAULT_ZK_STR, configuration));
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -142,7 +144,7 @@ public abstract class ClusterTest extends ControllerTest {
         Configuration config = new PropertiesConfiguration();
         config.setProperty(Helix.Instance.INSTANCE_ID_KEY,
             Minion.INSTANCE_PREFIX + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
-        MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), config);
+        MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, _clusterName, config);
 
         // Register plug-in task executors
         if (taskExecutorsToRegister != null) {
@@ -185,19 +187,22 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void addSchema(File schemaFile, String schemaName) throws Exception {
+  protected void addSchema(File schemaFile, String schemaName)
+      throws Exception {
     FileUploadUtils.sendFile("localhost", ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, "schemas", schemaName,
         new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.POST);
   }
 
-  protected void updateSchema(File schemaFile, String schemaName) throws Exception {
+  protected void updateSchema(File schemaFile, String schemaName)
+      throws Exception {
     FileUploadUtils.sendFile("localhost", ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, "schemas/" + schemaName,
         schemaName, new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.PUT);
   }
 
   protected void addOfflineTable(String timeColumnName, String timeColumnType, int retentionTimeValue,
       String retentionTimeUnit, String brokerTenant, String serverTenant, String tableName,
-      SegmentVersion segmentVersion) throws Exception {
+      SegmentVersion segmentVersion)
+      throws Exception {
     addOfflineTable(timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant, serverTenant,
         null, null, tableName, segmentVersion, null);
   }
@@ -263,7 +268,8 @@ public abstract class ClusterTest extends ControllerTest {
     private DatumReader<GenericData.Record> _reader;
 
     @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String kafkaTopicName) throws Exception {
+    public void init(Map<String, String> props, Schema indexingSchema, String kafkaTopicName)
+        throws Exception {
       // Load Avro schema
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
@@ -369,19 +375,17 @@ public abstract class ClusterTest extends ControllerTest {
       String sortedColumn, List<String> invertedIndexColumns, String loadMode, boolean useLlc,
       List<String> noDictionaryColumns, TableTaskConfig taskConfig)
       throws Exception {
-    int retentionDays = -1;
-    String retentionTimeUnit = "";
     if (useLlc) {
-      addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit,
-          KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile,
-          getRealtimeSegmentFlushSize(true), sortedColumn, invertedIndexColumns, loadMode, noDictionaryColumns, taskConfig);
-    } else {
-      addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(false), sortedColumn,
+      addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, null, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(true), sortedColumn,
           invertedIndexColumns, loadMode, noDictionaryColumns, taskConfig);
+    } else {
+      addRealtimeTable(tableName, timeColumnName, timeColumnType, -1, null, kafkaZkUrl, kafkaTopic, schemaName,
+          serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(false), sortedColumn, invertedIndexColumns,
+          loadMode, noDictionaryColumns, taskConfig);
     }
-    addOfflineTable(timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant,
-        invertedIndexColumns, loadMode, tableName, SegmentVersion.v1, taskConfig);
+    addOfflineTable(timeColumnName, timeColumnType, -1, null, brokerTenant, serverTenant, invertedIndexColumns,
+        loadMode, tableName, SegmentVersion.v1, taskConfig);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount)

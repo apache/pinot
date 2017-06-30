@@ -428,5 +428,5 @@
       "name": "DaysSinceEpoch"
     }
   },
-  "schemaName": "mytable_OFFLINE"
+  "schemaName": "mytable"
 }

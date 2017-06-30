@@ -36,8 +36,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -62,8 +60,6 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 public class QueryGenerator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QueryGenerator.class);
-
   // Configurable variables.
   private static final int MAX_NUM_SELECTION_COLUMNS = 3;
   private static final int MAX_NUM_AGGREGATION_COLUMNS = 3;
@@ -158,7 +154,6 @@ public class QueryGenerator {
             _singleValueColumnNames.add(fieldName);
             break;
           default:
-            LOGGER.warn("Ignoring field {} of type {}", fieldName, fieldType);
             break;
         }
       }
@@ -240,10 +235,10 @@ public class QueryGenerator {
     while (columnNameIterator.hasNext()) {
       String columnName = columnNameIterator.next();
 
-      // Remove multi-value columns with more than MAX_ELEMENTS_IN_MULTI_VALUE elements.
+      // Remove multi-value columns with more than MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE elements.
       Integer maxNumElements = _multiValueColumnMaxNumElements.get(columnName);
-      if (maxNumElements != null && maxNumElements > BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE) {
-        LOGGER.debug("Ignoring column {} with max number of {} elements", columnName, maxNumElements);
+      if (maxNumElements != null
+          && maxNumElements > ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE) {
         columnNameIterator.remove();
         _multiValueColumnMaxNumElements.remove(columnName);
       } else {
@@ -348,7 +343,7 @@ public class QueryGenerator {
       for (String projectionColumn : _projectionColumns) {
         if (_multiValueColumnMaxNumElements.containsKey(projectionColumn)) {
           // Multi-value column.
-          for (int i = 0; i < BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+          for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
             h2ProjectionColumns.add(projectionColumn + "__MV" + i);
           }
         } else {
@@ -509,7 +504,7 @@ public class QueryGenerator {
     LimitQueryFragment(int limit) {
       // When limit is MAX_RESULT_LIMIT, construct query without LIMIT.
       super(limit == MAX_RESULT_LIMIT ? "" : "LIMIT " + limit,
-          "LIMIT " + BaseClusterIntegrationTest.MAX_COMPARISON_LIMIT);
+          "LIMIT " + ClusterIntegrationTestUtils.MAX_NUM_ROWS_TO_COMPARE);
     }
   }
 
@@ -522,7 +517,8 @@ public class QueryGenerator {
   private class TopQueryFragment extends StringQueryFragment {
     TopQueryFragment(int top) {
       // When top is MAX_RESULT_LIMIT, construct query without TOP.
-      super(top == MAX_RESULT_LIMIT ? "" : "TOP " + top, "LIMIT " + BaseClusterIntegrationTest.MAX_COMPARISON_LIMIT);
+      super(top == MAX_RESULT_LIMIT ? "" : "TOP " + top,
+          "LIMIT " + ClusterIntegrationTestUtils.MAX_NUM_ROWS_TO_COMPARE);
     }
   }
 
@@ -799,6 +795,7 @@ public class QueryGenerator {
       return new StringQueryFragment(columnName + " BETWEEN " + leftValue + " AND " + rightValue);
     }
   }
+
   /**
    * Generator for single-value column <code>REGEX</code> predicate query fragment.
    */
@@ -833,9 +830,9 @@ public class QueryGenerator {
         String equalsPredicate = String.format("%s = %s", columnName, value);
         return new StringQueryFragment(equalsPredicate);
       }
-
     }
   }
+
   /**
    * Generator for multi-value column comparison predicate query fragment.
    * <p>DO NOT SUPPORT '<code>NOT EQUAL</code>'.
@@ -852,8 +849,9 @@ public class QueryGenerator {
         comparisonOperator = pickRandom(COMPARISON_OPERATORS);
       }
 
-      List<String> h2ComparisonClauses = new ArrayList<>(BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE);
-      for (int i = 0; i < BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+      List<String> h2ComparisonClauses =
+          new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
+      for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
         h2ComparisonClauses.add(joinWithSpaces(columnName + "__MV" + i, comparisonOperator, columnValue));
       }
 
@@ -879,8 +877,9 @@ public class QueryGenerator {
       }
       String inValues = StringUtils.join(values, ", ");
 
-      List<String> h2InClauses = new ArrayList<>(BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE);
-      for (int i = 0; i < BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+      List<String> h2InClauses =
+          new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
+      for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
         h2InClauses.add(columnName + "__MV" + i + " IN (" + inValues + ")");
       }
 
@@ -900,8 +899,9 @@ public class QueryGenerator {
       String leftValue = pickRandom(columnValues);
       String rightValue = pickRandom(columnValues);
 
-      List<String> h2ComparisonClauses = new ArrayList<>(BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE);
-      for (int i = 0; i < BaseClusterIntegrationTest.MAX_ELEMENTS_IN_MULTI_VALUE; i++) {
+      List<String> h2ComparisonClauses =
+          new ArrayList<>(ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
+      for (int i = 0; i < ClusterIntegrationTestUtils.MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE; i++) {
         h2ComparisonClauses.add(columnName + "__MV" + i + " BETWEEN " + leftValue + " AND " + rightValue);
       }
 

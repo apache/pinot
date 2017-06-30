@@ -27,7 +27,6 @@ import com.linkedin.pinot.tools.query.comparison.StarTreeQueryGenerator;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
@@ -61,7 +60,8 @@ import org.testng.annotations.Test;
  * comparator ensures that response from star tree is contained within the reference response. This
  * is to avoid false failures when groups with same value are truncated due to LIMIT or TOP N.
  */
-public class StarTreeClusterIntegrationTest extends ClusterTest {
+// TODO: clean up this test
+public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(StarTreeClusterIntegrationTest.class);
 
@@ -138,12 +138,11 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
    */
   private void generateAndUploadSegments(List<File> avroFiles, String tableName, boolean starTree)
       throws IOException, ArchiveException, InterruptedException {
-    BaseClusterIntegrationTest.ensureDirectoryExistsAndIsEmpty(_segmentsDir);
-    BaseClusterIntegrationTest.ensureDirectoryExistsAndIsEmpty(_tarredSegmentsDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(_segmentsDir, _tarredSegmentsDir);
 
     ExecutorService executor = Executors.newCachedThreadPool();
-    BaseClusterIntegrationTest.buildSegmentsFromAvro(avroFiles, executor, 0, _segmentsDir,
-        _tarredSegmentsDir, tableName, starTree, getSingleValueColumnsSchema());
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentsDir, _tarredSegmentsDir,
+        tableName, starTree, null, getSingleValueColumnsSchema(), executor);
 
     executor.shutdown();
     executor.awaitTermination(TIMEOUT_IN_SECONDS, TimeUnit.SECONDS);
@@ -191,15 +190,13 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
 
       @Override
       public boolean verify() {
-        String clusterName = getHelixClusterName();
-
-        List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
+        List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(_clusterName);
         LOGGER.info("Waiting for external view to update for resources: {} startTime: {}",
             resourcesInCluster, new Timestamp(System.currentTimeMillis()));
 
         for (String resourceName : resourcesInCluster) {
-          IdealState idealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
-          ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, resourceName);
+          IdealState idealState = helixAdmin.getResourceIdealState(_clusterName, resourceName);
+          ExternalView externalView = helixAdmin.getResourceExternalView(_clusterName, resourceName);
           LOGGER.info("HERE for {},\n IS:{} \n EV:{}", resourceName, idealState, externalView);
 
           if (idealState == null || externalView == null) {
@@ -246,8 +243,8 @@ public class StarTreeClusterIntegrationTest extends ClusterTest {
     startCluster();
     addOfflineTables();
 
-    BaseClusterIntegrationTest.ensureDirectoryExistsAndIsEmpty(_tmpDir);
-    List<File> avroFiles = BaseClusterIntegrationTest.unpackAvroData(_tmpDir, SEGMENT_COUNT);
+    TestUtils.ensureDirectoriesExistAndEmpty(_tmpDir);
+    List<File> avroFiles = unpackAvroData(_tmpDir);
     _queryFile = new File(TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class
         .getClassLoader().getResource("OnTimeStarTreeQueries.txt")));
 

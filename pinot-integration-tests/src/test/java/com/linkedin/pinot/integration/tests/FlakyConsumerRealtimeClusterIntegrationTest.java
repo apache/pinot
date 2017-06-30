@@ -16,33 +16,36 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import java.util.Random;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.linkedin.pinot.core.realtime.StreamProviderFactory;
+import java.util.Random;
+import org.testng.annotations.BeforeClass;
 
 
 /**
  * Integration test that simulates a flaky Kafka consumer.
  */
 public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
-  static Class<? extends StreamProvider> originalStreamProvider = StreamProviderFactory.getStreamProviderClass();
+  private static final Class<? extends StreamProvider> ORIGINAL_STREAM_PROVIDER =
+      StreamProviderFactory.getStreamProviderClass();
 
-  static {
+  @BeforeClass
+  @Override
+  public void setUp()
+      throws Exception {
     StreamProviderFactory.setStreamProviderClass(FlakyStreamProvider.class);
+    super.setUp();
   }
 
   public static class FlakyStreamProvider implements StreamProvider {
     private StreamProvider _streamProvider;
     private Random _random = new Random();
 
-    public FlakyStreamProvider() {
-      try {
-        _streamProvider = FlakyConsumerRealtimeClusterIntegrationTest.originalStreamProvider.newInstance();
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
+    public FlakyStreamProvider()
+        throws Exception {
+      _streamProvider = ORIGINAL_STREAM_PROVIDER.newInstance();
     }
 
     @Override
@@ -52,7 +55,8 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public void start() throws Exception {
+    public void start()
+        throws Exception {
       _streamProvider.start();
     }
 
@@ -103,7 +107,8 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public void shutdown() throws Exception {
+    public void shutdown()
+        throws Exception {
       _streamProvider.shutdown();
     }
   }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
@@ -30,6 +31,7 @@ import com.linkedin.pinot.minion.exception.FatalException;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import com.linkedin.pinot.minion.executor.BaseTaskExecutor;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
+import com.linkedin.pinot.util.TestUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -44,11 +47,14 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+/**
+ * Integration test that extends HybridClusterIntegrationTest and add minions into the cluster.
+ */
 public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
   private static final String RAW_TABLE_NAME = "mytable";
   private static final String OFFLINE_TABLE_NAME = "mytable_OFFLINE";
   private static final String REALTIME_TABLE_NAME = "mytable_REALTIME";
-  private static final int NUM_WORKERS = 3;
+  private static final int NUM_MINIONS = 3;
 
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
@@ -77,7 +83,7 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
 
     Map<String, Class<? extends PinotTaskExecutor>> taskExecutorsToRegister = new HashMap<>(1);
     taskExecutorsToRegister.put(TestTaskGenerator.TASK_TYPE, TestTaskExecutor.class);
-    startMinions(NUM_WORKERS, taskExecutorsToRegister);
+    startMinions(NUM_MINIONS, taskExecutorsToRegister);
   }
 
   @Test
@@ -88,13 +94,13 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
     _pinotTaskManager.scheduleTasks();
 
     // Wait at most 60 seconds for all tasks showing up in the cluster
-    long endTime = System.currentTimeMillis() + 60_000L;
-    while ((System.currentTimeMillis() < endTime)
-        && (_pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).size() != 4)) {
-      Thread.sleep(100L);
-    }
-    Assert.assertEquals(_pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).size(), 4,
-        "Not all tasks showed up within 60 seconds");
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        return _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).size() == 4;
+      }
+    }, 60_000L, "Failed to get all tasks showing up in the cluster");
 
     // Should not generate more tasks
     _pinotTaskManager.scheduleTasks();
@@ -110,37 +116,35 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
     _pinotHelixTaskResourceManager.stopTaskQueue(TestTaskGenerator.TASK_TYPE);
 
     // Wait at most 60 seconds for all tasks STOPPED
-    endTime = System.currentTimeMillis() + 60_000L;
-    int stoppedTaskCount = 0;
-    while ((System.currentTimeMillis() < endTime) && (stoppedTaskCount != 4)) {
-      Thread.sleep(100L);
-      stoppedTaskCount = 0;
-      taskStates = _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE);
-      for (TaskState taskState : taskStates.values()) {
-        if (taskState == TaskState.STOPPED) {
-          stoppedTaskCount++;
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        for (TaskState taskState : _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values()) {
+          if (taskState != TaskState.STOPPED) {
+            return false;
+          }
         }
+        return true;
       }
-    }
-    Assert.assertEquals(stoppedTaskCount, 4, "Not all tasks STOPPED within 60 seconds");
+    }, 60_000L, "Failed to get all tasks STOPPED");
 
     // Resume the task queue
     _pinotHelixTaskResourceManager.resumeTaskQueue(TestTaskGenerator.TASK_TYPE);
 
     // Wait at most 60 seconds for all tasks COMPLETED
-    endTime = System.currentTimeMillis() + 60_000L;
-    int completedTaskCount = 0;
-    while ((System.currentTimeMillis() < endTime) && (completedTaskCount != 4)) {
-      Thread.sleep(100L);
-      completedTaskCount = 0;
-      taskStates = _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE);
-      for (TaskState taskState : taskStates.values()) {
-        if (taskState == TaskState.COMPLETED) {
-          completedTaskCount++;
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        for (TaskState taskState : _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values()) {
+          if (taskState != TaskState.COMPLETED) {
+            return false;
+          }
         }
+        return true;
       }
-    }
-    Assert.assertEquals(completedTaskCount, 4, "Not all tasks COMPLETED within 60 seconds");
+    }, 60_000L, "Failed to get all tasks COMPLETED");
 
     // Delete the task queue
     _pinotHelixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE);
