@@ -271,7 +271,7 @@ public class TimeBasedAnomalyMerger {
       anomalyFunction.updateMergedAnomalyInfo(mergedAnomalies, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
 
       if(anomalyFunctionSpec.isToCalculateGlobalMetric()) {
-        MetricTimeSeries subMetricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
+        MetricTimeSeries subMetricTimeSeries = adInputContext.getDimensionMapMetricTimeSeriesMap().get(dimensions);
         computeImpactToGlobalMetric(adInputContext.getGlobalMetric(), subMetricTimeSeries, mergedAnomalies);
       }
     }
