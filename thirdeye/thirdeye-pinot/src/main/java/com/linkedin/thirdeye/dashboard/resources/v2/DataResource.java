@@ -382,7 +382,8 @@ public class DataResource {
 
     HeatMapViewRequest request = new HeatMapViewRequest();
     request.setCollection(collection);
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric,
+        metricConfigDTO.getDefaultAggFunction(), collection);
 
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = collectionMaxDataTimeCache.get(collection);

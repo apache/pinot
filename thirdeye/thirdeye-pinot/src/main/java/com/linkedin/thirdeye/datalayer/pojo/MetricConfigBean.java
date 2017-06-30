@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import java.util.Map;
 import java.util.Objects;
@@ -14,6 +15,7 @@ public class MetricConfigBean extends AbstractBean {
   public static final String ALIAS_JOINER = "::";
   public static final String URL_TEMPLATE_START_TIME = "startTime";
   public static final String URL_TEMPLATE_END_TIME = "endTime";
+  public static final MetricAggFunction DEFAULT_AGG_FUNCTION = MetricAggFunction.SUM;
 
   private String name;
 
@@ -26,6 +28,8 @@ public class MetricConfigBean extends AbstractBean {
   private boolean derived = false;
 
   private String derivedMetricExpression;
+
+  private MetricAggFunction defaultAggFunction = DEFAULT_AGG_FUNCTION;
 
   private Double rollupThreshold = DEFAULT_THRESHOLD;
 
@@ -88,6 +92,14 @@ public class MetricConfigBean extends AbstractBean {
 
   public void setDerivedMetricExpression(String derivedMetricExpression) {
     this.derivedMetricExpression = derivedMetricExpression;
+  }
+
+  public MetricAggFunction getDefaultAggFunction() {
+    return defaultAggFunction;
+  }
+
+  public void setDefaultAggFunction(MetricAggFunction defaultAggFunction) {
+    this.defaultAggFunction = defaultAggFunction;
   }
 
   public Double getRollupThreshold() {
@@ -158,6 +170,7 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(alias, mc.getAlias())
         && Objects.equals(derived, mc.isDerived())
         && Objects.equals(derivedMetricExpression, mc.getDerivedMetricExpression())
+        && Objects.equals(defaultAggFunction, mc.getDefaultAggFunction())
         && Objects.equals(rollupThreshold, mc.getRollupThreshold())
         && Objects.equals(inverseMetric, mc.isInverseMetric())
         && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
@@ -168,7 +181,7 @@ public class MetricConfigBean extends AbstractBean {
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
+    return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, defaultAggFunction, rollupThreshold,
         inverseMetric, cellSizeExpression, active, extSourceLinkInfo, metricProperties);
   }
 }

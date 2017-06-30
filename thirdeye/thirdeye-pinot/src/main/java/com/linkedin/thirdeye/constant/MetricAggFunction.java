@@ -1,5 +1,5 @@
 package com.linkedin.thirdeye.constant;
 
 public enum MetricAggFunction {
-  SUM, AVG, COUNT
+  SUM, AVG, COUNT, MAX
 }

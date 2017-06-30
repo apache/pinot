@@ -240,7 +240,8 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
   private OLAPDataBaseClient getOlapDataBaseClient(TimeRangeEntity current, TimeRangeEntity baseline, MetricConfigDTO metric, DatasetConfigDTO dataset) throws Exception {
     final String timezone = "UTC";
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric.getName(), MetricAggFunction.SUM, dataset.getDataset());
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric.getName(),
+        metric.getDefaultAggFunction(), dataset.getDataset());
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(cache);
     olapClient.setCollection(dataset.getDataset());
