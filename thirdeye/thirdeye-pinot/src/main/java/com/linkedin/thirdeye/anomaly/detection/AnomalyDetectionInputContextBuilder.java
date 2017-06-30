@@ -426,13 +426,12 @@ public class AnomalyDetectionInputContextBuilder {
 
   /**
    * Get the metric filter setting for an anomaly function
-   * @param anomalyFunctionSpec
+   * @param filterString
    * @return
    */
-  public static Multimap<String, String> getFiltersForFunction(AnomalyFunctionDTO anomalyFunctionSpec) {
+  public static Multimap<String, String> getFiltersForFunction(String filterString) {
     // Get the original filter
     Multimap<String, String> filters;
-    String filterString = anomalyFunctionSpec.getFilters();
     if (StringUtils.isNotBlank(filterString)) {
       filters = ThirdEyeUtils.getFilterSet(filterString);
     } else {
@@ -475,7 +474,7 @@ public class AnomalyDetectionInputContextBuilder {
       AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges, boolean endTimeInclusive)
       throws JobExecutionException, ExecutionException {
 
-    Multimap<String, String> filters = getFiltersForFunction(anomalyFunctionSpec);
+    Multimap<String, String> filters = getFiltersForFunction(anomalyFunctionSpec.getFilters());
 
     List<String> groupByDimensions = getDimensionsForFunction(anomalyFunctionSpec);
 
@@ -524,7 +523,7 @@ public class AnomalyDetectionInputContextBuilder {
       throws JobExecutionException, ExecutionException {
 
     // Get the original filter
-    Multimap<String, String> filters = getFiltersForFunction(anomalyFunctionSpec);
+    Multimap<String, String> filters = getFiltersForFunction(anomalyFunctionSpec.getFilters());
 
     // Decorate filters according to dimensionMap
     filters = ThirdEyeUtils.getFilterSetFromDimensionMap(dimensionMap, filters);
@@ -570,8 +569,8 @@ public class AnomalyDetectionInputContextBuilder {
    */
   public MetricTimeSeries getGlobalMetric(AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges)
       throws JobExecutionException, ExecutionException {
-    // Set empty dimension and filter
-    Multimap<String, String> filters = HashMultimap.create();
+    // Set empty dimension and global metric filter
+    Multimap<String, String> filters = getFiltersForFunction(anomalyFunctionSpec.getGlobalMetricFilters());
     List<String> groupByDimensions = Collections.emptyList();
 
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
