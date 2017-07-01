@@ -32,6 +32,21 @@ export default Ember.Controller.extend({
   }),
 
   /**
+   * Pseudo-encodes the querystring params to be posted. NOTE: URI encoders cannot be used
+   * here because they will encode the 'cron' property value, which causes the request to fail.
+   * Previously tried ${encodeURI(key)}=${encodeURI(paramsObj[key])}
+   * @method toQueryString
+   * @param {paramsObj} object - the object we are flattening and url-encoding
+   * @return {String}
+   */
+  toQueryString: function(paramsObj) {
+    return Object
+      .keys(paramsObj)
+      .map(key => `${key}=${paramsObj[key]}`)
+      .join('&');
+  },
+
+  /**
    * Handler for search by function name
    * Utilizing ember concurrency (task)
    */
@@ -136,14 +151,12 @@ export default Ember.Controller.extend({
     let gkey = '';
 
     const replayApi = {
-      base: 'http://knie-ld1.linkedin.biz:1867/api/detection-job',
+      base: '/api/detection-job',
       minute: `/replay/singlefunction?functionId=${newFuncId}&start=${startTime}&end=${endTime}`,
       hour: `/${newFuncId}/replay?start=${startTime}&end=${endTime}`,
       day: `/replay/function/${newFuncId}?start=${startTime}&end=${endTime}&goal=1.0&evalMethod=F1_SCORE&includeOriginal=false&tune=\{"pValueThreshold":\[0.001,0.005,0.01,0.05\]\}`,
-      reports: `/thirdeye/email/generate/metrics/${startStamp}/${endStamp}?metrics=${functionObj.metric}&subject=Your%20Metric%20Has%20Onboarded%20To%20Thirdeye&from=thirdeye-noreply@linkedin.com&to=${groupObj.recipients}&teHost=http://lva1-app0583.corp.linkedin.com:1426&smtpHost=email.corp.linkedin.com&smtpPort=25&includeSentAnomaliesOnly=true&isApplyFilter=true`
+      reports: `/thirdeye/email/generate/metrics/${startStamp}/${endStamp}?metrics=${functionObj.metric}&subject=Your%20Metric%20Has%20Onboarded%20To%20Thirdeye&from=thirdeye-noreply@linkedin.com&to=${groupObj.recipients}&smtpHost=email.corp.linkedin.com&smtpPort=25&includeSentAnomaliesOnly=true&isApplyFilter=true`
     };
-
-    //http://localhost:4200/api/detection-job/9840886/replay?start=2017-06-28&end=2017-05-29
 
     if (granularity.includes('minute')) { gkey = 'minute'; }
     if (granularity.includes('hour')) { gkey = 'hour'; }
@@ -237,11 +250,12 @@ export default Ember.Controller.extend({
   },
 
   saveThirdEyeFunction(functionData) {
-    const url = '/dashboard/anomaly-function/create?' + $.param(functionData);
+    const url = '/dashboard/anomaly-function/create?' + this.toQueryString(functionData);
     const postProps = {
       method: 'post',
       headers: { 'content-type': 'Application/Json' }
     };
+
     return fetch(url, postProps)
       .then(res => res.json());
   },
