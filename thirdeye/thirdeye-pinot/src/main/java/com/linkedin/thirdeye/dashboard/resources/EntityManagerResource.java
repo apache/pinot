@@ -130,14 +130,8 @@ public class EntityManagerResource {
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     try {
       switch (entityType) {
-      case ANOMALY_FUNCTION:
-        AnomalyFunctionDTO anomalyFunctionDTO = OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);
-        if (anomalyFunctionDTO.getId() == null) {
-          anomalyFunctionManager.save(anomalyFunctionDTO);
-        } else {
-          anomalyFunctionManager.update(anomalyFunctionDTO);
-        }
-        break;
+
+      // Update Only end point for these
       case DASHBOARD_CONFIG:
         DashboardConfigDTO dashboardConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, DashboardConfigDTO.class);
         dashboardConfigManager.update(dashboardConfigDTO);
@@ -149,6 +143,16 @@ public class EntityManagerResource {
       case METRIC_CONFIG:
         MetricConfigDTO metricConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, MetricConfigDTO.class);
         metricConfigManager.update(metricConfigDTO);
+        break;
+
+      // Create new entity when id is null
+      case ANOMALY_FUNCTION:
+        AnomalyFunctionDTO anomalyFunctionDTO = OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);
+        if (anomalyFunctionDTO.getId() == null) {
+          anomalyFunctionManager.save(anomalyFunctionDTO);
+        } else {
+          anomalyFunctionManager.update(anomalyFunctionDTO);
+        }
         break;
       case OVERRIDE_CONFIG:
         OverrideConfigDTO overrideConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, OverrideConfigDTO.class);
@@ -198,5 +202,7 @@ public class EntityManagerResource {
     }
     return Response.ok().build();
   }
+
+  // TODO: create a common delete end point for these entities
 }
 
