@@ -151,6 +151,7 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostnameOrAddress());
         configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
         configuration.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, "10000");
+        configuration.addProperty(Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
         overrideOfflineServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, configuration));
       }

@@ -647,7 +647,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       throw new RuntimeException("Segment file does not exist:" + segTarFileName);
     }
     SegmentCompletionProtocol.Response returnedResponse;
-    if (response.getIsSplitCommit() /* && */ ) { // TODO: PUT SERVER CONFIG HERE
+    if (response.getIsSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
       // Send segmentStart, segmentUpload, & segmentCommitEnd to the controller
       // if that succeeds, swap in-memory segment with the one built.
       returnedResponse = doSplitCommit(segTarFile, response);
