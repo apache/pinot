@@ -56,7 +56,8 @@ public class LLCSegmentCommitUpload extends PinotSegmentUploadRestletResource {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
 
-    boolean success = uploadSegment(params.getInstanceId(), params.getSegmentName());
+    // Upload to VIP
+    boolean success = uploadSegment(_controllerConf.generateVipUrl(), params.getSegmentName());
     if (success) {
       SegmentCompletionProtocol.Response.Params successParams = new SegmentCompletionProtocol.Response.Params()
           .withOffset(params.getOffset())
