@@ -15,58 +15,12 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import java.io.File;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkClient;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
-
 /**
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and
  * queries Pinot with split commit enabled from the controller side.
  *
  */
-public class LLCRealtimeClusterSplitCommitIntegrationTest extends RealtimeClusterIntegrationTest {
-  private static int KAFKA_PARTITION_COUNT = 2;
-
-  protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaTopic, File schemaFile, File avroFile) throws Exception {
-    Schema schema = Schema.fromFile(schemaFile);
-    addSchema(schemaFile, schema.getSchemaName());
-    List<String> noDictionaryColumns = Arrays.asList("NASDelay", "ArrDelayMinutes", "DepDelayMinutes");
-    addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schema.getSchemaName(),
-        null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", Collections.<String>emptyList(), "mmap",
-        noDictionaryColumns, null);
-  }
-
-  protected void createKafkaTopic(String kafkaTopic, String zkStr) {
-    KafkaStarterUtils.createTopic(kafkaTopic, zkStr, KAFKA_PARTITION_COUNT);
-  }
-
-  @Test
-  public void testSegmentFlushSize() {
-    ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR, 10000);
-    zkClient.setZkSerializer(new ZNRecordSerializer());
-    String zkPath = "/LLCRealtimeClusterSplitCommitIntegrationTest/PROPERTYSTORE/SEGMENTS/mytable_REALTIME";
-    List<String> segmentNames =
-        zkClient.getChildren(zkPath);
-    for (String segmentName : segmentNames) {
-      ZNRecord znRecord = zkClient.<ZNRecord>readData(zkPath + "/" + segmentName);
-      Assert.assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
-          Integer.toString(ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH / KAFKA_PARTITION_COUNT), "Segment " + segmentName +
-              " does not have the expected flush size");
-    }
-    zkClient.close();
-  }
+public class LLCRealtimeClusterSplitCommitIntegrationTest extends LLCRealtimeClusterIntegrationTest {
 
   @Override
   public void startController() {
@@ -77,10 +31,4 @@ public class LLCRealtimeClusterSplitCommitIntegrationTest extends RealtimeCluste
   public void startServer() {
     startServer(true);
   }
-
-  @Override
-  protected int getKafkaBrokerCount() {
-    return 2;
-  }
-
 }
