@@ -195,7 +195,6 @@ public class CommonConstants {
 
   public static class Server {
     public static final String CONFIG_OF_INSTANCE_DATA_DIR = "pinot.server.instance.dataDir";
-    public static final String CONFIG_OF_SPLIT_COMMIT = "pinot.server.splitCommit";
     public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
     public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
@@ -218,7 +217,6 @@ public class CommonConstants {
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";
     public static final String DEFAULT_INSTANCE_DATA_DIR = "/tmp/PinotServer/test/index";
-    public static final boolean DEFAULT_SPLIT_COMMIT = false;
     public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR = "/tmp/PinotServer/test/segmentTar";
     public static final String DEFAULT_SEGMENT_METADATA_LOADER_CLASS =
         "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader";
