@@ -521,17 +521,15 @@ public class AnomalyResource {
    *      the start time of the monitoring window (inclusive)
    * @param endTimeIso
    *      the end time of the monitoring window (exclusive)
-   * @param monitoringWindow
-   *      the window size of the monitoring window, ex: 1d, 6h, and so on
    * @return
+   *      the Map of AnomalyTimelinesView
    * @throws Exception
    */
   @GET
   @Path(value = "/anomaly-function/{id}/baseline")
   @Produces(MediaType.APPLICATION_JSON)
   public Map<String, AnomalyTimelinesView> getTimeSeriesAndBaselineData(@PathParam("id") long functionId,
-      @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
-      @QueryParam("monitoringWindow") String monitoringWindow) throws Exception {
+      @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso) throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
     if(anomalyFunctionSpec == null) {
       LOG.warn("Cannot find anomaly function {}", functionId);
