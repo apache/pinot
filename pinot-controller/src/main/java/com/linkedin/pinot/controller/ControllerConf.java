@@ -59,6 +59,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = false;
+  private static final String JERSEY_ADMIN_API_PORT = "controller.jersey.admin.api.port";
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -309,5 +310,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setTableMinReplicas(int minReplicas) {
     setProperty(TABLE_MIN_REPLICAS, minReplicas);
+  }
+
+  public int getJerseyAdminApiPort() {
+    return getInt(JERSEY_ADMIN_API_PORT, 21000);
   }
 }

@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -46,6 +47,7 @@ import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.PreConnectCallback;
 import org.apache.helix.task.TaskDriver;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
@@ -62,7 +64,9 @@ public class ControllerStarter {
 
   private final ControllerConf config;
   private final Component component;
+  // TODO: Remove restlet based controllerRestApp when migration to jersey is complete
   private final Application controllerRestApp;
+  private final ControllerAdminApiApplication adminApp;
   private final PinotHelixResourceManager helixResourceManager;
   private final RetentionManager retentionManager;
   private final MetricsRegistry _metricsRegistry;
@@ -79,6 +83,7 @@ public class ControllerStarter {
     config = conf;
     component = new Component();
     controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
+    adminApp = new ControllerAdminApiApplication();
     helixResourceManager = new PinotHelixResourceManager(config);
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds(),
         config.getDeletedSegmentsRetentionInDays());
@@ -160,19 +165,33 @@ public class ControllerStarter {
       Context applicationContext = component.getContext().createChildContext();
       LOGGER.info("Controller download url base: {}", config.generateVipUrl());
       LOGGER.info("Injecting configuration and resource managers to the API context");
+      // TODO: Remove attributes map when removing restlet
       ConcurrentMap<String, Object> attributes = applicationContext.getAttributes();
       attributes.put(ControllerConf.class.toString(), config);
       attributes.put(PinotHelixResourceManager.class.toString(), helixResourceManager);
       attributes.put(PinotHelixTaskResourceManager.class.toString(), _helixTaskResourceManager);
       attributes.put(PinotTaskManager.class.toString(), _taskManager);
-      MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
+      final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
       connectionManager.getParams().setConnectionTimeout(config.getServerAdminRequestTimeoutSeconds());
       attributes.put(HttpConnectionManager.class.toString(), connectionManager);
       attributes.put(Executor.class.toString(), executorService);
+      // register all the controller objects for injection to jersey resources
+      adminApp.registerBinder(new AbstractBinder() {
+        @Override
+        protected void configure() {
+          bind(config).to(ControllerConf.class);
+          bind(helixResourceManager).to(PinotHelixResourceManager.class);
+          bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
+          bind(_taskManager).to(PinotTaskManager.class);
+          bind(connectionManager).to(HttpConnectionManager.class);
+          bind(executorService).to(Executor.class);
+        }
+      });
+
       controllerRestApp.setContext(applicationContext);
       component.getDefaultHost().attach(controllerRestApp);
       component.start();
-
+      adminApp.start(config.getJerseyAdminApiPort());
       LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
       LOGGER.info("Controller services available at http://{}:{}/", config.getControllerHost(),
           config.getControllerPort());
