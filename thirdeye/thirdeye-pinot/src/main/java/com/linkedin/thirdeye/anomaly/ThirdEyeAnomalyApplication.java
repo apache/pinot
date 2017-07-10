@@ -15,8 +15,6 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
-import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
-import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
@@ -113,11 +111,6 @@ public class ThirdEyeAnomalyApplication
           monitorJobScheduler.start();
         }
         if (config.isAlert()) {
-          // Replaced by AlertJobScheduler V2
-          //alertJobScheduler = new AlertJobScheduler();
-          //alertJobScheduler.start();
-          //environment.jersey().register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
-
           // start alert scheduler v2
           alertJobSchedulerV2 = new AlertJobSchedulerV2();
           alertJobSchedulerV2.start();

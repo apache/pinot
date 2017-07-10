@@ -50,7 +50,7 @@ public class DetectionJobScheduler implements Runnable {
   private ScheduledExecutorService scheduledExecutorService;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY  = ThirdEyeCacheRegistry.getInstance();
-  private DetectionJobRunner detectionJobRunner = new DetectionJobRunner();
+  private final DetectionJobRunner detectionJobRunner = new DetectionJobRunner();
 
   private final ConcurrentHashMap<BackfillKey, Thread> existingBackfillJobs = new ConcurrentHashMap<>();
 

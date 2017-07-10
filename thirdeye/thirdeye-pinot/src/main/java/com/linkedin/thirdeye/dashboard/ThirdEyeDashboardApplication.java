@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
@@ -11,6 +13,7 @@ import com.linkedin.thirdeye.dashboard.resources.DashboardConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.dashboard.resources.DataCompletenessResource;
 import com.linkedin.thirdeye.dashboard.resources.DatasetConfigResource;
+import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.dashboard.resources.EntityManagerResource;
 import com.linkedin.thirdeye.dashboard.resources.EntityMappingResource;
@@ -132,6 +135,15 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+
+    /**
+     * Adding DetectionJobResource in Dashboard to allow replay/autotune from ui.
+     * creating a lightweight detection scheduler instance
+     * Do not call start() as this instance is only meant to run replay/autotune
+     */
+    DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
+    AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
+    env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
 
     if(config.getRootCause() != null) {
       env.jersey().register(makeRootCauseResource(config));
