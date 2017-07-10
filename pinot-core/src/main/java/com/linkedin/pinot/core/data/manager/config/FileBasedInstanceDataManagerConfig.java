@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +22,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.segment.ReadMode;
 
 
 /**
@@ -127,7 +127,7 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
       return ReadMode.valueOf(_instanceDataManagerConfiguration.getString(READ_MODE));
     } catch (Exception e) {
       LOGGER.warn("Caught exception file getting the read mode", e);
-      return null;
+      return ReadMode.DEFAULT_MODE;
     }
 
   }

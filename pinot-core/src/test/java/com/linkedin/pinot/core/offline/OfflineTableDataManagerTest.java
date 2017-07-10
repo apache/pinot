@@ -15,18 +15,6 @@
  */
 package com.linkedin.pinot.core.offline;
 
-import com.google.common.collect.ImmutableList;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineTableDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -47,7 +35,18 @@ import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
-
+import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.OfflineTableDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.yammer.metrics.core.MetricsRegistry;
 import static org.mockito.Mockito.*;
 
 
@@ -201,8 +200,6 @@ public class OfflineTableDataManagerTest {
 
   /*
    * These tests simulate the access of segments via OfflineTableDataManager.
-   * Two flavors are simulated : One to replace segments via OFFLINE/ONLINE transitions
-   * and the other to replace segments via helix message.
    *
    * It creates 31 segments (0..30) to start with and adds them to the tableDataManager (hi = 30, lo = 0)
    * It spawns 10 "query" threads, and one "helix" thread.
@@ -216,21 +213,13 @@ public class OfflineTableDataManagerTest {
    * - Replaces a segment (a randomm one between (lo,hi), 60% of the time)
    * and then waits for a random of 50-300ms before attempting one of the ops again.
    */
-  @Test
-  public void testOfflineOnline() throws Exception {
-    runStressTest(false);
-  }
 
   @Test
   public void testReplace() throws Exception {
-    runStressTest(true);
-  }
-
-  private void runStressTest(boolean replaceSegments) throws  Exception {
     _lo = 0;
     _hi = 30;   // Total number of segments we have in the server.
     final int numQueryThreads = 10;
-    final int runTimeSec = 30;
+    final int runTimeSec = 20;
     // With the current parameters, 3k ops take about 15 seconds, create about 90 segments and drop about half of them
     // Running with coverage, it provides complete coverage of the (relevant) lines in OfflineTableDataManager
 
@@ -243,13 +232,13 @@ public class OfflineTableDataManagerTest {
       _allSegManagers.add(_internalSegMap.get(segName));
     }
 
-    runStorageServer(numQueryThreads, runTimeSec, tableDataManager, replaceSegments);  // replaces segments while online
+    runStorageServer(numQueryThreads, runTimeSec, tableDataManager);  // replaces segments while online
 
 //    System.out.println("Nops = " + _numQueries + ",nDrops=" + _nDestroys + ",nCreates=" + _allSegments.size());
     tableDataManager.shutDown();
   }
 
-  private void runStorageServer(int numQueryThreads, int runTimeSec, TableDataManager tableDataManager, boolean replaceSegments) throws Exception {
+  private void runStorageServer(int numQueryThreads, int runTimeSec, TableDataManager tableDataManager) throws Exception {
     // Start 1 helix worker thread and as many query threads as configured.
     List<Thread> queryThreads = new ArrayList<>(numQueryThreads);
     for (int i = 0; i < numQueryThreads; i++) {
@@ -259,7 +248,7 @@ public class OfflineTableDataManagerTest {
       segUserThread.start();
     }
 
-    TestHelixWorker helixWorker = new TestHelixWorker(tableDataManager, replaceSegments);
+    TestHelixWorker helixWorker = new TestHelixWorker(tableDataManager);
     Thread helixWorkerThread = new Thread(helixWorker);
     helixWorkerThread.start();
     _masterThread = Thread.currentThread();
@@ -390,9 +379,8 @@ public class OfflineTableDataManagerTest {
     private final int _maxSleepMs;
     private final Random _random = new Random();
     private final TableDataManager _tableDataManager;
-    private final boolean _replaceSegments;
 
-    private TestHelixWorker(TableDataManager tableDataManager, boolean replaceSegments) {
+    private TestHelixWorker(TableDataManager tableDataManager) {
       _tableDataManager = tableDataManager;
 
       _removePercent = 20;
@@ -400,7 +388,6 @@ public class OfflineTableDataManagerTest {
       _replacePercent = 60;
       _minSleepMs = 50;
       _maxSleepMs = 300;
-      _replaceSegments = replaceSegments;
     }
 
     @Override
@@ -442,13 +429,6 @@ public class OfflineTableDataManagerTest {
     private void replaceSegment() {
       int segToReplace = _random.nextInt(_hi-_lo+1) + _lo;
       final String segName = segmentPrefix + segToReplace;
-      if (!_replaceSegments) {
-        _tableDataManager.removeSegment(segName);
-        try {
-          Thread.sleep(4);
-        } catch (InterruptedException e) {
-        }
-      }
       _tableDataManager.addSegment(makeIndexSegment(segName, _random.nextInt()));
       _allSegManagers.add(_internalSegMap.get(segName));
     }
