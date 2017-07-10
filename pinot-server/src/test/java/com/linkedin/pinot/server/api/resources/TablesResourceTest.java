@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.server.api.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -24,7 +23,8 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.Response;
-import com.fasterxml.jackson.core.type.TypeReference;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.type.TypeReference;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -38,7 +38,7 @@ import static org.testng.AssertJUnit.assertTrue;
 
 
 public class TablesResourceTest {
-
+  private static final ObjectMapper objectMapper = new ObjectMapper();
   ResourceTestHelper testHelper = new ResourceTestHelper();
 
   @BeforeClass
@@ -56,11 +56,9 @@ public class TablesResourceTest {
   @Test
   public void getTables()
       throws Exception {
-    Response response =
-        testHelper.target.path("/tables").request().get(Response.class);
+    Response response = testHelper.target.path("/tables").request().get(Response.class);
     String responseBody = response.readEntity(String.class);
-    TablesList tablesList =
-        new ObjectMapper().readValue(responseBody, TablesList.class);
+    TablesList tablesList = objectMapper.readValue(responseBody, TablesList.class);
     assertNotNull(tablesList);
     List<String> tables = tablesList.getTables();
     assertNotNull(tables);
@@ -69,8 +67,10 @@ public class TablesResourceTest {
 
     final String secondTable = "secondTable";
     testHelper.addTable(secondTable);
-    IndexSegment secondSegment = testHelper.setupSegment(secondTable, ResourceTestHelper.DEFAULT_AVRO_DATA_FILE, "2");
-    tablesList = testHelper.target.path("/tables").request().get(TablesList.class);
+    response = testHelper.target.path("/tables").request().get(Response.class);
+    responseBody = response.readEntity(String.class);
+    tablesList = objectMapper.readValue(responseBody, TablesList.class);
+
     assertNotNull(tablesList);
     assertNotNull(tablesList.getTables());
     assertEquals(tablesList.getTables().size(), 2);
@@ -173,15 +173,11 @@ public class TablesResourceTest {
   public void testSegmentCrcMetadata() throws Exception {
     final String urlFormat = "/tables/%s/segments/crc";
 
-    // Upload 10 segments
-    List<IndexSegment> segments = testHelper.setUpSegments(10);
+    // Upload segments
+    List<IndexSegment> segments = testHelper.setUpSegments(2);
 
     // Trigger crc api to fetch crc information
-    String response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME))
-        .request().get(String.class);
-    JSONObject jsonMeta = new JSONObject(response);
-    ObjectMapper mapper = new ObjectMapper();
-    Map<String, String> crcMap = mapper.readValue(response, new TypeReference<Map<String, Object>>(){});
+    Map<String, String> crcMap = fetchCrcInformation(urlFormat);
 
     // Check that crc info is correct
     for(IndexSegment segment : segments) {
@@ -189,5 +185,12 @@ public class TablesResourceTest {
       String crc = segment.getSegmentMetadata().getCrc();
       assertEquals(crcMap.get(segmentName), crc);
     }
+  }
+
+  private Map<String, String> fetchCrcInformation(String urlFormat) throws Exception {
+    // Trigger crc api to fetch crc information
+    String response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME))
+        .request().get(String.class);
+    return objectMapper.readValue(response, new TypeReference<Map<String, Object>>(){});
   }
 }
