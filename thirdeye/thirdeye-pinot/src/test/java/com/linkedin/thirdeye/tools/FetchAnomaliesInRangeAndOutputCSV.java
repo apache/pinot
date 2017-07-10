@@ -53,7 +53,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
       int rowCount = 0;
       if(resultNodes.size() > 0) {
-        bw.write(StringUtils.join(resultNodes.get(0).getSchema(), ","));
+        bw.write(resultNodes.get(0).getSchema());
         bw.newLine();
         for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes) {
           bw.write(n.toString());
