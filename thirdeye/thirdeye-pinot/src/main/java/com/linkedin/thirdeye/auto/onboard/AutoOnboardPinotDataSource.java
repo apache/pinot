@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,9 +39,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
   private AutoOnboardPinotMetricsUtils autoLoadPinotMetricsUtils;
 
-  private List<String> allDatasets = new ArrayList<>();
-  private Map<String, Schema> allSchemas = new HashMap<>();
-
   public AutoOnboardPinotDataSource(DataSourceConfig dataSourceConfig) {
     super(dataSourceConfig);
     autoLoadPinotMetricsUtils = new AutoOnboardPinotMetricsUtils(dataSourceConfig);
@@ -55,7 +53,9 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
   public void run() {
     LOG.info("Running auto load for {}", AutoOnboardPinotDataSource.class.getSimpleName());
     try {
-      loadDatasets();
+      List<String> allDatasets = new ArrayList<>();
+      Map<String, Schema> allSchemas = new HashMap<>();
+      loadDatasets(allDatasets, allSchemas);
       LOG.info("Checking all datasets");
       for (String dataset : allDatasets) {
         LOG.info("Checking dataset {}", dataset);
@@ -211,9 +211,11 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
   /**
    * Reads all table names in pinot, and loads their schema
+   * @param allSchemas
+   * @param allDatasets
    * @throws IOException
    */
-  private void loadDatasets() throws IOException {
+  private void loadDatasets(List<String> allDatasets, Map<String, Schema> allSchemas) throws IOException {
 
     JsonNode tables = autoLoadPinotMetricsUtils.getAllTablesFromPinot();
     LOG.info("Getting all schemas");
