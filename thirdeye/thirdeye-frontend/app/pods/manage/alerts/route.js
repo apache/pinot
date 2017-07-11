@@ -3,7 +3,6 @@ import fetch from 'fetch';
 
 export default Ember.Route.extend({
   model() {
-    // const url = '/thirdeye/entity/ANOMALY_FUNCTION';
     return Ember.RSVP.hash({
       filters: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(res => res.json()),
       suscriberGroupNames: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),

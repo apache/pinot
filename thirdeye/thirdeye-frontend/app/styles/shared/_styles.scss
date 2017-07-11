@@ -17,6 +17,18 @@ body {
 
 .te-form {
   margin-top: $te-default-element-spacing;
+
+  &__group {
+    &--horizontal {
+      width: 350px;
+      float: left;
+      margin-right: 20px;
+    }
+
+    &--last {
+      margin-right: 0;
+    }
+  }
 }
 
 .te-hide {

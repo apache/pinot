@@ -9,26 +9,59 @@ import moment from 'moment';
 import fetch from 'fetch';
 
 export default Ember.Controller.extend({
-  /**
-   * Array of metrics we're displaying
-   */
-  isMetricSelected: false,
-  isValidated: false,
-  showAlertGroupEdit: true,
-  isSubmitDisabled: true,
-  filters: {},
-  filterPropNames: JSON.stringify({}),
-  graphConfig: {},
 
   /**
-   * Handler for search by function name
-   * Utilizing ember concurrency (task)
+   * Initialized alert creation page settings
+   */
+  isValidated: false,
+  isMetricSelected: false,
+  showAlertGroupEdit: true,
+  isSubmitDisabled: true,
+  metricGranularityOptions: [],
+
+  /**
+   * Component property initial settings
+   */
+  filters: {},
+  graphConfig: {},
+  filterPropNames: JSON.stringify({}),
+
+  /**
+   * Object to cover basic ield 'presence' validation
+   */
+  requiredFields: [
+    'selectedMetricOption',
+    'selectedPattern',
+    'alertFunctionName',
+    'selectedAppName',
+    'selectedConfigGroup',
+    'alertGroupNewRecipient'],
+
+  /**
+   * Options for patterns of interest field. These may eventually load from the backend.
+   */
+  patternsOfInterest: ['Up and Down', 'Up only', 'Down only'],
+
+  /**
+   * Application name field options loaded from our model.
+   */
+  allApplicationNames: Ember.computed.reads('model.allAppNames'),
+
+  /**
+   * The list of all existing alert configuration groups.
+   */
+  allAlertsConfigGroups: Ember.computed.reads('model.allConfigGroups'),
+
+  /**
+   * Handler for search by function name - using ember concurrency (task)
+   * @method searchMetricsList
+   * @param {metric} String - portion of metric name used in typeahead
+   * @return {Promise}
    */
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
     const url = `/data/autocomplete/metric?name=${metric}`;
-    return fetch(url)
-      .then(res => res.json())
+    return fetch(url).then(res => res.json())
   }),
 
   /**
@@ -36,10 +69,10 @@ export default Ember.Controller.extend({
    * here because they will encode the 'cron' property value, which causes the request to fail.
    * Previously tried ${encodeURI(key)}=${encodeURI(paramsObj[key])}
    * @method toQueryString
-   * @param {paramsObj} object - the object we are flattening and url-encoding
+   * @param {Object} paramsObj - the object we are flattening and url-encoding
    * @return {String}
    */
-  toQueryString: function(paramsObj) {
+  toQueryString(paramsObj) {
     return Object
       .keys(paramsObj)
       .map(key => `${key}=${paramsObj[key]}`)
@@ -47,40 +80,68 @@ export default Ember.Controller.extend({
   },
 
   /**
-   * Handler for search by function name
-   * Utilizing ember concurrency (task)
+   * Fetches the selected metric's dimension data. TODO: Set up custom response handler for HTTP errors.
+   * See: https://github.com/github/fetch#handling-http-error-statuses
+   * @method fetchMetricDimensions
+   * @param {Number} metricId - Id for the selected metric
+   * @return {Promise}
    */
   fetchMetricDimensions(metricId) {
     const url = `/data/autocomplete/dimensions/metric/${metricId}`;
-    return fetch(url)
-      .then(res => res.json())
+    return fetch(url).then(res => res.json())
   },
 
+  /**
+   * Fetches an alert function record by Id.
+   * Use case: show me the names of all functions monitored by a given alert group.
+   * @method fetchFunctionById
+   * @param {Number} functionId - Id for the selected alert function
+   * @return {Promise}
+   */
   fetchFunctionById(functionId) {
     const url = `/onboard/function/${functionId}`;
-    return fetch(url)
-      .then(res => res.json())
+    return fetch(url).then(res => res.json())
   },
 
-  fetchAnomalyByName(name) {
-    const url = `/data/autocomplete/functionByName?name=${name}`;
-    return fetch(url)
-      .then(res => res.json())
+  /**
+   * Fetches an alert function record by name.
+   * Use case: when user names an alert, make sure no duplicate already exists.
+   * @method fetchAnomalyByName
+   * @param {String} functionName - name of alert or function
+   * @return {Promise}
+   */
+  fetchAnomalyByName(functionName) {
+    const url = `/data/autocomplete/functionByName?name=${functionName}`;
+    return fetch(url).then(res => res.json())
   },
 
+  /**
+   * Fetches all essential metric properties by metric Id.
+   * This is the data we will feed to the graph generating component.
+   * @method fetchMetricData
+   * @param {Number} metricId - Id for the selected metric
+   * @return {Ember.RSVP.promise}
+   */
   fetchMetricData(metricId) {
     const promiseHash = {
+      maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => res.json()),
       granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => res.json()),
       filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => res.json()),
-      maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => res.json()),
       selectedMetricDimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res =>res.json()),
     };
 
     return Ember.RSVP.hash(promiseHash);
   },
 
+  /**
+   * Fetches the time series data required to display the anomaly detection graph for the current metric.
+   * @method fetchAnomalyGraphData
+   * @param {Object} config - key metric properties to graph
+   * @return {Promise} Returns time-series data for the metric
+   */
   fetchAnomalyGraphData(config) {
     this.set('loading', true);
+
     const {
       id,
       dimension,
@@ -93,21 +154,58 @@ export default Ember.Controller.extend({
     } = config;
 
     const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters=${filters}`;
-    return fetch(url)
-      .then(res => res.json())
+
+    return fetch(url).then(res => res.json());
   },
 
-  triggerGraphFromMetric(metric) {
+  /**
+   * Send a POST request to the entity endpoint to create a new record.
+   * @method saveThirdEyeEntity
+   * @param {Object} alertData - The record being saved (in this case, a new alert config group)
+   * @param {String} entityType - The type of entity being saved
+   * @return {Promise}
+   */
+  saveThirdEyeEntity(alertData, entityType) {
+    const postProps = {
+      method: 'post',
+      body: JSON.stringify(alertData),
+      headers: { 'content-type': 'Application/Json' }
+    };
+    const url = '/thirdeye/entity?entityType=' + entityType;
+    return fetch(url, postProps);
+  },
+
+  /**
+   * Send a POST request to the new function create endpoint.
+   * @method saveThirdEyeFunction
+   * @param {Object} functionData - The new function to save
+   * @return {Promise}
+   */
+  saveThirdEyeFunction(functionData) {
+    const postProps = {
+      method: 'post',
+      headers: { 'content-type': 'Application/Json' }
+    };
+    const url = '/dashboard/anomaly-function/create?' + this.toQueryString(functionData);
+    return fetch(url, postProps).then(res => res.json());
+  },
+
+  /**
+   * Loads time-series data into the anomaly-graph component
+   * @method triggerGraphFromMetric
+   * @param {Number} metricId - Id of selected metric to graph
+   * @return {undefined}
+   */
+  triggerGraphFromMetric(metricId) {
     const maxTime = this.get('maxTime');
     const currentEnd = moment(maxTime).isValid()
       ? moment(maxTime).valueOf()
       : moment().subtract(1,'day').endOf('day').valueOf();
-    const granularity = this.get('granularities.firstObject');
-
+    const granularity = this.get('selectedGranularity') || this.get('granularities.firstObject');
     const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
     const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
     const baselineEnd = moment(currentEnd).subtract(1, 'week');
-    const { id } = metric;
+    const { id } = metricId;
 
     const graphConfig = {
       id,
@@ -118,8 +216,9 @@ export default Ember.Controller.extend({
       baselineEnd,
       granularity,
     };
+
     this.set('graphConfig', graphConfig);
-    console.log(JSON.stringify(graphConfig));
+    this.set('selectedGranularity', granularity);
 
     this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
       this.set('isMetricSelected', true);
@@ -128,17 +227,16 @@ export default Ember.Controller.extend({
     });
   },
 
-  triggerGraphFromDimensions(dimension) {
-    this.graphConfig.dimension = dimension;
-    this.fetchAnomalyGraphData(this.graphConfig).then(metricData => {
-      this.set('isMetricSelected', true);
-      this.set('selectedMetric', metricData);
-      this.set('loading', false);
-    });
-  },
-
+  /**
+   * Sends a request to begin advanced replay for a metric. The replay will fetch new
+   * time-series data based on user-selected sensitivity settings.
+   * @method triggerReplay
+   * @param {Object} functionObj - the alert object
+   * @param {Object} groupObj - the alert notification group object
+   * @param {Number} newFuncId - the id for the newly created function (alert)
+   * @return {Ember.RSVP.Promise}
+   */
   triggerReplay(functionObj, groupObj, newFuncId) {
-    console.log('in trigger replay');
     const startTime = moment().subtract(1,'month').endOf('day').format("YYYY-MM-DD");
     const startStamp = moment().subtract(1,'day').endOf('day').valueOf();
     const endTime = moment().subtract(1,'day').endOf('day').format("YYYY-MM-DD");
@@ -148,8 +246,6 @@ export default Ember.Controller.extend({
       method: 'POST',
       headers: { 'Content-Type': 'Application/Json' }
     };
-    let gkey = '';
-
     const replayApi = {
       base: '/api/detection-job',
       minute: `/replay/singlefunction?functionId=${newFuncId}&start=${startTime}&end=${endTime}`,
@@ -157,6 +253,7 @@ export default Ember.Controller.extend({
       day: `/replay/function/${newFuncId}?start=${startTime}&end=${endTime}&goal=1.0&evalMethod=F1_SCORE&includeOriginal=false&tune=\{"pValueThreshold":\[0.001,0.005,0.01,0.05\]\}`,
       reports: `/thirdeye/email/generate/metrics/${startStamp}/${endStamp}?metrics=${functionObj.metric}&subject=Your%20Metric%20Has%20Onboarded%20To%20Thirdeye&from=thirdeye-noreply@linkedin.com&to=${groupObj.recipients}&smtpHost=email.corp.linkedin.com&smtpPort=25&includeSentAnomaliesOnly=true&isApplyFilter=true`
     };
+    let gkey = '';
 
     if (granularity.includes('minute')) { gkey = 'minute'; }
     if (granularity.includes('hour')) { gkey = 'hour'; }
@@ -167,6 +264,71 @@ export default Ember.Controller.extend({
     });
   },
 
+  /**
+   * Enriches the list of functions by Id, adding the properties we may want to display.
+   * We are preparing to display the alerts that belong to the currently selected config group.
+   * @method prepareFunctions
+   * @param {Object} configGroup - the currently selected alert config group
+   * @param {Object} newId - conditional param to help us tag any function that was "just added"
+   * @return {Ember.RSVP.Promise} A new list of functions (alerts)
+   */
+  prepareFunctions(configGroup, newId = 0) {
+    const newFunctionList = [];
+    const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
+    let cnt = 0;
+    return new Ember.RSVP.Promise((resolve) => {
+      for (var functionId of existingFunctionList) {
+        this.fetchFunctionById(functionId).then(functionData => {
+          newFunctionList.push({
+            id: functionData.id,
+            name: functionData.functionName,
+            metric: functionData.metric + '::' + functionData.collection,
+            type: functionData.type,
+            active: functionData.isActive,
+            isNewId: functionData.id === newId
+          });
+          cnt ++;
+          if (existingFunctionList.length === cnt) {
+            resolve(newFunctionList);
+          }
+        });
+      }
+    });
+  },
+
+  /**
+   * Enables the submit button when all required fields are filled
+   * @method isSubmitDisabled
+   * @param {Number} metricId - Id of selected metric to graph
+   * @return {Boolean} PreventSubmit
+   */
+  isSubmitDisabled: Ember.computed(
+    'selectedMetricOption',
+    'selectedPattern',
+    'alertFunctionName',
+    'selectedAppName',
+    'selectedConfigGroup',
+    'alertGroupNewRecipient',
+    function() {
+      let preventSubmit = false;
+      const requiredFields = this.get('requiredFields');
+
+      for (var field of requiredFields) {
+        if (Ember.isNone(this.get(field))) {
+          preventSubmit = true;
+        }
+      }
+      return preventSubmit;
+    }
+  ),
+
+  /**
+   * Build the new alert properties based on granularity presets. This will make replay possible.
+   * @method newAlertProperties
+   * @param {String} alertFunctionName - new function name
+   * @param {Object} selectedMetricOption - the selected metric's properties
+   * @return {Object} New function object
+   */
   newAlertProperties: Ember.computed(
     'alertFunctionName',
     'selectedMetricOption',
@@ -215,65 +377,18 @@ export default Ember.Controller.extend({
     }
   ),
 
-  prepareFunctions(configGroup, newId = 0) {
-    const newFunctionList = [];
-    const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
-    let cnt = 0;
-    return new Ember.RSVP.Promise((resolve) => {
-      for (var functionId of existingFunctionList) {
-        this.fetchFunctionById(functionId).then(functionData => {
-          newFunctionList.push({
-            id: functionData.id,
-            name: functionData.functionName,
-            metric: functionData.metric,
-            type: functionData.type,
-            active: functionData.isActive,
-            isNewId: functionData.id === newId
-          });
-          cnt ++;
-          if (existingFunctionList.length === cnt) {
-            resolve(newFunctionList);
-          }
-        });
-      }
-    });
-  },
-
-  saveThirdEyeEntity(alertData, entityType) {
-    const postProps = {
-      method: 'post',
-      body: JSON.stringify(alertData),
-      headers: { 'content-type': 'Application/Json' }
-    };
-    const url = '/thirdeye/entity?entityType=' + entityType;
-    return fetch(url, postProps);
-  },
-
-  saveThirdEyeFunction(functionData) {
-    const url = '/dashboard/anomaly-function/create?' + this.toQueryString(functionData);
-    const postProps = {
-      method: 'post',
-      headers: { 'content-type': 'Application/Json' }
-    };
-
-    return fetch(url, postProps)
-      .then(res => res.json());
-  },
-
   /**
-   * Placeholder for patterns of interest options
-   */
-  patternsOfInterest: ['None', 'Up', 'Down', 'Either'],
-  /**
-   * Placeholder for alert groups options
+   * Filter all existing alert groups down to only those that are active and belong to the
+   * currently selected application team.
+   * @method filteredConfigGroups
+   * @param {Object} selectedApplication - user-selected application object
+   * @return {Array} activeGroups - filtered list of groups that are active
    */
   filteredConfigGroups: Ember.computed(
-    'model',
     'selectedApplication',
     function() {
       const appName = this.get('selectedApplication');
-      const allAlertsConfigGroups = this.get('model.allAlertsConfigGroups');
-      const activeGroups = allAlertsConfigGroups.filter(group => group.active);
+      const activeGroups = this.get('allAlertsConfigGroups').filter(group => group.active);
       const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
 
       if (Ember.isPresent(appName)) {
@@ -285,29 +400,33 @@ export default Ember.Controller.extend({
   ),
 
   /**
-   * Placeholder for app name options
-   */
-  allApplicationNames: Ember.computed.reads('model.allAppNames'),
-  /**
    * Actions for create alert form view
    */
   actions: {
+
     /**
-     * Function called when the dropdown value is updated
-     * @method onChangeDropdown
-     * @param {Object} selectedObj - If has dataset, this is the selected value from dropdown
+     * When a metric is selected, fetch its props, and send them to the graph builder
+     * @method onSelectMetric
+     * @param {Object} selectedObj - The selected metric
      * @return {undefined}
      */
     onSelectMetric(selectedObj) {
-      console.log(selectedObj);
+      this.set('loading', true);
       this.set('selectedMetricOption', selectedObj);
       this.fetchMetricData(selectedObj.id).then((hash) => {
         this.setProperties(hash);
+        this.set('metricGranularityOptions', hash.granularities);
         this.triggerGraphFromMetric(selectedObj);
-        console.log('funcObj settings : ', this.get('newAlertProperties'));
       })
     },
 
+    /**
+     * When a filter is selected, fetch new anomaly graph data based on that filter
+     * and trigger 'onSelectedMetric' to load the graph again.
+     * @method onSelectFilter
+     * @param {Object} filters - The selected filter to apply
+     * @return {undefined}
+     */
     onSelectFilter(filters) {
       this.set('graphConfig.filters', filters);
       this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
@@ -317,20 +436,56 @@ export default Ember.Controller.extend({
       });
     },
 
+    /**
+     * Set our selected dimension
+     * @method onSelectDimension
+     * @param {Object} selectedObj - The selected dimension option
+     * @return {undefined}
+     */
     onSelectDimension(selectedObj) {
       this.set('dimensionSelectorVal', selectedObj);
     },
 
+    /**
+     * Set our selected pattern
+     * @method onSelectPattern
+     * @param {Object} selectedObj - The selected pattern option
+     * @return {undefined}
+     */
     onSelectPattern(selectedObj) {
       this.set('selectedPattern', selectedObj);
     },
 
+    /**
+     * Set our selected granularity. Trigger graph reload.
+     * @method onSelectGranularity
+     * @param {Object} selectedObj - The selected granularity option
+     * @return {undefined}
+     */
+    onSelectGranularity(selectedObj) {
+      this.set('selectedGranularity', selectedObj);
+      this.triggerGraphFromMetric(this.get('selectedMetricOption'));
+    },
+
+    /**
+     * Set our selected application name
+     * @method onSelectAppName
+     * @param {Object} selectedObj - The selected app name option
+     * @return {undefined}
+     */
     onSelectAppName(selectedObj) {
       this.set('selectedAppName', selectedObj);
       this.set('selectedApplication', selectedObj.application);
       this.set('alertGroupNewRecipient', selectedObj.recipients);
     },
 
+    /**
+     * Set our selected alert configuration group. If one is selected, display editable fields
+     * for that group and display the list of functions that belong to that group.
+     * @method onSelectConfigGroup
+     * @param {Object} selectedObj - The selected config group option
+     * @return {undefined}
+     */
     onSelectConfigGroup(selectedObj) {
       if (selectedObj) {
         this.set('selectedConfigGroup', selectedObj);
@@ -344,11 +499,21 @@ export default Ember.Controller.extend({
       }
     },
 
+    /**
+     * Toggle 'create new' and 'edit existing' modes for alert groups
+     * @method onClickChangeGroupEditMode
+     * @return {undefined}
+     */
     onClickChangeGroupEditMode() {
       this.toggleProperty('showAlertGroupEdit');
     },
 
-    // Make sure alert name does not exist in system
+    /**
+     * Make sure alert name does not already exist in the system
+     * @method validateAlertName
+     * @param {String} name - The new alert name
+     * @return {undefined}
+     */
     validateAlertName(name) {
       let isDuplicateName = false;
       this.fetchAnomalyByName(name).then(anomaly => {
@@ -358,11 +523,15 @@ export default Ember.Controller.extend({
           }
         }
         this.set('isAlertNameDuplicate', isDuplicateName);
-        console.log('funcObj settings : ', this.get('newAlertProperties'));
       });
     },
 
-    // Verify that email address does not already exist in alert group. If it does, remove it and alert user.
+    /**
+     * Verify that email address does not already exist in alert group. If it does, remove it and alert user.
+     * @method validateAlertEmail
+     * @param {String} emailInput - Comma-separated list of new emails to add to the config group.
+     * @return {undefined}
+     */
     validateAlertEmail(emailInput) {
       const newEmailArr = emailInput.replace(/\s+/g, '').split(',');
       let existingEmailArr = this.get('selectedGroupRecipients');
@@ -381,31 +550,16 @@ export default Ember.Controller.extend({
           }
         }
 
-        this.send('validateRequired');
         this.set('isDuplicateEmail', isDuplicateErr);
         this.set('duplicateEmails', badEmailArr.join());
       }
     },
 
-    // Ensures presence of values for these fields. TODO: make this more efficient
-    validateRequired() {
-      const reqFields = [
-        'selectedMetricOption',
-        'selectedPattern',
-        'alertFunctionName',
-        'selectedAppName'
-      ];
-      let allFieldsReady = true;
-
-      for (var field of reqFields) {
-        if (Ember.isNone(this.get(field))) {
-          allFieldsReady = false;
-        }
-      }
-
-      this.set('isSubmitDisabled', !allFieldsReady);
-    },
-
+    /**
+     * Reset the form... clear all important fields
+     * @method clearAll
+     * @return {undefined}
+     */
     clearAll() {
       this.set('isMetricSelected', false);
       this.set('selectedMetricOption', null);
@@ -415,7 +569,6 @@ export default Ember.Controller.extend({
       this.set('selectedAppName', null);
       this.set('selectedConfigGroup', null);
       this.set('alertGroupNewRecipient', null);
-      this.set('createGroupName', null);
       this.set('showAlertGroupEdit', false);
       this.set('isCreateSuccess', false);
       this.set('isCreateError', false);
@@ -423,35 +576,41 @@ export default Ember.Controller.extend({
     },
 
     /**
-     * User hit submit. Buckle up - we're going for a ride! What we have to do here is:
-     * 1. Make sure all fields are validated
-     * 2. Send a new 'alert function' create request, which should return a new function ID
-     * 3. Add this Id to the 'Alert Config Group' for notifications
-     * 4. Send a Edit or Create request for the Alert Config Group based on user's choice
-     * 5. Notify user of result
+     * User hits submit... Buckle up - we're going for a ride! What we have to do here is:
+     *  1. Make sure all fields are validated (done inline and with computed props)
+     *  2. Disable submit button
+     *  3. Send a new 'alert function' create request, which should return a new function ID
+     *  4. Add this Id to the 'Alert Config Group' for notifications
+     *  5. Send a Edit or Create request for the Alert Config Group based on user's choice
+     *  6. Trigger metric replay (new time-based query to DB for anomaly detection tuning)
+     *  7. Notify user of result
+     * @method onSubmit
+     * @return {undefined}
      */
-    submit() {
+    onSubmit() {
       // This object contains the data for the new config group
       const newConfigObj = {
-        name: this.get('createGroupName'),
         active: true,
-        application: this.get('selectedAppName').application || null,
         emailConfig: { "functionIds": [] },
-        recipients: this.get('alertGroupNewRecipient')
+        name: this.get('selectedConfigGroup'),
+        recipients: this.get('alertGroupNewRecipient'),
+        application: this.get('selectedAppName').application || null
       };
+
       // This object contains the data for the new alert function, with default fillers
       const newFunctionObj = this.get('newAlertProperties');
+
       // If these two conditions are true, we assume the user wants to edit an existing alert group
       const isAlertGroupEditModeActive = this.get('showAlertGroupEdit') && this.selectedConfigGroup;
+
       // A reference to whichever 'alert config' object will be sent. Let's default to the new one
       let finalConfigObj = newConfigObj;
-      let newFunctionId = 0;
 
       // Disable submit
       this.set('isSubmitDisabled', true);
 
-      // First, save our new alert function
-      this.saveThirdEyeFunction(newFunctionObj).then(functionResult => {
+      // First, save our new alert function. TODO: deal with request failure case.
+      this.saveThirdEyeFunction(newFunctionObj).then(newFunctionId => {
 
         // Add new email recipients if we are dealing with an existing Alert Group
         if (isAlertGroupEditModeActive) {
@@ -463,12 +622,11 @@ export default Ember.Controller.extend({
           this.selectedConfigGroup.recipients = recipientsArr.join();
           finalConfigObj = this.selectedConfigGroup;
         }
+
         // Proceed only if function creation succeeds and returns an ID
         if (Ember.typeOf(functionResult) === 'number') {
           // Add our new Alert Function Id to the Alert Config Object
-          newFunctionId = functionResult;
           finalConfigObj.emailConfig.functionIds.push(newFunctionId);
-
           // Finally, save our Alert Config Group
           this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
             if (alertResult.ok) {
@@ -479,7 +637,6 @@ export default Ember.Controller.extend({
                 this.set('selectedGroupFunctions', functionData);
               });
               this.triggerReplay(newFunctionObj, finalConfigObj, newFunctionId).then(result => {
-                console.log('done with replay : ', result);
                 this.set('replayStatus', result);
               });
             }
