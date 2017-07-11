@@ -18,6 +18,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -418,8 +419,8 @@ public class DetectionJobScheduler implements Runnable {
   /**
    * Different from asynchronous backfill in runBackfill, it will return after the backfill is done.
    * This function monitors the backfill task status, and return once the tasks are completed.
-   * @param functionId
-   * the function id to be backfilled
+   * @param functionIds
+   * the list of function id to be backfilled
    * @param backfillStartTime
    * the monitor start time for backfill
    * @param backfillEndTime
@@ -427,19 +428,27 @@ public class DetectionJobScheduler implements Runnable {
    * @param force
    * set to false to resume from previous backfill if there exists any
    */
-  public void synchronousBackFill(long functionId, DateTime backfillStartTime, DateTime backfillEndTime, boolean force) {
-    Long jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
+  public void synchronousBackFill(List<Long> functionIds, DateTime backfillStartTime, DateTime backfillEndTime, boolean force) {
+    // A Map from jobExecutionId to its function Id
+    Map<Long, Long> jobExecutionIdFunctionIdMap = new HashMap<>();
+    for (long functionId : functionIds) {
+      Long jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
 
-    if (jobExecutionId == null) {
-      LOG.warn("Unable to perform backfill on function Id {} between {} and {}", functionId, backfillStartTime,
-          backfillEndTime);
-      return;
+      if (jobExecutionId == null) {
+        LOG.warn("Unable to perform backfill on function Id {} between {} and {}", functionId, backfillStartTime,
+            backfillEndTime);
+      } else {
+        jobExecutionIdFunctionIdMap.put(jobExecutionId, functionId);
+      }
     }
 
-    int retryCounter = 0;
-    while (waitForJobDone(jobExecutionId).equals(JobStatus.FAILED) && retryCounter < MAX_BACKFILL_RETRY) {
-      jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
-      retryCounter++;
+    for (long jobExecutionId : jobExecutionIdFunctionIdMap.keySet()) {
+      int retryCounter = 0;
+      while (waitForJobDone(jobExecutionId).equals(JobStatus.FAILED) && retryCounter < MAX_BACKFILL_RETRY) {
+        long functionId = jobExecutionIdFunctionIdMap.get(jobExecutionId);
+        jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
+        retryCounter++;
+      }
     }
   }
 
