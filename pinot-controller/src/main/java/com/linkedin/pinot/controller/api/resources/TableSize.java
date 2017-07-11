@@ -15,79 +15,76 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
-import java.io.IOException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.restlet.data.MediaType;
-import org.restlet.data.Status;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Get;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import java.util.concurrent.Executor;
+import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-public class TableSize extends BasePinotControllerRestletResource {
+@Api(tags = Constants.TABLE_TAG)
+@Path("/")
+public class TableSize {
   private static Logger LOGGER = LoggerFactory.getLogger(TableSize.class);
 
-  @Get
-  @Override
-  public Representation get() {
-    final String tableName = (String) getRequest().getAttributes().get("tableName");
-    final String detailedVal = (String) getRequest().getAttributes().get("detailed");
-    final boolean detailed = ! "false".equalsIgnoreCase(detailedVal);
+  @Inject
+  ControllerConf controllerConf;
+  @Inject
+  PinotHelixResourceManager pinotHelixResourceManager;
+  @Inject
+  ControllerMetrics metrics;
+  @Inject
+  Executor executor;
+  @Inject
+  HttpConnectionManager connectionManager;
 
-    if (tableName == null) {
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      StringRepresentation resp = new StringRepresentation("{\"error\" : \"Table name is required\"}");
-      resp.setMediaType(MediaType.APPLICATION_JSON);
-      return resp;
-    }
-    return getTableSizes(tableName, detailed);
-  }
-
-  @HttpVerb("get")
-  @Summary("Get table storage size across all replicas")
-  @Tags({"table"})
-  @Paths({"/tables/{tableName}/size"})
-  private Representation getTableSizes(
-      @Parameter(name="tableName", in = "path", description = "Table name")
+  @GET
+  @Path("/tables/{tableName}/size")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Read table sizes",
+      notes = "Get table size details. Table size is the size of untarred segments including replication")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")})
+  public TableSizeReader.TableSizeDetails getTableSize(
+      @ApiParam(value = "Table name without type", required = true,
+          example = "myTable | myTable_OFFLINE")
+      @PathParam("tableName")
       String tableName,
-      @Parameter(name="detailed", in="query",
-      description = "true=Provide detailed size information; false=Only aggregated size",
-      required = false)
-      boolean detailed) {
-    TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
-
-
+      @ApiParam(value = "Get detailed information", required = false)
+      @DefaultValue("true")
+      @QueryParam("detailed") boolean detailed) {
+    TableSizeReader tableSizeReader = new TableSizeReader(executor, connectionManager, pinotHelixResourceManager);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails = tableSizeReader.getTableSizeDetails(tableName,
-          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+          controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Throwable t) {
       LOGGER.error("Failed to read table size for: {}", tableName, t);
-      return responseRepresentation(Status.SERVER_ERROR_INTERNAL,
-          "{\"error\" : \"Error reading size information for "
-          + tableName + "\"}");
+      throw new WebApplicationException("Error reading size information for " + tableName,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     if (tableSizeDetails == null) {
-      return responseRepresentation(Status.CLIENT_ERROR_NOT_FOUND,
-          "{\"error\" : \"Table " + tableName + " does not exist\" }");
+      throw new WebApplicationException("Table " + tableName + " not found",
+          Response.Status.NOT_FOUND);
     }
-
-    try {
-      return responseRepresentation(Status.SUCCESS_OK,
-          new ObjectMapper().writeValueAsString(tableSizeDetails));
-    } catch (IOException e) {
-      LOGGER.error("Failed to convert table size to json for table: {}", tableName, e);
-      return responseRepresentation(Status.SERVER_ERROR_INTERNAL,
-          "{\"error\" : \"Error formatting table size\"}");
-    }
+    return tableSizeDetails;
   }
-
 }

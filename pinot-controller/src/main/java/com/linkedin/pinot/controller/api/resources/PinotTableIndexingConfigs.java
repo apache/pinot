@@ -16,87 +16,68 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import java.io.File;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
-import org.apache.commons.io.FileUtils;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.json.JSONException;
 import org.json.JSONObject;
-import org.restlet.data.Status;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Put;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Api(tags = Constants.TABLE_TAG)
+@Path("/")
+public class PinotTableIndexingConfigs {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIndexingConfigs.class);
 
-public class PinotTableIndexingConfigs extends BasePinotControllerRestletResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      PinotTableIndexingConfigs.class);
-  private final File baseDataDir;
-  private final File tempDir;
-
-  public PinotTableIndexingConfigs() throws IOException {
-    baseDataDir = new File(_controllerConf.getDataDir());
-    if (!baseDataDir.exists()) {
-      FileUtils.forceMkdir(baseDataDir);
-    }
-    tempDir = new File(baseDataDir, "schemasTemp");
-    if (!tempDir.exists()) {
-      FileUtils.forceMkdir(tempDir);
-    }
-  }
+  @Inject
+  ControllerConf controllerConf;
+  @Inject
+  PinotHelixResourceManager pinotHelixResourceManager;
+  @Inject
+  ControllerMetrics metrics;
 
   @Deprecated
-  @Override
-  @Put("json")
-  public Representation put(Representation entity) {
-    final String tableName = (String) getRequest().getAttributes().get("tableName");
-    if (tableName == null) {
-      String error = new String("Error: Table " + tableName + " not found.");
-      LOGGER.error(error);
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      return new StringRepresentation(error);
-    }
-    if (entity == null) {
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      return new StringRepresentation("{\"error\" : \"Request body is required\"}");
-    }
-    try {
-      return updateIndexingConfig(tableName, entity);
-    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
-      LOGGER.info("Failed to update metadata configuration for table {}, error: {}", tableName, e.getMessage());
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
-          ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
-      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST, e.getMessage());
-    } catch (final Exception e) {
-      LOGGER.error("Caught exception while updating indexing configs for table {}", tableName, e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
-      setStatus(Status.SERVER_ERROR_INTERNAL);
-      return exceptionToStringRepresentation(e);
-    }
-  }
-
-  @Deprecated
-  @HttpVerb("put")
-  @Summary("DEPRECATED: Updates the indexing configuration for a table")
-  @Tags({"table"})
-  @Paths({
-      "/tables/{tableName}/indexingConfigs"
+  @PUT
+  @Path("/tables/{tableName}/indexingConfigs")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update table indexing configuration")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Server error updating configuration")
   })
-  private Representation updateIndexingConfig(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the indexing configuration", required = true) String tableName,
-      Representation entity)
-      throws Exception {
-    TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(entity.getText()));
-    _pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
+  public SuccessResponse updateIndexingConfig(
+      @ApiParam(value = "Table name (without type)", required = true)
+      @PathParam("tableName") String tableName,
+      String body) {
+    TableConfig tableConfig = null;
+    try {
+       tableConfig = TableConfig.fromJSONConfig(new JSONObject(body));
+      pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
         tableConfig.getIndexingConfig());
-    return new StringRepresentation("done");
+      return new SuccessResponse("Updated indexing config for table " + tableName);
+    } catch (JSONException | IOException e) {
+      LOGGER.info("Error converting request to table config for table: {}", tableName, e);
+      throw new WebApplicationException("Error converting request body to table configuration",
+          Response.Status.BAD_REQUEST);
+    } catch (Exception e) {
+      LOGGER.info("Failed to update indexing config for table: {}", tableName, e);
+      throw new WebApplicationException("Error converting request body to table configuration",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 }

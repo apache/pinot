@@ -15,19 +15,8 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import org.slf4j.LoggerFactory;
-import org.slf4j.Logger;
-
-
-public class Constants {
-  private static final Logger LOGGER = LoggerFactory.getLogger(Constants.class);
-
-  public static final String TABLE_TAG = "Table";
-  public static final String VERSION_TAG = "Version";
-  public static final String HEALTH_TAG = "Health";
-  public static final String INSTANCE_TAG = "Instance";
-  public static final String SCHEMA_TAG = "Schema";
-  public static final String TENANT_TAG = "Tenant";
-
-  public static final String TABLE_TYPE = "type";
+public enum StateType {
+  ENABLE,
+  DISABLE,
+  DROP
 }

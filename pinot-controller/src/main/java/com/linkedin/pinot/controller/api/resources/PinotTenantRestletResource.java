@@ -15,35 +15,42 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.io.ByteStreams;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.restlet.swagger.Description;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import java.util.HashSet;
 import java.util.Set;
-import org.json.JSONException;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.json.JSONObject;
-import org.restlet.data.MediaType;
-import org.restlet.data.Status;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.representation.Variant;
-import org.restlet.resource.Delete;
-import org.restlet.resource.Get;
-import org.restlet.resource.Post;
-import org.restlet.resource.Put;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static javax.ws.rs.core.MediaType.*;
 
 
 /**
@@ -67,303 +74,266 @@ import org.slf4j.LoggerFactory;
  *   }' http://localhost:1234/tenants
  * </ul>
  */
-public class PinotTenantRestletResource extends BasePinotControllerRestletResource {
+@Api(tags = Constants.TENANT_TAG)
+@Path("/")
+public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PinotTenantRestletResource.class);
-
   private static final String TENANT_NAME = "tenantName";
 
-  private final ObjectMapper _objectMapper;
+  @Inject
+  ControllerConf controllerConf;
+  @Inject
+  PinotHelixResourceManager pinotHelixResourceManager;
+  @Inject
+  ControllerMetrics metrics;
 
-  public PinotTenantRestletResource() {
-    getVariants().add(new Variant(MediaType.TEXT_PLAIN));
-    getVariants().add(new Variant(MediaType.APPLICATION_JSON));
-    setNegotiated(false);
-    _objectMapper = new ObjectMapper();
-  }
-
-  /*
-   * For tenant creation
-   */
-  @Override
-  @Post("json")
-  public Representation post(Representation entity) {
-    StringRepresentation presentation;
-    try {
-      final Tenant tenant = _objectMapper.readValue(entity.getText(), Tenant.class);
-      presentation = createTenant(tenant);
-    } catch (final Exception e) {
-      presentation = exceptionToStringRepresentation(e);
-      LOGGER.error("Caught exception while creating tenant ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
-      setStatus(Status.SERVER_ERROR_INTERNAL);
-    }
-    return presentation;
-  }
-
-  @HttpVerb("post")
-  @Summary("Creates a tenant")
-  @Tags({ "tenant" })
-  @Paths({ "/tenants", "/tenants/" })
-  private StringRepresentation createTenant(Tenant tenant) {
+  @POST
+  @Path("/tenants")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = " Create a tenant")
+  @ApiResponses( {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error creating tenant")
+  })
+  public SuccessResponse createTenant(Tenant tenant) {
     PinotResourceManagerResponse response;
-    StringRepresentation presentation;
     switch (tenant.getTenantRole()) {
       case BROKER:
-        response = _pinotHelixResourceManager.createBrokerTenant(tenant);
-        presentation = new StringRepresentation(response.toString());
+        response = pinotHelixResourceManager.createBrokerTenant(tenant);
         break;
       case SERVER:
-        response = _pinotHelixResourceManager.createServerTenant(tenant);
-        presentation = new StringRepresentation(response.toString());
+        response = pinotHelixResourceManager.createServerTenant(tenant);
         break;
       default:
         throw new RuntimeException("Not a valid tenant creation call");
     }
-    return presentation;
+    if (response.isSuccessful()) {
+      return new SuccessResponse("Successfully created tenant");
+    }
+    metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
+    throw new WebApplicationException("Failed to create tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 
   /*
    * For tenant update
    */
-  @Override
-  @Put("json")
-  public Representation put(Representation entity) {
-    StringRepresentation presentation;
-    try {
-      final Tenant tenant = _objectMapper.readValue(ByteStreams.toByteArray(entity.getStream()), Tenant.class);
-      presentation = updateTenant(tenant);
-    } catch (final Exception e) {
-      presentation = exceptionToStringRepresentation(e);
-      LOGGER.error("Caught exception while updating tenant ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
-      setStatus(Status.SERVER_ERROR_INTERNAL);
-    }
-    return presentation;
-  }
-
-  @HttpVerb("put")
-  @Summary("Updates a tenant")
-  @Tags({ "tenant" })
-  @Paths({ "/tenants", "/tenants/" })
-  private StringRepresentation updateTenant(Tenant tenant) {
+  // TODO: should be /tenant/{tenantName}
+  @PUT
+  @Path("/tenants")
+  @Consumes(APPLICATION_JSON)
+  @ApiOperation(value =  "Update a tenant")
+  @ApiResponses(value =  {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Failed to update the tenant")
+  })
+  public SuccessResponse updateTenant(Tenant tenant) {
     PinotResourceManagerResponse response;
-    StringRepresentation presentation;
     switch (tenant.getTenantRole()) {
       case BROKER:
-        response = _pinotHelixResourceManager.updateBrokerTenant(tenant);
-        presentation = new StringRepresentation(response.toString());
+        response = pinotHelixResourceManager.updateBrokerTenant(tenant);
         break;
       case SERVER:
-        response = _pinotHelixResourceManager.updateServerTenant(tenant);
-        presentation = new StringRepresentation(response.toString());
+        response = pinotHelixResourceManager.updateServerTenant(tenant);
         break;
       default:
         throw new RuntimeException("Not a valid tenant update call");
     }
-    return presentation;
-  }
-
-  /**
-   * URI Mappings:
-   * "/tenants", "/tenants/": List all the tenants in the cluster.
-   * "/tenants/{tenantName}", "/tenants/{tenantName}/": List all instances for the tenant.
-   * "/tenants/{tenantName}?state={state}":
-   * - Set the state for the specified tenant to the specified value, one of {enable|disable|drop}.
-   *
-   * {@inheritDoc}
-   * @see org.restlet.resource.ServerResource#get()
-   */
-  @Override
-  @Get
-  public Representation get() {
-    StringRepresentation presentation = null;
-    try {
-      final String tenantName = (String) getRequest().getAttributes().get(TENANT_NAME);
-      final String state = getReference().getQueryAsForm().getValues(STATE);
-      ;
-      final String type = getReference().getQueryAsForm().getValues(TABLE_TYPE);
-
-      if (tenantName == null) {
-        presentation = getAllTenants(type);
-      } else if (state == null) {
-        presentation = getTenant(tenantName, type);
-      } else {
-        if (isValidState(state)) {
-          presentation = toggleTenantState(tenantName, state, type);
-        } else {
-          LOGGER.error(INVALID_STATE_ERROR);
-          setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-          return new StringRepresentation(INVALID_STATE_ERROR);
-        }
-      }
-    } catch (final Exception e) {
-      presentation = exceptionToStringRepresentation(e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_GET_ERROR, 1L);
-      setStatus(Status.SERVER_ERROR_INTERNAL);
-      LOGGER.error("Caught exception while fetching tenant ", e);
-      setStatus(Status.SERVER_ERROR_INTERNAL);
+    if (response.isSuccessful()) {
+      return new SuccessResponse("Updated tenant");
     }
-    return presentation;
+    metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
+    throw new WebApplicationException("Failed to update tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 
-  @HttpVerb("get")
-  @Summary("Gets information about a tenant")
-  @Tags({ "tenant" })
-  @Paths({ "/tenants/{tenantName}/metadata", "/tenants/{tenantName}/metadata/" })
-  private StringRepresentation getTenant(
-      @Parameter(name = "tenantName", in = "path", description = "The tenant name") String tenantName, @Parameter(
-          name = "type", in = "query", description = "The type of tenant, either SERVER or BROKER") String type)
-      throws JSONException {
-    StringRepresentation presentation;// Return instances related to given tenant name.
+  public static class TenantMetadata {
+    @JsonProperty(value = "ServerInstances")
+    Set<String> serverInstances;
+    @JsonProperty(value = "BrokerInstances")
+    Set<String> brokerInstances;
+    @JsonProperty(TENANT_NAME)
+    String tenantName;
+  }
 
-    JSONObject resourceGetRet = new JSONObject();
-    if (type == null) {
-      resourceGetRet.put("ServerInstances", _pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName));
-      resourceGetRet.put("BrokerInstances", _pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
+  @GET
+  @Path("/tenants")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List all tenants")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error reading tenants list")
+  })
+  public TenantsList getAllTenants(
+      @ApiParam(value = "Tenant type", required = false, allowableValues = "[BROKER, SERVER]", defaultValue = "")
+      @QueryParam("type") @DefaultValue("") String type) {
+    TenantsList tenants = new TenantsList();
+
+    if (type == null || type.isEmpty() || type.equalsIgnoreCase("server")) {
+      tenants.serverTenants = pinotHelixResourceManager.getAllServerTenantNames();
+    }
+    if (type == null || type.isEmpty() || type.equalsIgnoreCase("broker")) {
+      tenants.brokerTenants = pinotHelixResourceManager.getAllBrokerTenantNames();
+    }
+    return tenants;
+  }
+
+
+  @GET
+  @Path("/tenants/{tenantName}/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get tenant information")
+  @ApiResponses(value =  {
+      @ApiResponse(code = 200, message = "Success", response = TenantMetadata.class),
+      @ApiResponse(code = 404, message = "Tenant not found"),
+      @ApiResponse(code = 500, message = "Server error reading tenant information")
+  })
+  public TenantMetadata getTenantMetadata(
+      @ApiParam(value = "Tenant name", required = true)
+      @PathParam("tenantName")
+      String tenantName,
+      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "[SERVER, BROKER]")
+      @QueryParam("type") @DefaultValue("") String type) {
+
+    TenantMetadata tenantMeta = new TenantMetadata();
+    if (type == null || type.isEmpty()) {
+      tenantMeta.serverInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
+      tenantMeta.brokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
     } else {
       if (type.equalsIgnoreCase("server")) {
-        resourceGetRet.put("ServerInstances", _pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName));
+        tenantMeta.serverInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
       }
       if (type.equalsIgnoreCase("broker")) {
-        resourceGetRet.put("BrokerInstances", _pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
+        tenantMeta.brokerInstances =  pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
       }
     }
-    resourceGetRet.put(TENANT_NAME, tenantName);
-
-    presentation = new StringRepresentation(resourceGetRet.toString(), MediaType.APPLICATION_JSON);
-    return presentation;
+    tenantMeta.tenantName = tenantName;
+    return tenantMeta;
   }
 
-  @HttpVerb("get")
-  @Summary("Enable, disable or drop a tenant")
-  @Tags({ "tenant" })
-  @Paths({ "/tenants/{tenantName}", "/tenants/{tenantName}/" })
-  private StringRepresentation toggleTenantState(
-      @Parameter(name = "tenantName", in = "path", description = "The tenant name")
+  public static class TenantsList {
+    @JsonProperty("SERVER_TENANTS")
+    Set<String> serverTenants;
+    @JsonProperty("BROKER_TENANTS")
+    Set<String> brokerTenants;
+  }
+
+  // GET ?? really ??
+  // TODO: FIXME: This API is horribly bad design doing too many unrelated operations and giving
+  // different responses for each. That's a bad way to structure APIs because clients have no good way
+  // to parse response. Maintaining old behavior for backward compatibility.
+  // CHANGE-ALERT: This is not backward compatible. We've changed this API from GET to POST because:
+  //   1. That is correct
+  //   2. with GET, we need to write our own routing logic to avoid conflict since this is same as the API above
+  @POST
+  @Path("/tenants/{tenantName}/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Change tenant state")
+  @ApiResponses(value =  {
+      @ApiResponse(code = 200, message = "Success", response = String.class),
+      @ApiResponse(code = 404, message = "Tenant not found"),
+      @ApiResponse(code = 500, message = "Server error reading tenant information")
+  })
+  public String changeTenantState(
+      @ApiParam(value = "Tenant name", required = true)
+      @PathParam("tenantName")
       String tenantName,
-      @Parameter(name = "state", in = "query", description = "state to set for the tenant {enable|disable|drop}")
-      String state,
-      @Parameter(name = "type", in = "query", description = "The type of tenant, either SERVER or BROKER or NULL")
-      String type) throws JSONException {
-
-    Set<String> serverInstances = new HashSet<String>();
-    Set<String> brokerInstances = new HashSet<String>();
-    JSONObject instanceResult = new JSONObject();
-
-    if ((type == null) || type.equalsIgnoreCase("server")) {
-      serverInstances = _pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
+      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "[SERVER, BROKER]")
+      @QueryParam("type") String type,
+      @ApiParam(value = "state", required = true, defaultValue = "", allowableValues = "[enable, disable, drop]")
+      @QueryParam("state") @DefaultValue("") String state) {
+    TenantMetadata tenantMetadata = getTenantMetadata(tenantName, type);
+    Set<String> allInstances = new HashSet<>();
+    if (tenantMetadata.brokerInstances != null) {
+      allInstances.addAll(tenantMetadata.brokerInstances);
     }
-
-    if ((type == null) || type.equalsIgnoreCase("broker")) {
-      brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
+    if (tenantMetadata.serverInstances != null) {
+      allInstances.addAll(tenantMetadata.serverInstances);
     }
-
-    Set<String> allInstances = new HashSet<String>(serverInstances);
-    allInstances.addAll(brokerInstances);
-
+    // TODO: do not support drop. It's same as DELETE
     if (StateType.DROP.name().equalsIgnoreCase(state)) {
       if (!allInstances.isEmpty()) {
-        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-        return new StringRepresentation("Error: Tenant " + tenantName + " has live instances, cannot be dropped.");
+        throw new WebApplicationException("Tenant " + tenantName + " has live instance", Response.Status.BAD_REQUEST);
       }
-      _pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
-      _pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
-      _pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
-      return new StringRepresentation("Dropped tenant " + tenantName + " successfully.");
+      pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
+      pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
+      pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
+      try {
+        return new ObjectMapper().writeValueAsString(new SuccessResponse("Deleted tenant " + tenantName));
+      } catch (JsonProcessingException e) {
+         LOGGER.error("Error serializing response to json");
+        return "{\"message\" : \"Deleted tenant\" " + tenantName + "}";
+      }
     }
 
     boolean enable = StateType.ENABLE.name().equalsIgnoreCase(state) ? true : false;
-    for (String instance : allInstances) {
-      if (enable) {
-        instanceResult.put(instance, _pinotHelixResourceManager.enableInstance(instance));
-      } else {
-        instanceResult.put(instance, _pinotHelixResourceManager.disableInstance(instance));
-      }
-    }
-
-    return new StringRepresentation(instanceResult.toString(), MediaType.APPLICATION_JSON);
-  }
-
-  @HttpVerb("get")
-  @Summary("Gets information about all tenants")
-  @Tags({ "tenant" })
-  @Paths({ "/tenants", "/tenants/" })
-  private StringRepresentation getAllTenants(@Parameter(name = "type", in = "query",
-      description = "The type of tenant, either SERVER or BROKER") String type) throws JSONException {
-    StringRepresentation presentation;// Return all the tags.
-    final JSONObject ret = new JSONObject();
-    if (type == null || type.equalsIgnoreCase("server")) {
-      ret.put("SERVER_TENANTS", _pinotHelixResourceManager.getAllServerTenantNames());
-    }
-    if (type == null || type.equalsIgnoreCase("broker")) {
-      ret.put("BROKER_TENANTS", _pinotHelixResourceManager.getAllBrokerTenantNames());
-    }
-    presentation = new StringRepresentation(ret.toString(), MediaType.APPLICATION_JSON);
-    return presentation;
-  }
-
-  @Override
-  @Delete
-  public Representation delete() {
-    StringRepresentation presentation;
+    JSONObject instanceResult = new JSONObject();
+    String instance = null;
     try {
-      final String tenantName = (String) getRequest().getAttributes().get(TENANT_NAME);
-      final String type = getReference().getQueryAsForm().getValues("type");
-      presentation = deleteTenant(tenantName, type);
-    } catch (final Exception e) {
-      presentation = exceptionToStringRepresentation(e);
-      LOGGER.error("Caught exception while deleting tenant ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
-      setStatus(Status.SERVER_ERROR_INTERNAL);
+      for (String i : allInstances) {
+        instance = i;
+        if (enable) {
+          instanceResult.put(instance, pinotHelixResourceManager.enableInstance(instance));
+        } else {
+          instanceResult.put(instance, pinotHelixResourceManager.disableInstance(instance));
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.error("Error enabling/disabling instances for tenant: {}", tenantName, e);
+      metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR, 1L);
+      throw new WebApplicationException("Error during " + type + " operation for instance: " + instance, Response.Status.INTERNAL_SERVER_ERROR);
+
     }
-    return presentation;
+    return instanceResult.toString();
   }
 
-  @HttpVerb("delete")
-  @Summary("Deletes a tenant")
-  @Tags({ "tenant" })
-  @Description("Deletes a tenant from the cluster")
-  @Paths({ "/tenants/{tenantName}", "/tenants/{tenantName}/" })
-  private StringRepresentation deleteTenant(
-      @Parameter(name = "tenantName", in = "path", description = "The tenant id") String tenantName,
-      @Parameter(name = "type", in = "query", description = "The type of tenant, either SERVER or BROKER",
-          required = true) String type) {
-    StringRepresentation presentation;
-    if (type == null) {
-      presentation =
-          new StringRepresentation("Not specify the type for the tenant name. Please try to append:"
-              + "/?type=SERVER or /?type=BROKER ");
-    } else {
-      TenantRole tenantRole = TenantRole.valueOf(type.toUpperCase());
-      PinotResourceManagerResponse res = null;
-      switch (tenantRole) {
-        case BROKER:
-          if (_pinotHelixResourceManager.isBrokerTenantDeletable(tenantName)) {
-            res = _pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
-          } else {
-            res = new PinotResourceManagerResponse();
-            res.status = ResponseStatus.failure;
-            res.message = "Broker Tenant is not null, cannot delete it.";
-          }
-          break;
-        case SERVER:
-          if (_pinotHelixResourceManager.isServerTenantDeletable(tenantName)) {
-            res = _pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
+  @DELETE
+  @Path("/tenants/{tenantName}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Delete a tenant")
+  @ApiResponses(value = {
+      @ApiResponse(code=200, message = "Success"),
+      @ApiResponse(code = 400, message = "Tenant can not be deleted"),
+      @ApiResponse(code = 404, message = "Tenant not found"),
+      @ApiResponse(code = 500, message = "Error deleting tenant")})
+  public SuccessResponse deleteTenant(
+      @ApiParam(value = "Tenant name", required = true)
+      @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Tenant type", required = true, allowableValues = "[SERVER, BROKER]")
+      @QueryParam("type") @DefaultValue("") String type) {
+
+    if (type == null || type.isEmpty()) {
+      throw new WebApplicationException("Tenant type (BROKER | SERVER) is required as query parameter",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    TenantRole tenantRole = TenantRole.valueOf(type.toUpperCase());
+    PinotResourceManagerResponse res = null;
+    switch (tenantRole) {
+      case BROKER:
+        if (pinotHelixResourceManager.isBrokerTenantDeletable(tenantName)) {
+          res = pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
+        } else {
+          throw new WebApplicationException("Broker tenant is not null, can not delete it",
+              Response.Status.BAD_REQUEST);
+        }
+        break;
+      case SERVER:
+          if (pinotHelixResourceManager.isServerTenantDeletable(tenantName)) {
+            res = pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
             if (res.isSuccessful()) {
-              res = _pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
+              res = pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
             }
           } else {
-            res = new PinotResourceManagerResponse();
-            res.status = ResponseStatus.failure;
-            res.message = "Server Tenant is not null, cannot delete it.";
+            throw new WebApplicationException("Server tenant is not null, can not delete it",
+                Response.Status.BAD_REQUEST);
           }
-          break;
-        default:
-          break;
-      }
-      presentation = new StringRepresentation(res.toString());
+        break;
+      default:
+        break;
     }
-    return presentation;
+    if (res.isSuccessful()) {
+      return new SuccessResponse("Successfully deleted tenant " + tenantName);
+    }
+    metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
+    throw new WebApplicationException("Error deleting tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 }

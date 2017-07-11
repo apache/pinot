@@ -16,33 +16,30 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
 import org.json.JSONObject;
-import org.restlet.data.MediaType;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Get;
 
 
 /**
  * API endpoint that returns the versions of Pinot components.
  */
-public class PinotVersionRestletResource extends BasePinotControllerRestletResource {
-  @Override
-  @Get
-  public Representation get() {
-    return buildVersionResponse();
-  }
+@Api(tags = Constants.VERSION_TAG)
+@Path("/version")
+public class PinotVersionRestletResource {
 
-  @HttpVerb("get")
-  @Summary("Obtains the version number of the Pinot components")
-  @Tags({ "version" })
-  @Paths({ "/version" })
-  private Representation buildVersionResponse() {
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get version number of Pinot components")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success")})
+  public String getVersionNumber() {
     JSONObject jsonObject = new JSONObject(Utils.getComponentVersions());
-    return new StringRepresentation(jsonObject.toString(), MediaType.APPLICATION_JSON);
+    return jsonObject.toString();
   }
 }

@@ -16,29 +16,31 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import com.linkedin.pinot.controller.ControllerConf;
-import java.io.IOException;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import javax.inject.Inject;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
 import org.apache.commons.lang.StringUtils;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.ServerResource;
 
-
+@Api(tags = Constants.HEALTH_TAG)
+@Path("/pinot-controller/admin")
 public class PinotControllerHealthCheck extends ServerResource {
-  private final ControllerConf conf;
-  private final String vip;
 
-  public PinotControllerHealthCheck() throws IOException {
-    conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    vip = conf.generateVipUrl();
-  }
+  @Inject
+  ControllerConf controllerConf;
 
-  @Override
-  public Representation get() {
-    Representation presentation = null;
-    if (StringUtils.isNotBlank(vip)) {
-      presentation = new StringRepresentation("GOOD");
+  @GET
+  @Path("/pinot-controller/admin")
+  @ApiOperation(value = "Check controller health")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
+  public String checkHealth() {
+    if (StringUtils.isNotBlank(controllerConf.generateVipUrl())) {
+      return "GOOD";
     }
-    return presentation;
+    return "";
   }
-
 }
