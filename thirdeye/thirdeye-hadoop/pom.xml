@@ -45,6 +45,7 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-client</artifactId>
+            <scope>provided</scope>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
@@ -151,6 +152,10 @@
                                 <relocation>
                                     <pattern>org.</pattern>
                                     <shadedPattern>thirdeye.org.</shadedPattern>
+                                    <excludes>
+                                        <exclude>org.apache.hadoop.**</exclude>
+                                        <exclude>org.apache.httpcomponents.**</exclude>
+                                    </excludes>
                                 </relocation>
                                 <relocation>
                                     <pattern>me.</pattern>
