@@ -109,10 +109,9 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     }
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
     try {
-      GenericData.Record avroRecord =
-          reader.read(null, decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset,
-              length - HEADER_LENGTH, null));
-      return avroRecordConvetrer.transform(avroRecord, schema, destination);
+      GenericData.Record avroRecord = reader.read(null,
+          decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
+      return avroRecordConvetrer.transform(avroRecord, destination);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message using schema {}{}", (schema==null ? "null" : schema.getName()),
           (schemaUpdateFailed? "(possibly due to schema update failure)" : ""), e);
