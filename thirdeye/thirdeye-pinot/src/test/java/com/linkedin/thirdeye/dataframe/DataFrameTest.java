@@ -1016,6 +1016,7 @@ public class DataFrameTest {
   @Test
   public void testDataFrameGroupBy() {
     Grouping.DataFrameGrouping grouping = df.groupByValue("boolean");
+
     DoubleSeries ds = grouping.aggregate("double", DoubleSeries.SUM).getValues().getDoubles();
     assertEquals(ds, 0.0, -0.4);
 
@@ -1031,17 +1032,111 @@ public class DataFrameTest {
 
   @Test
   public void testResampleEndToEnd() {
-    df = df.resample("index", 2, new DataFrame.ResampleLast());
+    DataFrame out = df.resample("index", 2, new DataFrame.ResampleLast());
 
-    Assert.assertEquals(df.size(), 4);
-    Assert.assertEquals(df.getSeriesNames().size(), 6);
+    Assert.assertEquals(out.size(), 4);
+    Assert.assertEquals(out.getSeriesNames().size(), 6);
 
-    assertEquals(df.getLongs("index"), -2, 0, 2, 4);
-    assertEquals(df.getDoubles("double"), -2.1, -0.1, 1.3, 0.5);
-    assertEquals(df.getLongs("long"), -2, 1, 2, 1);
-    assertEquals(df.getStrings("string"), "-2.3", "-1", "0.13e1", "0.5");
-    assertEquals(df.getBooleans("boolean"), TRUE, TRUE, TRUE, TRUE);
-    assertEquals(df.getObjects("object"), "-2.3", 1L, true, 0.5d);
+    assertEquals(out.getLongs("index"), -2, 0, 2, 4);
+    assertEquals(out.getDoubles("double"), -2.1, -0.1, 1.3, 0.5);
+    assertEquals(out.getLongs("long"), -2, 1, 2, 1);
+    assertEquals(out.getStrings("string"), "-2.3", "-1", "0.13e1", "0.5");
+    assertEquals(out.getBooleans("boolean"), TRUE, TRUE, TRUE, TRUE);
+    assertEquals(out.getObjects("object"), "-2.3", 1L, true, 0.5d);
+  }
+
+  @Test
+  public void testGroupingMultiColumn() {
+    DataFrame out = df.groupByInterval("index", 2)
+        .aggregate(new String[] { "double", "boolean", "long", "string", "object" },
+            new Series.Function[] { DoubleSeries.SUM, LongSeries.MIN, LongSeries.MAX, StringSeries.LAST, StringSeries.CONCAT });
+
+    Assert.assertEquals(out.getSeriesNames().size(), 6);
+    Assert.assertEquals(out.size(), 4);
+    assertEquals(out.getDoubles("double"), -2.1, -0.1, 1.3, 0.5);
+    assertEquals(out.getLongs("boolean"), 0, 1, 1, 1);
+    assertEquals(out.getLongs("long"), 0, 1, 2, 1);
+    assertEquals(out.getStrings("string"), "0.0", "-1", "0.13e1", "0.5");
+    assertEquals(out.getStrings("object"), "-2.30", "1", "true", "0.5");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGroupingMultiColumnFailReuse() {
+    df.groupByInterval("index", 2)
+        .aggregate(new String[] { "double", "double" },
+            new Series.Function[] { DoubleSeries.SUM, LongSeries.MIN });
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGroupingMultiColumnFailReuseIndex() {
+    df.groupByInterval("index", 2)
+        .aggregate(new String[] { "index" }, new Series.Function[] { DoubleSeries.SUM });
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGroupingMultiColumnFailMisaligned() {
+    df.groupByInterval("index", 2)
+        .aggregate(new String[] { "double", "long" },
+            new Series.Function[] { DoubleSeries.SUM, LongSeries.MIN, LongSeries.MAX });
+  }
+
+  @Test
+  public void testGroupingMultiColumnExpression() {
+    DataFrame out = df.groupByInterval("index", 2)
+        .aggregate("double:sum", "boolean:min", "long:max", "string:last", "object:first");
+
+    Assert.assertEquals(out.getSeriesNames().size(), 6);
+    Assert.assertEquals(out.size(), 4);
+    assertEquals(out.getDoubles("double"), -2.1, -0.1, 1.3, 0.5);
+    assertEquals(out.getBooleans("boolean"), FALSE, TRUE, TRUE, TRUE);
+    assertEquals(out.getLongs("long"), 0, 1, 2, 1);
+    assertEquals(out.getStrings("string"), "0.0", "-1", "0.13e1", "0.5");
+    assertEquals(out.getObjects("object"), "-2.3", 1L, true, 0.5d);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGroupingMultiColumnExpressionFailReuse() {
+    df.groupByInterval("index", 2)
+        .aggregate("double:sum", "double:min");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGroupingMultiColumnExpressionFailReuseIndex() {
+    df.groupByInterval("index", 2).aggregate("index:sum");
+  }
+
+  @Test
+  public void testGroupingMultiColumnExpressionRename() {
+    DataFrame out = df.groupByInterval("index", 2)
+        .aggregate("double:sum:a", "double:max:b");
+
+    Assert.assertEquals(out.getSeriesNames().size(), 3);
+    Assert.assertEquals(out.size(), 4);
+    assertEquals(out.getDoubles("a"), -2.1, -0.1, 1.3, 0.5);
+    assertEquals(out.getDoubles("b"), 0.0, -0.1, 1.3, 0.5);
+  }
+
+  @Test
+  public void testGroupingExpressions() {
+    DataFrame out = new DataFrame()
+        .addSeries("a", 1, 2, 3, 4, 5)
+        .groupByCount(3)
+        .aggregate("a:sum:sum", "a:product:product",
+            "a:min:min", "a:max:max", "a:first:first", "a:last:last",
+            "a:mean:mean", "a:median:median", "a:std:std");
+
+    Assert.assertEquals(out.getSeriesNames().size(), 10);
+    Assert.assertEquals(out.size(), 2);
+    assertEquals(out.getIndex().getLongs(), 0, 1);
+    assertEquals(out.getLongs("sum"), 6, 9);
+    assertEquals(out.getLongs("product"), 6, 20);
+    assertEquals(out.getLongs("min"), 1, 4);
+    assertEquals(out.getLongs("max"), 3, 5);
+    assertEquals(out.getLongs("first"), 1, 4);
+    assertEquals(out.getLongs("last"), 3, 5);
+    assertEquals(out.getDoubles("mean"), 2, 4.5);
+    assertEquals(out.getDoubles("median"), 2, 4.5);
+    assertEquals(out.getDoubles("std"), 1, 0.70710);
   }
 
   @Test
@@ -2131,10 +2226,9 @@ public class DataFrameTest {
     assertEquals(s, 0, 0.25, 1.0);
   }
 
-  @Test
+  @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDoubleNormalizeFailInvalid() {
-    DoubleSeries s = DataFrame.toSeries(1.5, 1.5, 1.5).normalize();
-    assertEquals(s, DoubleSeries.nulls(3));
+    DataFrame.toSeries(1.5, 1.5, 1.5).normalize();
   }
 
   @Test
@@ -2143,10 +2237,9 @@ public class DataFrameTest {
     assertEquals(s, -1, 0.0, 1);
   }
 
-  @Test
+  @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDoubleZScoreFailInvalid() {
-    DoubleSeries s = DataFrame.toSeries(1.5, 1.5, 1.5).zscore();
-    assertEquals(s, DoubleSeries.nulls(3));
+    DataFrame.toSeries(1.5, 1.5, 1.5).zscore();
   }
 
   @Test

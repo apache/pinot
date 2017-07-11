@@ -1367,7 +1367,7 @@ public class DataFrame {
    * @param seriesName series containing grouping labels
    * @return DataFrameGrouping
    */
-  public Grouping.DataFrameGrouping groupByValue(String seriesName, long interval) {
+  public Grouping.DataFrameGrouping groupByInterval(String seriesName, long interval) {
     return new Grouping.DataFrameGrouping(seriesName, this, Grouping.GroupingByInterval.from(this.get(seriesName), interval));
   }
 
