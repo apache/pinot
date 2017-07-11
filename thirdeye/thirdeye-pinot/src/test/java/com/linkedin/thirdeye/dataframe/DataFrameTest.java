@@ -1617,6 +1617,22 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testMapFunctionGeneric() {
+    DataFrame df = new DataFrame()
+        .addSeries("a", 0, 1, 2, 3, 4)
+        .addSeries("b", 1, 2, 3, 4, 5)
+        .addSeries("c", 2, 3, 4, 5, 6)
+        .addSeries("d", 3, 4, 5, 6, 7);
+
+    String[] names = new String[] { "a", "b", "c", "d" };
+    assertEquals(df.map(DoubleSeries.SUM, names), 6, 10, 14, 18, 22);
+    assertEquals(df.map(LongSeries.SUM, names), 6, 10, 14, 18, 22);
+    assertEquals(df.map(StringSeries.CONCAT, names), "0123", "1234", "2345", "3456", "4567");
+    assertEquals(df.map(BooleanSeries.ALL_TRUE, names), FALSE, TRUE, TRUE, TRUE, TRUE);
+    assertEquals(df.map(ObjectSeries.TOSTRING, names), "[0, 1, 2, 3]", "[1, 2, 3, 4]", "[2, 3, 4, 5]", "[3, 4, 5, 6]", "[4, 5, 6, 7]");
+  }
+
+  @Test
   public void testSeriesEquals() {
     Assert.assertTrue(DataFrame.toSeries(0.0, 3.0, 4.0).equals(DataFrame.toSeries(0.0, 3.0, 4.0)));
     Assert.assertTrue(DataFrame.toSeries(0, 3, 4).equals(DataFrame.toSeries(0, 3, 4)));
