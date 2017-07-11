@@ -95,22 +95,4 @@ public class AvroRecordToPinotRowGenerator {
 
     return destination;
   }
-
-  public GenericRow transform(GenericRecord avroRecord, GenericRow destination) {
-    for (String column : indexingSchema.getColumnNames()) {
-      Object entry = avroRecord.get(column);
-      if (entry instanceof Utf8) {
-        entry = ((Utf8) entry).toString();
-      }
-      if (entry instanceof Array) {
-        entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry, indexingSchema.getFieldSpecFor(column));
-      }
-      if (entry == null && indexingSchema.getFieldSpecFor(column).isSingleValueField()) {
-        entry = AvroRecordReader.getDefaultNullValue(indexingSchema.getFieldSpecFor(column));
-      }
-      destination.putField(column, entry);
-    }
-
-    return destination;
-  }
 }

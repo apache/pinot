@@ -42,7 +42,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.*;
 
 
 /**
@@ -385,6 +385,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
+  }
+
+  @Test
+  public void testQueryException() throws Exception {
+    testQueryException("POTATO");
+    testQueryException("SELECT COUNT(*) FROM potato");
+    testQueryException("SELECT POTATO(ArrTime) FROM mytable");
+    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'");
+  }
+
+  private void testQueryException(String query) throws Exception {
+    JSONObject jsonObject = postQuery(query);
+    Assert.assertTrue(jsonObject.getJSONArray("exceptions").length() > 0);
   }
 
   @AfterClass
