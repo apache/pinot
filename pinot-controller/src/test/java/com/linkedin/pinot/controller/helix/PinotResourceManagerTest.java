@@ -25,10 +25,7 @@ import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.helix.HelixAdmin;
@@ -51,7 +48,6 @@ public class PinotResourceManagerTest {
   private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestPinotResourceManager";
   private final static String TABLE_NAME = "testTable";
-  private final static String LOCAL_DISK_DIR = "/tmp/segments";
   private ZkClient _zkClient;
 
   private HelixManager _helixZkManager;
@@ -99,105 +95,72 @@ public class PinotResourceManagerTest {
     ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
-  @Test
-  public void testAddingAndDeletingSegments()
-      throws Exception {
-    for (int i = 1; i <= 5; i++) {
-      addOneSegment(TABLE_NAME);
-      Thread.sleep(2000);
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-          TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
-      Assert.assertEquals(externalView.getPartitionSet().size(), i);
-    }
-    final ExternalView externalView =
-        _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
-    int i = 4;
-    for (final String segmentId : externalView.getPartitionSet()) {
-      deleteOneSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentId);
-      Thread.sleep(2000);
-      Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-          TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)).getPartitionSet().size(), i);
-      i--;
-    }
-  }
-
   /**
-   * Creates 5 threads that concurrently try to add 20 segments each, and asserts that we have
+   * First tests basic segment adding/deleting.
+   * Then creates 3 threads that concurrently try to add 10 segments each, and asserts that we have
    * 100 segments in the end. Then launches 5 threads again that concurrently try to delete all segments,
    * and makes sure that we have zero segments left in the end.
    * @throws Exception
    */
 
   @Test
-  public void testConcurrentAddingAndDeletingSegments() throws Exception {
-    ExecutorService addSegmentExecutor = Executors.newFixedThreadPool(5);
+  public void testBasicAndConcurrentAddingAndDeletingSegments() throws Exception {
+    // Basic add/delete case
+    for (int i = 1; i <= 2; i++) {
+      addOneSegment(TABLE_NAME);
+    }
+    Thread.sleep(1000);
+    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+        TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
+    Assert.assertEquals(externalView.getPartitionSet().size(), 2);
 
-    for (int i = 0; i < 5; ++i) {
+    for (final String segmentId : externalView.getPartitionSet()) {
+      deleteOneSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentId);
+    }
+    Thread.sleep(1000);
+    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+        TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)).getPartitionSet().size(), 0);
+
+    // Concurrent segment deletion
+    ExecutorService addSegmentExecutor = Executors.newFixedThreadPool(3);
+
+    for (int i = 0; i < 3; ++i) {
       addSegmentExecutor.execute(new Runnable() {
 
         @Override
         public void run() {
-          for (int i = 0; i < 20; ++i) {
+          for (int i = 0; i < 10; ++i) {
             addOneSegment(TABLE_NAME);
-            try {
-              Thread.sleep(1000);
-            } catch (InterruptedException e) {
-              Assert.assertFalse(true, "Exception caught during sleep.");
-            }
           }
         }
       });
     }
+    Thread.sleep(1000);
     addSegmentExecutor.shutdown();
     while (!addSegmentExecutor.isTerminated()) {
     }
 
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
     IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
-    Assert.assertEquals(idealState.getPartitionSet().size(), 100);
+    Assert.assertEquals(idealState.getPartitionSet().size(), 30);
 
-    ExecutorService deleteSegmentExecutor = Executors.newFixedThreadPool(5);
+    ExecutorService deleteSegmentExecutor = Executors.newFixedThreadPool(3);
     for (final String segment : idealState.getPartitionSet()) {
       deleteSegmentExecutor.execute(new Runnable() {
 
         @Override
         public void run() {
           deleteOneSegment(offlineTableName, segment);
-          try {
-            Thread.sleep(1000);
-          } catch (InterruptedException e) {
-            Assert.assertFalse(true, "Exception caught during sleep.");
-          }
         }
       });
     }
+    Thread.sleep(1000);
     deleteSegmentExecutor.shutdown();
     while (!deleteSegmentExecutor.isTerminated()) {
     }
 
     idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 0);
-  }
-
-  @Test
-  public void testDeletingTheSameSegmentInSegmentDeletionManager() throws Exception {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(TABLE_NAME);
-    final String segmentName = segmentMetadata.getName();
-
-    File segmentFile = new File(LOCAL_DISK_DIR + "/" + TABLE_NAME + "/" + segmentName);
-    for (int i = 0; i < 2; i++) {
-      addOneSegment(TABLE_NAME);
-      // Waiting for the external view to update
-      Thread.sleep(2000);
-
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-          TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
-
-      List<String> segmentsList = new ArrayList<>(externalView.getPartitionSet().size());
-      segmentsList.addAll(externalView.getPartitionSet());
-      _pinotHelixResourceManager.deleteSegments(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentsList);
-    }
-    Assert.assertTrue(!segmentFile.exists());
   }
 
   public void testWithCmdLines() throws Exception {
@@ -228,5 +191,4 @@ public class PinotResourceManagerTest {
     LOGGER.info("Trying to delete Segment : " + segment + " from resource : " + resource);
     _pinotHelixResourceManager.deleteSegment(resource, segment);
   }
-
 }
