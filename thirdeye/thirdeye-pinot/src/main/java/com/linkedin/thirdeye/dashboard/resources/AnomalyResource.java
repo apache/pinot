@@ -522,7 +522,7 @@ public class AnomalyResource {
    * @param endTimeIso
    *      the end time of the monitoring window (exclusive)
    * @return
-   *      the Map of AnomalyTimelinesView
+   *      the Map that maps dimension string to the AnomalyTimelinesView
    * @throws Exception
    */
   @GET
