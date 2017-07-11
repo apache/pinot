@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -441,6 +442,36 @@ public class AnomalyResource {
     anomalyFunctionDAO.update(anomalyFunctionSpec);
     return Response.ok(id).build();
   }
+
+  // Partially update anomaly function
+  @POST
+  @Path("/anomaly-function/update/properties")
+  public Response updateAnomalyFunctionProperties (@QueryParam("id") @NotNull Long id,
+      @QueryParam("config") @NotNull String propertiesJson) {
+    if(id == null || anomalyFunctionDAO.findById(id) == null) {
+      String msg = "Unable to update function properties. " + id + " doesn't exist";
+      LOG.warn(msg);
+      return Response.status(Response.Status.BAD_REQUEST).entity(msg).build();
+    }
+
+    if(StringUtils.isNotBlank(propertiesJson)) {
+      Map<String, String> configs = Collections.emptyMap();
+      try {
+        configs = OBJECT_MAPPER.readValue(propertiesJson, Map.class);
+      } catch (IOException e) {
+        String msg = "Unable to parse json string " + propertiesJson + " for function " + id;
+        LOG.error(msg);
+        return Response.status(Response.Status.BAD_REQUEST).entity(msg).build();
+      }
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
+      anomalyFunction.updateProperties(configs);
+      anomalyFunctionDAO.update(anomalyFunction);
+    }
+    String msg = "Successfully update properties for function " + id + " with " + propertiesJson;
+    LOG.info(msg);
+    return Response.ok(id).build();
+  }
+
 
   /**
    * Apply an autotune configuration to an existing function
