@@ -126,7 +126,7 @@ public class PinotHelixResourceManager {
   private SegmentDeletionManager _segmentDeletionManager;
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
-      @Nonnull String controllerInstanceId, @Nonnull String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis,
+      @Nonnull String controllerInstanceId, String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis,
       boolean isSingleTenantCluster, boolean isUpdateStateModel) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;

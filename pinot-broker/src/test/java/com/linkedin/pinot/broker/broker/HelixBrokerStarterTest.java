@@ -81,17 +81,21 @@ public class HelixBrokerStarterTest {
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZkStarter.DEFAULT_ZK_STR);
     _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
-    Thread.sleep(3000);
+
     final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     pinotHelixBrokerProperties.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
     _helixBrokerStarter =
         new HelixBrokerStarter(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, pinotHelixBrokerProperties);
 
-    Thread.sleep(1000);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
         ZkStarter.DEFAULT_ZK_STR, 5, true);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
         ZkStarter.DEFAULT_ZK_STR, 1, true);
+
+    while (_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE").size() == 0 ||
+        _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size() == 0) {
+      Thread.sleep(100);
+    }
 
     final String tableName = "dining";
     TableConfig tableConfig =
@@ -100,11 +104,14 @@ public class HelixBrokerStarterTest {
 
     for (int i = 1; i <= 5; i++) {
       addOneSegment(tableName);
-      Thread.sleep(2000);
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-          TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-      Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
+
+    Thread.sleep(1000);
+
+    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+        TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+
+    Assert.assertEquals(externalView.getPartitionSet().size(), 5);
   }
 
   @AfterTest
@@ -230,7 +237,7 @@ public class HelixBrokerStarterTest {
         // Do nothing
       }
 
-      Uninterruptibles.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
     }
   }
 
