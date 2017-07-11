@@ -404,17 +404,37 @@ public class PinotHelixResourceManager {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     List<String> segmentNames = new ArrayList<>();
     if (tableType == TableType.OFFLINE) {
-      for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(
-          _propertyStore, tableNameWithType)) {
+      for (OfflineSegmentZKMetadata segmentZKMetadata : getOfflineSegmentMetadata(tableNameWithType)) {
         segmentNames.add(segmentZKMetadata.getSegmentName());
       }
     } else {
-      for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(
-          _propertyStore, tableNameWithType)) {
+      for (RealtimeSegmentZKMetadata segmentZKMetadata : getRealtimeSegmentMetadata(tableNameWithType)) {
         segmentNames.add(segmentZKMetadata.getSegmentName());
       }
     }
     return segmentNames;
+  }
+
+  @Nonnull
+  public List<OfflineSegmentZKMetadata> getOfflineSegmentMetadata(@Nonnull String tableNameWithType) {
+    Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
+        "Table name: %s is not a valid table name with type suffix", tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == TableType.OFFLINE) {
+      return ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, tableNameWithType);
+    }
+    throw new RuntimeException("Cannot get offline metadata for table " + tableNameWithType);
+  }
+
+  @Nonnull
+  public List<RealtimeSegmentZKMetadata> getRealtimeSegmentMetadata(@Nonnull String tableNameWithType) {
+    Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
+        "Table name: %s is not a valid table name with type suffix", tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == TableType.REALTIME) {
+      return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_propertyStore, tableNameWithType);
+    }
+    throw new RuntimeException("Cannot get offline metadata for table " + tableNameWithType);
   }
 
   /**
