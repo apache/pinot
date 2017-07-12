@@ -18,6 +18,7 @@ package com.linkedin.pinot.transport.common;
 /**
  * Represent one segment in the system identified by a "string" type identifier
  *
+ * TODO: need to evaluate if we really need this class
  */
 public class SegmentId {
 

@@ -15,16 +15,12 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
-import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
@@ -32,8 +28,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
-import com.linkedin.pinot.broker.pruner.SegmentPrunerContext;
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
@@ -42,49 +36,72 @@ import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentId;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
-public class PartitionAwareOfflineRoutingTableBuilder extends AbstractRoutingTableBuilder {
-  private static final String PARTITION_METADATA_PRUNER = "PartitionZKMetadataPruner";
+/**
+ * Partition aware routing table builder for offline table.
+ *
+ * For an external view change, we need to update the look up table for routing. What we need to do here is to build a
+ * routing look up table that can quickly return the server instance when we are given a segment name and replica id.
+ * Since we assume that the replica group aware segment assignment strategy is used on the controller, we can now prune
+ * servers on the broker. For instance, let's say we have 1 partition, 2 replica groups, 4 servers.
+ *
+ * P0: RG0(server0, server1), RG1(server2, server3)
+ *
+ * Because it is guaranteed that servers of a replica group have a complete set of all segments of the table, we can
+ * pick either RG0(server0, server1) or RG1(server2, server3) for query. This will reduce the number of servers
+ * required for each query to 2 servers from 4 servers.
+ *
+ *
+ * In high level, we need to compute the look up table in the format of (segment_name -> (replica_id -> server_instance))
+ * while we are given the following information.
+ *   - external view: (segment_name -> set(servers))
+ *   - partition to replica group mapping: ((partition_number, replica_id) -> set(servers))
+ *
+ * We go through multiple steps to get the final look up table. The high level algorithm is as follows:
+ *   1. Compute the partition id set by looking at the segment zk metadata and cache metadata when possible.
+ *   2. Build a mapping table of (partition_id -> (server -> replica_id)) using partition set from step 1 and
+ *      the partition to replica group mapping table from property store.
+ *   3. Compute the final routing look up table from external view and the mapping from step 2.
+ *
+ */
+public class PartitionAwareOfflineRoutingTableBuilder extends AbstractPartitionAwareRoutingTableBuilder {
+
+  // When we use the table level replica group, we can assume that the number of partition is 1.
   private static final int TABLE_LEVEL_PARTITION_NUMBER = 0;
-  private static final int NO_PARTITION_NUMBER = -1;
 
-  Map<SegmentId, Map<Integer, ServerInstance>> _segmentId2ServersMapping = new HashMap<>();
-  AtomicReference<Map<SegmentId, Map<Integer, ServerInstance>>> _mappingRef = new AtomicReference<>(_segmentId2ServersMapping);
-  Map<SegmentId, SegmentZKMetadata> _segment2SegmentZkMetadataMap = new ConcurrentHashMap<>();
-  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private SegmentZKMetadataPrunerService _pruner;
-  private Random _random = new Random();
-  private TableConfig _tableConfig;
-  private int _numReplicas;
   private boolean _isPartitionLevelReplicaGroupAssignment;
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    _tableConfig = tableConfig;
-    _propertyStore = propertyStore;
-    _pruner = new SegmentZKMetadataPrunerService(new String[]{PARTITION_METADATA_PRUNER});
-
+    super.init(configuration, tableConfig, propertyStore);
     final String partitionColumn = _tableConfig.getValidationConfig().getReplicaGroupStrategyConfig().getPartitionColumn();
     _isPartitionLevelReplicaGroupAssignment = (partitionColumn != null);
   }
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView, List<InstanceConfig> instanceConfigList) {
+  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigList) {
+
+
     RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
     String[] segmentSet = externalView.getPartitionSet().toArray(new String[externalView.getPartitionSet().size()]);
     _numReplicas = _tableConfig.getValidationConfig().getReplicationNumber();
-    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMappingZKMedata = ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(_propertyStore, tableName);
 
-    // Compute partition id set
+    // Fetch the partition to replica group mapping table from the property store
+    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMappingZKMetadata =
+        ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(_propertyStore, tableName);
+
+    // 1. Compute the partition id set by looking at the segment zk metadata and cache metadata when possible
     Set<Integer> partitionIds = new HashSet<>();
     for (String segment : segmentSet) {
       SegmentId segmentId = new SegmentId(segment);
-      // retrieve the metadata for the segment and compute the partitionIds set
-      SegmentZKMetadata segmentZKMetadata = _segment2SegmentZkMetadataMap.get(segmentId);
-      if (segmentZKMetadata == null || segmentZKMetadata.getPartitionMetadata() == null) {
+      SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentId);
+      if (segmentZKMetadata == null || segmentZKMetadata.getPartitionMetadata() == null
+          || segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().size() == 0) {
         segmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segment);
-        _segment2SegmentZkMetadataMap.put(segmentId, segmentZKMetadata);
+        if (segmentZKMetadata != null) {
+          _segmentToZkMetadataMapping.put(segmentId, segmentZKMetadata);
+        }
       }
       int partitionId = getPartitionId(segmentZKMetadata);
       if (partitionId != NO_PARTITION_NUMBER) {
@@ -92,99 +109,72 @@ public class PartitionAwareOfflineRoutingTableBuilder extends AbstractRoutingTab
       }
     }
 
-    // Compute partition to server to replica id mapping for each partition
-    Map<Integer, Map<ServerInstance, Integer>> perPartitionServer2ReplicaIdMapping = new HashMap<>();
+    // 2. Build a mapping table of (partition_id -> (server -> replica_id)) using the partition to replica group mapping.
+    Map<Integer, Map<ServerInstance, Integer>> perPartitionServerToReplicaIdMapping = new HashMap<>();
     for (Integer partitionId : partitionIds) {
       for (int replicaId = 0; replicaId < _numReplicas; replicaId++) {
-        List<String> instancesfromReplicaGroup = partitionToReplicaGroupMappingZKMedata.getInstancesfromReplicaGroup(partitionId, replicaId);
-        for (String instanceName : instancesfromReplicaGroup) {
-          if(!perPartitionServer2ReplicaIdMapping.containsKey(partitionId)) {
-            perPartitionServer2ReplicaIdMapping.put(partitionId, new HashMap<ServerInstance, Integer>());
+        List<String> instancesFromReplicaGroup =
+            partitionToReplicaGroupMappingZKMetadata.getInstancesfromReplicaGroup(partitionId, replicaId);
+        for (String instanceName : instancesFromReplicaGroup) {
+          if (!perPartitionServerToReplicaIdMapping.containsKey(partitionId)) {
+            perPartitionServerToReplicaIdMapping.put(partitionId, new HashMap<ServerInstance, Integer>());
           }
-          perPartitionServer2ReplicaIdMapping.get(partitionId).put(ServerInstance.forInstanceName(instanceName), replicaId);
+          perPartitionServerToReplicaIdMapping.get(partitionId)
+              .put(ServerInstance.forInstanceName(instanceName), replicaId);
         }
       }
     }
 
-    // Compute segment id to replica id to server instance
-    Map<SegmentId, Map<Integer, ServerInstance>> segmentId2ServersMapping = new HashMap<>();
-    for (String segment : segmentSet) {
-      SegmentId segmentId = new SegmentId(segment);
-      SegmentZKMetadata segmentZKMetadata = _segment2SegmentZkMetadataMap.get(segmentId);
+    // 3. Compute the final routing look up table
+    Map<SegmentId, Map<Integer, ServerInstance>> segmentIdToServersMapping = new HashMap<>();
+    for (String segmentName : segmentSet) {
+      // Get partition_id from cached segment zk metadata
+      SegmentId segmentId = new SegmentId(segmentName);
+      SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentId);
       int partitionId = getPartitionId(segmentZKMetadata);
-      Map<String, String> instanceToStateMap = new HashMap<>(externalView.getStateMap(segment));
+
+      // Initialize data intermediate data structures or data
+      Map<String, String> instanceToStateMap = new HashMap<>(externalView.getStateMap(segmentName));
       Map<Integer, ServerInstance> serverInstanceMap = new HashMap<>();
       int replicaIdForNoPartitionMetadata = 0;
+
       for (String instance : instanceToStateMap.keySet()) {
         if (pruner.isInactive(instance)) {
           continue;
         }
+        // We are only interested in the servers that are online.
         if (instanceToStateMap.get(instance).equals("ONLINE")) {
-          // If there's no partition number in the metadata, assign replica id to instance sequentially.
+          // If there's no partition number in the metadata, assign replica id sequentially.
           ServerInstance serverInstance = ServerInstance.forInstanceName(instance);
           if (partitionId == NO_PARTITION_NUMBER) {
             serverInstanceMap.put(replicaIdForNoPartitionMetadata, serverInstance);
             replicaIdForNoPartitionMetadata++;
           } else {
-            int replicaId = perPartitionServer2ReplicaIdMapping.get(partitionId).get(serverInstance);
+            int replicaId = perPartitionServerToReplicaIdMapping.get(partitionId).get(serverInstance);
             serverInstanceMap.put(replicaId, serverInstance);
           }
         }
       }
-      segmentId2ServersMapping.put(segmentId, serverInstanceMap);
+      // Update the final routing look up table
+      segmentIdToServersMapping.put(segmentId, serverInstanceMap);
     }
 
     // Delete segment metadata from cache if the segment no longer exists in the external view.
     Set<String> segmentsFromExternalView = new HashSet<>(Arrays.asList(segmentSet));
-    for (SegmentId segmentId : _segment2SegmentZkMetadataMap.keySet()) {
+    for (SegmentId segmentId : _segmentToZkMetadataMapping.keySet()) {
       if (!segmentsFromExternalView.contains(segmentId.getSegmentId())) {
-        _segment2SegmentZkMetadataMap.remove(segmentId);
+        _segmentToZkMetadataMapping.remove(segmentId);
       }
     }
 
-    _mappingRef.set(segmentId2ServersMapping);
-  }
-
-  @Override
-  public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
-    Map<ServerInstance, SegmentIdSet> result = new HashMap<>();
-    Map<SegmentId, Map<Integer, ServerInstance>> mappingReference = _mappingRef.get();
-    SegmentPrunerContext prunerContext = new SegmentPrunerContext(request.getBrokerRequest());
-    int replicaGroupId = _random.nextInt(_numReplicas);
-    for (SegmentId segmentId : mappingReference.keySet()) {
-      // Check if the segment can be pruned
-      SegmentZKMetadata segmentZKMetadata = _segment2SegmentZkMetadataMap.get(segmentId);
-      boolean segmentPruned = _pruner.prune(segmentZKMetadata, prunerContext);
-
-      // If the segment cannot be pruned, we need to pick the server.
-      if (!segmentPruned) {
-        Map<Integer, ServerInstance> replicaId2ServerMapping = mappingReference.get(segmentId);
-        ServerInstance serverInstance = replicaId2ServerMapping.get(replicaGroupId);
-        // pick any other available server instance when the node is down/disabled
-        if (serverInstance == null) {
-          if (!replicaId2ServerMapping.isEmpty()) {
-            serverInstance = replicaId2ServerMapping.values().iterator().next();
-          } else {
-            // No server is found for this segment.
-            continue;
-          }
-        }
-        SegmentIdSet segmentIdSet = result.get(serverInstance);
-        if (segmentIdSet == null) {
-          segmentIdSet = new SegmentIdSet();
-          result.put(serverInstance, segmentIdSet);
-        }
-        segmentIdSet.addSegment(segmentId);
-      }
-    }
-    return result;
+    _mappingReference.set(segmentIdToServersMapping);
   }
 
   /**
-   * Assumes there is only one column
+   * Get partition id from segment Zk metadata. This helper function assumes there is only one column partition metadata.
    *
-   * @param segmentZKMetadata
-   * @return
+   * @param segmentZKMetadata segment zk metadata for a segment
+   * @return partition id
    */
   private int getPartitionId(SegmentZKMetadata segmentZKMetadata) {
     // If we use the partition level replica group assignment, we need to get the partition id by looking at the
@@ -209,10 +199,4 @@ public class PartitionAwareOfflineRoutingTableBuilder extends AbstractRoutingTab
     // If we use the table level replica group assignment, we can simply return the default partition number.
     return TABLE_LEVEL_PARTITION_NUMBER;
   }
-
-  @Override
-  public boolean isPartitionAware() {
-    return true;
-  }
-
 }

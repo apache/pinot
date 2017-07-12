@@ -141,73 +141,13 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
     @Override
     public void init(ExternalView externalView, List<InstanceConfig> instanceConfigList) {
       // 1. Gather all segments and group them by Kafka partition, sorted by sequence number
-      Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition = new HashMap<String, SortedSet<SegmentName>>();
-      for (String helixPartitionName : externalView.getPartitionSet()) {
-        // Ignore segments that are not low level consumer segments
-        if (!SegmentName.isLowLevelConsumerSegmentName(helixPartitionName)) {
-          continue;
-        }
-
-        final LLCSegmentName segmentName = new LLCSegmentName(helixPartitionName);
-        String kafkaPartitionName = segmentName.getPartitionRange();
-        SortedSet<SegmentName> segmentsForPartition = sortedSegmentsByKafkaPartition.get(kafkaPartitionName);
-
-        // Create sorted set if necessary
-        if (segmentsForPartition == null) {
-          segmentsForPartition = new TreeSet<SegmentName>();
-
-          sortedSegmentsByKafkaPartition.put(kafkaPartitionName, segmentsForPartition);
-        }
-
-        segmentsForPartition.add(segmentName);
-      }
+      Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition =
+          KafkaLowLevelRoutingTableBuilderUtil.getSortedSegmentsByKafkaPartition(externalView);
 
       // 2. Ensure that for each Kafka partition, we have at most one Helix partition (Pinot segment) in consuming state
-      Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition = new HashMap<String, SegmentName>();
-      for (String kafkaPartition : sortedSegmentsByKafkaPartition.keySet()) {
-        SortedSet<SegmentName> sortedSegmentsForKafkaPartition = sortedSegmentsByKafkaPartition.get(kafkaPartition);
-        SegmentName lastAllowedSegmentInConsumingState = null;
-
-        for (SegmentName segmentName : sortedSegmentsForKafkaPartition) {
-          Map<String, String> helixPartitionState = externalView.getStateMap(segmentName.getSegmentName());
-          boolean allInConsumingState = true;
-          int replicasInConsumingState = 0;
-
-          // Only keep the segment if all replicas have it in CONSUMING state
-          for (String externalViewState : helixPartitionState.values()) {
-            // Ignore ERROR state
-            if (externalViewState.equalsIgnoreCase(
-                CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ERROR)) {
-              continue;
-            }
-
-            // Not all segments are in CONSUMING state, therefore don't consider the last segment assignable to CONSUMING
-            // replicas
-            if (externalViewState.equalsIgnoreCase(
-                CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
-              allInConsumingState = false;
-              break;
-            }
-
-            // Otherwise count the replica as being in CONSUMING state
-            if (externalViewState.equalsIgnoreCase(
-                CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
-              replicasInConsumingState++;
-            }
-          }
-
-          // If all replicas have this segment in consuming state (and not all of them are in ERROR state), then pick this
-          // segment to be the last allowed segment to be in CONSUMING state
-          if (allInConsumingState && 0 < replicasInConsumingState) {
-            lastAllowedSegmentInConsumingState = segmentName;
-            break;
-          }
-        }
-
-        if (lastAllowedSegmentInConsumingState != null) {
-          allowedSegmentInConsumingStateByKafkaPartition.put(kafkaPartition, lastAllowedSegmentInConsumingState);
-        }
-      }
+      Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition =
+          KafkaLowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
+              sortedSegmentsByKafkaPartition);
 
       // 3. Sort all the segments to be used during assignment in ascending order of replicas
 

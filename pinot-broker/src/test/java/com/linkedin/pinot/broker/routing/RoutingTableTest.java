@@ -15,12 +15,6 @@
  */
 package com.linkedin.pinot.broker.routing;
 
-import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.broker.routing.PercentageBasedRoutingTableSelector;
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.RoutingTableSelector;
-import com.linkedin.pinot.broker.routing.RoutingTableSelectorFactory;
-import com.linkedin.pinot.broker.routing.TableConfigRoutingTableSelector;
 import com.linkedin.pinot.broker.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.RandomRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
@@ -94,7 +88,7 @@ public class RoutingTableTest {
 
     TableConfig testResource1Config = generateTableConfig("testResource1_OFFLINE");
     routingTable.markDataResourceOnline(testResource1Config, externalView1, instanceConfigs);
-    
+
     ExternalView externalView2 = new ExternalView("testResource2_OFFLINE");
     externalView2.setState("segment20", "dataServer_instance_0", "ONLINE");
     externalView2.setState("segment21", "dataServer_instance_0", "ONLINE");
@@ -475,44 +469,12 @@ public class RoutingTableTest {
     }
     return configs;
   }
-  
+
   private TableConfig generateTableConfig(String tableName) throws IOException, JSONException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     Builder builder = new TableConfig.Builder(tableType);
     builder.setTableName(tableName);
     return builder.build();
-  }
-
-
-  class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
-    private Map<String, ZNRecord> _contents = new HashMap<>();
-    private IZkDataListener _listener = null;
-
-    public FakePropertyStore() {
-      super((ZkBaseDataAccessor<ZNRecord>) null, null, null);
-    }
-
-    @Override
-    public ZNRecord get(String path, Stat stat, int options) {
-      return _contents.get(path);
-    }
-
-    @Override
-    public void subscribeDataChanges(String path, IZkDataListener listener) {
-      _listener = listener;
-    }
-
-    public void setContents(String path, ZNRecord contents) throws Exception {
-      _contents.put(path, contents);
-      if (_listener != null) {
-        _listener.handleDataChange(path, contents);
-      }
-    }
-
-    @Override
-    public void start() {
-      // Don't try to connect to zk
-    }
   }
 
   @Test
