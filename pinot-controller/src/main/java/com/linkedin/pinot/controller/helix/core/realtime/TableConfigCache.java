@@ -30,8 +30,10 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
  * Cache for table config.
  */
 public class TableConfigCache {
+
+  // TODO: Make cache size, timeout configurable through controller config.
   private static final long DEFAULT_CACHE_SIZE = 50;
-  private static final long DEFAULT_CACHE_TIMEOUT_IN_MINUTE = 5;
+  private static final long DEFAULT_CACHE_TIMEOUT_IN_MINUTE = 60;
 
   private final LoadingCache<String, TableConfig> _tableConfigCache;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
