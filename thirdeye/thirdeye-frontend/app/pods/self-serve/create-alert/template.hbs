@@ -65,7 +65,7 @@
         options=patternsOfInterest
         searchEnabled=false
         selected=selectedPattern
-        onchange=(action "onSelectPattern")
+        onchange=(action (mut selectedPattern))
         disabled=(not isMetricSelected)
         as |name|
       }}
@@ -77,7 +77,7 @@
       {{#power-select
         options=selectedMetricDimensions
         selected=dimensionSelectorVal
-        onchange=(action "onSelectDimension")
+        onchange=(action (mut dimensionSelectorVal))
         loadingMessage="Waiting for the server...."
         placeholder="Select a Dimension"
         searchPlaceholder="Type to filter..."
@@ -118,7 +118,16 @@
       {{#if isAlertNameDuplicate}}
         <div class="alert alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
       {{/if}}
-      {{input type="text" id="anomaly-form-function-name" class="form-control" placeholder="Add a descriptive alert name" value=alertFunctionName focus-out="validateAlertName" key-up="validateAlertName" disabled=(not isMetricSelected)}}
+      {{input
+        type="text"
+        id="anomaly-form-function-name"
+        class="form-control"
+        placeholder="Add a descriptive alert name"
+        value=alertFunctionName
+        focus-out="validateAlertName"
+        key-up="validateAlertName"
+        disabled=(not isMetricSelected)
+      }}
     </div>
     {{!-- Field: App Name --}}
     <div class="form-group">
@@ -171,25 +180,34 @@
           {{#if isDuplicateEmail}}
           <div class="alert alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>
           {{/if}}
-          {{input type="email" id="config-group-add-recipients" class="form-control" focus-out="validateAlertEmail" key-up="validateAlertEmail" placeholder="Add additional recipients (comma-separated email addresses)" autocomplete=false value=alertGroupNewRecipient disabled=(not isMetricSelected) required=true}}
+          {{input
+            type="email"
+            id="config-group-add-recipients"
+            class="form-control"
+            focus-out="validateAlertEmail"
+            key-up="validateAlertEmail"
+            placeholder="Add additional recipients (comma-separated email addresses)"
+            autocomplete=false
+            value=alertGroupNewRecipient
+            disabled=(not isMetricSelected)
+            required=true
+          }}
         </div>
         {{!-- Alert Group Metadata --}}
         <div class="form-group">
           <label for="config-group-functions" class="control-label">Alerts Monitored by This Group</label>
           <ul class="alert-group-functions">
-          {{#if selectedGroupFunctions}}
-          {{#each selectedGroupFunctions as |function|}}
-            <li class="alert-group-functions__item {{if function.isNewId 'alert-group-functions__item--new'}}">
-              <span class="alert-group-functions__item--value">{{function.name}} </span>
-              <span class="alert-group-functions__item--key">metric/collection: </span>
-              <span class="alert-group-functions__item--value">{{function.metric}} </span>
-              <span class="alert-group-functions__item--key">type: </span>
-              <span class="alert-group-functions__item--value">{{function.type}} </span>
-            </li>
-          {{/each}}
-          {{else}}
-            <span class="alert-group-functions__item--id">NONE</span>
-          {{/if}}
+            {{#each selectedGroupFunctions as |function|}}
+              <li class="alert-group-functions__item {{if function.isNewId 'alert-group-functions__item--new'}}">
+                <span class="alert-group-functions__item--value">{{function.name}} </span>
+                <span class="alert-group-functions__item--key">metric/collection: </span>
+                <span class="alert-group-functions__item--value">{{function.metric}} </span>
+                <span class="alert-group-functions__item--key">type: </span>
+                <span class="alert-group-functions__item--value">{{function.type}} </span>
+              </li>
+            {{else}}
+              <span class="alert-group-functions__item--id">NONE</span>
+            {{/each}}
           </ul>
         </div>
       {{/if}}
@@ -197,11 +215,25 @@
     {{!--  Fields for new alert group creation --}}
       <div class="form-group">
         <label for="config-group-new-name" class="control-label">Subscription Group Name</label>
-        {{input type="text" id="config-group-new-name" class="form-control" placeholder="Group Name" value=selectedConfigGroup.name disabled=(not isMetricSelected)}}
+        {{input
+          type="text"
+          id="config-group-new-name"
+          class="form-control"
+          placeholder="Group Name"
+          value=selectedConfigGroup.name
+          disabled=(not isMetricSelected)
+        }}
       </div>
       <div class="form-group">
         <label for="config-group-new-recipients" class="control-label">Recipient(s) to Add</label>
-        {{input type="text" id="config-group-new-recipients" class="form-control" placeholder="Emails, comma-separated" value=alertGroupNewRecipient disabled=(not isMetricSelected)}}
+        {{input
+          type="text"
+          id="config-group-new-recipients"
+          class="form-control"
+          placeholder="Emails, comma-separated"
+          value=alertGroupNewRecipient
+          disabled=(not isMetricSelected)
+        }}
       </div>
     {{/if}}
   </fieldset>
@@ -219,8 +251,21 @@
   {{/if}}
 
   <fieldset class="te-form__section-submit">
-    {{bs-button defaultText="Clear All" type="outline-primary" buttonType="cancel" onClick=(action "clearAll") class="te-submit-button"}}
-    {{bs-button defaultText="Create & Activate Alert" type="primary" onClick=(action "onSubmit") buttonType="submit" disabled=isSubmitDisabled class="te-submit-button"}}
+    {{bs-button
+      defaultText="Clear All"
+      type="outline-primary"
+      buttonType="cancel"
+      onClick=(action "clearAll")
+      class="te-submit-button"
+    }}
+    {{bs-button
+      defaultText="Create & Activate Alert"
+      type="primary"
+      onClick=(action "onSubmit")
+      buttonType="submit"
+      disabled=isSubmitDisabled
+      class="te-submit-button"
+    }}
   </fieldset>
 
   {{outlet}}

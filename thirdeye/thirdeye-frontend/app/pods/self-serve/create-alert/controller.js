@@ -253,11 +253,8 @@ export default Ember.Controller.extend({
       day: `/replay/function/${newFuncId}?start=${startTime}&end=${endTime}&goal=1.0&evalMethod=F1_SCORE&includeOriginal=false&tune=\{"pValueThreshold":\[0.001,0.005,0.01,0.05\]\}`,
       reports: `/thirdeye/email/generate/metrics/${startStamp}/${endStamp}?metrics=${functionObj.metric}&subject=Your%20Metric%20Has%20Onboarded%20To%20Thirdeye&from=thirdeye-noreply@linkedin.com&to=${groupObj.recipients}&smtpHost=email.corp.linkedin.com&smtpPort=25&includeSentAnomaliesOnly=true&isApplyFilter=true`
     };
-    let gkey = '';
-
-    if (granularity.includes('minute')) { gkey = 'minute'; }
-    if (granularity.includes('hour')) { gkey = 'hour'; }
-    if (granularity.includes('day')) { gkey = 'day'; }
+    const allowedGranularity = ['minute', 'hour', 'day'];
+    const gkey = allowedGranularity.includes(granularity) ? granularity : '';
 
     return new Ember.RSVP.Promise((resolve) => {
       fetch(replayApi.base + replayApi[gkey], postProps).then(res => resolve(res.json()));
@@ -310,15 +307,13 @@ export default Ember.Controller.extend({
     'selectedConfigGroup',
     'alertGroupNewRecipient',
     function() {
-      let preventSubmit = false;
       const requiredFields = this.get('requiredFields');
-
       for (var field of requiredFields) {
         if (Ember.isNone(this.get(field))) {
-          preventSubmit = true;
+          return true;
         }
       }
-      return preventSubmit;
+      return false;
     }
   ),
 
@@ -338,7 +333,7 @@ export default Ember.Controller.extend({
       const settingsByGranularity = {
         common: {
           functionName: this.get('alertFunctionName'),
-          metric: this.get('selectedMetricOption').name,
+          metric: this.get('selectedMetricOption'),
           dataset: this.get('selectedMetricOption').dataset,
           metricFunction: 'SUM',
           isActive: true
@@ -388,7 +383,7 @@ export default Ember.Controller.extend({
     'selectedApplication',
     function() {
       const appName = this.get('selectedApplication');
-      const activeGroups = this.get('allAlertsConfigGroups').filter(group => group.active);
+      const activeGroups = this.get('allAlertsConfigGroups').filterBy('active');
       const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
 
       if (Ember.isPresent(appName)) {
@@ -434,26 +429,6 @@ export default Ember.Controller.extend({
         this.set('selectedMetric', metricData);
         this.set('loading', false);
       });
-    },
-
-    /**
-     * Set our selected dimension
-     * @method onSelectDimension
-     * @param {Object} selectedObj - The selected dimension option
-     * @return {undefined}
-     */
-    onSelectDimension(selectedObj) {
-      this.set('dimensionSelectorVal', selectedObj);
-    },
-
-    /**
-     * Set our selected pattern
-     * @method onSelectPattern
-     * @param {Object} selectedObj - The selected pattern option
-     * @return {undefined}
-     */
-    onSelectPattern(selectedObj) {
-      this.set('selectedPattern', selectedObj);
     },
 
     /**
@@ -561,18 +536,20 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     clearAll() {
-      this.set('isMetricSelected', false);
-      this.set('selectedMetricOption', null);
-      this.set('selectedPattern', null);
-      this.set('dimensionSelectorVal', null);
-      this.set('alertFunctionName', null);
-      this.set('selectedAppName', null);
-      this.set('selectedConfigGroup', null);
-      this.set('alertGroupNewRecipient', null);
-      this.set('showAlertGroupEdit', false);
-      this.set('isCreateSuccess', false);
-      this.set('isCreateError', false);
-      this.set('filterPropNames', JSON.stringify({}));
+      this.setProperties({
+       isMetricSelected: false,
+       selectedMetricOption: null,
+       selectedPattern: null,
+       dimensionSelectorVal: null,
+       alertFunctionName: null,
+       selectedAppName: null,
+       selectedConfigGroup: null,
+       alertGroupNewRecipient: null,
+       showAlertGroupEdit: null,
+       isCreateSuccess: null,
+       isCreateError: null,
+       filterPropNames: JSON.stringify({})
+      })
     },
 
     /**
@@ -624,7 +601,7 @@ export default Ember.Controller.extend({
         }
 
         // Proceed only if function creation succeeds and returns an ID
-        if (Ember.typeOf(functionResult) === 'number') {
+        if (Ember.typeOf(newFunctionId) === 'number') {
           // Add our new Alert Function Id to the Alert Config Object
           finalConfigObj.emailConfig.functionIds.push(newFunctionId);
           // Finally, save our Alert Config Group
@@ -632,7 +609,7 @@ export default Ember.Controller.extend({
             if (alertResult.ok) {
               this.set('selectedGroupRecipients', finalConfigObj.recipients);
               this.set('isCreateSuccess', true);
-              this.set('finalFunctionId', functionResult);
+              this.set('finalFunctionId', newFunctionId);
               this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
                 this.set('selectedGroupFunctions', functionData);
               });
