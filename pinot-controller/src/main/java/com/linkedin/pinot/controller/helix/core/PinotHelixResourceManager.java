@@ -404,11 +404,13 @@ public class PinotHelixResourceManager {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     List<String> segmentNames = new ArrayList<>();
     if (tableType == TableType.OFFLINE) {
-      for (OfflineSegmentZKMetadata segmentZKMetadata : getOfflineSegmentMetadata(tableNameWithType)) {
+      for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(
+          _propertyStore, tableNameWithType)) {
         segmentNames.add(segmentZKMetadata.getSegmentName());
       }
     } else {
-      for (RealtimeSegmentZKMetadata segmentZKMetadata : getRealtimeSegmentMetadata(tableNameWithType)) {
+      for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(
+          _propertyStore, tableNameWithType)) {
         segmentNames.add(segmentZKMetadata.getSegmentName());
       }
     }

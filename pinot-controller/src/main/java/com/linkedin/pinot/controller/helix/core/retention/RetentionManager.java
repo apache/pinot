@@ -352,7 +352,7 @@ public class RetentionManager {
         }
         break;
       case REALTIME:
-        List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas =_pinotHelixResourceManager.getRealtimeSegmentMetadata(
+        List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = _pinotHelixResourceManager.getRealtimeSegmentMetadata(
             tableNameWithType);
         for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
           segmentMetadataList.add(realtimeSegmentZKMetadata);
