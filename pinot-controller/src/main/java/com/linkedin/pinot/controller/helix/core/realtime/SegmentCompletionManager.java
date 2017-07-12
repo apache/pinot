@@ -186,7 +186,7 @@ public class SegmentCompletionManager {
    * Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
    * incoming segment).
    */
-  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams) {
+  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams, boolean isSplitCommit) {
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }

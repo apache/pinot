@@ -157,7 +157,7 @@ public class LLCSegmentCommitTest {
     }
 
     @Override
-    public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params reqParams, boolean isSplitCommit) {
+    public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params reqParams) {
       commitStartCalled = true;
       return commitStartResponse;
     }
