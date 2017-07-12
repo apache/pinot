@@ -95,6 +95,19 @@ public class AnomalyReportGenerator {
     return anomalies;
   }
 
+  public List<MergedAnomalyResultDTO> getAnomaliesForFunctions(List<Long> functions, long startTime,
+      long endTime) {
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    LOG.info("fetching anomalies for functions : " + functions);
+    for (long function : functions) {
+      List<MergedAnomalyResultDTO> results = anomalyResultManager.
+          findByStartTimeInRangeAndFunctionId(startTime, endTime, function, false);
+      LOG.info("Found {} result for function {}", results.size(), function);
+      anomalies.addAll(results);
+    }
+    return anomalies;
+  }
+
   public void buildReport(List<MergedAnomalyResultDTO> anomalies,
       ThirdEyeAnomalyConfiguration configuration, AlertConfigDTO alertConfig) {
     buildReport(null, null, anomalies, configuration, alertConfig.getRecipients(), alertConfig.getFromAddress(),
