@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import java.io.IOException;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -26,24 +30,15 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.io.IOException;
-import java.util.List;
 import javax.inject.Inject;
-import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.glassfish.jersey.media.multipart.FormDataParam;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.SCHEMA_TAG)
 @Path("/")
@@ -81,6 +76,7 @@ public class PinotSchemaRestletResource {
     return schema;
   }
 
+  /*
   @POST
   @Path("/schemas")
   @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -112,6 +108,7 @@ public class PinotSchemaRestletResource {
   ) {
     return addOrUpdateSchema(schemaStr, schemaName);
   }
+  */
 
   @DELETE
   @Path("/schemas/{schemaName}")
