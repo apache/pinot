@@ -84,6 +84,10 @@ public class SegmentCompletionManager {
     _controllerConf = controllerConf;
   }
 
+  public boolean shouldAcceptSplitCommit() {
+    return _controllerConf.getAcceptSplitCommit();
+  }
+
   public static SegmentCompletionManager create(HelixManager helixManager,
       PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -124,13 +128,12 @@ public class SegmentCompletionManager {
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
           // multiple instances of the FSM to be created for the same commit sequence at the same time.
           final long endOffset = segmentMetadata.getEndOffset();
-          fsm = SegmentCompletionFSM.fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(), endOffset, _controllerConf.getAcceptSplitCommit());
+          fsm = SegmentCompletionFSM.fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(), endOffset);
         } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
-          fsm = SegmentCompletionFSM.fsmStoppedConsuming(_segmentManager, this, segmentName,
-              segmentMetadata.getNumReplicas(), _controllerConf.getAcceptSplitCommit());
+          fsm = SegmentCompletionFSM.fsmStoppedConsuming(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
         } else {
           // Segment is in the process of completing, and this is the first one to respond. Create fsm
-          fsm = SegmentCompletionFSM.fsmInHolding(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(), _controllerConf.getAcceptSplitCommit());
+          fsm = SegmentCompletionFSM.fsmInHolding(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
         }
         LOGGER.info("Created FSM {}", fsm);
         _fsmMap.put(segmentNameStr, fsm);
@@ -183,7 +186,7 @@ public class SegmentCompletionManager {
    * Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
    * incoming segment).
    */
-  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams, boolean isSplitCommit) {
+  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams) {
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -350,23 +353,23 @@ public class SegmentCompletionManager {
     private long _maxTimeAllowedToCommitMs;
     private boolean _isSplitCommit;
 
-    public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas, boolean isSplitCommit) {
-      return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas, isSplitCommit);
+    public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
+      return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
     }
 
-    public static SegmentCompletionFSM fsmInCommit(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas, long winningOffset, boolean isSplitCommit) {
-      return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas, winningOffset, isSplitCommit);
+    public static SegmentCompletionFSM fsmInCommit(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas, long winningOffset) {
+      return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas, winningOffset);
     }
 
-    public static SegmentCompletionFSM fsmStoppedConsuming(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas, boolean isSplitCommit) {
-      SegmentCompletionFSM fsm = new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas, isSplitCommit);
+    public static SegmentCompletionFSM fsmStoppedConsuming(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
+      SegmentCompletionFSM fsm = new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
       fsm._state = State.PARTIAL_CONSUMING;
       return fsm;
     }
 
     // Ctor that starts the FSM in HOLDING state
     private SegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
-        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas, boolean isSplitCommit) {
+        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
       _segmentName = segmentName;
       _numReplicas = numReplicas;
       _segmentManager = segmentManager;
@@ -392,19 +395,17 @@ public class SegmentCompletionManager {
       }
       _initialCommitTimeMs = initialCommitTimeMs;
       _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
-      _isSplitCommit = isSplitCommit;
+      _isSplitCommit = segmentCompletionManager.shouldAcceptSplitCommit();
     }
 
     // Ctor that starts the FSM in COMMITTED state
     private SegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
-        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
-        long winningOffset, boolean isSplitCommit) {
+        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas, long winningOffset) {
       // Constructor used when we get an event after a segment is committed.
-      this(segmentManager, segmentCompletionManager, segmentName, numReplicas, isSplitCommit);
+      this(segmentManager, segmentCompletionManager, segmentName, numReplicas);
       _state = State.COMMITTED;
       _winningOffset = winningOffset;
       _winner = "UNKNOWN";
-      _isSplitCommit = isSplitCommit;
     }
 
     @Override
@@ -459,7 +460,7 @@ public class SegmentCompletionManager {
 
           case ABORTED:
             // FSM has been aborted, just return HOLD
-            return hold(instanceId, offset, _isSplitCommit);
+            return hold(instanceId, offset);
 
           default:
             return fail(instanceId, offset);
@@ -508,7 +509,7 @@ public class SegmentCompletionManager {
             return COMMITTED__commit(instanceId, offset);
 
           case ABORTED:
-            return hold(instanceId, offset, _isSplitCommit);
+            return hold(instanceId, offset);
 
           default:
             return fail(instanceId, offset);
@@ -611,11 +612,11 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    private SegmentCompletionProtocol.Response commit(String instanceId, long offset, boolean isSplitCommit) {
+    private SegmentCompletionProtocol.Response commit(String instanceId, long offset) {
       long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs)/1000;
       LOGGER.info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
-          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withSplitCommit(isSplitCommit));
+          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withSplitCommit(_isSplitCommit));
     }
 
     private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {
@@ -635,17 +636,17 @@ public class SegmentCompletionManager {
           _winningOffset).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP));
     }
 
-    private SegmentCompletionProtocol.Response hold(String instanceId, long offset, boolean isSplitCommit) {
+    private SegmentCompletionProtocol.Response hold(String instanceId, long offset) {
       LOGGER.info("{}:HOLD for instance={} offset={}", _state, instanceId, offset);
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withStatus(
-          SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(offset).withSplitCommit(isSplitCommit));
+          SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(offset));
     }
 
     private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId, long offset) {
       _state = State.ABORTED;
       _segmentCompletionManager._controllerMetrics.addMeteredTableValue(_segmentName.getTableName(),
           ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
-      return hold(instanceId, offset, false);
+      return hold(instanceId, offset);
     }
 
     private SegmentCompletionProtocol.Response abortAndReturnFailed() {
@@ -712,7 +713,7 @@ public class SegmentCompletionManager {
       if (isWinnerPicked(instanceId, now, stopReason)) {
         if (_winner.equals(instanceId)) {
           LOGGER.info("{}:Committer notified winner instance={} offset={}", _state, instanceId, offset);
-          response = commit(instanceId, offset, _isSplitCommit);
+          response = commit(instanceId, offset);
           _state = State.COMMITTER_NOTIFIED;
         } else {
           LOGGER.info("{}:Committer decided winner={} offset={}", _state, _winner, _winningOffset);
@@ -720,7 +721,7 @@ public class SegmentCompletionManager {
           _state = State.COMMITTER_DECIDED;
         }
       } else {
-        response = hold(instanceId, offset, _isSplitCommit);
+        response = hold(instanceId, offset);
       }
       return response;
     }
@@ -753,7 +754,7 @@ public class SegmentCompletionManager {
       if (_winner.equals(instanceId)) {
         if (_winningOffset == offset) {
           LOGGER.info("{}:Notifying winner instance={} offset={}", _state, instanceId, offset);
-          response = commit(instanceId, offset, _isSplitCommit);
+          response = commit(instanceId, offset);
           _state = State.COMMITTER_NOTIFIED;
         } else {
           // Winner coming back with a different offset.
@@ -763,7 +764,7 @@ public class SegmentCompletionManager {
         }
       } else  if (offset == _winningOffset) {
         // Wait until winner has posted the segment.
-        response = hold(instanceId, offset, _isSplitCommit);
+        response = hold(instanceId, offset);
       } else {
         response = catchup(instanceId, offset);
       }
@@ -807,7 +808,7 @@ public class SegmentCompletionManager {
         // Winner is coming back to after holding. Somehow they never heard us return COMMIT.
         // Allow them to be winner again, since we are still within time to pick a winner.
         if (offset == _winningOffset) {
-          response = commit(instanceId, offset, _isSplitCommit);
+          response = commit(instanceId, offset);
         } else {
           // Something seriously wrong. Abort the FSM
           response = discard(instanceId, offset);
@@ -818,13 +819,13 @@ public class SegmentCompletionManager {
         // Common case: A different instance is reporting.
         if (offset == _winningOffset) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
-          response = hold(instanceId, offset, _isSplitCommit);
+          response = hold(instanceId, offset);
         } else if (offset < _winningOffset) {
           response = catchup(instanceId, offset);
         } else {
           // We have not yet committed, so ask the new responder to hold. They may be the new leader in case the
           // committer fails.
-          response = hold(instanceId, offset, _isSplitCommit);
+          response = hold(instanceId, offset);
         }
       }
       return response;
@@ -953,13 +954,13 @@ public class SegmentCompletionManager {
         // Common case: A different instance is reporting.
         if (offset == _winningOffset) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
-          response = hold(instanceId, offset, _isSplitCommit);
+          response = hold(instanceId, offset);
         } else if (offset < _winningOffset) {
           response = catchup(instanceId, offset);
         } else {
           // We have not yet committed, so ask the new responder to hold. They may be the new leader in case the
           // committer fails.
-          response = hold(instanceId, offset, _isSplitCommit);
+          response = hold(instanceId, offset);
         }
       }
       return response;
@@ -1027,7 +1028,7 @@ public class SegmentCompletionManager {
       }
       // We cannot get a commit if we are in this state, so ask them to hold. Maybe we are starting after a failover.
       // The server will re-send the segmentConsumed message.
-      return hold(instanceId, offset, _isSplitCommit);
+      return hold(instanceId, offset);
     }
 
     /**
