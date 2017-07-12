@@ -434,7 +434,7 @@ public class PinotHelixResourceManager {
     if (tableType == TableType.REALTIME) {
       return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_propertyStore, tableNameWithType);
     }
-    throw new RuntimeException("Cannot get offline metadata for table " + tableNameWithType);
+    throw new RuntimeException("Cannot get realtime metadata for table " + tableNameWithType);
   }
 
   /**
