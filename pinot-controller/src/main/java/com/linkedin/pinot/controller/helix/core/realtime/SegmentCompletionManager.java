@@ -88,6 +88,10 @@ public class SegmentCompletionManager {
     return _controllerConf.getAcceptSplitCommit();
   }
 
+  public String getControllerVipUrl() {
+    return _controllerConf.generateVipUrl();
+  }
+
   public static SegmentCompletionManager create(HelixManager helixManager,
       PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -186,7 +190,7 @@ public class SegmentCompletionManager {
    * Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
    * incoming segment).
    */
-  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams, boolean isSplitCommit) {
+  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams) {
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -352,6 +356,7 @@ public class SegmentCompletionManager {
     // We may need to add some time for the committer come back to us (after the build)? For now 0.
     private long _maxTimeAllowedToCommitMs;
     private boolean _isSplitCommit;
+    private String _controllerVipUrl;
 
     public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
       return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
@@ -396,6 +401,7 @@ public class SegmentCompletionManager {
       _initialCommitTimeMs = initialCommitTimeMs;
       _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
       _isSplitCommit = segmentCompletionManager.shouldAcceptSplitCommit();
+      _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
     }
 
     // Ctor that starts the FSM in COMMITTED state
@@ -410,7 +416,7 @@ public class SegmentCompletionManager {
 
     @Override
     public String toString() {
-      return "{" + _segmentName.getSegmentName() + "," + _state + "," + _startTimeMs + "," + _winner + "," + _winningOffset + "}";
+      return "{" + _segmentName.getSegmentName() + "," + _state + "," + _startTimeMs + "," + _winner + "," + _winningOffset + "," + _isSplitCommit + "," + _controllerVipUrl + "}";
     }
 
     // SegmentCompletionManager releases the FSM from the hashtable when it is done.
@@ -616,7 +622,8 @@ public class SegmentCompletionManager {
       long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs)/1000;
       LOGGER.info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
-          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withSplitCommit(_isSplitCommit));
+          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+          .withSplitCommit(_isSplitCommit).withControllerVipUrl(_controllerVipUrl));
     }
 
     private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {
@@ -638,8 +645,8 @@ public class SegmentCompletionManager {
 
     private SegmentCompletionProtocol.Response hold(String instanceId, long offset) {
       LOGGER.info("{}:HOLD for instance={} offset={}", _state, instanceId, offset);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withStatus(
-          SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(offset));
+      return new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(offset));
     }
 
     private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId, long offset) {

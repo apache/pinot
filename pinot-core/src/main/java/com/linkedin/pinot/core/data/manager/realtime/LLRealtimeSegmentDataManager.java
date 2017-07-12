@@ -628,17 +628,17 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   protected SegmentCompletionProtocol.Response doSplitCommit(File segmentTarFile, SegmentCompletionProtocol.Response response) {
     SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_currentOffset, _segmentNameStr);
-    if(!segmentCommitStartResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+    if (!segmentCommitStartResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
-    SegmentCompletionProtocol.Response segmentCommitUploadResponse = _protocolHandler.segmentCommitUpload(_currentOffset, _segmentNameStr, segmentTarFile,
-        response.getSegmentLocation());
+
+    SegmentCompletionProtocol.Response segmentCommitUploadResponse = _protocolHandler.segmentCommitUpload(
+        _currentOffset, _segmentNameStr, segmentTarFile, response.getSegmentLocation(), response.getControllerVipUrl());
     if (!segmentCommitUploadResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    SegmentCompletionProtocol.Response segmentCommitEndResponse = _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentTarFile, segmentCommitUploadResponse.getSegmentLocation());
-    return segmentCommitEndResponse;
+    return  _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
   }
 
   protected boolean commitSegment(final String segTarFileName, SegmentCompletionProtocol.Response response) {

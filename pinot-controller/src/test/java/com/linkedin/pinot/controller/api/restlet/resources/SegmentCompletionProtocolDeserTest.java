@@ -36,6 +36,7 @@ public class SegmentCompletionProtocolDeserTest {
   private final int EXTRA_TIME_SEC = 5;
   private final String SEGMENT_NAME = "name";
   private final long WAIT_TIME_MILLIS = 123;
+  private final String CONTROLLER_VIP_URL = "http://localhost:8998";
 
   @Test
   public void testSerializeAllRequestParams() throws MalformedURLException {
@@ -46,7 +47,7 @@ public class SegmentCompletionProtocolDeserTest {
             .withExtraTimeSec(EXTRA_TIME_SEC).withSegmentName(SEGMENT_NAME).withWaitTimeMillis(WAIT_TIME_MILLIS);
 
     SegmentCompletionProtocol.SegmentCommitRequest segmentCommitRequest = new SegmentCompletionProtocol.SegmentCommitRequest(reqParams);
-    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT));
+    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT, "http"));
 
     Reference reference = new Reference(url);
     SegmentCompletionProtocol.Request.Params params = SegmentCompletionUtils.extractParams(reference);
@@ -75,7 +76,7 @@ public class SegmentCompletionProtocolDeserTest {
         .withWaitTimeMillis(WAIT_TIME_MILLIS);
 
     SegmentCompletionProtocol.SegmentCommitRequest segmentCommitRequest = new SegmentCompletionProtocol.SegmentCommitRequest(reqParams);
-    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT));
+    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT, "http"));
 
     Reference reference = new Reference(url);
     SegmentCompletionProtocol.Request.Params params = SegmentCompletionUtils.extractParams(reference);
@@ -99,7 +100,7 @@ public class SegmentCompletionProtocolDeserTest {
         .withSegmentName(SEGMENT_NAME);
 
     SegmentCompletionProtocol.SegmentCommitRequest segmentCommitRequest = new SegmentCompletionProtocol.SegmentCommitRequest(reqParams);
-    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT));
+    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT, "http"));
 
     Reference reference = new Reference(url);
     SegmentCompletionProtocol.Request.Params params = SegmentCompletionUtils.extractParams(reference);
@@ -156,7 +157,7 @@ public class SegmentCompletionProtocolDeserTest {
         .withOffset(OFFSET)
         .withSegmentLocation(SEGMENT_LOCATION)
         .withSplitCommit(true)
-        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+        .withControllerVipUrl(CONTROLLER_VIP_URL).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
 
@@ -166,5 +167,6 @@ public class SegmentCompletionProtocolDeserTest {
     Assert.assertEquals(jsonObject.get("segmentLocation"), SEGMENT_LOCATION);
     Assert.assertEquals(jsonObject.get("isSplitCommitType"), true);
     Assert.assertEquals(jsonObject.get("status"), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT.toString());
+    Assert.assertEquals(jsonObject.get("controllerVipUrl"), CONTROLLER_VIP_URL);
   }
 }

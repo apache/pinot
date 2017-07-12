@@ -87,15 +87,15 @@ public class ServerSegmentCompletionProtocolHandler {
     return doHttp(request, null);
   }
 
-  public SegmentCompletionProtocol.Response segmentCommitUpload(long offset, final String segmentName, final File segmentTarFile, final String segmentLocation) {
+  public SegmentCompletionProtocol.Response segmentCommitUpload(long offset, final String segmentName, final File segmentTarFile, final String segmentLocation, final String controllerVipUrl) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName).withSegmentLocation(segmentLocation);
     SegmentCompletionProtocol.SegmentCommitUploadRequest request = new SegmentCompletionProtocol.SegmentCommitUploadRequest(params);
 
-    return doHttp(request, createFileParts(segmentName, segmentTarFile));
+    return doHttp(request, createFileParts(segmentName, segmentTarFile), controllerVipUrl);
   }
 
-  public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, final File segmentTarFile, String segmentLocation) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, String segmentLocation) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName).withSegmentLocation(segmentLocation);
     SegmentCompletionProtocol.SegmentCommitEndRequest request = new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
@@ -129,16 +129,21 @@ public class ServerSegmentCompletionProtocolHandler {
     return doHttp(request, null);
   }
 
-  private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts) {
+  private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts, String uploadHost) {
+    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_NOT_SENT;
     HttpClient httpClient = new HttpClient();
-    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
-    final String leaderAddress = leaderLocator.getControllerLeader();
-    if (leaderAddress == null) {
-      LOGGER.warn("No leader found {}", this.toString());
-      return SegmentCompletionProtocol.RESP_NOT_LEADER;
+
+    String hostPort = uploadHost;
+    String protocol = "http";
+    if (uploadHost.contains(protocol)) {
+      String[] protocolHost = uploadHost.split("://");
+      protocol = protocolHost[0];
+      hostPort = protocolHost[1];
     }
-    final String url = request.getUrl(leaderAddress);
+
+    final String url;
+    url = request.getUrl(hostPort, protocol);
     HttpMethodBase method;
     if (parts != null) {
       PostMethod postMethod = new PostMethod(url);
@@ -166,5 +171,16 @@ public class ServerSegmentCompletionProtocolHandler {
       leaderLocator.refreshControllerLeader();
       return response;
     }
+  }
+
+  private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts) {
+    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
+    final String leaderAddress = leaderLocator.getControllerLeader();
+    if (leaderAddress == null) {
+      LOGGER.warn("No leader found {}", this.toString());
+      return SegmentCompletionProtocol.RESP_NOT_LEADER;
+    }
+
+    return doHttp(request, parts, leaderAddress);
   }
 }
