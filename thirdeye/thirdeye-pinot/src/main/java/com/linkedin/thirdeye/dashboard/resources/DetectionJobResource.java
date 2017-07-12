@@ -218,17 +218,110 @@ public class DetectionJobResource {
    * Regenerates anomalies for each window separately
    *
    * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
-   * @param ids a string containing multiple anomaly function ids, separated by comma (e.g. f1,f2,f3)
+   * @param id an anomaly function id
    * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
    * @param endTimeIso The start time of the monitoring window (in ISO Format)
    * @param isForceBackfill false to resume backfill from the latest left off
-   * @param speedup whether this backfill should speedup with 7-day window
+   * @param speedup
+   *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
+   *      WoW-based algorithm, or Seasonal Data Model.
    * @return HTTP response of this request
    * @throws Exception
    */
   @POST
-  @Path("/{ids}/replay")
-  public Response generateAnomaliesInRange(@PathParam("ids") @NotNull String ids,
+  @Path("/{id}/replay")
+  public Response generateAnomaliesInRange(@PathParam("id") @NotNull final long id,
+      @QueryParam("start") @NotNull String startTimeIso,
+      @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("force") @DefaultValue("false") String isForceBackfill,
+      @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
+    final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(Long.valueOf(id));
+    if (anomalyFunction == null){
+      LOG.warn("[Backfill] Unable to load function id {}", id);
+      throw new IllegalArgumentException(String.format("[Backfill] Unable to load function id %d", id));
+    }
+    // Check if the anomaly function is active
+    if (!anomalyFunction.getIsActive()) {
+      LOG.warn("[Backfill] Skipping deactivated function id {}", id);
+      throw new IllegalArgumentException(String.format("[Backfill] Skipping deactivated function %d", id));
+    }
+
+    // Check if the timestamps are available
+    DateTime startTime = null;
+    DateTime endTime = null;
+    if (startTimeIso == null || startTimeIso.isEmpty()) {
+      LOG.error("[Backfill] Monitoring start time is not found");
+      throw new IllegalArgumentException(String.format("[Backfill] Monitoring start time is not found"));
+    }
+    if (endTimeIso == null || endTimeIso.isEmpty()) {
+      LOG.error("[Backfill] Monitoring end time is not found");
+      throw new IllegalArgumentException(String.format("[Backfill] Monitoring end time is not found"));
+    }
+
+    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+
+    if (startTime.isAfter(endTime)) {
+      LOG.error("[Backfill] Monitoring start time is after monitoring end time");
+      throw new IllegalArgumentException(String.format(
+          "[Backfill] Monitoring start time is after monitoring end time"));
+    }
+    if (endTime.isAfterNow()) {
+      endTime = DateTime.now();
+      LOG.warn("[Backfill] End time is in the future. Force to now.");
+    }
+
+    final DateTime innerStartTime = startTime;
+    final DateTime innerEndTime = endTime;
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        List<Long> functionIdList = new ArrayList<>();
+        functionIdList.add(id);
+        Map<Long, Integer> originalWindowSize = new HashMap<>();
+        Map<Long, TimeUnit> originalWindowUnit = new HashMap<>();
+        Map<Long, String> originalCron = new HashMap<>();
+        saveFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
+
+        // Update speed-up window and cron
+        if (speedup) {
+          for (long functionId : functionIdList) {
+            anomalyFunctionSpeedup(functionId);
+          }
+        }
+        // Run backfill
+        detectionJobScheduler.synchronousBackFill(functionIdList, innerStartTime, innerEndTime, forceBackfill);
+
+        // Revert window setup
+        revertFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
+      }
+    }).run();
+
+    return Response.ok().build();
+  }
+
+  /**
+   * Breaks down the given range into consecutive monitoring windows as per function definition
+   * Regenerates anomalies for each window separately
+   *
+   * Different from the previous replay function, this replay function takes multiple function ids, and is able to send
+   * out alerts to user once the replay is done.
+   *
+   * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
+   * @param ids a string containing multiple anomaly function ids, separated by comma (e.g. f1,f2,f3)
+   * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso The start time of the monitoring window (in ISO Format)
+   * @param isForceBackfill false to resume backfill from the latest left off
+   * @param speedup
+   *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
+   *      WoW-based algorithm, or Seasonal Data Model.
+   * @return HTTP response of this request
+   * @throws Exception
+   */
+  @POST
+  @Path("/replay")
+  public Response generateAnomaliesInRangeForFunctions(@QueryParam("ids") @NotNull String ids,
       @QueryParam("start") @NotNull String startTimeIso,
       @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
@@ -240,11 +333,10 @@ public class DetectionJobResource {
       if (anomalyFunction != null && anomalyFunction.getIsActive()) {
         functionIdList.add(Long.valueOf(functionId));
       } else {
-        // Check if the anomaly function is active
-        if (!anomalyFunction.getIsActive()) {
-          throw new IllegalArgumentException(String.format("Skipping deactivated function %s", functionId));
-        } else {
-          LOG.warn("Unable to load function id {}", functionId);
+        if (anomalyFunction == null) {
+          LOG.warn("[Backfill] Unable to load function id {}", functionId);
+        } else { // the anomaly function is deactivated
+          LOG.warn(String.format("[Backfill] Skipping deactivated function %s", functionId));
         }
       }
     }
@@ -290,11 +382,7 @@ public class DetectionJobResource {
         // Update speed-up window and cron
         if (speedup) {
           for (long functionId : functionIdList) {
-            AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-            anomalyFunction.setWindowSize(170);
-            anomalyFunction.setWindowUnit(TimeUnit.HOURS);
-            anomalyFunction.setCron("0 0 0 ? * MON *");
-            anomalyFunctionDAO.update(anomalyFunction);
+            anomalyFunctionSpeedup(functionId);
           }
         }
         // Run backfill
@@ -308,6 +396,24 @@ public class DetectionJobResource {
     }).run();
 
     return Response.ok().build();
+  }
+
+  /**
+   * Under current infrastructure, we are not able to determine whether and how we accelerate the backfill.
+   * Currently, the requirement for speedup is to increase the window up to 1 week.
+   * For WoW-based models, if we enlarge the window to 7 days, it can significantly increase the backfill speed.
+   * Now, the hard-coded code is a contemporary solution to this problem. It can be fixed under new infra.
+   *
+   * TODO Data model provide information on how the function can speed up, and user determines if they wnat to speed up
+   * TODO the replay
+   * @param functionId
+   */
+  private void anomalyFunctionSpeedup (long functionId) {
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    anomalyFunction.setWindowSize(170);
+    anomalyFunction.setWindowUnit(TimeUnit.HOURS);
+    anomalyFunction.setCron("0 0 0 ? * MON *");
+    anomalyFunctionDAO.update(anomalyFunction);
   }
 
   private void saveFunctionWindow(List<Long> functionIdList, Map<Long, Integer> windowSize,
