@@ -65,7 +65,6 @@ public class ControllerRequestBuilderUtil {
       } else {
         helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, UNTAGGED_BROKER_INSTANCE);
       }
-      Thread.sleep(1000);
     }
   }
 
