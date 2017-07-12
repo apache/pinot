@@ -491,6 +491,23 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return this.map(new DoubleMapZScore(this.mean().value(), this.std().value()));
   }
 
+  /**
+   * Returns a copy of the series with values rounded towards the nearest {@code nDecimals}-th decimal.
+   * <br/><b>NOTE:</b> a negative number for {@code nDecimals} will round to powers of 10.
+   *
+   * @param nDecimals number of decimals to round to
+   * @return series copy with values rounded towards the nearest given decimal
+   */
+  public DoubleSeries round(int nDecimals) {
+    final double multiplier = Math.pow(10, nDecimals);
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return Math.round(values[0] * multiplier) / multiplier;
+      }
+    });
+  }
+
   public DoubleSeries add(Series other) {
     if(other.size() == 1)
       return this.add(other.getDouble(0));
