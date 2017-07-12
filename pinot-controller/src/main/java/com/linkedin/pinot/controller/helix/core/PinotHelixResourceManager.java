@@ -417,6 +417,28 @@ public class PinotHelixResourceManager {
     return segmentNames;
   }
 
+  @Nonnull
+  public List<OfflineSegmentZKMetadata> getOfflineSegmentMetadata(@Nonnull String tableNameWithType) {
+    Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
+        "Table name: %s is not a valid table name with type suffix", tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == TableType.OFFLINE) {
+      return ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, tableNameWithType);
+    }
+    throw new RuntimeException("Cannot get offline metadata for table " + tableNameWithType);
+  }
+
+  @Nonnull
+  public List<RealtimeSegmentZKMetadata> getRealtimeSegmentMetadata(@Nonnull String tableNameWithType) {
+    Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
+        "Table name: %s is not a valid table name with type suffix", tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == TableType.REALTIME) {
+      return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_propertyStore, tableNameWithType);
+    }
+    throw new RuntimeException("Cannot get realtime metadata for table " + tableNameWithType);
+  }
+
   /**
    * Delete a list of segments from ideal state and remove them from the local storage.
    *

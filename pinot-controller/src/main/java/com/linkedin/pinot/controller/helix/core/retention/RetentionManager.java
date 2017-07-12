@@ -15,21 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention;
 
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
-import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,12 +25,23 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
+import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -141,7 +137,8 @@ public class RetentionManager {
       IdealState idealState = null;
       try {
         if (TableNameBuilder.getTableTypeFromTableName(tableName).equals(TableType.REALTIME)) {
-          idealState = HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableName);
+          idealState = _pinotHelixResourceManager.getHelixAdmin().getResourceIdealState(
+              _pinotHelixResourceManager.getHelixClusterName(), tableName);
         }
       } catch (Exception e) {
         LOGGER.warn("Could not get idealstate for {}", tableName, e);
@@ -254,8 +251,7 @@ public class RetentionManager {
     // Fetch table config.
     TableConfig offlineTableConfig;
     try {
-      offlineTableConfig =
-          ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
+      offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(TableNameBuilder.extractRawTableName(offlineTableName));
       if (offlineTableConfig == null) {
         LOGGER.error("Table config is null, skip updating deletion strategy for table: {}.", offlineTableName);
         return;
@@ -323,7 +319,7 @@ public class RetentionManager {
   private void updateDeletionStrategyForRealtimeTable(String realtimeTableName) {
     try {
       TableConfig realtimeTableConfig =
-          ZKMetadataProvider.getRealtimeTableConfig(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
+          _pinotHelixResourceManager.getRealtimeTableConfig(TableNameBuilder.extractRawTableName(realtimeTableName));
       assert realtimeTableConfig != null;
       SegmentsValidationAndRetentionConfig validationConfig = realtimeTableConfig.getValidationConfig();
       TimeRetentionStrategy timeRetentionStrategy =
@@ -336,34 +332,34 @@ public class RetentionManager {
   }
 
   private void updateSegmentMetadataForEntireCluster() {
+    // Gets table names with type.
     List<String> tableNames = _pinotHelixResourceManager.getAllTables();
-    for (String tableName : tableNames) {
-      _segmentMetadataMap.put(tableName, retrieveSegmentMetadataForTable(tableName));
+    for (String tableNameWithType : tableNames) {
+      _segmentMetadataMap.put(tableNameWithType, retrieveSegmentMetadataForTable(tableNameWithType));
     }
   }
 
-  private List<SegmentZKMetadata> retrieveSegmentMetadataForTable(String tableName) {
+  private List<SegmentZKMetadata> retrieveSegmentMetadataForTable(String tableNameWithType) {
     List<SegmentZKMetadata> segmentMetadataList = new ArrayList<>();
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     assert tableType != null;
     switch (tableType) {
       case OFFLINE:
-        List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas =
-            ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(propertyStore, tableName);
+        List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = _pinotHelixResourceManager.getOfflineSegmentMetadata(
+            tableNameWithType);
         for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
           segmentMetadataList.add(offlineSegmentZKMetadata);
         }
         break;
       case REALTIME:
-        List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas =
-            ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableName);
+        List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = _pinotHelixResourceManager.getRealtimeSegmentMetadata(
+            tableNameWithType);
         for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
           segmentMetadataList.add(realtimeSegmentZKMetadata);
         }
         break;
       default:
-        throw new IllegalArgumentException("No table type matches table name: " + tableName);
+        throw new IllegalArgumentException("No table type matches table name: " + tableNameWithType);
     }
     return segmentMetadataList;
   }
