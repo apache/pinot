@@ -195,7 +195,11 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(offline)));
       ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(realtime)));
     } else {
-      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(type)));
+      if (!isValidTableType(type)) {
+        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+        return new StringRepresentation("Table type " + type + " is not valid! Please use offline or realtime.");
+      }
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(type.toUpperCase())));
     }
 
     presentation = new StringRepresentation(ret.toString());
