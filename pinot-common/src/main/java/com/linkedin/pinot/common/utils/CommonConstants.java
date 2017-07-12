@@ -63,11 +63,21 @@ public class CommonConstants {
       public static final String SCHEMA = "schema";
       public static final String KAFKA = "kafka";
       public static final String STREAM_PREFIX = "stream";
-      public static enum SegmentAssignmentStrategyType {
+      public enum SegmentAssignmentStrategyType {
         RandomAssignmentStrategy,
         BalanceNumSegmentAssignmentStrategy,
         BucketizedSegmentAssignmentStrategy,
-        ReplicaGroupSegmentAssignmentStrategy;
+        ReplicaGroupSegmentAssignmentStrategy
+      }
+
+      public enum RoutingTableBuilderName {
+        DefaultOffline,
+        DefaultRealtime,
+        BalancedRandom,
+        KafkaLowLevel,
+        KafkaHighLevel,
+        PartitionAwareOffline,
+        PartitionAwareRealtime
       }
 
       public static class Schema {
