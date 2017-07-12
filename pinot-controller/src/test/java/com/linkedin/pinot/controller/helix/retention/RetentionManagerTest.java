@@ -168,7 +168,7 @@ public class RetentionManagerTest {
   }
 
   private void setupPinotHelixResourceManager(TableConfig tableConfig,
-      final List<String> removedSegments, PinotHelixResourceManager resourceManager) throws  Exception {
+      final List<String> removedSegments, PinotHelixResourceManager resourceManager) throws Exception {
     final String tableNameWithType = tableConfig.getTableName();
     when(resourceManager.isLeader()).thenReturn(true);
     when(resourceManager.getAllTables()).thenReturn(Collections.singletonList(tableNameWithType));
