@@ -110,10 +110,12 @@ export default Ember.Component.extend({
   noMatchesMessage: '',
 
   // selected Filters JSON
-  selected: {},
+  selected: JSON.stringify({}),
 
   // all Filters Object
   options: {},
+
+  disabled: false,
 
   /**
    * Takes the filters and massage them for the power-select grouping api
@@ -176,7 +178,12 @@ export default Ember.Component.extend({
   actions: {
     // Action handler for filter Selection/Deselection
     onFilterChange(filters) {
+      const onChangeHandler = this.get('onChange');
       this.set('selectedFilters', filters);
+
+      if (onChangeHandler) {
+        onChangeHandler(this.get('selected'));
+      }
     },
   }
 });

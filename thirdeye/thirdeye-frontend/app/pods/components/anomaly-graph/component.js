@@ -14,7 +14,7 @@ const COLOR_MAPPING = {
 export default Ember.Component.extend({
 
   /**
-   * Maps each metric to a color / class 
+   * Maps each metric to a color / class
    */
   didReceiveAttrs() {
     this._super(...arguments);
@@ -36,11 +36,12 @@ export default Ember.Component.extend({
   classNames: ['anomaly-graph'],
   primaryMetric: {},
   relatedMetrics: [],
-  showGraphLegend: true,
   colors: {},
 
-
   showLegend: false,
+  showSubchart: false,
+  showTitle: false,
+  height: 0,
 
   /**
    * Graph Legend config
@@ -67,7 +68,7 @@ export default Ember.Component.extend({
    * Graph Point Config
    */
   point: Ember.computed(
-    'showGraphLegend', 
+    'showLegend',
     function() {
       return {
         show: false,
@@ -79,12 +80,15 @@ export default Ember.Component.extend({
    * Graph axis config
    */
   axis: Ember.computed(
-    'primaryMetric', 
+    'primaryMetric',
     function () {
       return {
         y: {
-          show: true
-        }, 
+          show: true,
+          tick: {
+            format: d3.format('.2s')
+          }
+        },
         x: {
           type: 'timeseries',
           show: true,
@@ -101,10 +105,12 @@ export default Ember.Component.extend({
   /**
    * Graph Subchart Config
    */
-  subchart: Ember.computed('showGraphLegend',
+  subchart: Ember.computed(
+    'showLegend',
+    'showSubchart',
     function() {
       return {
-        show: this.get('showGraphLegend')
+        show: this.get('showSubchart') || this.get('showLegend')
       }
     }
   ),
@@ -112,9 +118,12 @@ export default Ember.Component.extend({
   /**
    * Graph Height Config
    */
-  size: Ember.computed('showGraphLegend',
+  size: Ember.computed(
+    'showLegend',
+    'height',
     function() {
-      const height = this.get('showGraphLegend') ? 400 : 200;
+      const height = this.get('height')
+        || this.get('showLegend') ? 400 : 200;
       return {
         height
       }
@@ -147,14 +156,14 @@ export default Ember.Component.extend({
     function() {
       const columns = [];
       const relatedMetrics = this.get('relatedMetrics') || [];
-      
+
       relatedMetrics
         .filterBy('isSelected')
         .forEach((metric)  => {
           if (!metric) { return }
           const { baselineValues, currentValues } = metric.subDimensionContributionMap['All'];
-          columns.push([`${metric.metricName}-current`, ...currentValues])
-          columns.push([`${metric.metricName}-baseline`, ...baselineValues])
+          columns.push([`${metric.metricName}-current`, ...currentValues]);
+          columns.push([`${metric.metricName}-baseline`, ...baselineValues]);
         })
       return columns;
     }
@@ -188,7 +197,6 @@ export default Ember.Component.extend({
         type: 'line',
         x: 'date',
         xFormat: '%Y-%m-%d %H:%M',
-        style: 'dashed',
         colors: this.get('colors')
       }
     }
@@ -200,7 +208,9 @@ export default Ember.Component.extend({
    */
   primaryRegions: Ember.computed('primaryMetric', function() {
     const primaryMetric = this.get('primaryMetric');
-    return primaryMetric.regions.map((region) => {
+    const regions = primaryMetric.regions;
+    if (!regions) { return []; }
+    return regions.map((region) => {
       return {
         axis: 'x',
         start: region.start,
@@ -220,7 +230,7 @@ export default Ember.Component.extend({
    */
   relatedRegions: Ember.computed(
     'relatedMetrics',
-    'relatedMetrics.@each.isSelected', 
+    'relatedMetrics.@each.isSelected',
     function() {
       const relatedMetrics = this.get('relatedMetrics');
       const regions = [];
@@ -246,7 +256,7 @@ export default Ember.Component.extend({
 
 
   /**
-   * Aggregates chart regions 
+   * Aggregates chart regions
    */
   regions: Ember.computed('primaryRegions', 'relatedRegions', function() {
     return [...this.get('primaryRegions'), ...this.get('relatedRegions')];
@@ -257,7 +267,7 @@ export default Ember.Component.extend({
       this.attrs.onSelection(...arguments);
     },
     onToggle() {
-      this.toggleProperty('showGraphLegend');
+      this.toggleProperty('showLegend');
     },
   }
 });

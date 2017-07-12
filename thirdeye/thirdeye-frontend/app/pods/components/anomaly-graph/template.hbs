@@ -1,5 +1,5 @@
 {{!-- TODO: move legend into own component--}}
-{{#if showGraphLegend}}
+{{#if showLegend}}
   <section class="anomaly-graph__left-panel">
     <div class="anomaly_graph__filters">
       <h5 class="legend-title">Primary Metric</h5>
@@ -24,9 +24,12 @@
 {{/if}}
 
 <section class="anomaly-graph__right-panel">
-  {{#unless showGraphLegend}}
+  {{#if showTitle}}
     <h3 class="anomaly-graph__title">#{{primaryMetric.metricId}} {{primaryMetric.metricName}}</h3>
-  {{/unless}}
+  {{/if}}
+  {{#if isLoading}}
+    {{ember-spinner}}
+  {{/if}}
   {{thirdeye-chart 
     data=data 
     axis=axis 

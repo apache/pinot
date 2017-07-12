@@ -94,6 +94,10 @@ body {
     &--active {
       background-color: $te-blue;
     }
+
+    &--active {
+      background-color: $te-blue;
+    }
   }
 }
 
@@ -103,5 +107,13 @@ body {
     padding-top: $te-default-element-spacing;
     text-align: right;
     border-top: 2px app-shade(black, 2) dotted;
+  }
+
+  &__sub-label {
+    margin: -5px 0 5px 0;
+
+    &--strong {
+      font-weight: 600;
+    }
   }
 }

@@ -47,8 +47,8 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
       });
 
     case ActionTypes.LOAD_PRIMARY_METRIC: {
-      let { 
-        id, 
+      let {
+        id,
         startDate,
         endDate,
         filters = "{}",

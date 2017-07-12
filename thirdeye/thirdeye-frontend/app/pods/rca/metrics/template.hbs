@@ -27,12 +27,25 @@
       {{#if metricList.loaded}}
         <section>
           {{#if splitView}}
-            {{anomaly-graph primaryMetric=metricList.primaryMetric showGraphLegend=false}}
+            {{anomaly-graph 
+              primaryMetric=metricList.primaryMetric 
+              showLegend=false
+              showTitle=true
+            }}
             {{#each metricList.relatedMetrics as |metric|}}
-              {{anomaly-graph primaryMetric=metric showGraphLegend=false}}
+              {{anomaly-graph 
+                primaryMetric=metric 
+                showGraphLegend=false
+                showTitle=true
+              }}
             {{/each}}
           {{else}}
-            {{anomaly-graph primaryMetric=metricList.primaryMetric relatedMetrics=metricList.relatedMetrics}}
+            {{anomaly-graph 
+              primaryMetric=metricList.primaryMetric 
+              relatedMetrics=metricList.relatedMetrics
+              showSubchart=true
+              showLegend=true
+            }}
           {{/if}}
         </section>
       {{/if}}

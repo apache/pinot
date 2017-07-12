@@ -11,7 +11,8 @@ export default Ember.Route.extend({
   model() {
     return RSVP.hash({
       // Fetch all alert group configurations
-      allAlertsConfigGroups: fetch('thirdeye/entity/ALERT_CONFIG').then(res => res.json())
+      allConfigGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
+      allAppNames: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
     })
   }
 });
