@@ -38,13 +38,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +67,7 @@ public class SegmentAssignmentStrategyTest {
   private final static String TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP= "testTableLevelReplicaGroup";
   private final static String TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP = "testPartitionLevelReplicaGroup";
 
+  private static final Random random = new Random();
   private final static String PARTITION_COLUMN = "memberId";
   private final static int NUM_REPLICA = 2;
   private PinotHelixResourceManager _pinotHelixResourceManager;
@@ -133,7 +135,7 @@ public class SegmentAssignmentStrategyTest {
       addOneSegment(TABLE_NAME_RANDOM);
 
       // Wait for all segments appear in the external view
-      while (!allSegmentsPushedToExternalView(TABLE_NAME_RANDOM, i + 1)) {
+      while (!allSegmentsPushedToIdealState(TABLE_NAME_RANDOM, i + 1)) {
         Thread.sleep(100);
       }
       final Set<String> taggedInstances =
@@ -142,11 +144,11 @@ public class SegmentAssignmentStrategyTest {
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+      IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME,
           TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_RANDOM));
-      Assert.assertEquals(externalView.getPartitionSet().size(), i + 1);
-      for (final String segmentId : externalView.getPartitionSet()) {
-        Assert.assertEquals(externalView.getStateMap(segmentId).size(), NUM_REPLICA);
+      Assert.assertEquals(idealState.getPartitionSet().size(), i + 1);
+      for (final String segmentId : idealState.getPartitionSet()) {
+        Assert.assertEquals(idealState.getInstanceStateMap(segmentId).size(), NUM_REPLICA);
       }
     }
   }
@@ -169,7 +171,7 @@ public class SegmentAssignmentStrategyTest {
     }
 
     // Wait for all segments appear in the external view
-    while (!allSegmentsPushedToExternalView(TABLE_NAME_BALANCED, numSegments)) {
+    while (!allSegmentsPushedToIdealState(TABLE_NAME_BALANCED, numSegments)) {
       Thread.sleep(100);
     }
 
@@ -179,10 +181,10 @@ public class SegmentAssignmentStrategyTest {
     for (final String instance : taggedInstances) {
       instance2NumSegmentsMap.put(instance, 0);
     }
-    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+    final IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME,
         TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_BALANCED));
-    for (final String segmentId : externalView.getPartitionSet()) {
-      for (final String instance : externalView.getStateMap(segmentId).keySet()) {
+    for (final String segmentId : idealState.getPartitionSet()) {
+      for (final String instance : idealState.getInstanceStateMap(segmentId).keySet()) {
         instance2NumSegmentsMap.put(instance, instance2NumSegmentsMap.get(instance) + 1);
       }
     }
@@ -235,7 +237,7 @@ public class SegmentAssignmentStrategyTest {
     }
 
     // Wait for all segments appear in the external view
-    while (!allSegmentsPushedToExternalView(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP, numSegments)) {
+    while (!allSegmentsPushedToIdealState(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP, numSegments)) {
       Thread.sleep(100);
     }
 
@@ -272,8 +274,9 @@ public class SegmentAssignmentStrategyTest {
 
   @Test
   public void testPartitionLevelReplicaGroupSegmentAssignmentStrategy() throws Exception {
-    int totalPartitionNumber = 2;
-    int numInstancesPerPartition = 5;
+    int totalPartitionNumber = random.nextInt(8) + 2;
+    int numInstancesPerPartition = random.nextInt(5) + 1;
+    int numSegments = random.nextInt(10) + 10;
 
     // Create the configuration for segment assignment strategy.
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
@@ -310,7 +313,6 @@ public class SegmentAssignmentStrategyTest {
     Map<Integer, Set<String>> partitionToSegment = new HashMap<>();
 
     // Upload segments
-    int numSegments = 20;
     for (int i = 0; i < numSegments; ++i) {
       int partitionNumber = i % totalPartitionNumber;
       String segmentName = "segment" + i;
@@ -323,7 +325,7 @@ public class SegmentAssignmentStrategyTest {
     }
 
     // Wait for all segments appear in the external view
-    while (!allSegmentsPushedToExternalView(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP, numSegments)) {
+    while (!allSegmentsPushedToIdealState(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP, numSegments)) {
       Thread.sleep(100);
     }
 
@@ -341,28 +343,34 @@ public class SegmentAssignmentStrategyTest {
       for (int group = 0; group < NUM_REPLICA; group++) {
         List<String> serversInReplicaGroup =
             partitionToReplicaGroupMapping.getInstancesfromReplicaGroup(partition, group);
-        Set<String> segmentsInReplicaGroup = new HashSet<>();
+        List<String> segmentsInReplicaGroup = new ArrayList<>();
         for (String server : serversInReplicaGroup) {
-          segmentsInReplicaGroup.addAll(serverToSegments.get(server));
+          Set<String> segmentsInServer = serverToSegments.get(server);
+          for (String segment : segmentsInServer) {
+            if (partitionToSegment.get(partition).contains(segment)) {
+              segmentsInReplicaGroup.add(segment);
+            }
+          }
         }
+        Assert.assertEquals(segmentsInReplicaGroup.size(), partitionToSegment.get(partition).size());
         Assert.assertTrue(segmentsInReplicaGroup.containsAll(partitionToSegment.get(partition)));
       }
     }
   }
 
-  private boolean allSegmentsPushedToExternalView(String tableName, int segmentNum) {
-    ExternalView externalView =
-        _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-    if (externalView != null && externalView.getPartitionSet() != null
-        && externalView.getPartitionSet().size() == segmentNum) {
+  private boolean allSegmentsPushedToIdealState(String tableName, int segmentNum) {
+    IdealState idealState =
+        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    if (idealState != null && idealState.getPartitionSet() != null
+        && idealState.getPartitionSet().size() == segmentNum) {
       return true;
     }
     return false;
   }
 
   private Map<String, Set<String>> getServersToSegmentsMapping(String tableName) {
-    ExternalView externalView =
-        _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    IdealState idealState =
+        _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
 
     List<String> servers = _pinotHelixResourceManager.getServerInstancesForTable(tableName,
         CommonConstants.Helix.TableType.OFFLINE);
@@ -372,8 +380,8 @@ public class SegmentAssignmentStrategyTest {
       serverToSegments.put(server, new HashSet<String>());
     }
 
-    for (String segment : externalView.getPartitionSet()) {
-      for (String server : externalView.getStateMap(segment).keySet()) {
+    for (String segment : idealState.getPartitionSet()) {
+      for (String server : idealState.getInstanceStateMap(segment).keySet()) {
         serverToSegments.get(server).add(segment);
       }
     }
