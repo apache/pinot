@@ -51,6 +51,7 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -101,9 +102,20 @@ public class AnomalyFunctionResource {
   }
 
   // Partially update anomaly function
-  @POST
-  @Path("/update/properties")
-  public Response updateAnomalyFunctionProperties (@QueryParam("id") @NotNull Long id,
+
+  /**
+   * Update the properties of the given anomaly function id
+   * @param id
+   *    The id of the given anomaly function
+   * @param propertiesJson
+   *    The json string defining the function properties to be updated, ex. {"pValueThreshold":"0.01",...}
+   * @return
+   *    OK if the properties are successfully updated
+   */
+  @PUT
+  @Path("/update")
+  public Response updateAnomalyFunctionProperties (
+      @QueryParam("id") @NotNull Long id,
       @QueryParam("config") @NotNull String propertiesJson) {
     if(id == null || anomalyFunctionDAO.findById(id) == null) {
       String msg = "Unable to update function properties. " + id + " doesn't exist";
