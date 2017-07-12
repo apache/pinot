@@ -107,28 +107,27 @@ public class AnomalyFunctionResource {
    * Update the properties of the given anomaly function id
    * @param id
    *    The id of the given anomaly function
-   * @param propertiesJson
+   * @param config
    *    The json string defining the function properties to be updated, ex. {"pValueThreshold":"0.01",...}
    * @return
    *    OK if the properties are successfully updated
    */
   @PUT
   @Path("/update")
-  public Response updateAnomalyFunctionProperties (
-      @QueryParam("id") @NotNull Long id,
-      @QueryParam("config") @NotNull String propertiesJson) {
+  public Response updateAnomalyFunctionProperties (@QueryParam("id") @NotNull Long id,
+      @QueryParam("config") @NotNull String config) {
     if(id == null || anomalyFunctionDAO.findById(id) == null) {
       String msg = "Unable to update function properties. " + id + " doesn't exist";
       LOG.warn(msg);
       return Response.status(Response.Status.BAD_REQUEST).entity(msg).build();
     }
 
-    if(StringUtils.isNotBlank(propertiesJson)) {
+    if(StringUtils.isNotBlank(config)) {
       Map<String, String> configs = Collections.emptyMap();
       try {
-        configs = OBJECT_MAPPER.readValue(propertiesJson, Map.class);
+        configs = OBJECT_MAPPER.readValue(config, Map.class);
       } catch (IOException e) {
-        String msg = "Unable to parse json string " + propertiesJson + " for function " + id;
+        String msg = "Unable to parse json string " + config + " for function " + id;
         LOG.error(msg);
         return Response.status(Response.Status.BAD_REQUEST).entity(msg).build();
       }
@@ -136,7 +135,7 @@ public class AnomalyFunctionResource {
       anomalyFunction.updateProperties(configs);
       anomalyFunctionDAO.update(anomalyFunction);
     }
-    String msg = "Successfully update properties for function " + id + " with " + propertiesJson;
+    String msg = "Successfully update properties for function " + id + " with " + config;
     LOG.info(msg);
     return Response.ok(id).build();
   }
