@@ -2248,6 +2248,17 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleNormalizeSum() {
+    DoubleSeries s = DataFrame.toSeries(1.5, 1.0, 2.5).normalizeSum();
+    assertEquals(s, 0.3, 0.2, 0.5);
+  }
+
+  @Test(expectedExceptions = ArithmeticException.class)
+  public void testDoubleNormalizeSumFailInvalid() {
+    DataFrame.toSeries(3.0, 0.0, -3.0).normalizeSum();
+  }
+
+  @Test
   public void testDoubleZScore() {
     DoubleSeries s = DataFrame.toSeries(0.0, 1.0, 2.0).zscore();
     assertEquals(s, -1, 0.0, 1);
@@ -2256,6 +2267,20 @@ public class DataFrameTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDoubleZScoreFailInvalid() {
     DataFrame.toSeries(1.5, 1.5, 1.5).zscore();
+  }
+
+  @Test
+  public void testDoubleRound() {
+    DoubleSeries s = DataFrame.toSeries(0.1235, 0.193, 2.4, 71);
+    assertEquals(s.round(5), 0.1235, 0.193, 2.4, 71);
+    assertEquals(s.round(4), 0.1235, 0.193, 2.4, 71);
+    assertEquals(s.round(3), 0.124, 0.193, 2.4, 71);
+    assertEquals(s.round(2), 0.12, 0.19, 2.4, 71);
+    assertEquals(s.round(1), 0.1, 0.2, 2.4, 71);
+    assertEquals(s.round(0), 0, 0, 2, 71);
+    assertEquals(s.round(-1), 0, 0, 0, 70);
+    assertEquals(s.round(-2), 0, 0, 0, 100);
+    assertEquals(s.round(-3), 0, 0, 0, 0);
   }
 
   @Test
