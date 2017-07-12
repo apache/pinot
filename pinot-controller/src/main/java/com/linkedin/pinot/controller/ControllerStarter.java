@@ -322,7 +322,6 @@ public class ControllerStarter {
     conf.setStatusCheckerFrequencyInSeconds(5*60);
     conf.setStatusCheckerWaitForPushTimeInSeconds(10*60);
     conf.setTenantIsolationEnabled(true);
-    conf.setSplitCommit(false);
     final ControllerStarter starter = new ControllerStarter(conf);
 
     starter.start();
