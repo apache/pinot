@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -57,8 +58,8 @@ public class TimeConversionTransform implements TransformFunction {
     Preconditions.checkState(inputTime.length >= length && inputTimeUnits.length >= length,
         outputTimeUnits.length >= length);
 
-    TimeUnit inputTimeUnit = TimeUnit.valueOf(inputTimeUnits[0]);
-    TimeUnit outputTimeUnit = TimeUnit.valueOf(outputTimeUnits[0]);
+    TimeUnit inputTimeUnit = getTimeUnit(inputTimeUnits[0]);
+    TimeUnit outputTimeUnit = getTimeUnit(outputTimeUnits[0]);
 
     if (_output == null || _output.length < length) {
       _output = new long[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
@@ -69,6 +70,21 @@ public class TimeConversionTransform implements TransformFunction {
     }
 
     return (T) _output;
+  }
+
+  /**
+   * Helper method to get TimeUnit enum from string name.
+   *
+   * @param timeUnitName String name of time unit.
+   * @return TimeUnit enum value
+   */
+  private TimeUnit getTimeUnit(String timeUnitName) {
+    try {
+      return TimeUnit.valueOf(timeUnitName);
+    } catch (IllegalArgumentException e) {
+      throw new BadQueryRequestException("Illegal time unit specified for timeConvert UDF: '" + timeUnitName
+          + "', only values defined in java.util.concurrent.TimeUnit supported currently.");
+    }
   }
 
   @Override
