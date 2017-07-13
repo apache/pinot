@@ -1503,98 +1503,220 @@ public class DataFrame {
    * Joins across data frames
    ***************************************************************************/
 
+  /**
+   * Performs an inner join on the index column of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
   public DataFrame joinInner(DataFrame other) {
     assertIndex(this, other);
-    return this.joinInner(other, this.getIndexName(), other.getIndexName());
+    return this.joinInner(other, new String[] { this.getIndexName() }, new String[] { other.getIndexName() });
   }
 
-  public DataFrame joinInner(DataFrame other, String onSeries) {
+  /**
+   * Performs an inner join on the {@code onSeries} columns of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinInner(DataFrame other, String... onSeries) {
     return this.joinInner(other, onSeries, onSeries);
   }
 
-  public DataFrame joinInner(DataFrame other, String onSeriesLeft, String onSeriesRight) {
-    List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.INNER);
-    return DataFrame.join(this, other, pairs, onSeriesLeft, onSeriesRight);
+  /**
+   * Performs an inner join on the {@code onSeriesLeft} columns of this DataFrame and
+   * the {@code onSeriesLeft} columns of the {@code other} DataFrame.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinInner(DataFrame other, String[] onSeriesLeft, String[] onSeriesRight) {
+    return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.INNER);
   }
 
+  /**
+   * Performs a left outer join on the index column of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
   public DataFrame joinLeft(DataFrame other) {
     assertIndex(this, other);
-    return this.joinLeft(other, this.getIndexName(), other.getIndexName());
+    return this.joinLeft(other, new String[] { this.getIndexName() }, new String[] { other.getIndexName() });
   }
 
-  public DataFrame joinLeft(DataFrame other, String onSeries) {
+  /**
+   * Performs a left outer join on the {@code onSeries} columns of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinLeft(DataFrame other, String... onSeries) {
     return this.joinLeft(other, onSeries, onSeries);
   }
 
-  public DataFrame joinLeft(DataFrame other, String onSeriesLeft, String onSeriesRight) {
-    List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.LEFT);
-    return DataFrame.join(this, other, pairs, onSeriesLeft, onSeriesRight);
+  /**
+   * Performs a left outer join on the {@code onSeriesLeft} columns of this DataFrame and
+   * the {@code onSeriesLeft} columns of the {@code other} DataFrame.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinLeft(DataFrame other, String[] onSeriesLeft, String[] onSeriesRight) {
+    return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.LEFT);
   }
 
+  /**
+   * Performs a right outer join on the index column of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
   public DataFrame joinRight(DataFrame other) {
     assertIndex(this, other);
-    return this.joinRight(other, this.getIndexName(), other.getIndexName());
+    return this.joinRight(other, new String[] { this.getIndexName() }, new String[] { other.getIndexName() });
   }
 
-  public DataFrame joinRight(DataFrame other, String onSeries) {
+  /**
+   * Performs a right outer join on the {@code onSeries} columns of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinRight(DataFrame other, String... onSeries) {
     return this.joinRight(other, onSeries, onSeries);
   }
 
-  public DataFrame joinRight(DataFrame other, String onSeriesLeft, String onSeriesRight) {
-    List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.RIGHT);
-    return DataFrame.join(this, other, pairs, onSeriesLeft, onSeriesRight);
+  /**
+   * Performs a right outer join on the {@code onSeriesLeft} columns of this DataFrame and
+   * the {@code onSeriesLeft} columns of the {@code other} DataFrame.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinRight(DataFrame other, String[] onSeriesLeft, String[] onSeriesRight) {
+    return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.RIGHT);
   }
 
+  /**
+   * Performs an outer join on the index column of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
   public DataFrame joinOuter(DataFrame other) {
     assertIndex(this, other);
-    return this.joinOuter(other, this.getIndexName(), other.getIndexName());
+    return this.joinOuter(other, new String[] { this.getIndexName() }, new String[] { other.getIndexName() });
   }
 
-  public DataFrame joinOuter(DataFrame other, String onSeries) {
+  /**
+   * Performs an outer join on the {@code onSeries} columns of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinOuter(DataFrame other, String... onSeries) {
     return this.joinOuter(other, onSeries, onSeries);
   }
 
-  public DataFrame joinOuter(DataFrame other, String onSeriesLeft, String onSeriesRight) {
-    List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.OUTER);
-    return DataFrame.join(this, other, pairs, onSeriesLeft, onSeriesRight);
+  /**
+   * Performs an outer join on the {@code onSeriesLeft} columns of this DataFrame and
+   * the {@code onSeriesLeft} columns of the {@code other} DataFrame.
+   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinOuter(DataFrame other, String[] onSeriesLeft, String[] onSeriesRight) {
+    return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.OUTER);
   }
 
-  private static DataFrame join(DataFrame left, DataFrame right, List<Series.JoinPair> pairs, String onSeriesLeft, String onSeriesRight) {
-    // TODO use hash join when available
-    byte[] maskValues = new byte[pairs.size()];
+  /**
+   * Performs a join between two DataFrames and returns the result as a new DataFrame. The join
+   * can be performed across multiple series. If (non-joined) series with the same name exist
+   * in both DataFrames, their names are appended with {@code COLUMN_JOIN_LEFT} and
+   * {@code COLUMN_JOIN_RIGHT} in the returned DataFrame.
+   *
+   * <b>NOTE:</b> the series names of the left join series survive.
+   *
+   * @param left left DataFrame
+   * @param right right DataFrame
+   * @param onSeriesLeft left series names to join on
+   * @param onSeriesRight right series names to join on
+   * @param joinType type of join to perform
+   * @return joined DataFrame
+   */
+  public static DataFrame join(DataFrame left, DataFrame right, String[] onSeriesLeft, String[] onSeriesRight, Series.JoinType joinType) {
+    if(onSeriesLeft.length != onSeriesRight.length)
+      throw new IllegalArgumentException("Number of series on the left side of the join must equal the number of series on the right side");
 
+    final int numSeries = onSeriesLeft.length;
+
+    // extract source series
+    Series[] leftSeries = new Series[numSeries];
+    for(int i=0; i<numSeries; i++)
+      leftSeries[i] = left.get(onSeriesLeft[i]);
+
+    Series[] rightSeries = new Series[numSeries];
+    for(int i=0; i<numSeries; i++)
+      rightSeries[i] = right.get(onSeriesRight[i]);
+
+    // perform join, generate row pairs
+    List<Series.JoinPair> pairs = filterJoinPairs(Series.hashJoin(leftSeries, rightSeries), joinType);
+
+    // extract projection indices
     int[] fromIndexLeft = new int[pairs.size()];
-    int i=0;
-    for(Series.JoinPair p : pairs) {
-      if(p.left == -1)
-        maskValues[i] = BooleanSeries.TRUE;
-      fromIndexLeft[i++] = p.left;
-    }
+    for(int i=0; i<pairs.size(); i++)
+      fromIndexLeft[i] = pairs.get(i).left;
 
     int[] fromIndexRight = new int[pairs.size()];
-    int j=0;
-    for(Series.JoinPair p : pairs) {
-      fromIndexRight[j++] = p.right;
+    for(int i=0; i<pairs.size(); i++)
+      fromIndexRight[i] = pairs.get(i).right;
+
+    byte[] maskValues = new byte[pairs.size()];
+    for(int i=0; i<pairs.size(); i++) {
+      if (pairs.get(i).left == -1)
+        maskValues[i] = BooleanSeries.TRUE;
     }
 
+    // perform projection
     DataFrame leftData = left.project(fromIndexLeft);
     DataFrame rightData = right.project(fromIndexRight);
 
-    Series joinKey = leftData.get(onSeriesLeft).set(BooleanSeries.buildFrom(maskValues), rightData.get(onSeriesRight));
+    // merge values of join columns
+    Series[] joinKeys = new Series[numSeries];
+    for(int i=0; i<numSeries; i++)
+      joinKeys[i] = leftData.get(onSeriesLeft[i]).set(BooleanSeries.buildFrom(maskValues), rightData.get(onSeriesRight[i]));
 
+    // select series names
     Set<String> seriesLeft = new HashSet<>(left.getSeriesNames());
     Set<String> seriesRight = new HashSet<>(right.getSeriesNames());
 
-    seriesLeft.remove(onSeriesLeft);
-    seriesRight.remove(onSeriesRight);
+    seriesLeft.removeAll(Arrays.asList(onSeriesLeft));
+    seriesRight.removeAll(Arrays.asList(onSeriesRight));
 
-    String joinKeyName = onSeriesLeft + "_" + onSeriesRight;
-    if(onSeriesLeft.equals(onSeriesRight))
-      joinKeyName = onSeriesLeft;
+    String[] joinKeyNames = onSeriesLeft;
 
+    // construct result
     DataFrame joined = new DataFrame();
-    joined.addSeries(joinKeyName, joinKey);
-    joined.setIndex(joinKeyName);
+
+    for(int i=0; i<numSeries; i++)
+      joined.addSeries(joinKeyNames[i], joinKeys[i]);
+
+    if(joined.contains(left.getIndexName()))
+      joined.setIndex(left.getIndexName());
 
     for(String name : seriesRight) {
       Series s = rightData.get(name);
@@ -1615,6 +1737,34 @@ public class DataFrame {
     }
 
     return joined;
+  }
+
+  private static List<Series.JoinPair> filterJoinPairs(List<Series.JoinPair> pairs, Series.JoinType type) {
+    List<Series.JoinPair> output;
+    switch(type) {
+      case LEFT:
+        output = new ArrayList<>(pairs.size());
+        for(Series.JoinPair p : pairs)
+          if(p.left != -1)
+            output.add(p);
+        return output;
+      case RIGHT:
+        output = new ArrayList<>(pairs.size());
+        for(Series.JoinPair p : pairs)
+          if(p.right != -1)
+            output.add(p);
+        return output;
+      case INNER:
+        output = new ArrayList<>(pairs.size());
+        for(Series.JoinPair p : pairs)
+          if(p.left != -1 && p.right != -1)
+            output.add(p);
+        return output;
+      case OUTER:
+        return pairs;
+      default:
+        throw new IllegalArgumentException(String.format("Unknown join type '%s'", type));
+    }
   }
 
   /**

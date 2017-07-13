@@ -2,8 +2,13 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang.ArrayUtils;
 
 
@@ -470,6 +475,15 @@ public abstract class Series {
    * @return indices of sorted values
    */
   abstract int[] sortedIndex();
+
+//  /**
+//   * Returns a hashCode representation of the underlying value. <i>Should</i> be unique, but
+//   * <i>need not</i> be unique. Used for hash join.
+//   *
+//   * @param index value index
+//   * @return hash code representation of value
+//   */
+//  abstract long hashCode(int index);
 
   /**
    * Compares values for equality across two series with potentially different types based on
@@ -1199,6 +1213,71 @@ public abstract class Series {
     }
 
     return pairs;
+  }
+
+  static List<JoinPair> hashJoin(Series[] left, Series[] right) {
+    if(left.length != right.length)
+      throw new IllegalArgumentException("Number of series on the left side of the join must be equal to the right side");
+    if(left.length <= 0)
+      throw new IllegalArgumentException("Must join on at least one series");
+    assertSameLength(left);
+    assertSameLength(right);
+
+    List<JoinPair> pairs = new ArrayList<>();
+    BitSet touchedRight = new BitSet(right[0].size());
+
+    Series[] rightTyped = new Series[right.length];
+    for(int i=0; i<right.length; i++)
+      rightTyped[i] = right[i].get(left[i].type());
+
+    // TODO replace with primitive implementation for performance
+    Map<Long, Set<Integer>> hashRight = new HashMap<>();
+    for(int i=0; i<rightTyped[0].size(); i++) {
+      long hashCode = hashCodeMultiple(rightTyped, i);
+      if(!hashRight.containsKey(hashCode))
+        hashRight.put(hashCode, new HashSet<Integer>());
+      hashRight.get(hashCode).add(i);
+    }
+
+    for(int i=0; i<left[0].size(); i++) {
+      long hashCode = hashCodeMultiple(left, i);
+      if(!hashRight.containsKey(hashCode)) {
+        // no match
+        pairs.add(new JoinPair(i, -1));
+      } else {
+        // match
+        for(Integer j : hashRight.get(hashCode)) {
+          if(equalsMultiple(left, rightTyped, i, j)) {
+            pairs.add(new JoinPair(i, j));
+            touchedRight.set(j);
+          }
+        }
+      }
+    }
+
+    for(int i=0; i<rightTyped[0].size(); i++) {
+      if(!touchedRight.get(i))
+        pairs.add(new JoinPair(-1, i));
+    }
+
+    return pairs;
+  }
+
+  static boolean equalsMultiple(Series[] left, Series[] right, int indexLeft, int indexRight) {
+    for(int i=0; i<left.length; i++) {
+      if (!left[i].equals(right[i], indexLeft, indexRight))
+        return false;
+    }
+    return true;
+  }
+
+  static long hashCodeMultiple(Series[] series, int index) {
+    // TODO hash long and double, etc. to same (native) value
+    long hashCode = 0;
+    for(Series s : series) {
+      hashCode = hashCode * 31 + s.getObject(index).hashCode();
+    }
+    return hashCode;
   }
 
   static void assertSameLength(Series... series) {
