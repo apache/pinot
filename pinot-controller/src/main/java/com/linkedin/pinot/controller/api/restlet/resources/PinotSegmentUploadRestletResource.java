@@ -183,7 +183,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   private Representation getSegmentsForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
       String tableName,
-      @Parameter(name = "tableType", in = "query", description = "Type of table {offline|realtime}", required = false)
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}", required = false)
       String type
       ) throws Exception {
     Representation presentation;
