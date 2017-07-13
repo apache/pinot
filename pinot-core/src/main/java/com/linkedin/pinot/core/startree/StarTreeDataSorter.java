@@ -58,7 +58,7 @@ public class StarTreeDataSorter {
 
   /**
    * Sort from to given start (inclusive) to end (exclusive) as per the provided sort order.
-   * 
+   *
    * @param startRecordId inclusive
    * @param endRecordId exclusive
    * @param sortOrder
@@ -148,7 +148,7 @@ public class StarTreeDataSorter {
 
   /**
    * Perform group-by based on the 'count' for the given column.
-   * 
+   *
    * @param startDocId inclusive
    * @param endDocId exclusive
    * @param colIndex
@@ -206,9 +206,10 @@ public class StarTreeDataSorter {
         byte[] dimBuff = new byte[dimensionSizeInBytes];
         byte[] metBuff = new byte[metricSizeInBytes];
 
-        copyTo(startOffset + (pointer * totalSizeInBytes), dimBuff, 0, dimensionSizeInBytes);
+        long pointerOffset = (long) pointer * totalSizeInBytes;
+        copyTo(startOffset + pointerOffset, dimBuff, 0, dimensionSizeInBytes);
         if (metricSizeInBytes > 0) {
-          copyTo(startOffset + (pointer * totalSizeInBytes) + dimensionSizeInBytes, metBuff, 0, metricSizeInBytes);
+          copyTo(startOffset + pointerOffset + dimensionSizeInBytes, metBuff, 0, metricSizeInBytes);
         }
 
         pointer = pointer + 1;
