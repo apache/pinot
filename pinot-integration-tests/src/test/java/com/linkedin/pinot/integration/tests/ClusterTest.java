@@ -288,7 +288,7 @@ public abstract class ClusterTest extends ControllerTest {
       try {
         GenericData.Record avroRecord =
             _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
-        return _rowGenerator.transform(avroRecord, _avroSchema, destination);
+        return _rowGenerator.transform(avroRecord, destination);
       } catch (Exception e) {
         LOGGER.error("Caught exception", e);
         throw new RuntimeException(e);
