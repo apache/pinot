@@ -109,6 +109,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+    Thread.sleep(12312312L);
   }
 
   protected void startHybridCluster()

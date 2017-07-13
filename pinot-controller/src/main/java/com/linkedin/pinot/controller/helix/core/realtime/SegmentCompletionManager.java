@@ -82,7 +82,7 @@ public class SegmentCompletionManager {
     _controllerMetrics = controllerMetrics;
   }
 
-  public boolean shouldAcceptSplitCommit() {
+  public boolean isSplitCommitEnabled() {
     return _segmentManager.getIsSplitCommitEnabled();
   }
 
@@ -352,8 +352,8 @@ public class SegmentCompletionManager {
     // We may need to add some time here to allow for getting the lock? For now 0
     // We may need to add some time for the committer come back to us (after the build)? For now 0.
     private long _maxTimeAllowedToCommitMs;
-    private boolean _isSplitCommitEnabled;
-    private String _controllerVipUrl;
+    private final boolean _isSplitCommitEnabled;
+    private final String _controllerVipUrl;
 
     public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
       return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
@@ -397,7 +397,7 @@ public class SegmentCompletionManager {
       }
       _initialCommitTimeMs = initialCommitTimeMs;
       _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
-      _isSplitCommitEnabled = segmentCompletionManager.shouldAcceptSplitCommit();
+      _isSplitCommitEnabled = segmentCompletionManager.isSplitCommitEnabled();
       _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
     }
 
@@ -618,10 +618,17 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response commit(String instanceId, long offset) {
       long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs)/1000;
       LOGGER.info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
-          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus(
-              SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
-          .withSplitCommit(_isSplitCommitEnabled).withControllerVipUrl(_controllerVipUrl));
+      if (_isSplitCommitEnabled) {
+        return new SegmentCompletionProtocol.Response(
+            new SegmentCompletionProtocol.Response.Params().withOffset(offset).withBuildTimeSeconds(allowedBuildTimeSec)
+                .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+                .withSplitCommit(_isSplitCommitEnabled).withControllerVipUrl(_controllerVipUrl));
+      } else {
+        return new SegmentCompletionProtocol.Response(
+            new SegmentCompletionProtocol.Response.Params().withOffset(offset).withBuildTimeSeconds(allowedBuildTimeSec)
+                .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+                .withSplitCommit(_isSplitCommitEnabled));
+      }
     }
 
     private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {
@@ -971,7 +978,7 @@ public class SegmentCompletionManager {
       return response;
     }
 
-    private SegmentCompletionProtocol.Response commitSegment(String instanceId, long offset, boolean isSplitCommitEnabled,
+    private SegmentCompletionProtocol.Response commitSegment(String instanceId, long offset, boolean isSplitCommit,
         String segmentLocation) {
       boolean success;
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
@@ -984,7 +991,7 @@ public class SegmentCompletionManager {
       _state = State.COMMITTING;
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
-      if (isSplitCommitEnabled) {
+      if (isSplitCommit) {
         if (!_segmentManager.commitSegmentFile(_segmentName.getTableName(), segmentLocation, _segmentName.getSegmentName())) {
           return SegmentCompletionProtocol.RESP_FAILED;
         }

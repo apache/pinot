@@ -435,6 +435,7 @@ public class SegmentCompletionProtocol {
         _buildTimeSec = -1;
         _isSplitCommit = false;
         _segmentLocation = null;
+        _controllerVipUrl = null;
       }
 
       public Params withOffset(long offset) {
