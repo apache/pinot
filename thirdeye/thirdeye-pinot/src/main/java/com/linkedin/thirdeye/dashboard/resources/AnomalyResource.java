@@ -89,8 +89,10 @@ public class AnomalyResource {
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
+  private EmailConfigurationManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private OverrideConfigManager overrideConfigDAO;
   private AutotuneConfigManager autotuneConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
@@ -103,8 +105,10 @@ public class AnomalyResource {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    this.overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
     this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
@@ -669,6 +673,116 @@ public class AnomalyResource {
     }
 
       return idList;
+  }
+
+  // Activate anomaly function
+  @POST
+  @Path("/anomaly-function/activate")
+  public Response activateAnomalyFunction(@NotNull @QueryParam("functionId") Long id) {
+    if (id == null) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    toggleFunctionById(id, true);
+    return Response.ok(id).build();
+  }
+
+  @DELETE
+  @Path("/anomaly-function/activate")
+  public Response deactivateAnomalyFunction(@NotNull @QueryParam("functionId") Long id) {
+    if (id == null) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    toggleFunctionById(id, false);
+    return Response.ok(id).build();
+  }
+
+  // batch activate and deactivate anomaly functions
+  @POST
+  @Path("/activate/batch")
+  public String activateFunction(@QueryParam("functionIds") String functionIds) {
+    toggleFunctions(functionIds, true);
+    return functionIds;
+  }
+
+  @POST
+  @Path("/deactivate/batch")
+  public String deactivateFunction(@QueryParam("functionIds") String functionIds) {
+    toggleFunctions(functionIds, false);
+    return functionIds;
+  }
+
+  /**
+   * toggle anomaly functions to active and inactive
+   *
+   * @param functionIds string comma separated function ids, ALL meaning all functions
+   * @param isActive boolean true or false, set function as true or false
+   */
+  private void toggleFunctions(String functionIds, boolean isActive) {
+    List<Long> functionIdsList = new ArrayList<>();
+
+    // can add tokens here to activate and deactivate all functions for example
+    // functionIds == {SPECIAL TOKENS} --> functionIdsList = anomalyFunctionDAO.findAll()
+
+    if (StringUtils.isNotBlank(functionIds)) {
+      String[] tokens = functionIds.split(",");
+      for (String token : tokens) {
+        functionIdsList.add(Long.valueOf(token));  // unhandled exception is expected
+      }
+    }
+
+    for (long id : functionIdsList) {
+      toggleFunctionById(id, isActive);
+    }
+  }
+
+
+  private void toggleFunctionById(long id, boolean isActive) {
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    anomalyFunctionSpec.setActive(isActive);
+    anomalyFunctionDAO.update(anomalyFunctionSpec);
+  }
+
+  // Delete anomaly function
+  @DELETE
+  @Path("/delete")
+  public Response deleteAnomalyFunctions(@NotNull @QueryParam("id") Long id,
+      @QueryParam("functionName") String functionName)
+      throws IOException {
+
+    if (id == null) {
+      throw new IllegalArgumentException("id is a required query param");
+    }
+
+    // call endpoint to shutdown if active
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    if (anomalyFunctionSpec == null) {
+      throw new IllegalStateException("No anomalyFunctionSpec with id " + id);
+    }
+
+    // delete dependent entities
+    // email config mapping
+    List<EmailConfigurationDTO> emailConfigurations = emailConfigurationDAO.findByFunctionId(id);
+    for (EmailConfigurationDTO emailConfiguration : emailConfigurations) {
+      emailConfiguration.getFunctions().remove(anomalyFunctionSpec);
+      emailConfigurationDAO.update(emailConfiguration);
+    }
+
+    // raw result mapping
+    List<RawAnomalyResultDTO> rawResults =
+        rawAnomalyResultDAO.findAllByTimeAndFunctionId(0, System.currentTimeMillis(), id);
+    for (RawAnomalyResultDTO result : rawResults) {
+      rawAnomalyResultDAO.delete(result);
+    }
+
+    // merged anomaly mapping
+    List<MergedAnomalyResultDTO> mergedResults = mergedAnomalyResultDAO.findByFunctionId(id, true);
+    for (MergedAnomalyResultDTO result : mergedResults) {
+      mergedAnomalyResultDAO.delete(result);
+    }
+
+    // delete from db
+    anomalyFunctionDAO.deleteById(id);
+    return Response.noContent().build();
   }
 
   /************ Anomaly Feedback **********/
