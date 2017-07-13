@@ -47,7 +47,6 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -87,6 +86,7 @@ public class AnomalyResource {
   private static final String DEFAULT_FUNCTION_TYPE = "WEEK_OVER_WEEK_RULE";
 
   private AnomalyFunctionManager anomalyFunctionDAO;
+  private MergedAnomalyResultManager anomalyMergedResultDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
@@ -103,6 +103,7 @@ public class AnomalyResource {
   public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
@@ -129,7 +130,7 @@ public class AnomalyResource {
   @Path("/anomalies/view/{anomaly_merged_result_id}")
   public MergedAnomalyResultDTO getMergedAnomalyDetail(
       @NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
-    return mergedAnomalyResultDAO.findById(mergedAnomalyId);
+    return anomalyMergedResultDAO.findById(mergedAnomalyId);
   }
 
   // View merged anomalies for collection
@@ -172,12 +173,12 @@ public class AnomalyResource {
 
       if (StringUtils.isNotBlank(metric)) {
         if (StringUtils.isNotBlank(exploredDimensions)) {
-          anomalyResults = mergedAnomalyResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
         } else {
-          anomalyResults = mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
         }
       } else {
-        anomalyResults = mergedAnomalyResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+        anomalyResults = anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
       }
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
@@ -242,6 +243,7 @@ public class AnomalyResource {
    String response = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(rawAnomalyResults);
    return response;
  }
+
 
   /************* CRUD for anomaly functions of collection **********************************************/
   // View all anomaly functions
@@ -684,26 +686,16 @@ public class AnomalyResource {
     return Response.ok(id).build();
   }
 
-  @DELETE
-  @Path("/anomaly-function/activate")
-  public Response deactivateAnomalyFunction(@NotNull @QueryParam("functionId") Long id) {
-    if (id == null) {
-      return Response.status(Response.Status.BAD_REQUEST).build();
-    }
-    toggleFunctionById(id, false);
-    return Response.ok(id).build();
-  }
-
   // batch activate and deactivate anomaly functions
   @POST
-  @Path("/activate/batch")
+  @Path("/anomaly-functions/activate")
   public String activateFunction(@QueryParam("functionIds") String functionIds) {
     toggleFunctions(functionIds, true);
     return functionIds;
   }
 
   @POST
-  @Path("/deactivate/batch")
+  @Path("/anomaly-functions/deactivate")
   public String deactivateFunction(@QueryParam("functionIds") String functionIds) {
     toggleFunctions(functionIds, false);
     return functionIds;
@@ -733,7 +725,6 @@ public class AnomalyResource {
     }
   }
 
-
   private void toggleFunctionById(long id, boolean isActive) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     anomalyFunctionSpec.setActive(isActive);
@@ -742,7 +733,7 @@ public class AnomalyResource {
 
   // Delete anomaly function
   @DELETE
-  @Path("/delete")
+  @Path("/anomaly-function/delete")
   public Response deleteAnomalyFunctions(@NotNull @QueryParam("id") Long id,
       @QueryParam("functionName") String functionName)
       throws IOException {
@@ -773,9 +764,9 @@ public class AnomalyResource {
     }
 
     // merged anomaly mapping
-    List<MergedAnomalyResultDTO> mergedResults = mergedAnomalyResultDAO.findByFunctionId(id, true);
+    List<MergedAnomalyResultDTO> mergedResults = anomalyMergedResultDAO.findByFunctionId(id, true);
     for (MergedAnomalyResultDTO result : mergedResults) {
-      mergedAnomalyResultDAO.delete(result);
+      anomalyMergedResultDAO.delete(result);
     }
 
     // delete from db
@@ -802,7 +793,7 @@ public class AnomalyResource {
   @Path(value = "anomaly-merged-result/feedback/{anomaly_merged_result_id}")
   public void updateAnomalyMergedResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId, String payload) {
     try {
-      MergedAnomalyResultDTO result = mergedAnomalyResultDAO.findById(anomalyResultId);
+      MergedAnomalyResultDTO result = anomalyMergedResultDAO.findById(anomalyResultId);
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
@@ -814,7 +805,7 @@ public class AnomalyResource {
       }
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
-      mergedAnomalyResultDAO.updateAnomalyFeedback(result);
+      anomalyMergedResultDAO.updateAnomalyFeedback(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
@@ -864,7 +855,7 @@ public class AnomalyResource {
       throws Exception {
 
     boolean loadRawAnomalies = false;
-    MergedAnomalyResultDTO anomalyResult = mergedAnomalyResultDAO.findById(anomalyResultId, loadRawAnomalies);
+    MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId, loadRawAnomalies);
     Map<String, String> anomalyProps = anomalyResult.getProperties();
 
     AnomalyTimelinesView anomalyTimelinesView = null;
