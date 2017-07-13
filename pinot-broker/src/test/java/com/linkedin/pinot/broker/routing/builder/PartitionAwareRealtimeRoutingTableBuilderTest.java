@@ -66,7 +66,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
   @Test
   public void testBrokerSideSegmentPruning() throws Exception {
-    int numIterations = 100;
+    int numIterations = 50;
 
     for (int iter = 0; iter < numIterations; iter++) {
       NUM_PARTITION = random.nextInt(8) + 3;
