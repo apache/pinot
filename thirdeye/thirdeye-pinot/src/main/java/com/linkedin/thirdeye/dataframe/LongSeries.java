@@ -262,6 +262,10 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return value;
   }
 
+  public long get(int index) {
+    return this.values[index];
+  }
+
   @Override
   public boolean isNull(int index) {
     return isNull(this.values[index]);
@@ -483,10 +487,25 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     });
   }
 
-  public LongSeries set(BooleanSeries where, long value) {
+  @Override
+  public LongSeries set(BooleanSeries mask, Series other) {
+    if(other.size() == 1)
+      return this.set(mask, other.getLong(0));
+    assertSameLength(this, mask ,other);
+
+    long[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<this.values.length; i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i)))
+        values[i] = other.getLong(i);
+    }
+    return buildFrom(values);
+  }
+
+  public LongSeries set(BooleanSeries mask, long value) {
+    assertSameLength(this, mask);
     long[] values = new long[this.values.length];
-    for(int i=0; i<where.size(); i++) {
-      if(BooleanSeries.isTrue(where.getBoolean(i))) {
+    for(int i=0; i<mask.size(); i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i))) {
         values[i] = value;
       } else {
         values[i] = this.values[i];

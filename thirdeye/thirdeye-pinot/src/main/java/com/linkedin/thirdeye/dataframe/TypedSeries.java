@@ -71,4 +71,9 @@ public abstract class TypedSeries<T extends Series> extends Series {
   public T last() {
     return (T)super.last();
   }
+
+  @Override
+  public T set(Series other) {
+    return (T)super.set(other);
+  }
 }

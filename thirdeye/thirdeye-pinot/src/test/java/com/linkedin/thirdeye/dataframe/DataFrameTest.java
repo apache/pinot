@@ -710,15 +710,15 @@ public class DataFrameTest {
 
   @Test
   public void testObjectGroupByValue() {
-    ObjectSeries in = DataFrame.toSeriesObjects(3, new Tuple(1, 2), "1.0", 3L, 3, "1.0", new Tuple(1, 0), "1.0", new Tuple(1, 2), ONULL);
+    ObjectSeries in = DataFrame.toSeriesObjects(3, new TestTuple(1, 2), "1.0", 3L, 3, "1.0", new TestTuple(1, 0), "1.0", new TestTuple(1, 2), ONULL);
     Grouping.SeriesGrouping grouping = in.groupByValue();
 
     Assert.assertEquals(grouping.size(), 6);
     assertEquals(grouping.apply(0).getObjects(), 3, 3);
-    assertEquals(grouping.apply(1).getObjects(), new Tuple(1, 2), new Tuple(1, 2));
+    assertEquals(grouping.apply(1).getObjects(), new TestTuple(1, 2), new TestTuple(1, 2));
     assertEquals(grouping.apply(2).getObjects(), "1.0", "1.0", "1.0");
     assertEquals(grouping.apply(3).getObjects(), 3L);
-    assertEquals(grouping.apply(4).getObjects(), new Tuple(1, 0));
+    assertEquals(grouping.apply(4).getObjects(), new TestTuple(1, 0));
     assertEquals(grouping.apply(5).getObjects(), ONULL);
   }
 
@@ -1800,6 +1800,50 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testJoinOuterEmpty() {
+    DataFrame left = new DataFrame()
+        .addSeries("leftKey", 4, 2, 1, 3)
+        .addSeries("leftValue", "a", "d", "c", "b");
+
+    DataFrame right = new DataFrame()
+        .addSeries("rightKey", DoubleSeries.empty())
+        .addSeries("rightValue", ObjectSeries.empty());
+
+    DataFrame joined = left.joinOuter(right, "leftKey", "rightKey");
+
+    Assert.assertEquals(joined.size(), 4);
+    Assert.assertEquals(joined.get("leftKey").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.STRING);
+    Assert.assertEquals(joined.get("rightKey").type(), Series.SeriesType.DOUBLE);
+    Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.OBJECT);
+    assertEquals(joined.getLongs("leftKey"), 1, 2, 3, 4);
+    assertEquals(joined.getDoubles("rightKey"), DNULL, DNULL, DNULL, DNULL);
+    assertEquals(joined.getStrings("leftValue"), "c", "d", "b", "a");
+    assertEquals(joined.getObjects("rightValue"), ONULL, ONULL, ONULL, ONULL);
+  }
+
+  @Test
+  public void testJoinOuterObject() {
+    DataFrame left = new DataFrame()
+        .addSeriesObjects("key", new DataFrame.Tuple("a", "a"), new DataFrame.Tuple("a", "b"))
+        .addSeries("leftValue", 1, 2);
+
+    DataFrame right = new DataFrame()
+        .addSeriesObjects("key", new DataFrame.Tuple("b", "b"), new DataFrame.Tuple("a", "b"))
+        .addSeries("rightValue", "3", "4");
+
+    DataFrame joined = left.joinOuter(right, "key");
+
+    Assert.assertEquals(joined.size(), 3);
+    Assert.assertEquals(joined.get("key").type(), Series.SeriesType.OBJECT);
+    Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.STRING);
+    assertEquals(joined.getObjects("key"), new DataFrame.Tuple("a", "a"), new DataFrame.Tuple("a", "b"), new DataFrame.Tuple("b", "b"));
+    assertEquals(joined.getLongs("leftValue"), 1, 2, LNULL);
+    assertEquals(joined.getStrings("rightValue"), SNULL, "4","3");
+  }
+
+  @Test
   public void testJoinSameName() {
     DataFrame left = new DataFrame()
         .addSeries("name", 1, 2, 3, 4)
@@ -1813,11 +1857,11 @@ public class DataFrameTest {
 
     DataFrame df = left.joinInner(right, "name", "name");
 
-    Assert.assertEquals(df.getSeriesNames().size(), 5);
+    Assert.assertEquals(df.getSeriesNames().size(), 7);
 
     Assert.assertTrue(df.contains("name"));
-    Assert.assertFalse(df.contains("name" + DataFrame.COLUMN_JOIN_LEFT));
-    Assert.assertFalse(df.contains("name" + DataFrame.COLUMN_JOIN_RIGHT));
+    Assert.assertTrue(df.contains("name" + DataFrame.COLUMN_JOIN_LEFT));
+    Assert.assertTrue(df.contains("name" + DataFrame.COLUMN_JOIN_RIGHT));
 
     Assert.assertFalse(df.contains("value"));
     Assert.assertTrue(df.contains("value" + DataFrame.COLUMN_JOIN_LEFT));
@@ -1842,10 +1886,11 @@ public class DataFrameTest {
 
     DataFrame df = left.joinInner(right, "name", "key");
 
-    Assert.assertEquals(df.getSeriesNames().size(), 2);
+    Assert.assertEquals(df.getSeriesNames().size(), 3);
 
     Assert.assertTrue(df.contains("name"));
     Assert.assertTrue(df.contains("key"));
+    Assert.assertTrue(df.contains("name_key"));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -3204,6 +3249,114 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testSetSingleValue() {
+    BooleanSeries mask = DataFrame.toSeries(FALSE, TRUE, TRUE, BNULL);
+
+    Series values = DataFrame.toSeries(TRUE);
+
+    assertEquals(DataFrame.toSeries(BNULL, FALSE, FALSE, FALSE).set(mask, values), BNULL, TRUE, TRUE, FALSE);
+    assertEquals(DataFrame.toSeries(LNULL, 2, 3, 4).set(mask, values), LNULL, 1, 1, 4);
+    assertEquals(DataFrame.toSeries(DNULL, 2.0, 3.0, 4.0).set(mask, values), DNULL, 1.0, 1.0, 4.0);
+    assertEquals(DataFrame.toSeries(SNULL, "a", "b", "c").set(mask, values), SNULL, "true", "true", "c");
+    assertEquals(DataFrame.toSeriesObjects(ONULL, false, 3, "a").set(mask, values), ONULL, true, true, "a");
+  }
+
+  @Test
+  public void testSet() {
+    BooleanSeries mask = DataFrame.toSeries(FALSE, TRUE, TRUE, BNULL);
+
+    Series values = DataFrame.toSeries(TRUE, BNULL, TRUE, FALSE);
+
+    assertEquals(DataFrame.toSeries(BNULL, FALSE, FALSE, FALSE).set(mask, values), BNULL, BNULL, TRUE, FALSE);
+    assertEquals(DataFrame.toSeries(LNULL, 2, 3, 4).set(mask, values), LNULL, LNULL, 1, 4);
+    assertEquals(DataFrame.toSeries(DNULL, 2.0, 3.0, 4.0).set(mask, values), DNULL, DNULL, 1.0, 4.0);
+    assertEquals(DataFrame.toSeries(SNULL, "a", "b", "c").set(mask, values), SNULL, SNULL, "true", "c");
+    assertEquals(DataFrame.toSeriesObjects(ONULL, false, 3, "a").set(mask, values), ONULL, ONULL, true, "a");
+  }
+
+  @Test
+  public void testSetFailMaskMisaligned() {
+    BooleanSeries mask = DataFrame.toSeries(FALSE, TRUE, TRUE);
+    Series values = DataFrame.toSeries(TRUE, BNULL, TRUE, FALSE);
+
+    try {
+      DataFrame.toSeries(BNULL, FALSE, FALSE, FALSE).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(LNULL, 2, 3, 4).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(DNULL, 2.0, 3.0, 4.0).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(SNULL, "a", "b", "c").set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeriesObjects(ONULL, false, 3, "a").set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testSetFailValuesMisaligned() {
+    BooleanSeries mask = DataFrame.toSeries(FALSE, TRUE, TRUE, BNULL);
+    Series values = DataFrame.toSeries(TRUE, BNULL, FALSE);
+
+    try {
+      DataFrame.toSeries(BNULL, FALSE, FALSE, FALSE).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(LNULL, 2, 3, 4).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(DNULL, 2.0, 3.0, 4.0).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(SNULL, "a", "b", "c").set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeriesObjects(ONULL, false, 3, "a").set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+  }
+
+  @Test
   public void testAppend() {
     DataFrame base = new DataFrame();
     base.addSeries("A", 1, 2, 3, 4);
@@ -3515,12 +3668,12 @@ public class DataFrameTest {
    * Test classes
    ***************************************************************************/
 
-  private static class Tuple {
+  private static class TestTuple {
     final int a;
     final int b;
-    final Tuple myself;
+    final TestTuple myself;
 
-    Tuple(int a, int b) {
+    TestTuple(int a, int b) {
       this.a = a;
       this.b = b;
       this.myself = this;
@@ -3544,7 +3697,7 @@ public class DataFrameTest {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-      Tuple tuple = (Tuple) o;
+      TestTuple tuple = (TestTuple) o;
       return a == tuple.a && b == tuple.b;
     }
 
@@ -3574,13 +3727,13 @@ public class DataFrameTest {
     }
   }
 
-  private static class CompTuple extends Tuple implements Comparable<CompTuple> {
-    CompTuple(int a, int b) {
+  private static class CompTestTuple extends TestTuple implements Comparable<CompTestTuple> {
+    CompTestTuple(int a, int b) {
       super(a, b);
     }
 
     @Override
-    public int compareTo(CompTuple o) {
+    public int compareTo(CompTestTuple o) {
       if(o == null)
         return 1;
       if(this.a == o.a)
@@ -3589,7 +3742,7 @@ public class DataFrameTest {
     }
   }
 
-  private static CompTuple tup(int a, int b) {
-    return new CompTuple(a, b);
+  private static CompTestTuple tup(int a, int b) {
+    return new CompTestTuple(a, b);
   }
 }

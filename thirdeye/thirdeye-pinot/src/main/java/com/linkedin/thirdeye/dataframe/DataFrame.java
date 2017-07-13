@@ -29,6 +29,8 @@ import org.apache.commons.csv.CSVRecord;
 public class DataFrame {
   public static final Pattern PATTERN_FORMULA_VARIABLE = Pattern.compile("\\$\\{([^}]*)}");
 
+  public static final String COLUMN_JOIN_KEY = "join_key";
+
   public static final String COLUMN_INDEX_DEFAULT = "index";
   public static final String COLUMN_JOIN_LEFT = "_left";
   public static final String COLUMN_JOIN_RIGHT = "_right";
@@ -1558,9 +1560,14 @@ public class DataFrame {
   }
 
   private static DataFrame join(DataFrame left, DataFrame right, List<Series.JoinPair> pairs, String onSeriesLeft, String onSeriesRight) {
+    // TODO use hash join when available
+    byte[] maskValues = new byte[pairs.size()];
+
     int[] fromIndexLeft = new int[pairs.size()];
     int i=0;
     for(Series.JoinPair p : pairs) {
+      if(p.left == -1)
+        maskValues[i] = BooleanSeries.TRUE;
       fromIndexLeft[i++] = p.left;
     }
 
@@ -1573,14 +1580,22 @@ public class DataFrame {
     DataFrame leftData = left.project(fromIndexLeft);
     DataFrame rightData = right.project(fromIndexRight);
 
+    Series joinKey = leftData.get(onSeriesLeft).set(BooleanSeries.buildFrom(maskValues), rightData.get(onSeriesRight));
+
     Set<String> seriesLeft = left.getSeriesNames();
     Set<String> seriesRight = right.getSeriesNames();
 
     DataFrame joined = new DataFrame();
 
+    String joinKeyName = onSeriesLeft + "_" + onSeriesRight;
+    if(onSeriesLeft.equals(onSeriesRight))
+      joinKeyName = onSeriesLeft;
+
+    joined.addSeries(joinKeyName, joinKey);
+
     for(String name : seriesRight) {
       Series s = rightData.get(name);
-      if(!seriesLeft.contains(name) || name.equals(onSeriesRight)) {
+      if(!seriesLeft.contains(name) && !joined.contains(name)) {
         joined.addSeries(name, s);
       } else {
         joined.addSeries(name + COLUMN_JOIN_RIGHT, s);
@@ -1589,7 +1604,7 @@ public class DataFrame {
 
     for(String name : seriesLeft) {
       Series s = leftData.get(name);
-      if(!seriesRight.contains(name) || name.equals(onSeriesLeft)) {
+      if(!seriesRight.contains(name) && !joined.contains(name)) {
         joined.addSeries(name, s);
       } else {
         joined.addSeries(name + COLUMN_JOIN_LEFT, s);
@@ -1854,45 +1869,94 @@ public class DataFrame {
     if (resultSetGroup.getResultSetCount() <= 0)
       throw new IllegalArgumentException("Query did not return any results");
 
-    if (resultSetGroup.getResultSetCount() > 1)
-      throw new IllegalArgumentException("Query returned multiple results");
-
-    ResultSet resultSet = resultSetGroup.getResultSet(0);
-
-    DataFrame df = new DataFrame();
-
     // TODO conditions not necessarily safe
-    if(resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 0) {
-      // empty result
+    if (resultSetGroup.getResultSetCount() == 1) {
+      ResultSet resultSet = resultSetGroup.getResultSet(0);
 
-    } else if(resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 1 && resultSet.getGroupKeyLength() == 0) {
-      // aggregation result
+      if (resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 0) {
+        // empty result
+        return new DataFrame();
 
-      String function = resultSet.getColumnName(0);
-      String value = resultSet.getString(0, 0);
-      df.addSeries(function, DataFrame.toSeries(new String[] { value }));
+      } else if (resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 1 && resultSet.getGroupKeyLength() == 0) {
+        // aggregation result
 
-    } else if(resultSet.getColumnCount() == 1 && resultSet.getGroupKeyLength() > 0) {
-      // groupby result
+        DataFrame df = new DataFrame();
+        String function = resultSet.getColumnName(0);
+        String value = resultSet.getString(0, 0);
+        df.addSeries(function, DataFrame.toSeries(new String[]{value}));
+        return df;
 
-      String function = resultSet.getColumnName(0);
-      df.addSeries(function, makeGroupByValueSeries(resultSet));
-      for(int i=0; i<resultSet.getGroupKeyLength(); i++) {
-        String groupKey = resultSet.getGroupKeyColumnName(i);
-        df.addSeries(groupKey, makeGroupByGroupSeries(resultSet, i));
+      } else if (resultSet.getColumnCount() >= 1 && resultSet.getGroupKeyLength() == 0) {
+        // selection result
+
+        DataFrame df = new DataFrame();
+        for (int i = 0; i < resultSet.getColumnCount(); i++) {
+          df.addSeries(resultSet.getColumnName(i), makeSelectionSeries(resultSet, i));
+        }
+        return df;
+
       }
-
-    } else if(resultSet.getColumnCount() >= 1 && resultSet.getGroupKeyLength() == 0) {
-      // selection result
-
-      for (int i = 0; i < resultSet.getColumnCount(); i++) {
-        df.addSeries(resultSet.getColumnName(i), makeSelectionSeries(resultSet, i));
-      }
-
-    } else {
-      // defensive
-      throw new IllegalStateException("Could not determine DataFrame shape from output");
     }
+
+    // group by result
+    // TODO use join on multiple columns when available
+    DataFrame df = new DataFrame();
+    df.addSeries(COLUMN_JOIN_KEY, ObjectSeries.empty());
+    df.setIndex(COLUMN_JOIN_KEY);
+
+    ResultSet firstResultSet = resultSetGroup.getResultSet(0);
+    String[] groupKeyNames = new String[firstResultSet.getGroupKeyLength()];
+    for(int i=0; i<firstResultSet.getGroupKeyLength(); i++) {
+      groupKeyNames[i] = firstResultSet.getGroupKeyColumnName(i);
+    }
+
+    System.out.println("groupKeyNames: " + Arrays.toString(groupKeyNames));
+
+    for(int i=0; i<resultSetGroup.getResultSetCount(); i++) {
+      ResultSet resultSet = resultSetGroup.getResultSet(i);
+      String function = resultSet.getColumnName(0);
+
+      // pack group by keys into key tuple
+      DataFrame dfColumn = new DataFrame();
+      for(int j=0; j<resultSet.getGroupKeyLength(); j++) {
+        dfColumn.addSeries(groupKeyNames[j], makeGroupByGroupSeries(resultSet, j));
+      }
+
+      ObjectSeries jointKey = dfColumn.map(new Series.ObjectFunction() {
+        @Override
+        public Object apply(Object... values) {
+          return new Tuple(values);
+        }
+      }, groupKeyNames);
+
+      // join on key tuple
+      DataFrame dfJoin = new DataFrame();
+      dfJoin.addSeries(COLUMN_JOIN_KEY, jointKey);
+      dfJoin.addSeries(function, makeGroupByValueSeries(resultSet));
+      dfJoin.setIndex(COLUMN_JOIN_KEY);
+
+      System.out.println("dfJoin " + i + ":");
+      System.out.println(dfJoin);
+
+      df = df.joinOuter(dfJoin);
+    }
+
+    // unpack key tuple
+    for(int i=0; i<groupKeyNames.length; i++) {
+      final int fi = i;
+      df.addSeries(groupKeyNames[i], df.map(new Series.ObjectFunction() {
+        @Override
+        public Object apply(Object... values) {
+          return ((Tuple) values[0]).values[fi];
+        }
+      }, COLUMN_JOIN_KEY));
+    }
+
+    System.out.println("output (including key tuple):");
+    System.out.println(df);
+
+    // remove key tuple series
+    df.dropSeries(COLUMN_JOIN_KEY);
 
     return df;
   }
@@ -1936,5 +2000,71 @@ public class DataFrame {
     }
 
     return DataFrame.toSeries(values);
+  }
+
+  public static class Tuple implements Comparable<Tuple> {
+    private final Object[] values;
+
+    Tuple(Object... values) {
+      this.values = Arrays.copyOf(values, values.length);
+    }
+
+    public Object[] getValues() {
+      return values;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      Tuple tuple = (Tuple) o;
+      return Arrays.equals(values, tuple.values);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(values);
+    }
+
+    @Override
+    public String toString() {
+      return Arrays.toString(values);
+    }
+
+    @Override
+    public int compareTo(Tuple o) {
+      if (this.values.length != o.values.length) {
+        return Integer.compare(this.values.length, o.values.length);
+      }
+
+      for (int i = 0; i < this.values.length; i++) {
+        if (this.values[i] == null && o.values[i] == null) {
+          continue;
+        }
+        if (this.values[i] == null) {
+          return -1;
+        }
+        if (o.values[i] == null) {
+          return 1;
+        }
+
+        if (this.values[i].equals(o.values[i])) {
+          continue;
+        }
+
+        int result = ((Comparable<Object>) this.values[i]).compareTo(o.values[i]);
+        if (result == 0) {
+          continue;
+        }
+
+        return result;
+      }
+
+      return 0;
+    }
   }
 }

@@ -316,6 +316,18 @@ public abstract class Series {
    */
   public abstract Series shift(int offset);
 
+  /**
+   * Returns a copy of the series with all values indicated by {@code mask} replace by the
+   * corresponding values in {@code other}. If {@code other} has only a single element,
+   * all values indicated by mask are replaced by the this single value. Otherwise, the
+   * series, {@code mask} and {@code other} must be of the same length.
+   *
+   * @param mask boolean
+   * @param other replacement values
+   * @return series copy with masked values replaced by values from {@code other}
+   */
+  public abstract Series set(BooleanSeries mask, Series other);
+
   /* *************************************************************************
    * Public optional operations
    * *************************************************************************/
@@ -594,6 +606,17 @@ public abstract class Series {
    */
   public Series append(Series... other) {
     return this.getBuilder().addSeries(this).addSeries(other).build();
+  }
+
+  /**
+   * Returns a copy of the series with all values replaced non-null values from {@code other}.
+   * @see Series#set(BooleanSeries, Series)
+   *
+   * @param other replacement values
+   * @return series copy with values replaced by non-null values from {@code other}
+   */
+  public Series set(Series other) {
+    return this.set(other.isNull().not(), other);
   }
 
   /**
