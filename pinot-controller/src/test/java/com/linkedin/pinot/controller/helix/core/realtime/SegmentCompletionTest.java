@@ -1116,7 +1116,7 @@ public class SegmentCompletionTest {
   public static class MockSegmentCompletionManager extends SegmentCompletionManager {
     public long _secconds;
     protected MockSegmentCompletionManager(PinotLLCRealtimeSegmentManager segmentManager, boolean isLeader) {
-      super(createMockHelixManager(isLeader), segmentManager, new ControllerMetrics(new MetricsRegistry()), null);
+      super(createMockHelixManager(isLeader), segmentManager, new ControllerMetrics(new MetricsRegistry()));
     }
     @Override
     protected long getCurrentTimeMs() {

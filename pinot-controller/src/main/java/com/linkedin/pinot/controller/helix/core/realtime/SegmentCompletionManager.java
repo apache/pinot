@@ -66,7 +66,6 @@ public class SegmentCompletionManager {
   private final Map<String, Long> _commitTimeMap = new ConcurrentHashMap<>();
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
-  private final ControllerConf _controllerConf;
 
   private static final int MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS = 1800; // Half hour max commit time for all segments
 
@@ -77,19 +76,18 @@ public class SegmentCompletionManager {
   // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
 
   protected SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
-      ControllerMetrics controllerMetrics, ControllerConf controllerConf) {
+      ControllerMetrics controllerMetrics) {
     _helixManager = helixManager;
     _segmentManager = segmentManager;
     _controllerMetrics = controllerMetrics;
-    _controllerConf = controllerConf;
   }
 
   public boolean shouldAcceptSplitCommit() {
-    return _controllerConf.getAcceptSplitCommit();
+    return _segmentManager.getIsSplitCommitEnabled();
   }
 
   public String getControllerVipUrl() {
-    return _controllerConf.generateVipUrl();
+    return _segmentManager.getControllerVipUrl();
   }
 
   public static SegmentCompletionManager create(HelixManager helixManager,
@@ -98,7 +96,7 @@ public class SegmentCompletionManager {
     if (_instance != null) {
       throw new RuntimeException("Cannot create multiple instances");
     }
-    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics, controllerConf);
+    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics);
     SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(
         TimeUnit.MILLISECONDS.convert(controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.SECONDS));
     return _instance;
@@ -203,7 +201,6 @@ public class SegmentCompletionManager {
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
       response = fsm.segmentCommitStart(instanceId, offset);
-
     } catch (Exception e) {
       // Return failed response
     }
@@ -278,7 +275,7 @@ public class SegmentCompletionManager {
    *
    * @return
    */
-  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommitEnabled) {
     String segmentLocation = reqParams.getSegmentLocation();
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
@@ -291,7 +288,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit, segmentLocation);
+      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommitEnabled, segmentLocation);
     } catch (Exception e) {
       // Return failed response
     }
@@ -355,7 +352,7 @@ public class SegmentCompletionManager {
     // We may need to add some time here to allow for getting the lock? For now 0
     // We may need to add some time for the committer come back to us (after the build)? For now 0.
     private long _maxTimeAllowedToCommitMs;
-    private boolean _isSplitCommit;
+    private boolean _isSplitCommitEnabled;
     private String _controllerVipUrl;
 
     public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
@@ -400,7 +397,7 @@ public class SegmentCompletionManager {
       }
       _initialCommitTimeMs = initialCommitTimeMs;
       _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
-      _isSplitCommit = segmentCompletionManager.shouldAcceptSplitCommit();
+      _isSplitCommitEnabled = segmentCompletionManager.shouldAcceptSplitCommit();
       _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
     }
 
@@ -416,7 +413,7 @@ public class SegmentCompletionManager {
 
     @Override
     public String toString() {
-      return "{" + _segmentName.getSegmentName() + "," + _state + "," + _startTimeMs + "," + _winner + "," + _winningOffset + "," + _isSplitCommit + "," + _controllerVipUrl + "}";
+      return "{" + _segmentName.getSegmentName() + "," + _state + "," + _startTimeMs + "," + _winner + "," + _winningOffset + "," + _isSplitCommitEnabled + "," + _controllerVipUrl + "}";
     }
 
     // SegmentCompletionManager releases the FSM from the hashtable when it is done.
@@ -584,7 +581,7 @@ public class SegmentCompletionManager {
      * We can get this call only when the state is COMMITTER_UPLOADING. Also, the instanceId should be equal to
      * the _winner.
      */
-    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommit, String segmentLocation) {
+    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommitEnabled, String segmentLocation) {
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
@@ -602,7 +599,7 @@ public class SegmentCompletionManager {
           return abortAndReturnFailed();
 
         }
-        SegmentCompletionProtocol.Response response = commitSegment(instanceId, offset, isSplitCommit, segmentLocation);
+        SegmentCompletionProtocol.Response response = commitSegment(instanceId, offset, isSplitCommitEnabled, segmentLocation);
         if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
           return abortAndReturnFailed();
         } else {
@@ -622,8 +619,9 @@ public class SegmentCompletionManager {
       long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs)/1000;
       LOGGER.info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
-          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
-          .withSplitCommit(_isSplitCommit).withControllerVipUrl(_controllerVipUrl));
+          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus(
+              SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+          .withSplitCommit(_isSplitCommitEnabled).withControllerVipUrl(_controllerVipUrl));
     }
 
     private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {
@@ -973,7 +971,7 @@ public class SegmentCompletionManager {
       return response;
     }
 
-    private SegmentCompletionProtocol.Response commitSegment(String instanceId, long offset, boolean isSplitCommit,
+    private SegmentCompletionProtocol.Response commitSegment(String instanceId, long offset, boolean isSplitCommitEnabled,
         String segmentLocation) {
       boolean success;
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
@@ -986,7 +984,7 @@ public class SegmentCompletionManager {
       _state = State.COMMITTING;
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
-      if (isSplitCommit) {
+      if (isSplitCommitEnabled) {
         if (!_segmentManager.commitSegmentFile(_segmentName.getTableName(), segmentLocation, _segmentName.getSegmentName())) {
           return SegmentCompletionProtocol.RESP_FAILED;
         }
