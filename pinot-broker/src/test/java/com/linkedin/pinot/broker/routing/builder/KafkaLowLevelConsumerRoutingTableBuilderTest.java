@@ -46,7 +46,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
 
   @Test
   public void testAllOnlineRoutingTable() {
-    final int ITERATIONS = 1000;
+    final int ITERATIONS = 50;
     Random random = new Random();
 
     KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
