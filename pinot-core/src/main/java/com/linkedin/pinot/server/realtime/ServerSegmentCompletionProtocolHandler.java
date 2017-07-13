@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethodBase;
+import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.multipart.FilePart;
@@ -136,11 +137,17 @@ public class ServerSegmentCompletionProtocolHandler {
 
     String hostPort = uploadHost;
     String protocol = "http";
-    if (uploadHost.contains(protocol)) {
-      String[] protocolHost = uploadHost.split("://");
-      protocol = protocolHost[0];
-      hostPort = protocolHost[1];
+    if (uploadHost.startsWith(protocol)) {
+      try {
+        URI uri = new URI(uploadHost, /* boolean escaped */ false);
+        protocol = uri.getScheme();
+        hostPort = uri.getAuthority();
+      } catch (Exception e) {
+        LOGGER.info("Could not make {} a URI. Using default protocol", uploadHost);
+        hostPort = uploadHost.split("://")[1];
+      }
     }
+
 
     final String url;
     url = request.getUrl(hostPort, protocol);

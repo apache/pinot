@@ -414,9 +414,9 @@ public class SegmentCompletionProtocol {
       StringBuilder builder = new StringBuilder();
       builder.append("{\"" + STATUS_KEY + "\":" + "\"" + _status.name() + "\"," + "\""
           + OFFSET_KEY + "\":" + _offset + ",\""
-          + COMMIT_TYPE_KEY + "\":" + _isSplitCommit + ",\""
-          + (_segmentLocation != null ? SEGMENT_LOCATION_KEY + "\":\"" + _segmentLocation + "\"," + "\"" : "")
-          + (_controllerVipUrl != null ? CONTROLLER_VIP_URL_KEY + "\":\"" + _controllerVipUrl + "\"" : ""));
+          + COMMIT_TYPE_KEY + "\":" + _isSplitCommit
+          + (_segmentLocation != null ? ",\"" + SEGMENT_LOCATION_KEY + "\":\"" + _segmentLocation + "\"" : "")
+          + (_controllerVipUrl != null ? "," + "\"" + CONTROLLER_VIP_URL_KEY + "\":\"" + _controllerVipUrl + "\"" : ""));
       builder.append("}");
       return builder.toString();
     }

@@ -638,7 +638,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    return  _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
+    return _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
   }
 
   protected boolean commitSegment(final String segTarFileName, SegmentCompletionProtocol.Response response) {

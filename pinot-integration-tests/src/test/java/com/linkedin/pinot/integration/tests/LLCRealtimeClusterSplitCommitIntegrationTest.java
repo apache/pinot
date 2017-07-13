@@ -16,6 +16,11 @@
 
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import org.apache.commons.configuration.Configuration;
+
+
 /**
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and
  * queries Pinot with split commit enabled from the controller side.
@@ -25,11 +30,13 @@ public class LLCRealtimeClusterSplitCommitIntegrationTest extends LLCRealtimeClu
 
   @Override
   public void startController() {
-    startController(true);
+    startController(ControllerTestUtils.getDefaultControllerConfigurationWithSplitCommit());
   }
 
   @Override
   public void startServer() {
-    startServer(true);
+    Configuration configuration = getDefaultConfiguration();
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
+    startServer(configuration);
   }
 }
