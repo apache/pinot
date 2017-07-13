@@ -58,7 +58,7 @@ import org.testng.annotations.BeforeTest;
  * </ul>
  */
 public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
-  private static final String AVRO_DATA = "data/test_data-sv.avro";
+  private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_126164076_167572854";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
 
