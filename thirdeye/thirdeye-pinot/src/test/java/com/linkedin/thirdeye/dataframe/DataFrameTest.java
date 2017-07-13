@@ -1765,13 +1765,12 @@ public class DataFrameTest {
 
     DataFrame joined = left.joinInner(right, "leftKey", "rightKey");
 
+    Assert.assertEquals(joined.getSeriesNames().size(), 3);
     Assert.assertEquals(joined.size(), 4);
-    Assert.assertEquals(joined.get("leftKey").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(joined.get("leftKey_rightKey").type(), Series.SeriesType.LONG);
     Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.STRING);
-    Assert.assertEquals(joined.get("rightKey").type(), Series.SeriesType.DOUBLE);
     Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.STRING);
-    assertEquals(joined.getLongs("leftKey"), 1, 1, 2, 3);
-    assertEquals(joined.getDoubles("rightKey"),1.0, 1.0, 2.0, 3.0);
+    assertEquals(joined.getLongs("leftKey_rightKey"), 1, 1, 2, 3);
     assertEquals(joined.getStrings("leftValue"), "c", "c", "d", "b");
     assertEquals(joined.getStrings("rightValue"), "w", "y", "z", "x");
   }
@@ -1788,13 +1787,12 @@ public class DataFrameTest {
 
     DataFrame joined = left.joinOuter(right, "leftKey", "rightKey");
 
+    Assert.assertEquals(joined.getSeriesNames().size(), 3);
     Assert.assertEquals(joined.size(), 7);
-    Assert.assertEquals(joined.get("leftKey").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(joined.get("leftKey_rightKey").type(), Series.SeriesType.LONG);
     Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.STRING);
-    Assert.assertEquals(joined.get("rightKey").type(), Series.SeriesType.DOUBLE);
     Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.STRING);
-    assertEquals(joined.getLongs("leftKey"), LNULL, 1, 1, 2, 3, 4, LNULL);
-    assertEquals(joined.getDoubles("rightKey"), 0.0, 1.0, 1.0, 2.0, 3.0, DNULL, 5.0);
+    assertEquals(joined.getLongs("leftKey_rightKey"), 0, 1, 1, 2, 3, 4, 5);
     assertEquals(joined.getStrings("leftValue"), SNULL, "c", "c", "d", "b", "a", SNULL);
     assertEquals(joined.getStrings("rightValue"), "u", "w", "y", "z", "x", SNULL, "v");
   }
@@ -1811,13 +1809,12 @@ public class DataFrameTest {
 
     DataFrame joined = left.joinOuter(right, "leftKey", "rightKey");
 
+    Assert.assertEquals(joined.getSeriesNames().size(), 3);
     Assert.assertEquals(joined.size(), 4);
-    Assert.assertEquals(joined.get("leftKey").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(joined.get("leftKey_rightKey").type(), Series.SeriesType.LONG);
     Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.STRING);
-    Assert.assertEquals(joined.get("rightKey").type(), Series.SeriesType.DOUBLE);
     Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.OBJECT);
-    assertEquals(joined.getLongs("leftKey"), 1, 2, 3, 4);
-    assertEquals(joined.getDoubles("rightKey"), DNULL, DNULL, DNULL, DNULL);
+    assertEquals(joined.getLongs("leftKey_rightKey"), 1, 2, 3, 4);
     assertEquals(joined.getStrings("leftValue"), "c", "d", "b", "a");
     assertEquals(joined.getObjects("rightValue"), ONULL, ONULL, ONULL, ONULL);
   }
@@ -1857,11 +1854,11 @@ public class DataFrameTest {
 
     DataFrame df = left.joinInner(right, "name", "name");
 
-    Assert.assertEquals(df.getSeriesNames().size(), 7);
+    Assert.assertEquals(df.getSeriesNames().size(), 5);
 
     Assert.assertTrue(df.contains("name"));
-    Assert.assertTrue(df.contains("name" + DataFrame.COLUMN_JOIN_LEFT));
-    Assert.assertTrue(df.contains("name" + DataFrame.COLUMN_JOIN_RIGHT));
+    Assert.assertFalse(df.contains("name" + DataFrame.COLUMN_JOIN_LEFT));
+    Assert.assertFalse(df.contains("name" + DataFrame.COLUMN_JOIN_RIGHT));
 
     Assert.assertFalse(df.contains("value"));
     Assert.assertTrue(df.contains("value" + DataFrame.COLUMN_JOIN_LEFT));
@@ -1886,10 +1883,8 @@ public class DataFrameTest {
 
     DataFrame df = left.joinInner(right, "name", "key");
 
-    Assert.assertEquals(df.getSeriesNames().size(), 3);
+    Assert.assertEquals(df.getSeriesNames().size(), 1);
 
-    Assert.assertTrue(df.contains("name"));
-    Assert.assertTrue(df.contains("key"));
     Assert.assertTrue(df.contains("name_key"));
   }
 

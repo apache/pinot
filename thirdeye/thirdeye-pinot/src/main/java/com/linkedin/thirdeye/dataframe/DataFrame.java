@@ -1582,20 +1582,23 @@ public class DataFrame {
 
     Series joinKey = leftData.get(onSeriesLeft).set(BooleanSeries.buildFrom(maskValues), rightData.get(onSeriesRight));
 
-    Set<String> seriesLeft = left.getSeriesNames();
-    Set<String> seriesRight = right.getSeriesNames();
+    Set<String> seriesLeft = new HashSet<>(left.getSeriesNames());
+    Set<String> seriesRight = new HashSet<>(right.getSeriesNames());
 
-    DataFrame joined = new DataFrame();
+    seriesLeft.remove(onSeriesLeft);
+    seriesRight.remove(onSeriesRight);
 
     String joinKeyName = onSeriesLeft + "_" + onSeriesRight;
     if(onSeriesLeft.equals(onSeriesRight))
       joinKeyName = onSeriesLeft;
 
+    DataFrame joined = new DataFrame();
     joined.addSeries(joinKeyName, joinKey);
+    joined.setIndex(joinKeyName);
 
     for(String name : seriesRight) {
       Series s = rightData.get(name);
-      if(!seriesLeft.contains(name) && !joined.contains(name)) {
+      if(!seriesLeft.contains(name)) {
         joined.addSeries(name, s);
       } else {
         joined.addSeries(name + COLUMN_JOIN_RIGHT, s);
@@ -1604,14 +1607,12 @@ public class DataFrame {
 
     for(String name : seriesLeft) {
       Series s = leftData.get(name);
-      if(!seriesRight.contains(name) && !joined.contains(name)) {
+      if(!seriesRight.contains(name)) {
         joined.addSeries(name, s);
       } else {
         joined.addSeries(name + COLUMN_JOIN_LEFT, s);
       }
     }
-
-    joined.setIndex(onSeriesLeft);
 
     return joined;
   }
