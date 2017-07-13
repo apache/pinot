@@ -115,10 +115,8 @@ public class AggregationGroupByTrimmingService {
           if (priorityQueue == null) {
             trimmedResults.get(i).put(groupKey, intermediateResults[i]);
           } else {
-            priorityQueue.add(new GroupKeyResultPair(groupKey, (Comparable) intermediateResults[i]));
-            if (priorityQueue.size() > _trimSize) {
-              priorityQueue.poll();
-            }
+            GroupKeyResultPair newValue = new GroupKeyResultPair(groupKey, (Comparable) intermediateResults[i]);
+            addToPriorityQueue(priorityQueue, newValue, _trimSize);
           }
         }
       }
@@ -171,10 +169,9 @@ public class AggregationGroupByTrimmingService {
       for (Map.Entry<String, Comparable> entry : finalResultMap.entrySet()) {
         String groupKey = entry.getKey();
         Comparable finalResult = entry.getValue();
-        priorityQueue.add(new GroupKeyResultPair(groupKey, finalResult));
-        if (priorityQueue.size() > _groupByTopN) {
-          priorityQueue.poll();
-        }
+
+        GroupKeyResultPair newValue = new GroupKeyResultPair(groupKey, finalResult);
+        addToPriorityQueue(priorityQueue, newValue, _groupByTopN);
       }
 
       // Fill trimmed results into the list.
@@ -190,6 +187,37 @@ public class AggregationGroupByTrimmingService {
     }
 
     return trimmedResults;
+  }
+
+  /**
+   * Helper method to add a value into priority queue:
+   * <ul>
+   *   <li> If the queue size is less than maxQueueSize, then the element is simply added into the priority queue. </li>
+   *   <li> If the queue size is >= maxQueueSize, then the given value is compared against the top of priority queue.
+   *        If value is 'better' than the top, then it is inserted into the queue, and the top element is removed,
+   *        to keep the size of the queue bounded. </li>
+   *   <li> If max queue size is <= 0, then simply returns. Caller is responsible for ensuring a valid value of
+   *        max queue size is provided. </li>
+   * </ul>
+   * @param priorityQueue Priority queue into which the element needs to be inserted.
+   * @param value Value to be inserted.
+   * @param maxQueueSize Max allowed queue size.
+   */
+  private void addToPriorityQueue(PriorityQueue<GroupKeyResultPair> priorityQueue, GroupKeyResultPair value, int maxQueueSize) {
+    // If maxQueueSize is zero, then simply return. Caller should check the validity of maxQueueSize.
+    if (maxQueueSize <= 0) {
+      return;
+    }
+
+    if (priorityQueue.size() >= maxQueueSize) {
+      GroupKeyResultPair topValue = priorityQueue.peek();
+      if (priorityQueue.comparator().compare(topValue, value) < 0) {
+        priorityQueue.poll();
+        priorityQueue.add(value);
+      }
+    } else {
+      priorityQueue.add(value);
+    }
   }
 
   private static class GroupKeyResultPair {
