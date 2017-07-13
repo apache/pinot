@@ -87,7 +87,6 @@ public class AnomalyResource {
   private static final String DEFAULT_FUNCTION_TYPE = "WEEK_OVER_WEEK_RULE";
 
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private MergedAnomalyResultManager anomalyMergedResultDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
   private EmailConfigurationManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
@@ -104,7 +103,6 @@ public class AnomalyResource {
   public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
-    this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
@@ -131,7 +129,7 @@ public class AnomalyResource {
   @Path("/anomalies/view/{anomaly_merged_result_id}")
   public MergedAnomalyResultDTO getMergedAnomalyDetail(
       @NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
-    return anomalyMergedResultDAO.findById(mergedAnomalyId);
+    return mergedAnomalyResultDAO.findById(mergedAnomalyId);
   }
 
   // View merged anomalies for collection
@@ -174,12 +172,12 @@ public class AnomalyResource {
 
       if (StringUtils.isNotBlank(metric)) {
         if (StringUtils.isNotBlank(exploredDimensions)) {
-          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+          anomalyResults = mergedAnomalyResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
         } else {
-          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+          anomalyResults = mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
         }
       } else {
-        anomalyResults = anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+        anomalyResults = mergedAnomalyResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
       }
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
@@ -804,7 +802,7 @@ public class AnomalyResource {
   @Path(value = "anomaly-merged-result/feedback/{anomaly_merged_result_id}")
   public void updateAnomalyMergedResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId, String payload) {
     try {
-      MergedAnomalyResultDTO result = anomalyMergedResultDAO.findById(anomalyResultId);
+      MergedAnomalyResultDTO result = mergedAnomalyResultDAO.findById(anomalyResultId);
       if (result == null) {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
@@ -816,7 +814,7 @@ public class AnomalyResource {
       }
       feedback.setComment(feedbackRequest.getComment());
       feedback.setFeedbackType(feedbackRequest.getFeedbackType());
-      anomalyMergedResultDAO.updateAnomalyFeedback(result);
+      mergedAnomalyResultDAO.updateAnomalyFeedback(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
@@ -866,7 +864,7 @@ public class AnomalyResource {
       throws Exception {
 
     boolean loadRawAnomalies = false;
-    MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId, loadRawAnomalies);
+    MergedAnomalyResultDTO anomalyResult = mergedAnomalyResultDAO.findById(anomalyResultId, loadRawAnomalies);
     Map<String, String> anomalyProps = anomalyResult.getProperties();
 
     AnomalyTimelinesView anomalyTimelinesView = null;
