@@ -30,4 +30,5 @@ public class Constants {
   public static final String TENANT_TAG = "Tenant";
 
   public static final String TABLE_TYPE = "type";
+  public static final String INTERNAL_TAG = "Internal Only";
 }
