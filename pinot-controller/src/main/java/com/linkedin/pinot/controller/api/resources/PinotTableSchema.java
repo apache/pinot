@@ -40,11 +40,11 @@ public class PinotTableSchema {
 
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
-  
+
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/schema")
-   @ApiOperation(value = "Get table schema", notes = "Read table schema")
+  @ApiOperation(value = "Get table schema", notes = "Read table schema")
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found")})
   public Schema getTableSchema(
