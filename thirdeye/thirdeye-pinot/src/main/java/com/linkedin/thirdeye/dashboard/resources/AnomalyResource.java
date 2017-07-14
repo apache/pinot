@@ -248,7 +248,7 @@ public class AnomalyResource {
   /************* CRUD for anomaly functions of collection **********************************************/
   // View all anomaly functions
   @GET
-  @Path("/anomaly-function/view")
+  @Path("/anomaly-function")
   public List<AnomalyFunctionDTO> viewAnomalyFunctions(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric) {
 
@@ -272,7 +272,7 @@ public class AnomalyResource {
 
   // Add anomaly function
   @POST
-  @Path("/anomaly-function/create")
+  @Path("/anomaly-function")
   public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
       @NotNull @QueryParam("functionName") String functionName,
       @NotNull @QueryParam("metric") String metric,
@@ -366,9 +366,9 @@ public class AnomalyResource {
   }
 
   // Edit anomaly function
-  @POST
-  @Path("/anomaly-function/update")
-  public Response updateAnomalyFunction(@NotNull @QueryParam("id") Long id,
+  @PUT
+  @Path("/anomaly-function/{id}")
+  public Response updateAnomalyFunction(@NotNull @PathParam("id") Long id,
       @QueryParam("dataset") String dataset,
       @QueryParam("functionName") String functionName,
       @QueryParam("metric") String metric,
@@ -741,7 +741,7 @@ public class AnomalyResource {
 
   // Delete anomaly function
   @DELETE
-  @Path("/anomaly-function/delete")
+  @Path("/anomaly-function")
   public Response deleteAnomalyFunctions(@NotNull @QueryParam("id") Long id,
       @QueryParam("functionName") String functionName)
       throws IOException {
