@@ -178,7 +178,8 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   })
   @Responses({
       @Response(statusCode = "200", description = "A list of all segments for the specified table"),
-      @Response(statusCode = "404", description = "The segment file or table does not exist")
+      @Response(statusCode = "404", description = "The segment file or table does not exist"),
+      @Response(statusCode = "400", description = "Bad client tableType parameter")
   })
   private Representation getSegmentsForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
