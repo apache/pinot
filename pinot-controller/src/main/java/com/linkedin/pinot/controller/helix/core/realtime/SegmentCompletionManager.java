@@ -275,7 +275,7 @@ public class SegmentCompletionManager {
    *
    * @return
    */
-  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommitEnabled) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit) {
     String segmentLocation = reqParams.getSegmentLocation();
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
@@ -288,7 +288,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommitEnabled, segmentLocation);
+      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit, segmentLocation);
     } catch (Exception e) {
       // Return failed response
     }
@@ -581,7 +581,7 @@ public class SegmentCompletionManager {
      * We can get this call only when the state is COMMITTER_UPLOADING. Also, the instanceId should be equal to
      * the _winner.
      */
-    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommitEnabled, String segmentLocation) {
+    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommit, String segmentLocation) {
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
@@ -599,7 +599,7 @@ public class SegmentCompletionManager {
           return abortAndReturnFailed();
 
         }
-        SegmentCompletionProtocol.Response response = commitSegment(instanceId, offset, isSplitCommitEnabled, segmentLocation);
+        SegmentCompletionProtocol.Response response = commitSegment(instanceId, offset, isSplitCommit, segmentLocation);
         if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
           return abortAndReturnFailed();
         } else {
@@ -618,17 +618,13 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response commit(String instanceId, long offset) {
       long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs)/1000;
       LOGGER.info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
+      SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params().withOffset(offset).withBuildTimeSeconds(allowedBuildTimeSec)
+          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+          .withSplitCommit(_isSplitCommitEnabled);
       if (_isSplitCommitEnabled) {
-        return new SegmentCompletionProtocol.Response(
-            new SegmentCompletionProtocol.Response.Params().withOffset(offset).withBuildTimeSeconds(allowedBuildTimeSec)
-                .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
-                .withSplitCommit(_isSplitCommitEnabled).withControllerVipUrl(_controllerVipUrl));
-      } else {
-        return new SegmentCompletionProtocol.Response(
-            new SegmentCompletionProtocol.Response.Params().withOffset(offset).withBuildTimeSeconds(allowedBuildTimeSec)
-                .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
-                .withSplitCommit(_isSplitCommitEnabled));
+        params.withControllerVipUrl(_controllerVipUrl);
       }
+      return new SegmentCompletionProtocol.Response(params);
     }
 
     private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {

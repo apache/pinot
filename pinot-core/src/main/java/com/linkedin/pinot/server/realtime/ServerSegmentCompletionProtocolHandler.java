@@ -143,8 +143,7 @@ public class ServerSegmentCompletionProtocolHandler {
         protocol = uri.getScheme();
         hostPort = uri.getAuthority();
       } catch (Exception e) {
-        LOGGER.info("Could not make {} a URI. Using default protocol", uploadHost);
-        hostPort = uploadHost.split("://")[1];
+        throw new RuntimeException("Could not make URI", e);
       }
     }
 
