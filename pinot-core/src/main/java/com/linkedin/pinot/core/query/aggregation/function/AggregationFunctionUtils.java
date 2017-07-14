@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.google.common.math.DoubleMath;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
@@ -65,7 +66,15 @@ public class AggregationFunctionUtils {
   @Nonnull
   public static String formatValue(@Nonnull Object value) {
     if (value instanceof Double) {
-      return String.format(Locale.US, "%1.5f", (Double) value);
+      Double doubleValue = (Double) value;
+
+      // String.format is very expensive, so avoid it for whole numbers that can fit in Long.
+      // We simply append ".00000" to long, in order to keep the existing behavior.
+      if (doubleValue <= Long.MAX_VALUE && DoubleMath.isMathematicalInteger(doubleValue)) {
+        return Long.toString(doubleValue.longValue()) + ".00000";
+      } else {
+        return String.format(Locale.US, "%1.5f", doubleValue);
+      }
     } else {
       return value.toString();
     }
