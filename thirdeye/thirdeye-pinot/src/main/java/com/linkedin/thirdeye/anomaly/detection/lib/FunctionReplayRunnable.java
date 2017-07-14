@@ -11,6 +11,8 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
@@ -145,7 +147,9 @@ public class FunctionReplayRunnable implements Runnable {
 
     anomalyFunctionDAO.update(anomalyFunctionDTO);
 
-    detectionJobScheduler.synchronousBackFill(clonedFunctionId, replayStart, replayEnd, isForceBackfill);
+    List<Long> functionIdList = new ArrayList<>();
+    functionIdList.add(clonedFunctionId);
+    detectionJobScheduler.synchronousBackFill(functionIdList, replayStart, replayEnd, isForceBackfill);
 
     if(autotuneConfigDAO != null) { // if no functionAutotuneId, skip update
       PerformanceEvaluate performanceEvaluator =
