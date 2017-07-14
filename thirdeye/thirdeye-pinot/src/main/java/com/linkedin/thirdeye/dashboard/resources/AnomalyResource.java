@@ -248,7 +248,7 @@ public class AnomalyResource {
   /************* CRUD for anomaly functions of collection **********************************************/
   // View all anomaly functions
   @GET
-  @Path("/anomaly-function/view")
+  @Path("/anomaly-function")
   public List<AnomalyFunctionDTO> viewAnomalyFunctions(@NotNull @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric) {
 
@@ -272,7 +272,7 @@ public class AnomalyResource {
 
   // Add anomaly function
   @POST
-  @Path("/anomaly-function/create")
+  @Path("/anomaly-function")
   public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
       @NotNull @QueryParam("functionName") String functionName,
       @NotNull @QueryParam("metric") String metric,
@@ -366,77 +366,85 @@ public class AnomalyResource {
   }
 
   // Edit anomaly function
-  @POST
-  @Path("/anomaly-function/update")
-  public Response updateAnomalyFunction(@NotNull @QueryParam("id") Long id,
-      @NotNull @QueryParam("dataset") String dataset,
-      @NotNull @QueryParam("functionName") String functionName,
-      @NotNull @QueryParam("metric") String metric,
+  @PUT
+  @Path("/anomaly-function/{id}")
+  public Response updateAnomalyFunction(@NotNull @PathParam("id") Long id,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("functionName") String functionName,
+      @QueryParam("metric") String metric,
       @QueryParam("type") String type,
-      @NotNull @QueryParam("windowSize") String windowSize,
-      @NotNull @QueryParam("windowUnit") String windowUnit,
-      @NotNull @QueryParam("windowDelay") String windowDelay,
+      @QueryParam("windowSize") String windowSize,
+      @QueryParam("windowUnit") String windowUnit,
+      @QueryParam("windowDelay") String windowDelay,
       @QueryParam("cron") String cron,
       @QueryParam("windowDelayUnit") String windowDelayUnit,
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters,
-      @NotNull @QueryParam("properties") String properties,
-      @QueryParam("isActive") boolean isActive) throws Exception {
-
-    if (id == null || StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName)
-        || StringUtils.isEmpty(metric) || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit)
-        || StringUtils.isEmpty(windowDelay) || StringUtils.isEmpty(properties)) {
-      throw new UnsupportedOperationException("Received null for one of the mandatory params: "
-          + "id " + id + ",dataset " + dataset + ", functionName " + functionName + ", metric " + metric
-          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", windowDelay " + windowDelay
-          + ", properties" + properties);
-    }
+      @QueryParam("properties") String properties,
+      @QueryParam("isActive") Boolean isActive) throws Exception {
 
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("AnomalyFunctionSpec with id " + id + " does not exist");
     }
 
-    DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
-    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-    TimeGranularity dataGranularity = timespec.getDataGranularity();
+    // Update dataset if exists
+    if (StringUtils.isNotBlank(dataset)) {
+      DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+      TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+      TimeGranularity dataGranularity = timespec.getDataGranularity();
+      anomalyFunctionSpec.setCollection(dataset);
 
-    anomalyFunctionSpec.setActive(isActive);
-    anomalyFunctionSpec.setCollection(dataset);
-    anomalyFunctionSpec.setFunctionName(functionName);
-    anomalyFunctionSpec.setTopicMetric(metric);
-    anomalyFunctionSpec.setMetrics(Arrays.asList(metric));
-    if (StringUtils.isEmpty(type)) {
-      type = DEFAULT_FUNCTION_TYPE;
+      // bucket size and unit are defaulted to the collection granularity
+      anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
+      anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
     }
-    anomalyFunctionSpec.setType(type);
-    anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
-    anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
 
-    // bucket size and unit are defaulted to the collection granularity
-    anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
-    anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
+    if (isActive != null) {
+      anomalyFunctionSpec.setActive(isActive);
+    }
+    if (StringUtils.isNotBlank(functionName)) {
+      anomalyFunctionSpec.setFunctionName(functionName);
+    }
+    if (StringUtils.isNotBlank(metric)) {
+      anomalyFunctionSpec.setTopicMetric(metric);
+      anomalyFunctionSpec.setMetrics(Arrays.asList(metric));
+    }
+    if (StringUtils.isNotEmpty(type)) {
+      anomalyFunctionSpec.setType(type);
+    }
+    if (StringUtils.isNotBlank(windowSize)) {
+      anomalyFunctionSpec.setWindowSize(Integer.valueOf(windowSize));
+    }
+    if (StringUtils.isNotBlank(windowUnit)) {
+      anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
+    }
 
-    if (!StringUtils.isBlank(filters)) {
+    if (StringUtils.isNotBlank(filters)) {
       filters = URLDecoder.decode(filters, UTF8);
       String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
       anomalyFunctionSpec.setFilters(filterString);
     }
-    anomalyFunctionSpec.setProperties(properties);
+    if (StringUtils.isNotBlank(properties)) {
+      Properties propertiesToUpdate = AnomalyFunctionDTO.toProperties(properties);
+      Map<String, String> propertyMap = new HashMap<>();
+      for (String propertyName : propertiesToUpdate.stringPropertyNames()) {
+        propertyMap.put(propertyName, propertiesToUpdate.getProperty(propertyName));
+      }
+      anomalyFunctionSpec.updateProperties(propertyMap);
+    }
 
     if(StringUtils.isNotEmpty(exploreDimensions)) {
       // Ensure that the explore dimension names are ordered as schema dimension names
       anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
     }
-    if (StringUtils.isEmpty(cron)) {
-      cron = DEFAULT_CRON;
-    } else {
+    if (StringUtils.isNotEmpty(cron)) {
       // validate cron
       if (!CronExpression.isValidExpression(cron)) {
         throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
       }
+      anomalyFunctionSpec.setCron(cron);
     }
-    anomalyFunctionSpec.setCron(cron);
 
     anomalyFunctionDAO.update(anomalyFunctionSpec);
     return Response.ok(id).build();
@@ -733,7 +741,7 @@ public class AnomalyResource {
 
   // Delete anomaly function
   @DELETE
-  @Path("/anomaly-function/delete")
+  @Path("/anomaly-function")
   public Response deleteAnomalyFunctions(@NotNull @QueryParam("id") Long id,
       @QueryParam("functionName") String functionName)
       throws IOException {

@@ -142,7 +142,7 @@ $(document).ready( function() {
     /** Handelbars template for main content
      /** Handelbars template for SELF SERVICE tab ANOMALY FUNCTION FORM **/
 
-    //Harcoding the function type metadata till backend endpoint is updated/available: "/thirdeye/function/metadata"
+    //Harcoding the function type metadata till backend endpoint is updated/available: "/dashboard/anomaly-function/metadata"
     //Todo: get the function-type metadata from the backend once endpoint is updated
     var anomalyFunctionTypeMetaData = {
         KALMAN_FILTER: [
