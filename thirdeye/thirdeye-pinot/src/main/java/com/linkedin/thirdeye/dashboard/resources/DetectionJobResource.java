@@ -235,70 +235,8 @@ public class DetectionJobResource {
       @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
-    final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(Long.valueOf(id));
-    if (anomalyFunction == null){
-      LOG.warn("[Backfill] Unable to load function id {}", id);
-      throw new IllegalArgumentException(String.format("[Backfill] Unable to load function id %d", id));
-    }
-    // Check if the anomaly function is active
-    if (!anomalyFunction.getIsActive()) {
-      LOG.warn("[Backfill] Skipping deactivated function id {}", id);
-      throw new IllegalArgumentException(String.format("[Backfill] Skipping deactivated function %d", id));
-    }
 
-    // Check if the timestamps are available
-    DateTime startTime = null;
-    DateTime endTime = null;
-    if (startTimeIso == null || startTimeIso.isEmpty()) {
-      LOG.error("[Backfill] Monitoring start time is not found");
-      throw new IllegalArgumentException(String.format("[Backfill] Monitoring start time is not found"));
-    }
-    if (endTimeIso == null || endTimeIso.isEmpty()) {
-      LOG.error("[Backfill] Monitoring end time is not found");
-      throw new IllegalArgumentException(String.format("[Backfill] Monitoring end time is not found"));
-    }
-
-    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-
-    if (startTime.isAfter(endTime)) {
-      LOG.error("[Backfill] Monitoring start time is after monitoring end time");
-      throw new IllegalArgumentException(String.format(
-          "[Backfill] Monitoring start time is after monitoring end time"));
-    }
-    if (endTime.isAfterNow()) {
-      endTime = DateTime.now();
-      LOG.warn("[Backfill] End time is in the future. Force to now.");
-    }
-
-    final DateTime innerStartTime = startTime;
-    final DateTime innerEndTime = endTime;
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        List<Long> functionIdList = new ArrayList<>();
-        functionIdList.add(id);
-        Map<Long, Integer> originalWindowSize = new HashMap<>();
-        Map<Long, TimeUnit> originalWindowUnit = new HashMap<>();
-        Map<Long, String> originalCron = new HashMap<>();
-        saveFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
-
-        // Update speed-up window and cron
-        if (speedup) {
-          for (long functionId : functionIdList) {
-            anomalyFunctionSpeedup(functionId);
-          }
-        }
-        // Run backfill
-        detectionJobScheduler.synchronousBackFill(functionIdList, innerStartTime, innerEndTime, forceBackfill);
-
-        // Revert window setup
-        revertFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
-      }
-    }).run();
-
-    return Response.ok().build();
+    return generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso, isForceBackfill, speedup);
   }
 
   /**
@@ -390,8 +328,6 @@ public class DetectionJobResource {
 
         // Revert window setup
         revertFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
-
-        // TODO send out email to user
       }
     }).run();
 

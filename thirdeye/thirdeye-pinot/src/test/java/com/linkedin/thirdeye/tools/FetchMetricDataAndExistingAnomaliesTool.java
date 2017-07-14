@@ -119,6 +119,10 @@ public class FetchMetricDataAndExistingAnomaliesTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
   }
 
+  public AnomalyFunctionDTO getAnomalyFunctionDTO(long functionId) {
+    return anomalyFunctionDAO.findById(functionId);
+  }
+
   public List<ResultNode> fetchMergedAnomaliesInRangeByFunctionId(long functionId, DateTime startTime, DateTime endTime){
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     LOG.info("Loading merged anaomaly results of functionId {} from db...", functionId);
