@@ -1158,10 +1158,9 @@ public abstract class Series {
    * @see Series#compare(Series, int, int)
    *
    * @param other series to match values against
-   * @param type type of join to perform
    * @return list of index pairs for join
    */
-  List<JoinPair> join(Series other, JoinType type) {
+  List<JoinPair> mergeJoin(Series other) {
     // NOTE: merge join
     int[] lref = this.sortedIndex();
     int[] rref = other.sortedIndex();
@@ -1171,20 +1170,10 @@ public abstract class Series {
     int j = 0;
     while(i < this.size() || j < other.size()) {
       if(j >= other.size() || (i < this.size() && this.compare(other, lref[i], rref[j]) < 0)) {
-        switch(type) {
-          case LEFT:
-          case OUTER:
-            pairs.add(new JoinPair(lref[i], -1));
-          default:
-        }
+        pairs.add(new JoinPair(lref[i], -1));
         i++;
       } else if(i >= this.size() || (j < other.size() && this.compare(other, lref[i], rref[j]) > 0)) {
-        switch(type) {
-          case RIGHT:
-          case OUTER:
-            pairs.add(new JoinPair(-1, rref[j]));
-          default:
-        }
+        pairs.add(new JoinPair(-1, rref[j]));
         j++;
       } else if(i < this.size() && j < other.size()) {
         // generate cross product
@@ -1258,6 +1247,40 @@ public abstract class Series {
     for(int i=0; i<rightTyped[0].size(); i++) {
       if(!touchedRight.get(i))
         pairs.add(new JoinPair(-1, i));
+    }
+
+    return pairs;
+  }
+
+  static List<JoinPair> productJoin(Series[] left, Series[] right) {
+    if(left.length != right.length)
+      throw new IllegalArgumentException("Number of series on the left side of the join must be equal to the right side");
+    if(left.length <= 0)
+      throw new IllegalArgumentException("Must join on at least one series");
+    assertSameLength(left);
+    assertSameLength(right);
+
+    List<JoinPair> pairs = new ArrayList<>();
+    BitSet touchedRight = new BitSet(right[0].size());
+
+    for(int i=0; i<left[0].size(); i++) {
+      boolean touchedLeft = false;
+      for(int j=0; j<right[0].size(); j++) {
+        if(equalsMultiple(left, right, i, j)) {
+          pairs.add(new JoinPair(i, j));
+          touchedRight.set(j);
+          touchedLeft = true;
+        }
+      }
+
+      if(!touchedLeft) {
+        pairs.add(new JoinPair(i, -1));
+      }
+    }
+
+    for(int j=0; j<right[0].size(); j++) {
+      if(!touchedRight.get(j))
+        pairs.add(new JoinPair(-1, j));
     }
 
     return pairs;

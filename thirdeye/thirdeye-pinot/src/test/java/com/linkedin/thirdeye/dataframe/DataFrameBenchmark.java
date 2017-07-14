@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -858,7 +859,141 @@ public class DataFrameBenchmark {
     logResults("benchmarkMovingWindowSumLongArray", checksum);
   }
 
+  private void benchmarkMergeJoinLongArray() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      long[] otherValues = shuffle(Arrays.copyOf(longValues, N_ELEMENTS));
+
+      startTimer();
+      // NOTE: this is cheating, could be N_ELEMENTS ^ 2
+      int[] resLeft = new int[N_ELEMENTS];
+      int[] resRight = new int[N_ELEMENTS];
+
+      // NOTE: this is cheating as well. we need the original indices instead
+      Arrays.sort(longValues);
+      Arrays.sort(otherValues);
+
+      int i=0;
+      int j=0;
+      int o=0;
+      while(i < N_ELEMENTS && j < N_ELEMENTS) {
+        // left == right
+        int k=0;
+        while((j+k) < N_ELEMENTS && longValues[i] == otherValues[j+k]) {
+          resLeft[o] = i;
+          resRight[o] = j+k;
+          o++;
+          k++;
+        }
+        if(k > 0) {
+          i++;
+          continue;
+        }
+
+        // left < right
+        if(longValues[i] < otherValues[j]) {
+          resLeft[o] = i;
+          resRight[o] = -1;
+          o++;
+          i++;
+          continue;
+        }
+
+        // left > right
+        resLeft[o] = -1;
+        resRight[o] = j;
+        o++;
+        j++;
+      }
+
+      int[] truncLeft = Arrays.copyOf(resLeft, o);
+      int[] truncRight = Arrays.copyOf(resRight, o);
+      stopTimer();
+
+      if(truncLeft.length != N_ELEMENTS || truncRight.length != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Join incorrect (got %d pairs, should be %d)", truncLeft.length, N_ELEMENTS));
+
+      checksum ^= checksum(truncLeft);
+      checksum ^= checksum(truncRight);
+    }
+
+    logResults("benchmarkMergeJoinLongArray", checksum);
+  }
+
+  private void benchmarkMergeJoinLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+      LongSeries other = LongSeries.buildFrom(shuffle(longValues));
+
+      startTimer();
+      List<Series.JoinPair> pairs = series.mergeJoin(other);
+      stopTimer();
+
+      if(pairs.size() != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Join incorrect (got %d pairs, should be %d)", pairs.size(), N_ELEMENTS));
+
+      checksum ^= checksum(pairs);
+    }
+
+    logResults("benchmarkMergeJoinLongArray", checksum);
+  }
+
+  private void benchmarkHashJoinLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+      LongSeries other = LongSeries.buildFrom(shuffle(longValues));
+
+      startTimer();
+      List<Series.JoinPair> pairs = Series.hashJoin(new Series[] { series }, new Series[] { other });
+      stopTimer();
+
+      if(pairs.size() != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Join incorrect (got %d pairs, should be %d)", pairs.size(), N_ELEMENTS));
+
+      checksum ^= checksum(pairs);
+    }
+
+    logResults("benchmarkHashJoinLongSeries", checksum);
+  }
+
+  private void benchmarkProductJoinLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+      LongSeries other = LongSeries.buildFrom(shuffle(longValues));
+
+      startTimer();
+      List<Series.JoinPair> pairs = Series.productJoin(new Series[] { series }, new Series[] { other });
+      stopTimer();
+
+      if(pairs.size() != N_ELEMENTS)
+        throw new IllegalStateException("Join incorrect");
+
+      checksum ^= checksum(pairs);
+    }
+
+    logResults("benchmarkProductJoinLongSeries", checksum);
+  }
+
   private void benchmarkAll() {
+    //benchmarkMergeJoinLongArray();
+    benchmarkMergeJoinLongSeries();
+    benchmarkHashJoinLongSeries();
+    //benchmarkProductJoinLongSeries(); // NOTE: way too slow
     benchmarkHasNullLongSeries();
     benchmarkDropNullLongSeries();
     benchmarkDropNullLongArray();
@@ -1014,5 +1149,37 @@ public class DataFrameBenchmark {
       bits ^= v;
     }
     return bits;
+  }
+
+  private static long checksum(int... values) {
+    long bits = 0;
+    for(int v : values) {
+      bits ^= v;
+    }
+    return bits;
+  }
+
+  private static long checksum(Iterable<Series.JoinPair> pairs) {
+    long bits = 0;
+    for(Series.JoinPair p : pairs) {
+      bits ^= p.left;
+    }
+    for(Series.JoinPair p : pairs) {
+      bits ^= p.right;
+    }
+    return bits;
+  }
+
+  // from: https://stackoverflow.com/questions/1519736/random-shuffling-of-an-array
+  private static long[] shuffle(long[] arr) {
+    arr = Arrays.copyOf(arr, arr.length);
+    Random rnd = ThreadLocalRandom.current();
+    for (int i=arr.length-1; i>0; i--) {
+      int index = rnd.nextInt(i + 1);
+      long a = arr[index];
+      arr[index] = arr[i];
+      arr[i] = a;
+    }
+    return arr;
   }
 }
