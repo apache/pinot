@@ -17,7 +17,7 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -26,193 +26,155 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
-import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
-import org.json.JSONException;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.assertNotSame;
-
 
 public class TableViewsTest extends ControllerTest {
-  public static final String TABLE_NAME = "VIEWS_TABLE";
-  public static final String OFFLINE_ONLY_TABLE = "OFFLINE_ONLY_TABLE";
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final String OFFLINE_TABLE_NAME = "offlineTable";
+  private static final String HYBRID_TABLE_NAME = "hybridTable";
+  private static final int NUM_BROKER_INSTANCES = 3;
+  private static final int NUM_SERVER_INSTANCES = 4;
 
-  private final ControllerRequestURLBuilder _controllerRequestURLBuilder =
+  private final ControllerRequestURLBuilder _requestBuilder =
       ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
-  private PinotHelixResourceManager pinotHelixResourceManager;
 
   @BeforeClass
-  public void setupTest()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
-    pinotHelixResourceManager = new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(),
-        TableViewsTest.class.getName() + "_controller", null, 10000L, true, /*isUpdateStateModel=*/false);
-    pinotHelixResourceManager.start();
+    PinotHelixResourceManager helixResourceManager = _controllerStarter.getHelixResourceManager();
 
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, 5, true);
+        ZkStarter.DEFAULT_ZK_STR, NUM_BROKER_INSTANCES, true);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, 20, true);
+        ZkStarter.DEFAULT_ZK_STR, NUM_SERVER_INSTANCES, true);
 
-    String request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON("default", 5).toString();
-    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request);
+    // Create the offline table and add one segment
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
+            .setNumReplicas(2)
+            .build();
+    helixResourceManager.addTable(tableConfig);
+    helixResourceManager.addSegment(new SimpleSegmentMetadata(OFFLINE_TABLE_NAME), "downloadUrl");
 
-    request = ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON("default", 20, 16, 2).toString();
-    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request);
-
-    request = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(OFFLINE_ONLY_TABLE)
+    // Create the hybrid table
+    tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME)
         .setNumReplicas(2)
-        .setBrokerTenant("default")
-        .setServerTenant("default")
-        .build()
-        .toJSONConfigString();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), request);
-    addOneSegment(OFFLINE_ONLY_TABLE);
-
-    request = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNumReplicas(2)
-        .setBrokerTenant("default")
-        .setServerTenant("default")
-        .build()
-        .toJSONConfigString();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), request);
+        .build();
+    helixResourceManager.addTable(tableConfig);
 
     Map<String, String> streamConfigs = new HashMap<>();
-    streamConfigs.put("streamType", "kafka");
     streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.CONSUMER_TYPE,
         DataSource.Realtime.Kafka.ConsumerType.highLevel.toString());
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.TOPIC_NAME, "fakeTopic");
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.DECODER_CLASS, "fakeClass");
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.ZK_BROKER_URL, "fakeUrl");
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING,
-        "potato");
-    streamConfigs.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1234));
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "."
-        + DataSource.Realtime.Kafka.AUTO_OFFSET_RESET, "smallest");
-
-    request = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName("potato")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .setSchemaName("fakeSchema")
+    tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(HYBRID_TABLE_NAME)
         .setNumReplicas(2)
-        .setBrokerTenant("default")
-        .setServerTenant("default")
-        .setLoadMode("MMAP")
-        .setSortedColumn("fakeColumn")
         .setStreamConfigs(streamConfigs)
-        .build()
-        .toJSONConfigString();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), request);
+        .build();
+    helixResourceManager.addTable(tableConfig);
+
+    // Wait for external view get updated
+    long endTime = System.currentTimeMillis() + 10_000L;
+    while (System.currentTimeMillis() < endTime) {
+      Thread.sleep(100L);
+      TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+      if ((tableView.offline == null) || (tableView.offline.size() != 1)) {
+        continue;
+      }
+      tableView = getTableView(HYBRID_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+      if (tableView.offline == null) {
+        continue;
+      }
+      if ((tableView.realtime == null) || (tableView.realtime.size() != NUM_SERVER_INSTANCES)) {
+        continue;
+      }
+      return;
+    }
+    Assert.fail("Failed to get external view updated");
   }
 
-  @AfterClass
-  public void teardownTest()
-      throws Exception {
-    stopController();
-    stopZk();
+  @DataProvider(name = "viewProvider")
+  public Object[][] viewProvider() {
+    return new Object[][]{{TableViews.IDEALSTATE}, {TableViews.EXTERNALVIEW}};
   }
 
-  @DataProvider(name = "stateProvider")
-  public Object[][] stateProvider() {
-    Object[][] configs = {
-        {TableViews.IDEALSTATE},
-        {TableViews.EXTERNALVIEW}
-    };
-    return configs;
+  @Test(dataProvider = "viewProvider")
+  public void testTableNotFound(String view) throws Exception {
+    String url = _requestBuilder.forTableView("unknownTable", view, null);
+    HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+    Assert.assertEquals(connection.getResponseCode(), 404);
   }
 
-  @Test(dataProvider = "stateProvider")
-  public void getOfflineTableState(String state)
-      throws IOException, JSONException {
-    String response = getState(OFFLINE_ONLY_TABLE, state, null);
-    TableViews.TableView tableView = toTableViews(response);
-    assertNotNull(tableView.offline);
-    assertNull(tableView.realtime);
-    assertEquals(tableView.offline.size(), 1);
+  @Test(dataProvider = "viewProvider")
+  public void testBadRequest(String view) throws Exception {
+    String url = _requestBuilder.forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
+    HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+    Assert.assertEquals(connection.getResponseCode(), 400);
+  }
 
-    for (Map.Entry<String, Map<String, String>> stringMapEntry : tableView.offline.entrySet()) {
-      assertTrue(stringMapEntry.getKey().startsWith("SimpleSegment"));
-      Map<String, String> serverMap = stringMapEntry.getValue();
-      assertEquals(serverMap.size(), 2);
+  @Test(dataProvider = "viewProvider")
+  public void testOfflineTableState(String view) throws Exception {
+    TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
+    Assert.assertNotNull(tableView.offline);
+    Assert.assertEquals(tableView.offline.size(), 1);
+    Assert.assertNull(tableView.realtime);
+
+    for (Map.Entry<String, Map<String, String>> segmentMapEntry : tableView.offline.entrySet()) {
+      Assert.assertTrue(segmentMapEntry.getKey().startsWith("SimpleSegment"));
+      Map<String, String> serverMap = segmentMapEntry.getValue();
+      Assert.assertEquals(serverMap.size(), 2);
       for (Map.Entry<String, String> serverMapEntry : serverMap.entrySet()) {
-        assertTrue(serverMapEntry.getKey().startsWith("Server_"));
-        assertEquals(serverMapEntry.getValue(), "ONLINE");
+        Assert.assertTrue(serverMapEntry.getKey().startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE));
+        Assert.assertEquals(serverMapEntry.getValue(), "ONLINE");
       }
     }
   }
 
-  @Test(dataProvider = "stateProvider")
-  public void testTableNotFound(String state)
-      throws IOException, JSONException {
-    String url = _controllerRequestURLBuilder.forTableView("UNKNOWN_TABLE", state, null);
-    HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-    assertEquals(connection.getResponseCode(), 404);
+  @Test(dataProvider = "viewProvider")
+  public void testHybridTableState(String state) throws Exception {
+    TableViews.TableView tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
+    Assert.assertNull(tableView.offline);
+    Assert.assertNotNull(tableView.realtime);
+    Assert.assertEquals(tableView.realtime.size(), NUM_SERVER_INSTANCES);
+
+    tableView = getTableView(HYBRID_TABLE_NAME, state, "offline");
+    Assert.assertNotNull(tableView.offline);
+    Assert.assertEquals(tableView.offline.size(), 0);
+    Assert.assertNull(tableView.realtime);
+
+    tableView = getTableView(HYBRID_TABLE_NAME, state, null);
+    Assert.assertNotNull(tableView.offline);
+    Assert.assertEquals(tableView.offline.size(), 0);
+    Assert.assertNotNull(tableView.realtime);
+    Assert.assertEquals(tableView.realtime.size(), NUM_SERVER_INSTANCES);
+
+    tableView = getTableView(TableNameBuilder.OFFLINE.tableNameWithType(HYBRID_TABLE_NAME), state, null);
+    Assert.assertNotNull(tableView.offline);
+    Assert.assertEquals(tableView.offline.size(), 0);
+    Assert.assertNull(tableView.realtime);
+
+    tableView = getTableView(TableNameBuilder.REALTIME.tableNameWithType(HYBRID_TABLE_NAME), state, null);
+    Assert.assertNull(tableView.offline);
+    Assert.assertNotNull(tableView.realtime);
+    Assert.assertEquals(tableView.realtime.size(), NUM_SERVER_INSTANCES);
   }
 
-  @Test(dataProvider = "stateProvider")
-  public void testBadRequest(String state)
-      throws IOException {
-    String url = _controllerRequestURLBuilder.forTableView("UNKNOWN_TABLE", state, "no_such_type");
-    HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-    assertEquals(connection.getResponseCode(), 400);
+  private TableViews.TableView getTableView(String tableName, String view, String tableType) throws Exception {
+    return OBJECT_MAPPER.readValue(sendGetRequest(_requestBuilder.forTableView(tableName, view, tableType)),
+        TableViews.TableView.class);
   }
 
-  @Test(dataProvider = "stateProvider")
-  public void testGetState(String state)
-      throws IOException, JSONException {
-    String response = getState(TABLE_NAME, state, "realtime");
-    TableViews.TableView tableView = toTableViews(response);
-    assertNull(tableView.offline);
-    assertNotNull(tableView.realtime);
-    assertNotSame(tableView.realtime.size(), 0);
-
-    response = getState(TABLE_NAME, state, "offline");
-    tableView = toTableViews(response);
-    assertNull(tableView.realtime);
-    assertNotNull(tableView.offline);
-    // empty because we didn't add any segment
-    assertEquals(tableView.offline.size(), 0);
-
-    response = getState(TABLE_NAME, state, null);
-    tableView = toTableViews(response);
-    assertNotNull(tableView.offline);
-    assertNotNull(tableView.realtime);
-    assertEquals(tableView.offline.size(), 0);
-    assertNotSame(tableView.realtime.size(), 0);
-
-    response = getState(TABLE_NAME + "_REALTIME", state, null);
-    tableView = toTableViews(response);
-    assertNull(tableView.offline);
-    assertNotNull(tableView.realtime);
-  }
-
-  private String getState(String tableName, String state, String tableType)
-      throws IOException, JSONException {
-    return sendGetRequest(_controllerRequestURLBuilder.forTableView(tableName, state, tableType));
-  }
-
-  private void addOneSegment(String tableName) {
-    SegmentMetadata metadata = new SimpleSegmentMetadata(tableName);
-    pinotHelixResourceManager.addSegment(metadata, "someurl");
-  }
-
-  private TableViews.TableView toTableViews(String response)
-      throws IOException {
-    ObjectMapper mapper = new ObjectMapper();
-    return mapper.readValue(response, TableViews.TableView.class);
+  @AfterClass
+  public void tearDown() {
+    stopController();
+    stopZk();
   }
 }
