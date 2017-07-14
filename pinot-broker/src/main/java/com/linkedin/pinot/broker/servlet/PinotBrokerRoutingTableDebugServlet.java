@@ -49,7 +49,7 @@ public class PinotBrokerRoutingTableDebugServlet extends HttpServlet {
       String tableName;
       String pathInfo = req.getPathInfo();
 
-      if (pathInfo.startsWith("/") && pathInfo.lastIndexOf('/') == 0) {
+      if (pathInfo != null && !pathInfo.isEmpty() && pathInfo.startsWith("/") && pathInfo.lastIndexOf('/') == 0) {
         // Drop leading slash
         tableName = pathInfo.substring(1);
       } else {
