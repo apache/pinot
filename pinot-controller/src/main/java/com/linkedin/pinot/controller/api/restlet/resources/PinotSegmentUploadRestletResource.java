@@ -178,12 +178,13 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   })
   @Responses({
       @Response(statusCode = "200", description = "A list of all segments for the specified table"),
-      @Response(statusCode = "404", description = "The segment file or table does not exist")
+      @Response(statusCode = "404", description = "The segment file or table does not exist"),
+      @Response(statusCode = "400", description = "Bad client tableType parameter")
   })
   private Representation getSegmentsForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
       String tableName,
-      @Parameter(name = "tableType", in = "query", description = "Type of table {offline|realtime}", required = false)
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}", required = false)
       String type
       ) throws Exception {
     Representation presentation;
@@ -195,7 +196,11 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(offline)));
       ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(realtime)));
     } else {
-      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(type)));
+      if (!isValidTableType(type)) {
+        setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+        return new StringRepresentation("Table type " + type + " is not valid! Please use offline or realtime.");
+      }
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(type.toUpperCase())));
     }
 
     presentation = new StringRepresentation(ret.toString());
