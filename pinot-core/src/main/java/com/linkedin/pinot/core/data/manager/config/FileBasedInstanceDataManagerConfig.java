@@ -54,6 +54,8 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   private static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
   // Key of whether to enable default columns
   private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
+  // Key of whether to enable split commit
+  private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
 
   private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_TABLE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -145,6 +147,11 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   @Override
   public boolean isEnableDefaultColumns() {
     return _instanceDataManagerConfiguration.getBoolean(ENABLE_DEFAULT_COLUMNS, false);
+  }
+
+  @Override
+  public boolean isEnableSplitCommit() {
+    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT, false);
   }
 
   @Override

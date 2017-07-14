@@ -293,6 +293,10 @@ public class HelixServerStarter {
     return pinotHelixStarter;
   }
 
+  public ServerConf getServerConf() {
+    return _serverConf;
+  }
+
   public static void main(String[] args) throws Exception {
     /*
     // Another way to start a server via IDE

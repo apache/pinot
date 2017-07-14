@@ -39,4 +39,6 @@ public interface InstanceDataManagerConfig {
   String getAvgMultiValueCount();
 
   boolean isEnableDefaultColumns();
+
+  boolean isEnableSplitCommit();
 }

@@ -36,6 +36,7 @@ public class SegmentCompletionProtocolDeserTest {
   private final int EXTRA_TIME_SEC = 5;
   private final String SEGMENT_NAME = "name";
   private final long WAIT_TIME_MILLIS = 123;
+  private final String CONTROLLER_VIP_URL = "http://localhost:8998";
 
   @Test
   public void testSerializeAllRequestParams() throws MalformedURLException {
@@ -46,7 +47,7 @@ public class SegmentCompletionProtocolDeserTest {
             .withExtraTimeSec(EXTRA_TIME_SEC).withSegmentName(SEGMENT_NAME).withWaitTimeMillis(WAIT_TIME_MILLIS);
 
     SegmentCompletionProtocol.SegmentCommitRequest segmentCommitRequest = new SegmentCompletionProtocol.SegmentCommitRequest(reqParams);
-    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT));
+    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT, "http"));
 
     Reference reference = new Reference(url);
     SegmentCompletionProtocol.Request.Params params = SegmentCompletionUtils.extractParams(reference);
@@ -75,7 +76,7 @@ public class SegmentCompletionProtocolDeserTest {
         .withWaitTimeMillis(WAIT_TIME_MILLIS);
 
     SegmentCompletionProtocol.SegmentCommitRequest segmentCommitRequest = new SegmentCompletionProtocol.SegmentCommitRequest(reqParams);
-    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT));
+    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT, "http"));
 
     Reference reference = new Reference(url);
     SegmentCompletionProtocol.Request.Params params = SegmentCompletionUtils.extractParams(reference);
@@ -99,7 +100,7 @@ public class SegmentCompletionProtocolDeserTest {
         .withSegmentName(SEGMENT_NAME);
 
     SegmentCompletionProtocol.SegmentCommitRequest segmentCommitRequest = new SegmentCompletionProtocol.SegmentCommitRequest(reqParams);
-    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT));
+    URL url = new URL(segmentCommitRequest.getUrl(HOSTPORT, "http"));
 
     Reference reference = new Reference(url);
     SegmentCompletionProtocol.Request.Params params = SegmentCompletionUtils.extractParams(reference);
@@ -149,14 +150,14 @@ public class SegmentCompletionProtocolDeserTest {
   }
 
   @Test
-  public void testJsonResponseWithAllParams() throws JSONException {
+     public void testJsonResponseWithAllParams() throws JSONException {
     // Test with all params
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params()
         .withBuildTimeSeconds(BUILD_TIME_MILLIS)
         .withOffset(OFFSET)
         .withSegmentLocation(SEGMENT_LOCATION)
         .withSplitCommit(true)
-        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+        .withControllerVipUrl(CONTROLLER_VIP_URL).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
 
@@ -166,5 +167,85 @@ public class SegmentCompletionProtocolDeserTest {
     Assert.assertEquals(jsonObject.get("segmentLocation"), SEGMENT_LOCATION);
     Assert.assertEquals(jsonObject.get("isSplitCommitType"), true);
     Assert.assertEquals(jsonObject.get("status"), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT.toString());
+    Assert.assertEquals(jsonObject.get("controllerVipUrl"), CONTROLLER_VIP_URL);
+  }
+
+  @Test
+  public void testJsonNullSegmentLocationAndVip() throws JSONException {
+    SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params()
+        .withBuildTimeSeconds(BUILD_TIME_MILLIS)
+        .withOffset(OFFSET)
+        .withSplitCommit(false)
+        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+
+    SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
+
+    com.alibaba.fastjson.JSONObject jsonObject = JSON.parseObject(response.toJsonString());
+
+    Assert.assertEquals(jsonObject.get("offset"), OFFSET);
+    Assert.assertEquals(jsonObject.get("segmentLocation"), null);
+    Assert.assertEquals(jsonObject.get("isSplitCommitType"), false);
+    Assert.assertEquals(jsonObject.get("status"), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT.toString());
+    Assert.assertEquals(jsonObject.get("controllerVipUrl"), null);
+  }
+
+  @Test
+  public void testJsonResponseWithoutSplitCommit() throws JSONException {
+    SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params()
+        .withBuildTimeSeconds(BUILD_TIME_MILLIS)
+        .withOffset(OFFSET)
+        .withSplitCommit(false)
+        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+
+    SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
+
+    com.alibaba.fastjson.JSONObject jsonObject = JSON.parseObject(response.toJsonString());
+
+    Assert.assertEquals(jsonObject.get("offset"), OFFSET);
+    Assert.assertEquals(jsonObject.get("isSplitCommitType"), false);
+    Assert.assertEquals(jsonObject.get("status"), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT.toString());
+    Assert.assertEquals(jsonObject.get("controllerVipUrl"), null);
+  }
+
+  @Test
+  public void testJsonResponseWithSegmentLocationNullVip() throws JSONException {
+    // Should never happen because if split commit, should have both location and VIP, but testing deserialization regardless
+    SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params()
+        .withBuildTimeSeconds(BUILD_TIME_MILLIS)
+        .withOffset(OFFSET)
+        .withSegmentLocation(SEGMENT_LOCATION)
+        .withSplitCommit(false)
+        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+
+    SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
+
+    com.alibaba.fastjson.JSONObject jsonObject = JSON.parseObject(response.toJsonString());
+
+    Assert.assertEquals(jsonObject.get("offset"), OFFSET);
+    Assert.assertEquals(jsonObject.get("isSplitCommitType"), false);
+    Assert.assertEquals(jsonObject.get("segmentLocation"), SEGMENT_LOCATION);
+    Assert.assertEquals(jsonObject.get("status"), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT.toString());
+    Assert.assertEquals(jsonObject.get("controllerVipUrl"), null);
+  }
+
+  @Test
+  public void testJsonResponseWithVipAndNullSegmentLocation() throws JSONException {
+    // Should never happen because if split commit, should have both location and VIP, but testing deserialization regardless
+    SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params()
+        .withBuildTimeSeconds(BUILD_TIME_MILLIS)
+        .withOffset(OFFSET)
+        .withControllerVipUrl(CONTROLLER_VIP_URL)
+        .withSplitCommit(false)
+        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+
+    SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(params);
+
+    com.alibaba.fastjson.JSONObject jsonObject = JSON.parseObject(response.toJsonString());
+
+    Assert.assertEquals(jsonObject.get("offset"), OFFSET);
+    Assert.assertEquals(jsonObject.get("isSplitCommitType"), false);
+    Assert.assertEquals(jsonObject.get("segmentLocation"), null);
+    Assert.assertEquals(jsonObject.get("status"), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT.toString());
+    Assert.assertEquals(jsonObject.get("controllerVipUrl"), CONTROLLER_VIP_URL);
   }
 }

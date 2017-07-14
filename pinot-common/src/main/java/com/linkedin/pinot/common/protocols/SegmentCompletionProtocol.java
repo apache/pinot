@@ -96,6 +96,7 @@ public class SegmentCompletionProtocol {
   public static final String BUILD_TIME_KEY = "buildTimeSec";  // Sent by controller in COMMIT message
   public static final String COMMIT_TYPE_KEY = "isSplitCommitType";
   public static final String SEGMENT_LOCATION_KEY = "segmentLocation";
+  public static final String CONTROLLER_VIP_URL_KEY = "controllerVipUrl";
 
   public static final String MSG_TYPE_CONSUMED = "segmentConsumed";
   public static final String MSG_TYPE_COMMIT = "segmentCommit";
@@ -155,8 +156,8 @@ public class SegmentCompletionProtocol {
       _msgType = msgType;
     }
 
-    public String getUrl(String hostPort) {
-      return "http://" + hostPort +  "/" + _msgType + "?" +
+    public String getUrl(String hostPort, String protocol) {
+      return protocol + "://" + hostPort +  "/" + _msgType + "?" +
         PARAM_SEGMENT_NAME + "=" + _params.getSegmentName() + "&" +
         PARAM_OFFSET + "=" + _params.getOffset() + "&" +
         PARAM_INSTANCE_ID + "=" + _params.getInstanceId() +
@@ -301,6 +302,24 @@ public class SegmentCompletionProtocol {
     }
   }
 
+  public static class SegmentCommitStartRequest extends Request {
+    public SegmentCommitStartRequest(Params params) {
+      super(params, MSG_TYPE_COMMIT_START);
+    }
+  }
+
+  public static class SegmentCommitUploadRequest extends Request {
+    public SegmentCommitUploadRequest(Params params) {
+      super(params, MSG_TYPE_SEGMENT_UPLOAD);
+    }
+  }
+
+  public static class SegmentCommitEndRequest extends Request {
+    public SegmentCommitEndRequest(Params params) {
+      super(params, MSG_TYPE_COMMIT_END);
+    }
+  }
+
   public static class SegmentStoppedConsuming extends Request {
     public SegmentStoppedConsuming(Params params) {
       super(params, MSG_TYPE_STOPPED_CONSUMING);
@@ -313,6 +332,7 @@ public class SegmentCompletionProtocol {
     final long _buildTimeSeconds;
     final boolean _isSplitCommit;
     final String _segmentLocation;
+    final String _controllerVipUrl;
 
     public Response(String jsonRespStr) {
       JSONObject jsonObject = JSONObject.parseObject(jsonRespStr);
@@ -349,6 +369,12 @@ public class SegmentCompletionProtocol {
         segmentLocation = jsonObject.getString(SEGMENT_LOCATION_KEY);
       }
       _segmentLocation = segmentLocation;
+
+      String controllerVipUrl= null;
+      if (jsonObject.containsKey(CONTROLLER_VIP_URL_KEY)) {
+        controllerVipUrl = jsonObject.getString(CONTROLLER_VIP_URL_KEY);
+      }
+      _controllerVipUrl = controllerVipUrl;
     }
 
     public Response(Params params) {
@@ -357,6 +383,7 @@ public class SegmentCompletionProtocol {
       _buildTimeSeconds = params.getBuildTimeSeconds();
       _isSplitCommit = params.getIsSplitCommit();
       _segmentLocation = params.getSegmentLocation();
+      _controllerVipUrl = params.getControllerVipUrl();
     }
 
     public ControllerResponseStatus getStatus() {
@@ -375,6 +402,10 @@ public class SegmentCompletionProtocol {
       return _isSplitCommit;
     }
 
+    public String getControllerVipUrl() {
+      return _controllerVipUrl;
+    }
+
     public String getSegmentLocation() {
       return _segmentLocation;
     }
@@ -383,8 +414,9 @@ public class SegmentCompletionProtocol {
       StringBuilder builder = new StringBuilder();
       builder.append("{\"" + STATUS_KEY + "\":" + "\"" + _status.name() + "\"," + "\""
           + OFFSET_KEY + "\":" + _offset + ",\""
-          + COMMIT_TYPE_KEY + "\":" + _isSplitCommit + ",\""
-          + SEGMENT_LOCATION_KEY + "\":\"" + _segmentLocation + "\"");
+          + COMMIT_TYPE_KEY + "\":" + _isSplitCommit
+          + (_segmentLocation != null ? ",\"" + SEGMENT_LOCATION_KEY + "\":\"" + _segmentLocation + "\"" : "")
+          + (_controllerVipUrl != null ? "," + "\"" + CONTROLLER_VIP_URL_KEY + "\":\"" + _controllerVipUrl + "\"" : ""));
       builder.append("}");
       return builder.toString();
     }
@@ -395,6 +427,7 @@ public class SegmentCompletionProtocol {
       private long _buildTimeSec;
       private boolean _isSplitCommit;
       private String _segmentLocation;
+      private String _controllerVipUrl;
 
       public Params() {
         _offset = -1L;
@@ -402,6 +435,7 @@ public class SegmentCompletionProtocol {
         _buildTimeSec = -1;
         _isSplitCommit = false;
         _segmentLocation = null;
+        _controllerVipUrl = null;
       }
 
       public Params withOffset(long offset) {
@@ -424,6 +458,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withControllerVipUrl(String controllerVipUrl) {
+        _controllerVipUrl = controllerVipUrl;
+        return this;
+      }
+
       public Params withSegmentLocation(String segmentLocation) {
         _segmentLocation = segmentLocation;
         return this;
@@ -443,6 +482,9 @@ public class SegmentCompletionProtocol {
       }
       public String getSegmentLocation() {
         return _segmentLocation;
+      }
+      public String getControllerVipUrl() {
+        return _controllerVipUrl;
       }
     }
   }

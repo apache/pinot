@@ -45,6 +45,7 @@ public class IndexLoadingConfig {
   private boolean _enableDefaultColumns = true;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
+  private boolean _enableSplitCommit = false;
 
   public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
       @Nullable TableConfig tableConfig) {
@@ -61,6 +62,8 @@ public class IndexLoadingConfig {
       }
 
       _enableDefaultColumns = instanceDataManagerConfig.isEnableDefaultColumns();
+
+      _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
 
       String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
       if (avgMultiValueCount != null) {
@@ -175,6 +178,10 @@ public class IndexLoadingConfig {
 
   public boolean isEnableDefaultColumns() {
     return _enableDefaultColumns;
+  }
+
+  public boolean isEnableSplitCommit() {
+    return _enableSplitCommit;
   }
 
   @Nonnull

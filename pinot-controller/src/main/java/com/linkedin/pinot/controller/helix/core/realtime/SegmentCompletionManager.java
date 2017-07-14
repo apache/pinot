@@ -82,6 +82,14 @@ public class SegmentCompletionManager {
     _controllerMetrics = controllerMetrics;
   }
 
+  public boolean isSplitCommitEnabled() {
+    return _segmentManager.getIsSplitCommitEnabled();
+  }
+
+  public String getControllerVipUrl() {
+    return _segmentManager.getControllerVipUrl();
+  }
+
   public static SegmentCompletionManager create(HelixManager helixManager,
       PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -124,8 +132,7 @@ public class SegmentCompletionManager {
           final long endOffset = segmentMetadata.getEndOffset();
           fsm = SegmentCompletionFSM.fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(), endOffset);
         } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
-          fsm = SegmentCompletionFSM.fsmStoppedConsuming(_segmentManager, this, segmentName,
-              segmentMetadata.getNumReplicas());
+          fsm = SegmentCompletionFSM.fsmStoppedConsuming(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
         } else {
           // Segment is in the process of completing, and this is the first one to respond. Create fsm
           fsm = SegmentCompletionFSM.fsmInHolding(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
@@ -181,7 +188,7 @@ public class SegmentCompletionManager {
    * Otherwise, this method will return a protocol response to be returned to the client right away (without saving the
    * incoming segment).
    */
-  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams, boolean isSplitCommit) {
+  public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams) {
     if (!_helixManager.isLeader()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -345,6 +352,8 @@ public class SegmentCompletionManager {
     // We may need to add some time here to allow for getting the lock? For now 0
     // We may need to add some time for the committer come back to us (after the build)? For now 0.
     private long _maxTimeAllowedToCommitMs;
+    private final boolean _isSplitCommitEnabled;
+    private final String _controllerVipUrl;
 
     public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
       return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
@@ -388,12 +397,13 @@ public class SegmentCompletionManager {
       }
       _initialCommitTimeMs = initialCommitTimeMs;
       _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
+      _isSplitCommitEnabled = segmentCompletionManager.isSplitCommitEnabled();
+      _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
     }
 
     // Ctor that starts the FSM in COMMITTED state
     private SegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
-        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
-        long winningOffset) {
+        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas, long winningOffset) {
       // Constructor used when we get an event after a segment is committed.
       this(segmentManager, segmentCompletionManager, segmentName, numReplicas);
       _state = State.COMMITTED;
@@ -403,7 +413,7 @@ public class SegmentCompletionManager {
 
     @Override
     public String toString() {
-      return "{" + _segmentName.getSegmentName() + "," + _state + "," + _startTimeMs + "," + _winner + "," + _winningOffset + "}";
+      return "{" + _segmentName.getSegmentName() + "," + _state + "," + _startTimeMs + "," + _winner + "," + _winningOffset + "," + _isSplitCommitEnabled + "," + _controllerVipUrl + "}";
     }
 
     // SegmentCompletionManager releases the FSM from the hashtable when it is done.
@@ -608,8 +618,13 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response commit(String instanceId, long offset) {
       long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs)/1000;
       LOGGER.info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
-          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus( SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
+      SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params().withOffset(offset).withBuildTimeSeconds(allowedBuildTimeSec)
+          .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
+          .withSplitCommit(_isSplitCommitEnabled);
+      if (_isSplitCommitEnabled) {
+        params.withControllerVipUrl(_controllerVipUrl);
+      }
+      return new SegmentCompletionProtocol.Response(params);
     }
 
     private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {
@@ -631,8 +646,8 @@ public class SegmentCompletionManager {
 
     private SegmentCompletionProtocol.Response hold(String instanceId, long offset) {
       LOGGER.info("{}:HOLD for instance={} offset={}", _state, instanceId, offset);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withStatus(
-          SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(offset));
+      return new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(offset));
     }
 
     private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId, long offset) {

@@ -112,6 +112,14 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealstateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
 
+  public boolean getIsSplitCommitEnabled() {
+    return _controllerConf.getAcceptSplitCommit();
+  }
+
+  public String getControllerVipUrl() {
+    return _controllerConf.generateVipUrl();
+  }
+
   public static synchronized void create(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
     create(helixResourceManager.getHelixAdmin(), helixResourceManager.getHelixClusterName(),

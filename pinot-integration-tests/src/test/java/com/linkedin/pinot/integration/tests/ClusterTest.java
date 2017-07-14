@@ -111,20 +111,32 @@ public abstract class ClusterTest extends ControllerTest {
     startServers(1);
   }
 
+  protected void startServer(Configuration configuration) {
+    startServers(1, configuration);
+  }
+
+  public Configuration getDefaultConfiguration() {
+    Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostnameOrAddress());
+    configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
+    configuration.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, "10000");
+    configuration.addProperty(Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
+    configuration.setProperty(Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, false);
+    return configuration;
+  }
+
   protected void startServers(int serverCount) {
+    startServers(serverCount, getDefaultConfiguration());
+  }
+
+  protected void startServers(int serverCount, Configuration configuration) {
     try {
       for (int i = 0; i < serverCount; i++) {
-        Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
             Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + i);
-        configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostnameOrAddress());
-        configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
-        configuration.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, "10000");
-        configuration.addProperty(Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
-        configuration.setProperty(Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, false);
         overrideOfflineServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(_clusterName, ZkStarter.DEFAULT_ZK_STR, configuration));
       }

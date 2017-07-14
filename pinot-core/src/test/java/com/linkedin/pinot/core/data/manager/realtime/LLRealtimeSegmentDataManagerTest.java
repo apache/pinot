@@ -660,7 +660,9 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     public boolean invokeCommit(String segTarFileName) {
-      return super.commitSegment(segTarFileName);
+      SegmentCompletionProtocol.Response response = mock(SegmentCompletionProtocol.Response.class);
+      when(response.getIsSplitCommit()).thenReturn(false);
+      return super.commitSegment(segTarFileName, response);
     }
 
     private void terminateLoopIfNecessary() {
@@ -755,7 +757,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean commitSegment(final String segTarFile) {
+    protected boolean commitSegment(final String segTarFile, SegmentCompletionProtocol.Response response) {
       _commitSegmentCalled = true;
       return true;
     }

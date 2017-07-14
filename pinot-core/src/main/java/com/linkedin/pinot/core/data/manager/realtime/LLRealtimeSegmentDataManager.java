@@ -16,20 +16,6 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -64,7 +50,21 @@ import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.yammer.metrics.core.Meter;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import kafka.message.MessageAndOffset;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -513,7 +513,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
-                success = commitSegment(segmentTarFile);
+                success = commitSegment(segmentTarFile, response);
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -626,15 +626,37 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return destDir.getAbsolutePath();
   }
 
-  protected boolean commitSegment(final String segTarFileName) {
-    // Send segmentCommit() to the controller
-    // if that succeeds, swap in-memory segment with the one built.
+  protected SegmentCompletionProtocol.Response doSplitCommit(File segmentTarFile, SegmentCompletionProtocol.Response response) {
+    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_currentOffset, _segmentNameStr);
+    if (!segmentCommitStartResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+
+    SegmentCompletionProtocol.Response segmentCommitUploadResponse = _protocolHandler.segmentCommitUpload(
+        _currentOffset, _segmentNameStr, segmentTarFile, response.getSegmentLocation(), response.getControllerVipUrl());
+    if (!segmentCommitUploadResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+
+    return _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
+  }
+
+  protected boolean commitSegment(final String segTarFileName, SegmentCompletionProtocol.Response response) {
     File segTarFile = new File(segTarFileName);
     if (!segTarFile.exists()) {
       throw new RuntimeException("Segment file does not exist:" + segTarFileName);
     }
-    SegmentCompletionProtocol.Response response =  postSegmentCommitMsg(segTarFile);
-    if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
+    SegmentCompletionProtocol.Response returnedResponse;
+    if (response.getIsSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
+      // Send segmentStart, segmentUpload, & segmentCommitEnd to the controller
+      // if that succeeds, swap in-memory segment with the one built.
+      returnedResponse = doSplitCommit(segTarFile, response);
+    } else {
+      // Send segmentCommit() to the controller
+      // if that succeeds, swap in-memory segment with the one built.
+      returnedResponse = postSegmentCommitMsg(segTarFile);
+    }
+    if (!returnedResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       segmentLogger.warn("Received controller response {}", response);
       return false;
     }
