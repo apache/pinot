@@ -272,7 +272,12 @@ public abstract class ThirdEyeUtils {
   public static String getDerivedMetricExpression(String metricExpressionName, String dataset) throws ExecutionException {
     String derivedMetricExpression = null;
     MetricDataset metricDataset = new MetricDataset(metricExpressionName, dataset);
-    MetricConfigDTO metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(metricDataset);
+
+
+    MetricConfigDTO metricConfig = DAORegistry.getInstance().getMetricConfigDAO().findByMetricAndDataset(metricDataset.getMetricName(), metricDataset.getDataset());
+
+//    MetricConfigDTO metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(metricDataset);
+
     if (metricConfig.isDerived()) {
       derivedMetricExpression = metricConfig.getDerivedMetricExpression();
     } else {

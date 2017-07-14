@@ -127,7 +127,7 @@ public class EmailResource {
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
-    if (isApplyFilter){
+    if (isApplyFilter) {
       anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
     }
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();

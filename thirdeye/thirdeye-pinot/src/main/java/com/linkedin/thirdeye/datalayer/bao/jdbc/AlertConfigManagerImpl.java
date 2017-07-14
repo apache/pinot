@@ -51,4 +51,17 @@ public class AlertConfigManagerImpl extends AbstractManagerImpl<AlertConfigDTO>
     }
     return result;
   }
+
+  @Override
+  public List<AlertConfigDTO> findByFunctionId(Long functionId) {
+    List<AlertConfigBean> list = genericPojoDao.getAll(AlertConfigBean.class);
+    List<AlertConfigDTO> result = new ArrayList<>();
+    for (AlertConfigBean bean : list) {
+      if (bean.getEmailConfig() != null && bean.getEmailConfig().getFunctionIds().contains(functionId)) {
+        result.add(MODEL_MAPPER.map(bean, AlertConfigDTO.class));
+      }
+    }
+    return result;
+  }
+
 }
