@@ -118,15 +118,20 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private synchronized void assignRealtimeSegmentsToServerInstancesIfNecessary()
       throws JSONException, IOException {
     // Fetch current ideal state snapshot
-    Map<String, IdealState> idealStateMap = new HashMap<String, IdealState>();
+    Map<String, IdealState> idealStateMap = new HashMap<>();
 
-    for (String resource : _pinotHelixResourceManager.getAllRealtimeTables()) {
-      final String tableName = TableNameBuilder.extractRawTableName(resource);
-      TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+    for (String realtimeTableName : _pinotHelixResourceManager.getAllRealtimeTables()) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
+
+      // Table config might have already been deleted
+      if (tableConfig == null) {
+        continue;
+      }
+
       KafkaStreamMetadata metadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
       if (metadata.hasHighLevelKafkaConsumerType()) {
-        idealStateMap.put(resource, _pinotHelixResourceManager.getHelixAdmin()
-            .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), resource));
+        idealStateMap.put(realtimeTableName, _pinotHelixResourceManager.getHelixAdmin()
+            .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName));
       } else {
         LOGGER.debug("Not considering table {} for realtime segment assignment");
       }
@@ -134,18 +139,18 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
 
     List<Pair<String, String>> listOfSegmentsToAddToInstances = new ArrayList<Pair<String, String>>();
 
-    for (String resource : idealStateMap.keySet()) {
+    for (String realtimeTableName : idealStateMap.keySet()) {
       try {
-        IdealState state = idealStateMap.get(resource);
+        IdealState state = idealStateMap.get(realtimeTableName);
 
         // Are there any partitions?
         if (state.getPartitionSet().size() == 0) {
           // No, this is a brand new ideal state, so we will add one new segment to every partition and replica
-          List<String> instancesInResource = new ArrayList<String>();
+          List<String> instancesInResource = new ArrayList<>();
           try {
-            instancesInResource.addAll(_pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
+            instancesInResource.addAll(_pinotHelixResourceManager.getServerInstancesForTable(realtimeTableName, TableType.REALTIME));
           } catch (Exception e) {
-            LOGGER.error("Caught exception while fetching instances for resource {}", resource, e);
+            LOGGER.error("Caught exception while fetching instances for resource {}", realtimeTableName, e);
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
           }
 
@@ -160,15 +165,15 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
               continue;
             }
 
-            String groupId = instanceZKMetadata.getGroupId(resource);
-            String partitionId = instanceZKMetadata.getPartition(resource);
+            String groupId = instanceZKMetadata.getGroupId(realtimeTableName);
+            String partitionId = instanceZKMetadata.getPartition(realtimeTableName);
             if (groupId != null && !groupId.isEmpty() && partitionId != null && !partitionId.isEmpty()) {
               listOfSegmentsToAddToInstances.add(new Pair<String, String>(
                   new HLCSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())).getSegmentName(),
                   instanceId));
             } else {
               LOGGER.warn("Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
-                  instanceId, groupId, partitionId, resource);
+                  instanceId, groupId, partitionId, realtimeTableName);
               _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
             }
           }
@@ -177,9 +182,9 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
           try {
             instancesToAssignRealtimeSegment.addAll(
-                _pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
+                _pinotHelixResourceManager.getServerInstancesForTable(realtimeTableName, TableType.REALTIME));
           } catch (Exception e) {
-            LOGGER.error("Caught exception while fetching instances for resource {}", resource, e);
+            LOGGER.error("Caught exception while fetching instances for resource {}", realtimeTableName, e);
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
           }
 
@@ -204,15 +209,15 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           // Assign a new segment to the server instances not currently processing this segment
           for (String instanceId : instancesToAssignRealtimeSegment) {
             InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
-            String groupId = instanceZKMetadata.getGroupId(resource);
-            String partitionId = instanceZKMetadata.getPartition(resource);
+            String groupId = instanceZKMetadata.getGroupId(realtimeTableName);
+            String partitionId = instanceZKMetadata.getPartition(realtimeTableName);
             listOfSegmentsToAddToInstances.add(new Pair<String, String>(
                 new HLCSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())).getSegmentName(),
                 instanceId));
           }
         }
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while processing resource {}, skipping.", resource, e);
+        LOGGER.warn("Caught exception while processing resource {}, skipping.", realtimeTableName, e);
         _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
       }
     }
@@ -372,14 +377,18 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   }
 
   @Override
-  public void handleChildChange(String parentPath, List<String> currentChilds)
+  public void handleChildChange(String parentPath, List<String> currentChildren)
       throws Exception {
     LOGGER.info("PinotRealtimeSegmentManager.handleChildChange: {}", parentPath);
     processPropertyStoreChange(parentPath);
-    for (String table : currentChilds) {
-      if (table.endsWith("_REALTIME")) {
-        LOGGER.info("PinotRealtimeSegmentManager.handleChildChange with table: {}", parentPath + "/" + table);
-        processPropertyStoreChange(parentPath + "/" + table);
+
+    // If parent path get removed, currentChildren will be null
+    if (currentChildren != null) {
+      for (String table : currentChildren) {
+        if (table.endsWith("_REALTIME")) {
+          LOGGER.info("PinotRealtimeSegmentManager.handleChildChange with table: {}", parentPath + "/" + table);
+          processPropertyStoreChange(parentPath + "/" + table);
+        }
       }
     }
   }

@@ -115,6 +115,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   @AfterClass
   public void tearDown()
       throws Exception {
+    dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
     stopController();
