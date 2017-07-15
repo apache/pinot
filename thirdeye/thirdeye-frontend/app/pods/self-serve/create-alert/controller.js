@@ -222,13 +222,17 @@ export default Ember.Controller.extend({
       granularity,
     };
 
-    this.set('graphConfig', graphConfig);
-    this.set('selectedGranularity', granularity);
+    this.setProperties({
+      graphConfig: graphConfig,
+      selectedGranularity: granularity
+    });
 
     this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
-      this.set('isMetricSelected', true);
-      this.set('selectedMetric', metricData);
-      this.set('loading', false);
+      this.setProperties({
+        isMetricSelected: true,
+        selectedMetric: metricData,
+        loading: false
+      });
     });
   },
 
@@ -308,11 +312,7 @@ export default Ember.Controller.extend({
     'selectedConfigGroup',
     'newConfigGroupName',
     function() {
-      if (this.selectedConfigGroup && Ember.isNone(this.newConfigGroupName)) {
-        return true;
-      } else {
-        return false;
-      }
+      return this.get('selectedConfigGroup') && Ember.isNone(this.get('newConfigGroupName'));
   }),
 
   /**
@@ -362,8 +362,8 @@ export default Ember.Controller.extend({
       const settingsByGranularity = {
         common: {
           functionName: this.get('alertFunctionName'),
-          metric: this.get('selectedMetricOption').name,
-          dataset: this.get('selectedMetricOption').dataset,
+          metric: this.get('selectedMetricOption.name'),
+          dataset: this.get('selectedMetricOption.dataset'),
           metricFunction: 'SUM',
           isActive: true
         },
@@ -454,9 +454,11 @@ export default Ember.Controller.extend({
     onSelectFilter(filters) {
       this.set('graphConfig.filters', filters);
       this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
-        this.set('isMetricSelected', true);
-        this.set('selectedMetric', metricData);
-        this.set('loading', false);
+        this.setProperties({
+          isMetricSelected: true,
+          selectedMetric: metricData,
+          loading: false
+        });
       });
     },
 
@@ -478,8 +480,10 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectAppName(selectedObj) {
-      this.set('selectedAppName', selectedObj);
-      this.set('selectedApplication', selectedObj.application);
+      this.setProperties({
+        selectedAppName: selectedObj,
+        selectedApplication: selectedObj.application
+      });
     },
 
     /**
@@ -490,9 +494,11 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectConfigGroup(selectedObj) {
-      this.set('selectedConfigGroup', selectedObj);
-      this.set('newConfigGroupName', null);
-      this.set('selectedGroupRecipients', selectedObj.recipients.replace(/,+/g, ', '));
+      this.setProperties({
+        selectedConfigGroup: selectedObj,
+        newConfigGroupName: null,
+        selectedGroupRecipients: selectedObj.recipients.replace(/,+/g, ', '),
+      });
       this.prepareFunctions(selectedObj).then(functionData => {
         this.set('selectedGroupFunctions', functionData);
       });
@@ -523,9 +529,11 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     validateNewGroupName(name) {
-      this.set('newConfigGroupName', name);
-      this.set('selectedConfigGroup', null);
-      this.set('selectedGroupRecipients', null);
+      this.setProperties({
+        newConfigGroupName: name,
+        selectedConfigGroup: null,
+        selectedGroupRecipients: null
+      });
     },
 
     /**
@@ -552,8 +560,10 @@ export default Ember.Controller.extend({
           }
         }
 
-        this.set('isDuplicateEmail', isDuplicateErr);
-        this.set('duplicateEmails', badEmailArr.join());
+        this.setProperties({
+          isDuplicateEmail: isDuplicateErr,
+          duplicateEmails: badEmailArr.join()
+        });
       }
     },
 
@@ -575,6 +585,7 @@ export default Ember.Controller.extend({
        selectedConfigGroup: null,
        newConfigGroupName: null,
        alertGroupNewRecipient: null,
+       selectedGroupRecipients: null,
        isCreateAlertSuccess: null,
        isCreateAlertError: false,
        isCreateGroupSuccess: false,
@@ -637,9 +648,11 @@ export default Ember.Controller.extend({
           // Finally, save our Alert Config Group
           this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
             if (alertResult.ok) {
-              this.set('selectedGroupRecipients', finalConfigObj.recipients);
-              this.set('isCreateAlertSuccess', true);
-              this.set('finalFunctionId', newFunctionId);
+              this.setProperties({
+                selectedGroupRecipients: finalConfigObj.recipients,
+                 isCreateAlertSuccess: true,
+                 finalFunctionId: newFunctionId
+              });
               // Confirm group creation if not in group edit mode
               if (!isEditGroupMode) {
                 this.set('isCreateGroupSuccess', true);
@@ -655,8 +668,10 @@ export default Ember.Controller.extend({
                 this.set('isReplayComplete', true);
               });
               // Now, disable form
-              this.set('isFormDisabled', true);
-              this.set('isMetricSelected', false);
+              this.setProperties({
+                isFormDisabled: true,
+                isMetricSelected: false
+              });
             } else {
               this.set('isCreateAlertError', true);
             }
