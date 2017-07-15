@@ -18,6 +18,7 @@
         placeholder="Search by Metric Name"
         searchPlaceholder="Type to filter..."
         triggerId="select-metric"
+        disabled=isFormDisabled
         as |metric|
       }}
         {{metric.alias}}
@@ -110,11 +111,11 @@
   </fieldset>
 
   <fieldset class="te-form__section">
-    <legend class="te-form__section-title">Alert Details:</legend>
+    <legend class="te-form__section-title">Alert and Notification:</legend>
     {{!-- Field: New Alert Name --}}
     <div class="form-group">
       <label for="anomaly-form-function-name" class="control-label required">Alert Name</label>
-      <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">application_metricName_dimensionName_others</span></div>
+      <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">productName_metricName_dimensionName_other</span></div>
       {{#if isAlertNameDuplicate}}
         <div class="alert alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
       {{/if}}
@@ -131,13 +132,13 @@
     </div>
     {{!-- Field: App Name --}}
     <div class="form-group">
-      <label for="anomaly-form-app-name" class="control-label required">Application Name</label>
+      <label for="anomaly-form-app-name" class="control-label required">Related Product or Team</label>
        {{#power-select
           options=allApplicationNames
           selected=selectedAppName
           onchange=(action "onSelectAppName")
           loadingMessage="Waiting for the server...."
-          placeholder="Select an existing application name"
+          placeholder="Select an existing product/team name"
           searchPlaceholder="Type to filter..."
           triggerId="anomaly-form-app-name"
           disabled=(not isMetricSelected)
@@ -148,105 +149,102 @@
     </div>
     {{!-- Field: Select Existing Subscription Group --}}
     <div class="form-group">
-      <div class="te-page-right te-page-right--inside">
-        <a href="#" class="thirdeye-link-secondary thirdeye-link-secondary--inside" {{action "onClickChangeGroupEditMode"}}>
-          {{if showAlertGroupEdit "Create a New Alert Subscription Group" "Add New Alert to Existing Subscription Group"}}
-        </a>
-      </div>
-      {{#if showAlertGroupEdit}}
-        <label for="config-group" class="control-label">Add This Alert To An Existing Subscription Group</label>
-        {{#power-select
-          options=filteredConfigGroups
-          selected=selectedConfigGroup
-          onchange=(action "onSelectConfigGroup")
-          disabled=(not isMetricSelected)
-          loadingMessage="Waiting for the server...."
-          placeholder="Select an existing alert subscription group"
-          searchPlaceholder="Type to filter..."
-          triggerId="config-group"
-          as |group|
-        }}
-          {{group.name}}
-        {{/power-select}}
-      {{/if}}
+      <label for="config-group" class="control-label">Add This Alert To An Existing Subscription Group</label>
+      {{#power-select
+        options=filteredConfigGroups
+        selected=selectedConfigGroup
+        onchange=(action "onSelectConfigGroup")
+        disabled=(not isMetricSelected)
+        loadingMessage="Waiting for the server...."
+        placeholder="Select an existing alert subscription group"
+        searchPlaceholder="Type to filter..."
+        triggerId="config-group"
+        as |group|
+      }}
+        {{group.name}}
+      {{/power-select}}
     </div>
-    {{!--  Fields for existing alert group edit --}}
-    {{#if showAlertGroupEdit}}
-      {{#if selectedConfigGroup}}
-        {{!-- Field: new alert group recipient emails --}}
-        <div class="form-group">
-          <label for="config-group" class="control-label">Add Notification Recipients</label>
-          <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "None"}}</span></div>
-          {{#if isDuplicateEmail}}
-          <div class="alert alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>
-          {{/if}}
-          {{input
-            type="email"
-            id="config-group-add-recipients"
-            class="form-control"
-            focus-out="validateAlertEmail"
-            key-up="validateAlertEmail"
-            placeholder="Add additional recipients (comma-separated email addresses)"
-            autocomplete=false
-            value=alertGroupNewRecipient
-            disabled=(not isMetricSelected)
-            required=true
-          }}
-        </div>
-        {{!-- Alert Group Metadata --}}
-        <div class="form-group">
-          <label for="config-group-functions" class="control-label">Alerts Monitored by This Group</label>
-          <ul class="alert-group-functions">
-            {{#each selectedGroupFunctions as |function|}}
-              <li class="alert-group-functions__item {{if function.isNewId 'alert-group-functions__item--new'}}">
-                <span class="alert-group-functions__item--value">{{function.name}} </span>
-                <span class="alert-group-functions__item--key">metric/collection: </span>
-                <span class="alert-group-functions__item--value">{{function.metric}} </span>
-                <span class="alert-group-functions__item--key">type: </span>
-                <span class="alert-group-functions__item--value">{{function.type}} </span>
-              </li>
-            {{else}}
-              <span class="alert-group-functions__item--id">NONE</span>
-            {{/each}}
-          </ul>
-        </div>
-      {{/if}}
-    {{else}}
     {{!--  Fields for new alert group creation --}}
+    <div class="form-group">
+      <label for="config-group-new-name" class="control-label">Or Provide A New Subscription Group Name</label>
+      {{input
+        type="text"
+        id="config-group-new-name"
+        class="form-control"
+        placeholder="New Group Name"
+        value=newConfigGroupName
+        key-down="validateNewGroupName"
+        disabled=(not isMetricSelected)
+      }}
+    </div>
+    {{!-- Field: new alert group recipient emails --}}
+    <div class="form-group">
+      <label for="config-group" class="control-label">Add Alert Notification Recipients</label>
+      <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "None"}}</span></div>
+      {{#if isDuplicateEmail}}
+        <div class="alert alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>
+      {{/if}}
+      {{input
+        type="email"
+        id="config-group-add-recipients"
+        class="form-control"
+        focus-out="validateAlertEmail"
+        key-up="validateAlertEmail"
+        placeholder="Add additional recipients (comma-separated email addresses)"
+        autocomplete=false
+        value=alertGroupNewRecipient
+        disabled=(not isMetricSelected)
+        required=true
+      }}
+    </div>
+    {{#if selectedConfigGroup}}
+      {{!-- Alert Group Metadata --}}
       <div class="form-group">
-        <label for="config-group-new-name" class="control-label">Subscription Group Name</label>
-        {{input
-          type="text"
-          id="config-group-new-name"
-          class="form-control"
-          placeholder="Group Name"
-          value=selectedConfigGroup.name
-          disabled=(not isMetricSelected)
-        }}
-      </div>
-      <div class="form-group">
-        <label for="config-group-new-recipients" class="control-label">Recipient(s) to Add</label>
-        {{input
-          type="text"
-          id="config-group-new-recipients"
-          class="form-control"
-          placeholder="Emails, comma-separated"
-          value=alertGroupNewRecipient
-          disabled=(not isMetricSelected)
-        }}
+        <label for="config-group-functions" class="control-label">Alerts Monitored by This Group</label>
+        <ul class="alert-group-functions">
+          {{#each selectedGroupFunctions as |function|}}
+            <li class="alert-group-functions__item {{if function.isNewId 'alert-group-functions__item--new'}}">
+              <span class="alert-group-functions__item--value">{{function.name}} </span>
+              <span class="alert-group-functions__item--key">metric/collection: </span>
+              <span class="alert-group-functions__item--value">{{function.metric}} </span>
+              <span class="alert-group-functions__item--key">type: </span>
+              <span class="alert-group-functions__item--value">{{function.type}} </span>
+            </li>
+          {{else}}
+            <span class="alert-group-functions__item--id">NONE</span>
+          {{/each}}
+        </ul>
       </div>
     {{/if}}
   </fieldset>
 
-  {{#if isCreateSuccess}}
+  {{#if isCreateAlertSuccess}}
     {{#bs-alert type="success"}}
-      <strong>Success</strong> You have created anomaly function Id {{finalFunctionId}}.
+      <strong>Success!</strong> You have created anomaly alert Id <strong>{{finalFunctionId}}</strong>.
     {{/bs-alert}}
   {{/if}}
 
-  {{#if isCreateError}}
+  {{#if isCreateGroupSuccess}}
+    {{#bs-alert type="success"}}
+      <strong>Success!</strong> You have created anomaly notification group <strong>{{newConfigGroupName}}</strong>.
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if isCreateAlertError}}
     {{#bs-alert type="danger"}}
-      <strong>Error</strong> Alert creation has failed. Please try again.
+      <strong>Error!</strong> Alert creation has failed. Please try again.
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if isReplayTriggeredSuccess}}
+    {{#bs-alert type="success"}}
+      <strong>Success!</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has started processing. We will notify <strong>{{alertGroupNewRecipient}}</strong> when the replay is complete.
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if isReplayComplete}}
+    {{#bs-alert type="success"}}
+      <strong>Success</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has completed.
     {{/bs-alert}}
   {{/if}}
 
@@ -258,14 +256,25 @@
       onClick=(action "clearAll")
       class="te-submit-button"
     }}
-    {{bs-button
-      defaultText="Create & Activate Alert"
-      type="primary"
-      onClick=(action "onSubmit")
-      buttonType="submit"
-      disabled=isSubmitDisabled
-      class="te-submit-button"
-    }}
+    {{#if isFormDisabled}}
+      {{bs-button
+        defaultText="Create Another Alert"
+        type="primary"
+        onClick=(action "clearAll")
+        buttonType="submit"
+        class="te-submit-button"
+      }}
+    {{else}}
+      {{bs-button
+        defaultText="Create & Activate Alert"
+        type="primary"
+        onClick=(action "onSubmit")
+        buttonType="submit"
+        disabled=isSubmitDisabled
+        class="te-submit-button"
+      }}
+    {{/if}}
+
   </fieldset>
 
   {{outlet}}

@@ -8,6 +8,23 @@ import fetch from 'fetch';
 import RSVP from 'rsvp';
 
 export default Ember.Route.extend({
+
+  actions: {
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    * @return {undefined}
+    */
+    refreshModel() {
+      this.refresh();
+    }
+  },
+
+  /**
+   * Model hook for the create alert route.
+   * @method model
+   * @return {Object}
+   */
   model() {
     return RSVP.hash({
       // Fetch all alert group configurations
