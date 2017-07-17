@@ -10,7 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.joda.time.DateTime;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,9 +24,19 @@ import org.slf4j.LoggerFactory;
 public class AnomalyEventsPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyEventsPipeline.class);
 
-  private static final int START_OFFSET_HOURS = 6;
+  private static final String PROP_K = "k";
+  private static final int PROP_K_DEFAULT = -1;
 
+  private static final String PROP_LOOKBACK = "lookback";
+  private static final String PROP_LOOKBACK_DEFAULT = "2d";
+
+  private static final String PROP_STRATEGY = "strategy";
+  private static final String PROP_STRATEGY_DEFAULT = ScoreUtils.StrategyType.QUADRATIC.toString();
+
+  private final ScoreUtils.StrategyType strategy;
   private final MergedAnomalyResultManager anomalyDAO;
+  private final long lookback;
+  private final int k;
 
   /**
    * Constructor for dependency injection
@@ -34,10 +44,14 @@ public class AnomalyEventsPipeline extends Pipeline {
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
    * @param anomalyDAO anomaly config DAO
+   * @param lookback lookback period in millis
    */
-  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, MergedAnomalyResultManager anomalyDAO) {
+  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, MergedAnomalyResultManager anomalyDAO, ScoreUtils.StrategyType strategy, long lookback, int k) {
     super(outputName, inputNames);
     this.anomalyDAO = anomalyDAO;
+    this.strategy = strategy;
+    this.lookback = lookback;
+    this.k = k;
   }
 
   /**
@@ -45,11 +59,14 @@ public class AnomalyEventsPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param ignore configuration properties (none)
+   * @param properties configuration properties ({@code PROP_K}, {@code PROP_LOOKBACK}, {@code PROP_STRATEGY})
    */
-  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> ignore) {
+  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.lookback = ScoreUtils.parsePeriod(MapUtils.getString(properties, PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT));
+    this.strategy = ScoreUtils.parseStrategy(MapUtils.getString(properties, PROP_STRATEGY, PROP_STRATEGY_DEFAULT));
+    this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
   }
 
   @Override
@@ -57,25 +74,22 @@ public class AnomalyEventsPipeline extends Pipeline {
     Set<MetricEntity> metrics = context.filter(MetricEntity.class);
 
     TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
-    long start = new DateTime(current.getStart()).minusHours(START_OFFSET_HOURS).getMillis();
+    long lookback = current.getStart() - this.lookback;
+    long start = current.getStart();
     long end = current.getEnd();
+
+    ScoreUtils.TimeRangeStrategy strategy = ScoreUtils.build(this.strategy, lookback, start, end);
 
     Set<AnomalyEventEntity> entities = new HashSet<>();
     for(MetricEntity me : metrics) {
       List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), start, end);
 
       for(MergedAnomalyResultDTO dto : anomalies) {
-        double score = getScore(dto, start, end);
+        double score = strategy.score(dto.getStartTime(), dto.getEndTime());
         entities.add(AnomalyEventEntity.fromDTO(score, dto));
       }
     }
 
-    return new PipelineResult(context, EntityUtils.normalizeScores(entities));
-  }
-
-  private double getScore(MergedAnomalyResultDTO dto, long start, long end) {
-    long duration = end - start;
-    long offset = dto.getEndTime() - start;
-    return Math.max(offset / (double)duration, 0);
+    return new PipelineResult(context, EntityUtils.topk(entities, this.k));
   }
 }

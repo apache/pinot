@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
-import org.joda.time.DateTime;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,16 +28,26 @@ import org.slf4j.LoggerFactory;
 public class HolidayEventsPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
 
-  private static final int START_OFFSET_HOURS = 72;
+  enum StrategyType {
+    LINEAR,
+    TRIANGULAR,
+    QUADRATIC,
+    DIMENSION
+  }
+
+  private static final String PROP_K = "k";
+  private static final int PROP_K_DEFAULT = -1;
+
+  private static final String PROP_LOOKBACK = "lookback";
+  private static final String PROP_LOOKBACK_DEFAULT = "1w";
 
   private static final String PROP_STRATEGY = "strategy";
+  private static final String PROP_STRATEGY_DEFAULT = StrategyType.TRIANGULAR.toString();
 
-  private static final String STRATEGY_TIME = "time";
-  private static final String STRATEGY_DIMENSION = "dimension";
-
+  private final StrategyType strategy;
   private final EventDataProviderManager eventDataProvider;
-
-  private final ScoringStrategy strategy;
+  private final long lookback;
+  private final int k;
 
   /**
    * Constructor for dependency injection
@@ -46,11 +56,14 @@ public class HolidayEventsPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param eventDataProvider event data provider manager
    * @param strategy scoring strategy
+   * @param lookback lookback in millis
    */
-  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager eventDataProvider, ScoringStrategy strategy) {
+  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager eventDataProvider, StrategyType strategy, long lookback, int k) {
     super(outputName, inputNames);
     this.eventDataProvider = eventDataProvider;
     this.strategy = strategy;
+    this.lookback = lookback;
+    this.k = k;
   }
 
   /**
@@ -58,16 +71,14 @@ public class HolidayEventsPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param properties configuration properties ({@code PROP_STRATEGY})
+   * @param properties configuration properties ({@code PROP_LOOKBACK}, {@code PROP_STRATEGY})
    */
   public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.eventDataProvider = EventDataProviderManager.getInstance();
-
-    String propStrategy = STRATEGY_TIME;
-    if(properties.containsKey(PROP_STRATEGY))
-      propStrategy = properties.get(PROP_STRATEGY).toString();
-    this.strategy = parseStrategy(propStrategy);
+    this.lookback = ScoreUtils.parsePeriod(MapUtils.getString(properties, PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT));
+    this.strategy = StrategyType.valueOf(MapUtils.getString(properties, PROP_STRATEGY, PROP_STRATEGY_DEFAULT));
+    this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
   }
 
   @Override
@@ -81,19 +92,22 @@ public class HolidayEventsPipeline extends Pipeline {
     // TODO evaluate use of baseline events
     //events.addAll(getHolidayEvents(baseline, dimensionEntities));
 
-    long start = new DateTime(current.getStart()).minusHours(START_OFFSET_HOURS).getMillis();
+    long lookback = current.getStart() - this.lookback;
+    long start = current.getStart();
     long end = current.getEnd();
+
+    ScoringStrategy strategy = makeStrategy(lookback, start, end);
 
     List<EventDTO> events = getHolidayEvents(start, end, dimensionEntities);
 
     Set<HolidayEventEntity> entities = new HashSet<>();
     for(EventDTO ev : events) {
-      double score = this.strategy.score(ev, start, end, urn2entity);
+      double score = strategy.score(ev, urn2entity);
       HolidayEventEntity entity = HolidayEventEntity.fromDTO(score, ev);
       entities.add(entity);
     }
 
-    return new PipelineResult(context, EntityUtils.normalizeScores(entities));
+    return new PipelineResult(context, EntityUtils.topk(entities, this.k));
   }
 
   private List<EventDTO> getHolidayEvents(long start, long end, Set<DimensionEntity> dimensionEntities) {
@@ -118,36 +132,45 @@ public class HolidayEventsPipeline extends Pipeline {
     return eventDataProvider.getEvents(filter);
   }
 
-  private static ScoringStrategy parseStrategy(String strategy) {
-    switch(strategy) {
-      case STRATEGY_TIME:
-        return new TimeStrategy();
-      case STRATEGY_DIMENSION:
+  private ScoringStrategy makeStrategy(long lookback, long start, long end) {
+    switch(this.strategy) {
+      case LINEAR:
+        return new ScoreWrapper(new ScoreUtils.LinearStartTimeStrategy(start, end));
+      case TRIANGULAR:
+        return new ScoreWrapper(new ScoreUtils.TriangularStartTimeStrategy(lookback, start, end));
+      case QUADRATIC:
+        return new ScoreWrapper(new ScoreUtils.QuadraticTriangularStartTimeStrategy(lookback, start, end));
+      case DIMENSION:
         return new DimensionStrategy();
+      default:
+        throw new IllegalArgumentException(String.format("Invalid strategy type '%s'", this.strategy));
     }
-    throw new IllegalArgumentException(String.format("Unknown strategy '%s'", strategy));
   }
 
   private interface ScoringStrategy {
-    double score(EventDTO dto, long start, long end, Map<String, DimensionEntity> urn2entity);
+    double score(EventDTO dto, Map<String, DimensionEntity> urn2entity);
   }
 
-  private static class TimeStrategy implements ScoringStrategy {
+  private static class ScoreWrapper implements ScoringStrategy {
+    private final ScoreUtils.TimeRangeStrategy delegate;
+
+    public ScoreWrapper(ScoreUtils.TimeRangeStrategy delegate) {
+      this.delegate = delegate;
+    }
+
     @Override
-    public double score(EventDTO dto, long start, long end, Map<String, DimensionEntity> urn2entity) {
-      long duration = end - start;
-      long offset = dto.getStartTime() - start;
-      return Math.max(offset / (double)duration, 0);
+    public double score(EventDTO dto, Map<String, DimensionEntity> urn2entity) {
+      return this.delegate.score(dto.getStartTime(), dto.getEndTime());
     }
   }
 
   private static class DimensionStrategy implements ScoringStrategy {
     @Override
-    public double score(EventDTO dto, long start, long end, Map<String, DimensionEntity> urn2entity) {
+    public double score(EventDTO dto, Map<String, DimensionEntity> urn2entity) {
       return makeDimensionScore(urn2entity, dto.getTargetDimensionMap());
     }
 
-    static double makeDimensionScore(Map<String, DimensionEntity> urn2entity, Map<String, List<String>> dimensionFilterMap) {
+    private static double makeDimensionScore(Map<String, DimensionEntity> urn2entity, Map<String, List<String>> dimensionFilterMap) {
       double sum = 0.0;
       Set<String> urns = filter2urns(dimensionFilterMap);
       for(String urn : urns) {
@@ -158,7 +181,7 @@ public class HolidayEventsPipeline extends Pipeline {
       return sum;
     }
 
-    static Set<String> filter2urns(Map<String, List<String>> dimensionFilterMap) {
+    private static Set<String> filter2urns(Map<String, List<String>> dimensionFilterMap) {
       Set<String> urns = new HashSet<>();
       for(Map.Entry<String, List<String>> e : dimensionFilterMap.entrySet()) {
         for(String val : e.getValue()) {

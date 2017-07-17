@@ -90,7 +90,7 @@ public class EntityUtils {
    * @param entities entities
    * @return entities with normalized scores
    */
-  public static Set<Entity> normalizeScores(Set<? extends Entity> entities) {
+  public static Set<Entity> normalizeScores(Collection<? extends Entity> entities) {
     double min = Double.MAX_VALUE;
     double max = Double.MIN_VALUE;
 
@@ -123,9 +123,9 @@ public class EntityUtils {
    * @param k top k elements to return (<0 indicates all)
    * @return top k entities
    */
-  public static <T extends Entity> Set<T> topk(Set<T> entities, int k) {
+  public static <T extends Entity> Set<T> topk(Collection<T> entities, int k) {
     if (k < 0)
-      return entities;
+      return new HashSet<>(entities);
     List<T> sorted = new ArrayList<>(entities);
     Collections.sort(sorted, Entity.HIGHEST_SCORE_FIRST);
     return new HashSet<>(sorted.subList(0, Math.min(k, sorted.size())));
@@ -139,7 +139,7 @@ public class EntityUtils {
    * @param k top k elements to return (<0 indicates all)
    * @return top k normalized entities
    */
-  public static Set<Entity> topkNormalized(Set<? extends Entity> entities, int k) {
+  public static Set<Entity> topkNormalized(Collection<? extends Entity> entities, int k) {
     return topk(normalizeScores(entities), k);
   }
 
