@@ -16,7 +16,9 @@
 package com.linkedin.pinot.common.metrics;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
@@ -30,10 +32,11 @@ import com.yammer.metrics.core.MetricsRegistry;
 public class ValidationMetrics {
   private final MetricsRegistry _metricsRegistry;
 
-  private final Map<String, Long> gaugeValues = new HashMap<String, Long>();
+  private final Map<String, Long> _gaugeValues = new HashMap<String, Long>();
+  private final Set<MetricName> _metricNames = new HashSet<>();
 
   /**
-   * A simple gauge that returns whatever last value was stored in the gaugeValues hash map.
+   * A simple gauge that returns whatever last value was stored in the _gaugeValues hash map.
    */
   private class StoredValueGauge extends Gauge<Long> {
     private final String key;
@@ -44,13 +47,13 @@ public class ValidationMetrics {
 
     @Override
     public Long value() {
-      return gaugeValues.get(key);
+      return _gaugeValues.get(key);
     }
   }
 
   /**
    * A simple gauge that returns the difference between the current system time in millis and the value stored in the
-   * gaugeValues hash map.
+   * _gaugeValues hash map.
    */
   private class CurrentTimeMillisDeltaGauge extends Gauge<Long> {
     private final String key;
@@ -61,7 +64,7 @@ public class ValidationMetrics {
 
     @Override
     public Long value() {
-      Long gaugeValue = gaugeValues.get(key);
+      Long gaugeValue = _gaugeValues.get(key);
 
       if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
         return System.currentTimeMillis() - gaugeValue;
@@ -72,7 +75,7 @@ public class ValidationMetrics {
 
   /**
    * A simple gauge that returns the difference in hours between the current system time and the value stored in the
-   * gaugeValues hash map.
+   * _gaugeValues hash map.
    */
   private class CurrentTimeMillisDeltaGaugeHours extends Gauge<Double> {
     private final String key;
@@ -85,7 +88,7 @@ public class ValidationMetrics {
 
     @Override
     public Double value() {
-      Long gaugeValue = gaugeValues.get(key);
+      Long gaugeValue = _gaugeValues.get(key);
 
       if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
         return (System.currentTimeMillis() - gaugeValue) / MILLIS_PER_HOUR;
@@ -215,11 +218,24 @@ public class ValidationMetrics {
   }
 
   private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<?> gaugeFactory, final long value) {
-    if (!gaugeValues.containsKey(gaugeName)) {
-      gaugeValues.put(gaugeName, value);
+    if (!_gaugeValues.containsKey(gaugeName)) {
+      _gaugeValues.put(gaugeName, value);
       MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
+      _metricNames.add(metricName);
     } else {
-      gaugeValues.put(gaugeName, value);
+      _gaugeValues.put(gaugeName, value);
     }
+  }
+
+  /**
+   * Unregisters all validation metrics.
+   */
+  public void unregisterAllMetrics() {
+    for (MetricName metricName : _metricNames) {
+      MetricsHelper.removeMetric(_metricsRegistry, metricName);
+    }
+
+    _metricNames.clear();
+    _gaugeValues.clear();
   }
 }

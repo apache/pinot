@@ -128,6 +128,7 @@ public class ValidationManager {
    */
   public void runValidation() {
     if (!_pinotHelixResourceManager.isLeader()) {
+      _validationMetrics.unregisterAllMetrics();
       LOGGER.info("Skipping validation, not leader!");
       return;
     }
