@@ -212,4 +212,56 @@ public class EmailResource {
             includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }
+
+
+  @GET
+  @Path("generate/functions/{startTime}/{endTime}")
+  public Response generateAndSendAlertForFunctions(
+      @PathParam("startTime") Long startTime, @PathParam("endTime") Long endTime,
+      @QueryParam("functions") String functions, @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
+      @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
+      @QueryParam("isApplyFilter") boolean isApplyFilter,
+      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") int smtpPort,
+      @QueryParam("phantomJsPath") String phantomJsPath) {
+    if (Strings.isNullOrEmpty(functions)) {
+      throw new WebApplicationException("metrics null or empty: " + functions);
+    }
+    List<Long> functionList = new ArrayList<>();
+    for (String functionId : functions.split(",")) {
+      functionList.add(Long.valueOf(functionId));
+    }
+    if (functionList.size() == 0) {
+      throw new WebApplicationException("metrics empty : " + functionList);
+    }
+    if (Strings.isNullOrEmpty(toAddr)) {
+      throw new WebApplicationException("Empty : list of recipients" + toAddr);
+    }
+    if(Strings.isNullOrEmpty(teHost)) {
+      throw new WebApplicationException("Invalid TE host" + teHost);
+    }
+    if (Strings.isNullOrEmpty(smtpHost)) {
+      throw new WebApplicationException("invalid smtp host" + smtpHost);
+    }
+    AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
+    List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
+        .getAnomaliesForFunctions(functionList, startTime, endTime);
+    if(isApplyFilter){
+      anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
+    }
+    ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
+    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
+    smtpConfiguration.setSmtpHost(smtpHost);
+    smtpConfiguration.setSmtpPort(smtpPort);
+
+    configuration.setSmtpConfiguration(smtpConfiguration);
+    configuration.setDashboardHost(teHost);
+    configuration.setPhantomJsPath(phantomJsPath);
+    String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
+    anomalyReportGenerator
+        .buildReport(startTime, endTime, null, null, anomalies, emailSub, configuration,
+            includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
+    return Response.ok().build();
+  }
 }
