@@ -523,6 +523,11 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return Arrays.hashCode(this.values);
   }
 
+  @Override
+  int hashCode(int index) {
+    return this.values[index].hashCode();
+  }
+
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */

@@ -502,6 +502,10 @@ public abstract class Series {
     return this.compare(that, indexThis, indexThat) == 0;
   }
 
+  int hashCode(int index) {
+    return this.getObject(index).hashCode();
+  }
+
   /* *************************************************************************
    * Public interface
    * *************************************************************************/
@@ -1252,6 +1256,54 @@ public abstract class Series {
     return pairs;
   }
 
+  static List<JoinPair> hashJoinTuple(Series[] left, Series[] right) {
+    if(left.length != right.length)
+      throw new IllegalArgumentException("Number of series on the left side of the join must be equal to the right side");
+    if(left.length <= 0)
+      throw new IllegalArgumentException("Must join on at least one series");
+    assertSameLength(left);
+    assertSameLength(right);
+
+    List<JoinPair> pairs = new ArrayList<>();
+    BitSet touchedRight = new BitSet(right[0].size());
+
+    SeriesType[] types = new SeriesType[left.length];
+    for(int i=0; i<left.length; i++)
+      types[i] = left[i].type();
+
+    // TODO replace with primitive implementation for performance
+    Map<DataFrame.Tuple, Set<Integer>> hashRight = new HashMap<>();
+    for(int i=0; i<right[0].size(); i++) {
+      DataFrame.Tuple tuple = makeTuple(right, types, i);
+      if(!hashRight.containsKey(tuple))
+        hashRight.put(tuple, new HashSet<Integer>());
+      hashRight.get(tuple).add(i);
+    }
+
+    for(int i=0; i<left[0].size(); i++) {
+      DataFrame.Tuple tuple = makeTuple(left, types, i);
+      if(!hashRight.containsKey(tuple)) {
+        // no match
+        pairs.add(new JoinPair(i, -1));
+      } else {
+        // match
+        for(Integer j : hashRight.get(tuple)) {
+          if(equalsMultiple(left, right, i, j)) {
+            pairs.add(new JoinPair(i, j));
+            touchedRight.set(j);
+          }
+        }
+      }
+    }
+
+    for(int i=0; i<right[0].size(); i++) {
+      if(!touchedRight.get(i))
+        pairs.add(new JoinPair(-1, i));
+    }
+
+    return pairs;
+  }
+
   static List<JoinPair> productJoin(Series[] left, Series[] right) {
     if(left.length != right.length)
       throw new IllegalArgumentException("Number of series on the left side of the join must be equal to the right side");
@@ -1284,6 +1336,32 @@ public abstract class Series {
     }
 
     return pairs;
+  }
+
+  static DataFrame.Tuple makeTuple(Series[] series, SeriesType[] types, int rowIndex) {
+    Object[] values = new Object[series.length];
+    for(int i=0; i<series.length; i++) {
+      switch(types[i]) {
+        case LONG:
+          values[i] = series[i].getLong(rowIndex);
+          break;
+        case DOUBLE:
+          values[i] = series[i].getDouble(rowIndex);
+          break;
+        case STRING:
+          values[i] = series[i].getString(rowIndex);
+          break;
+        case BOOLEAN:
+          values[i] = series[i].getBoolean(rowIndex);
+          break;
+        case OBJECT:
+          values[i] = series[i].getObject(rowIndex);
+          break;
+        default:
+          throw new IllegalArgumentException(String.format("Unknown type '%s'", types[i]));
+      }
+    }
+    return DataFrame.Tuple.buildFrom(values);
   }
 
   static boolean equalsMultiple(Series[] left, Series[] right, int indexLeft, int indexRight) {

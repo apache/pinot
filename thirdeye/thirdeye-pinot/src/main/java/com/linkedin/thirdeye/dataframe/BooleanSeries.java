@@ -775,6 +775,11 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return Arrays.hashCode(this.values);
   }
 
+  @Override
+  int hashCode(int index) {
+    return this.values[index];
+  }
+
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */

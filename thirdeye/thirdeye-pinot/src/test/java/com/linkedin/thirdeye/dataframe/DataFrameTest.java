@@ -1688,6 +1688,23 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testLongHashJoinTuple() {
+    Series sLeft = DataFrame.toSeries(4, 3, 1, 2);
+    Series sRight = DataFrame.toSeries(5, 4, 3, 3, 0);
+
+    List<Series.JoinPair> pairs = Series.hashJoinTuple(new Series[] { sLeft }, new Series[] { sRight });
+
+    Assert.assertEquals(pairs.size(), 7);
+    Assert.assertEquals(pairs.get(0), new Series.JoinPair(0, 1));
+    Assert.assertEquals(pairs.get(1), new Series.JoinPair(1, 2));
+    Assert.assertEquals(pairs.get(2), new Series.JoinPair(1, 3));
+    Assert.assertEquals(pairs.get(3), new Series.JoinPair(2, -1));
+    Assert.assertEquals(pairs.get(4), new Series.JoinPair(3, -1));
+    Assert.assertEquals(pairs.get(5), new Series.JoinPair(-1, 0));
+    Assert.assertEquals(pairs.get(6), new Series.JoinPair(-1, 4));
+  }
+
+  @Test
   public void testLongProductJoin() {
     Series sLeft = DataFrame.toSeries(4, 3, 1, 2);
     Series sRight = DataFrame.toSeries(5, 4, 3, 3, 0);
@@ -1821,11 +1838,11 @@ public class DataFrameTest {
   @Test
   public void testJoinOuterObject() {
     DataFrame left = new DataFrame()
-        .addSeriesObjects("key", new DataFrame.Tuple("a", "a"), new DataFrame.Tuple("a", "b"))
+        .addSeriesObjects("key", DataFrame.Tuple.buildFrom("a", "a"), DataFrame.Tuple.buildFrom("a", "b"))
         .addSeries("leftValue", 1, 2);
 
     DataFrame right = new DataFrame()
-        .addSeriesObjects("key", new DataFrame.Tuple("b", "b"), new DataFrame.Tuple("a", "b"))
+        .addSeriesObjects("key", DataFrame.Tuple.buildFrom("b", "b"), DataFrame.Tuple.buildFrom("a", "b"))
         .addSeries("rightValue", "3", "4");
 
     DataFrame joined = left.joinOuter(right, "key");
@@ -1834,7 +1851,8 @@ public class DataFrameTest {
     Assert.assertEquals(joined.get("key").type(), Series.SeriesType.OBJECT);
     Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.LONG);
     Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.STRING);
-    assertEquals(joined.getObjects("key"), new DataFrame.Tuple("a", "a"), new DataFrame.Tuple("a", "b"), new DataFrame.Tuple("b", "b"));
+    assertEquals(joined.getObjects("key"),DataFrame.Tuple.buildFrom("a", "a"),
+        DataFrame.Tuple.buildFrom("a", "b"), DataFrame.Tuple.buildFrom("b", "b"));
     assertEquals(joined.getLongs("leftValue"), 1, 2, LNULL);
     assertEquals(joined.getStrings("rightValue"), SNULL, "4","3");
   }

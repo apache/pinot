@@ -2076,7 +2076,7 @@ public class DataFrame {
       ObjectSeries jointKey = dfColumn.map(new Series.ObjectFunction() {
         @Override
         public Object apply(Object... values) {
-          return new Tuple(values);
+          return Tuple.copyFrom(values);
         }
       }, groupKeyNames);
 
@@ -2156,8 +2156,16 @@ public class DataFrame {
   public static class Tuple implements Comparable<Tuple> {
     private final Object[] values;
 
-    Tuple(Object... values) {
-      this.values = Arrays.copyOf(values, values.length);
+    public static Tuple buildFrom(Object... values) {
+      return new Tuple(values);
+    }
+
+    public static Tuple copyFrom(Object... values) {
+      return new Tuple(Arrays.copyOf(values, values.length));
+    }
+
+    private Tuple(Object... values) {
+      this.values = values;
     }
 
     public Object[] getValues() {

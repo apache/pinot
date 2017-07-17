@@ -640,6 +640,11 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     return fromIndex;
   }
 
+  @Override
+  int hashCode(int index) {
+    return this.values[index].hashCode();
+  }
+
   static final class ObjectSortTuple {
     final Object value;
     final int index;

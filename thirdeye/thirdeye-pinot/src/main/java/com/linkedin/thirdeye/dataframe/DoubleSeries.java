@@ -790,6 +790,11 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return nullSafeDoubleComparator(this.values[indexThis], that.getDouble(indexThat));
   }
 
+  @Override
+  int hashCode(int index) {
+    return (int) Double.doubleToRawLongBits(this.values[index]);
+  }
+
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */

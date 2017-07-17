@@ -542,6 +542,11 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return this.fillNull(DEFAULT);
   }
 
+  @Override
+  int hashCode(int index) {
+    return (int) this.values[index];
+  }
+
   /**
    * Return a copy of the series with all <b>null</b> values replaced by
    * {@code value}.
