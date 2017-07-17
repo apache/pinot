@@ -273,16 +273,14 @@ public abstract class ThirdEyeUtils {
     String derivedMetricExpression = null;
     MetricDataset metricDataset = new MetricDataset(metricExpressionName, dataset);
 
+    MetricConfigDTO metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(metricDataset);
 
-    MetricConfigDTO metricConfig = DAORegistry.getInstance().getMetricConfigDAO().findByMetricAndDataset(metricDataset.getMetricName(), metricDataset.getDataset());
-
-//    MetricConfigDTO metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(metricDataset);
-
-    if (metricConfig.isDerived()) {
+    if (metricConfig != null && metricConfig.isDerived()) {
       derivedMetricExpression = metricConfig.getDerivedMetricExpression();
     } else {
       derivedMetricExpression = MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId();
     }
+    
     return derivedMetricExpression;
   }
 
