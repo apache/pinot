@@ -15,40 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import org.apache.helix.AccessOption;
-import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixDataAccessor;
-import org.apache.helix.HelixManager;
-import org.apache.helix.InstanceType;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.CurrentState;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.model.LiveInstance;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.zookeeper.data.Stat;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.json.JSONException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -96,8 +62,42 @@ import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ClusterMessagingService;
+import org.apache.helix.Criteria;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.LiveInstance;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.zookeeper.data.Stat;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotHelixResourceManager {
@@ -1330,48 +1330,57 @@ public class PinotHelixResourceManager {
   }
 
   public void deleteOfflineTable(String tableName) {
-    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    // Remove from brokerResource
-    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
-    // Delete data table
-    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
-      return;
-    }
-    List<String> segments = getSegmentsFor(offlineTableName);
-    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, segments);
-    // remove from property store
-    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(getPropertyStore(), offlineTableName);
-    ZKMetadataProvider.removeResourceConfigFromPropertyStore(getPropertyStore(), offlineTableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
 
-    // dropping table
-    _helixAdmin.dropResource(_helixClusterName, offlineTableName);
+    // Remove the table from brokerResource
+    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
+
+    // Drop the table
+    if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
+      _helixAdmin.dropResource(_helixClusterName, offlineTableName);
+    }
+
+    // Remove all segments for the table
+    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName));
+    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, offlineTableName);
+
+    // Remove table config
+    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
   }
 
   public void deleteRealtimeTable(String tableName) {
-    final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    // Remove from brokerResource
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+
+    // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
-    // Delete data table
-    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(realtimeTableName)) {
-      return;
-    }
-    List<String> segments = getSegmentsFor(realtimeTableName);
-    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, segments);
-    // remove from property store
-    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(getPropertyStore(), realtimeTableName);
-    ZKMetadataProvider.removeResourceConfigFromPropertyStore(getPropertyStore(), realtimeTableName);
-    ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(getPropertyStore(), realtimeTableName);
-    // Remove groupId/PartitionId mapping for realtime table type.
-    for (String instance : getAllInstancesForTable(realtimeTableName)) {
-      InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(getPropertyStore(), instance);
-      if (instanceZKMetadata != null) {
-        instanceZKMetadata.removeResource(realtimeTableName);
-        ZKMetadataProvider.setInstanceZKMetadata(getPropertyStore(), instanceZKMetadata);
-      }
+
+    // Cache the state and drop the table
+    Set<String> instancesForTable = null;
+    if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(realtimeTableName)) {
+      instancesForTable = getAllInstancesForTable(realtimeTableName);
+      _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
     }
 
-    // dropping table
-    _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
+    // Remove all segments for the table
+    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName));
+    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, realtimeTableName);
+
+    // Remove table config
+    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
+
+    // Remove Kafka partition assignment for LLC table
+    ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(_propertyStore, realtimeTableName);
+
+    // Remove groupId/PartitionId mapping for HLC table
+    if (instancesForTable != null) {
+      for (String instance : instancesForTable) {
+        InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, instance);
+        if (instanceZKMetadata != null) {
+          instanceZKMetadata.removeResource(realtimeTableName);
+          ZKMetadataProvider.setInstanceZKMetadata(_propertyStore, instanceZKMetadata);
+        }
+      }
+    }
   }
 
   /**
