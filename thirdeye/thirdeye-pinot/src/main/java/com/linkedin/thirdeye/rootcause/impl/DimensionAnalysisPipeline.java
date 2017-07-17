@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
 import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
@@ -23,7 +22,6 @@ import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,7 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
+import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -54,8 +52,10 @@ public class DimensionAnalysisPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionAnalysisPipeline.class);
 
   public static final String PROP_PARALLELISM = "parallelism";
+  public static final int PROP_PARALLELISM_DEFAULT = 1;
 
-  public static final String PROP_PARALLELISM_DEFAULT = "1";
+  public static final String PROP_K = "k";
+  public static final int PROP_K_DEFAULT = -1;
 
   public static final long TIMEOUT = 120000;
 
@@ -68,6 +68,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final ExecutorService executor;
+  private final int k;
 
   /**
    * Constructor for dependency injection
@@ -80,12 +81,13 @@ public class DimensionAnalysisPipeline extends Pipeline {
    * @param executor executor service for parallel task execution
    */
   public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
-      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor) {
+      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor, int k) {
     super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.cache = cache;
     this.executor = executor;
+    this.k = k;
   }
 
   /**
@@ -93,19 +95,15 @@ public class DimensionAnalysisPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param properties configuration properties ({@code PROP_PARALLELISM=1})
+   * @param properties configuration properties ({@code PROP_K}, {@code PROP_PARALLELISM})
    */
   public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
-
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
-
-    String parallelismProp = PROP_PARALLELISM_DEFAULT;
-    if(properties.containsKey(PROP_PARALLELISM))
-      parallelismProp = properties.get(PROP_PARALLELISM).toString();
-    this.executor = Executors.newFixedThreadPool(Integer.parseInt(parallelismProp));
+    this.executor = Executors.newFixedThreadPool(MapUtils.getInteger(properties, PROP_PARALLELISM, PROP_PARALLELISM_DEFAULT));
+    this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
   }
 
   @Override
@@ -200,7 +198,15 @@ public class DimensionAnalysisPipeline extends Pipeline {
       }
     }, COST);
 
-    return new PipelineResult(context, toEntities(result));
+    // drop dimensions with 0 cost
+    result = result.filter(new Series.DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] > 0.0d;
+      }
+    }, COST).dropNull();
+
+    return new PipelineResult(context, EntityUtils.topk(toEntities(result), this.k));
   }
 
   private static Set<DimensionEntity> toEntities(DataFrame df) {
