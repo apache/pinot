@@ -114,6 +114,48 @@ function submitData(url, data, tab, dataType = "json") {
     })
 }
 
+function updateData(url, data, tab, dataType = "json") {
+
+  if (data === undefined) {
+    data = ""
+  }
+
+  if (!tab) {
+    tab = hash.view;
+  }
+  return $.ajax({
+    url: url,
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    },
+    type: 'put',
+    dataType: dataType, // NOTE: expecting 'json' fails on empty 200 response
+    data: data,
+    statusCode: {
+      404: function () {
+        $("#" + tab + "-chart-area-error").empty();
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+        var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+        warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }));
+        $("#" + tab + "-chart-area-error").append(closeBtn);
+        $("#" + tab + "-chart-area-error").append(warning);
+        $("#" + tab + "-chart-area-error").fadeIn(100);
+        return
+      },
+      500: function () {
+        $("#" + tab + "-chart-area-error").empty();
+        var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' });
+        error.append($('<p></p>', { html: 'Internal server error' }));
+        $("#" + tab + "-chart-area-error").append(error);
+        $("#" + tab + "-chart-area-error").fadeIn(100);
+        return
+      }
+    }
+  }).always(function () {
+  })
+}
+
 function deleteData(url, data, tab, dataType = "json") {
     if (data === undefined) {
         data = ""

@@ -191,7 +191,7 @@ export default Ember.Controller.extend({
       method: 'post',
       headers: { 'content-type': 'Application/Json' }
     };
-    const url = '/dashboard/anomaly-function/create?' + this.toQueryString(functionData);
+    const url = '/dashboard/anomaly-function?' + this.toQueryString(functionData);
     return fetch(url, postProps).then(res => res.json());
   },
 
