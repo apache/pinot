@@ -53,20 +53,6 @@ public class TaskGenerator {
 
   }
 
-  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext,
-      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
-
-    List<AlertTaskInfo> tasks = new ArrayList<>();
-    EmailConfigurationDTO alertConfig = alertJobContext.getAlertConfig();
-    long jobExecutionId = alertJobContext.getJobExecutionId();
-
-    AlertTaskInfo taskInfo =
-        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
-            alertConfig, null);
-    tasks.add(taskInfo);
-    return tasks;
-  }
-
   public List<AlertTaskInfo> createAlertTasksV2(AlertJobContext alertJobContext,
       DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
 
@@ -75,7 +61,7 @@ public class TaskGenerator {
     long jobExecutionId = alertJobContext.getJobExecutionId();
 
     AlertTaskInfo taskInfo =
-        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, null,
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
             alertConfig);
     tasks.add(taskInfo);
     return tasks;

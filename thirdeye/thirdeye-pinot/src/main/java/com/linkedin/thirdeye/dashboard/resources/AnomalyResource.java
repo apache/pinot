@@ -17,19 +17,19 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -88,7 +88,7 @@ public class AnomalyResource {
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
-  private EmailConfigurationManager emailConfigurationDAO;
+  private AlertConfigManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private OverrideConfigManager overrideConfigDAO;
@@ -104,7 +104,7 @@ public class AnomalyResource {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
+    this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
@@ -758,9 +758,9 @@ public class AnomalyResource {
 
     // delete dependent entities
     // email config mapping
-    List<EmailConfigurationDTO> emailConfigurations = emailConfigurationDAO.findByFunctionId(id);
-    for (EmailConfigurationDTO emailConfiguration : emailConfigurations) {
-      emailConfiguration.getFunctions().remove(anomalyFunctionSpec);
+    List<AlertConfigDTO> emailConfigurations = emailConfigurationDAO.findByFunctionId(id);
+    for (AlertConfigDTO emailConfiguration : emailConfigurations) {
+      emailConfiguration.getEmailConfig().getFunctionIds().remove(anomalyFunctionSpec.getId());
       emailConfigurationDAO.update(emailConfiguration);
     }
 

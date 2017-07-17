@@ -22,6 +22,7 @@ import com.linkedin.thirdeye.dashboard.resources.MetricConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.OnboardDatasetMetricResource;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.OverrideConfigResource;
+import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
@@ -36,9 +37,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
-import com.linkedin.thirdeye.rootcause.impl.PipelineConfiguration;
 import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
 
 import io.dropwizard.assets.AssetsBundle;
@@ -49,7 +48,6 @@ import io.dropwizard.views.ViewBundle;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -136,10 +134,10 @@ public class ThirdEyeDashboardApplication
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-    /**
-     * Adding DetectionJobResource in Dashboard to allow replay/autotune from ui.
-     * creating a lightweight detection scheduler instance
-     * Do not call start() as this instance is only meant to run replay/autotune
+    /*
+      Adding DetectionJobResource in Dashboard to allow replay/autotune from ui.
+      creating a lightweight detection scheduler instance
+      Do not call start() as this instance is only meant to run replay/autotune
      */
     DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
     AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
@@ -147,6 +145,19 @@ public class ThirdEyeDashboardApplication
 
     if(config.getRootCause() != null) {
       env.jersey().register(makeRootCauseResource(config));
+    }
+
+    // Load external resources
+    if (config.getResourceConfig() != null) {
+      List<ResourceConfiguration> resourceConfigurations = config.getResourceConfig();
+      for(ResourceConfiguration resourceConfiguration : resourceConfigurations) {
+        try {
+          env.jersey().register(Class.forName(resourceConfiguration.getClassName()));
+          LOG.info("Registering resource [{}]", resourceConfiguration.getClassName());
+        } catch (Exception e) {
+          LOG.error("Could not instantiate resource", e);
+        }
+      }
     }
   }
 

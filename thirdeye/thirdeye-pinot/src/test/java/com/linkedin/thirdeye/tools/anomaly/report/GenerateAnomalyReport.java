@@ -6,20 +6,18 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
@@ -49,7 +47,6 @@ public class GenerateAnomalyReport {
 
   MergedAnomalyResultManager anomalyResultManager;
   MetricConfigManager metricConfigManager;
-  EmailConfigurationManager emailConfigurationManager;
 
   Date startTime;
   Date endTime;
@@ -64,7 +61,6 @@ public class GenerateAnomalyReport {
     DaoProviderUtil.init(persistenceConfig);
     anomalyResultManager = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     metricConfigManager = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
-    emailConfigurationManager = DaoProviderUtil.getInstance(EmailConfigurationManagerImpl.class);
 
     this.startTime = startTime;
     this.endTime = endTime;
@@ -82,21 +78,6 @@ public class GenerateAnomalyReport {
       List<MetricConfigDTO> metrics = metricConfigManager.findActiveByDataset(collection);
       for (MetricConfigDTO metric : metrics) {
         System.out.println(collection + "," + metric.getName());
-      }
-    }
-  }
-
-  void updateEmailConfig() {
-    String recipients = "xyz@linkedin.com";
-    for (String collection : collections) {
-      List<EmailConfigurationDTO> emailConfigs =
-          emailConfigurationManager.findByCollection(collection);
-      for (EmailConfigurationDTO emailConfigurationDTO : emailConfigs) {
-        if (emailConfigurationDTO.getFunctions().size() > 0) {
-          emailConfigurationDTO.setToAddresses(recipients);
-          emailConfigurationManager.update(emailConfigurationDTO);
-          System.out.println("Email updated " + emailConfigurationDTO.getMetric());
-        }
       }
     }
   }
@@ -171,17 +152,17 @@ public class GenerateAnomalyReport {
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap) {
     HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    try (Writer out = new OutputStreamWriter(baos, AlertTaskRunner.CHARSET)) {
+    try (Writer out = new OutputStreamWriter(baos, AlertTaskRunnerV2.CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
-      freemarkerConfig.setDefaultEncoding(AlertTaskRunner.CHARSET);
+      freemarkerConfig.setDefaultEncoding(AlertTaskRunnerV2.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
       Template template = freemarkerConfig.getTemplate("custom-anomaly-report.ftl");
       template.process(paramMap, out);
 
       String alertEmailSubject =
           "Thirdeye : Daily anomaly report";
-      String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);
+      String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
       EmailHelper.sendEmailWithHtml(email, smtpConfiguration, alertEmailSubject, alertEmailHtml,
           "thirdeye-dev@linkedin.com", emailRecipients);
     } catch (Exception e) {
@@ -237,6 +218,15 @@ public class GenerateAnomalyReport {
             Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(),
             "");
     ThirdEyeAnomalyConfiguration detectorConfig = factory.build(detectorConfigFile);
+
+
+    // to start cache service
+    detectorConfig.setRootDir(config.getThirdEyeConfigDirectoryPath());
+    try {
+      ThirdEyeCacheRegistry.initializeCaches(detectorConfig);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
 
     GenerateAnomalyReport reportGenerator =
         new GenerateAnomalyReport(df.parse(config.getStartTimeIso()),

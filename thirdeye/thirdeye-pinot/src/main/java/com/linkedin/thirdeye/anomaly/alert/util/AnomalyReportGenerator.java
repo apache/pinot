@@ -36,7 +36,6 @@ import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -268,16 +267,16 @@ public class AnomalyReportGenerator {
     }
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    try (Writer out = new OutputStreamWriter(baos, AlertTaskRunner.CHARSET)) {
+    try (Writer out = new OutputStreamWriter(baos, AlertTaskRunnerV2.CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
-      freemarkerConfig.setDefaultEncoding(AlertTaskRunner.CHARSET);
+      freemarkerConfig.setDefaultEncoding(AlertTaskRunnerV2.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
       Template template = freemarkerConfig.getTemplate(MULTIPLE_ANOMALIES_EMAIL_TEMPLATE);
 
       template.process(paramMap, out);
 
-      String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);
+      String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
       EmailHelper.sendEmailWithHtml(email, smtpConfiguration, subject, alertEmailHtml, fromEmail,
           emailRecipients);
     } catch (Exception e) {

@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomaly.alert.v2;
 
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
-import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.DummyAlertGrouper;
@@ -62,7 +61,7 @@ import org.slf4j.LoggerFactory;
 
 public class AlertTaskRunnerV2 implements TaskRunner {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunnerV2.class);
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String CHARSET = "UTF-8";
 

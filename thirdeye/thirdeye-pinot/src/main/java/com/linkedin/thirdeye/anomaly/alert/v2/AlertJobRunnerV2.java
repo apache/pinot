@@ -28,8 +28,7 @@ import org.slf4j.LoggerFactory;
 
 public class AlertJobRunnerV2 implements Job {
 
-  private static final Logger
-      LOG = LoggerFactory.getLogger(com.linkedin.thirdeye.anomaly.alert.AlertJobRunner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AlertJobRunnerV2.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String ALERT_JOB_CONTEXT_V2 = "ALERT_JOB_CONTEXT_V2";
