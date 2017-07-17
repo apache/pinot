@@ -2,9 +2,13 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -113,6 +117,33 @@ public class EntityUtils {
   }
 
   /**
+   * Returns the top {@code K} entities based on score
+   *
+   * @param entities entities
+   * @param k top k elements to return (<0 indicates all)
+   * @return top k entities
+   */
+  public static <T extends Entity> Set<T> topk(Set<T> entities, int k) {
+    if (k < 0)
+      return entities;
+    List<T> sorted = new ArrayList<>(entities);
+    Collections.sort(sorted, Entity.HIGHEST_SCORE_FIRST);
+    return new HashSet<>(sorted.subList(0, Math.min(k, sorted.size())));
+  }
+
+  /**
+   * Returns the top {@code K} entities based on score after normalizing scores to the interval
+   * {@code [0.0, 1.0]}.
+   *
+   * @param entities entities
+   * @param k top k elements to return (<0 indicates all)
+   * @return top k normalized entities
+   */
+  public static Set<Entity> topkNormalized(Set<? extends Entity> entities, int k) {
+    return topk(normalizeScores(entities), k);
+  }
+
+  /**
    * Attemps to parse {@code urn} and return a specific Entity subtype with the given {@code score}
    * Supports {@code MetricEntity}, {@code DimensionEntity}, {@code TimeRangeEntity}, and
    * {@code ServiceEntity}.
@@ -140,6 +171,7 @@ public class EntityUtils {
     }
     throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
   }
+
   /**
    * Attemps to parse {@code urn} and return a specific Entity subtype with the given {@code score}
    * Supports {@code MetricEntity}, {@code DimensionEntity}, {@code TimeRangeEntity}, and
