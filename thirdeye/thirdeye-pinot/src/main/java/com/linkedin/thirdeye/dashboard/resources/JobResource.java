@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -76,5 +78,32 @@ public class JobResource {
     List<TaskDTO> taskDTOs = taskDao.findByParams(filters);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(taskDTOs);
     return rootNode.toString();
+  }
+
+  @GET
+  @Path("/job/status")
+  @Produces(MediaType.APPLICATION_JSON)
+  public JobStatus getJobStatus(@NotNull @QueryParam("jobId") long jobId) {
+    JobDTO jobDTO = jobDao.findById(jobId);
+    List<TaskDTO> taskDTOs = taskDao.findByJobIdStatusNotIn(jobId, TaskStatus.COMPLETED);
+    JobStatus jobStatus = jobDTO.getStatus();
+    if (taskDTOs.size() > 0) {
+      boolean containFails = false;
+      for (TaskDTO task : taskDTOs) {
+        if (task.getStatus().equals(TaskStatus.FAILED)) {
+          containFails = true;
+        }
+      }
+      if (containFails) {
+        jobStatus = JobStatus.FAILED;
+      } else {
+        jobStatus = JobStatus.SCHEDULED;
+      }
+    } else {
+      jobStatus = JobStatus.COMPLETED;
+    }
+    jobDTO.setStatus(jobStatus);
+    jobDao.update(jobDTO);
+    return jobStatus;
   }
 }

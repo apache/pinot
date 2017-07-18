@@ -266,6 +266,7 @@ public class DetectionJobResource {
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
     final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
     final List<Long> functionIdList = new ArrayList<>();
+    final List<Long> detectionJobIdList = new ArrayList<>();
     for (String functionId : ids.split(",")) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(Long.valueOf(functionId));
       if (anomalyFunction != null && anomalyFunction.getIsActive()) {
@@ -307,31 +308,35 @@ public class DetectionJobResource {
       LOG.warn("[Backfill] End time is in the future. Force to now.");
     }
 
-    final DateTime innerStartTime = startTime;
-    final DateTime innerEndTime = endTime;
+    final Map<Long, Integer> originalWindowSize = new HashMap<>();
+    final Map<Long, TimeUnit> originalWindowUnit = new HashMap<>();
+    final Map<Long, String> originalCron = new HashMap<>();
+    saveFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
+
+    // Update speed-up window and cron
+    if (speedup) {
+      for (long functionId : functionIdList) {
+        anomalyFunctionSpeedup(functionId);
+      }
+    }
+    // Run backfill
+    for (long functionId : functionIdList) {
+      long detectionJobId = detectionJobScheduler.runBackfill(functionId, startTime, endTime, forceBackfill);
+      detectionJobIdList.add(detectionJobId);
+    }
+
     new Thread(new Runnable() {
       @Override
       public void run() {
-        Map<Long, Integer> originalWindowSize = new HashMap<>();
-        Map<Long, TimeUnit> originalWindowUnit = new HashMap<>();
-        Map<Long, String> originalCron = new HashMap<>();
-        saveFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
-
-        // Update speed-up window and cron
-        if (speedup) {
-          for (long functionId : functionIdList) {
-            anomalyFunctionSpeedup(functionId);
-          }
+        for(long detectionJobId : detectionJobIdList) {
+          detectionJobScheduler.waitForJobDone(detectionJobId);
         }
-        // Run backfill
-        detectionJobScheduler.synchronousBackFill(functionIdList, innerStartTime, innerEndTime, forceBackfill);
-
         // Revert window setup
         revertFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
       }
     }).run();
 
-    return Response.ok().build();
+    return Response.ok(detectionJobIdList).build();
   }
 
   /**
