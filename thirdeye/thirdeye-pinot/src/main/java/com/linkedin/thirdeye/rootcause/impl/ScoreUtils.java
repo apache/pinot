@@ -26,7 +26,7 @@ public class ScoreUtils {
    * @return period in millis
    */
   public static long parsePeriod(String period) {
-    // NOTE: Yoda Time Parser/Formatter does not support optional sections
+    // NOTE: JodaTime Parser/Formatter does not support optional sections
 
     Period p = Period.ZERO;
 
