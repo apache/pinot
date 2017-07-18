@@ -82,7 +82,7 @@ public class AnomalyEventsPipeline extends Pipeline {
 
     Set<AnomalyEventEntity> entities = new HashSet<>();
     for(MetricEntity me : metrics) {
-      List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), start, end);
+      List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), lookback, end);
 
       for(MergedAnomalyResultDTO dto : anomalies) {
         double score = strategy.score(dto.getStartTime(), dto.getEndTime());
