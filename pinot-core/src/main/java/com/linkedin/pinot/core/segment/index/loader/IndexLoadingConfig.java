@@ -40,6 +40,7 @@ public class IndexLoadingConfig {
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>();
+  private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private SegmentVersion _segmentVersion = SegmentVersion.DEFAULT_VERSION;
   private StarTreeFormatVersion _starTreeVersion = StarTreeFormatVersion.DEFAULT_VERSION;
   private boolean _enableDefaultColumns = true;
@@ -92,6 +93,11 @@ public class IndexLoadingConfig {
       List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
       if (noDictionaryColumns != null) {
         _noDictionaryColumns.addAll(noDictionaryColumns);
+      }
+
+      List<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
+      if (onHeapDictionaryColumns != null) {
+        _onHeapDictionaryColumns.addAll(onHeapDictionaryColumns);
       }
 
       String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
@@ -150,6 +156,11 @@ public class IndexLoadingConfig {
   @Nonnull
   public Set<String> getNoDictionaryColumns() {
     return _noDictionaryColumns;
+  }
+
+  @Nonnull
+  public Set<String> getOnHeapDictionaryColumns() {
+    return _onHeapDictionaryColumns;
   }
 
   @Nonnull

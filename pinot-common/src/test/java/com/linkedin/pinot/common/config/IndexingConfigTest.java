@@ -35,11 +35,14 @@ import org.testng.annotations.Test;
 public class IndexingConfigTest {
 
   @Test
-  public void testIgnoreUnknown()
+  public void testSerDe()
       throws JSONException, IOException {
     JSONObject json = new JSONObject();
     json.put("invertedIndexColumns", Arrays.asList("a", "b", "c"));
     json.put("sortedColumn", Arrays.asList("d", "e", "f"));
+
+    String[] expectedOnHeapDictionaryColumns = new String[] {"x", "y", "z"};
+    json.put("onHeapDictionaryColumns", Arrays.asList(expectedOnHeapDictionaryColumns));
     json.put("loadMode", "MMAP");
     json.put("keyThatIsUnknown", "randomValue");
 
@@ -59,6 +62,12 @@ public class IndexingConfigTest {
     Assert.assertEquals("d", sortedIndexColumns.get(0));
     Assert.assertEquals("e", sortedIndexColumns.get(1));
     Assert.assertEquals("f", sortedIndexColumns.get(2));
+
+    List<String> actualOnHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
+    Assert.assertEquals(actualOnHeapDictionaryColumns.size(), expectedOnHeapDictionaryColumns.length);
+    for (int i = 0; i < expectedOnHeapDictionaryColumns.length; i++) {
+      Assert.assertEquals(actualOnHeapDictionaryColumns.get(i), expectedOnHeapDictionaryColumns[i]);
+    }
   }
 
   @Test
