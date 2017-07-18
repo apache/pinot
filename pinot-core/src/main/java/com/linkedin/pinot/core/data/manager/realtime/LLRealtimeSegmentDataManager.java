@@ -279,7 +279,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
       throw e;
     } else {
-      segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
+      segmentLogger.info("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       makeConsumerWrapper("Too many transient errors");
     }
