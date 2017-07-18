@@ -113,9 +113,11 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
           timeSpec = dataTimeSpec;
         }
 
-        // Decorate filter set for pre-computed (non-additive) dataset
         Multimap<String, String> decoratedFilterSet = request.getFilterSet();
-        if (!datasetConfig.isAdditive()) {
+        // Decorate filter set for pre-computed (non-additive) dataset
+        // NOTE: We do not decorate the filter if the metric name is '*', which is used by count(*) query, because
+        // the results are usually meta-data and should be shown regardless the filter setting.
+        if (!datasetConfig.isAdditive() && !"*".equals(metricFunction.getMetricName())) {
           decoratedFilterSet =
               generateFilterSetWithPreAggregatedDimensionValue(request.getFilterSet(), request.getGroupBy(),
                   datasetConfig.getDimensions(), datasetConfig.getDimensionsHaveNoPreAggregation(),
