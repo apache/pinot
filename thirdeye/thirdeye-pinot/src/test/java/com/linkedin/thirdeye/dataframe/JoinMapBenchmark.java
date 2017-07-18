@@ -20,7 +20,7 @@ public class JoinMapBenchmark {
   private static final int N_ROUNDS = 15;
   private static final int N_ELEMENTS = 10_000_000;
 
-  private static final String[] SERIES_NAMES = new String[] { "task", "min", "mid", "max", "outer", "checksum", "samples", "collisions" };
+  private static final String[] SERIES_NAMES = new String[] { "task", "min", "mid", "max", "outer", "checksum", "samples", "collisions", "rereads" };
 
   private static final long SEED = System.nanoTime();
 
@@ -33,7 +33,8 @@ public class JoinMapBenchmark {
   private void benchmarkJoinMap() {
     startTimerOuter();
     long checksum = 0;
-    int collisions = 0;
+    long collisions = 0;
+    long rereads = 0;
 
     for (int r = 0; r < N_ROUNDS; r++) {
       int[] keys = generateIntData(N_ELEMENTS);
@@ -54,9 +55,10 @@ public class JoinMapBenchmark {
         throw new IllegalStateException("Input and output data disagree");
       checksum ^= checksum(output);
       collisions += m.getCollisions();
+      rereads += m.getRereads();
     }
 
-    logResults("benchmarkJoinMap", checksum, collisions);
+    logResults("benchmarkJoinMap", checksum, collisions, rereads);
   }
 
   private void benchmarkHashMap() {
@@ -83,7 +85,7 @@ public class JoinMapBenchmark {
       checksum ^= checksum(output);
     }
 
-    logResults("benchmarkHashMap", checksum, 0);
+    logResults("benchmarkHashMap", checksum, 0, 0);
   }
 
   private void benchmarkAll() {
@@ -108,14 +110,14 @@ public class JoinMapBenchmark {
     this.timeOuter = System.nanoTime() - this.tStartOuter;
   }
 
-  private void logResults(String name, long checksum, int colls) {
+  private void logResults(String name, long checksum, long collissions, long rereads) {
     stopTimerOuter();
     Collections.sort(this.times);
     long tMid = this.times.get(this.times.size() / 2);
     long tMin = Collections.min(this.times);
     long tMax = Collections.max(this.times);
-    LOG.info("{}: min/mid/max = {}ms {}ms {}ms [all={}ms, chk={}, cnt={}, colls={}]", name, tMin / 1000000, tMid / 1000000, tMax / 1000000, timeOuter / 1000000, checksum % 1000, this.times.size(), colls);
-    this.results.append(name, tMin, tMid, tMax, this.timeOuter, checksum, this.times.size(), colls);
+    LOG.info("{}: min/mid/max = {}ms {}ms {}ms [all={}ms, chk={}, cnt={}, colls={}, rread={}]", name, tMin / 1000000, tMid / 1000000, tMax / 1000000, timeOuter / 1000000, checksum % 1000, this.times.size(), collissions, rereads);
+    this.results.append(name, tMin, tMid, tMax, this.timeOuter, checksum, this.times.size(), collissions, rereads);
 
     // reset timer stats
     this.times = new ArrayList<>();

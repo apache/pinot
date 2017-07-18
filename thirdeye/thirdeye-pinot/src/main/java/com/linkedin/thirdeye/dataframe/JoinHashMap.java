@@ -7,12 +7,15 @@ class JoinHashMap {
   private static final int VALUE_MASK = 0x7FFFFFFF;
   private static final long NEXT_FLAG = 0x0000000080000000L;
 
-  private static final double SCALING_FACTOR = 1.25;
+  private static final double SCALING_FACTOR = 2;
+
+  private static final int SEED = 0xAE928F20;
 
   private final int shift;
   private final long[] data;
 
-  private int collisions = 0;
+  private long collisions = 0;
+  private long rereads = 0;
 
   // 0xHHHHHHHH[fv]VVVVVVV
   //
@@ -46,12 +49,13 @@ class JoinHashMap {
   public void put(int key, int value) {
     if(value > MAX_VALUE || (value & NEXT_FLAG) != 0)
       throw new IllegalArgumentException(String.format("Value must be between 0 and %d", MAX_VALUE));
+    int step = 1;
     int hash = hash(key);
     long tuple = tuple(key, value + 1); // ensure 0 indicates empty
     long ttup = fetch(hash);
     while(ttup != 0) {
-      this.data[hash2index(hash)] = ttup | NEXT_FLAG;
-      hash += 1;
+//      this.data[hash2index(hash)] = ttup | NEXT_FLAG;
+      hash += step * step++;
       ttup = fetch(hash);
       this.collisions++;
     }
@@ -59,7 +63,8 @@ class JoinHashMap {
   }
 
   public int get(int key, int offset) {
-    int steps = 0;
+//    int steps = 0;
+    int step = 1;
     int toff = 0;
     int hash = hash(key);
     long tuple = fetch(hash);
@@ -71,15 +76,16 @@ class JoinHashMap {
         if(offset == toff++)
           return (tval & VALUE_MASK) - 1; // fix value offset
       }
-      if(!tupleHasNext(tuple))
-        return -1;
+//      if(!tupleHasNext(tuple))
+//        return -1;
 
-      hash += 1;
+      hash += step * step++;
       tuple = fetch(hash);
+      this.rereads++;
 
-      // NOTE: this could enter a cycle, catch it
-      if(this.data.length <= steps++)
-        throw new IllegalArgumentException("Cycle detected");
+//      // NOTE: this could enter a cycle, catch it
+//      if(this.data.length <= steps++)
+//        throw new IllegalArgumentException("Cycle detected");
     }
     return -1;
   }
@@ -112,8 +118,26 @@ class JoinHashMap {
     return this.data.length;
   }
 
-  public int getCollisions() {
+  public long getCollisions() {
     return this.collisions;
+  }
+
+  public long getRereads() {
+    return rereads;
+  }
+
+  public String visualize() {
+    final int rowSize = (int) (Math.ceil(Math.sqrt(this.data.length)) * 1.5);
+    final StringBuilder sb = new StringBuilder();
+    for(int i=0; i<this.size(); i++) {
+      if(i % rowSize == 0)
+        sb.append('\n');
+      if(this.data[i] == 0)
+        sb.append('.');
+      else
+        sb.append('X');
+    }
+    return sb.toString();
   }
 
   int hash2index(int hash) {
@@ -167,14 +191,20 @@ class JoinHashMap {
     return 1 << value;
   }
 
-  // murmur hash, derived from apache hadoop
-  static int hash(int value) {
-    return value;
-//    final int seed = 0x3F1243A2;
+  static int hash(int k) {
+    final int m = 0x5bd1e995;
+    final int r = 24;
+    k *= m;
+    k ^= k >>> r;
+    return k;
+  }
+
+//  // murmur hash, derived from apache hadoop
+//  static int hash(int value) {
 //    final int m = 0x5bd1e995;
 //    final int r = 24;
 //
-//    int h = seed;
+//    int h = SEED;
 //    int k = value;
 //
 //    k *= m;
@@ -189,7 +219,14 @@ class JoinHashMap {
 //    h ^= h >>> 15;
 //
 //    return h;
-  }
+//  }
 
+  public static void main(String[] args) {
+    JoinHashMap m = new JoinHashMap(100);
+    for(int i=0; i<100; i++) {
+      m.put(i, i);
+    }
+    System.out.println(m.visualize());
+  }
 
 }

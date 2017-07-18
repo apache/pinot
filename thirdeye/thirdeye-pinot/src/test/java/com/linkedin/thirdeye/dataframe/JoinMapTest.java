@@ -31,15 +31,15 @@ public class JoinMapTest {
   @Test
   public void testSizing() {
     Assert.assertEquals(new JoinHashMap(0).size(), 2);
-    Assert.assertEquals(new JoinHashMap(1).size(), 2);
-    Assert.assertEquals(new JoinHashMap(2).size(), 4);
-    Assert.assertEquals(new JoinHashMap(3).size(), 4);
-    Assert.assertEquals(new JoinHashMap(4).size(), 8);
-    Assert.assertEquals(new JoinHashMap(5).size(), 8);
-    Assert.assertEquals(new JoinHashMap(6).size(), 8);
-    Assert.assertEquals(new JoinHashMap(7).size(), 16); // scaling factor
-    Assert.assertEquals(new JoinHashMap(8).size(), 16);
-    Assert.assertEquals(new JoinHashMap(9).size(), 16);
+    Assert.assertEquals(new JoinHashMap(1).size(), 4);
+    Assert.assertEquals(new JoinHashMap(2).size(), 8);
+    Assert.assertEquals(new JoinHashMap(3).size(), 8);
+    Assert.assertEquals(new JoinHashMap(4).size(), 16);
+    Assert.assertEquals(new JoinHashMap(5).size(), 16);
+    Assert.assertEquals(new JoinHashMap(6).size(), 16);
+    Assert.assertEquals(new JoinHashMap(7).size(), 16);
+    Assert.assertEquals(new JoinHashMap(8).size(), 32);
+    Assert.assertEquals(new JoinHashMap(9).size(), 32);
   }
 
   @Test
