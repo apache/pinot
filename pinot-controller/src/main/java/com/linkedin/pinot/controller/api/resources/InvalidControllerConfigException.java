@@ -18,6 +18,6 @@ package com.linkedin.pinot.controller.api.resources;
 
 public class InvalidControllerConfigException extends Exception {
   public InvalidControllerConfigException(final String s) {
-    super(s);t co
+    super(s);
   }
 }
