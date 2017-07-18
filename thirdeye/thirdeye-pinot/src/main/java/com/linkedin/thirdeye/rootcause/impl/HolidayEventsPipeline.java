@@ -98,7 +98,7 @@ public class HolidayEventsPipeline extends Pipeline {
 
     ScoringStrategy strategy = makeStrategy(lookback, start, end);
 
-    List<EventDTO> events = getHolidayEvents(start, end, dimensionEntities);
+    List<EventDTO> events = getHolidayEvents(lookback, end, dimensionEntities);
 
     Set<HolidayEventEntity> entities = new HashSet<>();
     for(EventDTO ev : events) {
