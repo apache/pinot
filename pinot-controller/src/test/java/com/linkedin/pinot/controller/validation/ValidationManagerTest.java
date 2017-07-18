@@ -72,7 +72,6 @@ import static org.mockito.Mockito.when;
 
 /**
  * Tests for the ValidationManager.
- *
  */
 public class ValidationManagerTest {
   private String HELIX_CLUSTER_NAME = "TestValidationManager";
@@ -471,7 +470,7 @@ public class ValidationManagerTest {
       super(null);
     }
     @Override
-    public void updateNumNonConsumingPartitionsMetric(final String tableName, final int count) {
+    public void updateNonConsumingPartitionCountMetric(final String tableName, final int count) {
       partitionCount = count;
     }
   }

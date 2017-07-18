@@ -27,12 +27,11 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 /**
  * Validation metrics utility class, which contains the glue code to publish metrics.
- *
  */
 public class ValidationMetrics {
   private final MetricsRegistry _metricsRegistry;
 
-  private final Map<String, Long> _gaugeValues = new HashMap<String, Long>();
+  private final Map<String, Long> _gaugeValues = new HashMap<>();
   private final Set<MetricName> _metricNames = new HashSet<>();
 
   /**
@@ -136,18 +135,18 @@ public class ValidationMetrics {
   }
 
   /**
-   * Updates the gauge for the number of missing segments.
+   * Updates the missing segment count gauge.
    *
    * @param resource The resource for which the gauge is updated
    * @param missingSegmentCount The number of missing segments
    */
-  public void updateMissingSegmentsGauge(final String resource, final int missingSegmentCount) {
+  public void updateMissingSegmentCountGauge(final String resource, final int missingSegmentCount) {
     final String fullGaugeName = makeGaugeName(resource, "missingSegmentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, missingSegmentCount);
   }
 
   /**
-   * Updates the gauge for the offline segment delay.
+   * Updates the offline segment delay gauge.
    *
    * @param resource The resource for which the gauge is updated
    * @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch, or Long.MIN_VALUE
@@ -161,7 +160,7 @@ public class ValidationMetrics {
   }
 
   /**
-   * Updates the gauge for the last push time.
+   * Updates the last push time gauge.
    *
    * @param resource The resource for which the gauge is updated
    * @param lastPushTimeMillis The last push time, in milliseconds since the epoch, or Long.MIN_VALUE if there is no
@@ -175,33 +174,33 @@ public class ValidationMetrics {
   }
 
   /**
-   * Updates the gauge for the Total Document Count
+   * Updates the total document count gauge.
    *
    * @param resource The resource for which the gauge is updated
-   * @param documentCount Total document count for the give resource name / tablename
+   * @param documentCount Total document count for the given resource name or table name
    */
-  public void updateTotalDocumentsGauge(final String resource, final long documentCount)
+  public void updateTotalDocumentCountGauge(final String resource, final long documentCount)
   {
     final String fullGaugeName = makeGaugeName(resource, "TotalDocumentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, documentCount);
   }
 
   /**
+   * Updates the non consuming partition count metric.
    *
-   * @param resource The resource for which the guage is updated
-   * @param partitionCount Number of kafka partitions that do not have any segment in CONSUMING state.
+   * @param resource The resource for which the gauge is updated
+   * @param partitionCount Number of Kafka partitions that do not have any segment in CONSUMING state.
    */
-  public void updateNumNonConsumingPartitionsMetric(final String resource, final int partitionCount) {
+  public void updateNonConsumingPartitionCountMetric(final String resource, final int partitionCount) {
     final String fullGaugeName = makeGaugeName(resource, "NonConsumingPartitionCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, partitionCount);
-
   }
 
   /**
-   * Updates the gauge for the Total segment count
+   * Updates the segment count gauge.
    *
    * @param resource The resource for which the gauge is updated
-   * @param segmentCount Total segment count for the give resource name / tablename
+   * @param segmentCount Total segment count for the given resource name or table name
    */
   public void updateSegmentCountGauge(final String resource, final long segmentCount)
   {

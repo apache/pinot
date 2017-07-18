@@ -58,8 +58,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
- *
- * Dec 10, 2014
 */
 
 public class ValidationManager {
@@ -163,7 +161,7 @@ public class ValidationManager {
             segmentMetadataList.add(segmentMetadata);
           }
           // Update the gauge to contain the total document count in the segments
-          _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList,
+          _validationMetrics.updateTotalDocumentCountGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList,
               countHLCSegments));
           if (streamMetadata.hasSimpleKafkaConsumerType()) {
             validateLLCSegments(tableName, tableConfig);
@@ -238,7 +236,7 @@ public class ValidationManager {
     // Kafka partition set now has all the partitions that do not have any segments in CONSUMING state.
     if (!llcSegments.isEmpty()) {
       // Raise the metric only if there is at least one llc segment in the idealstate.
-      _validationMetrics.updateNumNonConsumingPartitionsMetric(realtimeTableName, nonConsumingKafkaPartitions.size());
+      _validationMetrics.updateNonConsumingPartitionCountMetric(realtimeTableName, nonConsumingKafkaPartitions.size());
       // Recreate a segment for the partitions that are missing one.
       for (Integer kafkaPartition : nonConsumingKafkaPartitions) {
         LOGGER.warn("Table {}, kafka partition {} has no segments in CONSUMING state (out of {} llc segments)",
@@ -288,7 +286,7 @@ public class ValidationManager {
     }
 
     // Update the gauge that contains the number of missing segments
-    _validationMetrics.updateMissingSegmentsGauge(tableName, missingSegmentCount);
+    _validationMetrics.updateMissingSegmentCountGauge(tableName, missingSegmentCount);
 
     // Compute the max segment end time and max segment push time
     long maxSegmentEndTime = Long.MIN_VALUE;
@@ -314,7 +312,7 @@ public class ValidationManager {
     _validationMetrics.updateOfflineSegmentDelayGauge(tableName, maxSegmentEndTime);
     _validationMetrics.updateLastPushTimeGauge(tableName, maxSegmentPushTime);
     // Update the gauge to contain the total document count in the segments
-    _validationMetrics.updateTotalDocumentsGauge(tableName, computeOfflineTotalDocumentInSegments(segmentMetadataList));
+    _validationMetrics.updateTotalDocumentCountGauge(tableName, computeOfflineTotalDocumentInSegments(segmentMetadataList));
     // Update the gauge to contain the total number of segments for this table
     _validationMetrics.updateSegmentCountGauge(tableName, segmentMetadataList.size());
   }
