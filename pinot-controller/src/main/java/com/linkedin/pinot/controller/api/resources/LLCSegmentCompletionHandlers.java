@@ -16,11 +16,13 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.slf4j.Logger;
@@ -65,6 +67,11 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC) int extraTimeSec
   ) {
 
+    if (instanceId == null || segmentName == null || offset == -1) {
+      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
+
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withExtraTimeSec(
         extraTimeSec);
@@ -93,6 +100,10 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason
   ) {
 
+    if (instanceId == null || segmentName == null || offset == -1) {
+      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason);
     LOGGER.info(requestParams.toString());
@@ -119,6 +130,10 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason
   ) {
 
+    if (instanceId == null || segmentName == null || offset == -1) {
+      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason);
     LOGGER.info(requestParams.toString());
@@ -167,8 +182,6 @@ public class LLCSegmentCompletionHandlers {
 
 
   private boolean uploadSegment(FormDataMultiPart multiPart, final String instanceId, final String segmentName) {
-    FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-
     Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
     if (!validateMultiPart(map, segmentName)) {
       return false;
@@ -177,25 +190,56 @@ public class LLCSegmentCompletionHandlers {
     final FormDataBodyPart bodyPart = map.get(name).get(0);
     InputStream is = bodyPart.getValueAs(InputStream.class);
 
-    File tmpFile = new File(provider.getTmpDir(), name);
 
+    FileOutputStream os = null;
     try {
-      provider.saveStreamAs(is, tmpFile);
+      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
+      File tmpFile = new File(provider.getTmpDir(), name);
+      os = new FileOutputStream(tmpFile);
+      IOUtils.copyLarge(is, os);
+      os.flush();
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       final String rawTableName = llcSegmentName.getTableName();
       final File tableDir = new File(provider.getBaseDataDir(), rawTableName);
       final File segmentFile = new File(tableDir, segmentName);
 
-      synchronized (_helixResourceManager) {
+      // Multiple threads can reach this point at the same time, if the following scenario happens
+      // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
+      // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
+      // the network speeds changed). The second server made it through the FSM and reached this point.
+      // The synchronization below takes care that exactly one file gets moved in place.
+      // There are still corner conditions that are not handled correctly. For example,
+      // 1. What if the offset of the faster server was different?
+      // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
+      //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
+      //    of the slower server.
+      // In order to overcome controller restarts after the segment is renamed, but before it is committed, we DO need to
+      // check for existing segment file and remove it. So, the block cannot be removed altogether.
+      // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
+      // be used.
+      synchronized (SegmentCompletionManager.getInstance()) {
         if (segmentFile.exists()) {
           LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentName, instanceId);
           FileUtils.deleteQuietly(segmentFile);
         }
         FileUtils.moveFile(tmpFile, segmentFile);
       }
+    } catch (InvalidControllerConfigException e) {
+      LOGGER.error("Invalid controller config exception from instance {} for segment {}", instanceId, segmentName, e);
+      return false;
     } catch (IOException e) {
       LOGGER.error("File upload exception from instance {} for segment {}", instanceId, segmentName, e);
       return false;
+    }
+    finally {
+      try {
+        is.close();
+        if (os != null) {
+          os.close();
+        }
+      } catch (IOException e) {
+        LOGGER.error("Could not close input or output streams: instance {}, segment {}", instanceId, segmentName);
+      }
     }
     return true;
   }

@@ -17,10 +17,6 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 
@@ -32,7 +28,7 @@ public class FileUploadPathProvider {
   private final File _baseDataDir;
   private final File _tmpUntarredPath;
 
-  public FileUploadPathProvider(ControllerConf controllerConf) {
+  public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
     _controllerConf = controllerConf;
     try {
       _baseDataDir = new File(_controllerConf.getDataDir());
@@ -49,7 +45,7 @@ public class FileUploadPathProvider {
       }
 //      String vip = _controllerConf.generateVipUrl();
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new InvalidControllerConfigException("Bad controller configuration");
     }
   }
 
@@ -63,17 +59,5 @@ public class FileUploadPathProvider {
 
   public File getTmpUntarredPath() {
     return _tmpUntarredPath;
-  }
-
-  public void saveStreamAs(InputStream is, File outputFile) throws IOException {
-    OutputStream os = new FileOutputStream(outputFile);
-    int read = 0;
-    byte[] bytes = new byte[4096];
-    while ((read = is.read(bytes)) != -1) {
-      os.write(bytes, 0, read);
-    }
-    os.flush();
-    os.close();
-    is.close();
   }
 }
