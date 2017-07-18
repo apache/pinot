@@ -24,11 +24,10 @@ import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import org.apache.commons.lang.StringUtils;
-import org.restlet.resource.ServerResource;
 
 @Api(tags = Constants.HEALTH_TAG)
 @Path("/pinot-controller/admin")
-public class PinotControllerHealthCheck extends ServerResource {
+public class PinotControllerHealthCheck {
 
   @Inject
   ControllerConf controllerConf;
