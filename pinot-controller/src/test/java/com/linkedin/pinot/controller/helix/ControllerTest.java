@@ -24,9 +24,9 @@ import com.linkedin.pinot.controller.validation.ValidationManager;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
@@ -164,114 +164,73 @@ public abstract class ControllerTest {
     _zkClient.close();
   }
 
-  public static String sendDeleteRequest(String urlString) throws IOException {
-    final long start = System.currentTimeMillis();
+  public static String sendGetRequest(String urlString) throws IOException {
+    return constructResponse(new URL(urlString).openStream());
+  }
 
-    final URL url = new URL(urlString);
-    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-    conn.setDoOutput(true);
-    conn.setRequestMethod("DELETE");
-    conn.connect();
+  public static String sendPostRequest(String urlString, String payload) throws IOException {
+    URLConnection urlConnection = new URL(urlString).openConnection();
+    urlConnection.setDoOutput(true);
 
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
+    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(urlConnection.getOutputStream(), "UTF-8"))) {
+      writer.write(payload, 0, payload.length());
+      writer.flush();
     }
 
-    final long stop = System.currentTimeMillis();
-
-    LOGGER.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
-
-    return sb.toString();
+    return constructResponse(urlConnection.getInputStream());
   }
 
   public static String sendPutRequest(String urlString, String payload) throws IOException {
-    LOGGER.info("Sending PUT to " + urlString + " with payload " + payload);
-    final long start = System.currentTimeMillis();
-    final URL url = new URL(urlString);
-    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-    conn.setDoOutput(true);
-    conn.setRequestMethod("PUT");
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setDoOutput(true);
+    httpConnection.setRequestMethod("PUT");
 
-    writer.write(payload, 0, payload.length());
-    writer.flush();
-
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
+    try (
+        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(httpConnection.getOutputStream(), "UTF-8"))) {
+      writer.write(payload);
+      writer.flush();
     }
 
-    final long stop = System.currentTimeMillis();
-
-    LOGGER.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
-
-    return sb.toString();
+    return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
-      IOException, JSONException {
-    LOGGER.info("Sending POST to " + urlString + " with payload " + payload);
-    final long start = System.currentTimeMillis();
-    final URL url = new URL(urlString);
-    final URLConnection conn = url.openConnection();
-    conn.setDoOutput(true);
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
+  public static String sendDeleteRequest(String urlString) throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setRequestMethod("DELETE");
+    httpConnection.connect();
 
-    writer.write(payload, 0, payload.length());
-    writer.flush();
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+    return constructResponse(httpConnection.getInputStream());
+  }
 
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
+  private static String constructResponse(InputStream inputStream) throws IOException {
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"))) {
+      StringBuilder responseBuilder = new StringBuilder();
+      String line;
+      while ((line = reader.readLine()) != null) {
+        responseBuilder.append(line);
+      }
+      return responseBuilder.toString();
     }
-
-    final long stop = System.currentTimeMillis();
-
-    LOGGER.info(" Time take for Request : " + payload + " in ms:" + (stop - start));
-
-    return sb.toString();
   }
 
-  public static String sendGetRequest(String urlString) throws UnsupportedEncodingException, IOException, JSONException {
-    BufferedReader reader = null;
-    final URL url = new URL(urlString);
-    reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"));
-    final StringBuilder queryResp = new StringBuilder();
-    for (String respLine; (respLine = reader.readLine()) != null;) {
-      queryResp.append(respLine);
-    }
-    return queryResp.toString();
-  }
-
-  public static PostMethod sendMultipartPostRequest(String url, String body)
-      throws IOException {
+  public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {
     HttpClient httpClient = new HttpClient();
     PostMethod postMethod = new PostMethod(url);
     // our handlers ignore key...so we can put anything here
-    Part[] parts = { new StringPart("body", body)};
+    Part[] parts = {new StringPart("body", body)};
     postMethod.setRequestEntity(new MultipartRequestEntity(parts, postMethod.getParams()));
     httpClient.executeMethod(postMethod);
     return postMethod;
   }
 
-  public static PutMethod sendMultipartPutRequest(String url, String body)
-      throws IOException {
+  public static PutMethod sendMultipartPutRequest(String url, String body) throws IOException {
     HttpClient httpClient = new HttpClient();
     PutMethod putMethod = new PutMethod(url);
     // our handlers ignore key...so we can put anything here
-    Part[] parts = { new StringPart("body", body)};
+    Part[] parts = {new StringPart("body", body)};
     putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
     httpClient.executeMethod(putMethod);
     return putMethod;
-
   }
 
   protected String getHelixClusterName() {
