@@ -22,6 +22,7 @@ import java.util.Arrays;
 
 
 public class StringDictionary extends ImmutableDictionaryReader {
+  private static final String EMPTY_STRING = "";
   private final int lengthofMaxEntry;
   private static Charset UTF_8 = Charset.forName("UTF-8");
   private final char paddingChar;
@@ -56,12 +57,7 @@ public class StringDictionary extends ImmutableDictionaryReader {
       return "null";
     }
     byte[] bytes = dataFileReader.getBytes(dictionaryId, 0);
-    for (int i = lengthofMaxEntry - 1; i >= 0; i--) {
-      if (bytes[i] != paddingChar) {
-        return new String(bytes, 0, i + 1, UTF_8);
-      }
-    }
-    return "";
+    return getUnpaddedString(bytes);
   }
 
   @Override
@@ -115,17 +111,28 @@ public class StringDictionary extends ImmutableDictionaryReader {
     int outEndPos = outStartPos + limit;
     for (int i = outStartPos; i < outEndPos; i++) {
       String val = outValues[i];
-      byte[] bytes = val.getBytes(UTF_8);
-      for (int j = 0; j < lengthofMaxEntry; j++) {
-        if (bytes[j] == paddingChar) {
-          outValues[i] = new String(bytes, 0, j, UTF_8);
-          break;
-        }
-      }
+      outValues[i] = getUnpaddedString(val.getBytes(UTF_8));
     }
   }
 
   private String getString(int dictionaryId) {
     return dataFileReader.getString(dictionaryId, 0);
+  }
+
+  /**
+   * Helper method to build and return String from given byte[] after stripping out the padding character.
+   * It strips out all padding characters at the end of the string. This means that non-terminating padding character(s)
+   * may exist in the returned String.
+   *
+   * @param bytes Byte array
+   * @return Unpadded string of byte[]
+   */
+  private String getUnpaddedString(byte[] bytes) {
+    for (int i = lengthofMaxEntry - 1; i >= 0; i--) {
+      if (bytes[i] != paddingChar) {
+        return new String(bytes, 0, i + 1, UTF_8);
+      }
+    }
+    return EMPTY_STRING;
   }
 }
