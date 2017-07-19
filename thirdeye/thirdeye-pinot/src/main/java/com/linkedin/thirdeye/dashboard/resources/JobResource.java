@@ -96,6 +96,11 @@ public class JobResource {
     JobDTO jobDTO = jobDao.findById(id);
     List<TaskDTO> taskDTOs = taskDao.findByJobIdStatusNotIn(id, TaskStatus.COMPLETED);
     JobStatus jobStatus = jobDTO.getStatus();
+    if (jobStatus.equals(JobStatus.FAILED) || jobStatus.equals(JobStatus.COMPLETED)) {
+      // The final job status is reached. No change is made.
+      return jobStatus;
+    }
+    JobStatus previousStatus = jobStatus;
     if (taskDTOs.size() > 0) {
       boolean containFails = false;
       for (TaskDTO task : taskDTOs) {
@@ -111,8 +116,11 @@ public class JobResource {
     } else {
       jobStatus = JobStatus.COMPLETED;
     }
-    jobDTO.setStatus(jobStatus);
-    jobDao.update(jobDTO);
+    // If there is no change, no update is made.
+    if (!previousStatus.equals(jobStatus)) {
+      jobDTO.setStatus(jobStatus);
+      jobDao.update(jobDTO);
+    }
     return jobStatus;
   }
 }

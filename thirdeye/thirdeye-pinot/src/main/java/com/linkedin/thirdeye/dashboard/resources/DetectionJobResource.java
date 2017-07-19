@@ -225,7 +225,7 @@ public class DetectionJobResource {
    * @param speedup
    *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
    *      WoW-based algorithm, or Seasonal Data Model.
-   * @return HTTP response of this request with a map from function id to its job execution id
+   * @return HTTP response of this request with a job execution id
    * @throws Exception
    */
   @POST
@@ -235,8 +235,11 @@ public class DetectionJobResource {
       @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
-
-    return generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso, isForceBackfill, speedup);
+    Response response = generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso,
+        isForceBackfill, speedup);
+    // As there is only one function id, simplify the response message to a single job execution id
+    Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
+    return Response.status(response.getStatus()).entity(entity.values()).build();
   }
 
   /**
