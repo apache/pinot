@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dataframe;
 
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -122,6 +123,22 @@ public class DataFrameUtils {
   }
 
   /**
+   * Returns a Thirdeye response parsed as a DataFrame. The method stores the time values in
+   * {@code COL_TIME} by default, and creates columns for each groupBy attribute and for each
+   * MetricFunction specified in the request. It further evaluates expressions for derived
+   * metrics.
+   * @see DataFrameUtils#makeAggregateRequest(long, long, long, List, String, MetricConfigManager, DatasetConfigManager)
+   * @see DataFrameUtils#makeTimeSeriesRequest(long, long, long, String, MetricConfigManager, DatasetConfigManager)
+   *
+   * @param response thirdeye client response
+   * @param rc RequestContainer
+   * @return response as dataframe
+   */
+  public static DataFrame evaluateResponse(ThirdEyeResponse response, RequestContainer rc) throws Exception {
+    return evaluateExpressions(parseResponse(response), rc.getExpressions());
+  }
+
+  /**
    * Returns a map-transformation of a given DataFrame, assuming that all values can be converted
    * to Double values. The map is keyed by series names.
    *
@@ -229,6 +246,46 @@ public class DataFrameUtils {
         .setMetricFunctions(functions)
         .setGroupByTimeGranularity(dataset.bucketTimeGranularity())
         .setDataSource(dataset.getDataSource())
+        .build(reference);
+
+    return new RequestContainer(request, expressions);
+  }
+
+  /**
+   * Constructs and wraps a request for a metric with derived expressions. Resolves all
+   * required dependencies from the Thirdeye database.
+   *
+   * @param metricId metric id
+   * @param start start time in millis (inclusive)
+   * @param end end time in millis (exclusive)
+   * @param reference unique identifier for request
+   * @param metricDAO metric config DAO
+   * @param datasetDAO dataset config DAO
+   * @return RequestContainer
+   * @throws Exception
+   */
+  public static RequestContainer makeAggregateRequest(long metricId, long start, long end, List<String> dimensions, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
+    MetricConfigDTO metric = metricDAO.findById(metricId);
+    if(metric == null)
+      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", metricId));
+
+    DatasetConfigDTO dataset = datasetDAO.findByDataset(metric.getDataset());
+    if(dataset == null)
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
+
+    List<MetricFunction> functions = new ArrayList<>();
+    List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
+        metric.getDefaultAggFunction(), metric.getDataset());
+    for(MetricExpression exp : expressions) {
+      functions.addAll(exp.computeMetricFunctions());
+    }
+
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .setStartTimeInclusive(start)
+        .setEndTimeExclusive(end)
+        .setMetricFunctions(functions)
+        .setDataSource(dataset.getDataSource())
+        .setGroupBy(dimensions)
         .build(reference);
 
     return new RequestContainer(request, expressions);
