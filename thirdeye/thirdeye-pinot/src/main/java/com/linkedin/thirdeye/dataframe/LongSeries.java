@@ -359,6 +359,20 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return this.aggregate(DoubleSeries.STD);
   }
 
+  /**
+   * Returns a copy of the series with absolute values ({@code "|x|"}).
+   *
+   * @return series copy with absolute values
+   */
+  public LongSeries abs() {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return Math.abs(values[0]);
+      }
+    });
+  }
+
   public LongSeries add(Series other) {
     if(other.size() == 1)
       return this.add(other.getLong(0));

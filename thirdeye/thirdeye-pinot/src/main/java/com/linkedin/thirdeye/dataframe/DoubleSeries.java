@@ -508,6 +508,20 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     });
   }
 
+  /**
+   * Returns a copy of the series with absolute values ({@code "|x|"}).
+   *
+   * @return series copy with absolute values
+   */
+  public DoubleSeries abs() {
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return Math.abs(values[0]);
+      }
+    });
+  }
+
   public DoubleSeries add(Series other) {
     if(other.size() == 1)
       return this.add(other.getDouble(0));
