@@ -28,9 +28,31 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Provider
-public class WebApplicationExceptionMapper implements ExceptionMapper<WebApplicationException> {
+public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable> {
   private static final Logger LOGGER = LoggerFactory.getLogger(WebApplicationExceptionMapper.class);
   private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+
+  @Override
+  public Response toResponse(Throwable t) {
+    int status = 500;
+    if (! (t instanceof WebApplicationException)) {
+      LOGGER.error("Server error: ", t);
+    } else {
+      status = ((WebApplicationException)t ).getResponse().getStatus();
+    }
+
+    ErrorInfo einfo = new ErrorInfo(status, t.getMessage());
+    try {
+      return Response.status(status).entity(JSON_MAPPER.writeValueAsString(einfo))
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    } catch (JsonProcessingException e) {
+      String err = String.format("{\"status\":%d, \"error\":%s}", einfo.code, einfo.error);
+      return Response.status(status).entity(err)
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
+  }
 
   public static class ErrorInfo {
     @JsonCreator
@@ -40,20 +62,5 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<WebApplica
     }
     public int code;
     public String error;
-  }
-
-  @Override
-  public Response toResponse(WebApplicationException e) {
-    Response response = e.getResponse();
-    ErrorInfo einfo = new ErrorInfo(response.getStatus(), e.getMessage());
-    try {
-      return Response.status(response.getStatus())
-          .entity(JSON_MAPPER.writeValueAsString(einfo))
-          .type(MediaType.APPLICATION_JSON)
-          .build();
-    } catch (JsonProcessingException e1) {
-      LOGGER.error("Failed to convert to json", e1);
-      return response;
-    }
   }
 }

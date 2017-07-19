@@ -155,7 +155,6 @@
     <dependency>
       <groupId>io.swagger</groupId>
       <artifactId>swagger-jaxrs</artifactId>
-      <version>1.5.10</version>
     </dependency>
 
     <!-- Helix Related Dependency -->
