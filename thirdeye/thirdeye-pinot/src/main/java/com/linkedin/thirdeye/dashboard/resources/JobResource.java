@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -9,6 +11,7 @@ import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -76,5 +79,48 @@ public class JobResource {
     List<TaskDTO> taskDTOs = taskDao.findByParams(filters);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(taskDTOs);
     return rootNode.toString();
+  }
+
+  /**
+   * Get the execution status of the given job id
+   * @param id
+   * @return the status of the job
+   * COMPLETE if all tasks of the job are done without errors
+   * FAILED if at least one of the tasks underneath is failed
+   * SCHEDULED if at least one task underneath is still running or waiting
+   */
+  @GET
+  @Path("/job/{id}/status")
+  @Produces(MediaType.APPLICATION_JSON)
+  public JobStatus getJobStatus(@NotNull @PathParam("id") long id) {
+    JobDTO jobDTO = jobDao.findById(id);
+    List<TaskDTO> taskDTOs = taskDao.findByJobIdStatusNotIn(id, TaskStatus.COMPLETED);
+    JobStatus jobStatus = jobDTO.getStatus();
+    if (jobStatus.equals(JobStatus.FAILED) || jobStatus.equals(JobStatus.COMPLETED)) {
+      // The final job status is reached. No change is made.
+      return jobStatus;
+    }
+    JobStatus previousStatus = jobStatus;
+    if (taskDTOs.size() > 0) {
+      boolean containFails = false;
+      for (TaskDTO task : taskDTOs) {
+        if (task.getStatus().equals(TaskStatus.FAILED)) {
+          containFails = true;
+        }
+      }
+      if (containFails) {
+        jobStatus = JobStatus.FAILED;
+      } else {
+        jobStatus = JobStatus.SCHEDULED;
+      }
+    } else {
+      jobStatus = JobStatus.COMPLETED;
+    }
+    // If there is no change, no update is made.
+    if (!previousStatus.equals(jobStatus)) {
+      jobDTO.setStatus(jobStatus);
+      jobDao.update(jobDTO);
+    }
+    return jobStatus;
   }
 }

@@ -225,7 +225,7 @@ public class DetectionJobResource {
    * @param speedup
    *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
    *      WoW-based algorithm, or Seasonal Data Model.
-   * @return HTTP response of this request
+   * @return HTTP response of this request with a job execution id
    * @throws Exception
    */
   @POST
@@ -235,8 +235,11 @@ public class DetectionJobResource {
       @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
-
-    return generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso, isForceBackfill, speedup);
+    Response response = generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso,
+        isForceBackfill, speedup);
+    // As there is only one function id, simplify the response message to a single job execution id
+    Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
+    return Response.status(response.getStatus()).entity(entity.values()).build();
   }
 
   /**
@@ -254,7 +257,7 @@ public class DetectionJobResource {
    * @param speedup
    *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
    *      WoW-based algorithm, or Seasonal Data Model.
-   * @return HTTP response of this request
+   * @return HTTP response of this request with a map from function id to its job execution id
    * @throws Exception
    */
   @POST
@@ -266,6 +269,7 @@ public class DetectionJobResource {
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
     final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
     final List<Long> functionIdList = new ArrayList<>();
+    final Map<Long, Long> detectionJobIdMap = new HashMap<>();
     for (String functionId : ids.split(",")) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(Long.valueOf(functionId));
       if (anomalyFunction != null && anomalyFunction.getIsActive()) {
@@ -307,31 +311,35 @@ public class DetectionJobResource {
       LOG.warn("[Backfill] End time is in the future. Force to now.");
     }
 
-    final DateTime innerStartTime = startTime;
-    final DateTime innerEndTime = endTime;
+    final Map<Long, Integer> originalWindowSize = new HashMap<>();
+    final Map<Long, TimeUnit> originalWindowUnit = new HashMap<>();
+    final Map<Long, String> originalCron = new HashMap<>();
+    saveFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
+
+    // Update speed-up window and cron
+    if (speedup) {
+      for (long functionId : functionIdList) {
+        anomalyFunctionSpeedup(functionId);
+      }
+    }
+    // Run backfill
+    for (long functionId : functionIdList) {
+      long detectionJobId = detectionJobScheduler.runBackfill(functionId, startTime, endTime, forceBackfill);
+      detectionJobIdMap.put(functionId, detectionJobId);
+    }
+
     new Thread(new Runnable() {
       @Override
       public void run() {
-        Map<Long, Integer> originalWindowSize = new HashMap<>();
-        Map<Long, TimeUnit> originalWindowUnit = new HashMap<>();
-        Map<Long, String> originalCron = new HashMap<>();
-        saveFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
-
-        // Update speed-up window and cron
-        if (speedup) {
-          for (long functionId : functionIdList) {
-            anomalyFunctionSpeedup(functionId);
-          }
+        for(long detectionJobId : detectionJobIdMap.values()) {
+          detectionJobScheduler.waitForJobDone(detectionJobId);
         }
-        // Run backfill
-        detectionJobScheduler.synchronousBackFill(functionIdList, innerStartTime, innerEndTime, forceBackfill);
-
         // Revert window setup
         revertFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
       }
     }).run();
 
-    return Response.ok().build();
+    return Response.ok(detectionJobIdMap).build();
   }
 
   /**
