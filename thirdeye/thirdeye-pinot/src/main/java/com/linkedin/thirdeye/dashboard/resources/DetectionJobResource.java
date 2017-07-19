@@ -225,7 +225,7 @@ public class DetectionJobResource {
    * @param speedup
    *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
    *      WoW-based algorithm, or Seasonal Data Model.
-   * @return HTTP response of this request with a job execution id
+   * @return HTTP response of this request with a map from function id to its job execution id
    * @throws Exception
    */
   @POST
@@ -254,7 +254,7 @@ public class DetectionJobResource {
    * @param speedup
    *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
    *      WoW-based algorithm, or Seasonal Data Model.
-   * @return HTTP response of this request with the list of job execution id
+   * @return HTTP response of this request with a map from function id to its job execution id
    * @throws Exception
    */
   @POST
@@ -266,7 +266,7 @@ public class DetectionJobResource {
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
     final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
     final List<Long> functionIdList = new ArrayList<>();
-    final List<Long> detectionJobIdList = new ArrayList<>();
+    final Map<Long, Long> detectionJobIdMap = new HashMap<>();
     for (String functionId : ids.split(",")) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(Long.valueOf(functionId));
       if (anomalyFunction != null && anomalyFunction.getIsActive()) {
@@ -322,13 +322,13 @@ public class DetectionJobResource {
     // Run backfill
     for (long functionId : functionIdList) {
       long detectionJobId = detectionJobScheduler.runBackfill(functionId, startTime, endTime, forceBackfill);
-      detectionJobIdList.add(detectionJobId);
+      detectionJobIdMap.put(functionId, detectionJobId);
     }
 
     new Thread(new Runnable() {
       @Override
       public void run() {
-        for(long detectionJobId : detectionJobIdList) {
+        for(long detectionJobId : detectionJobIdMap.values()) {
           detectionJobScheduler.waitForJobDone(detectionJobId);
         }
         // Revert window setup
@@ -336,7 +336,7 @@ public class DetectionJobResource {
       }
     }).run();
 
-    return Response.ok(detectionJobIdList).build();
+    return Response.ok(detectionJobIdMap).build();
   }
 
   /**
