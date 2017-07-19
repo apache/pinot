@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import org.apache.commons.httpclient.URI;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -49,6 +51,7 @@ import javax.ws.rs.core.MediaType;
 public class LLCSegmentCompletionHandlers {
 
   private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCompletionHandlers.class);
+  private static final String SCHEME = "file://";
 
   @Inject
   ControllerConf _controllerConf;
@@ -150,6 +153,67 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
+  @GET
+  @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
+  @Produces(MediaType.APPLICATION_JSON)
+  public String segmentCommitStart(
+      @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset
+  ) {
+    if (instanceId == null || segmentName == null || offset == -1) {
+      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
+
+    SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
+    LOGGER.info(requestParams.toString());
+
+    try {
+      SegmentCompletionProtocol.Response response =
+          SegmentCompletionManager.getInstance().segmentCommitStart(requestParams);
+      final String responseStr = response.toJsonString();
+      LOGGER.info(responseStr);
+      return responseStr;
+    } catch (Throwable t) {
+      LOGGER.error("Exception handling request", t);
+      throw new WebApplicationException(t);
+    }
+  }
+
+  @GET
+  @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
+  @Produces(MediaType.APPLICATION_JSON)
+  public String segmentCommitEnd(
+      @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset
+  ) {
+    if (instanceId == null || segmentName == null || offset == -1) {
+      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
+
+    SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
+    LOGGER.info(requestParams.toString());
+
+    final boolean isSuccess = true;
+    final boolean isSplitCommit = true;
+
+    try {
+      SegmentCompletionProtocol.Response response =
+          SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit);
+      final String responseStr = response.toJsonString();
+      LOGGER.info(responseStr);
+      return responseStr;
+    } catch (Throwable t) {
+      LOGGER.error("Exception handling request", t);
+      throw new WebApplicationException(t);
+    }
+  }
+
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -169,7 +233,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams);
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
       // Get the segment and put it in the right place.
-      boolean success = uploadSegment(multiPart, instanceId, segmentName);
+      boolean success = uploadSegment(multiPart, instanceId, segmentName, false) != null;
 
       response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false);
     }
@@ -180,56 +244,96 @@ public class LLCSegmentCompletionHandlers {
     return response.toJsonString();
   }
 
+  // This method may be called in any controller, leader or non-leader.
+  @POST
+  @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
+  @Produces(MediaType.APPLICATION_JSON)
+  public String segmentUpload(
+      @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+      FormDataMultiPart multiPart
+  )
+  {
+    SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
+    LOGGER.info(requestParams.toString());
 
-  private boolean uploadSegment(FormDataMultiPart multiPart, final String instanceId, final String segmentName) {
+    final String segmentLocation = uploadSegment(multiPart, instanceId, segmentName, true);
+    if (segmentLocation == null) {
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
+    SegmentCompletionProtocol.Response.Params responseParams = new SegmentCompletionProtocol.Response.Params()
+        .withOffset(requestParams.getOffset())
+        .withSegmentLocation(segmentLocation)
+        .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
+
+    return new SegmentCompletionProtocol.Response(responseParams).toJsonString();
+  }
+
+  private String uploadSegment(FormDataMultiPart multiPart, final String instanceId, final String segmentName,
+      boolean isSplitCommit) {
     Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
     if (!validateMultiPart(map, segmentName)) {
-      return false;
+      return null;
     }
     final String name = map.keySet().iterator().next();
     final FormDataBodyPart bodyPart = map.get(name).get(0);
     InputStream is = bodyPart.getValueAs(InputStream.class);
-
+    String segmentLocation;
 
     FileOutputStream os = null;
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-      File tmpFile = new File(provider.getTmpDir(), name);
+      File tmpFile = new File(provider.getTmpDir(), name + "." + UUID.randomUUID().toString());
+      tmpFile.deleteOnExit();
       os = new FileOutputStream(tmpFile);
       IOUtils.copyLarge(is, os);
       os.flush();
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       final String rawTableName = llcSegmentName.getTableName();
       final File tableDir = new File(provider.getBaseDataDir(), rawTableName);
-      final File segmentFile = new File(tableDir, segmentName);
-
-      // Multiple threads can reach this point at the same time, if the following scenario happens
-      // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
-      // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
-      // the network speeds changed). The second server made it through the FSM and reached this point.
-      // The synchronization below takes care that exactly one file gets moved in place.
-      // There are still corner conditions that are not handled correctly. For example,
-      // 1. What if the offset of the faster server was different?
-      // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
-      //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
-      //    of the slower server.
-      // In order to overcome controller restarts after the segment is renamed, but before it is committed, we DO need to
-      // check for existing segment file and remove it. So, the block cannot be removed altogether.
-      // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
-      // be used.
-      synchronized (SegmentCompletionManager.getInstance()) {
-        if (segmentFile.exists()) {
-          LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentName, instanceId);
-          FileUtils.deleteQuietly(segmentFile);
-        }
-        FileUtils.moveFile(tmpFile, segmentFile);
+      File segmentFile;
+      if (isSplitCommit) {
+        String uniqueSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
+        segmentFile = new File(tableDir, uniqueSegmentFileName);
+      } else {
+        segmentFile = new File(tableDir, segmentName);
       }
+
+      if (isSplitCommit) {
+        FileUtils.moveFile(tmpFile, segmentFile);
+      } else {
+        // Multiple threads can reach this point at the same time, if the following scenario happens
+        // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
+        // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
+        // the network speeds changed). The second server made it through the FSM and reached this point.
+        // The synchronization below takes care that exactly one file gets moved in place.
+        // There are still corner conditions that are not handled correctly. For example,
+        // 1. What if the offset of the faster server was different?
+        // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
+        //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
+        //    of the slower server.
+        // In order to overcome controller restarts after the segment is renamed, but before it is committed, we DO need to
+        // check for existing segment file and remove it. So, the block cannot be removed altogether.
+        // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
+        // be used.
+        synchronized (SegmentCompletionManager.getInstance()) {
+          if (segmentFile.exists()) {
+            LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentFile.getAbsolutePath(), instanceId);
+            FileUtils.deleteQuietly(segmentFile);
+          }
+          FileUtils.moveFile(tmpFile, segmentFile);
+        }
+      }
+      LOGGER.info("Moved file {} to {}", tmpFile.getAbsolutePath(), segmentFile.getAbsolutePath());
+      segmentLocation = new URI(SCHEME + segmentFile.getAbsolutePath(), /* boolean escaped */ false).toString();
     } catch (InvalidControllerConfigException e) {
       LOGGER.error("Invalid controller config exception from instance {} for segment {}", instanceId, segmentName, e);
-      return false;
+      return null;
     } catch (IOException e) {
       LOGGER.error("File upload exception from instance {} for segment {}", instanceId, segmentName, e);
-      return false;
+      return null;
     }
     finally {
       try {
@@ -241,7 +345,7 @@ public class LLCSegmentCompletionHandlers {
         LOGGER.error("Could not close input or output streams: instance {}, segment {}", instanceId, segmentName);
       }
     }
-    return true;
+    return segmentLocation;
   }
 
   // Validate that there is one file that is in the input.
