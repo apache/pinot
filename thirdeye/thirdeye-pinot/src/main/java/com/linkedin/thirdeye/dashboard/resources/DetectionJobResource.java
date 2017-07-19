@@ -225,7 +225,7 @@ public class DetectionJobResource {
    * @param speedup
    *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
    *      WoW-based algorithm, or Seasonal Data Model.
-   * @return HTTP response of this request
+   * @return HTTP response of this request with a job execution id
    * @throws Exception
    */
   @POST
@@ -254,7 +254,7 @@ public class DetectionJobResource {
    * @param speedup
    *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
    *      WoW-based algorithm, or Seasonal Data Model.
-   * @return HTTP response of this request
+   * @return HTTP response of this request with the list of job execution id
    * @throws Exception
    */
   @POST

@@ -80,6 +80,14 @@ public class JobResource {
     return rootNode.toString();
   }
 
+  /**
+   * Get the execution status of the given job id
+   * @param jobId
+   * @return the status of the job
+   * COMPLETE if all tasks of the job are done without errors
+   * FAILED if at least one of the tasks underneath is failed
+   * SCHEDULED if at least one task underneath is still running or waiting
+   */
   @GET
   @Path("/job/status")
   @Produces(MediaType.APPLICATION_JSON)
