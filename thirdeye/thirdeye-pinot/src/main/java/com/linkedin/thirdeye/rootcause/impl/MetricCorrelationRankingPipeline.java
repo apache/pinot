@@ -1,5 +1,20 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrameUtils;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.Pipeline;
+import com.linkedin.thirdeye.rootcause.PipelineContext;
+import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -9,30 +24,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DataFrameUtils;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.Series;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.Pipeline;
-import com.linkedin.thirdeye.rootcause.PipelineContext;
-import com.linkedin.thirdeye.rootcause.PipelineResult;
 
 
 /**
@@ -133,7 +126,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     allMetrics.addAll(targetMetrics);
 
     // generate requests
-    List<RequestContainer> requestList = new ArrayList<>();
+    List<DataFrameUtils.RequestContainer> requestList = new ArrayList<>();
     requestList.addAll(makeRequests(targetMetrics, currentRange, PRE_CURRENT));
     requestList.addAll(makeRequests(candidateMetrics, currentRange, PRE_CURRENT));
     requestList.addAll(makeRequests(targetMetrics, baselineRange, PRE_BASELINE));
@@ -141,16 +134,16 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     LOG.info("Requesting {} time series", requestList.size());
 
-    Map<String, RequestContainer> requests = new HashMap<>();
-    for(RequestContainer rc : requestList) {
-      requests.put(rc.request.getRequestReference(), rc);
+    Map<String, DataFrameUtils.RequestContainer> requests = new HashMap<>();
+    for(DataFrameUtils.RequestContainer rc : requestList) {
+      requests.put(rc.getRequest().getRequestReference(), rc);
     }
 
     // fetch responses and calculate derived metrics
     Map<String, DataFrame> responses = new HashMap<>();
     List<ThirdEyeRequest> thirdeyeRequests = new ArrayList<>();
-    for(RequestContainer rc : requestList) {
-      thirdeyeRequests.add(rc.request);
+    for(DataFrameUtils.RequestContainer rc : requestList) {
+      thirdeyeRequests.add(rc.getRequest());
     }
 
       // send requests
@@ -163,7 +156,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
       try {
         response = future.get(TIMEOUT, TimeUnit.MILLISECONDS);
       } catch (Exception e) {
-        LOG.warn("Error executing request '{}'. Skipping.", requestList.get(i).request.getRequestReference(), e);
+        LOG.warn("Error executing request '{}'. Skipping.", requestList.get(i).getRequest().getRequestReference(), e);
         continue;
       } finally {
         i++;
@@ -174,7 +167,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
       DataFrame df;
       try {
         df = DataFrameUtils.parseResponse(response);
-        DataFrameUtils.evaluateExpressions(df, requests.get(id).expressions);
+        DataFrameUtils.evaluateExpressions(df, requests.get(id).getExpressions());
       } catch (Exception e) {
         LOG.warn("Could not parse response for '{}'. Skipping.", id, e);
         continue;
@@ -281,44 +274,17 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     }
   }
 
-  private List<RequestContainer> makeRequests(Collection<MetricEntity> metrics, TimeRangeEntity timerange, String prefix) {
-    List<RequestContainer> requests = new ArrayList<>();
+  private List<DataFrameUtils.RequestContainer> makeRequests(Collection<MetricEntity> metrics, TimeRangeEntity timerange, String prefix) {
+    List<DataFrameUtils.RequestContainer> requests = new ArrayList<>();
     for(MetricEntity e : metrics) {
       String id = makeIdentifier(e.getUrn(), prefix);
       try {
-        requests.add(makeRequest(e, timerange, id));
+        requests.add(DataFrameUtils.makeTimeSeriesRequest(e.getId(), timerange.getStart(), timerange.getEnd(), id, this.metricDAO, this.datasetDAO));
       } catch (Exception ex) {
         LOG.warn(String.format("Could not make request for '%s'. Skipping.", id), ex);
       }
     }
     return requests;
-  }
-
-  private RequestContainer makeRequest(MetricEntity e, TimeRangeEntity t, String reference) throws Exception {
-    MetricConfigDTO metric = this.metricDAO.findById(e.getId());
-    if(metric == null)
-      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", e.getId()));
-
-    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
-    if(dataset == null)
-      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
-
-    List<MetricFunction> functions = new ArrayList<>();
-    List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
-        metric.getDefaultAggFunction(), metric.getDataset());
-    for(MetricExpression exp : expressions) {
-      functions.addAll(exp.computeMetricFunctions());
-    }
-
-    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
-        .setStartTimeInclusive(t.getStart())
-        .setEndTimeExclusive(t.getEnd())
-        .setMetricFunctions(functions)
-        .setGroupByTimeGranularity(dataset.bucketTimeGranularity())
-        .setDataSource(dataset.getDataSource())
-        .build(reference);
-
-    return new RequestContainer(request, expressions);
   }
 
   private Set<MetricEntity> filterNonBaselineContext(PipelineContext context) {
@@ -350,16 +316,6 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         return new StaticStrategy();
       default:
         throw new IllegalArgumentException(String.format("Unknown strategy '%s'", strategy));
-    }
-  }
-
-  private static class RequestContainer {
-    final ThirdEyeRequest request;
-    final List<MetricExpression> expressions;
-
-    RequestContainer(ThirdEyeRequest request, List<MetricExpression> expressions) {
-      this.request = request;
-      this.expressions = expressions;
     }
   }
 
