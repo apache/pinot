@@ -223,8 +223,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
       FormDataMultiPart multiPart
-  )
-  {
+  ) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
     LOGGER.info(requestParams.toString());
@@ -253,8 +252,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
       FormDataMultiPart multiPart
-  )
-  {
+  ) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
     LOGGER.info(requestParams.toString());
@@ -285,7 +283,7 @@ public class LLCSegmentCompletionHandlers {
     FileOutputStream os = null;
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-      File tmpFile = new File(provider.getTmpDir(), name + "." + UUID.randomUUID().toString());
+      File tmpFile = new File(provider.getFileUploadTmpDir(), name + "." + UUID.randomUUID().toString());
       tmpFile.deleteOnExit();
       os = new FileOutputStream(tmpFile);
       IOUtils.copyLarge(is, os);

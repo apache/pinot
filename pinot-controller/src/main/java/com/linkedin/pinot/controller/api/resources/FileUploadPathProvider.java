@@ -24,9 +24,10 @@ import com.linkedin.pinot.controller.ControllerConf;
 public class FileUploadPathProvider {
   private final ControllerConf _controllerConf;
 
-  private final File _tmpDir;
+  private final File _fileUploadTmpDir;
   private final File _baseDataDir;
   private final File _tmpUntarredPath;
+  private final File _schemasTmpDir;
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
     _controllerConf = controllerConf;
@@ -35,13 +36,17 @@ public class FileUploadPathProvider {
       if (!_baseDataDir.exists()) {
         FileUtils.forceMkdir(_baseDataDir);
       }
-      _tmpDir = new File(_baseDataDir, "fileUploadTemp");
-      if (!_tmpDir.exists()) {
-        FileUtils.forceMkdir(_tmpDir);
+      _fileUploadTmpDir = new File(_baseDataDir, "fileUploadTemp");
+      if (!_fileUploadTmpDir.exists()) {
+        FileUtils.forceMkdir(_fileUploadTmpDir);
       }
-      _tmpUntarredPath = new File(_tmpDir, "untarred");
+      _tmpUntarredPath = new File(_fileUploadTmpDir, "untarred");
       if (!_tmpUntarredPath.exists()) {
         _tmpUntarredPath.mkdirs();
+      }
+      _schemasTmpDir = new File(_baseDataDir, "schemasTemp");
+      if (!_schemasTmpDir.exists()) {
+        FileUtils.forceMkdir(_schemasTmpDir);
       }
 //      String vip = _controllerConf.generateVipUrl();
     } catch (Exception e) {
@@ -49,8 +54,8 @@ public class FileUploadPathProvider {
     }
   }
 
-  public File getTmpDir() {
-    return _tmpDir;
+  public File getFileUploadTmpDir() {
+    return _fileUploadTmpDir;
   }
 
   public File getBaseDataDir() {
