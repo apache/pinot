@@ -97,7 +97,7 @@ AnalysisModel.prototype = {
   fetchRootCauseData() {
     const windowSize = this.currentEnd - this.currentStart;
     const urn = `thirdeye:metric:${this.metricId}`;
-    return dataService.fetchRootCauseData(this.currentEnd, this.baselineEnd, windowSize, urn);
+    return dataService.fetchRootCauseData(this.currentStart, this.currentStart, windowSize, urn);
   },
 
   /**
