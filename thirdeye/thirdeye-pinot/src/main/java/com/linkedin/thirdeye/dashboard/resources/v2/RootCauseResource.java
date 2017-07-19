@@ -63,10 +63,13 @@ public class RootCauseResource {
     // parse urns arg
     urns = parseUrnsParam(urns);
 
+    if(urns.isEmpty())
+      throw new IllegalArgumentException("Must provide entity urns");
+
     // format input
     Set<Entity> input = new HashSet<>();
-    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, current - windowSize, current));
-    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baseline - windowSize, baseline));
+    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, current, current + windowSize));
+    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baseline, baseline + windowSize));
     for(String urn : urns) {
       input.add(EntityUtils.parseURN(urn, 1.0));
     }
