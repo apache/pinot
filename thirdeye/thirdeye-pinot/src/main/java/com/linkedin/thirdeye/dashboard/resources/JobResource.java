@@ -11,6 +11,7 @@ import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -82,18 +83,18 @@ public class JobResource {
 
   /**
    * Get the execution status of the given job id
-   * @param jobId
+   * @param id
    * @return the status of the job
    * COMPLETE if all tasks of the job are done without errors
    * FAILED if at least one of the tasks underneath is failed
    * SCHEDULED if at least one task underneath is still running or waiting
    */
   @GET
-  @Path("/job/status")
+  @Path("/job/{id}/status")
   @Produces(MediaType.APPLICATION_JSON)
-  public JobStatus getJobStatus(@NotNull @QueryParam("jobId") long jobId) {
-    JobDTO jobDTO = jobDao.findById(jobId);
-    List<TaskDTO> taskDTOs = taskDao.findByJobIdStatusNotIn(jobId, TaskStatus.COMPLETED);
+  public JobStatus getJobStatus(@NotNull @PathParam("id") long id) {
+    JobDTO jobDTO = jobDao.findById(id);
+    List<TaskDTO> taskDTOs = taskDao.findByJobIdStatusNotIn(id, TaskStatus.COMPLETED);
     JobStatus jobStatus = jobDTO.getStatus();
     if (taskDTOs.size() > 0) {
       boolean containFails = false;
