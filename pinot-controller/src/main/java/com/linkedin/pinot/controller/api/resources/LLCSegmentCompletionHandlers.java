@@ -166,7 +166,7 @@ public class LLCSegmentCompletionHandlers {
     LOGGER.info(requestParams.toString());
 
     final SegmentCompletionManager segmentCompletionManager = SegmentCompletionManager.getInstance();
-    SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams, false);
+    SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams);
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
       // Get the segment and put it in the right place.
       boolean success = uploadSegment(multiPart, instanceId, segmentName);
