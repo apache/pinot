@@ -155,6 +155,8 @@
                                     <excludes>
                                         <exclude>org.apache.hadoop.**</exclude>
                                         <exclude>org.apache.httpcomponents.**</exclude>
+                                        <!-- excluding w3c package, which is not pulled into this fat jar but is used by databind during runtime -->
+                                        <!-- if we don't exclude this package, databind code would try to find thirdeye.org.w3c, which does not exist -->
                                         <exclude>org.w3c.**</exclude>
                                     </excludes>
                                 </relocation>
