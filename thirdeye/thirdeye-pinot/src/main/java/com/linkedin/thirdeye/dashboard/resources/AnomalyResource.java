@@ -322,7 +322,7 @@ public class AnomalyResource {
     TimeUnit windowDelayTimeUnit;
     switch (dataGranularityUnit) {
     case MINUTES:
-      windowDelayTime = 30;
+      windowDelayTime = 0;
       windowDelayTimeUnit = TimeUnit.MINUTES;
       break;
     case DAYS:
@@ -331,11 +331,17 @@ public class AnomalyResource {
       break;
     case HOURS:
     default:
-      windowDelayTime = 10;
+      windowDelayTime = 2;
       windowDelayTimeUnit = TimeUnit.HOURS;
     }
     anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
     anomalyFunctionSpec.setWindowDelay(windowDelayTime);
+
+    // setup detection frequency if it's minutely function
+    if (dataGranularity.getUnit().equals(TimeUnit.MINUTES)) {
+      TimeGranularity frequency = new TimeGranularity(30, TimeUnit.MINUTES);
+      anomalyFunctionSpec.setFrequency(frequency);
+    }
 
     // bucket size and unit are defaulted to the collection granularity
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
