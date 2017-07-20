@@ -135,12 +135,12 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <!--<transformers>
+                            <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.linkedin.thirdeye.hadoop.ThirdEyeJob</mainClass>
                                 </transformer>
-                            </transformers>-->
+                            </transformers>
                             <relocations>
                                 <relocation>
                                     <pattern>com.</pattern>
