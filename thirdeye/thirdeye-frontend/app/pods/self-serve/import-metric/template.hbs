@@ -5,30 +5,93 @@
 </div>
 
 <main class="alert-onboard paper-container">
-
   {{#bs-form model=this class="te-form" onSubmit=(action "submit") as |form|}}
-    <section class="te-form__section-fields">
+
+  <fieldset class="te-form__section">
+    <legend class="te-form__section-title">Existing Dashboard</legend>
+    <div class="form-group">
       {{form.element
         controlType="text"
-        label="Onboard InGraph Dashboard"
+        label="Onboard Existing InGraph Dashboard"
         placeholder="Type inGraph dashboard name..."
-        property="dashboard-name"
-        required=true
+        property="importExistingDashboardName"
+        disabled=isExistingDashFieldDisabled
       }}
-      <p class="te-form-text">Or</p>
+    </div>
+  </fieldset>
+
+  <p class="te-form-text">Or</p>
+
+  <fieldset class="te-form__section">
+    <legend class="te-form__section-title">New Custom Dashboard</legend>
+    <div class="form-group">
+      {{form.element
+        controlType="text"
+        label="New Dataset Name"
+        placeholder="Type new dataset name..."
+        property="importCustomNewDataset"
+        disabled=isCustomDashFieldDisabled
+      }}
       {{form.element
         controlType="text"
         label="Provide RRD"
         placeholder="RRD here"
-        property="dashboard-id"
-        required=true
+        property="importCustomNewRrd"
+        disabled=isCustomDashFieldDisabled
       }}
-    </section>
+    </div>
+  </fieldset>
+
+    {{#if isImportSuccess}}
+      {{#bs-alert type="success"}}
+        <strong>Success!</strong> You have successfully imported <strong>{{importDashboardName}}</strong> dataset, including the following metrics:
+        {{#each importedMetrics as |metric|}}
+          <br>{{metric}}
+        {{else}}
+          <br>No metrics imported.
+        {{/each}}
+      {{/bs-alert}}
+    {{/if}}
+
+    {{#if isMetricOnboarded}}
+      {{#bs-alert type="success"}}
+        <strong>Success!</strong> The metric has been onboarded for <strong>{{datasetName}}</strong>
+      {{/bs-alert}}
+    {{/if}}
+
+    {{#if isImportError}}
+      {{#bs-alert type="danger"}}
+        <strong>Error:</strong> Metrics not imported. Please check your dashboard, datased, and metric names.
+      {{/bs-alert}}
+    {{/if}}
+
     <section class="te-form__section-submit">
-      {{bs-button defaultText="Cancel" type="outline-primary" buttonType="cancel" class="te-submit-button"}}
-      {{bs-button defaultText="Import" type="primary" buttonType="submit" class="te-submit-button"}}
+      {{bs-button
+        defaultText="Reset"
+        type="outline-primary"
+        buttonType="reset"
+        onClick=(action "clearAll")
+        class="te-submit-button"
+      }}
+
+      {{#if isFormDisabled}}
+        {{bs-button
+          defaultText="Onboard Another Dashboard"
+          type="primary"
+          onClick=(action "clearAll")
+          buttonType="submit"
+          class="te-submit-button"
+        }}
+      {{else}}
+        {{bs-button
+          defaultText="Import Metrics"
+          type="primary"
+          buttonType="submit"
+          class="te-submit-button"
+          disabled=isSubmitDisabled
+        }}
+      {{/if}}
     </section>
   {{/bs-form}}
-
   {{outlet}}
 </main>
