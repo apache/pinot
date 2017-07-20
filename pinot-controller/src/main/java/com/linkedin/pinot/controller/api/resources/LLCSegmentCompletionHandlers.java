@@ -183,7 +183,7 @@ public class LLCSegmentCompletionHandlers {
   }
 
   @GET
-  @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
+  @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitEnd(
       @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
