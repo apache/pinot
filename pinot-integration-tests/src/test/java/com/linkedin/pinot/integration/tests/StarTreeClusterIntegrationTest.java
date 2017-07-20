@@ -17,9 +17,7 @@ package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.tools.query.comparison.QueryComparison;
 import com.linkedin.pinot.tools.query.comparison.SegmentInfoProvider;
@@ -147,13 +145,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     executor.shutdown();
     executor.awaitTermination(TIMEOUT_IN_SECONDS, TimeUnit.SECONDS);
 
-    for (String segmentName : _tarredSegmentsDir.list()) {
-      LOGGER.info("Uploading segment {}", segmentName);
-      File file = new File(_tarredSegmentsDir, segmentName);
-      FileUploadUtils.sendSegmentFile(ControllerTestUtils.DEFAULT_CONTROLLER_HOST,
-          ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT, segmentName, file,
-          file.length());
-    }
+    uploadSegments(_tarredSegmentsDir);
   }
 
   /**

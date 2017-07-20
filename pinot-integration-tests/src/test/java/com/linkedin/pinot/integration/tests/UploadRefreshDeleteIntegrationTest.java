@@ -17,7 +17,6 @@ package com.linkedin.pinot.integration.tests;
 
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -117,10 +116,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 
-    for (String segmentFileName : segmentTarDir.list()) {
-      File file = new File(segmentTarDir, segmentFileName);
-      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentFileName, file, file.length());
-    }
+    uploadSegments(segmentTarDir);
 
     avroFile.delete();
     FileUtils.deleteQuietly(segmentTarDir);
@@ -167,7 +163,8 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
       }
     }).start();
 
-    FileUploadUtils.sendSegmentFile("localhost", "8998", segmentFileName, file, segmentLength, 5, 5);
+    FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentFileName, file,
+        segmentLength, 5, 5);
 
     avroFile.delete();
     FileUtils.deleteQuietly(segmentTarDir);
@@ -305,7 +302,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
                 synchronized (segmentName) {
                   // Delete this segment
                   LOGGER.info("Deleting segment {}", segmentName);
-                  String reply = sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+                  String reply = sendDeleteRequest(_controllerRequestURLBuilder.
                       forSegmentDelete("myresource", segmentName));
                   LOGGER.info("Deletion returned {}", reply);
 

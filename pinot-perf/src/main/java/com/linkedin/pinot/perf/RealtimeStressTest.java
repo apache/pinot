@@ -84,7 +84,7 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
     startServer();
 
     // Create realtime table
-    setUpTable("DaysSinceEpoch", "DAYS", avroFiles.get(0));
+    setUpTable(avroFiles.get(0));
 
     // Wait a couple of seconds for all Helix state transitions to happen
     Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);

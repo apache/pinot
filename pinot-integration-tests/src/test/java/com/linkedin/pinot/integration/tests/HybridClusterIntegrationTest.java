@@ -18,10 +18,8 @@ package com.linkedin.pinot.integration.tests;
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
@@ -49,10 +47,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   private static final int NUM_REALTIME_SEGMENTS = 6;
 
   private KafkaServerStartable _kafkaStarter;
-
-  protected boolean useLlc() {
-    return false;
-  }
+  private Schema _schema;
 
   protected int getNumOfflineSegments() {
     return NUM_OFFLINE_SEGMENTS;
@@ -63,28 +58,23 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start Zk, Kafka and Pinot
     startHybridCluster();
 
-    // Unpack the Avro files
-    // NOTE: Avro files has to be ordered as time series data
-    int numSegments = unpackAvroData(_tempDir).size();
-    List<File> avroFiles = new ArrayList<>(numSegments);
-    for (int i = 1; i <= numSegments; i++) {
-      avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
-    }
+    List<File> avroFiles = getAllAvroFiles();
     List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles);
     List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles);
 
     ExecutorService executor = Executors.newCachedThreadPool();
 
     // Create segments from Avro data
+    File schemaFile = getSchemaFile();
+    _schema = Schema.fromFile(schemaFile);
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, 0, _segmentDir, _tarDir, getTableName(), false,
-        getRawIndexColumns(), null, executor);
+        getRawIndexColumns(), _schema, executor);
 
     // Push data into the Kafka topic
     pushAvroIntoKafka(realtimeAvroFiles, getKafkaTopic(), executor);
@@ -93,26 +83,22 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     setUpH2Connection(avroFiles, executor);
 
     // Initialize query generator
-    setupQueryGenerator(avroFiles, executor);
+    setUpQueryGenerator(avroFiles, executor);
 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     // Create Pinot table
-    setUpTable("DaysSinceEpoch", "DAYS", avroFiles.get(0));
+    setUpTable(avroFiles.get(0));
 
     // Upload all segments
-    for (String segmentName : _tarDir.list()) {
-      File segmentFile = new File(_tarDir, segmentName);
-      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, segmentFile, segmentFile.length());
-    }
+    uploadSegments(_tarDir);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected void startHybridCluster()
-      throws Exception {
+  protected void startHybridCluster() throws Exception {
     // Start Zk and Kafka
     startZk();
     _kafkaStarter =
@@ -123,7 +109,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, getNumKafkaPartitions());
 
     // Start the Pinot cluster
-    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
+    ControllerConf config = getDefaultControllerConfiguration();
     config.setTenantIsolationEnabled(false);
     startController(config);
     startBroker();
@@ -134,15 +120,31 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     createServerTenant(TENANT_NAME, 1, 1);
   }
 
-  protected void setUpTable(String timeColumnName, String timeColumnType, File avroFile)
-      throws Exception {
-    File schemaFile = getSchemaFile();
-    Schema schema = Schema.fromFile(schemaFile);
-    String schemaName = schema.getSchemaName();
-    addSchema(schemaFile, schemaName);
-    addHybridTable(getTableName(), timeColumnName, timeColumnType, KafkaStarterUtils.DEFAULT_ZK_STR, getKafkaTopic(),
-        schemaName, TENANT_NAME, TENANT_NAME, avroFile, getSortedColumn(), getInvertedIndexColumns(), getLoadMode(),
-        useLlc(), getRawIndexColumns(), getTaskConfig());
+  protected void setUpTable(File avroFile) throws Exception {
+    String schemaName = _schema.getSchemaName();
+    addSchema(getSchemaFile(), schemaName);
+
+    String timeColumnName = _schema.getTimeColumnName();
+    Assert.assertNotNull(timeColumnName);
+    TimeUnit outgoingTimeUnit = _schema.getOutgoingTimeUnit();
+    Assert.assertNotNull(outgoingTimeUnit);
+    String timeColumnType = outgoingTimeUnit.toString();
+    addHybridTable(getTableName(), timeColumnName, timeColumnType, KafkaStarterUtils.DEFAULT_ZK_STR,
+        KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(), schemaName, TENANT_NAME, TENANT_NAME, avroFile,
+        getSortedColumn(), getInvertedIndexColumns(), getLoadMode(), useLlc(), getRawIndexColumns(), getTaskConfig());
+  }
+
+  protected List<File> getAllAvroFiles() throws Exception {
+    // Unpack the Avro files
+    int numSegments = unpackAvroData(_tempDir).size();
+
+    // Avro files has to be ordered as time series data
+    List<File> avroFiles = new ArrayList<>(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(_tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+
+    return avroFiles;
   }
 
   protected List<File> getOfflineAvroFiles(List<File> avroFiles) {
@@ -165,8 +167,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testBrokerDebugOutput()
-      throws Exception {
+  public void testBrokerDebugOutput() throws Exception {
     String tableName = getTableName();
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary"));
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + tableName));
@@ -179,28 +180,24 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
-  public void testQueriesFromQueryFile()
-      throws Exception {
+  public void testQueriesFromQueryFile() throws Exception {
     super.testQueriesFromQueryFile();
   }
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
     super.testGeneratedQueriesWithMultiValues();
   }
 
   @Test
   @Override
-  public void testInstanceShutdown()
-      throws Exception {
+  public void testInstanceShutdown() throws Exception {
     super.testInstanceShutdown();
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     // Try deleting the tables and check that they have no routing table
     final String tableName = getTableName();
     dropOfflineTable(tableName);
@@ -234,8 +231,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    *
    * @throws Exception
    */
-  protected void cleanup()
-      throws Exception {
+  protected void cleanup() throws Exception {
     FileUtils.deleteDirectory(_tempDir);
   }
 }

@@ -21,10 +21,7 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import java.io.IOException;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -32,51 +29,46 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class PinotSchemaRestletResourceTest extends ControllerTest {
-  private static final ObjectMapper objectMapper = new ObjectMapper();
-  ControllerRequestURLBuilder urlBuilder = ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
 
- @BeforeClass
+public class PinotSchemaRestletResourceTest extends ControllerTest {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  @BeforeClass
   public void setUp() {
     startZk();
-    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
-    config.setTableMinReplicas(1);
-    startController(config);
+    startController();
   }
 
-  public JSONObject createDefaultSchema()
-      throws JSONException, JsonProcessingException {
+  public JSONObject createDefaultSchema() throws JSONException, JsonProcessingException {
     JSONObject schemaJson = new JSONObject();
     schemaJson.put("schemaName", "testSchema");
     JSONArray dimFieldSpec = new JSONArray();
     schemaJson.put("dimensionFieldSpecs", dimFieldSpec);
     JSONArray metricFieldSpec = new JSONArray();
     schemaJson.put("metricFieldSpecs", metricFieldSpec);
-    JSONObject timeFieldSpec = new JSONObject();
-    // schemaJson.put("timeFieldSpec", timeFieldSpec);
 
     DimensionFieldSpec df = new DimensionFieldSpec("dimA", FieldSpec.DataType.STRING, true, "");
-    dimFieldSpec.put(new JSONObject(objectMapper.writeValueAsString(df)));
+    dimFieldSpec.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(df)));
     df = new DimensionFieldSpec("dimB", FieldSpec.DataType.LONG, true, 0);
-    dimFieldSpec.put(new JSONObject(objectMapper.writeValueAsString(df)));
+    dimFieldSpec.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(df)));
 
     MetricFieldSpec mf = new MetricFieldSpec("metricA", FieldSpec.DataType.INT, 0);
-    metricFieldSpec.put(new JSONObject(objectMapper.writeValueAsString(mf)));
+    metricFieldSpec.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(mf)));
 
     mf = new MetricFieldSpec("metricB", FieldSpec.DataType.DOUBLE, -1);
-    metricFieldSpec.put(new JSONObject(objectMapper.writeValueAsString(mf)));
+    metricFieldSpec.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(mf)));
     return schemaJson;
   }
 
   @Test
-  public void testBadContentType()
-      throws JSONException, JsonProcessingException {
+  public void testBadContentType() throws JSONException, JsonProcessingException {
     JSONObject schema = createDefaultSchema();
     try {
-      sendPostRequest(urlBuilder.forSchemaCreate(), schema.toString());
+      sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toString());
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
       return;
@@ -86,22 +78,21 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testCreateUpdateSchema()
-      throws JSONException, IOException {
+  public void testCreateUpdateSchema() throws JSONException, IOException {
     JSONObject schema = createDefaultSchema();
-    String url = urlBuilder.forSchemaCreate();
+    String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
     JSONArray dimSpecs = schema.getJSONArray("dimensionFieldSpecs");
     DimensionFieldSpec df = new DimensionFieldSpec("NewColumn", FieldSpec.DataType.STRING, true);
-    dimSpecs.put(new JSONObject(objectMapper.writeValueAsString(df)));
+    dimSpecs.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(df)));
 
     postMethod = sendMultipartPostRequest(url, schema.toString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
     final String schemaName = schema.getString("schemaName");
-    String schemaStr = sendGetRequest(urlBuilder.forSchemaGet(schemaName));
+    String schemaStr = sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(schemaName));
     Schema readSchema = Schema.fromString(schemaStr);
     Schema inputSchema = Schema.fromString(schema.toString());
     Assert.assertEquals(readSchema, inputSchema);
@@ -110,25 +101,31 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
     final String yetAnotherColumn = "YetAnotherColumn";
     Assert.assertFalse(readSchema.getFieldSpecMap().containsKey(yetAnotherColumn));
     df = new DimensionFieldSpec(yetAnotherColumn, FieldSpec.DataType.STRING, true);
-    dimSpecs.put(new JSONObject(objectMapper.writeValueAsString(df)));
-    PutMethod putMethod = sendMultipartPutRequest(urlBuilder.forSchemaUpdate(schemaName), schema.toString());
+    dimSpecs.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(df)));
+    PutMethod putMethod =
+        sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName), schema.toString());
     Assert.assertEquals(putMethod.getStatusCode(), 200);
     // verify some more...
-    schemaStr = sendGetRequest(urlBuilder.forSchemaGet(schemaName));
+    schemaStr = sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(schemaName));
     readSchema = Schema.fromString(schemaStr);
     inputSchema = Schema.fromString(schema.toString());
     Assert.assertEquals(readSchema, inputSchema);
     Assert.assertTrue(readSchema.getFieldSpecMap().containsKey(yetAnotherColumn));
 
     // error cases
-    putMethod = sendMultipartPutRequest(urlBuilder.forSchemaUpdate(schemaName), schema.toString().substring(1));
+    putMethod = sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName),
+        schema.toString().substring(1));
     // invalid json
     Assert.assertEquals(putMethod.getStatusCode(), 400);
 
     schema.put("schemaName", "differentSchemaName");
-    putMethod = sendMultipartPutRequest(urlBuilder.forSchemaUpdate(schemaName), schema.toString());
+    putMethod = sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName), schema.toString());
     Assert.assertEquals(putMethod.getStatusCode(), 400);
-
   }
 
+  @AfterClass
+  public void tearDown() {
+    stopController();
+    stopZk();
+  }
 }

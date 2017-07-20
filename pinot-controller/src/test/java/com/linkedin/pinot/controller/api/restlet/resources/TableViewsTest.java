@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
@@ -43,9 +42,6 @@ public class TableViewsTest extends ControllerTest {
   private static final String HYBRID_TABLE_NAME = "hybridTable";
   private static final int NUM_BROKER_INSTANCES = 3;
   private static final int NUM_SERVER_INSTANCES = 4;
-
-  private final ControllerRequestURLBuilder _requestBuilder =
-      ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -108,14 +104,14 @@ public class TableViewsTest extends ControllerTest {
 
   @Test(dataProvider = "viewProvider")
   public void testTableNotFound(String view) throws Exception {
-    String url = _requestBuilder.forTableView("unknownTable", view, null);
+    String url = _controllerRequestURLBuilder.forTableView("unknownTable", view, null);
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     Assert.assertEquals(connection.getResponseCode(), 404);
   }
 
   @Test(dataProvider = "viewProvider")
   public void testBadRequest(String view) throws Exception {
-    String url = _requestBuilder.forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
+    String url = _controllerRequestURLBuilder.forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     Assert.assertEquals(connection.getResponseCode(), 400);
   }
@@ -168,7 +164,8 @@ public class TableViewsTest extends ControllerTest {
   }
 
   private TableViews.TableView getTableView(String tableName, String view, String tableType) throws Exception {
-    return OBJECT_MAPPER.readValue(sendGetRequest(_requestBuilder.forTableView(tableName, view, tableType)),
+    return OBJECT_MAPPER.readValue(
+        sendGetRequest(_controllerRequestURLBuilder.forTableView(tableName, view, tableType)),
         TableViews.TableView.class);
   }
 

@@ -49,7 +49,7 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.integration.tests.HybridScanBasedCommandLineTestRunner</mainClass>
+              <mainClass>com.linkedin.pinot.integration.tests.HybridClusterIntegrationTestCommandLineRunner</mainClass>
               <name>pinot-hybrid-cluster-test</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>

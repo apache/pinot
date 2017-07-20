@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
@@ -33,8 +33,7 @@ import org.restlet.representation.Representation;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class LLCSegmentCommitTest {
@@ -110,7 +109,7 @@ public class LLCSegmentCommitTest {
     Context createMockContext() {
       Context context = mock(Context.class);
       ConcurrentHashMap<String, Object> map = new ConcurrentHashMap<>(1);
-      map.put(ControllerConf.class.toString(), ControllerTestUtils.getDefaultControllerConfiguration());
+      map.put(ControllerConf.class.toString(), ControllerTest.getDefaultControllerConfiguration());
       when(context.getAttributes()).thenReturn(map);
       return context;
     }
