@@ -12,7 +12,7 @@ export function checkStatus(response) {
   } else {
     const error = new Error(response.statusText);
     error.response = response;
-    return error;
+    throw error;
   }
 }
 

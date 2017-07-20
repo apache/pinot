@@ -12,6 +12,7 @@ export default Ember.Controller.extend({
    */
   isImportSuccess: false,
   isImportError: false,
+  isSubmitDone: false,
   isSubmitDisabled: true,
   isMetricOnboarded: false,
   isExistingDashFieldDisabled: false,
@@ -58,24 +59,23 @@ export default Ember.Controller.extend({
     'importExistingDashboardName',
     'importCustomNewDataset',
     'importCustomNewMetric',
-    'importCustomNewRrd', {
-    get() {
+    'importCustomNewRrd',
+    'isSubmitDone',
+    function() {
       const rrd = this.get('importCustomNewRrd');
       const name = this.get('importCustomNewDataset');
       const metric = this.get('importCustomNewMetric');
-      return Ember.isPresent(rrd) || Ember.isPresent(name) || Ember.isPresent(metric);
-    },
-    set(value) {
-      return value;
+      const isSubmitted = this.get('isSubmitDone');
+      return Ember.isPresent(rrd) || Ember.isPresent(name) || Ember.isPresent(metric) || isSubmitted;
     }
-  }),
+  ),
 
   /**
    * Determines whether all fields are disabled (after submit)
    * @method isFormDisabled
    * @return {Boolean} isFormDisabled
    */
-  isFormDisabled : Ember.computed.and('isExistingDashFieldDisabled', 'isCustomDashFieldDisabled'),
+  isFormDisabled: Ember.computed.and('isExistingDashFieldDisabled', 'isCustomDashFieldDisabled'),
 
   /**
    * Fetches an alert function record by name.
@@ -86,7 +86,7 @@ export default Ember.Controller.extend({
    */
   fetchMetricsList(dataSet) {
     const url = `/thirdeye-admin/metric-config/metrics?dataset=${dataSet}`
-    return fetch(url).then(res => res.json());
+    return fetch(url).then((res) => res.json());
   },
 
   /**
@@ -97,9 +97,7 @@ export default Ember.Controller.extend({
    */
   triggerInstantOnboard() {
     const url = '/autoOnboard/runAdhoc/AutometricsThirdeyeDataSource';
-    return new Ember.RSVP.Promise((resolve) => {
-      fetch(url, { method: 'post' }).then(res => resolve(checkStatus(res)));
-    });
+    return fetch(url, { method: 'post' }).then(checkStatus);
   },
 
   /**
@@ -116,28 +114,7 @@ export default Ember.Controller.extend({
       headers: { 'content-type': 'Application/Json' }
     };
     const url = '/onboard/create';
-    return new Ember.RSVP.Promise((resolve) => {
-      fetch(url, postProps).then(res => resolve(checkStatus(res)));
-    });
-  },
-
-  /**
-   * Generates/updates the metrics for an existing inGraphs dashboard
-   * https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Onboarding+ingraph+dashboards
-   * @method onboardMetricsToDataset
-   * @param {String} rrd - The metric RRD
-   * @return {Ember.RSVP.Promise}
-   */
-  onboardMetricsToDataset(rrd) {
-    const postProps = {
-      method: 'post',
-      body: JSON.stringify({ RRD: rrd }),
-      headers: { 'content-type': 'Application/Json' }
-    };
-    const url = '/onboard/create';
-    return new Ember.RSVP.Promise((resolve) => {
-      fetch(url, postProps).then(res => resolve(checkStatus(res)));
-    });
+    return fetch(url, postProps).then(checkStatus);
   },
 
   /**
@@ -153,10 +130,10 @@ export default Ember.Controller.extend({
     clearAll() {
       this.setProperties({
        isCustomDashFieldDisabled: false,
-       isExistingDashFieldDisabled: false,
        isImportSuccess: false,
        isImportError: false,
        isMetricOnboarded: false,
+       isSubmitDone: false,
        importExistingDashboardName: '',
        importCustomNewDataset: '',
        importCustomNewMetric: '',
@@ -184,27 +161,29 @@ export default Ember.Controller.extend({
       // Disable the form and show options to user
       this.setProperties({
         datasetName,
-        isCustomDashFieldDisabled: true,
-        isExistingDashFieldDisabled: true
+        isSubmitDone: true,
+        isCustomDashFieldDisabled: true
       });
 
       // Make import request
       this.onboardNewDataset(importObj).then(importResult => {
         // Check server for newly onboarded metrics
-        this.fetchMetricsList(datasetName).then(metricsList => {
-          if (!metricsList.Records.length) {
-            this.set('isImportError', true);
-          } else {
-            // Trigger onboard for imported metrics
-            this.triggerInstantOnboard().then(onboardRes => {
-              this.setProperties({
-                isImportSuccess: true,
-                isMetricOnboarded: true,
-                importedMetrics: metricsList.Records
-              });
+        return this.fetchMetricsList(datasetName)
+      }).then((metricsList) => {
+        if (!metricsList.Records.length) {
+          return new Promise.reject();
+        } else {
+          // Trigger onboard for imported metrics
+          this.triggerInstantOnboard().then(onboardRes => {
+            this.setProperties({
+              isImportSuccess: true,
+              isMetricOnboarded: true,
+              importedMetrics: metricsList.Records
             });
-          }
-        });
+          });
+        }
+      }).catch((err)=>{
+        this.set('isImportError', true);
       });
     }
   }
