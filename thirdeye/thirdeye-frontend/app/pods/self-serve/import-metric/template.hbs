@@ -34,6 +34,13 @@
       }}
       {{form.element
         controlType="text"
+        label="New Metric Name"
+        placeholder="Type new metric name..."
+        property="importCustomNewMetric"
+        disabled=isCustomDashFieldDisabled
+      }}
+      {{form.element
+        controlType="text"
         label="Provide RRD"
         placeholder="RRD here"
         property="importCustomNewRrd"
@@ -44,7 +51,7 @@
 
     {{#if isImportSuccess}}
       {{#bs-alert type="success"}}
-        <strong>Success!</strong> You have successfully imported <strong>{{importDashboardName}}</strong> dataset, including the following metrics:
+        <strong>Success!</strong> You have successfully imported <strong>{{datasetName}}</strong> dataset, including the following metrics:
         {{#each importedMetrics as |metric|}}
           <br>{{metric}}
         {{else}}
@@ -55,7 +62,7 @@
 
     {{#if isMetricOnboarded}}
       {{#bs-alert type="success"}}
-        <strong>Success!</strong> The metric has been onboarded for <strong>{{datasetName}}</strong>
+        <strong>Success!</strong> The metrics have been onboarded for <strong>{{datasetName}}</strong>
       {{/bs-alert}}
     {{/if}}
 
@@ -69,9 +76,9 @@
       {{bs-button
         defaultText="Reset"
         type="outline-primary"
-        buttonType="reset"
+
         onClick=(action "clearAll")
-        class="te-submit-button"
+        class="te-cancel-button"
       }}
 
       {{#if isFormDisabled}}

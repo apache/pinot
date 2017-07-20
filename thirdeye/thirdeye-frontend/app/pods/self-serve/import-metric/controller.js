@@ -25,21 +25,23 @@ export default Ember.Controller.extend({
   isSubmitDisabled: Ember.computed(
     'importExistingDashboardName',
     'importCustomNewDataset',
+    'importCustomNewMetric',
     'importCustomNewRrd',
     function() {
       let isDisabled = true;
       const existingNameField = this.get('importExistingDashboardName');
       const newNameField = this.get('importCustomNewDataset');
+      const newMetricField = this.get('importCustomNewMetric');
       const newRrdField = this.get('importCustomNewRrd');
       // If existing dashboard field is filled, release submit button.
       if (Ember.isPresent(existingNameField)) {
         isDisabled = false;
       }
       // If any of the 'import custom' fields are filled, assume user will go the RRD import route. Disable submit.
-      if (Ember.isPresent(newNameField) || Ember.isPresent(newRrdField)) {
+      if (Ember.isPresent(newNameField) || Ember.isPresent(newRrdField) || Ember.isPresent(newMetricField)) {
         isDisabled = true;
         // Enable submit if all required RRD fields are present
-        if (Ember.isPresent(newNameField) && Ember.isPresent(newRrdField)) {
+        if (Ember.isPresent(newNameField) && Ember.isPresent(newRrdField) && Ember.isPresent(newMetricField)) {
           isDisabled = false;
         }
       }
@@ -55,26 +57,25 @@ export default Ember.Controller.extend({
   isExistingDashFieldDisabled: Ember.computed(
     'importExistingDashboardName',
     'importCustomNewDataset',
-    'importCustomNewRrd',
-    function() {
-      const newNameField = this.get('importCustomNewDataset');
-      const newRrdField = this.get('importCustomNewRrd');
-      return Ember.isPresent(newNameField) || Ember.isPresent(newRrdField);
+    'importCustomNewMetric',
+    'importCustomNewRrd', {
+    get() {
+      const rrd = this.get('importCustomNewRrd');
+      const name = this.get('importCustomNewDataset');
+      const metric = this.get('importCustomNewMetric');
+      return Ember.isPresent(rrd) || Ember.isPresent(name) || Ember.isPresent(metric);
+    },
+    set(value) {
+      return value;
     }
-  ),
+  }),
 
   /**
    * Determines whether all fields are disabled (after submit)
    * @method isFormDisabled
    * @return {Boolean} isFormDisabled
    */
-  isFormDisabled: Ember.computed(
-    'isExistingDashFieldDisabled',
-    'isCustomDashFieldDisabled',
-    function() {
-      return (this.get('isExistingDashFieldDisabled') && this.get('isCustomDashFieldDisabled'));
-    }
-  ),
+  isFormDisabled : Ember.computed.and('isExistingDashFieldDisabled', 'isCustomDashFieldDisabled'),
 
   /**
    * Fetches an alert function record by name.
@@ -140,23 +141,6 @@ export default Ember.Controller.extend({
   },
 
   /**
-   * Display results of new metrics onboarding
-   * @method prepareMetricListResult
-   * @param {Array} metricsList - List of new metrics
-   * @return {Ember.RSVP.Promise}
-   */
-  prepareMetricListResult(metricsList) {
-    if (!metricsList.Records.length) {
-      this.set('isImportError', true);
-    } else {
-      this.setProperties({
-        isImportSuccess: true,
-        importedMetrics: metricsList.Records
-      });
-    }
-  },
-
-  /**
    * Defined actions for component
    */
   actions: {
@@ -172,11 +156,12 @@ export default Ember.Controller.extend({
        isExistingDashFieldDisabled: false,
        isImportSuccess: false,
        isImportError: false,
-       importExistingDashboardName: null,
-       importCustomNewDataset: null,
-       importCustomNewRrd: null,
-       datasetName: null,
-       isMetricOnboarded: false
+       isMetricOnboarded: false,
+       importExistingDashboardName: '',
+       importCustomNewDataset: '',
+       importCustomNewMetric: '',
+       importCustomNewRrd: '',
+       datasetName: '',
       });
     },
 
@@ -188,41 +173,38 @@ export default Ember.Controller.extend({
     submit() {
       const isRrdImport = this.get('isExistingDashFieldDisabled');
       const datasetName = isRrdImport ? this.get('importCustomNewDataset') : this.get('importExistingDashboardName');
-      const importObj = {
-        datasetName: datasetName,
-        dataSource: 'AutometricsThirdeyeDataSource'
-      };
-      // For either mode (import existing vs import new) make call to /onboard/create endpoint
-      this.onboardNewDataset(importObj).then(newDatasetResult => {
-        this.set('datasetName', this.get('importCustomNewDataset'));
-        // If this is a new metric from RRD, send RRD and new metric name for onboarding
-        if (isRrdImport) {
-          importObj.properties = { RRD: this.get('importCustomNewRrd') };
-          this.onboardNewDataset(importObj).then(onboardMetricsRes => {
-            // Check server for newly onboarded metrics
-            this.fetchMetricsList(datasetName).then(metricsList => {
-              this.prepareMetricListResult(metricsList);
-            });
-            // If new metric, manually trigger the onboard
-            this.triggerInstantOnboard().then(triggerOnboardRes => {
-              this.set('isMetricOnboarded', Ember.isPresent(datasetName));
-            });
-          });
-        } else {
-          // Check server for newly onboarded metrics
-          this.fetchMetricsList(datasetName).then(metricsList => {
-            this.prepareMetricListResult(metricsList);
-          });
-          // If new metric, manually trigger the onboard
-          this.triggerInstantOnboard().then(triggerOnboardRes => {
-            this.set('isMetricOnboarded', true);
-          });
-        }
-      });
+      const importObj = { datasetName: datasetName, dataSource: 'AutometricsThirdeyeDataSource' };
+
+      // Enhance request payload for custom metrics
+      if (isRrdImport) {
+        importObj.metricName = this.get('importCustomNewMetric');
+        importObj.properties = { RRD: this.get('importCustomNewRrd') };
+      }
+
       // Disable the form and show options to user
       this.setProperties({
+        datasetName,
         isCustomDashFieldDisabled: true,
         isExistingDashFieldDisabled: true
+      });
+
+      // Make import request
+      this.onboardNewDataset(importObj).then(importResult => {
+        // Check server for newly onboarded metrics
+        this.fetchMetricsList(datasetName).then(metricsList => {
+          if (!metricsList.Records.length) {
+            this.set('isImportError', true);
+          } else {
+            // Trigger onboard for imported metrics
+            this.triggerInstantOnboard().then(onboardRes => {
+              this.setProperties({
+                isImportSuccess: true,
+                isMetricOnboarded: true,
+                importedMetrics: metricsList.Records
+              });
+            });
+          }
+        });
       });
     }
   }
