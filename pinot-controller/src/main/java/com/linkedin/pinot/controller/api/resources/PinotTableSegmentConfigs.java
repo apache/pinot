@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
@@ -30,12 +34,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-@Api(tags = Constants.TABLE_TAG)
+@Api(tags = "table")
 @Path("/")
 public class PinotTableSegmentConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(
