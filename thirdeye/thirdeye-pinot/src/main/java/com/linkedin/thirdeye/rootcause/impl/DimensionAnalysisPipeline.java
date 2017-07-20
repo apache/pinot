@@ -1,32 +1,27 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.client.diffsummary.Cube;
-import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
-import com.linkedin.thirdeye.client.diffsummary.Dimensions;
-import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
-import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.Grouping;
-import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -34,8 +29,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +44,12 @@ import org.slf4j.LoggerFactory;
 public class DimensionAnalysisPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionAnalysisPipeline.class);
 
+  public static final String COL_CONTRIB = "contribution";
+  public static final String COL_DELTA = "delta";
+  public static final String COL_DIM_NAME = "dimension";
+  public static final String COL_DIM_VALUE = "value";
+  public static final String COL_SCORE = "score";
+
   public static final String PROP_PARALLELISM = "parallelism";
   public static final int PROP_PARALLELISM_DEFAULT = 1;
 
@@ -58,11 +57,6 @@ public class DimensionAnalysisPipeline extends Pipeline {
   public static final int PROP_K_DEFAULT = -1;
 
   public static final long TIMEOUT = 120000;
-
-  private static final String KEY = "key";
-  static final String DIMENSION = "dimension";
-  static final String COST = "cost";
-  static final String VALUE = "value";
 
   private final QueryCache cache;
   private final MetricConfigManager metricDAO;
@@ -113,176 +107,161 @@ public class DimensionAnalysisPipeline extends Pipeline {
     final TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
     final TimeRangeEntity baseline = TimeRangeEntity.getContextBaseline(context);
 
-    DataFrame dfScore = new DataFrame();
-    dfScore.addSeries(DIMENSION, StringSeries.empty());
-    dfScore.addSeries(VALUE, StringSeries.empty());
-    dfScore.addSeries(COST, DoubleSeries.empty());
-
-    Map<String, Future<DataFrame>> scores = new HashMap<>();
+    Map<Dimension, Double> scores = new HashMap<>();
     for(MetricEntity me : metricsEntities) {
-      final MetricConfigDTO metricDTO = metricDAO.findById(me.getId());
-
-      if(metricDTO == null) {
-        LOG.warn("Could not resolve metric id {}. Skipping.", me.getId());
-        continue;
-      }
-
-      final DatasetConfigDTO datasetDTO = datasetDAO.findByDataset(metricDTO.getDataset());
-
-      if(datasetDTO == null) {
-        LOG.warn("Could not resolve dataset '{}'. Skipping metric id {}", metricDTO.getDataset(), me.getId());
-        continue;
-      }
-
-      // Create asynchronous scoring task
-      final MetricEntity entity = me;
-      Callable<DataFrame> scoreTask = new Callable<DataFrame>() {
-        @Override
-        public DataFrame call() throws Exception {
-          LOG.info("Scoring metric '{}' in dataset '{}' with weight {}", metricDTO.getName(), datasetDTO.getDataset(), entity.getScore());
-          DataFrame dfMetric = DimensionAnalysisPipeline.this.score(datasetDTO, metricDTO, current, baseline);
-
-          // modify cost by metric score
-          final double metricScore = entity.getScore();
-          dfMetric.mapInPlace(new Series.DoubleFunction() {
-            @Override
-            public double apply(double... values) {
-              return values[0] * metricScore;
-            }
-          }, COST);
-
-          return dfMetric;
-        }
-      };
-
-      Future<DataFrame> fScore = this.executor.submit(scoreTask);
-      scores.put(me.getUrn(), fScore);
-    }
-
-    // Combine results
-    for(Map.Entry<String, Future<DataFrame>> e : scores.entrySet()) {
       try {
-        dfScore = dfScore.append(e.getValue().get(TIMEOUT, TimeUnit.MILLISECONDS));
-      } catch (Exception ex) {
-        LOG.warn("Exception while combining results for '{}'. Skipping.", e.getKey(), ex);
+        final long windowSize = current.getEnd() - current.getStart();
+        DataFrame dfScores = getDimensionScores(me.getId(), current.getStart(), baseline.getStart(), windowSize);
+
+        for(int i=0; i<dfScores.size(); i++) {
+          double score = dfScores.getDouble(COL_SCORE, i);
+          Dimension d = new Dimension(dfScores.getString(COL_DIM_NAME, i), dfScores.getString(COL_DIM_VALUE, i));
+          if(!scores.containsKey(d))
+            scores.put(d, 0.0d);
+          scores.put(d, scores.get(d) + score * me.getScore());
+        }
+      } catch (Exception e) {
+        LOG.warn("Error calculating dimension scores for '{}'. Skipping.", me.getUrn(), e);
       }
     }
 
-    // TODO use multi-column grouping when available
-    // generate dimension keys
-    dfScore.mapInPlace(new Series.StringFunction() {
-      @Override
-      public String apply(String... values) {
-        return values[0] + ":" + values[1];
-      }
-    }, KEY, DIMENSION, VALUE);
-
-    Grouping.DataFrameGrouping grouping = dfScore.groupByValue(KEY);
-    DataFrame sumCost = grouping.aggregate(COST, DoubleSeries.SUM).fillNull(COST);
-    DataFrame dimension = grouping.aggregate(DIMENSION, StringSeries.FIRST);
-    DataFrame value = grouping.aggregate(VALUE, StringSeries.FIRST);
-
-    // TODO cleanup
-    // truncate results to most important dimensions
-    DataFrame trunc = sumCost.sortedBy(COST);
-
-    final double total = sumCost.getDoubles(COST).sum().value();
-    final double truncTotal = trunc.getDoubles(COST).sum().value();
-    LOG.info("Using {} out of {} scored dimensions, explaining {} of total differences", trunc.size(), sumCost.size(), truncTotal / total);
-
-    DataFrame result = trunc.joinLeft(dimension).joinLeft(value);
-    result.mapInPlace(new Series.DoubleFunction() {
-      @Override
-      public double apply(double... values) {
-        return values[0] / total;
-      }
-    }, COST);
-
-    // drop dimensions with 0 cost
-    result = result.filter(new Series.DoubleConditional() {
-      @Override
-      public boolean apply(double... values) {
-        return values[0] > 0.0d;
-      }
-    }, COST).dropNull();
-
-    return new PipelineResult(context, EntityUtils.topk(toEntities(result), this.k));
-  }
-
-  private static Set<DimensionEntity> toEntities(DataFrame df) {
     Set<DimensionEntity> entities = new HashSet<>();
-    for(int i=0; i<df.size(); i++) {
-      String dimension = df.getString(DIMENSION, i);
-      String value = df.getString(VALUE, i).toLowerCase();
-      double score = df.getDouble(COST, i);
-      entities.add(DimensionEntity.fromDimension(score, dimension, value));
-    }
-    return entities;
-  }
-
-  /**
-   * Perform contribution analysis on a metric given a time range and baseline.
-   *
-   * @param dataset thirdeye dataset reference
-   * @param metric thirdeye metric reference
-   * @param current current time range
-   * @param baseline baseline time range
-   * @return DataFrame with normalized cost
-   * @throws Exception if data cannot be fetched or data is invalid
-   */
-  DataFrame score(DatasetConfigDTO dataset, MetricConfigDTO metric, TimeRangeEntity current, TimeRangeEntity baseline) throws Exception {
-    if(!metric.getDataset().equals(dataset.getDataset()))
-      throw new IllegalArgumentException("Dataset and metric must match");
-
-    // build data cube
-    OLAPDataBaseClient olapClient = getOlapDataBaseClient(current, baseline, metric, dataset);
-    Dimensions dimensions = new Dimensions(dataset.getDimensions());
-
-    Cube cube = new Cube();
-    cube.buildDimensionCostSet(olapClient, dimensions, null);
-
-    return toNormalizedDataFrame(cube.getCostSet());
-  }
-
-  private OLAPDataBaseClient getOlapDataBaseClient(TimeRangeEntity current, TimeRangeEntity baseline, MetricConfigDTO metric, DatasetConfigDTO dataset) throws Exception {
-    final String timezone = "UTC";
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric.getName(),
-        metric.getDefaultAggFunction(), dataset.getDataset());
-
-    OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(cache);
-    olapClient.setCollection(dataset.getDataset());
-    olapClient.setMetricExpression(metricExpressions.get(0));
-    olapClient.setCurrentStartInclusive(new DateTime(current.getStart(), DateTimeZone.forID(timezone)));
-    olapClient.setCurrentEndExclusive(new DateTime(current.getEnd(), DateTimeZone.forID(timezone)));
-    olapClient.setBaselineStartInclusive(new DateTime(baseline.getStart(), DateTimeZone.forID(timezone)));
-    olapClient.setBaselineEndExclusive(new DateTime(baseline.getEnd(), DateTimeZone.forID(timezone)));
-    return olapClient;
-  }
-
-  private static DataFrame toNormalizedDataFrame(Collection<DimNameValueCostEntry> costs) {
-    String[] dim = new String[costs.size()];
-    String[] value = new String[costs.size()];
-    double[] cost = new double[costs.size()];
-    int i = 0;
-    for(DimNameValueCostEntry e : costs) {
-      dim[i] = e.getDimName();
-      value[i] = e.getDimValue();
-      cost[i] = e.getCost();
-      i++;
+    for(Map.Entry<Dimension, Double> entry : scores.entrySet()) {
+      entities.add(entry.getKey().toEntity(entry.getValue()));
     }
 
-    DoubleSeries sCost = DataFrame.toSeries(cost).fillNull();
+    return new PipelineResult(context, EntityUtils.topkNormalized(entities, this.k));
+  }
+
+  private DataFrame getContribution(long metricId, long start, long end, String dimension) throws Exception {
+    String ref = String.format("%d-%s", metricId, dimension);
+    DataFrameUtils.RequestContainer rc = DataFrameUtils.makeAggregateRequest(metricId, start, end, Arrays.asList(dimension), ref, this.metricDAO, this.datasetDAO);
+    ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
+
+    DataFrame raw = DataFrameUtils.evaluateResponse(res, rc);
+
+    DataFrame out = new DataFrame();
+    out.addSeries(dimension, raw.getStrings(dimension));
+    out.addSeries(COL_CONTRIB, raw.getDoubles(DataFrameUtils.COL_VALUE).normalizeSum());
+    out.setIndex(dimension);
+
+    return out;
+  }
+
+  private DataFrame getContributionDelta(long metricId, long current, long baseline, long windowSize, String dimension) throws Exception {
+    DataFrame curr = getContribution(metricId, current, current + windowSize, dimension);
+    DataFrame base = getContribution(metricId, baseline, baseline + windowSize, dimension);
+
+    DataFrame joined = curr.joinOuter(base)
+        .fillNull(COL_CONTRIB + DataFrame.COLUMN_JOIN_LEFT)
+        .fillNull(COL_CONTRIB + DataFrame.COLUMN_JOIN_RIGHT);
+
+    DoubleSeries diff = joined.getDoubles(COL_CONTRIB + DataFrame.COLUMN_JOIN_LEFT)
+        .subtract(joined.getDoubles(COL_CONTRIB + DataFrame.COLUMN_JOIN_RIGHT));
 
     DataFrame df = new DataFrame();
-    df.addSeries(DIMENSION, dim);
-    df.addSeries(VALUE, value);
-
-    if(sCost.sum().value() > 0.0) {
-      df.addSeries(COST, sCost.divide(sCost.sum()));
-    } else {
-      df.addSeries(COST, sCost);
-    }
+    df.addSeries(dimension, joined.getStrings(dimension));
+    df.addSeries(COL_CONTRIB, joined.getDoubles(COL_CONTRIB + DataFrame.COLUMN_JOIN_LEFT));
+    df.addSeries(COL_DELTA, diff);
+    df.setIndex(dimension);
 
     return df;
   }
+
+  private DataFrame packDimension(DataFrame dfDelta, String dimension) {
+    DataFrame df = new DataFrame();
+    df.addSeries(COL_CONTRIB, dfDelta.get(COL_CONTRIB));
+    df.addSeries(COL_DELTA, dfDelta.get(COL_DELTA));
+    df.addSeries(COL_DIM_NAME, StringSeries.fillValues(dfDelta.size(), dimension));
+    df.addSeries(COL_DIM_VALUE, dfDelta.get(dimension));
+    return df;
+  }
+
+  private Future<DataFrame> getContributionDeltaPackedAsync(final long metricId, final long current, final long baseline, final long windowSize, final String dimension) throws Exception {
+    return this.executor.submit(new Callable<DataFrame>() {
+      @Override
+      public DataFrame call() throws Exception {
+        return packDimension(getContributionDelta(metricId, current, baseline, windowSize, dimension), dimension);
+      }
+    });
+  }
+
+  private DataFrame getDimensionScores(long metricId, long current, long baseline, long windowSize) throws Exception {
+    MetricConfigDTO metric = this.metricDAO.findById(metricId);
+    if(metric == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric id '%d'", metricId));
+    }
+
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    if(dataset == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
+    }
+
+    if(!dataset.isAdditive()) {
+      throw new IllegalArgumentException(String.format("Requires additive dataset, but '%s' isn't.", dataset.getDataset()));
+    }
+
+    Collection<Future<DataFrame>> futures = new ArrayList<>();
+    for(String dimension : dataset.getDimensions()) {
+      futures.add(getContributionDeltaPackedAsync(metricId, current, baseline, windowSize, dimension));
+    }
+
+    final long timeout = System.currentTimeMillis() + TIMEOUT;
+    Collection<DataFrame> contributors = new ArrayList<>();
+    for(Future<DataFrame> future : futures) {
+      final long timeLeft = Math.max(timeout - System.currentTimeMillis(), 0);
+      contributors.add(future.get(timeLeft, TimeUnit.MILLISECONDS));
+    }
+
+    DataFrame combined = DataFrame.builder(
+        COL_DIM_NAME + ":STRING",
+        COL_DIM_VALUE + ":STRING",
+        COL_CONTRIB + ":DOUBLE",
+        COL_DELTA + ":DOUBLE").build();
+
+    combined = combined.append(contributors.toArray(new DataFrame[contributors.size()]));
+    combined.addSeries(COL_SCORE, combined.getDoubles(COL_DELTA).abs());
+
+    return combined.sortedBy(COL_SCORE).reverse();
+  }
+
+  private static class Dimension {
+    final String name;
+    final String value;
+
+    public Dimension(String name, String value) {
+      this.name = name;
+      this.value = value;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public String getValue() {
+      return value;
+    }
+
+    public DimensionEntity toEntity(double score) {
+      return DimensionEntity.fromDimension(score, this.name, this.value);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      Dimension dimension = (Dimension) o;
+      return Objects.equals(name, dimension.name) && Objects.equals(value, dimension.value);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, value);
+    }
+  }
+
 }

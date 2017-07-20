@@ -2419,6 +2419,12 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleAbs() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, -1, 1.5, -0.003, 0.0d, -0.0d);
+    assertEquals(base.abs(), DNULL, 1, 1, 1.5, 0.003, 0, 0);
+  }
+
+  @Test
   public void testDoubleCount() {
     DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
     Assert.assertEquals(base.count(1), 2);
@@ -2598,6 +2604,11 @@ public class DataFrameTest {
     assertEquals(base.eq(LNULL), BooleanSeries.nulls(5));
   }
 
+  @Test
+  public void testLongAbs() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, -3, 5, -10);
+    assertEquals(base.abs(), LNULL, 0, 3, 5, 10);
+  }
 
   @Test
   public void testLongCount() {
