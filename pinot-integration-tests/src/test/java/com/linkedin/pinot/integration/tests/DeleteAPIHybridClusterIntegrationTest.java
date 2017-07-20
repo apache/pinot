@@ -22,25 +22,10 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
-import java.io.File;
 import java.util.Collections;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import junit.framework.Assert;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 /**
@@ -53,24 +38,22 @@ import junit.framework.Assert;
 public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrationTest {
   private String TABLE_NAME;
   private long nOfflineRows;
-  ControllerConf config;
 
   @BeforeClass
   public void setUp() throws Exception {
     super.setUp();
     TABLE_NAME = super.getTableName();
     nOfflineRows = numRowsReturned(CommonConstants.Helix.TableType.OFFLINE);
-    config = ControllerTestUtils.getDefaultControllerConfiguration();
   }
 
   private long numRowsReturned(CommonConstants.Helix.TableType tableType) throws Exception {
     org.json.JSONObject response = postQuery("select count(*) from '" + TABLE_NAME + "_" + tableType + "'");
     if (response.get("numDocsScanned").equals(new Integer(0))) {
       return 0;
-    }
-    else {
+    } else {
       // Throws a null pointer exception when there are no rows because it can't find "aggregationResults"
-      String pinotValue = ((org.json.JSONArray) response.get("aggregationResults")).getJSONObject(0).get("value").toString();
+      String pinotValue =
+          ((org.json.JSONArray) response.get("aggregationResults")).getJSONObject(0).get("value").toString();
       return Long.parseLong(pinotValue);
     }
   }
@@ -88,7 +71,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     Assert.fail("Operation took too long");
   }
 
-  private void waitForSegmentsToBeInDeleteDirectory() throws Exception{
+  private void waitForSegmentsToBeInDeleteDirectory() throws Exception {
     long start = System.currentTimeMillis();
     long end = start + 60 * 1000;
     while (System.currentTimeMillis() < end) {
@@ -103,34 +86,40 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   }
 
   @Override // Leaving this out because it is done in the superclass
-  public void testGeneratedQueriesWithMultiValues() {}
+  public void testGeneratedQueriesWithMultiValues() {
+  }
 
   @Override // Leaving this out because it is done in the superclass
-  public void testQueriesFromQueryFile() {}
+  public void testQueriesFromQueryFile() {
+  }
 
   @Override // Leaving this out because it is done in the superclass
-  public void testBrokerDebugOutput() {}
+  public void testBrokerDebugOutput() {
+  }
 
   @Test
   public void deleteRealtimeSegmentFromGetAPI() throws Exception {
     long currRealtimeRows = numRowsReturned(CommonConstants.Helix.TableType.REALTIME);
 
-    String segmentList = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    String segmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
-    JSONArray realtimeSegmentsList = getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.REALTIME.toString());
+    JSONArray realtimeSegmentsList =
+        getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.REALTIME.toString());
 
     String removedSegment = realtimeSegmentsList.get(0).toString();
     long removedSegmentRows = getNumRowsFromRealtimeMetadata(removedSegment);
     Assert.assertNotSame(removedSegmentRows, 0L);
 
-    sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    sendGetRequest(_controllerRequestURLBuilder.
         forDeleteSegmentWithGetAPI(TABLE_NAME, removedSegment, CommonConstants.Helix.TableType.REALTIME.toString()));
 
     waitForNumRows(currRealtimeRows - removedSegmentRows, CommonConstants.Helix.TableType.REALTIME);
 
     String postDeleteSegmentList = sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
-    JSONArray realtimeSegmentsListReturn = getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString());
+        _controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
+            CommonConstants.Helix.TableType.REALTIME.toString()));
+    JSONArray realtimeSegmentsListReturn =
+        getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString());
     realtimeSegmentsList.remove(removedSegment);
     Assert.assertEquals(realtimeSegmentsListReturn, realtimeSegmentsList);
   }
@@ -139,65 +128,72 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   public void deleteRealtimeSegmentFromDeleteAPI() throws Exception {
     long currRealtimeRows = numRowsReturned(CommonConstants.Helix.TableType.REALTIME);
 
-    String segmentList = sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
-    JSONArray realtimeSegmentsList =  getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.REALTIME.toString());
+    String segmentList = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
+        CommonConstants.Helix.TableType.REALTIME.toString()));
+    JSONArray realtimeSegmentsList =
+        getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.REALTIME.toString());
 
     String removedSegment = realtimeSegmentsList.get(0).toString();
     long removedSegmentRows = getNumRowsFromRealtimeMetadata(removedSegment);
     Assert.assertNotSame(removedSegmentRows, 0L);
 
-    sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    sendDeleteRequest(_controllerRequestURLBuilder.
         forSegmentDeleteAPI(TABLE_NAME, removedSegment, CommonConstants.Helix.TableType.REALTIME.toString()));
 
     waitForNumRows(currRealtimeRows - removedSegmentRows, CommonConstants.Helix.TableType.REALTIME);
 
     String postDeleteSegmentList = sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forSegmentListAPIWithTableType(TABLE_NAME,
+        _controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
             CommonConstants.Helix.TableType.REALTIME.toString()));
-    JSONArray realtimeSegmentsListReturn = getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString());
+    JSONArray realtimeSegmentsListReturn =
+        getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString());
     realtimeSegmentsList.remove(removedSegment);
     Assert.assertEquals(realtimeSegmentsListReturn, realtimeSegmentsList);
   }
 
   // @Test TODO: Add back when we use LLC only
-  public void deleteAllRealtimeSegmentsFromGetAPI() throws Exception {}
+  public void deleteAllRealtimeSegmentsFromGetAPI() throws Exception {
+  }
 
   // @Test TODO: Add back when we use LLC only
-  public void deleteAllRealtimeSegmentsFromDeleteAPI() throws Exception {}
+  public void deleteAllRealtimeSegmentsFromDeleteAPI() throws Exception {
+  }
 
   @Test
   public void deleteFromDeleteAPI() throws Exception {
-    String segmentList = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    String segmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
-    JSONArray offlineSegmentsList = getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
+    JSONArray offlineSegmentsList =
+        getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
     Assert.assertNotNull(offlineSegmentsList);
 
     String removedSegment = offlineSegmentsList.get(0).toString();
     long removedSegmentRows = getNumRowsFromOfflineMetadata(removedSegment);
     Assert.assertNotSame(removedSegmentRows, 0L);
 
-    sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    sendDeleteRequest(_controllerRequestURLBuilder.
         forSegmentDeleteAPI(TABLE_NAME, removedSegment, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
     waitForNumRows(nOfflineRows - removedSegmentRows, CommonConstants.Helix.TableType.OFFLINE);
 
-    String postDeleteSegmentList = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    String postDeleteSegmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
-    JSONArray offlineSegmentsListReturn = getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
+    JSONArray offlineSegmentsListReturn =
+        getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
     offlineSegmentsList.remove(removedSegment);
     Assert.assertEquals(offlineSegmentsListReturn, offlineSegmentsList);
 
     // Testing Delete All API here
-    sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    sendDeleteRequest(_controllerRequestURLBuilder.
         forSegmentDeleteAllAPI(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
     waitForNumRows(0, CommonConstants.Helix.TableType.OFFLINE);
 
-    String postDeleteSegmentListAll = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    String postDeleteSegmentListAll = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
-    Assert.assertEquals(getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll, CommonConstants.Helix.TableType.OFFLINE.toString()),
+    Assert.assertEquals(
+        getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll, CommonConstants.Helix.TableType.OFFLINE.toString()),
         Collections.emptyList());
 
     waitForSegmentsToBeInDeleteDirectory();
@@ -206,62 +202,65 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
   @Test
   public void deleteFromGetAPI() throws Exception {
-    String segmentList = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    String segmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
-    JSONArray offlineSegmentsList = getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
+    JSONArray offlineSegmentsList =
+        getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
 
     String removedSegment = offlineSegmentsList.get(0).toString();
 
     long removedSegmentRows = getNumRowsFromOfflineMetadata(removedSegment);
     Assert.assertNotSame(removedSegmentRows, 0L);
 
-    sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    sendGetRequest(_controllerRequestURLBuilder.
         forDeleteSegmentWithGetAPI(TABLE_NAME, removedSegment, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
     waitForNumRows(nOfflineRows - removedSegmentRows, CommonConstants.Helix.TableType.OFFLINE);
 
-    String postDeleteSegmentList = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    String postDeleteSegmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
-    JSONArray offlineSegmentsListReturn = getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
+    JSONArray offlineSegmentsListReturn =
+        getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
     offlineSegmentsList.remove(removedSegment);
     Assert.assertEquals(offlineSegmentsListReturn, offlineSegmentsList);
 
     // Testing Delete All API here
-    sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    sendGetRequest(_controllerRequestURLBuilder.
         forDeleteAllSegmentsWithTypeWithGetAPI(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
     waitForNumRows(0, CommonConstants.Helix.TableType.OFFLINE);
 
-    String postDeleteSegmentListAll = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    String postDeleteSegmentListAll = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
-    Assert.assertEquals(getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll, CommonConstants.Helix.TableType.OFFLINE.toString()), Collections.emptyList());
+    Assert.assertEquals(
+        getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll, CommonConstants.Helix.TableType.OFFLINE.toString()),
+        Collections.emptyList());
 
     waitForSegmentsToBeInDeleteDirectory();
     repushOfflineSegments();
   }
 
   private long getNumRowsFromOfflineMetadata(String segmentName) throws Exception {
-    OfflineSegmentZKMetadata segmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, TABLE_NAME, segmentName);
+    OfflineSegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, TABLE_NAME, segmentName);
     return segmentZKMetadata.getTotalRawDocs();
   }
 
   private long getNumRowsFromRealtimeMetadata(String segmentName) {
-    RealtimeSegmentZKMetadata segmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, TABLE_NAME, segmentName);
+    RealtimeSegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, TABLE_NAME, segmentName);
     return segmentZKMetadata.getTotalRawDocs();
   }
 
   private com.alibaba.fastjson.JSONArray getSegmentsFromJsonSegmentAPI(String json, String type) throws Exception {
-    JSONObject tableTypeAndSegments = (JSONObject)JSON.parseArray(json).get(0);
+    JSONObject tableTypeAndSegments = (JSONObject) JSON.parseArray(json).get(0);
     return (JSONArray) tableTypeAndSegments.get(type);
   }
 
   private void repushOfflineSegments() throws Exception {
-    for (String segmentName : _tarDir.list()) {
-      File file = new File(_tarDir, segmentName);
-      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
-    }
+    uploadSegments(_tarDir);
     waitForNumRows(nOfflineRows, CommonConstants.Helix.TableType.OFFLINE);
   }
 }

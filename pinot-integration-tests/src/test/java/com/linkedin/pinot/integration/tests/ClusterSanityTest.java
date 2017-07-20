@@ -19,7 +19,6 @@ import com.google.common.base.Function;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import javax.annotation.Nullable;
@@ -43,8 +42,7 @@ public class ClusterSanityTest extends ClusterTest {
   private static final int NUM_SERVERS = 1;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     startZk();
     startController();
     startBrokers(INITIAL_NUM_BROKERS);
@@ -58,18 +56,15 @@ public class ClusterSanityTest extends ClusterTest {
    * @throws Exception
    */
   @Test
-  public void testBrokerScaleDown()
-      throws Exception {
+  public void testBrokerScaleDown() throws Exception {
     Tenant tenant =
         new Tenant.TenantBuilder(TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(NEW_NUM_BROKERS).build();
 
     // Send the 'put' (instead of 'post') request, that updates the tenants instead of creating
     JSONObject request = tenant.toJSON();
-    sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forBrokerTenantCreate(),
-        request.toString());
+    sendPutRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request.toString());
 
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         return _helixAdmin.getInstancesInClusterWithTag(_clusterName, BROKER_TENANT_NAME).size() == 1;
@@ -78,8 +73,7 @@ public class ClusterSanityTest extends ClusterTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropOfflineTable(TABLE_NAME);
     stopServer();
     stopBroker();

@@ -60,8 +60,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
   }
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     // Start the Pinot cluster
     startZk();
     startController();
@@ -72,7 +71,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
     startKafka();
 
     // Create Pinot table
-    setUpTable("DaysSinceEpoch", "DAYS", null);
+    setUpTable(null);
   }
 
   /**
@@ -80,8 +79,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
    *
    * @throws Exception
    */
-  private void startFakeServer()
-      throws Exception {
+  private void startFakeServer() throws Exception {
     _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress() + "_"
         + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
@@ -108,8 +106,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
    * @throws Exception
    */
   @Test
-  public void testStopConsumingAndAutoFix()
-      throws Exception {
+  public void testStopConsumingAndAutoFix() throws Exception {
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 
     // Check if segment get into CONSUMING state
@@ -154,7 +151,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
     final String oldSegment = _currentSegment;
 
     // Now call the validation manager, and the segment should fix itself
-    getControllerValidationManager().runValidation();
+    _controllerStarter.getValidationManager().runValidation();
 
     // Check if a new segment get into CONSUMING state
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
@@ -180,35 +177,30 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
 
   @Test(enabled = false)
   @Override
-  public void testQueriesFromQueryFile()
-      throws Exception {
+  public void testQueriesFromQueryFile() throws Exception {
     // Skipped
   }
 
   @Test(enabled = false)
   @Override
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
     // Skipped
   }
 
   @Test(enabled = false)
   @Override
-  public void testInstanceShutdown()
-      throws Exception {
+  public void testInstanceShutdown() throws Exception {
     // Skipped
   }
 
   @Test(enabled = false)
   @Override
-  public void testSegmentFlushSize()
-      throws Exception {
+  public void testSegmentFlushSize() throws Exception {
     // Skipped
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     stopFakeServer();
     stopBroker();
     stopController();

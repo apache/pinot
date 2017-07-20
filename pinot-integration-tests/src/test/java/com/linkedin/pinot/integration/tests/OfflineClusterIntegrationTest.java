@@ -18,9 +18,7 @@ package com.linkedin.pinot.integration.tests;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -41,8 +39,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.*;
 
 
 /**
@@ -71,8 +67,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       new ArrayList<>(NUM_BROKERS + NUM_SERVERS);
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -111,7 +106,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     setUpH2Connection(avroFiles, executor);
 
     // Initialize query generator
-    setupQueryGenerator(avroFiles, executor);
+    setUpQueryGenerator(avroFiles, executor);
 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
@@ -121,10 +116,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         getTableName(), SegmentVersion.v1, getTaskConfig());
 
     // Upload all segments
-    for (String segmentName : _tarDir.list()) {
-      File segmentFile = new File(_tarDir, segmentName);
-      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, segmentFile, segmentFile.length());
-    }
+    uploadSegments(_tarDir);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
@@ -132,22 +124,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   @Override
-  public void testQueriesFromQueryFile()
-      throws Exception {
+  public void testQueriesFromQueryFile() throws Exception {
     super.testQueriesFromQueryFile();
   }
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
     super.testGeneratedQueriesWithMultiValues();
   }
 
   @Test
   @Override
-  public void testInstanceShutdown()
-      throws Exception {
+  public void testInstanceShutdown() throws Exception {
     super.testInstanceShutdown();
   }
 
@@ -160,8 +149,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testInvertedIndexTriggering()
-      throws Exception {
+  public void testInvertedIndexTriggering() throws Exception {
     final long numTotalDocs = getCountStarResult();
 
     JSONObject queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -170,10 +158,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Update table config and trigger reload
     updateOfflineTable("DaysSinceEpoch", -1, "", null, null, UPDATED_INVERTED_INDEX_COLUMNS, getLoadMode(),
         getTableName(), SegmentVersion.v1, getTaskConfig());
-    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable/segments/reload?type=offline");
+    sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline");
 
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
@@ -210,8 +197,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    * </ul>
    */
   @Test
-  public void testDefaultColumns()
-      throws Exception {
+  public void testDefaultColumns() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     reloadDefaultColumns(true);
@@ -227,8 +213,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 79);
   }
 
-  private void reloadDefaultColumns(final boolean withExtraColumns)
-      throws Exception {
+  private void reloadDefaultColumns(final boolean withExtraColumns) throws Exception {
     final long numTotalDocs = getCountStarResult();
 
     if (withExtraColumns) {
@@ -238,7 +223,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Trigger reload
-    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable/segments/reload?type=offline");
+    sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline");
 
     String errorMessage;
     if (withExtraColumns) {
@@ -248,7 +233,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
@@ -276,16 +260,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, errorMessage);
   }
 
-  private void sendSchema(String resourceName)
-      throws Exception {
+  private void sendSchema(String resourceName) throws Exception {
     URL resource = OfflineClusterIntegrationTest.class.getClassLoader().getResource(resourceName);
     Assert.assertNotNull(resource);
     File schemaFile = new File(resource.getFile());
     addSchema(schemaFile, getTableName());
   }
 
-  private void testNewAddedColumns()
-      throws Exception {
+  private void testNewAddedColumns() throws Exception {
     long numTotalDocs = getCountStarResult();
 
     String pqlQuery;
@@ -401,8 +383,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     // Test instance decommission before tearing down
     testInstanceDecommission();
 
@@ -412,18 +393,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  private void testInstanceDecommission()
-      throws Exception {
-    ControllerRequestURLBuilder requestBuilder = ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
-
+  private void testInstanceDecommission() throws Exception {
     // Fetch all instances
-    JSONObject response = new JSONObject(sendGetRequest(requestBuilder.forInstanceList()));
+    JSONObject response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     JSONArray instanceList = response.getJSONArray("instances");
     int numInstances = instanceList.length();
-    assertEquals(numInstances, NUM_BROKERS + NUM_SERVERS);
+    Assert.assertEquals(numInstances, NUM_BROKERS + NUM_SERVERS);
 
     // Try to delete a server that does not exist
-    String deleteInstanceRequest = requestBuilder.forInstanceDelete("potato");
+    String deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete("potato");
     try {
       sendDeleteRequest(deleteInstanceRequest);
       Assert.fail("Delete should have returned a failure status (404)");
@@ -444,7 +422,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Try to delete a live server
-    deleteInstanceRequest = requestBuilder.forInstanceDelete(serverName);
+    deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete(serverName);
     try {
       sendDeleteRequest(deleteInstanceRequest);
       Assert.fail("Delete should have returned a failure status (409)");
@@ -472,7 +450,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Try to delete a broker whose information is still live
     try {
-      deleteInstanceRequest = requestBuilder.forInstanceDelete(brokerName);
+      deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete(brokerName);
       sendDeleteRequest(deleteInstanceRequest);
       Assert.fail("Delete should have returned a failure status (409)");
     } catch (IOException e) {

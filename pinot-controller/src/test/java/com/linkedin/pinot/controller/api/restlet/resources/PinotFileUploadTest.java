@@ -19,9 +19,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.restlet.Client;
 import org.restlet.Request;
 import org.restlet.Response;
@@ -40,18 +38,12 @@ import org.testng.annotations.Test;
  *
  */
 public class PinotFileUploadTest extends ControllerTest {
-
-  private final static String TABLE_NAME = "testTable";
-
-  private static final String HELIX_CLUSTER_NAME = "PinotFileUploadTest";
-
-  private PinotHelixResourceManager _pinotHelixResourceManager;
+  private static final String TABLE_NAME = "testTable";
 
   @Test
   public void testUploadBogusData() {
     Client client = new Client(Protocol.HTTP);
-    Request request =
-        new Request(Method.POST, ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forDataFileUpload());
+    Request request = new Request(Method.POST, _controllerRequestURLBuilder.forDataFileUpload());
     request.setEntity("blah", MediaType.MULTIPART_ALL);
     Response response = client.handle(request);
 
@@ -62,30 +54,25 @@ public class PinotFileUploadTest extends ControllerTest {
   public void setUp() throws Exception {
     startZk();
     startController();
-    _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
         ZkStarter.DEFAULT_ZK_STR, 5, true);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
         ZkStarter.DEFAULT_ZK_STR, 5, true);
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 5);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
+        5);
 
     // Adding table
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
         .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
         .setNumReplicas(2)
         .build();
-    _pinotHelixResourceManager.addTable(tableConfig);
+    _controllerStarter.getHelixResourceManager().addTable(tableConfig);
   }
 
   @AfterClass
   public void tearDown() throws Exception {
     stopController();
     stopZk();
-  }
-
-  @Override
-  protected String getHelixClusterName() {
-    return HELIX_CLUSTER_NAME;
   }
 }

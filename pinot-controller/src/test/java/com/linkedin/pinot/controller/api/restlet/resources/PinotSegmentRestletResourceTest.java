@@ -16,34 +16,26 @@
 
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import java.util.HashMap;
+import java.util.Map;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class PinotSegmentRestletResourceTest extends ControllerTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResourceTest.class);
-  ControllerRequestURLBuilder urlBuilder = ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
-
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
   private final static String TABLE_NAME = "testTable";
@@ -120,7 +112,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
   }
 
   private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize) throws Exception {
-    String crcMapStr = sendGetRequest(urlBuilder.forListAllCrcInformationForTable(TABLE_NAME));
+    String crcMapStr = sendGetRequest(_controllerRequestURLBuilder.forListAllCrcInformationForTable(TABLE_NAME));
     Map<String, String> crcMap = OBJECT_MAPPER.readValue(crcMapStr, new TypeReference<Map<String, Object>>() {
     });
     for (String segmentName : crcMap.keySet()) {
@@ -133,7 +125,6 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
 
   private SegmentMetadata addOneSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
-    LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
     _pinotHelixResourceManager.addSegment(segmentMetadata, "downloadUrl");
     return segmentMetadata;
   }

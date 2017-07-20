@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -37,8 +38,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   private List<KafkaServerStartable> _kafkaStarters;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -62,13 +62,13 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     setUpH2Connection(avroFiles, executor);
 
     // Initialize query generator
-    setupQueryGenerator(avroFiles, executor);
+    setUpQueryGenerator(avroFiles, executor);
 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     // Create Pinot table
-    setUpTable("DaysSinceEpoch", "DAYS", avroFiles.get(0));
+    setUpTable(avroFiles.get(0));
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
@@ -80,41 +80,50 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, getNumKafkaPartitions());
   }
 
-  protected void setUpTable(String timeColumnName, String timeColumnType, File avroFile)
-      throws Exception {
+  protected void setUpTable(File avroFile) throws Exception {
     File schemaFile = getSchemaFile();
     Schema schema = Schema.fromFile(schemaFile);
     String schemaName = schema.getSchemaName();
     addSchema(schemaFile, schemaName);
-    addRealtimeTable(getTableName(), timeColumnName, timeColumnType, -1, null, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), schemaName, null, null, avroFile, getRealtimeSegmentFlushSize(false), getSortedColumn(),
-        getInvertedIndexColumns(), getLoadMode(), getRawIndexColumns(), getTaskConfig());
+
+    String timeColumnName = schema.getTimeColumnName();
+    Assert.assertNotNull(timeColumnName);
+    TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
+    Assert.assertNotNull(outgoingTimeUnit);
+    String timeColumnType = outgoingTimeUnit.toString();
+
+    if (useLlc()) {
+      addLLCRealtimeTable(getTableName(), timeColumnName, timeColumnType, -1, null,
+          KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(), schemaName, null, null, avroFile,
+          getRealtimeSegmentFlushSize(true), getSortedColumn(), getInvertedIndexColumns(), getLoadMode(),
+          getRawIndexColumns(), getTaskConfig());
+    } else {
+      addRealtimeTable(getTableName(), timeColumnName, timeColumnType, -1, null, KafkaStarterUtils.DEFAULT_ZK_STR,
+          getKafkaTopic(), schemaName, null, null, avroFile, getRealtimeSegmentFlushSize(false), getSortedColumn(),
+          getInvertedIndexColumns(), getLoadMode(), getRawIndexColumns(), getTaskConfig());
+    }
   }
 
   @Test
   @Override
-  public void testQueriesFromQueryFile()
-      throws Exception {
+  public void testQueriesFromQueryFile() throws Exception {
     super.testQueriesFromQueryFile();
   }
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
     super.testGeneratedQueriesWithMultiValues();
   }
 
   @Test
   @Override
-  public void testInstanceShutdown()
-      throws Exception {
+  public void testInstanceShutdown() throws Exception {
     super.testInstanceShutdown();
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();

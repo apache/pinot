@@ -21,15 +21,14 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.json.JSONObject;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -42,13 +41,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private final TableConfig.Builder _offlineBuilder = new TableConfig.Builder(TableType.OFFLINE);
   private final TableConfig.Builder _realtimeBuilder = new TableConfig.Builder(TableType.REALTIME);
-  private final ControllerRequestURLBuilder _controllerRequestURLBuilder =
-      ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
 
   @BeforeClass
   public void setUp() {
     startZk();
-    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
+    ControllerConf config = getDefaultControllerConfiguration();
     config.setTableMinReplicas(TABLE_MIN_REPLICATION);
     startController(config);
 
@@ -84,8 +81,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testCreateTable()
-      throws Exception {
+  public void testCreateTable() throws Exception {
     // Create a table with an invalid name
     TableConfig tableConfig = _offlineBuilder.setTableName("").setNumReplicas(3).build();
     // Set bad table name inside table config builder is not allowed, so have to explicitly set in table config
@@ -131,14 +127,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testTableMinReplication()
-      throws Exception {
+  public void testTableMinReplication() throws Exception {
     testTableMinReplicationInternal("minReplicationOne", 1);
     testTableMinReplicationInternal("minReplicationTwo", TABLE_MIN_REPLICATION + 2);
   }
 
-  private void testTableMinReplicationInternal(String tableName, int tableReplication)
-      throws Exception {
+  private void testTableMinReplicationInternal(String tableName, int tableReplication) throws Exception {
     String tableJSONConfigString =
         _offlineBuilder.setTableName(tableName).setNumReplicas(tableReplication).build().toJSONConfigString();
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
@@ -158,15 +152,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 //    Assert.assertEquals(replicasPerPartition, Math.max(tableReplication, TABLE_MIN_REPLICATION));
   }
 
-  private TableConfig getTableConfig(String tableName, String tableType)
-      throws Exception {
+  private TableConfig getTableConfig(String tableName, String tableType) throws Exception {
     String tableConfigString = sendGetRequest(_controllerRequestURLBuilder.forTableGet(tableName));
     return TableConfig.fromJSONConfig(new JSONObject(tableConfigString).getJSONObject(tableType));
   }
 
   @Test
-  public void testUpdateTableConfig()
-      throws Exception {
+  public void testUpdateTableConfig() throws Exception {
     String tableName = "updateTC";
     String tableJSONConfigString =
         _offlineBuilder.setTableName(tableName).setNumReplicas(2).build().toJSONConfigString();
@@ -214,5 +206,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       notFoundException = true;
     }
     Assert.assertTrue(notFoundException);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    stopController();
+    stopZk();
   }
 }

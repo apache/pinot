@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,7 +26,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.*;
 
 
 /**
@@ -50,8 +49,7 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
       serverInstance.put("port", Integer.toString(basePort + i));
       serverInstance.put("tag", serverTenant);
       serverInstance.put("type", "server");
-      sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(),
-          serverInstance.toString());
+      sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
     }
   }
 

@@ -17,9 +17,7 @@ package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import com.linkedin.pinot.client.ConnectionFactory;
-import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -30,13 +28,10 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.model.ExternalView;
 import org.testng.Assert;
 
 
@@ -51,8 +46,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final String DEFAULT_AVRO_TAR_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz";
   private static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
-  private static final int DEFAULT_NUM_KAFKA_BROKERS = 1;
-  private static final int DEFAULT_NUM_KAFKA_PARTITIONS = 10;
+  private static final int DEFAULT_HLC_NUM_KAFKA_BROKERS = 1;
+  private static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
+  private static final int DEFAULT_HLC_NUM_KAFKA_PARTITIONS = 10;
+  private static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
   private static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
   private static final String DEFAULT_SORTED_COLUMN = "Carrier";
   private static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
@@ -94,12 +91,24 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return getClass().getSimpleName();
   }
 
+  protected boolean useLlc() {
+    return false;
+  }
+
   protected int getNumKafkaBrokers() {
-    return DEFAULT_NUM_KAFKA_BROKERS;
+    if (useLlc()) {
+      return DEFAULT_LLC_NUM_KAFKA_BROKERS;
+    } else {
+      return DEFAULT_HLC_NUM_KAFKA_BROKERS;
+    }
   }
 
   protected int getNumKafkaPartitions() {
-    return DEFAULT_NUM_KAFKA_PARTITIONS;
+    if (useLlc()) {
+      return DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
+    } else {
+      return DEFAULT_HLC_NUM_KAFKA_PARTITIONS;
+    }
   }
 
   protected int getMaxNumKafkaMessagesPerBatch() {
@@ -183,12 +192,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param executor Executor
    * @throws Exception
    */
-  protected void setUpH2Connection(@Nonnull final List<File> avroFiles, @Nonnull ExecutorService executor)
-      throws Exception {
+  protected void setUpH2Connection(@Nonnull final List<File> avroFiles, @Nonnull Executor executor) throws Exception {
     Assert.assertNull(_h2Connection);
     Class.forName("org.h2.Driver");
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
-    executor.submit(new Runnable() {
+    executor.execute(new Runnable() {
       @Override
       public void run() {
         try {
@@ -206,7 +214,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param avroFiles List of Avro files
    * @param executor Executor
    */
-  protected void setupQueryGenerator(@Nonnull final List<File> avroFiles, @Nonnull ExecutorService executor) {
+  protected void setUpQueryGenerator(@Nonnull final List<File> avroFiles, @Nonnull Executor executor) {
     Assert.assertNull(_queryGenerator);
     final String tableName = getTableName();
     executor.execute(new Runnable() {
@@ -237,8 +245,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @throws Exception
    */
   @Nonnull
-  protected List<File> unpackAvroData(@Nonnull File outputDir)
-      throws Exception {
+  protected List<File> unpackAvroData(@Nonnull File outputDir) throws Exception {
     URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getAvroTarFileName());
     Assert.assertNotNull(resourceUrl);
     return TarGzCompressionUtils.unTar(new File(resourceUrl.getFile()), outputDir);
@@ -252,7 +259,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param executor Executor
    */
   protected void pushAvroIntoKafka(@Nonnull final List<File> avroFiles, @Nonnull final String kafkaTopic,
-      @Nonnull ExecutorService executor) {
+      @Nonnull Executor executor) {
     executor.execute(new Runnable() {
       @Override
       public void run() {
@@ -272,47 +279,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return Current count start result
    * @throws Exception
    */
-  protected long getCurrentCountStarResult()
-      throws Exception {
+  protected long getCurrentCountStarResult() throws Exception {
     return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName()).getResultSet(0).getLong(0);
-  }
-
-  /**
-   * Wait for all segments for the given table type to become online.
-   *
-   * @param tableType Table type
-   * @param expectedNumSegments Expected number of online segments
-   * @throws Exception
-   */
-  protected void waitForAllSegmentsOnline(@Nonnull CommonConstants.Helix.TableType tableType,
-      final int expectedNumSegments, long timeoutMs)
-      throws Exception {
-    final String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(getTableName());
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          ExternalView externalView = _helixAdmin.getResourceExternalView(_clusterName, tableNameWithType);
-          Set<String> partitionSet = externalView.getPartitionSet();
-          if (partitionSet.size() == expectedNumSegments) {
-            int numOnlinePartitions = 0;
-            for (String partitionId : partitionSet) {
-              Map<String, String> partitionStateMap = externalView.getStateMap(partitionId);
-              if (partitionStateMap.containsValue("ONLINE")) {
-                numOnlinePartitions++;
-              }
-            }
-            if (numOnlinePartitions == expectedNumSegments) {
-              return true;
-            }
-          }
-          return false;
-        } catch (Exception e) {
-          return null;
-        }
-      }
-    }, timeoutMs, "Failed to get all " + expectedNumSegments + " segments in table " + tableNameWithType + " online");
   }
 
   /**
@@ -321,8 +289,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param timeoutMs Timeout in milliseconds
    * @throws Exception
    */
-  protected void waitForAllDocsLoaded(long timeoutMs)
-      throws Exception {
+  protected void waitForAllDocsLoaded(long timeoutMs) throws Exception {
     final long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
@@ -344,9 +311,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param sqlQueries H2 query
    * @throws Exception
    */
-  protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries)
-      throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pqlQuery, BROKER_BASE_API_URL, getPinotConnection(), sqlQueries,
+  protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries) throws Exception {
+    ClusterIntegrationTestUtils.testQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries,
         getH2Connection());
   }
 }

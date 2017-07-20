@@ -15,15 +15,11 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.base.Function;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFutureTask;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
@@ -45,9 +41,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -62,8 +56,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
@@ -86,8 +78,7 @@ public class ClusterIntegrationTestUtils {
    */
   @SuppressWarnings("SqlNoDataSourceInspection")
   public static void setUpH2TableWithAvro(@Nonnull List<File> avroFiles, @Nonnull String tableName,
-      @Nonnull Connection h2Connection)
-      throws Exception {
+      @Nonnull Connection h2Connection) throws Exception {
     int numFields;
 
     // Pick a sample Avro file to extract the H2 schema and create the H2 table
@@ -238,69 +229,50 @@ public class ClusterIntegrationTestUtils {
    * @param rawIndexColumns Columns to create raw index with
    * @param pinotSchema Pinot schema
    * @param executor Executor
-   * @return Future for a map from input Avro file to output tar file
    */
-  @Nonnull
-  public static Future<Map<File, File>> buildSegmentsFromAvro(@Nonnull List<File> avroFiles, int baseSegmentIndex,
+  public static void buildSegmentsFromAvro(@Nonnull List<File> avroFiles, int baseSegmentIndex,
       @Nonnull final File segmentDir, @Nonnull final File tarDir, @Nonnull final String tableName,
       final boolean createStarTreeIndex, @Nullable final List<String> rawIndexColumns,
       @Nullable final com.linkedin.pinot.common.data.Schema pinotSchema, @Nonnull Executor executor) {
     int numSegments = avroFiles.size();
-    List<ListenableFutureTask<Pair<File, File>>> futureTasks = new ArrayList<>(numSegments);
-
     for (int i = 0; i < numSegments; i++) {
       final File avroFile = avroFiles.get(i);
       final int segmentIndex = i + baseSegmentIndex;
-      ListenableFutureTask<Pair<File, File>> futureTask = ListenableFutureTask.create(new Callable<Pair<File, File>>() {
+      executor.execute(new Runnable() {
         @Override
-        public Pair<File, File> call()
-            throws Exception {
-          File outputDir = new File(segmentDir, "segment-" + segmentIndex);
-          SegmentGeneratorConfig segmentGeneratorConfig =
-              SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
+        public void run() {
+          try {
+            File outputDir = new File(segmentDir, "segment-" + segmentIndex);
+            SegmentGeneratorConfig segmentGeneratorConfig =
+                SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
 
-          // Test segment with space and special character in the file name (PINOT-3296)
-          segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
+            // Test segment with space and special character in the file name
+            segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
 
-          segmentGeneratorConfig.setEnableStarTreeIndex(createStarTreeIndex);
+            segmentGeneratorConfig.setEnableStarTreeIndex(createStarTreeIndex);
 
-          if (rawIndexColumns != null) {
-            segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexColumns);
+            if (rawIndexColumns != null) {
+              segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexColumns);
+            }
+
+            // Build the segment
+            SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+            driver.init(segmentGeneratorConfig);
+            driver.build();
+
+            // Tar the segment
+            File[] files = outputDir.listFiles();
+            Assert.assertNotNull(files);
+            File segmentFile = files[0];
+            String segmentName = segmentFile.getName();
+            TarGzCompressionUtils.createTarGzOfDirectory(segmentFile.getAbsolutePath(),
+                new File(tarDir, segmentName).getAbsolutePath());
+          } catch (Exception e) {
+            // Ignored
           }
-
-          // Build the segment
-          SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-          driver.init(segmentGeneratorConfig);
-          driver.build();
-
-          // Tar the segment
-          File[] files = outputDir.listFiles();
-          Assert.assertNotNull(files);
-          File segmentFile = files[0];
-          String segmentName = segmentFile.getName();
-          String tarGzPath = TarGzCompressionUtils.createTarGzOfDirectory(segmentFile.getAbsolutePath(),
-              new File(tarDir, segmentName).getAbsolutePath());
-
-          return new ImmutablePair<>(avroFile, new File(tarGzPath));
         }
       });
-
-      futureTasks.add(futureTask);
-      executor.execute(futureTask);
     }
-
-    return Futures.transform(Futures.allAsList(futureTasks), new Function<List<Pair<File, File>>, Map<File, File>>() {
-      @Nonnull
-      @Override
-      public Map<File, File> apply(@Nullable List<Pair<File, File>> pairs) {
-        Assert.assertNotNull(pairs);
-        Map<File, File> avroToSegmentMap = new HashMap<>();
-        for (Pair<File, File> pair : pairs) {
-          avroToSegmentMap.put(pair.getLeft(), pair.getRight());
-        }
-        return avroToSegmentMap;
-      }
-    });
   }
 
   /**
@@ -316,8 +288,7 @@ public class ClusterIntegrationTestUtils {
    */
   public static void pushAvroIntoKafka(@Nonnull List<File> avroFiles, @Nonnull String kafkaBroker,
       @Nonnull String kafkaTopic, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
-      @Nullable String partitionColumn)
-      throws Exception {
+      @Nullable String partitionColumn) throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
@@ -378,8 +349,7 @@ public class ClusterIntegrationTestUtils {
   @SuppressWarnings("unused")
   public static void pushRandomAvroIntoKafka(@Nonnull File avroFile, @Nonnull String kafkaBroker,
       @Nonnull String kafkaTopic, int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
-      @Nullable String partitionColumn)
-      throws Exception {
+      @Nullable String partitionColumn) throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
@@ -507,10 +477,9 @@ public class ClusterIntegrationTestUtils {
    */
   public static void testQuery(@Nonnull String pqlQuery, @Nonnull String brokerUrl,
       @Nonnull com.linkedin.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
-      @Nullable Connection h2Connection)
-      throws Exception {
+      @Nullable Connection h2Connection) throws Exception {
     // Use broker response for metadata check, connection response for value check
-    JSONObject pinotResponse = ControllerTest.postQuery(pqlQuery, brokerUrl);
+    JSONObject pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pqlQuery);
 
     // Skip comparison if SQL queries are not specified
