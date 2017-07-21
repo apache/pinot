@@ -233,7 +233,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
     @Override
     protected int getRealtimeSegmentFlushSize(boolean useLlc) {
-      return super.getRealtimeSegmentFlushSize(useLlc) * 10;
+      return super.getRealtimeSegmentFlushSize(useLlc) * 100;
     }
 
     @Override
