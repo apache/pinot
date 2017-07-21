@@ -3,6 +3,10 @@ package com.linkedin.thirdeye.dataframe;
 import java.util.Arrays;
 
 
+/**
+ * Custom hash-based multimap implementation for joins. Primitive, fixed size, append only.
+ * Minimizes memory footprint and overheads.
+ */
 class JoinHashMap {
   private static final int M = 0x5bd1e995;
   private static final int SEED = 0xb7f93ea;
@@ -47,8 +51,11 @@ class JoinHashMap {
 
     int cntr = 0;
     while(val != -1) {
-      if(cntr >= this.outBuffer.length)
-        this.outBuffer = new int[this.outBuffer.length * 2];
+      if(cntr >= this.outBuffer.length) {
+        int[] newBuffer = new int[this.outBuffer.length * 2];
+        System.arraycopy(this.outBuffer, 0, newBuffer, 0, this.outBuffer.length);
+        this.outBuffer = newBuffer;
+      }
       this.outBuffer[cntr++] = val;
       val = this.getNext();
     }

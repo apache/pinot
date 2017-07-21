@@ -170,6 +170,39 @@ public abstract class Series {
     }
   }
 
+  static final class JoinPairs {
+    private static final long TO_LONG = 0xFFFFFFFFL;
+
+    int size = 0;
+    long[] pairs;
+
+    public JoinPairs(int initialCapacity) {
+      this.pairs = new long[initialCapacity];
+    }
+
+    public int size() {
+      return this.size;
+    }
+
+    public int left(int index) {
+      return (int)(this.pairs[index] >>> 32);
+    }
+
+    public int right(int index) {
+      return (int)this.pairs[index];
+    }
+
+    public JoinPairs add(int left, int right) {
+      if(this.size >= this.pairs.length) {
+        long[] newBuffer = new long[this.pairs.length * 2];
+        System.arraycopy(this.pairs, 0, newBuffer, 0, this.pairs.length);
+        this.pairs = newBuffer;
+      }
+      this.pairs[this.size++] = ((left & TO_LONG) << 32) | (right & TO_LONG);
+      return this;
+    }
+  }
+
   /* *************************************************************************
    * Public abstract interface
    * *************************************************************************/
@@ -1338,6 +1371,45 @@ public abstract class Series {
     for(int i=0; i<rightTyped[0].size(); i++) {
       if(!touchedRight.get(i))
         pairs.add(new JoinPair(-1, i));
+    }
+
+    return pairs;
+  }
+
+  static JoinPairs hashJoinMapPairs(Series[] left, Series[] right) {
+    if(left.length != right.length)
+      throw new IllegalArgumentException("Number of series on the left side of the join must be equal to the right side");
+    if(left.length <= 0)
+      throw new IllegalArgumentException("Must join on at least one series");
+    assertSameLength(left);
+    assertSameLength(right);
+
+    JoinPairs pairs = new JoinPairs(left[0].size());
+    BitSet touchedRight = new BitSet(right[0].size());
+
+    Series[] rightTyped = new Series[right.length];
+    for(int i=0; i<right.length; i++)
+      rightTyped[i] = right[i].get(left[i].type());
+
+    JoinHashMap hashRight = new JoinHashMap(rightTyped);
+
+    for(int i=0; i<left[0].size(); i++) {
+      int[] rows = hashRight.get(left, i);
+      if(rows.length <= 0) {
+        pairs.add(i, -1);
+        continue;
+      }
+      for(int j : rows) {
+        if(equalsMultiple(left, rightTyped, i, j)) {
+          pairs.add(i, j);
+          touchedRight.set(j);
+        }
+      }
+    }
+
+    for(int i=0; i<rightTyped[0].size(); i++) {
+      if(!touchedRight.get(i))
+        pairs.add(-1, i);
     }
 
     return pairs;
