@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.dashboard.resources;
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.ALERT_FILTER_LOGISITC_AUTO_TUNE;
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE;
 
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,7 +25,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -249,7 +247,10 @@ public class DetectionJobResource {
    * Different from the previous replay function, this replay function takes multiple function ids, and is able to send
    * out alerts to user once the replay is done.
    *
-   * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
+   * Enable replay on inactive function, but still keep the original function status after replay
+   * If the anomaly function has historical anomalies, will only remove anomalies within the replay period, making replay capable to take historical information
+   *
+   *  As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
    * @param ids a string containing multiple anomaly function ids, separated by comma (e.g. f1,f2,f3)
    * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
    * @param endTimeIso The start time of the monitoring window (in ISO Format)
@@ -272,14 +273,10 @@ public class DetectionJobResource {
     final Map<Long, Long> detectionJobIdMap = new HashMap<>();
     for (String functionId : ids.split(",")) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(Long.valueOf(functionId));
-      if (anomalyFunction != null && anomalyFunction.getIsActive()) {
+      if (anomalyFunction != null) {
         functionIdList.add(Long.valueOf(functionId));
       } else {
-        if (anomalyFunction == null) {
-          LOG.warn("[Backfill] Unable to load function id {}", functionId);
-        } else { // the anomaly function is deactivated
-          LOG.warn(String.format("[Backfill] Skipping deactivated function %s", functionId));
-        }
+        LOG.warn("[Backfill] Unable to load function id {}", functionId);
       }
     }
     if (functionIdList.isEmpty()) {
@@ -322,9 +319,26 @@ public class DetectionJobResource {
         anomalyFunctionSpeedup(functionId);
       }
     }
-    // Run backfill
+
+    // Run backfill : for each function, set to be active to enable runBackfill,
+    //                remove existing anomalies if there is any already within the replay window (to avoid duplicated anomaly results)
+    //                set the original activation status back after backfill
     for (long functionId : functionIdList) {
+      // Activate anomaly function if it's inactive
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+      Boolean isActive = anomalyFunction.getIsActive();
+      if (!isActive) {
+        anomalyFunction.setActive(true);
+        anomalyFunctionDAO.update(anomalyFunction);
+      }
+      // remove existing anomalies within same replay window
+      OnboardResource onboardResource = new OnboardResource();
+      onboardResource.deleteExistingAnomalies(functionId, startTime.getMillis(), endTime.getMillis());
+      // run backfill
       long detectionJobId = detectionJobScheduler.runBackfill(functionId, startTime, endTime, forceBackfill);
+      // Put back activation status
+      anomalyFunction.setActive(isActive);
+      anomalyFunctionDAO.update(anomalyFunction);
       detectionJobIdMap.put(functionId, detectionJobId);
     }
 

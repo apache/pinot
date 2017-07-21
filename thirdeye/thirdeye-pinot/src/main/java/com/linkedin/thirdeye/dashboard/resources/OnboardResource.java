@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.format.ISODateTimeFormat;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
+import javax.validation.constraints.NotNull;
 
 @Path("/onboard")
 @Produces(MediaType.APPLICATION_JSON)
@@ -90,6 +92,31 @@ public class OnboardResource {
       LOG.error("Can not clone function: Id {}, with name tag {}", id, tag);
       throw new WebApplicationException(e);
     }
+  }
+
+  /**
+   * Copy one anomaly function (with currId) over in total to another anomaly function (with srcId)
+   * "copyTo" updates current anomaly function (with currId) to use srcId and src function name
+   * To explicitly illustrate : denote current anomaly function with (currId, currFunctionName, currProperties, currAnomalyHistory)
+   *                            denote src anomaly function with (srcId, srcFunctionName, srcProperties, srcAnomalyHistory)
+   * After "copyTo", the two functions will become:
+   *        (srcId, srcFunctionName, currProperties, currAnomalyHistory)
+   *        (currId, currFunctionName, currProperties, currAnomalyHistory)
+   * This updates src function's properties and historical anomalies into current function's properties and historical anomalies
+   * @param srcId : the source function Id to be copied to
+   * @param currId : the current function Id that have properties and historical anomalies to be copied to source function
+   * @return OK is success
+   */
+  @POST
+  @Path("function/{srcId}/copyTo/{currId}")
+  public Response copyTo(@PathParam("srcId") @NotNull Long srcId,
+      @PathParam("currId") @NotNull Long currId) {
+    AnomalyFunctionDTO currAnomalyFunction = anomalyFunctionDAO.findById(currId);
+    AnomalyFunctionDTO srcAnomalyFunction = anomalyFunctionDAO.findById(srcId);
+    currAnomalyFunction.setId(srcId);
+    currAnomalyFunction.setFunctionName(srcAnomalyFunction.getFunctionName());
+    anomalyFunctionDAO.update(currAnomalyFunction);
+    return Response.ok().build();
   }
 
 
