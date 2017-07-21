@@ -13,76 +13,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.linkedin.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import java.util.Map;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.restlet.data.Status;
-import org.restlet.representation.Representation;
-import org.restlet.resource.Get;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 
-public class TableViews extends BasePinotControllerRestletResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      TableViews.class);
+@Api(tags = "table")
+public class TableViews {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableViews.class);
   public static final String IDEALSTATE = "idealstate";
   public static final String EXTERNALVIEW = "externalview";
 
-  @Get
-  @Override
-  public Representation get() {
-    final String tableName = (String) getRequest().getAttributes().get("tableName");
-    final int viewPositon = 3;
-
-    String[] path = getReference().getPath().split("/");
-    // first part is "" because paths start with /
-    if (path.length < (viewPositon + 1) ||
-        (!path[viewPositon].equalsIgnoreCase(EXTERNALVIEW) && !path[viewPositon].equalsIgnoreCase(IDEALSTATE))) {
-      // this is unexpected condition
-      LOGGER.error("Invalid path: {} while reading views", path);
-      return responseRepresentation(Status.SERVER_ERROR_INTERNAL, "{\"error\":\"Invalid reqeust path\"");
-    }
-
-    final String view = path[viewPositon];
-    String tableTypeStr = getQuery().getValues("tableType");
-
-    if (tableTypeStr == null) {
-      tableTypeStr = "";
-    }
-    TableType tableType = null;
-    if (! tableTypeStr.isEmpty()) {
-      try {
-        tableType = TableType.valueOf(tableTypeStr.toUpperCase());
-      } catch(IllegalArgumentException e) {
-        return responseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
-            "{\"error\":\"Illegal value for table type: " + tableTypeStr + "\"}");
-      } catch (Exception e) {
-        LOGGER.error("Error", e);
-        return responseRepresentation(Status.SERVER_ERROR_INTERNAL, "error");
-
-      }
-    }
-    if (tableName == null || view == null) {
-      return responseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
-          "{\"error\" : \"Table name and view type are required\"}");
-    }
-    return getTableState(tableName, view, tableType);
-  }
+  @Inject
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   public static class TableView
   {
@@ -92,78 +59,88 @@ public class TableViews extends BasePinotControllerRestletResource {
     Map<String, Map<String, String>> realtime;
   }
 
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/idealstate")
+  @ApiOperation(value = "Get table ideal state", notes = "Get table ideal state")
+  public TableView getIdealState(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
+  ) {
+    CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
+    return getTableState(tableName, IDEALSTATE, tableType);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/externalview")
+  @ApiOperation(value = "Get table external view", notes = "Get table external view")
+  public TableView getExternalView(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
+
+  ) {
+    CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
+    return getTableState(tableName, EXTERNALVIEW, tableType);
+  }
+
   // we use name "view" to closely match underlying names and to not
   // confuse with table state of enable/disable
-  private Representation getTableState(
-      String tableName,
-      String view,
-      TableType tableType) {
+  private TableView getTableState( String tableName, String view, CommonConstants.Helix.TableType tableType) {
     TableView tableView;
     if (view.equalsIgnoreCase(IDEALSTATE)) {
       tableView = getTableIdealState(tableName, tableType);
     } else if (view.equalsIgnoreCase(EXTERNALVIEW)) {
       tableView = getTableExternalView(tableName, tableType);
     } else {
-      return responseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
-          "{\"error\" : \"Bad view name: " + view + ". Expected idealstate or externalview\" }");
+      throw new WebApplicationException("Bad view name: " + view + ". Expected idealstate or externalview",
+          Response.Status.BAD_REQUEST);
     }
 
     if (tableView.offline == null && tableView.realtime == null) {
-      return responseRepresentation(Status.CLIENT_ERROR_NOT_FOUND,
-          "{\"error\" : \"Table not found}");
+      throw new WebApplicationException("Table not found", Response.Status.BAD_REQUEST);
     }
+    return tableView;
+  }
 
-    ObjectMapper mapper = new ObjectMapper();
+  private TableView getTableIdealState( String tableNameOptType, CommonConstants.Helix.TableType tableType) {
+    TableView tableView = new TableView();
+    if (tableType == null || tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      tableView.offline = getIdealState(tableNameOptType, CommonConstants.Helix.TableType.OFFLINE);
+    }
+    if (tableType == null || tableType == CommonConstants.Helix.TableType.REALTIME) {
+      tableView.realtime = getIdealState(tableNameOptType, CommonConstants.Helix.TableType.REALTIME);
+    }
+    return tableView;
+  }
+
+  private TableView getTableExternalView( @Nonnull String tableNameOptType, @Nullable CommonConstants.Helix.TableType tableType) {
+    TableView tableView = new TableView();
+    if (tableType == null || tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      tableView.offline = getExternalView(tableNameOptType, CommonConstants.Helix.TableType.OFFLINE);
+    }
+    if (tableType == null || tableType == CommonConstants.Helix.TableType.REALTIME) {
+      tableView.realtime = getExternalView(tableNameOptType, CommonConstants.Helix.TableType.REALTIME);
+    }
+    return tableView;
+  }
+
+
+  private CommonConstants.Helix.TableType validateTableType(String tableTypeStr) {
+    if (tableTypeStr == null) {
+      return null;
+    }
     try {
-      String response = mapper.writeValueAsString(tableView);
-      return responseRepresentation(Status.SUCCESS_OK, response);
-    } catch (JsonProcessingException e) {
-      LOGGER.error("Failed to serialize {} for table {}", tableName, view, e);
-      return responseRepresentation(Status.SERVER_ERROR_INTERNAL, "{\"error\": \"Error serializing response\"}");
+      return CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOGGER.info("Illegal table type '{}'", tableTypeStr);
+      throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'", Response.Status.BAD_REQUEST);
     }
-  }
-
-  @HttpVerb("get")
-  @Summary("Get table external view")
-  @Tags({"table"})
-  @Paths({"/tables/{tableName}/externalview"})
-  private TableView getTableExternalView(
-      @Parameter(name = "tableName", in = "path", description = "Table name(without type)", required = true)
-      @Nonnull String tableNameOptType,
-      @Parameter(name = "tableType", in="query", description = "Table type", required = false)
-      @Nullable TableType tableType) {
-    TableView tableView = new TableView();
-    if (tableType == null || tableType == TableType.OFFLINE) {
-      tableView.offline = getExternalView(tableNameOptType, TableType.OFFLINE);
-    }
-    if (tableType == null || tableType == TableType.REALTIME) {
-      tableView.realtime = getExternalView(tableNameOptType, TableType.REALTIME);
-    }
-    return tableView;
-  }
-
-  @HttpVerb("get")
-  @Summary("Get table idealstate")
-  @Tags({"table"})
-  @Paths({"/tables/{tableName}/idealstate"})
-  private TableView getTableIdealState(
-      @Parameter(name = "tableName", in = "path", description = "Table name(without type)", required = true)
-      String tableNameOptType,
-      @Parameter(name = "tableType", in="query", description = "Table type", required = false)
-      TableType tableType) {
-    TableView tableView = new TableView();
-    if (tableType == null || tableType == TableType.OFFLINE) {
-      tableView.offline = getIdealState(tableNameOptType, TableType.OFFLINE);
-    }
-    if (tableType == null || tableType == TableType.REALTIME) {
-      tableView.realtime = getIdealState(tableNameOptType, TableType.REALTIME);
-    }
-    return tableView;
   }
 
   @Nullable
   public Map<String, Map<String, String>> getIdealState(@Nonnull String tableNameOptType,
-      @Parameter(name = "tableType", in = "query", description = "Table type", required = false) @Nullable TableType tableType) {
+      @Nullable CommonConstants.Helix.TableType tableType) {
     String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
     IdealState resourceIdealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), tableNameWithType);
@@ -171,16 +148,16 @@ public class TableViews extends BasePinotControllerRestletResource {
   }
 
   @Nullable
-  public Map<String, Map<String, String>> getExternalView(@Nonnull String tableNameOptType, TableType tableType) {
+  public Map<String, Map<String, String>> getExternalView(@Nonnull String tableNameOptType, CommonConstants.Helix.TableType tableType) {
     String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
     ExternalView resourceEV = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceExternalView(_pinotHelixResourceManager.getHelixClusterName(), tableNameWithType);
     return resourceEV == null ? null : resourceEV.getRecord().getMapFields();
   }
 
-  private String getTableNameWithType(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+  private String getTableNameWithType(@Nonnull String tableNameOptType, @Nullable CommonConstants.Helix.TableType tableType) {
     if (tableType != null) {
-      if (tableType == TableType.OFFLINE) {
+      if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
         return TableNameBuilder.OFFLINE.tableNameWithType(tableNameOptType);
       } else {
         return TableNameBuilder.REALTIME.tableNameWithType(tableNameOptType);

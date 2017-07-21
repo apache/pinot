@@ -163,7 +163,7 @@ public class PinotSegmentUploadRestletResource {
         throw new WebApplicationException("Segment " + segmentName + " or table " + tableName + " not found",
             Response.Status.NOT_FOUND);
       }
-      Response.ResponseBuilder builder = Response.ok();
+      Response.ResponseBuilder builder = Response.ok(dataFile);
       builder.header("Content-Disposition", "attachment; filename=" + dataFile.getName());
       return builder.build();
     } catch (Exception e) {

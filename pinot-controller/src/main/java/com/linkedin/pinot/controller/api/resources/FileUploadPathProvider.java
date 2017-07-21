@@ -28,6 +28,8 @@ import com.linkedin.pinot.controller.ControllerConf;
 public class FileUploadPathProvider {
   public static final String HDR_CONTROLLER_VERSION = "Pinot-Controller-Version";
   public final static String HDR_CONTROLLER_HOST = "Pinot-Controller-Host";
+  public final static String STATE = "state";
+  public final static String TABLE_NAME = "tableName";
 
   private final ControllerConf _controllerConf;
 

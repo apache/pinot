@@ -76,9 +76,6 @@ public class PinotTableRestletResource {
 
   public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
 
-  private final static String STATE = "state";
-  private final static String TABLE_NAME = "tableName";
-
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
@@ -184,8 +181,8 @@ public class PinotTableRestletResource {
         JSONObject offline = new JSONObject();
         tableExists = true;
 
-        offline.put(TABLE_NAME, offlineTableName);
-        offline.put(STATE, toggleTableState(offlineTableName, stateStr).toJSON().toString());
+        offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
+        offline.put(FileUploadPathProvider.STATE, toggleTableState(offlineTableName, stateStr).toJSON().toString());
         ret.put(offline);
       }
 
@@ -195,8 +192,8 @@ public class PinotTableRestletResource {
         JSONObject realTime = new JSONObject();
         tableExists = true;
 
-        realTime.put(TABLE_NAME, realTimeTableName);
-        realTime.put(STATE, toggleTableState(realTimeTableName, stateStr).toJSON().toString());
+        realTime.put(FileUploadPathProvider.TABLE_NAME, realTimeTableName);
+        realTime.put(FileUploadPathProvider.STATE, toggleTableState(realTimeTableName, stateStr).toJSON().toString());
         ret.put(realTime);
       }
       if (tableExists) {

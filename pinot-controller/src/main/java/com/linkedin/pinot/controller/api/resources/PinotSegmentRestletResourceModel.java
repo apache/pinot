@@ -16,12 +16,18 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -76,6 +82,9 @@ public class PinotSegmentRestletResourceModel {
   public static Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResourceModel.class);
   public static final Response.Status BAD_REQUEST = Response.Status.BAD_REQUEST;
   public static final Response.Status INTERNAL_ERROR = Response.Status.INTERNAL_SERVER_ERROR;
+
+  @Inject
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @GET
   @Path("tables/{tableName}/segments")
@@ -298,5 +307,43 @@ public class PinotSegmentRestletResourceModel {
       }
     }
     return rv;
+  }
+
+  private JSONArray getAllSegmentsMetadataForTable(String tableName, String tableType) {
+    boolean foundRealtimeTable = false;
+    boolean foundOfflineTable = false;
+    JSONArray ret = new JSONArray();
+
+    try {
+      if ((tableType == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableType))
+          && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+        JSONObject realtime = new JSONObject();
+        realtime.put(FileUploadPathProvider.TABLE_NAME, realtimeTableName);
+        realtime.put("segments", new ObjectMapper()
+            .writeValueAsString(_pinotHelixResourceManager.getInstanceToSegmentsInATableMap(realtimeTableName)));
+        ret.put(realtime);
+        foundRealtimeTable = true;
+      }
+
+      if ((tableType == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableType)) && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+        String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+        JSONObject offline = new JSONObject();
+        offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
+        offline.put("segments", new ObjectMapper()
+            .writeValueAsString(_pinotHelixResourceManager.getInstanceToSegmentsInATableMap(offlineTableName)));
+        ret.put(offline);
+        foundOfflineTable = true;
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException(e, INTERNAL_ERROR);
+    }
+
+    if (foundOfflineTable || foundRealtimeTable) {
+      return ret;
+    } else {
+      throw new WebApplicationException("Table " + tableName + " not found.", Response.Status.NOT_FOUND);
+    }
+
   }
 }

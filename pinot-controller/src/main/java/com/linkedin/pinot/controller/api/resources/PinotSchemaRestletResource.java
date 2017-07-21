@@ -87,7 +87,7 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Gets a schema", notes = "Gets a schema")
-  public String getSchema(
+  public Schema getSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName
   ) {
     LOGGER.info("looking for schema {}", schemaName);
@@ -95,7 +95,7 @@ public class PinotSchemaRestletResource {
     if (schema == null) {
       throw new WebApplicationException("Schema not found", Response.Status.NOT_FOUND);
     }
-    return schema.getJSONSchema();
+    return schema;
   }
 
   @DELETE
