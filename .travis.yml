@@ -20,6 +20,7 @@ cache:
   directories:
     - $HOME/.m2
 
+dist: precise
 sudo: false
 
 install:
