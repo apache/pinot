@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -33,26 +30,35 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONObject;
-import org.restlet.data.Form;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import javax.inject.Inject;
+import javax.ws.rs.FormParam;
+import javax.ws.rs.GET;
 
 
-public class PqlQueryResource extends BasePinotControllerRestletResource {
+public class PqlQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PqlQueryResource.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
   private static final Random RANDOM = new Random();
 
-  @Override
-  public Representation get() {
+  @Inject
+  PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @GET
+  public Representation get(
+      @FormParam("pql") String pqlQuery,
+      @FormParam("trace") String traceEnabled
+  ) {
     try {
-      Form query = getQuery();
-      LOGGER.debug("Running query: " + query);
-      String pqlQuery = query.getValues("pql");
-      String traceEnabled = query.getValues("trace");
+      LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
 
       // Get resource table name.
       String tableName;
