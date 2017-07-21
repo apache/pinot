@@ -160,7 +160,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.debug("starTreeTempDir:{}", starTreeTempDir);
   }
 
-  @Deprecated
   public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
     init(config, new RecordReaderSegmentCreationDataSource(reader));
   }

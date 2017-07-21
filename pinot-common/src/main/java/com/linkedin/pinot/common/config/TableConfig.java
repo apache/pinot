@@ -319,6 +319,7 @@ public class TableConfig {
     private String _sortedColumn;
     private List<String> _invertedIndexColumns;
     private List<String> _noDictionaryColumns;
+    private List<String> _onHeapDictionaryColumns;
     private Map<String, String> _streamConfigs;
 
     private TableCustomConfig _customConfig;
@@ -430,6 +431,11 @@ public class TableConfig {
       return this;
     }
 
+    public Builder setOnHeapDictionaryColumns(List<String> onHeapDictionaryColumns) {
+      _onHeapDictionaryColumns = onHeapDictionaryColumns;
+      return this;
+    }
+
     public Builder setStreamConfigs(Map<String, String> streamConfigs) {
       Preconditions.checkState(_tableType == TableType.REALTIME);
       _streamConfigs = streamConfigs;
@@ -487,6 +493,7 @@ public class TableConfig {
       }
       indexingConfig.setInvertedIndexColumns(_invertedIndexColumns);
       indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
+      indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
       indexingConfig.setStreamConfigs(_streamConfigs);
       // TODO: set SegmentPartitionConfig here
 

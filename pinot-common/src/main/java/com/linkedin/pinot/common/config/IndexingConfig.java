@@ -39,6 +39,7 @@ public class IndexingConfig {
   private String _starTreeFormat;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns;
+  private List<String> _onHeapDictionaryColumns;
   private StarTreeIndexSpec _starTreeIndexSpec;
   private SegmentPartitionConfig _segmentPartitionConfig;
 
@@ -110,8 +111,16 @@ public class IndexingConfig {
     return _noDictionaryColumns;
   }
 
+  public List<String> getOnHeapDictionaryColumns() {
+    return _onHeapDictionaryColumns;
+  }
+
   public void setNoDictionaryColumns(List<String> noDictionaryColumns) {
     _noDictionaryColumns = noDictionaryColumns;
+  }
+
+  public void setOnHeapDictionaryColumns(List<String> onHeapDictionaryColumns) {
+    _onHeapDictionaryColumns = onHeapDictionaryColumns;
   }
 
   public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
