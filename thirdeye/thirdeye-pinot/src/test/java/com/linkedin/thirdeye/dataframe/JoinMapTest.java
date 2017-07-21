@@ -43,6 +43,14 @@ public class JoinMapTest {
   }
 
   @Test
+  public void testTuple() {
+    Assert.assertEquals(JoinHashMap.tuple(0xFFFFFFFF, 0xFFFFFFFF), 0xFFFFFFFFFFFFFFFFL);
+    Assert.assertEquals(JoinHashMap.tuple(0xFFFFFFFF, 0x00000000), 0xFFFFFFFF00000000L);
+    Assert.assertEquals(JoinHashMap.tuple(0x00000000, 0xFFFFFFFF), 0x00000000FFFFFFFFL);
+    Assert.assertEquals(JoinHashMap.tuple(0x00000000, 0x00000000), 0x0000000000000000L);
+  }
+
+  @Test
   public void testTupleDecomposition() {
     final long tuple = 0x1234567899990000L;
     Assert.assertEquals(JoinHashMap.tuple2key(tuple), 0x12345678);
@@ -54,16 +62,37 @@ public class JoinMapTest {
     Assert.assertEquals(JoinHashMap.tuple(0x12345678, 0x79999999), 0x1234567879999999L);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testValueUpperBound() {
-    final JoinHashMap m = new JoinHashMap(0);
-    m.put(0xFFFFFFFF, 0x80000000);
+  @Test
+  public void testValuesUpperBound() {
+    final JoinHashMap m = new JoinHashMap(2);
+    final int KEY_HI = 0xFFFFFFFF;
+    final int KEY_LO = 0x00000000;
+    final int VAL_HI = 0xFFFFFFFE;
+
+    m.put(KEY_HI, VAL_HI);
+    m.put(KEY_LO, VAL_HI);
+
+    Assert.assertEquals(m.get(KEY_HI, 0), VAL_HI);
+    Assert.assertEquals(m.get(KEY_LO, 0), VAL_HI);
+  }
+
+  @Test
+  public void testValuesLowerBound() {
+    final JoinHashMap m = new JoinHashMap(2);
+    final int KEY_HI = 0xFFFFFFFF;
+    final int KEY_LO = 0x00000000;
+    final int VAL_LO = 0x00000000;
+
+    m.put(KEY_HI, VAL_LO);
+    m.put(KEY_LO, VAL_LO);
+
+    Assert.assertEquals(m.get(KEY_HI, 0), VAL_LO);
+    Assert.assertEquals(m.get(KEY_LO, 0), VAL_LO);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testValueLowerBound() {
-    final JoinHashMap m = new JoinHashMap(0);
-    m.put(0xFFFFFFFF, -1);
+  public void testValuesReserved() {
+    new JoinHashMap(0).put(0, JoinHashMap.RESERVED_VALUE);
   }
 
   @Test
@@ -111,5 +140,40 @@ public class JoinMapTest {
     Assert.assertEquals(m.get(3, 0), 97);
     Assert.assertEquals(m.get(3, 1), 93);
     Assert.assertEquals(m.get(3, 2), -1);
+  }
+
+  @Test
+  public void testMultiset() {
+    JoinHashMap m = new JoinHashMap(10000);
+    for(int i=0; i<1000; i++) {
+      for(int j=0; j<10; j++) {
+        m.put(i, j);
+      }
+    }
+
+    for(int i=0; i<1000; i++) {
+      for(int j=0; j<10; j++) {
+        Assert.assertEquals(m.get(i, j), j);
+      }
+      Assert.assertEquals(m.get(i, 10), -1);
+    }
+  }
+
+  @Test
+  public void testMultisetIterator() {
+    JoinHashMap m = new JoinHashMap(10000);
+    for(int i=0; i<1000; i++) {
+      for(int j=0; j<10; j++) {
+        m.put(i, j);
+      }
+    }
+
+    for(int i=0; i<1000; i++) {
+      Assert.assertEquals(m.get(i, 0), 0);
+      for(int j=1; j<10; j++) {
+        Assert.assertEquals(m.getNext(), j);
+      }
+      Assert.assertEquals(m.getNext(), -1);
+    }
   }
 }

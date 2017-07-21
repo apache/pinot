@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dataframe;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,8 +53,7 @@ public class JoinMapBenchmark {
       }
       stopTimer();
 
-      if(!Arrays.equals(values, output))
-        throw new IllegalStateException("Input and output data disagree");
+      assertEquals(output, values);
       checksum ^= checksum(output);
       collisions += m.getCollisions();
       rereads += m.getRereads();
@@ -69,7 +70,7 @@ public class JoinMapBenchmark {
       int[] keys = generateIntData(N_ELEMENTS);
       int[] values = generateIntData(N_ELEMENTS);
       int[] output = new int[N_ELEMENTS];
-      Map<Integer, Integer> m = new HashMap<>();
+      Map<Integer, Integer> m = new HashMap<>(N_ELEMENTS);
 
       startTimer();
       for(int i=0; i<N_ELEMENTS; i++) {
@@ -80,17 +81,81 @@ public class JoinMapBenchmark {
       }
       stopTimer();
 
-      if(!Arrays.equals(values, output))
-        throw new IllegalStateException("Input and output data disagree");
+      assertEquals(output, values);
       checksum ^= checksum(output);
     }
 
     logResults("benchmarkHashMap", checksum, 0, 0);
   }
 
+  private void benchmarkJoinMultiMap() {
+    startTimerOuter();
+    long checksum = 0;
+    long collisions = 0;
+    long rereads = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      int[] values = generateIntData(N_ELEMENTS);
+      int[] output = new int[N_ELEMENTS];
+      JoinHashMap m = new JoinHashMap(N_ELEMENTS);
+
+      startTimer();
+      for(int i=N_ELEMENTS-1; i>=0; i--) {
+        m.put(i / 10, values[i]);
+      }
+
+      int cntr = 0;
+      for(int i=0; i<N_ELEMENTS / 10; i++) {
+        int val = m.get(i, 0);
+        if(val != -1)
+          output[cntr++] = val;
+        while((val = m.getNext()) != -1)
+          output[cntr++] = val;
+      }
+      stopTimer();
+
+      assertEqualsSorted(output, values);
+      checksum ^= checksum(output);
+      collisions += m.getCollisions();
+      rereads += m.getRereads();
+    }
+
+    logResults("benchmarkJoinMultiMap", checksum, collisions, rereads);
+  }
+
+  private void benchmarkHashMultiMap() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      int[] values = generateIntData(N_ELEMENTS);
+      int[] output = new int[N_ELEMENTS];
+      Multimap<Integer, Integer> m = HashMultimap.create(N_ELEMENTS / 10, 10);
+
+      startTimer();
+      for(int i=N_ELEMENTS-1; i>=0; i--) {
+        m.put(i / 10, values[i]);
+      }
+
+      int cntr = 0;
+      for(int i=0; i<N_ELEMENTS / 10; i++) {
+        for(int val : m.get(i))
+          output[cntr++] = val;
+      }
+      stopTimer();
+
+      assertEqualsSorted(output, values);
+      checksum ^= checksum(output);
+    }
+
+    logResults("benchmarkHashMultiMap", checksum, 0, 0);
+  }
+
   private void benchmarkAll() {
     benchmarkJoinMap();
     benchmarkHashMap();
+    benchmarkJoinMultiMap();
+    benchmarkHashMultiMap();
   }
 
   private void startTimer() {
@@ -197,6 +262,22 @@ public class JoinMapBenchmark {
       bits ^= p.right;
     }
     return bits;
+  }
+
+  private static int[] assertEquals(int[] actual, int[] expected) {
+    if(actual.length != expected.length)
+      throw new IllegalArgumentException(String.format("expected length %d, but got %d", expected.length, actual.length));
+    for(int i=0; i<expected.length; i++) {
+      if(expected[i] != actual[i])
+        throw new IllegalArgumentException(String.format("Expected index=%d value %d, but got %d", i, expected[i], actual[i]));
+    }
+    return actual;
+  }
+
+  private static int[] assertEqualsSorted(int[] actual, int[] expected) {
+    Arrays.sort(actual);
+    Arrays.sort(expected);
+    return assertEquals(actual, expected);
   }
 
   // from: https://stackoverflow.com/questions/1519736/random-shuffling-of-an-array
