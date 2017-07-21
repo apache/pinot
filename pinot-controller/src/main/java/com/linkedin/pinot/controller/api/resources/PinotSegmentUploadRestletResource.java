@@ -67,6 +67,7 @@ import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -170,13 +171,44 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
+  @DELETE
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableName}/{segmentName}")
+  @ApiOperation(value = "Deletes a segment", notes = "Deletes a segment")
+  public SuccessResponse deleteOneSegment(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
+  ) {
+    // TODO Use the Enable|Disable|Drop code to set the state to "drop"
+    // May be move this API to that file?
+
+    throw new WebApplicationException("Not implemented", Response.Status.INTERNAL_SERVER_ERROR);
+//    return new SuccessResponse("Not yet implemented");
+  }
+
+  @DELETE
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableName}")
+  @ApiOperation(value = "Deletes all segments of a table", notes = "Deletes all segments of a table")
+  public SuccessResponse deleteAllSegments(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
+  ) {
+    // TODO Use the Enable|Disable|Drop code to set the state to "drop"
+    // May be move this API to that file?
+
+    throw new WebApplicationException("Not implemented", Response.Status.INTERNAL_SERVER_ERROR);
+//    return new SuccessResponse("Not yet implemented");
+  }
+
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment")
   // TODO Does it even work if the segment is sent as a JSON body? Need to compare with the other API
-  public SuccessResponse uploadSegment(
+  public Response uploadSegment(
       FormDataMultiPart multiPart,
       String segmentJsonStr,    // If segment is present as json body
       @Context HttpHeaders headers,
@@ -285,7 +317,11 @@ public class PinotSegmentUploadRestletResource {
         String clientAddrString = request.getRemoteAddr();
         String clientAddress = InetAddress.getByName(clientAddrString).getHostName();
         LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentFile.getName(), clientAddress);
-        return uploadSegment(segmentFile, dataFile, downloadURI, provider);
+        PinotResourceManagerResponse resourceManagerResponse =  uploadSegment(segmentFile, dataFile, downloadURI, provider);
+        Response.ResponseBuilder builder = Response.ok();
+        builder.header(FileUploadPathProvider.HDR_CONTROLLER_HOST, FileUploadPathProvider.getControllerHostName());
+        builder.header(FileUploadPathProvider.HDR_CONTROLLER_VERSION, FileUploadPathProvider.getHdrControllerVersion());
+        return builder.build();
       } else {
         // Some problem happened, sent back a simple line of text.
         String errorMsg = "No file was uploaded";
@@ -312,7 +348,7 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private SuccessResponse uploadSegment(File indexDir, File dataFile, String downloadUrl,FileUploadPathProvider provider)
+  private PinotResourceManagerResponse uploadSegment(File indexDir, File dataFile, String downloadUrl,FileUploadPathProvider provider)
       throws ConfigurationException, IOException, JSONException {
     final SegmentMetadata metadata = new SegmentMetadataImpl(indexDir);
     final File tableDir = new File(provider.getBaseDataDir(), metadata.getTableName());
@@ -351,10 +387,11 @@ public class PinotSegmentUploadRestletResource {
     }
 
     if (!response.isSuccessful()) {
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
+          ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       throw new WebApplicationException("Error uploading segment", Response.Status.INTERNAL_SERVER_ERROR);
     }
-    return new SuccessResponse(response.getMessage());
+    return response;
   }
 
   private String getDownloadUri(FileUploadUtils.FileUploadType uploadType, HttpHeaders headers, String segmentJsonStr) throws Exception {
@@ -412,16 +449,17 @@ public class PinotSegmentUploadRestletResource {
 
   // Validate that there is one file that is in the input.
   public static boolean validateMultiPart(Map<String, List<FormDataBodyPart>> map, String segmentName) {
+    boolean isGood = true;
     if (map.size() != 1) {
-      LOGGER.error("Incorrect number of multi-part elements: {} (segmentName {})", map.size(), segmentName);
-      return false;
+      LOGGER.warn("Incorrect number of multi-part elements: {} (segmentName {}). Picking one", map.size(), segmentName);
+      isGood = false;
     }
     List<FormDataBodyPart> bodyParts = map.get(map.keySet().iterator().next());
     if (bodyParts.size() != 1) {
-      LOGGER.error("Incorrect number of elements in list in first part: {} (segmentName {})", bodyParts.size(), segmentName);
-      return false;
+      LOGGER.warn("Incorrect number of elements in list in first part: {} (segmentName {}). Picking first one", bodyParts.size(), segmentName);
+      isGood = false;
     }
-    return true;
+    return isGood;
   }
 
   /**
