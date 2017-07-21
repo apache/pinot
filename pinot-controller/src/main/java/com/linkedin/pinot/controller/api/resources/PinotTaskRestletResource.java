@@ -15,12 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
-import javax.annotation.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
@@ -37,6 +30,13 @@ import org.restlet.resource.Delete;
 import org.restlet.resource.Get;
 import org.restlet.resource.Post;
 import org.restlet.resource.Put;
+import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
+import javax.annotation.Nullable;
 
 
 public class PinotTaskRestletResource extends BasePinotControllerRestletResource {
@@ -205,7 +205,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       Collections.sort(taskTypes);
       return new StringRepresentation(new JSONArray(taskTypes).toString());
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -220,7 +220,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       Collections.sort(tasks);
       return new StringRepresentation(new JSONArray(tasks).toString());
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -237,7 +237,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       result.put("configs", new JSONObject(taskConfig.getConfigs()));
       return new StringRepresentation(result.toString(2));
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -251,7 +251,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       return new StringRepresentation(
           new JSONObject(_pinotHelixTaskResourceManager.getTaskStates(taskType)).toString(2));
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -264,7 +264,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
     try {
       return new StringRepresentation(_pinotHelixTaskResourceManager.getTaskState(taskName).toString());
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -278,7 +278,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       Collections.sort(taskQueues);
       return new StringRepresentation(new JSONArray(taskQueues).toString());
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -291,7 +291,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
     try {
       return new StringRepresentation(_pinotHelixTaskResourceManager.getTaskQueueState(taskType).toString());
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -305,7 +305,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       _pinotHelixTaskResourceManager.createTaskQueue(taskType);
       return new StringRepresentation("Successfully created task queue for task type: " + taskType);
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -331,7 +331,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       String taskName = _pinotHelixTaskResourceManager.submitTask(pinotTaskConfig);
       return new StringRepresentation("Successfully submitted task: " + taskName);
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -354,7 +354,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
           throw new IllegalArgumentException("Unsupported state: " + state);
       }
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -367,7 +367,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       _pinotTaskManager.scheduleTasks();
       return new StringRepresentation("Succeeded");
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 
@@ -381,7 +381,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
       _pinotHelixTaskResourceManager.deleteTaskQueue(taskType);
       return new StringRepresentation("Successfully deleted task queue for task type: " + taskType);
     } catch (Exception e) {
-      return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
   }
 }
