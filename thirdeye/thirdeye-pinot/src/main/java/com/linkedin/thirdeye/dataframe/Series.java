@@ -1304,6 +1304,45 @@ public abstract class Series {
     return pairs;
   }
 
+  static List<JoinPair> hashJoinMap(Series[] left, Series[] right) {
+    if(left.length != right.length)
+      throw new IllegalArgumentException("Number of series on the left side of the join must be equal to the right side");
+    if(left.length <= 0)
+      throw new IllegalArgumentException("Must join on at least one series");
+    assertSameLength(left);
+    assertSameLength(right);
+
+    List<JoinPair> pairs = new ArrayList<>();
+    BitSet touchedRight = new BitSet(right[0].size());
+
+    Series[] rightTyped = new Series[right.length];
+    for(int i=0; i<right.length; i++)
+      rightTyped[i] = right[i].get(left[i].type());
+
+    JoinHashMap hashRight = new JoinHashMap(rightTyped);
+
+    for(int i=0; i<left[0].size(); i++) {
+      int[] rows = hashRight.get(left, i);
+      if(rows.length <= 0) {
+        pairs.add(new JoinPair(i, -1));
+        continue;
+      }
+      for(int j : rows) {
+        if(equalsMultiple(left, rightTyped, i, j)) {
+          pairs.add(new JoinPair(i, j));
+          touchedRight.set(j);
+        }
+      }
+    }
+
+    for(int i=0; i<rightTyped[0].size(); i++) {
+      if(!touchedRight.get(i))
+        pairs.add(new JoinPair(-1, i));
+    }
+
+    return pairs;
+  }
+
   static List<JoinPair> productJoin(Series[] left, Series[] right) {
     if(left.length != right.length)
       throw new IllegalArgumentException("Number of series on the left side of the join must be equal to the right side");
