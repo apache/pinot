@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.linkedin.pinot.controller.api.resources;
 
 import java.util.ArrayList;
@@ -21,27 +22,38 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Delete;
-import org.restlet.resource.Get;
-import org.restlet.resource.Post;
-import org.restlet.resource.Put;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
-import javax.annotation.Nullable;
+import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 
 
-public class PinotTaskRestletResource extends BasePinotControllerRestletResource {
+@Api(tags = "task")
+public class PinotTaskRestletResource {
   private static final String TASK_QUEUE_STATE_STOP = "STOP";
   private static final String TASK_QUEUE_STATE_RESUME = "RESUME";
+
+  @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
+
+  @Inject
+  PinotTaskManager _pinotTaskManager;
 
   /**
    * URI Mappings:
@@ -76,38 +88,100 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
    *   </li>
    * </ul>
    */
-  @Get
-  @Override
-  public Representation get() {
-    ConcurrentMap<String, Object> attributes = getRequest().getAttributes();
-    String taskName = (String) attributes.get(TASK_NAME);
-    String taskType = (String) attributes.get(TASK_TYPE);
 
-    String requestType = getReference().getSegments().get(1);
-    switch (requestType) {
-      case "tasktypes":
-        // "/tasks/tasktypes"
-        return getTaskTypes();
-      case "tasks":
-        // "/tasks/tasks/{taskType}"
-        return getTasks(taskType);
-      case "taskconfig":
-        // "/tasks/taskconfig/{taskName}"
-        return getTaskConfig(taskName);
-      case "taskstates":
-        // "/tasks/taskstates/{taskType}"
-        return getTaskStates(taskType);
-      case "taskstate":
-        // "/tasks/taskstate/{taskName}"
-        return getTaskState(taskName);
-      case "taskqueues":
-        // "/tasks/taskqueues"
-        return getTaskQueues();
-      case "taskqueuestate":
-        // "/tasks/taskqueuestate/{taskType}"
-        return getTaskQueueState(taskType);
-      default:
-        throw new IllegalStateException("Unsupported request type: " + requestType);
+  @GET
+  @Path("/tasks/tasktypes")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List all task types", notes = "List all task types")
+  public JSONArray listTaskTypes(
+
+  ) {
+    List<String> taskTypes = new ArrayList<>(_pinotHelixTaskResourceManager.getTaskTypes());
+    Collections.sort(taskTypes);
+    return new JSONArray(taskTypes);
+  }
+
+  @GET
+  @ApiOperation( value = "List all tasks", notes = "List all tasks")
+  @Path("/tasks/tasks/{taskType}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public JSONArray getTasks(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType
+  ) {
+    List<String> tasks = new ArrayList<>(_pinotHelixTaskResourceManager.getTasks(taskType));
+    Collections.sort(tasks);
+    return new JSONArray(tasks);
+  }
+
+  @GET
+  @ApiOperation(value = "Get a task's configuration")
+  @Path("/tasks/taskconfig/{taskName}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public JSONObject getTaskConfig(
+      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName
+  ) {
+    try {
+      PinotTaskConfig taskConfig = _pinotHelixTaskResourceManager.getTaskConfig(taskName);
+      JSONObject result = new JSONObject();
+      result.put("taskType", taskConfig.getTaskType());
+      result.put("configs", new JSONObject(taskConfig.getConfigs()));
+      return result;
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
+    }
+  }
+
+  @GET
+  @ApiOperation(value = "Get all tasks' configuration", notes = "Get all tasks' configuration")
+  @Path("/tasks/taskstates/{taskType}")
+  public JSONObject getTasksConfiguration(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType
+  ) {
+    try {
+      return new JSONObject(_pinotHelixTaskResourceManager.getTaskStates(taskType));
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
+    }
+  }
+
+  @GET
+  @ApiOperation(value = "Get a task's state", notes = "Get a task's state")
+  @Path("/tasks/taskstate/{taskName}")
+  public String getTaskState(
+      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName
+  ) {
+    try {
+      return _pinotHelixTaskResourceManager.getTaskState(taskName).toString();
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
+    }
+  }
+
+  @GET
+  @ApiOperation(value = "List all task queues", notes = "List all task queues")
+  @Path("/tasks/taskqueues")
+  public JSONArray getTaskQueues(
+
+  ) {
+    try {
+      List<String> taskQueues = new ArrayList<>(_pinotHelixTaskResourceManager.getTaskQueues());
+      Collections.sort(taskQueues);
+      return new JSONArray(taskQueues);
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
+    }
+  }
+
+  @GET
+  @ApiOperation(value = "Get a task queue's state", notes = "Get a task queue's state")
+  @Path("/tasks/taskqueuestate/{taskType}")
+  public String getTaskQueueState(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType
+  ) {
+    try {
+      return _pinotHelixTaskResourceManager.getTaskQueueState(taskType).toString();
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
     }
   }
 
@@ -124,20 +198,44 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
    *   </li>
    * </ul>
    */
-  @Post
-  @Override
-  public Representation post(Representation entity) {
-    String taskType = (String) getRequest().getAttributes().get(TASK_TYPE);
-    String requestType = getReference().getSegments().get(1);
-    switch (requestType) {
-      case "taskqueue":
-        // "/tasks/taskqueue/{taskType}"
-        return createTaskQueue(taskType);
-      case "task":
-        // "/tasks/task/{taskType}"
-        return submitTask(taskType, entity);
-      default:
-        throw new IllegalStateException("Unsupported request type: " + requestType);
+  @POST
+  @ApiOperation(value = "Create a task queue", notes = "Create a task queue")
+  @Path("/tasks/taskqueue/{taskType}")
+  public SuccessResponse createTaskQueue(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType
+  ) {
+    try {
+      _pinotHelixTaskResourceManager.createTaskQueue(taskType);
+      return new SuccessResponse("Successfully created task queue for task type: " + taskType);
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
+    }
+  }
+
+  @POST
+  @ApiOperation(value = "Submit a task", notes = "Submit a task")
+  @Path("/tasks/task/{taskType}")
+  @Consumes(MediaType.APPLICATION_JSON)
+  public SuccessResponse submitTask(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      String configMapStr
+  ) {
+    try {
+      Map<String, String> configs = new HashMap<>();
+      PinotTaskConfig pinotTaskConfig;
+      if (configMapStr != null) {
+        JSONObject jsonConfig = new JSONObject(configMapStr);
+        Iterator iterator = jsonConfig.keys();
+        while (iterator.hasNext()) {
+          String key = (String) iterator.next();
+          configs.put(key, jsonConfig.getString(key));
+        }
+      }
+      pinotTaskConfig = new PinotTaskConfig(taskType, configs);
+      String taskName = _pinotHelixTaskResourceManager.submitTask(pinotTaskConfig);
+      return new SuccessResponse("Successfully submitted task: " + taskName);
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
     }
   }
 
@@ -154,23 +252,43 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
    *   </li>
    * </ul>
    */
-  @Put
-  @Override
-  public Representation put(Representation entity) {
-    String requestType = getReference().getSegments().get(1);
-    switch (requestType) {
-      case "taskqueue":
-        // "/tasks/taskqueue/{taskType}?state={state}"
-        String taskType = (String) getRequest().getAttributes().get(TASK_TYPE);
-        String state = getReference().getQueryAsForm().getValues(STATE);
-        return toggleTaskQueueState(taskType, state);
-      case "scheduletasks":
-        // "/tasks/scheduletasks"
-        return scheduleTasks();
-      default:
-        throw new IllegalStateException("Unsupported request type: " + requestType);
+
+  @PUT
+  @ApiOperation(value = "Stop/resume a task queue", notes = "Stop/resume a task queue")
+  @Path("/tasks/taskqueue/{taskType}")
+  public SuccessResponse toggleTaskQueueState(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "state", required = true) @QueryParam("state") String state
+  ) {
+    try {
+      switch (state.toUpperCase()) {
+        case TASK_QUEUE_STATE_STOP:
+          _pinotHelixTaskResourceManager.stopTaskQueue(taskType);
+          return new SuccessResponse("Successfully stopped task queue for task type: " + taskType);
+        case TASK_QUEUE_STATE_RESUME:
+          _pinotHelixTaskResourceManager.resumeTaskQueue(taskType);
+          return new SuccessResponse("Successfully resumed task queue for task type: " + taskType);
+        default:
+          throw new IllegalArgumentException("Unsupported state: " + state);
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
     }
   }
+
+  @PUT
+  @ApiOperation(value = "Schedule tasks", notes = "Schedule tasks")
+  @Path("/tasks/scheduletasks")
+  public SuccessResponse scheduleTasks(
+  ) {
+    try {
+      _pinotTaskManager.scheduleTasks();
+      return new SuccessResponse("Succeeded");
+    } catch (Exception e) {
+      throw new WebApplicationException(e);
+    }
+  }
+
 
   /**
    * URI Mappings:
@@ -181,207 +299,18 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
    *   </li>
    * </ul>
    */
-  @Delete
-  @Override
-  public Representation delete() {
-    String taskType = (String) getRequest().getAttributes().get(TASK_TYPE);
-    String requestType = getReference().getSegments().get(1);
-    switch (requestType) {
-      case "taskqueue":
-        // "/tasks/taskqueue/{taskType}"
-        return deleteTaskQueue(taskType);
-      default:
-        throw new IllegalStateException("Unsupported request type: " + requestType);
-    }
-  }
 
-  @HttpVerb("get")
-  @Summary("List all task types")
-  @Tags({"task"})
-  @Paths({"/tasks/tasktypes", "/tasks/tasktypes/"})
-  private Representation getTaskTypes() {
-    try {
-      List<String> taskTypes = new ArrayList<>(_pinotHelixTaskResourceManager.getTaskTypes());
-      Collections.sort(taskTypes);
-      return new StringRepresentation(new JSONArray(taskTypes).toString());
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("get")
-  @Summary("List all tasks")
-  @Tags({"task"})
-  @Paths({"/tasks/tasks/{taskType}", "/tasks/tasks/{taskType}/"})
-  private Representation getTasks(
-      @Parameter(name = "taskType", in = "path", description = "Task type", required = true) String taskType) {
-    try {
-      List<String> tasks = new ArrayList<>(_pinotHelixTaskResourceManager.getTasks(taskType));
-      Collections.sort(tasks);
-      return new StringRepresentation(new JSONArray(tasks).toString());
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("get")
-  @Summary("Get a task's configuration")
-  @Tags({"task"})
-  @Paths({"/tasks/taskconfig/{taskName}", "/tasks/taskconfig/{taskName}/"})
-  private Representation getTaskConfig(
-      @Parameter(name = "taskName", in = "path", description = "Task name", required = true) String taskName) {
-    try {
-      PinotTaskConfig taskConfig = _pinotHelixTaskResourceManager.getTaskConfig(taskName);
-      JSONObject result = new JSONObject();
-      result.put("taskType", taskConfig.getTaskType());
-      result.put("configs", new JSONObject(taskConfig.getConfigs()));
-      return new StringRepresentation(result.toString(2));
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("get")
-  @Summary("Get all tasks' configuration")
-  @Tags({"task"})
-  @Paths({"/tasks/taskstates/{taskType}", "/tasks/taskstates/{taskType}/"})
-  private Representation getTaskStates(
-      @Parameter(name = "taskType", in = "path", description = "Task type", required = true) String taskType) {
-    try {
-      return new StringRepresentation(
-          new JSONObject(_pinotHelixTaskResourceManager.getTaskStates(taskType)).toString(2));
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("get")
-  @Summary("Get a task's state")
-  @Tags({"task"})
-  @Paths({"/tasks/taskstate/{taskName}", "/tasks/taskstate/{taskName}/"})
-  private Representation getTaskState(
-      @Parameter(name = "taskName", in = "path", description = "Task name", required = true) String taskName) {
-    try {
-      return new StringRepresentation(_pinotHelixTaskResourceManager.getTaskState(taskName).toString());
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("get")
-  @Summary("List all task queues")
-  @Tags({"task"})
-  @Paths({"/tasks/taskqueues", "/tasks/taskqueues/"})
-  private Representation getTaskQueues() {
-    try {
-      List<String> taskQueues = new ArrayList<>(_pinotHelixTaskResourceManager.getTaskQueues());
-      Collections.sort(taskQueues);
-      return new StringRepresentation(new JSONArray(taskQueues).toString());
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("get")
-  @Summary("Get a task queue's state")
-  @Tags({"task"})
-  @Paths({"/tasks/taskqueuestate/{taskType}", "/tasks/taskqueuestate/{taskType}/"})
-  private Representation getTaskQueueState(
-      @Parameter(name = "taskType", in = "path", description = "Task type", required = true) String taskType) {
-    try {
-      return new StringRepresentation(_pinotHelixTaskResourceManager.getTaskQueueState(taskType).toString());
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("post")
-  @Summary("Create a task queue")
-  @Tags({"task"})
-  @Paths({"/tasks/taskqueue/{taskType}", "/tasks/taskqueue/{taskType}/"})
-  private Representation createTaskQueue(
-      @Parameter(name = "taskType", in = "path", description = "Task type", required = true) String taskType) {
-    try {
-      _pinotHelixTaskResourceManager.createTaskQueue(taskType);
-      return new StringRepresentation("Successfully created task queue for task type: " + taskType);
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("post")
-  @Summary("Submit a task")
-  @Tags({"task"})
-  @Paths({"/tasks/task/{taskType}", "/tasks/task/{taskType}/"})
-  private Representation submitTask(
-      @Parameter(name = "taskType", in = "path", description = "Task type", required = true) String taskType,
-      @Nullable Representation entity) {
-    try {
-      Map<String, String> configs = new HashMap<>();
-      PinotTaskConfig pinotTaskConfig;
-      if (entity != null) {
-        JSONObject jsonConfig = new JSONObject(entity.getText());
-        Iterator iterator = jsonConfig.keys();
-        while (iterator.hasNext()) {
-          String key = (String) iterator.next();
-          configs.put(key, jsonConfig.getString(key));
-        }
-      }
-      pinotTaskConfig = new PinotTaskConfig(taskType, configs);
-      String taskName = _pinotHelixTaskResourceManager.submitTask(pinotTaskConfig);
-      return new StringRepresentation("Successfully submitted task: " + taskName);
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("put")
-  @Summary("Stop/resume a task queue")
-  @Tags({"task"})
-  @Paths({"/tasks/taskqueue/{taskType}?state={state}", "/tasks/taskqueue/{taskType}?state={state}/"})
-  private Representation toggleTaskQueueState(
-      @Parameter(name = "taskType", in = "path", description = "Task type", required = true) String taskType,
-      @Parameter(name = "state", in = "query", description = "Target state {stop|resume}", required = true) String state) {
-    try {
-      switch (state.toUpperCase()) {
-        case TASK_QUEUE_STATE_STOP:
-          _pinotHelixTaskResourceManager.stopTaskQueue(taskType);
-          return new StringRepresentation("Successfully stopped task queue for task type: " + taskType);
-        case TASK_QUEUE_STATE_RESUME:
-          _pinotHelixTaskResourceManager.resumeTaskQueue(taskType);
-          return new StringRepresentation("Successfully resumed task queue for task type: " + taskType);
-        default:
-          throw new IllegalArgumentException("Unsupported state: " + state);
-      }
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("put")
-  @Summary("Schedule tasks")
-  @Tags({"task"})
-  @Paths({"/tasks/scheduletasks", "/tasks/scheduletasks/"})
-  private Representation scheduleTasks() {
-    try {
-      _pinotTaskManager.scheduleTasks();
-      return new StringRepresentation("Succeeded");
-    } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-    }
-  }
-
-  @HttpVerb("delete")
-  @Summary("Delete a task queue")
-  @Tags({"task"})
-  @Paths({"/tasks/taskqueue", "/tasks/taskqueue/"})
-  private Representation deleteTaskQueue(
-      @Parameter(name = "taskType", in = "path", description = "Task type", required = true) String taskType) {
+  @DELETE
+  @ApiOperation(notes = "Delete a task queue", value = "Delete a task queue")
+  @Path("/tasks/taskqueue/{taskType}")
+  public SuccessResponse deleteTaskQueue(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType
+  ) {
     try {
       _pinotHelixTaskResourceManager.deleteTaskQueue(taskType);
-      return new StringRepresentation("Successfully deleted task queue for task type: " + taskType);
+      return new SuccessResponse("Successfully deleted task queue for task type: " + taskType);
     } catch (Exception e) {
-      return com.linkedin.pinot.controller.api.restlet.resources.PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      throw new WebApplicationException(e);
     }
   }
 }
