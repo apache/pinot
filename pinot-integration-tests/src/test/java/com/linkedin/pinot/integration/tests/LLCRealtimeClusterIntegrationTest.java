@@ -47,7 +47,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     for (String segmentName : segmentNames) {
       ZNRecord znRecord = _propertyStore.get(zkSegmentsPath + "/" + segmentName, null, 0);
       Assert.assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
-          Integer.toString(getRealtimeSegmentFlushSize(true) / getNumKafkaPartitions()),
+          Integer.toString(getRealtimeSegmentFlushSize() / getNumKafkaPartitions()),
           "Segment: " + segmentName + " does not have the expected flush size");
     }
   }

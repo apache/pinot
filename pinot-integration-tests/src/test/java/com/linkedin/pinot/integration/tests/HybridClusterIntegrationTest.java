@@ -128,10 +128,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertNotNull(timeColumnName);
     TimeUnit outgoingTimeUnit = _schema.getOutgoingTimeUnit();
     Assert.assertNotNull(outgoingTimeUnit);
-    String timeColumnType = outgoingTimeUnit.toString();
-    addHybridTable(getTableName(), timeColumnName, timeColumnType, KafkaStarterUtils.DEFAULT_ZK_STR,
-        KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(), schemaName, TENANT_NAME, TENANT_NAME, avroFile,
-        getSortedColumn(), getInvertedIndexColumns(), getLoadMode(), useLlc(), getRawIndexColumns(), getTaskConfig());
+    String timeType = outgoingTimeUnit.toString();
+
+    addHybridTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
+        TENANT_NAME, TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(),
+        getTaskConfig());
   }
 
   protected List<File> getAllAvroFiles() throws Exception {

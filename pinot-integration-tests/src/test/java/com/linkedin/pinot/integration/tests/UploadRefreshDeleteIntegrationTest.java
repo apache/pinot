@@ -70,15 +70,14 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @BeforeMethod
-  public void setupMethod(Object[] args)
-      throws Exception {
+  public void setupMethod(Object[] args) throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     if (args == null || args.length == 0) {
       return;
     }
     _tableName = (String) args[0];
     SegmentVersion version = (SegmentVersion) args[1];
-    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, null, null, null, _tableName, version);
+    addOfflineTable(_tableName, version);
   }
 
   @AfterMethod

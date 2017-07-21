@@ -112,8 +112,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     // Create the table
-    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, null, null, null, getInvertedIndexColumns(), getLoadMode(),
-        getTableName(), SegmentVersion.v1, getTaskConfig());
+    addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
+        getTaskConfig());
 
     // Upload all segments
     uploadSegments(_tarDir);
@@ -156,8 +156,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertEquals(queryResponse.getLong("numEntriesScannedInFilter"), numTotalDocs);
 
     // Update table config and trigger reload
-    updateOfflineTable("DaysSinceEpoch", -1, "", null, null, UPDATED_INVERTED_INDEX_COLUMNS, getLoadMode(),
-        getTableName(), SegmentVersion.v1, getTaskConfig());
+    updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
+        UPDATED_INVERTED_INDEX_COLUMNS, getTaskConfig());
     sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline");
 
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
