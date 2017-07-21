@@ -1,8 +1,13 @@
 package com.linkedin.thirdeye.dataframe;
 
+import java.util.Arrays;
+
+
 class JoinHashMap {
   private static final int M = 0x5bd1e995;
+  private static final int SEED = 0xb7f93ea;
   private static final long TO_LONG = 0xFFFFFFFFL;
+  private static final int INITIAL_SIZE = 1;
 
   public static final int RESERVED_VALUE = 0xFFFFFFFF;
 
@@ -18,6 +23,7 @@ class JoinHashMap {
 
   private int iteratorKey = -1;
   private int iterator = -1;
+  private int[] outBuffer = new int[INITIAL_SIZE];
 
   // 0xHHHHHHHHVVVVVVVV
   //
@@ -33,6 +39,28 @@ class JoinHashMap {
     for(int i=0; i<series[0].size(); i++) {
       put(hashRow(series, i), i);
     }
+  }
+
+  public int[] get(Series[] series, int row) {
+    int key = hashRow(series, row);
+    int val = this.get(key);
+
+    int cntr = 0;
+    while(val != -1) {
+      if(cntr >= this.outBuffer.length)
+        this.outBuffer = new int[this.outBuffer.length * 2];
+      this.outBuffer[cntr++] = val;
+      val = this.getNext();
+    }
+    return Arrays.copyOf(this.outBuffer, cntr);
+  }
+
+  static int hashRow(Series[] series, int row) {
+    int k = SEED;
+    for(Series s : series) {
+      k = hash(s.hashCode(row) ^ k);
+    }
+    return k;
   }
 
   public JoinHashMap(int maxSize) {
@@ -146,10 +174,6 @@ class JoinHashMap {
 
   static long tuple(int key, int val) {
     return ((key & TO_LONG) << 32) | (val & TO_LONG);
-  }
-
-  static int hashRow(Series[] series, int row) {
-    return 0;
   }
 
   static int log2(int value) {
