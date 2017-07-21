@@ -28,6 +28,7 @@ public class FileUploadPathProvider {
   private final File _baseDataDir;
   private final File _tmpUntarredPath;
   private final File _schemasTmpDir;
+  private final String _vip;
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
     _controllerConf = controllerConf;
@@ -48,7 +49,7 @@ public class FileUploadPathProvider {
       if (!_schemasTmpDir.exists()) {
         FileUtils.forceMkdir(_schemasTmpDir);
       }
-//      String vip = _controllerConf.generateVipUrl();
+      _vip = _controllerConf.generateVipUrl();
     } catch (Exception e) {
       throw new InvalidControllerConfigException("Bad controller configuration");
     }
@@ -64,5 +65,9 @@ public class FileUploadPathProvider {
 
   public File getTmpUntarredPath() {
     return _tmpUntarredPath;
+  }
+
+  public String getVip() {
+    return _vip;
   }
 }

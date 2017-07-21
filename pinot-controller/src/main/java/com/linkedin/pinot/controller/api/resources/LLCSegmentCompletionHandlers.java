@@ -272,7 +272,7 @@ public class LLCSegmentCompletionHandlers {
   private String uploadSegment(FormDataMultiPart multiPart, final String instanceId, final String segmentName,
       boolean isSplitCommit) {
     Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-    if (!validateMultiPart(map, segmentName)) {
+    if (!PinotSegmentUploadRestletResource.validateMultiPart(map, segmentName)) {
       return null;
     }
     final String name = map.keySet().iterator().next();
@@ -344,19 +344,5 @@ public class LLCSegmentCompletionHandlers {
       }
     }
     return segmentLocation;
-  }
-
-  // Validate that there is one file that is in the input.
-  private boolean validateMultiPart(Map<String, List<FormDataBodyPart>> map, String segmentName) {
-    if (map.size() != 1) {
-      LOGGER.error("Incorrect number of multi-part elements: {} for segment {}", map.size(), segmentName);
-      return false;
-    }
-    List<FormDataBodyPart> bodyParts = map.get(map.keySet().iterator().next());
-    if (bodyParts.size() != 1) {
-      LOGGER.error("Incorrect number of elements in list in first part: {} for segment {}", bodyParts.size(), segmentName);
-      return false;
-    }
-    return true;
   }
 }

@@ -34,7 +34,7 @@ import javax.ws.rs.core.MediaType;
 
 
 @Api(tags = {"table", "tenant"})
-public class PinotTableTenantConfigs extends BasePinotControllerRestletResource {
+public class PinotTableTenantConfigs {
 
   @Inject
   PinotHelixResourceManager _helixResourceManager;
