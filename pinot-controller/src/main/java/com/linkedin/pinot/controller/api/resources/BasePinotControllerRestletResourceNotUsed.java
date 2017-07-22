@@ -15,14 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.alibaba.fastjson.JSONObject;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
-import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
@@ -38,14 +30,21 @@ import org.restlet.resource.ServerResource;
 import org.restlet.util.Series;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.alibaba.fastjson.JSONObject;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 
 
 /**
  * Base class for Controller restlet resource apis.
  */
-public class BasePinotControllerRestletResource extends ServerResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      BasePinotControllerRestletResource.class);
+public class BasePinotControllerRestletResourceNotUsed extends ServerResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger("NOTUSED");
 
   protected static final String TABLE_NAME = "tableName";
   protected static final String TABLE_TYPE = "type";
@@ -106,7 +105,7 @@ public class BasePinotControllerRestletResource extends ServerResource {
     return controllerVersion;
   }
 
-  public BasePinotControllerRestletResource() {
+  public BasePinotControllerRestletResourceNotUsed() {
     ConcurrentMap<String, Object> appAttributes = getApplication().getContext().getAttributes();
 
     _controllerConf = (ControllerConf) appAttributes.get(ControllerConf.class.toString());
