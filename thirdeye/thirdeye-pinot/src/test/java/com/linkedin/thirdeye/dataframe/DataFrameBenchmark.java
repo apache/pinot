@@ -923,7 +923,7 @@ public class DataFrameBenchmark {
     logResults("benchmarkMergeJoinLongArray", checksum);
   }
 
-  private void benchmarkMergeJoinLongSeries() {
+  private void benchmarkHashJoinOuterLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -933,7 +933,7 @@ public class DataFrameBenchmark {
       LongSeries other = LongSeries.buildFrom(shuffle(longValues));
 
       startTimer();
-      List<Series.JoinPair> pairs = series.mergeJoin(other);
+      Series.JoinPairs pairs = Series.hashJoinOuter(new Series[] { series }, new Series[] { other });
       stopTimer();
 
       if(pairs.size() != N_ELEMENTS)
@@ -942,10 +942,10 @@ public class DataFrameBenchmark {
       checksum ^= checksum(pairs);
     }
 
-    logResults("benchmarkMergeJoinLongSeries", checksum);
+    logResults("benchmarkHashJoinOuterLongSeries", checksum);
   }
 
-  private void benchmarkHashJoinLongSeries() {
+  private void benchmarkHashJoinInnerLongSeries() {
     startTimerOuter();
     long checksum = 0;
 
@@ -955,7 +955,7 @@ public class DataFrameBenchmark {
       LongSeries other = LongSeries.buildFrom(shuffle(longValues));
 
       startTimer();
-      List<Series.JoinPair> pairs = Series.hashJoin(new Series[] { series }, new Series[] { other });
+      Series.JoinPairs pairs = Series.hashJoinInner(new Series[] { series }, new Series[] { other });
       stopTimer();
 
       if(pairs.size() != N_ELEMENTS)
@@ -964,105 +964,13 @@ public class DataFrameBenchmark {
       checksum ^= checksum(pairs);
     }
 
-    logResults("benchmarkHashJoinLongSeries", checksum);
-  }
-
-  private void benchmarkHashJoinMapLongSeries() {
-    startTimerOuter();
-    long checksum = 0;
-
-    for(int r=0; r<N_ROUNDS_SLOW; r++) {
-      long[] longValues = generateLongData(N_ELEMENTS);
-      LongSeries series = LongSeries.buildFrom(longValues);
-      LongSeries other = LongSeries.buildFrom(shuffle(longValues));
-
-      startTimer();
-      List<Series.JoinPair> pairs = Series.hashJoinMap(new Series[] { series }, new Series[] { other });
-      stopTimer();
-
-      if(pairs.size() != N_ELEMENTS)
-        throw new IllegalStateException(String.format("Join incorrect (got %d pairs, should be %d)", pairs.size(), N_ELEMENTS));
-
-      checksum ^= checksum(pairs);
-    }
-
-    logResults("benchmarkHashJoinMapLongSeries", checksum);
-  }
-
-  private void benchmarkHashJoinMapPairsLongSeries() {
-    startTimerOuter();
-    long checksum = 0;
-
-    for(int r=0; r<N_ROUNDS_SLOW; r++) {
-      long[] longValues = generateLongData(N_ELEMENTS);
-      LongSeries series = LongSeries.buildFrom(longValues);
-      LongSeries other = LongSeries.buildFrom(shuffle(longValues));
-
-      startTimer();
-      Series.JoinPairs pairs = Series.hashJoinMapPairs(new Series[] { series }, new Series[] { other });
-      stopTimer();
-
-      if(pairs.size() != N_ELEMENTS)
-        throw new IllegalStateException(String.format("Join incorrect (got %d pairs, should be %d)", pairs.size(), N_ELEMENTS));
-
-      checksum ^= checksum(pairs);
-    }
-
-    logResults("benchmarkHashJoinMapPairsLongSeries", checksum);
-  }
-
-  private void benchmarkHashJoinTupleLongSeries() {
-    startTimerOuter();
-    long checksum = 0;
-
-    for(int r=0; r<N_ROUNDS_SLOW; r++) {
-      long[] longValues = generateLongData(N_ELEMENTS);
-      LongSeries series = LongSeries.buildFrom(longValues);
-      LongSeries other = LongSeries.buildFrom(shuffle(longValues));
-
-      startTimer();
-      List<Series.JoinPair> pairs = Series.hashJoinTuple(new Series[] { series }, new Series[] { other });
-      stopTimer();
-
-      if(pairs.size() != N_ELEMENTS)
-        throw new IllegalStateException(String.format("Join incorrect (got %d pairs, should be %d)", pairs.size(), N_ELEMENTS));
-
-      checksum ^= checksum(pairs);
-    }
-
-    logResults("benchmarkHashJoinTupleLongSeries", checksum);
-  }
-
-  private void benchmarkProductJoinLongSeries() {
-    startTimerOuter();
-    long checksum = 0;
-
-    for(int r=0; r<N_ROUNDS_SLOW; r++) {
-      long[] longValues = generateLongData(N_ELEMENTS);
-      LongSeries series = LongSeries.buildFrom(longValues);
-      LongSeries other = LongSeries.buildFrom(shuffle(longValues));
-
-      startTimer();
-      List<Series.JoinPair> pairs = Series.productJoin(new Series[] { series }, new Series[] { other });
-      stopTimer();
-
-      if(pairs.size() != N_ELEMENTS)
-        throw new IllegalStateException("Join incorrect");
-
-      checksum ^= checksum(pairs);
-    }
-
-    logResults("benchmarkProductJoinLongSeries", checksum);
+    logResults("benchmarkHashJoinInnerLongSeries", checksum);
   }
 
   private void benchmarkAll() {
 //    benchmarkMergeJoinLongArray();
-    benchmarkMergeJoinLongSeries();
-    benchmarkHashJoinLongSeries();
-    benchmarkHashJoinMapLongSeries();
-    benchmarkHashJoinMapPairsLongSeries();
-    benchmarkHashJoinTupleLongSeries();
-    //benchmarkProductJoinLongSeries(); // NOTE: way too slow
+    benchmarkHashJoinOuterLongSeries();
+    benchmarkHashJoinInnerLongSeries();
     benchmarkHasNullLongSeries();
     benchmarkDropNullLongSeries();
     benchmarkDropNullLongArray();
@@ -1224,17 +1132,6 @@ public class DataFrameBenchmark {
     long bits = 0;
     for(int v : values) {
       bits ^= v;
-    }
-    return bits;
-  }
-
-  private static long checksum(Iterable<Series.JoinPair> pairs) {
-    long bits = 0;
-    for(Series.JoinPair p : pairs) {
-      bits ^= p.left;
-    }
-    for(Series.JoinPair p : pairs) {
-      bits ^= p.right;
     }
     return bits;
   }

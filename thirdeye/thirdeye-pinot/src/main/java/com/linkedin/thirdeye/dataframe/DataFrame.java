@@ -1674,20 +1674,20 @@ public class DataFrame {
       rightSeries[i] = right.get(onSeriesRight[i]);
 
     // perform join, generate row pairs
-    List<Series.JoinPair> pairs = filterJoinPairs(Series.hashJoin(leftSeries, rightSeries), joinType);
+    Series.JoinPairs pairs = filterJoinPairs(Series.hashJoinOuter(leftSeries, rightSeries), joinType);
 
     // extract projection indices
     int[] fromIndexLeft = new int[pairs.size()];
     for(int i=0; i<pairs.size(); i++)
-      fromIndexLeft[i] = pairs.get(i).left;
+      fromIndexLeft[i] = pairs.left(i);
 
     int[] fromIndexRight = new int[pairs.size()];
     for(int i=0; i<pairs.size(); i++)
-      fromIndexRight[i] = pairs.get(i).right;
+      fromIndexRight[i] = pairs.right(i);
 
     byte[] maskValues = new byte[pairs.size()];
     for(int i=0; i<pairs.size(); i++) {
-      if (pairs.get(i).left == -1)
+      if (pairs.left(i) == -1)
         maskValues[i] = BooleanSeries.TRUE;
     }
 
@@ -1739,26 +1739,23 @@ public class DataFrame {
     return joined;
   }
 
-  private static List<Series.JoinPair> filterJoinPairs(List<Series.JoinPair> pairs, Series.JoinType type) {
-    List<Series.JoinPair> output;
+  private static Series.JoinPairs filterJoinPairs(Series.JoinPairs pairs, Series.JoinType type) {
+    Series.JoinPairs output = new Series.JoinPairs(pairs.size());
     switch(type) {
       case LEFT:
-        output = new ArrayList<>(pairs.size());
-        for(Series.JoinPair p : pairs)
-          if(p.left != -1)
-            output.add(p);
+        for(int i=0; i<pairs.size(); i++)
+          if(pairs.left(i) != -1)
+            output.add(pairs.get(i));
         return output;
       case RIGHT:
-        output = new ArrayList<>(pairs.size());
-        for(Series.JoinPair p : pairs)
-          if(p.right != -1)
-            output.add(p);
+        for(int i=0; i<pairs.size(); i++)
+          if(pairs.right(i) != -1)
+            output.add(pairs.get(i));
         return output;
       case INNER:
-        output = new ArrayList<>(pairs.size());
-        for(Series.JoinPair p : pairs)
-          if(p.left != -1 && p.right != -1)
-            output.add(p);
+        for(int i=0; i<pairs.size(); i++)
+          if(pairs.left(i) != -1 && pairs.right(i) != -1)
+            output.add(pairs.get(i));
         return output;
       case OUTER:
         return pairs;

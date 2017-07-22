@@ -253,17 +253,6 @@ public class JoinMapBenchmark {
     return bits;
   }
 
-  private static long checksum(Iterable<Series.JoinPair> pairs) {
-    long bits = 0;
-    for(Series.JoinPair p : pairs) {
-      bits ^= p.left;
-    }
-    for(Series.JoinPair p : pairs) {
-      bits ^= p.right;
-    }
-    return bits;
-  }
-
   private static int[] assertEquals(int[] actual, int[] expected) {
     if(actual.length != expected.length)
       throw new IllegalArgumentException(String.format("expected length %d, but got %d", expected.length, actual.length));
