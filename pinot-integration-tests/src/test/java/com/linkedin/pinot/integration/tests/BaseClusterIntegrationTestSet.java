@@ -40,6 +40,7 @@ import org.testng.Assert;
  * Shared set of common tests for cluster integration tests.
  * <p>To enable the test, override it and add @Test annotation.
  */
+@SuppressWarnings("unused")
 public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
   private static final Random RANDOM = new Random();
 
@@ -95,8 +96,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testHardcodedQueries()
-      throws Exception {
+  public void testHardcodedQueries() throws Exception {
     // Here are some sample queries.
     String query;
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
@@ -121,8 +121,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testQueriesFromQueryFile()
-      throws Exception {
+  public void testQueriesFromQueryFile() throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
     Assert.assertNotNull(resourceUrl);
     File queriesFile = new File(resourceUrl.getFile());
@@ -159,8 +158,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testGeneratedQueriesWithoutMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithoutMultiValues() throws Exception {
     testGeneratedQueries(false);
   }
 
@@ -169,13 +167,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
     testGeneratedQueries(true);
   }
 
-  private void testGeneratedQueries(boolean withMultiValues)
-      throws Exception {
+  private void testGeneratedQueries(boolean withMultiValues) throws Exception {
     QueryGenerator queryGenerator = getQueryGenerator();
     queryGenerator.setSkipMultiValuePredicates(!withMultiValues);
     int numQueriesToGenerate = getNumQueriesToGenerate();
@@ -186,12 +182,28 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
+   * Test invalid queries which should cause query exceptions.
+   *
+   * @throws Exception
+   */
+  public void testQueryExceptions() throws Exception {
+    testQueryException("POTATO");
+    testQueryException("SELECT COUNT(*) FROM potato");
+    testQueryException("SELECT POTATO(ArrTime) FROM mytable");
+    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'");
+  }
+
+  private void testQueryException(String query) throws Exception {
+    JSONObject jsonObject = postQuery(query);
+    Assert.assertTrue(jsonObject.getJSONArray("exceptions").length() > 0);
+  }
+
+  /**
    * Test if routing table get updated when instance is shutting down.
    *
    * @throws Exception
    */
-  public void testInstanceShutdown()
-      throws Exception {
+  public void testInstanceShutdown() throws Exception {
     List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
     Assert.assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
@@ -281,8 +293,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 60_000L, errorMessage);
   }
 
-  private void checkForEmptyRoutingTable(final boolean shouldBeEmpty)
-      throws Exception {
+  private void checkForEmptyRoutingTable(final boolean shouldBeEmpty) throws Exception {
     String errorMessage;
     if (shouldBeEmpty) {
       errorMessage = "Routing table is not empty";

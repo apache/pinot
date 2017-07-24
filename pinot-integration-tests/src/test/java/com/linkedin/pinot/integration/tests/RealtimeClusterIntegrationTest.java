@@ -93,8 +93,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     String timeType = outgoingTimeUnit.toString();
 
     addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, null,
-        null, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(), getTaskConfig());
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, null, null,
+        getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(), getTaskConfig());
   }
 
   @Test
@@ -107,6 +107,12 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   @Override
   public void testGeneratedQueriesWithMultiValues() throws Exception {
     super.testGeneratedQueriesWithMultiValues();
+  }
+
+  @Test
+  @Override
+  public void testQueryExceptions() throws Exception {
+    super.testQueryExceptions();
   }
 
   @Test
