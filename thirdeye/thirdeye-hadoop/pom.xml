@@ -158,6 +158,9 @@
                                         <!-- excluding w3c package, which is not pulled into this fat jar but is used by databind during runtime -->
                                         <!-- if we don't exclude this package, databind code would try to find thirdeye.org.w3c, which does not exist -->
                                         <exclude>org.w3c.**</exclude>
+                                        <!-- excluding packages that will not be able to be found during runtime after relocation -->
+                                        <exclude>org.xml.**</exclude>
+                                        <exclude>org.apache.log4j.**</exclude>
                                     </excludes>
                                 </relocation>
                                 <relocation>
@@ -172,10 +175,11 @@
                                     <pattern>it.</pattern>
                                     <shadedPattern>thirdeye.it.</shadedPattern>
                                 </relocation>
-                                <relocation>
+                                <!-- xerial should not be relocated; otherwise, java.lang.UnsatisfiedLinkError would occur -->
+                                <!--<relocation>
                                     <pattern>xerial.</pattern>
                                     <shadedPattern>thirdeye.xerial.</shadedPattern>
-                                </relocation>
+                                </relocation>-->
                                 <relocation>
                                     <pattern>scala.</pattern>
                                     <shadedPattern>thirdeye.scala.</shadedPattern>
