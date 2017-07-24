@@ -1,3 +1,5 @@
+var services;
+
 function renderMappingsSelection() {
   var html = "<table style='border: 1px;width: 80%'>"
       + "<tr><td>When showing this:</td><td><select name='entityTypeSelector1' id='entityTypeSelector1' onchange='renderEntityTypeSelector(this.id)'></select><div id='entityTypeSelector1_details'></div></td></tr>"
@@ -16,6 +18,11 @@ function renderMappingsSelection() {
     }
     $("#entityTypeSelector1").html(select);
     $("#entityTypeSelector2").html(select);
+
+    // pre load the services
+    getData("/external/services/all", "admin-mappings").done(function (data) {
+      services = data;
+    })
   });
 }
 
@@ -60,6 +67,18 @@ function renderEntityTypeSelector(divId) {
       }
       entityUrn.val(getUrnForPrefixEntityType(entityType) + metricId);
     });
+  } else if (entityType === 'SERVICE') {
+    entitySelect.select2({
+      placeholder: "select a service",
+      data: services
+    });
+    entitySelect.on("change", function (e) {
+      const $selectedElement = $(e.currentTarget);
+      const serviceArr = $selectedElement.select2('data');
+      if (serviceArr.length) {
+        entityUrn.val(getUrnForPrefixEntityType(entityType) + serviceArr[0]['id']);
+      }
+    });
   } else {
     entityUrn.val(getUrnForPrefixEntityType(entityType));
   }
@@ -69,6 +88,8 @@ function getUrnForPrefixEntityType(entityType) {
   switch (entityType) {
     case "METRIC":
       return "thirdeye:metric:";
+    case "SERVICE":
+      return "thirdeye:service:";
     case "DIMENSION":
     case "DIMENSION_VAL":
       return "thirdeye:dimension:";
@@ -90,6 +111,10 @@ function getEntitySpecificSelectionOptions(baseId, entityType) {
 
   switch (entityType) {
     case "METRIC":
+      html += "<select style='width:100%' id='" + baseId + "_" + entityType + "'></select><div id='"
+          + baseId + "_final_urn' ></div>";
+      break;
+    case "SERVICE":
       html += "<select style='width:100%' id='" + baseId + "_" + entityType + "'></select><div id='"
           + baseId + "_final_urn' ></div>";
       break;
