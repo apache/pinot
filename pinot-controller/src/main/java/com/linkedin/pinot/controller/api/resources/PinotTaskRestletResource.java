@@ -44,7 +44,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 
 
-@Api(tags = "task")
+@Api(tags = Constants.TASK_TAG)
 public class PinotTaskRestletResource {
   private static final String TASK_QUEUE_STATE_STOP = "STOP";
   private static final String TASK_QUEUE_STATE_RESUME = "RESUME";

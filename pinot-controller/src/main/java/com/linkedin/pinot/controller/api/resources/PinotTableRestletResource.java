@@ -52,7 +52,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 
-@Api(tags = "table")
+@Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotTableRestletResource {
   /**

@@ -83,7 +83,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 
-@Api(tags = "segment")
+@Api(tags = Constants.SEGMENT_TAG)
+@Path("/")
 public class PinotSegmentUploadRestletResource {
   public static Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
 
@@ -213,14 +214,30 @@ public class PinotSegmentUploadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
-  @ApiOperation(value = "Upload a segment", notes = "Upload a segment")
-  // TODO Does it even work if the segment is sent as a JSON body? Need to compare with the other API
-  public Response uploadSegment(
+  @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  public Response uploadSegmentAsMultiPart(
       FormDataMultiPart multiPart,
+      @Context HttpHeaders headers,
+      @Context HttpServletRequest request
+  ) {
+    return uploadSegmentInternal(multiPart, null, headers, request);
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/segments")
+  @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
+  // TODO Does it even work if the segment is sent as a JSON body? Need to compare with the other API
+  public Response uploadSegmentAsJson(
       String segmentJsonStr,    // If segment is present as json body
       @Context HttpHeaders headers,
       @Context HttpServletRequest request
   ) {
+    return uploadSegmentInternal(null, segmentJsonStr, headers, request);
+  }
+
+  private Response uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr, HttpHeaders headers, HttpServletRequest request) {
     File dataFile = null;
     String downloadURI = null;
     boolean found = false;

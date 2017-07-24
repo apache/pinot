@@ -35,7 +35,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
-@Api(tags = "table")
+@Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotTableSegmentConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(
