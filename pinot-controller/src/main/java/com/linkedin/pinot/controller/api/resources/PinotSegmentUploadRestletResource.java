@@ -61,6 +61,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import javax.annotation.Nonnull;
@@ -81,6 +82,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 
+@Api(tags = "segment")
 public class PinotSegmentUploadRestletResource {
   public static Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
 
@@ -180,11 +182,13 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
   ) {
-    // TODO Use the Enable|Disable|Drop code to set the state to "drop"
-    // May be move this API to that file?
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new WebApplicationException("Table type must not be null", Response.Status.BAD_REQUEST);
+    }
+    PinotSegmentRestletResource.toggleStateInternal(tableName, StateType.DROP, tableType, segmentName, _pinotHelixResourceManager);
 
-    throw new WebApplicationException("Not implemented", Response.Status.INTERNAL_SERVER_ERROR);
-//    return new SuccessResponse("Not yet implemented");
+    return new SuccessResponse("Segment deleted");
   }
 
   @DELETE
@@ -195,11 +199,13 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
   ) {
-    // TODO Use the Enable|Disable|Drop code to set the state to "drop"
-    // May be move this API to that file?
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new WebApplicationException("Table type must not be null", Response.Status.BAD_REQUEST);
+    }
+    PinotSegmentRestletResource.toggleStateInternal(tableName, StateType.DROP, tableType, null, _pinotHelixResourceManager);
 
-    throw new WebApplicationException("Not implemented", Response.Status.INTERNAL_SERVER_ERROR);
-//    return new SuccessResponse("Not yet implemented");
+    return new SuccessResponse("All segments of table " + TableNameBuilder.forType(tableType).tableNameWithType(tableName) + " deleted");
   }
 
   @POST
@@ -319,8 +325,6 @@ public class PinotSegmentUploadRestletResource {
         LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentFile.getName(), clientAddress);
         PinotResourceManagerResponse resourceManagerResponse =  uploadSegment(segmentFile, dataFile, downloadURI, provider);
         Response.ResponseBuilder builder = Response.ok();
-        builder.header(FileUploadPathProvider.HDR_CONTROLLER_HOST, FileUploadPathProvider.getControllerHostName());
-        builder.header(FileUploadPathProvider.HDR_CONTROLLER_VERSION, FileUploadPathProvider.getHdrControllerVersion());
         return builder.build();
       } else {
         // Some problem happened, sent back a simple line of text.

@@ -17,6 +17,8 @@ package com.linkedin.pinot.controller.api.resources;
 
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import javax.ws.rs.WebApplicationException;
 
 
 public class Constants {
@@ -29,6 +31,29 @@ public class Constants {
   public static final String SCHEMA_TAG = "Schema";
   public static final String TENANT_TAG = "Tenant";
 
-  public static final String TABLE_TYPE = "type";
   public static final String INTERNAL_TAG = "Internal Only";
+
+  public static CommonConstants.Helix.TableType validateTableType(String tableTypeStr) {
+    if (tableTypeStr == null) {
+      return null;
+    }
+    try {
+      return CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOGGER.info("Illegal table type '{}'", tableTypeStr);
+      throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'", PinotSegmentRestletResource.BAD_REQUEST);
+    }
+  }
+
+  public static StateType validateState(String stateStr) {
+    if (stateStr == null) {
+      return null;
+    }
+    try {
+      return StateType.valueOf(stateStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOGGER.info("Illegal state '{}'", stateStr);
+      throw new WebApplicationException("Illegal state '" + stateStr + "'", PinotSegmentRestletResource.BAD_REQUEST);
+    }
+  }
 }

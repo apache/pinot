@@ -17,17 +17,12 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import java.io.File;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 
 
 // TODO This is a misc class used by many jersey apis. Need to rename it correctly
 public class FileUploadPathProvider {
-  public static final String HDR_CONTROLLER_VERSION = "Pinot-Controller-Version";
-  public final static String HDR_CONTROLLER_HOST = "Pinot-Controller-Host";
   public final static String STATE = "state";
   public final static String TABLE_NAME = "tableName";
 
@@ -38,11 +33,6 @@ public class FileUploadPathProvider {
   private final File _tmpUntarredPath;
   private final File _schemasTmpDir;
   private final String _vip;
-
-  private final static String CONTROLLER_COMPONENT = "pinot-controller";
-
-  private volatile static String controllerHostName = null;
-  private volatile static String controllerVersion = null;
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
     _controllerConf = controllerConf;
@@ -87,30 +77,5 @@ public class FileUploadPathProvider {
 
   public File getSchemasTmpDir() {
     return _schemasTmpDir;
-  }
-
-  public static String getControllerHostName() {
-    if (controllerHostName != null) {
-      return controllerHostName;
-    }
-
-    controllerHostName = NetUtil.getHostnameOrAddress();
-    if (controllerHostName == null) {
-      // In case of a temporary failure, we will go back to getting the right value again.
-      return "unknown";
-    }
-    return controllerHostName;
-  }
-
-  public static String getHdrControllerVersion() {
-    if (controllerVersion != null) {
-      return controllerVersion;
-    }
-    Map<String, String> versions = Utils.getComponentVersions();
-    controllerVersion = versions.get(CONTROLLER_COMPONENT);
-    if (controllerVersion == null) {
-      controllerVersion = "Unknown";
-    }
-    return controllerVersion;
   }
 }

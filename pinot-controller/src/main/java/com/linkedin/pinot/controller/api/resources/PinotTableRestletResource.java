@@ -36,6 +36,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -120,7 +121,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public JSONObject listTableConfigs(
+  public String listTableConfigs(
   ) {
     try {
       List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
@@ -128,20 +129,13 @@ public class PinotTableRestletResource {
       JSONArray tableArray = new JSONArray(rawTables);
       JSONObject resultObject = new JSONObject();
       resultObject.put("tables", tableArray);
-      return resultObject;
+      return resultObject.toString();
     } catch (Exception e) {
       throw new WebApplicationException(e);
     }
   }
 
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableName}")
-  @ApiOperation(value = "Lists tableconfig for a table", notes = "Lists tableconfig for a table")
-  public JSONObject listTableConfigs(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
+  private String listTableConfigs(@Nonnull String tableName, @Nonnull String tableTypeStr) {
     try {
       JSONObject ret = new JSONObject();
 
@@ -157,7 +151,7 @@ public class PinotTableRestletResource {
         Preconditions.checkNotNull(tableConfig);
         ret.put(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
       }
-      return ret;
+      return ret.toString();
     } catch (Exception e) {
       throw new WebApplicationException(e);
     }
@@ -167,12 +161,24 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
   @ApiOperation(value = "Enable/Disable/Drop a table", notes = "Enable/Disable/Drop a table")
-  public JSONArray alterTableState(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "enable|disable|drop", required = true) @QueryParam("state") String stateStr,
+  public String alterTableStateOrListTableConfig(
+      @ApiParam(value = "Name of the table", required = false) @PathParam("tableName") String tableName,
+      @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
     try {
+      if (tableName == null) {
+        List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
+        Collections.sort(rawTables);
+        JSONArray tableArray = new JSONArray(rawTables);
+        JSONObject resultObject = new JSONObject();
+        resultObject.put("tables", tableArray);
+        return resultObject.toString();
+      }
+      if (stateStr == null) {
+        return listTableConfigs(tableName, tableTypeStr);
+      }
+      StateType state = Constants.validateState(stateStr);
       JSONArray ret = new JSONArray();
       boolean tableExists = false;
 
@@ -197,7 +203,7 @@ public class PinotTableRestletResource {
         ret.put(realTime);
       }
       if (tableExists) {
-        return ret;
+        return ret.toString();
       } else {
         throw new WebApplicationException("Table '" + tableName + "' does not exist", Response.Status.BAD_REQUEST);
       }
@@ -350,5 +356,4 @@ public class PinotTableRestletResource {
       }
     }
   }
-
 }

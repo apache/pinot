@@ -116,14 +116,14 @@ public class PinotSegmentRestletResource {
     }
 
     try {
-      CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
-      StateType state = validateState(stateStr);
+      CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
+      StateType state = Constants.validateState(stateStr);
 
       if (stateStr == null) {
         JSONArray result = getAllSegmentsMetadataForTable(tableName, tableType);
         return result.toString();
       }
-      return toggleStateInternal(tableName, state, tableType, null).toString();
+      return toggleStateInternal(tableName, state, tableType, null, _pinotHelixResourceManager).toString();
     } catch (Exception e) {
       throw new WebApplicationException(e, INTERNAL_ERROR);
     }
@@ -147,15 +147,15 @@ public class PinotSegmentRestletResource {
       throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
     }
 
-    CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
-    StateType stateType = validateState(stateStr);
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
+    StateType stateType = Constants.validateState(stateStr);
 
     try {
       if (stateStr == null) {
         // This is a list metadata operation
         return getSegmentMetaData(tableName, segmentName, tableType).toString();
       } else {
-        return toggleStateInternal(tableName, stateType, tableType, segmentName).toString();
+        return toggleStateInternal(tableName, stateType, tableType, segmentName, _pinotHelixResourceManager).toString();
       }
     } catch (Exception e) {
       throw new WebApplicationException(e, INTERNAL_ERROR);
@@ -175,7 +175,7 @@ public class PinotSegmentRestletResource {
     if (tableName == null || tableName.length() == 0) {
       throw new WebApplicationException("Table name cannot be null", BAD_REQUEST);
     }
-    CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     try {
       JSONArray result = getAllSegmentsMetadataForTable(tableName, tableType);
       return result.toString();
@@ -200,7 +200,7 @@ public class PinotSegmentRestletResource {
     if (segmentName == null || segmentName.length() == 0) {
       throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
     }
-    CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     // The code in restlet.resources seems to return an array of arrays, so we will do the same
     // to maintain backward compatibility
     try {
@@ -238,7 +238,7 @@ public class PinotSegmentRestletResource {
     if (segmentName == null || segmentName.length() == 0) {
       throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
     }
-    CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
 
     return reloadSegmentForTable(tableName, segmentName, tableType);
   }
@@ -254,7 +254,7 @@ public class PinotSegmentRestletResource {
     if (tableName == null) {
       throw new WebApplicationException("Table type cannot be null", BAD_REQUEST);
     }
-    CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
 
     return reloadAllSegmentsForTable(tableName, tableType);
   }
@@ -270,7 +270,7 @@ public class PinotSegmentRestletResource {
     if (tableName == null) {
       throw new WebApplicationException("Table type cannot be null", BAD_REQUEST);
     }
-    CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
 
     try {
       return getAllCrcMetadataForTable(tableName);
@@ -280,30 +280,6 @@ public class PinotSegmentRestletResource {
   }
 
   //////////////////////////////////////////////////////////////////////////////////////
-
-  private CommonConstants.Helix.TableType validateTableType(String tableTypeStr) {
-    if (tableTypeStr == null) {
-      return null;
-    }
-    try {
-      return CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      LOGGER.info("Illegal table type '{}'", tableTypeStr);
-      throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'", BAD_REQUEST);
-    }
-  }
-
-  private StateType validateState(String stateStr) {
-    if (stateStr == null) {
-      return null;
-    }
-    try {
-      return StateType.valueOf(stateStr.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      LOGGER.info("Illegal state '{}'", stateStr);
-      throw new WebApplicationException("Illegal state '" + stateStr + "'", BAD_REQUEST);
-    }
-  }
 
   private String reloadSegmentForTable( String tableName, String segmentName, CommonConstants.Helix.TableType tableType) {
     int numReloadMessagesSent = 0;
@@ -337,19 +313,19 @@ public class PinotSegmentRestletResource {
     return "Sent " + numReloadMessagesSent + " reload messages";
   }
 
-  private JSONArray toggleStateInternal(String tableName, StateType state, CommonConstants.Helix.TableType tableType, String segmentName) {
+  public static JSONArray toggleStateInternal(String tableName, StateType state, CommonConstants.Helix.TableType tableType, String segmentName, PinotHelixResourceManager helixResourceManager) {
     JSONArray ret = new JSONArray();
     List<String> segmentsToToggle = new ArrayList<>();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String tableNameWithType = "";
-    List<String> realtimeSegments = _pinotHelixResourceManager.getSegmentsFor(realtimeTableName);
-    List<String> offlineSegments = _pinotHelixResourceManager.getSegmentsFor(offlineTableName);
+    List<String> realtimeSegments = helixResourceManager.getSegmentsFor(realtimeTableName);
+    List<String> offlineSegments = helixResourceManager.getSegmentsFor(offlineTableName);
     try {
 
       if (tableType == null) {
-        PinotResourceManagerResponse responseRealtime = toggleSegmentsForTable(realtimeSegments, realtimeTableName, segmentName, state);
-        PinotResourceManagerResponse responseOffline = toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state);
+        PinotResourceManagerResponse responseRealtime = toggleSegmentsForTable(realtimeSegments, realtimeTableName, segmentName, state, helixResourceManager);
+        PinotResourceManagerResponse responseOffline = toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state, helixResourceManager);
         if (!responseOffline.isSuccessful() || !responseRealtime.isSuccessful()) {
           throw new WebApplicationException(
               "OFFLINE response : " + responseOffline.getMessage() + ", REALTIME response" + responseRealtime
@@ -361,7 +337,7 @@ public class PinotSegmentRestletResource {
         ret.put(responses);
         return ret;
       } else if (CommonConstants.Helix.TableType.REALTIME == tableType) {
-        if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        if (helixResourceManager.hasRealtimeTable(tableName)) {
           tableNameWithType = realtimeTableName;
           if (segmentName != null) {
             segmentsToToggle = Collections.singletonList(segmentName);
@@ -372,7 +348,7 @@ public class PinotSegmentRestletResource {
           throw new WebApplicationException("There is no realtime table for " + tableName, BAD_REQUEST);
         }
       } else {
-        if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+        if (helixResourceManager.hasOfflineTable(tableName)) {
           tableNameWithType = offlineTableName;
           if (segmentName != null) {
             segmentsToToggle = Collections.singletonList(segmentName);
@@ -382,10 +358,9 @@ public class PinotSegmentRestletResource {
         } else {
           throw new WebApplicationException("There is no offline table for: " + tableName, BAD_REQUEST);
         }
-
-        PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
-        ret.put(resourceManagerResponse);
       }
+      PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state, helixResourceManager);
+      ret.put(resourceManagerResponse);
       return ret;
     } catch (Exception e) {
       throw new WebApplicationException(e, INTERNAL_ERROR);
@@ -403,12 +378,13 @@ public class PinotSegmentRestletResource {
    * @return
    * @throws JSONException
    */
-  private PinotResourceManagerResponse toggleSegmentsForTable(@Nonnull List<String> segmentsToToggle, @Nonnull String tableName, String segmentName, @Nonnull StateType state) throws JSONException {
+  private static PinotResourceManagerResponse toggleSegmentsForTable(@Nonnull List<String> segmentsToToggle, @Nonnull String tableName, String segmentName, @Nonnull StateType state,
+      PinotHelixResourceManager helixResourceManager) throws JSONException {
     long timeOutInSeconds = 10L;
     if (segmentName == null) {
       // For enable, allow 5 seconds per segment for an instance as timeout.
       if (state == StateType.ENABLE) {
-        int instanceCount = _pinotHelixResourceManager.getAllInstances().size();
+        int instanceCount = helixResourceManager.getAllInstances().size();
         if (instanceCount != 0) {
           timeOutInSeconds = (long) ((_offlineToOnlineTimeoutInseconds * segmentsToToggle.size()) / instanceCount);
         } else {
@@ -419,11 +395,11 @@ public class PinotSegmentRestletResource {
 
     switch (state) {
       case ENABLE:
-        return _pinotHelixResourceManager.toggleSegmentState(tableName, segmentsToToggle, true, timeOutInSeconds);
+        return helixResourceManager.toggleSegmentState(tableName, segmentsToToggle, true, timeOutInSeconds);
       case DISABLE:
-        return _pinotHelixResourceManager.toggleSegmentState(tableName, segmentsToToggle, false, timeOutInSeconds);
+        return helixResourceManager.toggleSegmentState(tableName, segmentsToToggle, false, timeOutInSeconds);
       case DROP:
-        return _pinotHelixResourceManager.deleteSegments(tableName, segmentsToToggle);
+        return helixResourceManager.deleteSegments(tableName, segmentsToToggle);
       default:
         throw new WebApplicationException("Invalid state", BAD_REQUEST);
     }
