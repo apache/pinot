@@ -232,8 +232,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @Override
-    protected int getRealtimeSegmentFlushSize(boolean useLlc) {
-      return super.getRealtimeSegmentFlushSize(useLlc) * 100;
+    protected int getRealtimeSegmentFlushSize() {
+      return super.getRealtimeSegmentFlushSize() * 100;
     }
 
     @Override
@@ -287,10 +287,10 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       Assert.assertNotNull(timeColumnName);
       TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
       Assert.assertNotNull(outgoingTimeUnit);
-      String timeColumnType = outgoingTimeUnit.toString();
-      addHybridTable(_tableName, timeColumnName, timeColumnType, KAFKA_ZK_STR, KAFKA_BROKER, getKafkaTopic(),
-          schemaName, TENANT_NAME, TENANT_NAME, _realtimeAvroFiles.get(0), _sortedColumn, _invertedIndexColumns, "MMAP",
-          useLlc(), null, null);
+      String timeType = outgoingTimeUnit.toString();
+      addHybridTable(_tableName, _useLlc, KAFKA_BROKER, KAFKA_ZK_STR, getKafkaTopic(), getRealtimeSegmentFlushSize(),
+          _realtimeAvroFiles.get(0), timeColumnName, timeType, schemaName, TENANT_NAME, TENANT_NAME, "MMAP",
+          _sortedColumn, _invertedIndexColumns, null, null);
 
       // Upload all segments
       uploadSegments(_tarDir);

@@ -18,7 +18,6 @@ package com.linkedin.pinot.integration.tests;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.tools.query.comparison.QueryComparison;
 import com.linkedin.pinot.tools.query.comparison.SegmentInfoProvider;
 import com.linkedin.pinot.tools.query.comparison.StarTreeQueryGenerator;
@@ -63,7 +62,6 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(StarTreeClusterIntegrationTest.class);
 
-
   private static final int NUM_GENERATED_QUERIES = 100;
 
   private static final int TOTAL_EXPECTED_DOCS = 115545;
@@ -71,12 +69,6 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "myTable";
   private static final String STAR_TREE_TABLE_NAME = "myStarTable";
 
-  private static final String TIME_COLUMN_NAME = "DaysSinceEpoch";
-  private static final String TIME_UNIT = "daysSinceEpoch";
-  private static final String RETENTION_TIME_UNIT = "";
-
-  private static final int RETENTION_TIME = -1;
-  private static final int SEGMENT_COUNT = 12;
   private static final long TIMEOUT_IN_MILLISECONDS = 30 * 1000;
   private static final long TIMEOUT_IN_SECONDS = 3600;
 
@@ -104,10 +96,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
    * @throws Exception
    */
   private void addOfflineTables() throws Exception {
-    addOfflineTable(TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT, null, null, DEFAULT_TABLE_NAME,
-        SegmentVersion.v1);
-    addOfflineTable(TIME_COLUMN_NAME, TIME_UNIT, RETENTION_TIME, RETENTION_TIME_UNIT, null, null, STAR_TREE_TABLE_NAME,
-        SegmentVersion.v1);
+    addOfflineTable(DEFAULT_TABLE_NAME);
+    addOfflineTable(STAR_TREE_TABLE_NAME);
   }
 
   /**

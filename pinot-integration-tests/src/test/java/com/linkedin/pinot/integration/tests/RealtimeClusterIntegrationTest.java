@@ -90,18 +90,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     Assert.assertNotNull(timeColumnName);
     TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
     Assert.assertNotNull(outgoingTimeUnit);
-    String timeColumnType = outgoingTimeUnit.toString();
+    String timeType = outgoingTimeUnit.toString();
 
-    if (useLlc()) {
-      addLLCRealtimeTable(getTableName(), timeColumnName, timeColumnType, -1, null,
-          KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(), schemaName, null, null, avroFile,
-          getRealtimeSegmentFlushSize(true), getSortedColumn(), getInvertedIndexColumns(), getLoadMode(),
-          getRawIndexColumns(), getTaskConfig());
-    } else {
-      addRealtimeTable(getTableName(), timeColumnName, timeColumnType, -1, null, KafkaStarterUtils.DEFAULT_ZK_STR,
-          getKafkaTopic(), schemaName, null, null, avroFile, getRealtimeSegmentFlushSize(false), getSortedColumn(),
-          getInvertedIndexColumns(), getLoadMode(), getRawIndexColumns(), getTaskConfig());
-    }
+    addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, null,
+        null, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(), getTaskConfig());
   }
 
   @Test

@@ -46,10 +46,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final String DEFAULT_AVRO_TAR_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz";
   private static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
-  private static final int DEFAULT_HLC_NUM_KAFKA_BROKERS = 1;
+  private static final int DEFAULT_LLC_SEGMENT_FLUSH_SIZE = 5000;
+  private static final int DEFAULT_HLC_SEGMENT_FLUSH_SIZE = 20000;
   private static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
-  private static final int DEFAULT_HLC_NUM_KAFKA_PARTITIONS = 10;
+  private static final int DEFAULT_HLC_NUM_KAFKA_BROKERS = 1;
   private static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
+  private static final int DEFAULT_HLC_NUM_KAFKA_PARTITIONS = 10;
   private static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
   private static final String DEFAULT_SORTED_COLUMN = "Carrier";
   private static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
@@ -93,6 +95,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected boolean useLlc() {
     return false;
+  }
+
+  protected int getRealtimeSegmentFlushSize() {
+    if (useLlc()) {
+      return DEFAULT_LLC_SEGMENT_FLUSH_SIZE;
+    } else {
+      return DEFAULT_HLC_SEGMENT_FLUSH_SIZE;
+    }
   }
 
   protected int getNumKafkaBrokers() {

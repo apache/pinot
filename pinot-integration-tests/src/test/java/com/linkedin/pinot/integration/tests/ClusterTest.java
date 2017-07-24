@@ -18,6 +18,7 @@ package com.linkedin.pinot.integration.tests;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
@@ -66,23 +67,12 @@ import org.testng.Assert;
 public abstract class ClusterTest extends ControllerTest {
   private static final int DEFAULT_BROKER_PORT = 18099;
 
-  private static final int LLC_SEGMENT_FLUSH_SIZE = 5000;
-  private static final int HLC_SEGMENT_FLUSH_SIZE = 20000;
-
   protected final String _clusterName = getHelixClusterName();
   protected String _brokerBaseApiUrl;
 
   private List<HelixBrokerStarter> _brokerStarters = new ArrayList<>();
   private List<HelixServerStarter> _serverStarters = new ArrayList<>();
   private List<MinionStarter> _minionStarters = new ArrayList<>();
-
-  protected int getRealtimeSegmentFlushSize(boolean useLlc) {
-    if (useLlc) {
-      return LLC_SEGMENT_FLUSH_SIZE;
-    } else {
-      return HLC_SEGMENT_FLUSH_SIZE;
-    }
-  }
 
   protected void startBroker() {
     startBrokers(1);
@@ -233,21 +223,38 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void addOfflineTable(String timeColumnName, String timeColumnType, int retentionTimeValue,
-      String retentionTimeUnit, String brokerTenant, String serverTenant, String tableName,
-      SegmentVersion segmentVersion) throws Exception {
-    addOfflineTable(timeColumnName, timeColumnType, retentionTimeValue, retentionTimeUnit, brokerTenant, serverTenant,
-        null, null, tableName, segmentVersion, null);
+  protected void addOfflineTable(String tableName) throws Exception {
+    addOfflineTable(tableName, SegmentVersion.v1);
   }
 
-  protected void addOfflineTable(String timeColumnName, String timeColumnType, int retentionTimeValue,
-      String retentionTimeUnit, String brokerTenant, String serverTenant, List<String> invertedIndexColumns,
-      String loadMode, String tableName, SegmentVersion segmentVersion, TableTaskConfig taskConfig) throws Exception {
-    String tableJSONConfigString = new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
+  protected void addOfflineTable(String tableName, SegmentVersion segmentVersion) throws Exception {
+    addOfflineTable(tableName, null, null, null, null, null, segmentVersion, null, null);
+  }
+
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
+      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
+      TableTaskConfig taskConfig) throws Exception {
+    TableConfig tableConfig =
+        getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
+            invertedIndexColumns, taskConfig);
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+  }
+
+  protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
+      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
+      TableTaskConfig taskConfig) throws Exception {
+    TableConfig tableConfig =
+        getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
+            invertedIndexColumns, taskConfig);
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
+  }
+
+  private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
+      String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
+      List<String> invertedIndexColumns, TableTaskConfig taskConfig) throws Exception {
+    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName(timeColumnName)
-        .setTimeType(timeColumnType)
-        .setRetentionTimeUnit(retentionTimeUnit)
-        .setRetentionTimeValue(String.valueOf(retentionTimeValue))
+        .setTimeType(timeType)
         .setNumReplicas(3)
         .setBrokerTenant(brokerTenant)
         .setServerTenant(serverTenant)
@@ -255,37 +262,12 @@ public abstract class ClusterTest extends ControllerTest {
         .setSegmentVersion(segmentVersion.toString())
         .setInvertedIndexColumns(invertedIndexColumns)
         .setTaskConfig(taskConfig)
-        .build()
-        .toJSONConfigString();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
-  }
-
-  protected void updateOfflineTable(String timeColumnName, int retentionTimeValue, String retentionTimeUnit,
-      String brokerTenant, String serverTenant, List<String> invertedIndexColumns, String loadMode, String tableName,
-      SegmentVersion segmentVersion, TableTaskConfig taskConfig) throws Exception {
-    String tableJSONConfigString = new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
-        .setTimeColumnName(timeColumnName)
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit(retentionTimeUnit)
-        .setRetentionTimeValue(String.valueOf(retentionTimeValue))
-        .setNumReplicas(3)
-        .setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant)
-        .setLoadMode(loadMode)
-        .setSegmentVersion(segmentVersion.toString())
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setTaskConfig(taskConfig)
-        .build()
-        .toJSONConfigString();
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableJSONConfigString);
+        .build();
   }
 
   protected void dropOfflineTable(String tableName) throws Exception {
-    sendDeleteRequest(_controllerRequestURLBuilder.forTableDelete(tableName + "_OFFLINE"));
-  }
-
-  protected void dropRealtimeTable(String tableName) throws Exception {
-    sendDeleteRequest(_controllerRequestURLBuilder.forTableDelete(tableName + "_REALTIME"));
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder {
@@ -303,7 +285,7 @@ public abstract class ClusterTest extends ControllerTest {
       _avroSchema = reader.getSchema();
       reader.close();
       _rowGenerator = new AvroRecordToPinotRowGenerator(indexingSchema);
-      _reader = new GenericDatumReader<GenericData.Record>(_avroSchema);
+      _reader = new GenericDatumReader<>(_avroSchema);
     }
 
     @Override
@@ -324,95 +306,63 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void addRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
-      String retentionTimeUnit, String kafkaZkUrl, String kafkaTopic, String schemaName, String serverTenant,
-      String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
-      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
+  protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
+      String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
+      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
       throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
-        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
-    streamConfigs.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
-    streamConfigs.put(
-        DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET, "smallest");
-
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-    String tableJSONConfigString = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName)
-        .setTimeColumnName(timeColumnName)
-        .setTimeType(timeColumnType)
-        .setRetentionTimeUnit(retentionTimeUnit)
-        .setRetentionTimeValue(String.valueOf(retentionDays))
-        .setSchemaName(schemaName)
-        .setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant)
-        .setLoadMode(loadMode)
-        .setSortedColumn(sortedColumn)
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setNoDictionaryColumns(noDictionaryColumns)
-        .setStreamConfigs(streamConfigs)
-        .setTaskConfig(taskConfig)
-        .build()
-        .toJSONConfigString();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
-  }
-
-  protected void addLLCRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
-      String retentionTimeUnit, String kafkaBrokerList, String kafkaTopic, String schemaName, String serverTenant,
-      String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
-      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
-      throws Exception {
-    Map<String, String> streamConfigs = new HashMap<>();
-    streamConfigs.put("streamType", "kafka");
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
-        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
-    streamConfigs.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
-    streamConfigs.put(
-        DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET, "smallest");
-
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-    String tableJSONConfigString = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName)
-        .setLLC(true)
-        .setTimeColumnName(timeColumnName)
-        .setTimeType(timeColumnType)
-        .setRetentionTimeUnit(retentionTimeUnit)
-        .setRetentionTimeValue(String.valueOf(retentionDays))
-        .setSchemaName(schemaName)
-        .setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant)
-        .setLoadMode(loadMode)
-        .setSortedColumn(sortedColumn)
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setNoDictionaryColumns(noDictionaryColumns)
-        .setStreamConfigs(streamConfigs)
-        .setTaskConfig(taskConfig)
-        .build()
-        .toJSONConfigString();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
-  }
-
-  protected void addHybridTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaBroker, String kafkaTopic, String schemaName, String serverTenant, String brokerTenant, File avroFile,
-      String sortedColumn, List<String> invertedIndexColumns, String loadMode, boolean useLlc,
-      List<String> noDictionaryColumns, TableTaskConfig taskConfig) throws Exception {
     if (useLlc) {
-      addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, null, kafkaBroker, kafkaTopic, schemaName,
-          serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(true), sortedColumn, invertedIndexColumns,
-          loadMode, noDictionaryColumns, taskConfig);
+      // LLC
+      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
+      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
     } else {
-      addRealtimeTable(tableName, timeColumnName, timeColumnType, -1, null, kafkaZkUrl, kafkaTopic, schemaName,
-          serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(false), sortedColumn, invertedIndexColumns,
-          loadMode, noDictionaryColumns, taskConfig);
+      // HLC
+      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
+      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
+      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
     }
-    addOfflineTable(timeColumnName, timeColumnType, -1, null, brokerTenant, serverTenant, invertedIndexColumns,
-        loadMode, tableName, SegmentVersion.v1, taskConfig);
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
+    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
+        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    streamConfigs.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
+    streamConfigs.put(
+        DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET, "smallest");
+
+    TableConfig tableConfig = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName)
+        .setLLC(useLlc)
+        .setTimeColumnName(timeColumnName)
+        .setTimeType(timeType)
+        .setSchemaName(schemaName)
+        .setBrokerTenant(brokerTenant)
+        .setServerTenant(serverTenant)
+        .setLoadMode(loadMode)
+        .setSortedColumn(sortedColumn)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setNoDictionaryColumns(noDictionaryColumns)
+        .setStreamConfigs(streamConfigs)
+        .setTaskConfig(taskConfig)
+        .build();
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+  }
+
+  protected void dropRealtimeTable(String tableName) throws Exception {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
+  }
+
+  protected void addHybridTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
+      String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
+      String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
+      throws Exception {
+    addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, SegmentVersion.v1,
+        invertedIndexColumns, taskConfig);
+    addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
+        timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
+        noDictionaryColumns, taskConfig);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {
