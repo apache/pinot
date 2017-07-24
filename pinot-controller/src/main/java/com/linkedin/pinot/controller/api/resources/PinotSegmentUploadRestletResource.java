@@ -61,6 +61,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.controller.util.TableSizeReader;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -476,8 +477,7 @@ public class PinotSegmentUploadRestletResource {
       @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) {
     TableSizeReader
         tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    // TODO: FIXME: pass tableSizeReader from correct package instead of null
-    StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, null);
+    StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);

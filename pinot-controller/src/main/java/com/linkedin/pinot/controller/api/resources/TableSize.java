@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.util.TableSizeReader;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
