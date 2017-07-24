@@ -74,7 +74,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends AbstractPartition
     RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
 
     // Compute segment id to replica id to server instance
-    Map<SegmentId, Map<Integer, ServerInstance>> segmentId2ServersMapping = new HashMap<>();
+    Map<SegmentId, Map<Integer, ServerInstance>> segmentIdToServersMapping = new HashMap<>();
     for (String segmentName : externalView.getPartitionSet()) {
       SegmentId segmentId = new SegmentId(segmentName);
       int partitionId = getPartitionId(segmentName);
@@ -107,7 +107,11 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends AbstractPartition
         }
         replicaId++;
       }
-      segmentId2ServersMapping.put(segmentId, serverInstanceMap);
+
+      // Update the final routing look up table.
+      if (!serverInstanceMap.isEmpty()) {
+        segmentIdToServersMapping.put(segmentId, serverInstanceMap);
+      }
     }
 
     // Delete segment metadata from the cache if the segment no longer exists in the external view.
@@ -118,7 +122,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends AbstractPartition
       }
     }
 
-    _mappingReference.set(segmentId2ServersMapping);
+    _mappingReference.set(segmentIdToServersMapping);
   }
 
   /**
