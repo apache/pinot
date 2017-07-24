@@ -864,6 +864,7 @@ public class DataResource {
 
   public enum EntityType {
     METRIC,
+    SERVICE,
     DIMENSION,
     DIMENSION_VAL,
     CUSTOM
