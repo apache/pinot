@@ -45,8 +45,8 @@ import org.testng.annotations.Test;
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final int NUM_BROKERS = 2;
-  private static final int NUM_SERVERS = 2;
+  private static final int NUM_BROKERS = 1;
+  private static final int NUM_SERVERS = 1;
 
   // For inverted index triggering test
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
@@ -64,7 +64,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
-      new ArrayList<>(NUM_BROKERS + NUM_SERVERS);
+      new ArrayList<>(getNumBrokers() + getNumServers());
+
+  protected int getNumBrokers() {
+    return NUM_BROKERS;
+  }
+
+  protected int getNumServers() {
+    return NUM_SERVERS;
+  }
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -73,8 +81,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Start the Pinot cluster
     startZk();
     startController();
-    startBrokers(NUM_BROKERS);
-    startServers(NUM_SERVERS);
+    startBrokers(getNumBrokers());
+    startServers(getNumServers());
 
     // Set up service status callbacks
     List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
@@ -123,26 +131,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  @Override
-  public void testQueriesFromQueryFile() throws Exception {
-    super.testQueriesFromQueryFile();
-  }
-
-  @Test
-  @Override
-  public void testGeneratedQueriesWithMultiValues() throws Exception {
-    super.testGeneratedQueriesWithMultiValues();
-  }
-
-  @Test
-  @Override
-  public void testInstanceShutdown() throws Exception {
-    super.testInstanceShutdown();
-  }
-
-  @Test
   public void testInstancesStarted() {
-    Assert.assertEquals(_serviceStatusCallbacks.size(), NUM_BROKERS + NUM_SERVERS);
+    Assert.assertEquals(_serviceStatusCallbacks.size(), getNumBrokers() + getNumServers());
     for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
       Assert.assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
     }
@@ -164,16 +154,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          // Query 10 times to ensure all replicas get reloaded
-          for (int i = 0; i < 10; i++) {
-            JSONObject queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-            // Total docs should not change during reload
-            Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
-            if (queryResponse.getLong("numEntriesScannedInFilter") != 0L) {
-              return false;
-            }
-          }
-          return true;
+          JSONObject queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+          // Total docs should not change during reload
+          Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
+          return queryResponse.getLong("numEntriesScannedInFilter") == 0L;
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
@@ -236,23 +220,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          // Query 10 times to ensure all replicas get reloaded
-          for (int i = 0; i < 10; i++) {
-            JSONObject queryResponse = postQuery(TEST_DEFAULT_COLUMNS_QUERY);
-            // Total docs should not change during reload
-            Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
-            long count = queryResponse.getJSONArray("aggregationResults").getJSONObject(0).getLong("value");
-            if (withExtraColumns) {
-              if (count != numTotalDocs) {
-                return false;
-              }
-            } else {
-              if (count != 0) {
-                return false;
-              }
-            }
+          JSONObject queryResponse = postQuery(TEST_DEFAULT_COLUMNS_QUERY);
+          // Total docs should not change during reload
+          Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
+          long count = queryResponse.getJSONArray("aggregationResults").getJSONObject(0).getLong("value");
+          if (withExtraColumns) {
+            return count == numTotalDocs;
+          } else {
+            return count == 0;
           }
-          return true;
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
@@ -369,19 +345,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
   }
 
-  @Test
-  public void testQueryException() throws Exception {
-    testQueryException("POTATO");
-    testQueryException("SELECT COUNT(*) FROM potato");
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable");
-    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'");
-  }
-
-  private void testQueryException(String query) throws Exception {
-    JSONObject jsonObject = postQuery(query);
-    Assert.assertTrue(jsonObject.getJSONArray("exceptions").length() > 0);
-  }
-
   @AfterClass
   public void tearDown() throws Exception {
     // Test instance decommission before tearing down
@@ -398,7 +361,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JSONObject response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     JSONArray instanceList = response.getJSONArray("instances");
     int numInstances = instanceList.length();
-    Assert.assertEquals(numInstances, NUM_BROKERS + NUM_SERVERS);
+    Assert.assertEquals(numInstances, getNumBrokers() + getNumServers());
 
     // Try to delete a server that does not exist
     String deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete("potato");

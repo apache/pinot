@@ -131,8 +131,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     String timeType = outgoingTimeUnit.toString();
 
     addHybridTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
-        TENANT_NAME, TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(),
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME,
+        TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(),
         getTaskConfig());
   }
 
@@ -190,6 +190,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Override
   public void testGeneratedQueriesWithMultiValues() throws Exception {
     super.testGeneratedQueriesWithMultiValues();
+  }
+
+  @Test
+  @Override
+  public void testQueryExceptions() throws Exception {
+    super.testQueryExceptions();
   }
 
   @Test
