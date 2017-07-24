@@ -292,6 +292,10 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     return this;
   }
 
+  public Object get(int index) {
+    return this.values[index];
+  }
+
   public List<Object> toList() {
     return this.toListTyped();
   }
@@ -405,10 +409,25 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
     });
   }
 
-  public ObjectSeries set(BooleanSeries where, Object value) {
+  @Override
+  public ObjectSeries set(BooleanSeries mask, Series other) {
+    if(other.size() == 1)
+      return this.set(mask, other.getObject(0));
+    assertSameLength(this, mask ,other);
+
+    Object[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<this.values.length; i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i)))
+        values[i] = other.getObject(i);
+    }
+    return buildFrom(values);
+  }
+
+  public ObjectSeries set(BooleanSeries mask, Object value) {
+    assertSameLength(this, mask);
     Object[] values = new Object[this.values.length];
-    for(int i=0; i<where.size(); i++) {
-      if(BooleanSeries.isTrue(where.getBoolean(i))) {
+    for(int i=0; i<mask.size(); i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i))) {
         values[i] = value;
       } else {
         values[i] = this.values[i];
@@ -619,6 +638,11 @@ public class ObjectSeries extends TypedSeries<ObjectSeries> {
       fromIndex[i] = tuples.get(i).index;
     }
     return fromIndex;
+  }
+
+  @Override
+  int hashCode(int index) {
+    return this.values[index].hashCode();
   }
 
   static final class ObjectSortTuple {

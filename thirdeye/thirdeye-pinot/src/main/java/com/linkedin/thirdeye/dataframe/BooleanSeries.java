@@ -286,6 +286,10 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return booleanValueOf(value);
   }
 
+  public byte get(int index) {
+    return this.values[index];
+  }
+
   @Override
   public boolean isNull(int index) {
     return isNull(this.values[index]);
@@ -531,10 +535,25 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     });
   }
 
-  public BooleanSeries set(BooleanSeries where, byte value) {
+  @Override
+  public BooleanSeries set(BooleanSeries mask, Series other) {
+    if(other.size() == 1)
+      return this.set(mask, other.getBoolean(0));
+    assertSameLength(this, mask ,other);
+
+    byte[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<this.values.length; i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i)))
+        values[i] = other.getBoolean(i);
+    }
+    return buildFrom(values);
+  }
+
+  public BooleanSeries set(BooleanSeries mask, byte value) {
+    assertSameLength(this, mask);
     byte[] values = new byte[this.values.length];
-    for(int i=0; i<where.size(); i++) {
-      if(BooleanSeries.isTrue(where.getBoolean(i))) {
+    for(int i=0; i<mask.size(); i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i))) {
         values[i] = valueOf(value);
       } else {
         values[i] = this.values[i];
@@ -543,8 +562,8 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return buildFrom(values);
   }
 
-  public BooleanSeries set(BooleanSeries where, boolean value) {
-    return this.set(where, valueOf(value));
+  public BooleanSeries set(BooleanSeries mask, boolean value) {
+    return this.set(mask, valueOf(value));
   }
 
   public BooleanSeries set(int index, byte value) {
@@ -754,6 +773,11 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   @Override
   public int hashCode() {
     return Arrays.hashCode(this.values);
+  }
+
+  @Override
+  int hashCode(int index) {
+    return this.values[index];
   }
 
   /**

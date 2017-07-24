@@ -710,15 +710,15 @@ public class DataFrameTest {
 
   @Test
   public void testObjectGroupByValue() {
-    ObjectSeries in = DataFrame.toSeriesObjects(3, new Tuple(1, 2), "1.0", 3L, 3, "1.0", new Tuple(1, 0), "1.0", new Tuple(1, 2), ONULL);
+    ObjectSeries in = DataFrame.toSeriesObjects(3, new TestTuple(1, 2), "1.0", 3L, 3, "1.0", new TestTuple(1, 0), "1.0", new TestTuple(1, 2), ONULL);
     Grouping.SeriesGrouping grouping = in.groupByValue();
 
     Assert.assertEquals(grouping.size(), 6);
     assertEquals(grouping.apply(0).getObjects(), 3, 3);
-    assertEquals(grouping.apply(1).getObjects(), new Tuple(1, 2), new Tuple(1, 2));
+    assertEquals(grouping.apply(1).getObjects(), new TestTuple(1, 2), new TestTuple(1, 2));
     assertEquals(grouping.apply(2).getObjects(), "1.0", "1.0", "1.0");
     assertEquals(grouping.apply(3).getObjects(), 3L);
-    assertEquals(grouping.apply(4).getObjects(), new Tuple(1, 0));
+    assertEquals(grouping.apply(4).getObjects(), new TestTuple(1, 0));
     assertEquals(grouping.apply(5).getObjects(), ONULL);
   }
 
@@ -1654,103 +1654,94 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testLongJoinInner() {
+  public void testLongHashJoinOuter() {
     Series sLeft = DataFrame.toSeries(4, 3, 1, 2);
     Series sRight = DataFrame.toSeries(5, 4, 3, 3, 0);
 
-    List<Series.JoinPair> pairs = sLeft.join(sRight, Series.JoinType.INNER);
-
-    Assert.assertEquals(pairs.size(), 3);
-    Assert.assertEquals(pairs.get(0), new Series.JoinPair(1, 2));
-    Assert.assertEquals(pairs.get(1), new Series.JoinPair(1, 3));
-    Assert.assertEquals(pairs.get(2), new Series.JoinPair(0, 1));
-  }
-
-  @Test
-  public void testLongJoinLeft() {
-    Series sLeft = DataFrame.toSeries(4, 3, 1, 2);
-    Series sRight = DataFrame.toSeries(5, 4, 3, 3, 0);
-
-    List<Series.JoinPair> pairs = sLeft.join(sRight, Series.JoinType.LEFT);
-
-    Assert.assertEquals(pairs.size(), 5);
-    Assert.assertEquals(pairs.get(0), new Series.JoinPair(2, -1));
-    Assert.assertEquals(pairs.get(1), new Series.JoinPair(3, -1));
-    Assert.assertEquals(pairs.get(2), new Series.JoinPair(1, 2));
-    Assert.assertEquals(pairs.get(3), new Series.JoinPair(1, 3));
-    Assert.assertEquals(pairs.get(4), new Series.JoinPair(0, 1));
-  }
-
-  @Test
-  public void testLongJoinRight() {
-    Series sLeft = DataFrame.toSeries(4, 3, 1, 2);
-    Series sRight = DataFrame.toSeries(5, 4, 3, 3, 0);
-
-    List<Series.JoinPair> pairs = sLeft.join(sRight, Series.JoinType.RIGHT);
-
-    Assert.assertEquals(pairs.size(), 5);
-    Assert.assertEquals(pairs.get(0), new Series.JoinPair(-1, 4));
-    Assert.assertEquals(pairs.get(1), new Series.JoinPair(1, 2));
-    Assert.assertEquals(pairs.get(2), new Series.JoinPair(1, 3));
-    Assert.assertEquals(pairs.get(3), new Series.JoinPair(0, 1));
-    Assert.assertEquals(pairs.get(4), new Series.JoinPair(-1, 0));
-  }
-
-  @Test
-  public void testLongJoinOuter() {
-    Series sLeft = DataFrame.toSeries(4, 3, 1, 2);
-    Series sRight = DataFrame.toSeries(5, 4, 3, 3, 0);
-
-    List<Series.JoinPair> pairs = sLeft.join(sRight, Series.JoinType.OUTER);
+    Series.JoinPairs pairs = Series.hashJoinOuter(new Series[] { sLeft }, new Series[] { sRight });
 
     Assert.assertEquals(pairs.size(), 7);
-    Assert.assertEquals(pairs.get(0), new Series.JoinPair(-1, 4));
-    Assert.assertEquals(pairs.get(1), new Series.JoinPair(2, -1));
-    Assert.assertEquals(pairs.get(2), new Series.JoinPair(3, -1));
-    Assert.assertEquals(pairs.get(3), new Series.JoinPair(1, 2));
-    Assert.assertEquals(pairs.get(4), new Series.JoinPair(1, 3));
-    Assert.assertEquals(pairs.get(5), new Series.JoinPair(0, 1));
-    Assert.assertEquals(pairs.get(6), new Series.JoinPair(-1, 0));
+    Assert.assertEquals(pairs.get(0), 0x0000000000000001L);
+    Assert.assertEquals(pairs.get(1), 0x0000000100000002L);
+    Assert.assertEquals(pairs.get(2), 0x0000000100000003L);
+    Assert.assertEquals(pairs.get(3), 0x00000002FFFFFFFFL);
+    Assert.assertEquals(pairs.get(4), 0x00000003FFFFFFFFL);
+    Assert.assertEquals(pairs.get(5), 0xFFFFFFFF00000000L);
+    Assert.assertEquals(pairs.get(6), 0xFFFFFFFF00000004L);
   }
 
   @Test
-  public void testLongDoubleJoinInner() {
+  public void testLongHashJoinOuterMultiple() {
+    Series sLeft1 = DataFrame.toSeries(1, 1, 1, 2, 2);
+    Series sLeft2 = DataFrame.toSeries("a", "b", "a", "b", "a");
+    Series sRight1 = DataFrame.toSeries(1.0, 1.0, 1.0, 2.0, 2.3);
+    Series sRight2 = DataFrame.toSeries("a", "a", "a", "b", "b");
+
+    Series.JoinPairs pairs = Series.hashJoinOuter(new Series[] { sLeft1, sLeft2 }, new Series[] { sRight1, sRight2 });
+
+    Assert.assertEquals(pairs.size(), 10);
+    Assert.assertEquals(pairs.get(0), 0x0000000000000000L);
+    Assert.assertEquals(pairs.get(1), 0x0000000000000001L);
+    Assert.assertEquals(pairs.get(2), 0x0000000000000002L);
+    Assert.assertEquals(pairs.get(3), 0x00000001FFFFFFFFL);
+    Assert.assertEquals(pairs.get(4), 0x0000000200000000L);
+    Assert.assertEquals(pairs.get(5), 0x0000000200000001L);
+    Assert.assertEquals(pairs.get(6), 0x0000000200000002L);
+    Assert.assertEquals(pairs.get(7), 0x0000000300000003L);
+    Assert.assertEquals(pairs.get(8), 0x0000000300000004L); // (!) 2.3 -> 2
+    Assert.assertEquals(pairs.get(9), 0x00000004FFFFFFFFL);
+  }
+
+  @Test
+  public void testLongDoubleJoin() {
     Series sLeft = DataFrame.toSeries(4, 3, 1, 2);
     Series sRight = DataFrame.toSeries(5.0, 4.0, 3.0, 3.0, 0.0);
 
-    List<Series.JoinPair> pairs = sLeft.join(sRight, Series.JoinType.INNER);
+    Series.JoinPairs pairs = Series.hashJoinOuter(new Series[] { sLeft }, new Series[] { sRight });
 
-    Assert.assertEquals(pairs.size(), 3);
-    Assert.assertEquals(pairs.get(0), new Series.JoinPair(1, 2));
-    Assert.assertEquals(pairs.get(1), new Series.JoinPair(1, 3));
-    Assert.assertEquals(pairs.get(2), new Series.JoinPair(0, 1));
+    Assert.assertEquals(pairs.size(), 7);
+    Assert.assertEquals(pairs.get(0), 0x0000000000000001L);
+    Assert.assertEquals(pairs.get(1), 0x0000000100000002L);
+    Assert.assertEquals(pairs.get(2), 0x0000000100000003L);
+    Assert.assertEquals(pairs.get(3), 0x00000002FFFFFFFFL);
+    Assert.assertEquals(pairs.get(4), 0x00000003FFFFFFFFL);
+    Assert.assertEquals(pairs.get(5), 0xFFFFFFFF00000000L);
+    Assert.assertEquals(pairs.get(6), 0xFFFFFFFF00000004L);
   }
 
   @Test
-  public void testStringJoinInner() {
+  public void testStringJoin() {
     Series sLeft = DataFrame.toSeries("4", "3", "1", "2");
     Series sRight = DataFrame.toSeries("5", "4", "3", "3", "0");
 
-    List<Series.JoinPair> pairs = sLeft.join(sRight, Series.JoinType.INNER);
+    Series.JoinPairs pairs = Series.hashJoinOuter(new Series[] { sLeft }, new Series[] { sRight });
 
-    Assert.assertEquals(pairs.size(), 3);
-    Assert.assertEquals(pairs.get(0), new Series.JoinPair(1, 2));
-    Assert.assertEquals(pairs.get(1), new Series.JoinPair(1, 3));
-    Assert.assertEquals(pairs.get(2), new Series.JoinPair(0, 1));
+    Assert.assertEquals(pairs.size(), 7);
+    Assert.assertEquals(pairs.get(0), 0x0000000000000001L);
+    Assert.assertEquals(pairs.get(1), 0x0000000100000002L);
+    Assert.assertEquals(pairs.get(2), 0x0000000100000003L);
+    Assert.assertEquals(pairs.get(3), 0x00000002FFFFFFFFL);
+    Assert.assertEquals(pairs.get(4), 0x00000003FFFFFFFFL);
+    Assert.assertEquals(pairs.get(5), 0xFFFFFFFF00000000L);
+    Assert.assertEquals(pairs.get(6), 0xFFFFFFFF00000004L);
   }
 
   @Test
-  public void testBooleanJoinInner() {
-    Series sLeft = DataFrame.toSeries(true, false, false);
-    Series sRight = DataFrame.toSeries(false, true, true);
+  public void testBooleanJoin() {
+    Series sLeft = DataFrame.toSeries(true, false, false, true);
+    Series sRight = DataFrame.toSeries(false, true, true, false);
 
-    List<Series.JoinPair> pairs = sLeft.join(sRight, Series.JoinType.INNER);
+    Series.JoinPairs pairs = Series.hashJoinOuter(new Series[] { sLeft }, new Series[] { sRight });
 
-    Assert.assertEquals(pairs.size(), 4);
-    Assert.assertEquals(pairs.get(0), new Series.JoinPair(1, 0));
-    Assert.assertEquals(pairs.get(1), new Series.JoinPair(2, 0));
-    Assert.assertEquals(pairs.get(2), new Series.JoinPair(0, 1));
-    Assert.assertEquals(pairs.get(3), new Series.JoinPair(0, 2));
+    Assert.assertEquals(pairs.size(), 8);
+    Assert.assertEquals(pairs.get(0), 0x0000000000000001L);
+    Assert.assertEquals(pairs.get(1), 0x0000000000000002L);
+    Assert.assertEquals(pairs.get(2), 0x0000000100000000L);
+    Assert.assertEquals(pairs.get(3), 0x0000000100000003L);
+    Assert.assertEquals(pairs.get(4), 0x0000000200000000L);
+    Assert.assertEquals(pairs.get(5), 0x0000000200000003L);
+    Assert.assertEquals(pairs.get(6), 0x0000000300000001L);
+    Assert.assertEquals(pairs.get(7), 0x0000000300000002L);
   }
 
   @Test
@@ -1763,17 +1754,16 @@ public class DataFrameTest {
         .addSeries("rightKey", 5.0, 2.0, 1.0, 3.0, 1.0, 0.0)
         .addSeries("rightValue", "v", "z", "w", "x", "y", "u");
 
-    DataFrame joined = left.joinInner(right, "leftKey", "rightKey");
+    DataFrame joined = left.joinInner(right, new String[] { "leftKey" }, new String[] { "rightKey" });
 
+    Assert.assertEquals(joined.getSeriesNames().size(), 3);
     Assert.assertEquals(joined.size(), 4);
     Assert.assertEquals(joined.get("leftKey").type(), Series.SeriesType.LONG);
     Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.STRING);
-    Assert.assertEquals(joined.get("rightKey").type(), Series.SeriesType.DOUBLE);
     Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.STRING);
-    assertEquals(joined.getLongs("leftKey"), 1, 1, 2, 3);
-    assertEquals(joined.getDoubles("rightKey"),1.0, 1.0, 2.0, 3.0);
-    assertEquals(joined.getStrings("leftValue"), "c", "c", "d", "b");
-    assertEquals(joined.getStrings("rightValue"), "w", "y", "z", "x");
+    assertEquals(joined.getLongs("leftKey"), 2, 1, 1, 3);
+    assertEquals(joined.getStrings("leftValue"), "d", "c", "c", "b");
+    assertEquals(joined.getStrings("rightValue"), "z", "w", "y", "x");
   }
 
   @Test
@@ -1786,17 +1776,60 @@ public class DataFrameTest {
         .addSeries("rightKey", 5.0, 2.0, 1.0, 3.0, 1.0, 0.0)
         .addSeries("rightValue", "v", "z", "w", "x", "y", "u");
 
-    DataFrame joined = left.joinOuter(right, "leftKey", "rightKey");
+    DataFrame joined = left.joinOuter(right, new String[] { "leftKey" }, new String[] { "rightKey" });
 
+    Assert.assertEquals(joined.getSeriesNames().size(), 3);
     Assert.assertEquals(joined.size(), 7);
     Assert.assertEquals(joined.get("leftKey").type(), Series.SeriesType.LONG);
     Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.STRING);
-    Assert.assertEquals(joined.get("rightKey").type(), Series.SeriesType.DOUBLE);
     Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.STRING);
-    assertEquals(joined.getLongs("leftKey"), LNULL, 1, 1, 2, 3, 4, LNULL);
-    assertEquals(joined.getDoubles("rightKey"), 0.0, 1.0, 1.0, 2.0, 3.0, DNULL, 5.0);
-    assertEquals(joined.getStrings("leftValue"), SNULL, "c", "c", "d", "b", "a", SNULL);
-    assertEquals(joined.getStrings("rightValue"), "u", "w", "y", "z", "x", SNULL, "v");
+    assertEquals(joined.getLongs("leftKey"), 4, 2, 1, 1, 3, 5, 0);
+    assertEquals(joined.getStrings("leftValue"), "a", "d", "c", "c", "b", SNULL, SNULL);
+    assertEquals(joined.getStrings("rightValue"), SNULL, "z", "w", "y", "x", "v", "u");
+  }
+
+  @Test
+  public void testJoinOuterEmpty() {
+    DataFrame left = new DataFrame()
+        .addSeries("leftKey", 4, 2, 1, 3)
+        .addSeries("leftValue", "a", "d", "c", "b");
+
+    DataFrame right = new DataFrame()
+        .addSeries("rightKey", DoubleSeries.empty())
+        .addSeries("rightValue", ObjectSeries.empty());
+
+    DataFrame joined = left.joinOuter(right, new String[] { "leftKey" }, new String[] { "rightKey" });
+
+    Assert.assertEquals(joined.getSeriesNames().size(), 3);
+    Assert.assertEquals(joined.size(), 4);
+    Assert.assertEquals(joined.get("leftKey").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.STRING);
+    Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.OBJECT);
+    assertEquals(joined.getLongs("leftKey"), 4, 2, 1, 3);
+    assertEquals(joined.getStrings("leftValue"), "a", "d", "c", "b");
+    assertEquals(joined.getObjects("rightValue"), ONULL, ONULL, ONULL, ONULL);
+  }
+
+  @Test
+  public void testJoinOuterObject() {
+    DataFrame left = new DataFrame()
+        .addSeriesObjects("key", DataFrame.Tuple.buildFrom("a", "a"), DataFrame.Tuple.buildFrom("a", "b"))
+        .addSeries("leftValue", 1, 2);
+
+    DataFrame right = new DataFrame()
+        .addSeriesObjects("key", DataFrame.Tuple.buildFrom("b", "b"), DataFrame.Tuple.buildFrom("a", "b"))
+        .addSeries("rightValue", "3", "4");
+
+    DataFrame joined = left.joinOuter(right, "key");
+
+    Assert.assertEquals(joined.size(), 3);
+    Assert.assertEquals(joined.get("key").type(), Series.SeriesType.OBJECT);
+    Assert.assertEquals(joined.get("leftValue").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(joined.get("rightValue").type(), Series.SeriesType.STRING);
+    assertEquals(joined.getObjects("key"),DataFrame.Tuple.buildFrom("a", "a"),
+        DataFrame.Tuple.buildFrom("a", "b"), DataFrame.Tuple.buildFrom("b", "b"));
+    assertEquals(joined.getLongs("leftValue"), 1, 2, LNULL);
+    assertEquals(joined.getStrings("rightValue"), SNULL, "4","3");
   }
 
   @Test
@@ -1840,12 +1873,10 @@ public class DataFrameTest {
     DataFrame right = new DataFrame()
         .addSeries("key", 3, 4, 5, 6);
 
-    DataFrame df = left.joinInner(right, "name", "key");
+    DataFrame df = left.joinInner(right, new String[] { "name" }, new String[] { "key" });
 
-    Assert.assertEquals(df.getSeriesNames().size(), 2);
-
+    Assert.assertEquals(df.getSeriesNames().size(), 1);
     Assert.assertTrue(df.contains("name"));
-    Assert.assertTrue(df.contains("key"));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -3204,6 +3235,114 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testSetSingleValue() {
+    BooleanSeries mask = DataFrame.toSeries(FALSE, TRUE, TRUE, BNULL);
+
+    Series values = DataFrame.toSeries(TRUE);
+
+    assertEquals(DataFrame.toSeries(BNULL, FALSE, FALSE, FALSE).set(mask, values), BNULL, TRUE, TRUE, FALSE);
+    assertEquals(DataFrame.toSeries(LNULL, 2, 3, 4).set(mask, values), LNULL, 1, 1, 4);
+    assertEquals(DataFrame.toSeries(DNULL, 2.0, 3.0, 4.0).set(mask, values), DNULL, 1.0, 1.0, 4.0);
+    assertEquals(DataFrame.toSeries(SNULL, "a", "b", "c").set(mask, values), SNULL, "true", "true", "c");
+    assertEquals(DataFrame.toSeriesObjects(ONULL, false, 3, "a").set(mask, values), ONULL, true, true, "a");
+  }
+
+  @Test
+  public void testSet() {
+    BooleanSeries mask = DataFrame.toSeries(FALSE, TRUE, TRUE, BNULL);
+
+    Series values = DataFrame.toSeries(TRUE, BNULL, TRUE, FALSE);
+
+    assertEquals(DataFrame.toSeries(BNULL, FALSE, FALSE, FALSE).set(mask, values), BNULL, BNULL, TRUE, FALSE);
+    assertEquals(DataFrame.toSeries(LNULL, 2, 3, 4).set(mask, values), LNULL, LNULL, 1, 4);
+    assertEquals(DataFrame.toSeries(DNULL, 2.0, 3.0, 4.0).set(mask, values), DNULL, DNULL, 1.0, 4.0);
+    assertEquals(DataFrame.toSeries(SNULL, "a", "b", "c").set(mask, values), SNULL, SNULL, "true", "c");
+    assertEquals(DataFrame.toSeriesObjects(ONULL, false, 3, "a").set(mask, values), ONULL, ONULL, true, "a");
+  }
+
+  @Test
+  public void testSetFailMaskMisaligned() {
+    BooleanSeries mask = DataFrame.toSeries(FALSE, TRUE, TRUE);
+    Series values = DataFrame.toSeries(TRUE, BNULL, TRUE, FALSE);
+
+    try {
+      DataFrame.toSeries(BNULL, FALSE, FALSE, FALSE).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(LNULL, 2, 3, 4).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(DNULL, 2.0, 3.0, 4.0).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(SNULL, "a", "b", "c").set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeriesObjects(ONULL, false, 3, "a").set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testSetFailValuesMisaligned() {
+    BooleanSeries mask = DataFrame.toSeries(FALSE, TRUE, TRUE, BNULL);
+    Series values = DataFrame.toSeries(TRUE, BNULL, FALSE);
+
+    try {
+      DataFrame.toSeries(BNULL, FALSE, FALSE, FALSE).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(LNULL, 2, 3, 4).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(DNULL, 2.0, 3.0, 4.0).set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeries(SNULL, "a", "b", "c").set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+
+    try {
+      DataFrame.toSeriesObjects(ONULL, false, 3, "a").set(mask, values);
+      Assert.fail();
+    } catch (IllegalArgumentException expected) {
+      // expected
+    }
+  }
+
+  @Test
   public void testAppend() {
     DataFrame base = new DataFrame();
     base.addSeries("A", 1, 2, 3, 4);
@@ -3515,12 +3654,12 @@ public class DataFrameTest {
    * Test classes
    ***************************************************************************/
 
-  private static class Tuple {
+  private static class TestTuple {
     final int a;
     final int b;
-    final Tuple myself;
+    final TestTuple myself;
 
-    Tuple(int a, int b) {
+    TestTuple(int a, int b) {
       this.a = a;
       this.b = b;
       this.myself = this;
@@ -3544,7 +3683,7 @@ public class DataFrameTest {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-      Tuple tuple = (Tuple) o;
+      TestTuple tuple = (TestTuple) o;
       return a == tuple.a && b == tuple.b;
     }
 
@@ -3574,13 +3713,13 @@ public class DataFrameTest {
     }
   }
 
-  private static class CompTuple extends Tuple implements Comparable<CompTuple> {
-    CompTuple(int a, int b) {
+  private static class CompTestTuple extends TestTuple implements Comparable<CompTestTuple> {
+    CompTestTuple(int a, int b) {
       super(a, b);
     }
 
     @Override
-    public int compareTo(CompTuple o) {
+    public int compareTo(CompTestTuple o) {
       if(o == null)
         return 1;
       if(this.a == o.a)
@@ -3589,7 +3728,7 @@ public class DataFrameTest {
     }
   }
 
-  private static CompTuple tup(int a, int b) {
-    return new CompTuple(a, b);
+  private static CompTestTuple tup(int a, int b) {
+    return new CompTestTuple(a, b);
   }
 }

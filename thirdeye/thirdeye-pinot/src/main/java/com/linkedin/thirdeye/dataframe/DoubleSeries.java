@@ -355,6 +355,10 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return value;
   }
 
+  public double get(int index) {
+    return this.values[index];
+  }
+
   @Override
   public boolean isNull(int index) {
     return isNull(this.values[index]);
@@ -672,10 +676,25 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }, this, other);
   }
 
-  public DoubleSeries set(BooleanSeries where, double value) {
+  @Override
+  public DoubleSeries set(BooleanSeries mask, Series other) {
+    if(other.size() == 1)
+      return this.set(mask, other.getDouble(0));
+    assertSameLength(this, mask ,other);
+
+    double[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<this.values.length; i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i)))
+        values[i] = other.getDouble(i);
+    }
+    return buildFrom(values);
+  }
+
+  public DoubleSeries set(BooleanSeries mask, double value) {
+    assertSameLength(this, mask);
     double[] values = new double[this.values.length];
-    for(int i=0; i<where.size(); i++) {
-      if(BooleanSeries.isTrue(where.getBoolean(i))) {
+    for(int i=0; i<mask.size(); i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i))) {
         values[i] = value;
       } else {
         values[i] = this.values[i];
@@ -769,6 +788,11 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   @Override
   int compare(Series that, int indexThis, int indexThat) {
     return nullSafeDoubleComparator(this.values[indexThis], that.getDouble(indexThat));
+  }
+
+  @Override
+  int hashCode(int index) {
+    return (int) Double.doubleToRawLongBits(this.values[index]);
   }
 
   /**

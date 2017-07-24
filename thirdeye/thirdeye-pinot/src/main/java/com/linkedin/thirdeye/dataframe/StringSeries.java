@@ -218,6 +218,10 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return value;
   }
 
+  public String get(int index) {
+    return this.values[index];
+  }
+
   @Override
   public boolean isNull(int index) {
     return isNull(this.values[index]);
@@ -386,10 +390,25 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     });
   }
 
-  public StringSeries set(BooleanSeries where, String value) {
+  @Override
+  public StringSeries set(BooleanSeries mask, Series other) {
+    if(other.size() == 1)
+      return this.set(mask, other.getString(0));
+    assertSameLength(this, mask ,other);
+
+    String[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<this.values.length; i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i)))
+        values[i] = other.getString(i);
+    }
+    return buildFrom(values);
+  }
+
+  public StringSeries set(BooleanSeries mask, String value) {
+    assertSameLength(this, mask);
     String[] values = new String[this.values.length];
-    for(int i=0; i<where.size(); i++) {
-      if(BooleanSeries.isTrue(where.getBoolean(i))) {
+    for(int i=0; i<mask.size(); i++) {
+      if(BooleanSeries.isTrue(mask.getBoolean(i))) {
         values[i] = value;
       } else {
         values[i] = this.values[i];
@@ -502,6 +521,11 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   @Override
   public int hashCode() {
     return Arrays.hashCode(this.values);
+  }
+
+  @Override
+  int hashCode(int index) {
+    return this.values[index].hashCode();
   }
 
   /**
