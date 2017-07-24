@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import java.util.List;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.alibaba.fastjson.JSONArray;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -25,7 +30,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -36,10 +40,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.TABLE_TAG)
@@ -49,25 +49,25 @@ public class PinotTableInstances {
 
   @Inject
   ControllerConf controllerConf;
+
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
+
   @Inject
   ControllerMetrics metrics;
 
   @GET
   @Path("/tables/{tableName}/instances")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "List table instances", notes = "List instances of the give table")
+  @ApiOperation(value = "List table instances", notes = "List instances of the given table")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")})
   public String getTableInstances(
-      @ApiParam(value = "Table name without type", required = true)
-      @PathParam("tableName") String tableName,
-      @ApiParam(value = "Instance type", required = false, example = "broker",
-          allowableValues = "[broker, server]")
-      @DefaultValue("")
-      @QueryParam("type") String type) {
+      @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Instance type", required = false, example = "broker", allowableValues = "[broker, server]")
+          @DefaultValue("") @QueryParam("type") String type
+  ) {
     try {
       JSONObject ret = new JSONObject();
       ret.put("tableName", tableName);

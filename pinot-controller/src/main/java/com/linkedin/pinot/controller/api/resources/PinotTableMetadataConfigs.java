@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -29,9 +32,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
@@ -52,8 +52,8 @@ public class PinotTableMetadataConfigs {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"),
   @ApiResponse(code = 500, message = "Internal server error"),
   @ApiResponse(code = 404, message = "Table not found")})
-  public SuccessResponse updateTableMetadata(@PathParam("tableName")String tableName,
-      String requestBody) {
+  public SuccessResponse updateTableMetadata(@PathParam("tableName")String tableName, String requestBody
+  ) {
     try {
       TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(requestBody));
       pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),

@@ -89,7 +89,7 @@ import javax.ws.rs.core.Response;
  * @see org.restlet.resource.ServerResource#get()
  */
 
-@Api(tags = "table")
+@Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotSegmentRestletResource {
   public static Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRestletResource.class);

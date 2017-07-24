@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import org.apache.commons.lang.StringUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -23,7 +24,6 @@ import io.swagger.annotations.ApiResponses;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import org.apache.commons.lang.StringUtils;
 
 @Api(tags = Constants.HEALTH_TAG)
 @Path("/pinot-controller/admin")
@@ -36,7 +36,8 @@ public class PinotControllerHealthCheck {
   @Path("/pinot-controller/admin")
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
-  public String checkHealth() {
+  public String checkHealth(
+  ) {
     if (StringUtils.isNotBlank(controllerConf.generateVipUrl())) {
       return "GOOD";
     }

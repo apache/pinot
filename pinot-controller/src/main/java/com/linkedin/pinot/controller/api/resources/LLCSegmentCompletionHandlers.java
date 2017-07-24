@@ -34,7 +34,6 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
-import io.swagger.annotations.Api;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -46,7 +45,8 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 
 
-@Api(tags = Constants.INTERNAL_TAG)
+// Do NOT tag this class with @Api. We don't want these exposed in swagger.
+// @Api(tags = Constants.INTERNAL_TAG)
 @Path("/")
 public class LLCSegmentCompletionHandlers {
 

@@ -15,9 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import java.util.UUID;
-import org.restlet.data.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +26,7 @@ public class SegmentCompletionUtils {
   // Used to create temporary segment file names
   private static final String TMP = ".tmp.";
 
+  /* TODO NOT USED. TO BE DELETED.
   static SegmentCompletionProtocol.Request.Params extractParams(Reference reference) {
     final String offsetStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
     final String segmentName = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
@@ -104,6 +103,7 @@ public class SegmentCompletionUtils {
 
     return params;
   }
+  */
 
   /**
    * Takes in a segment name, and returns a file name prefix that is used to store all attempted uploads of this

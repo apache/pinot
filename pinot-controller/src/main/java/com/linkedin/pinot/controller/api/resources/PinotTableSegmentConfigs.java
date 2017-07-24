@@ -54,9 +54,10 @@ public class PinotTableSegmentConfigs {
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
       @ApiResponse(code=404, message="Table not found"),
       @ApiResponse(code=500, message = "Internal server error")})
-  public SuccessResponse put(@ApiParam(value = "Table name", required = true)
-      @PathParam("tableName") String tableName,
-      String requestBody) {
+  public SuccessResponse put(
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      String requestBody
+  ) {
     try {
       TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(requestBody));
       pinotHelixResourceManager.updateSegmentsValidationAndRetentionConfigFor(tableConfig.getTableName(),

@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import java.io.IOException;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -24,7 +29,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.io.IOException;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.PUT;
@@ -33,10 +37,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
@@ -61,9 +61,9 @@ public class PinotTableIndexingConfigs {
       @ApiResponse(code = 500, message = "Server error updating configuration")
   })
   public SuccessResponse updateIndexingConfig(
-      @ApiParam(value = "Table name (without type)", required = true)
-      @PathParam("tableName") String tableName,
-      String body) {
+      @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName,
+      String body
+  ) {
     TableConfig tableConfig = null;
     try {
        tableConfig = TableConfig.fromJSONConfig(new JSONObject(body));

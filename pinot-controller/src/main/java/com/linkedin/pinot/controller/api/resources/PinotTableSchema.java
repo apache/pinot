@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
@@ -30,8 +32,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Api(value = Constants.SCHEMA_TAG)
 @Path("/")
@@ -48,8 +48,8 @@ public class PinotTableSchema {
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found")})
   public Schema getTableSchema(
-      @ApiParam(value = "Table name (without type)", required = true)
-      @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName
+  ) {
     Schema schema = pinotHelixResourceManager.getTableSchema(tableName);
     if (schema != null) {
       return schema;

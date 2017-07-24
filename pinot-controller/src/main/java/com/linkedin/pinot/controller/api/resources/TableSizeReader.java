@@ -13,8 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.linkedin.pinot.controller.api.resources;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executor;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -24,25 +33,16 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Reads table sizes from servers
  */
 public class TableSizeReader {
-  private static Logger LOGGER = LoggerFactory.getLogger(
-      TableSizeReader.class);
+  private static Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
   private Executor executor;
   private HttpConnectionManager connectionManager;
   private PinotHelixResourceManager helixResourceManager;
@@ -64,7 +64,8 @@ public class TableSizeReader {
    * @param timeoutMsec
    * @return
    */
-  public @Nullable TableSizeDetails getTableSizeDetails(@Nonnull String tableName,
+  public @Nullable
+  TableSizeDetails getTableSizeDetails(@Nonnull String tableName,
       @Nonnegative int timeoutMsec) {
     Preconditions.checkNotNull(tableName, "Table name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
@@ -112,8 +113,10 @@ public class TableSizeReader {
     public long reportedSizeInBytes = 0;
     // estimated size if servers are down
     public long estimatedSizeInBytes = 0;
-    public @Nullable TableSubTypeSizeDetails offlineSegments;
-    public @Nullable TableSubTypeSizeDetails realtimeSegments;
+    public @Nullable
+    TableSubTypeSizeDetails offlineSegments;
+    public @Nullable
+    TableSubTypeSizeDetails realtimeSegments;
 
     public TableSizeDetails(String tableName) {
       this.tableName = tableName;
@@ -225,9 +228,7 @@ public class TableSizeReader {
       Map<String, List<String>> serverSegmentsMap) {
     ImmutableSet<String> erroredServers = null;
     try {
-      erroredServers = Sets.difference(
-          serverSegmentsMap.keySet(),
-          serverSizeInfo.keySet()).immutableCopy();
+      erroredServers = Sets.difference(serverSegmentsMap.keySet(), serverSizeInfo.keySet()).immutableCopy();
     } catch (Exception e) {
       LOGGER.error("Failed to get set difference: ", e);
     }

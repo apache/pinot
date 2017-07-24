@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import java.util.concurrent.Executor;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -23,7 +27,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.util.concurrent.Executor;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -34,9 +37,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
@@ -63,14 +63,13 @@ public class TableSize {
       @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")})
   public TableSizeReader.TableSizeDetails getTableSize(
-      @ApiParam(value = "Table name without type", required = true,
-          example = "myTable | myTable_OFFLINE")
-      @PathParam("tableName")
-      String tableName,
-      @ApiParam(value = "Get detailed information", required = false)
-      @DefaultValue("true")
-      @QueryParam("detailed") boolean detailed) {
-    TableSizeReader tableSizeReader = new TableSizeReader(executor, connectionManager, pinotHelixResourceManager);
+      @ApiParam(value = "Table name without type", required = true, example = "myTable | myTable_OFFLINE")
+          @PathParam("tableName") String tableName,
+      @ApiParam(value = "Get detailed information", required = false) @DefaultValue("true")
+          @QueryParam("detailed") boolean detailed
+  ) {
+    TableSizeReader
+        tableSizeReader = new TableSizeReader(executor, connectionManager, pinotHelixResourceManager);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails = tableSizeReader.getTableSizeDetails(tableName,

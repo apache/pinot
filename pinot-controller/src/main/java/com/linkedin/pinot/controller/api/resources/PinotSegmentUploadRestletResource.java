@@ -474,7 +474,8 @@ public class PinotSegmentUploadRestletResource {
    */
   private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
       @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) {
-    TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    TableSizeReader
+        tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
     // TODO: FIXME: pass tableSizeReader from correct package instead of null
     StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, null);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());

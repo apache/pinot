@@ -36,6 +36,7 @@ import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import javax.annotation.Nullable;
@@ -51,7 +52,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-
+@Api(tags = Constants.SCHEMA_TAG)
 public class PinotSchemaRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotSchemaRestletResource.class);
 
@@ -64,9 +65,8 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
-  @ApiOperation(value = "Lists all schema names", notes = "Lists all schema names")
+  @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public JSONArray listSchemaNames(
-
   ) {
     try {
       List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
@@ -86,7 +86,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @ApiOperation(value = "Gets a schema", notes = "Gets a schema")
+  @ApiOperation(value = "Get a schema", notes = "Gets a schema by name")
   public Schema getSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName
   ) {
@@ -101,7 +101,7 @@ public class PinotSchemaRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @ApiOperation(value = "Deletes a schema", notes = "Deletes a schema")
+  @ApiOperation(value = "Delete a schema", notes = "Deletes a schema by name")
   public SuccessResponse deleteSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName
   ) {
@@ -118,7 +118,7 @@ public class PinotSchemaRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @ApiOperation(value = "Updates a schema", notes = "Updates a schema")
+  @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       FormDataMultiPart multiPart

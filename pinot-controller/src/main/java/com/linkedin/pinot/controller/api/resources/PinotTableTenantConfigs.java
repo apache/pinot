@@ -48,8 +48,7 @@ public class PinotTableTenantConfigs {
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found")})
   public String rebuildBrokerResource(
-      @ApiParam(value = "Table name (with type)", required = true)
-      @PathParam("tableName") String tableNameWithType
+      @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType
   ) {
     try {
       final PinotResourceManagerResponse pinotResourceManagerResponse =

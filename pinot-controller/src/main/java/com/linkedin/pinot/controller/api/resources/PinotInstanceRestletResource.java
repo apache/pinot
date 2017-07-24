@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import java.util.List;
+import org.apache.helix.model.InstanceConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -24,7 +28,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -36,9 +39,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.helix.model.InstanceConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.INSTANCE_TAG)
@@ -72,7 +72,8 @@ public class PinotInstanceRestletResource {
   @ApiOperation(value = "List all instances")
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
       @ApiResponse(code=500, message = "Error reading instances")})
-  public Instances getAllInstances() {
+  public Instances getAllInstances(
+  ) {
     return new Instances(pinotHelixResourceManager.getAllInstances());
   }
 
@@ -86,8 +87,8 @@ public class PinotInstanceRestletResource {
   public Instance getInstance(
       @ApiParam(value = "Instance name", required = true,
           example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
-      @PathParam("instanceName")
-      String instanceName) {
+      @PathParam("instanceName") String instanceName)
+  {
 
     if (!pinotHelixResourceManager.instanceExists(instanceName)) {
       throw new WebApplicationException("Instance " + instanceName + " does not exist",
@@ -104,7 +105,9 @@ public class PinotInstanceRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully created"),
       @ApiResponse(code=409, message="Instance exists already"),
       @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addInstance(Instance instance) {
+  public SuccessResponse addInstance(
+      Instance instance
+  ) {
     LOGGER.info("Instance creation request received for instance " + instance.toInstanceId());
     final PinotResourceManagerResponse resp = pinotHelixResourceManager.addInstance(instance);
     if (resp.status == PinotResourceManagerResponse.ResponseStatus.failure) {
@@ -125,9 +128,9 @@ public class PinotInstanceRestletResource {
   public SuccessResponse addInstance(
       @ApiParam(value = "Instance name", required = true,
           example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
-      @PathParam("instanceName")
-      String instanceName,
-      String state) {
+      @PathParam("instanceName") String instanceName,
+      String state
+  ) {
     // TODO: state should be moved to path or form parameter
     if (! pinotHelixResourceManager.instanceExists(instanceName)) {
       throw new WebApplicationException("Instance " + instanceName + " does not exist",
@@ -155,7 +158,7 @@ public class PinotInstanceRestletResource {
   @Path("/instances/{instanceName}")
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Delete an instance", consumes = MediaType.APPLICATION_JSON,
-      notes = "Creates a new instance with given instance config")
+      notes = "Deletes an instance of given name")
   @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully deleted"),
       @ApiResponse(code = 404, message = "Instance not found"),
       @ApiResponse(code = 409, message = "Instance can not be deleted"),
@@ -164,8 +167,8 @@ public class PinotInstanceRestletResource {
   public SuccessResponse deleteInstance(
       @ApiParam(value = "Instance name", required = true,
           example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
-      @PathParam("instanceName")
-      String instanceName) {
+      @PathParam("instanceName") String instanceName
+  ) {
     if (! pinotHelixResourceManager.instanceExists(instanceName)) {
       throw new WebApplicationException("Instance " + instanceName + " does not exist",
           Response.Status.NOT_FOUND);
