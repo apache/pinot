@@ -23,6 +23,7 @@ public class DataFrameBenchmark {
   private static final int N_ELEMENTS = 10_000_000;
   private static final int N_NULLS = 100_000;
   private static final int N_WINDOW = 1000;
+  private static final int N_GROUPS = 1000;
 
   private static final String[] SERIES_NAMES = new String[] { "task", "min", "mid", "max", "outer", "checksum", "samples" };
 
@@ -945,6 +946,28 @@ public class DataFrameBenchmark {
     logResults("benchmarkHashJoinOuterLongSeries", checksum);
   }
 
+  private void benchmarkHashJoinOuterGuavaLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+      LongSeries other = LongSeries.buildFrom(shuffle(longValues));
+
+      startTimer();
+      Series.JoinPairs pairs = Series.hashJoinOuterGuava(new Series[] { series }, new Series[] { other });
+      stopTimer();
+
+      if(pairs.size() != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Join incorrect (got %d pairs, should be %d)", pairs.size(), N_ELEMENTS));
+
+      checksum ^= checksum(pairs);
+    }
+
+    logResults("benchmarkHashJoinOuterGuavaLongSeries", checksum);
+  }
+
   private void benchmarkHashJoinInnerLongSeries() {
     startTimerOuter();
     long checksum = 0;
@@ -967,48 +990,110 @@ public class DataFrameBenchmark {
     logResults("benchmarkHashJoinInnerLongSeries", checksum);
   }
 
+  private void benchmarkGroupByValueLongSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      long[] keyValues = new long[N_ELEMENTS];
+      for(int i=0; i<N_ELEMENTS; i++) {
+        keyValues[i] = i % N_GROUPS;
+      }
+
+      DataFrame df = new DataFrame();
+      df.addSeries("key", keyValues);
+      df.addSeries("value", longValues);
+
+      startTimer();
+      Grouping.GroupingDataFrame result = df.groupByValue("key").sum("value");
+      stopTimer();
+
+      if(result.size() != N_GROUPS)
+        throw new IllegalStateException(String.format("GroupBy incorrect (got %d keys, should be %d)", result.size(), N_GROUPS));
+
+      checksum ^= checksum(result.getValues().getLongs().values());
+    }
+
+    logResults("benchmarkGroupByValueLongSeries", checksum);
+  }
+
+  private void benchmarkGroupByValueMultipleSeries() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      long[] longKeyValues = new long[N_ELEMENTS];
+      double[] doubleKeyValues = new double[N_ELEMENTS];
+      for(int i=0; i<N_ELEMENTS; i++) {
+        longKeyValues[i] = i % N_GROUPS;
+        doubleKeyValues[i] = i % N_GROUPS;
+      }
+
+      DataFrame df = new DataFrame();
+      df.addSeries("longKey", longKeyValues);
+      df.addSeries("doubleKey", doubleKeyValues);
+      df.addSeries("value", longValues);
+
+      startTimer();
+      Grouping.GroupingDataFrame result = df.groupByValue("longKey", "doubleKey").sum("value");
+      stopTimer();
+
+      if(result.size() != N_GROUPS)
+        throw new IllegalStateException(String.format("GroupBy incorrect (got %d keys, should be %d)", result.size(), N_GROUPS));
+
+      checksum ^= checksum(result.getValues().getLongs().values());
+    }
+
+    logResults("benchmarkGroupByValueMultipleSeries", checksum);
+  }
+
   private void benchmarkAll() {
+//    benchmarkGroupByValueLongSeries();
+//    benchmarkGroupByValueMultipleSeries();
 //    benchmarkMergeJoinLongArray();
     benchmarkHashJoinOuterLongSeries();
-    benchmarkHashJoinInnerLongSeries();
-    benchmarkHasNullLongSeries();
-    benchmarkDropNullLongSeries();
-    benchmarkDropNullLongArray();
-    benchmarkAggregateLongSeries();
-    benchmarkAggregateLongArray();
-    benchmarkMinMaxLongSeries();
-    benchmarkMinMaxLongArray();
-    benchmarkEqualsLongSeries();
-    benchmarkEqualsLongArray();
-    benchmarkEqLongSeries();
-    benchmarkShiftLongSeries();
-    benchmarkShiftLongArray();
-    benchmarkSortLongSeries();
-    benchmarkSortLongArray();
-    benchmarkUniqueLongSeries();
-    benchmarkUniqueLongArrayWithObjects();
-    benchmarkExpandingWindowSumLongSeries();
-    benchmarkExpandingWindowSumLongArray();
-    benchmarkExpandingWindowMaxLongSeries();
-    benchmarkExpandingWindowMaxLongArray();
-    benchmarkMovingWindowSumLongSeries();
-    benchmarkMovingWindowSumLongArray();
-    benchmarkMapDoubleSeries();
-    benchmarkMapDoubleSeriesOperation();
-    benchmarkMapDoubleArray();
-    benchmarkMapLongSeries();
-    benchmarkMapLongSeriesOperation();
-    benchmarkMapLongArray();
-    benchmarkMapLongObjectSeriesOperation();
-    benchmarkMapLongObjectArray();
-    benchmarkMapTwoSeries();
-    benchmarkMapTwoSeriesOperation();
-    benchmarkMapTwoArrays();
-    benchmarkMapThreeSeries();
-    benchmarkMapThreeArrays();
-    benchmarkMapFourSeriesGeneric();
-    benchmarkMapFourArrays();
-    benchmarkMapTwoSeriesExpression();
+    benchmarkHashJoinOuterGuavaLongSeries();
+//    benchmarkHashJoinInnerLongSeries();
+//    benchmarkHasNullLongSeries();
+//    benchmarkDropNullLongSeries();
+//    benchmarkDropNullLongArray();
+//    benchmarkAggregateLongSeries();
+//    benchmarkAggregateLongArray();
+//    benchmarkMinMaxLongSeries();
+//    benchmarkMinMaxLongArray();
+//    benchmarkEqualsLongSeries();
+//    benchmarkEqualsLongArray();
+//    benchmarkEqLongSeries();
+//    benchmarkShiftLongSeries();
+//    benchmarkShiftLongArray();
+//    benchmarkSortLongSeries();
+//    benchmarkSortLongArray();
+//    benchmarkUniqueLongSeries();
+//    benchmarkUniqueLongArrayWithObjects();
+//    benchmarkExpandingWindowSumLongSeries();
+//    benchmarkExpandingWindowSumLongArray();
+//    benchmarkExpandingWindowMaxLongSeries();
+//    benchmarkExpandingWindowMaxLongArray();
+//    benchmarkMovingWindowSumLongSeries();
+//    benchmarkMovingWindowSumLongArray();
+//    benchmarkMapDoubleSeries();
+//    benchmarkMapDoubleSeriesOperation();
+//    benchmarkMapDoubleArray();
+//    benchmarkMapLongSeries();
+//    benchmarkMapLongSeriesOperation();
+//    benchmarkMapLongArray();
+//    benchmarkMapLongObjectSeriesOperation();
+//    benchmarkMapLongObjectArray();
+//    benchmarkMapTwoSeries();
+//    benchmarkMapTwoSeriesOperation();
+//    benchmarkMapTwoArrays();
+//    benchmarkMapThreeSeries();
+//    benchmarkMapThreeArrays();
+//    benchmarkMapFourSeriesGeneric();
+//    benchmarkMapFourArrays();
+//    benchmarkMapTwoSeriesExpression();
   }
 
   private void startTimer() {

@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -551,14 +552,7 @@ public abstract class Grouping {
       int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, sref.length);
       buckets.add(fromIndex);
 
-      // keys from buckets
-      int[] keyIndex = new int[buckets.size()];
-      int i = 0;
-      for(int[] b : buckets) {
-        keyIndex[i++] = b[0];
-      }
-
-      return new GroupingByValue(series.project(keyIndex), buckets);
+      return new GroupingByValue(series.project(keysFromBuckets(buckets)), buckets);
     }
 
     public static GroupingByValue from(ObjectSeries series) {
@@ -577,14 +571,41 @@ public abstract class Grouping {
             entry.getValue().toArray(new Integer[entry.getValue().size()])));
       }
 
-      // keys from buckets
+      return new GroupingByValue(series.project(keysFromBuckets(buckets)), buckets);
+    }
+
+    public static GroupingByValue from(Series[] series) {
+      Series.assertSameLength(series);
+
+      List<int[]> buckets = new ArrayList<>();
+      PrimitiveMultimap m = new PrimitiveMultimap(series);
+      BitSet b = new BitSet(series[0].size());
+
+      for(int i=0; i<series[0].size(); i++) {
+        if(!b.get(i)) {
+          int[] keys = m.get(series, i, series);
+          for(int k : keys)
+            b.set(k);
+          buckets.add(keys);
+        }
+      }
+
+      int[] keys = keysFromBuckets(buckets);
+      DataFrame.Tuple[] tuples = new DataFrame.Tuple[keys.length];
+      for(int i=0; i<keys.length; i++) {
+        tuples[i] = DataFrame.Tuple.buildFrom(series, keys[i]);
+      }
+
+      return new GroupingByValue(ObjectSeries.buildFrom((Object[])tuples), buckets);
+    }
+
+    private static int[] keysFromBuckets(List<int[]> buckets) {
       int[] keyIndex = new int[buckets.size()];
       int i = 0;
       for(int[] b : buckets) {
         keyIndex[i++] = b[0];
       }
-
-      return new GroupingByValue(series.project(keyIndex), buckets);
+      return keyIndex;
     }
   }
 

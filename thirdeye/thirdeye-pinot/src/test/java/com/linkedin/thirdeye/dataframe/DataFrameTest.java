@@ -723,6 +723,32 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testMultipleGroupByValue() {
+    DataFrame df = new DataFrame();
+    df.addSeries("a", DataFrame.toSeries(1, 1, 1, 2, 2));
+    df.addSeries("b", DataFrame.toSeries(1.0, 2.0, 1.0, 2.0, 2.0));
+    df.addSeries("c", DataFrame.toSeries("a", "b", "c", "d", "e"));
+
+    Grouping.DataFrameGrouping grouping = df.groupByValue("b", "a");
+
+    final Series keys = grouping.grouping.keys;
+    Assert.assertEquals(keys.size(), 3);
+    Assert.assertEquals(keys.getObject(0), DataFrame.Tuple.buildFrom(1.0d, 1L));
+    Assert.assertEquals(keys.getObject(1), DataFrame.Tuple.buildFrom(2.0d, 1L));
+    Assert.assertEquals(keys.getObject(2), DataFrame.Tuple.buildFrom(2.0d, 2L));
+
+    Assert.assertEquals(grouping.size(), 3);
+    assertEquals(grouping.apply("a", 0).getObjects(), 1L, 1L);
+    assertEquals(grouping.apply("a", 1).getObjects(), 1L);
+    assertEquals(grouping.apply("a", 2).getObjects(), 2L, 2L);
+
+    Assert.assertEquals(grouping.size(), 3);
+    assertEquals(grouping.apply("b", 0).getObjects(), 1.0d, 1.0d);
+    assertEquals(grouping.apply("b", 1).getObjects(), 2.0d);
+    assertEquals(grouping.apply("b", 2).getObjects(), 2.0d, 2.0d);
+  }
+
+  @Test
   public void testLongGroupByMovingWindow() {
     LongSeries in = DataFrame.toSeries(3, 4, 5, 5, 3, 1, 5, LNULL);
     Grouping.SeriesGrouping grouping = in.groupByMovingWindow(3);
