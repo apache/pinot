@@ -14,7 +14,7 @@ export default Ember.Controller.extend({
   isImportError: false,
   isSubmitDone: false,
   isSubmitDisabled: true,
-  isMetricOnboarded: false,
+  isDashboardExistError: false,
   isExistingDashFieldDisabled: false,
   isCustomDashFieldDisabled: false,
 
@@ -78,10 +78,29 @@ export default Ember.Controller.extend({
   isFormDisabled: Ember.computed.and('isExistingDashFieldDisabled', 'isCustomDashFieldDisabled'),
 
   /**
-   * Fetches an alert function record by name.
-   * Use case: when user names an alert, make sure no duplicate already exists.
-   * @method fetchAnomalyByName
-   * @param {String} functionName - name of alert or function
+   * Validates whether the entered dashboard name exists in inGraphs
+   * @method validateDashboardName
+   * @param {Boolean} isRrdImport - indicates whether we are importing custom dashboard name
+   * @param {String} dashboardName - name of dashboard to import
+   * @return {Promise}
+   */
+  validateDashboardName(isRrdImport, dashboardName) {
+    // TODO: add correct endpoint
+    const url = `/onboard/validate?dashboard=${dashboardName}`
+    // Only make the call if we are importing an existing inGraphs dashboard (isRrdImport = false)
+    if (isRrdImport) {
+      return Promise.resolve(true);
+    } else {
+      // TODO: enable when endpoint ready
+      // return fetch(url).then((res) => res.json());
+      return Promise.resolve(true);
+    }
+  },
+
+  /**
+   * Fetches a list of existing metrics by dataset name
+   * @method fetchMetricsList
+   * @param {String} dataSet - name of dataset to use in lookup
    * @return {Promise}
    */
   fetchMetricsList(dataSet) {
@@ -118,6 +137,41 @@ export default Ember.Controller.extend({
   },
 
   /**
+   * Generates/updates the metrics for an existing inGraphs dashboard
+   * https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Onboarding+ingraph+dashboards
+   * @method processNewImportSequence
+   * @param {Boolean} isRrdImport - Indicates mode of import request
+   * @param {Object} importObj - Request data containing dataset or metric name
+   * @return {Ember.RSVP.Promise}
+   */
+  processNewImportSequence(isRrdImport, importObj) {
+    // Make request to create new dataset name in TE Database
+    this.onboardNewDataset(importObj)
+    // Make request to trigger instant onboard
+    .then((importResult) => {
+      return this.triggerInstantOnboard();
+    })
+    // Check for metrics in TE that belong to the new dataset name
+    .then((onboardResult) => {
+      return this.fetchMetricsList(importObj.datasetName);
+    })
+    // If this is a custom dashboard import, and no metrics returned, assume something went wrong.
+    .then((metricsList) => {
+      if (isRrdImport && !metricsList.Records.length) {
+        return new Promise.reject();
+      } else {
+        this.setProperties({
+          isImportSuccess: true,
+          importedMetrics: metricsList.Records
+        });
+      }
+    })
+    .catch((error) => {
+      this.set('isImportError', true);
+    });
+  },
+
+  /**
    * Defined actions for component
    */
   actions: {
@@ -132,7 +186,7 @@ export default Ember.Controller.extend({
        isCustomDashFieldDisabled: false,
        isImportSuccess: false,
        isImportError: false,
-       isMetricOnboarded: false,
+       isDashboardExistError: false,
        isSubmitDone: false,
        importExistingDashboardName: '',
        importCustomNewDataset: '',
@@ -158,31 +212,27 @@ export default Ember.Controller.extend({
         importObj.properties = { RRD: this.get('importCustomNewRrd') };
       }
 
-      // Disable the form and show options to user
-      this.setProperties({
-        datasetName,
-        isSubmitDone: true,
-        isCustomDashFieldDisabled: true
-      });
+      // Reset error state for existing field validation
+      this.set('isDashboardExistError', false);
 
-      // Make import request
-      this.onboardNewDataset(importObj).then(importResult => {
-        // Check server for newly onboarded metrics
-        return this.fetchMetricsList(datasetName)
-      }).then((metricsList) => {
-        if (!metricsList.Records.length) {
-          return new Promise.reject();
-        } else {
-          // Trigger onboard for imported metrics
-          this.triggerInstantOnboard().then(onboardRes => {
-            this.setProperties({
-              isImportSuccess: true,
-              isMetricOnboarded: true,
-              importedMetrics: metricsList.Records
-            });
+      // Check whether provided dashboard name exists before sending onboard requests.
+      this.validateDashboardName(isRrdImport, datasetName)
+      .then((isValid) => {
+        if (isValid) {
+          // Begin onboard sequence
+          this.processNewImportSequence(isRrdImport, importObj);
+          // Disable the form and show options to user
+          this.setProperties({
+            datasetName,
+            isSubmitDone: true,
+            isCustomDashFieldDisabled: true
           });
+        } else {
+          this.set('isCustomDashFieldDisabled', true);
+          this.set('isDashboardExistError', true);
         }
-      }).catch((err)=>{
+      })
+      .catch((error) => {
         this.set('isImportError', true);
       });
     }
