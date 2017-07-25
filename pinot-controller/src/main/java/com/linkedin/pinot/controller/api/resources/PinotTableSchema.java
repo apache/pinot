@@ -33,7 +33,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-@Api(value = Constants.SCHEMA_TAG)
+@Api(tags = Constants.SCHEMA_TAG)
 @Path("/")
 public class PinotTableSchema {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableSchema.class);

@@ -53,6 +53,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 @Api(tags = Constants.SCHEMA_TAG)
+@Path("/")
 public class PinotSchemaRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotSchemaRestletResource.class);
 
@@ -134,14 +135,13 @@ public class PinotSchemaRestletResource {
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/schemas/{schemaName}")
-  @ApiOperation(value = "Updates a schema", notes = "Updates a schema")
+  @Path("/schemas")
+  @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
   public SuccessResponse addSchema(
-      @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       FormDataMultiPart multiPart
   ) {
     try {
-      return addOrUpdateSchema(schemaName, multiPart);
+      return addOrUpdateSchema(null, multiPart);
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
