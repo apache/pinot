@@ -634,13 +634,14 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
 
     SegmentCompletionProtocol.Response segmentCommitUploadResponse = _protocolHandler.segmentCommitUpload(
-        _currentOffset, _segmentNameStr, segmentTarFile, prevResponse.getSegmentLocation(), prevResponse.getControllerVipUrl());
+        _currentOffset, _segmentNameStr, segmentTarFile, prevResponse.getControllerVipUrl());
     if (!segmentCommitUploadResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
       segmentLogger.warn("Segment upload failed  with response {}", segmentCommitUploadResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    SegmentCompletionProtocol.Response commitEndResponse =  _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
+    SegmentCompletionProtocol.Response commitEndResponse =  _protocolHandler.segmentCommitEnd(_currentOffset,
+        _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS))  {
       segmentLogger.warn("CommitEnd failed  with response {}", commitEndResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
