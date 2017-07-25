@@ -1,31 +1,94 @@
-{{!-- TODO: move legend into own component--}}
 {{#if showLegend}}
   <section class="anomaly-graph__left-panel">
     <div class="anomaly_graph__filters">
       <h5 class="legend-title">Primary Metric</h5>
       <ul class="anomaly-graph__filter-group">
         <li class="anomaly-graph__filter-item">
-          {{input type="checkbox" id=(concat "metric-" metric.id) checked=true disabled=true click=(action "onSelection" anomaly)}}
-          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{primaryMetric.color}}" for="metric-{{primaryMetric.id}}" title={{primaryMetric.metricName}}> {{primaryMetric.metricName}} </label>
+          {{input type="checkbox" id=(concat primaryMetricId metric.id) checked=true disabled=true}}
+          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{primaryMetric.color}}" for="{{concat primaryMetricId metric.id}}" title={{primaryMetric.metricName}}> {{primaryMetric.metricName}} </label>
         </li>
       </ul>
-      <h5 class="legend-title">Related Metrics</h5>
-      <ul class="anomaly-graph__filter-group">
-      {{#each relatedMetrics as |metric index|}}
-        <li class="anomaly-graph__filter-item">{{input type="checkbox" id=(concat "related-metric-" index) checked=metric.isSelected}}
-          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{metric.color}}" for="related-metric-{{index}}" title={{metric.metricName}}> {{metric.metricName}} </label>
-        </li>
-      {{else}}
-        No Related Metrics.
-      {{/each}}
-      </ul>
+
+      {{#if showEvents}}
+        <h5 class="legend-title">Related Events ({{holidayEvents.length}})
+          <a class="pull-right legend-cta" {{action (toggle "isEventsHidden" this)}}>
+            <i class="glyphicon {{if isEventsHidden "glyphicon-chevron-down" "glyphicon-chevron-up"}}"></i>
+          </a>
+        </h5>
+        <ul class="anomaly-graph__filter-group {{if isEventsHidden "anomaly-graph__filter-group--hidden"}}">
+
+          {{#each holidayEvents as |event|}}
+            <li class="anomaly-graph__filter-item">
+              {{input 
+                type="checkbox" 
+                change=(action "onSelection" event.urn)
+                id=(concat relatedMetricId event.urn) 
+                checked=event.isSelected}}
+              <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{event.color}}" for="{{concat relatedMetricId event.urn}}" title={{event.label}}> {{event.label}} </label>
+            </li>
+          {{else}}
+            No Related Events. 
+            {{#link-to 'rca.details.events' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add an event) </a>{{/link-to}}
+          {{/each}}
+          
+        </ul>
+      {{/if}}
+
+      {{#if showDimensions}}
+        <h5 class="legend-title">Dimensions ({{dimensions.length}})
+          <a class="pull-right legend-cta" {{action (toggle "isDimensionsHidden" this)}}>
+            <i class="glyphicon {{if isDimensionsHidden "glyphicon-chevron-down" "glyphicon-chevron-up"}}"></i>
+          </a>
+        </h5>
+        <ul class="anomaly-graph__filter-group {{if isDimensionsHidden "anomaly-graph__filter-group--hidden"}}">
+          {{#each dimensions as |subdimension|}}
+            <li class="anomaly-graph__filter-item">
+              {{input
+                type="checkbox"
+                id=(concat dimensionId subdimension.id)
+                change=(action "onSelection" subdimension)
+                checked=subdimension.isSelected}}
+              <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{subdimension.color}}" for="{{concat dimensionId subdimension.id}}" title={{subdimension.name}}> {{subdimension.name}} </label>
+            </li>
+          {{else}}
+            No Dimensions.
+            {{#link-to 'rca.details.dimensions' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add a dimension) </a>{{/link-to}}
+          {{/each}}
+        </ul>
+      {{/if}}
+
+      {{#if showMetrics}}
+        <h5 class="legend-title">Related Metrics ({{relatedMetrics.length}})
+          <a class="pull-right legend-cta" {{action (toggle "isMetricsHidden" this)}}>
+            <i class="glyphicon {{if isMetricsHidden "glyphicon-chevron-down" "glyphicon-chevron-up"}}"></i>
+          </a>
+        </h5>
+        <ul class="anomaly-graph__filter-group {{if isMetricsHidden "anomaly-graph__filter-group--hidden"}}">
+        {{#each relatedMetrics as |metric index|}}
+          <li class="anomaly-graph__filter-item">
+            {{input 
+              type="checkbox" 
+              change=(action "onSelection" metric checked)
+              id=(concat relatedMetricId index) 
+              checked=metric.isSelected
+              }}
+            <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{metric.color}}" for="{{concat relatedMetricId index}}" title={{metric.metricName}}> {{metric.metricName}} </label>
+          </li>
+        {{else}}
+          No Related Metrics.
+          {{#link-to 'rca.details.metrics' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add a metric) </a>{{/link-to}}
+        {{/each}}
+        </ul>
+      {{/if}}
+
+      
     </div>
   </section>
 {{/if}}
 
 <section class="anomaly-graph__right-panel">
   {{#if showTitle}}
-    <h3 class="anomaly-graph__title">#{{primaryMetric.metricId}} {{primaryMetric.metricName}}</h3>
+    <h3 class="anomaly-graph__title">{{primaryMetric.metricName}}</h3>
   {{/if}}
   {{#if isLoading}}
     {{ember-spinner}}
@@ -40,5 +103,6 @@
     zoom=zoom
     point=point
     subchart=subchart
+    tooltip=tooltip
   }}
 </section>

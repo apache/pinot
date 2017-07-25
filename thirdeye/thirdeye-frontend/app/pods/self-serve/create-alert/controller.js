@@ -66,7 +66,7 @@ export default Ember.Controller.extend({
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
     const url = `/data/autocomplete/metric?name=${metric}`;
-    return fetch(url).then(res => res.json())
+    return fetch(url).then(res => res.json());
   }),
 
   /**
@@ -93,7 +93,7 @@ export default Ember.Controller.extend({
    */
   fetchMetricDimensions(metricId) {
     const url = `/data/autocomplete/dimensions/metric/${metricId}`;
-    return fetch(url).then(res => res.json())
+    return fetch(url).then(res => res.json());
   },
 
   /**
@@ -105,7 +105,7 @@ export default Ember.Controller.extend({
    */
   fetchFunctionById(functionId) {
     const url = `/onboard/function/${functionId}`;
-    return fetch(url).then(res => res.json())
+    return fetch(url).then(res => res.json());
   },
 
   /**
@@ -117,7 +117,7 @@ export default Ember.Controller.extend({
    */
   fetchAnomalyByName(functionName) {
     const url = `/data/autocomplete/functionByName?name=${functionName}`;
-    return fetch(url).then(res => res.json())
+    return fetch(url).then(res => res.json());
   },
 
   /**
@@ -132,7 +132,7 @@ export default Ember.Controller.extend({
       maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => res.json()),
       granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => res.json()),
       filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => res.json()),
-      selectedMetricDimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res =>res.json()),
+      selectedMetricDimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res =>res.json())
     };
 
     return Ember.RSVP.hash(promiseHash);
@@ -191,6 +191,7 @@ export default Ember.Controller.extend({
       method: 'post',
       headers: { 'content-type': 'Application/Json' }
     };
+
     const url = '/dashboard/anomaly-function?' + this.toQueryString(functionData);
     return fetch(url, postProps).then(res => res.json());
   },
@@ -205,7 +206,7 @@ export default Ember.Controller.extend({
     const maxTime = this.get('maxTime');
     const currentEnd = moment(maxTime).isValid()
       ? moment(maxTime).valueOf()
-      : moment().subtract(1,'day').endOf('day').valueOf();
+      : moment().subtract(1, 'day').endOf('day').valueOf();
     const granularity = this.get('selectedGranularity') || this.get('granularities.firstObject');
     const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
     const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
@@ -219,7 +220,7 @@ export default Ember.Controller.extend({
       currentEnd,
       baselineStart,
       baselineEnd,
-      granularity,
+      granularity
     };
 
     this.setProperties({
@@ -246,10 +247,10 @@ export default Ember.Controller.extend({
    * @return {Ember.RSVP.Promise}
    */
   triggerReplay(functionObj, groupObj, newFuncId) {
-    const startTime = moment().subtract(1,'month').endOf('day').format("YYYY-MM-DD");
-    const startStamp = moment().subtract(1,'day').endOf('day').valueOf();
-    const endTime = moment().subtract(1,'day').endOf('day').format("YYYY-MM-DD");
-    const endStamp = moment().subtract(1,'month').endOf('day').valueOf();
+    const startTime = moment().subtract(1, 'month').endOf('day').format("YYYY-MM-DD");
+    const startStamp = moment().subtract(1, 'day').endOf('day').valueOf();
+    const endTime = moment().subtract(1, 'day').endOf('day').format("YYYY-MM-DD");
+    const endStamp = moment().subtract(1, 'month').endOf('day').valueOf();
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const postProps = {
       method: 'POST',
@@ -313,7 +314,7 @@ export default Ember.Controller.extend({
     'newConfigGroupName',
     function() {
       return this.get('selectedConfigGroup') && Ember.isNone(this.get('newConfigGroupName'));
-  }),
+    }),
 
   /**
    * Enables the submit button when all required fields are filled
@@ -441,7 +442,7 @@ export default Ember.Controller.extend({
         this.setProperties(hash);
         this.set('metricGranularityOptions', hash.granularities);
         this.triggerGraphFromMetric(selectedObj);
-      })
+      });
     },
 
     /**
@@ -497,7 +498,7 @@ export default Ember.Controller.extend({
       this.setProperties({
         selectedConfigGroup: selectedObj,
         newConfigGroupName: null,
-        selectedGroupRecipients: selectedObj.recipients.replace(/,+/g, ', '),
+        selectedGroupRecipients: selectedObj.recipients.replace(/,+/g, ', ')
       });
       this.prepareFunctions(selectedObj).then(functionData => {
         this.set('selectedGroupFunctions', functionData);
@@ -574,24 +575,24 @@ export default Ember.Controller.extend({
      */
     clearAll() {
       this.setProperties({
-       isFormDisabled: false,
-       isMetricSelected: false,
-       selectedMetricOption: null,
-       selectedPattern: null,
-       selectedGranularity: null,
-       dimensionSelectorVal: null,
-       alertFunctionName: null,
-       selectedAppName: null,
-       selectedConfigGroup: null,
-       newConfigGroupName: null,
-       alertGroupNewRecipient: null,
-       selectedGroupRecipients: null,
-       isCreateAlertSuccess: null,
-       isCreateAlertError: false,
-       isCreateGroupSuccess: false,
-       isReplayTriggeredSuccess: false,
-       isReplayComplete: false,
-       filterPropNames: JSON.stringify({})
+        isFormDisabled: false,
+        isMetricSelected: false,
+        selectedMetricOption: null,
+        selectedPattern: null,
+        selectedGranularity: null,
+        dimensionSelectorVal: null,
+        alertFunctionName: null,
+        selectedAppName: null,
+        selectedConfigGroup: null,
+        newConfigGroupName: null,
+        alertGroupNewRecipient: null,
+        selectedGroupRecipients: null,
+        isCreateAlertSuccess: null,
+        isCreateAlertError: false,
+        isCreateGroupSuccess: false,
+        isReplayTriggeredSuccess: false,
+        isReplayComplete: false,
+        filterPropNames: JSON.stringify({})
       });
       this.send('refreshModel');
     },
@@ -650,8 +651,8 @@ export default Ember.Controller.extend({
             if (alertResult.ok) {
               this.setProperties({
                 selectedGroupRecipients: finalConfigObj.recipients,
-                 isCreateAlertSuccess: true,
-                 finalFunctionId: newFunctionId
+                isCreateAlertSuccess: true,
+                finalFunctionId: newFunctionId
               });
               // Confirm group creation if not in group edit mode
               if (!isEditGroupMode) {

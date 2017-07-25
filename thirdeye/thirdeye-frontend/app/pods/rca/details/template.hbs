@@ -1,0 +1,101 @@
+<div class="container">
+  <h2 class="te-title">Summary</h2>
+  <div class="paper-container">
+    <div class="paper-container__body">
+      <section class="rca-summary">
+        <div class="row">
+          <div class="form-group col-xs-6">
+            <label class="te-label" for="select-granularity">Granularity: </label>
+            {{#power-select
+              selected=uiGranularity
+              options=granularities
+              triggerId="select-granularity"
+              onchange=(action "onGranularityChange") 
+              searchEnabled=false
+              as |granularity|
+            }}
+              {{granularity}}
+            {{/power-select}}
+          </div>
+          <div class="col-xs-6">
+            <label class="te-label" for="select-mode">Compare Mode: </label>
+            {{#power-select
+              selected=compareMode
+              options=compareModeOptions
+              triggerId="select-mode"
+              searchEnabled=false
+              onchange=(action "onModeChange")
+              as |mode|
+            }}
+              {{mode}}
+            {{/power-select}}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="te-label" for="select-filters">Filters: </label>
+          {{filter-select
+            options=metricFilters
+            selected=filters
+            triggerId="select-filter"
+          }}
+        </div>
+        <main class="paper-container">
+          {{#containers/primary-metric-container as |summary actions|}}
+            {{#if summary.loading}}
+              <section class="paper-container">
+                <div class="spinner-wrapper">
+                  {{ember-spinner}}
+                </div>
+              </section>
+            {{/if}}
+
+            {{#if summary.loaded}}
+              {{anomaly-graph 
+                classNames='anomaly-graph--no-border'
+                primaryMetric=summary.primaryMetric 
+                showLegend=true
+                showSubchart=true
+                showGraphLegend=false
+                showEvents=true
+                showMetrics=true
+                showDimensions=true
+                onSubchartChange=(action "setDateParams")
+                onSelection=(action actions.onDeselect)
+                subchartStart=analysisStart
+                subchartEnd=analysisEnd
+                relatedMetrics=summary.selectedMetrics
+                selectedMetrics=summary.selectedMetrics
+                dimensions=summary.selectedDimensions
+                selectedDimensions=summary.selectedDimensions
+                events=summary.selectedEvents
+              }}
+            {{/if}}
+          {{/containers/primary-metric-container}}
+        </main>
+      </section>
+    </div>
+  </div>
+
+  <h2 class="te-title">Root Cause Analysis</h2>
+  <div id="root-cause-analysis" class="paper-container">
+    <div class="contribution-table__header">
+      <div class="contribution-table__subnav">
+        {{#link-to "rca.details.events" class="thirdeye-link thirdeye-link--nav" activeClass="thirdeye-link--active"}}
+          Events Correlation 
+        {{/link-to}}
+      </div>
+      <div class="contribution-table__subnav">
+        {{#link-to "rca.details.dimensions" class="thirdeye-link thirdeye-link--nav" activeClass="thirdeye-link--active"}}
+          Dimensions Analysis 
+        {{/link-to}}
+      </div>
+      <div class="contribution-table__subnav">
+        {{#link-to "rca.details.metrics" class="thirdeye-link thirdeye-link--nav" activeClass="thirdeye-link--active"}}
+          Metrics Correlation 
+        {{/link-to}}
+      </div>
+    </div>
+    {{outlet}}
+  </div>
+</div>

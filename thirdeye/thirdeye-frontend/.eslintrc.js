@@ -14,9 +14,14 @@ module.exports = {
     es6: true
   },
   rules: {
-    "eol-last": ["error", "always"],
-    "indent": ["error", 2, { "SwitchCase": 1 }],
-    "space-in-parens": ["error", "never"],
-    "no-trailing-spaces": ["error"],
+    "eol-last": ["warn", "always"],
+    "indent": ["warn", 2, { "SwitchCase": 1 }],
+    "space-in-parens": ["warn", "never"],
+    "no-trailing-spaces": ["warn"],
+    "comma-dangle": ["warn", "never"],
+    "comma-spacing": ["warn", { "before": false, "after": true }],
+    "semi": ["warn", "always"],
+    "comma-style": ["warn", "last"],
+    "no-unused-vars": ["warn", { "vars": "all", "args": "after-used", "ignoreRestSiblings": false }]
   }
 };

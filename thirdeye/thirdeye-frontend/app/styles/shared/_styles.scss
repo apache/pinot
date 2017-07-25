@@ -9,10 +9,19 @@ body {
 
 .te-title {
   @include app-title-mixin;
+
+  &--flush {
+    @include padding-reset;
+    @include margin-reset;
+  }
 }
 
 .te-sub-title {
   @include app-sub-title-mixin;
+  &--flush {
+    @include padding-reset;
+    @include margin-reset;
+  }
 }
 
 .te-form {

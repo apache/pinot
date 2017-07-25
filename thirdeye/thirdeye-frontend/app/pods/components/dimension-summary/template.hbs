@@ -1,0 +1,16 @@
+    <div class="dimension-summary__item">
+      <label class="dimension-summary__label">Current Total</label>
+      <span class="dimension-summary__data">{{format-number data.currentTotal}}</span>
+    </div>
+    <div class="dimension-summary__item">
+      <label class="dimension-summary__label">Baseline Total</label>
+      <span class="dimension-summary__data">{{format-number data.baselineTotal}}</span>
+    </div>
+    <div class="dimension-summary__item">
+      <label class="dimension-summary__label">Change Value</label>
+      <span class="dimension-summary__data dimension-summary__data--{{color-delta data.deltaChange}}">{{format-number data.deltaChange}}</span>
+    </div>
+    <div class="dimension-summary__item">
+      <label class="dimension-summary__label">% Change</label>
+      <span class="dimension-summary__data dimension-summary__data--{{color-delta data.deltaPercentage}}">{{data.deltaPercentage}} %</span>
+    </div>

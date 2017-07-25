@@ -4,7 +4,7 @@ import Ember from 'ember';
  * Template helper that computes the background color
  * for the contribution map
  * @param {Number} [value=0] Contribution change in percentage
- * @return {String}          rgba color for background 
+ * @return {String}          rgba color for background
  */
 export function computeColor([value = 0]) {
   const opacity = Math.abs(value / 25);

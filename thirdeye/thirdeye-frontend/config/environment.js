@@ -18,6 +18,10 @@ module.exports = function(environment) {
       directory: 'app/mirage'
     },
 
+    moment: {
+      includeTimezone: 'all'
+    },
+
     EmberENV: {
 
       FEATURES: {

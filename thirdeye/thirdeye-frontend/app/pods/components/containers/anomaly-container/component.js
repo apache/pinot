@@ -3,11 +3,11 @@ import { connect } from 'ember-redux';
 import { Actions } from 'thirdeye-frontend/actions/anomaly';
 
 function select(store) {
-  const { 
-    entity, 
-    loading, 
-    loaded, 
-    failed,
+  const {
+    entity,
+    loading,
+    loaded,
+    failed
   } = store.anomaly;
 
   return {
@@ -30,7 +30,7 @@ function actions(dispatch) {
       const params = {};
 
       dispatch(Actions.request(params));
-    },
+    }
   };
 }
 

@@ -1,20 +1,23 @@
 /* analysis table css*/
 
 .contribution-table {
-  border: 1px solid $te-grey;
+  border: 1px solid $te-grey--border;
   margin-top: $te-default-element-spacing;
+
+  &__body {
+    padding: $te-spacing;
+    position: relative;
+  }
+
+  &__title {
+    @include margin-reset;
+    @include padding-reset;
+    font-size: initial;
+    font-weight: 600;
+  }
 }
 
-.contribution-table__body {
-  padding: 14px;
-}
 
-.contribution-table__title {
-  @include margin-reset;
-  @include padding-reset;
-  font-size: initial;
-  font-weight: 600;
-}
 
 
 .analysis-table-wrapper {
@@ -23,12 +26,12 @@
 
 .contribution-table__header {
   display: flex;
-  border-bottom: 1px solid $te-grey;
-  padding: 14px 0;
+  border-bottom: 1px solid $te-grey--border;
+  padding: $te-spacing 0;
 }
 
 .contribution-table__subnav {
-  margin: 0 14px;
+  margin: 0 $te-spacing;
 }
 
 .analysis-table {
@@ -36,14 +39,14 @@
   border: none;
   width: auto;
   min-width: 100%;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 300;
 }
 
 .analysis-table__header {
   text-align: center;
   font-weight: 300;
-  font-size: 14px;
+  font-size: 12px;
   white-space: nowrap;
   background-color: #E4E8EC;
   padding: 4px 8px;
@@ -64,7 +67,7 @@
   /* offset the table border*/
   left: -1px;
   font-weight: 300;
-  font-size: 14px;
+  font-size: 13px;
   white-space: nowrap;
   background-color: white;
 }
@@ -118,7 +121,7 @@
 
 .analysis-table__anchor,
 .analysis-table__dimension {
-  border:none!important;
+  border: none!important;
   padding: 9px;
 }
 

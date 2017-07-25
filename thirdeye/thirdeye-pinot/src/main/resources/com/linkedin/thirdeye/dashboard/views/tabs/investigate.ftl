@@ -136,22 +136,12 @@
           </div>
           {{#unless ../externalUrls.INGRAPH}}
             <div class="wow-card-footer">
-              <a href="{{wow.url}}" target="_blank" class="thirdeye-link">View Contribution Analysis</a>
+              <a href="{{wow.newUrl}}" target="_blank" class="thirdeye-link">View Contribution Analysis</a>
             </div>
           {{/unless}}
         </li>
       {{/each}}
     </ul>
-
-  <!-- <div class="investigate-tips padding-all">
-    <div class="investigate-icon">
-      <img rel="lightbulb" src="assets/img/Lightbulb.png">
-    </div>
-    <div class="investigate-tips-body">
-      <label class="label-medium-semibold">Investigating Tip</label>
-      <p>Anomalies are Tricky! Sure an event such as <strong>Diwali</strong> may be the cause for the anomaly. but where did the drop take place? Did it actually happen in India? Always take a double look and watch out for these tricky anomalies!</p>
-    </div>
-  </div> -->
 </div>
 
 

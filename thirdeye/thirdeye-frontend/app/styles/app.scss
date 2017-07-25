@@ -2,18 +2,9 @@
   box-sizing: border-box;
 }
 
-/* Individual bootstrap components (as needed)
-@import "ember-bootstrap/bootstrap/variables.scss";
-@import "ember-bootstrap/bootstrap/normalize.scss";
-@import "ember-bootstrap/bootstrap/mixins.scss";
-@import "ember-bootstrap/bootstrap/glyphicons.scss";
-@import "ember-bootstrap/bootstrap/forms.scss";
-@import "ember-bootstrap/bootstrap/grid.scss";
-@import "ember-bootstrap/bootstrap/tables.scss";
-*/
-
 // All-in-one Bootstrap
 @import "ember-bootstrap/bootstrap.scss";
+
 
 // Shared
 @import "shared/functions";
@@ -24,6 +15,16 @@
 
 // Wrapper
 @import "wrapper/color";
+
+body {
+  background-color: #f5f5f5;
+  margin: 0;
+}
+
+.anomaly-title-bar {
+  background: white;
+  border-bottom: 1px #e9e9e9 solid;
+}
 @import 'wrapper/styles';
 
 // Components
@@ -31,6 +32,9 @@
 @import 'components/anomaly-graph';
 @import 'components/contribution-table';
 @import 'components/te-navbar';
+@import 'components/filter-select';
+@import 'components/dimension-heatmap';
+@import 'components/dimension-summary';
 
 // Pod Pages
 @import 'ember-power-select/themes/bootstrap';
@@ -39,3 +43,4 @@
 @import "pods/self-serve/create-alert";
 @import "pods/self-serve/import-metric";
 @import 'pods/rca';
+@import 'pods/events';

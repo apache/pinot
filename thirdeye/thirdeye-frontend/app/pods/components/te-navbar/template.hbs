@@ -1,45 +1,48 @@
 <div class="container">
-  {{#if isGlobalNav}}
-    <div class="te-nav__logo">
-      {{#link-to "index" class="te-nav__link te-nav__link--home"}}
-        {{webappName}}
-      {{/link-to}}
-    </div>
-  {{/if}}
-
-  <ul class="te-nav__list">
-    {{#each navItems as |navItem|}}
-      {{#unless navItem.hidden}}
-        <li class="te-nav__item te-nav__item--{{navItem.className}}">
-          {{#if navItem.isCustomLink}}
-            <a class="te-nav__link nounderline" href="{{navItem.link}}">
-              {{navItem.title}}
-            </a>
-          {{else if navItem.id}}
-            {{#link-to navItem.link navItem.id class="te-nav__link"}}
-              {{navItem.title}}
-            {{/link-to}}
-          {{else}}
-            {{#link-to navItem.link class="te-nav__link"}}
-              {{navItem.title}}
-            {{/link-to}}
-          {{/if}}
-        </li>
-      {{/unless}}
-    {{/each}}
-  </ul>
-
-  {{#if isGlobalNav}}
-    <div class="te-nav__user" role="menu">
-      {{#link-to "self-serve.create-alert" tagName="button" type="button" class="te-nav__button"}}
-        Create Alert
-      {{/link-to}}
-      <div class="te-nav__user-dropdown">
-        <a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
-          <img src="/assets/images/default-avatar.png" alt="User Avatar" class="te-nav__user-avatar">
-          <i class="glyphicon glyphicon-menu-down"></i>
-        </a>
+  <div class="row">
+    {{#if isGlobalNav}}
+      <div class="te-nav__logo">
+        {{#link-to "index" class="te-nav__link te-nav__link--home"}}
+          {{webappName}}
+        {{/link-to}}
       </div>
-    </div>
-  {{/if}}
+    {{/if}}
+
+    <ul class="te-nav__list">
+      {{#each navItems as |navItem|}}
+        {{#unless navItem.hidden}}
+          <li class="te-nav__item te-nav__item--{{navItem.className}}">
+            {{#if navItem.isCustomLink}}
+              <a class="te-nav__link nounderline" href="{{navItem.link}}">
+                {{navItem.title}}
+              </a>
+            {{else if navItem.id}}
+              {{#link-to navItem.link navItem.id class="te-nav__link"}}
+                {{navItem.title}}
+              {{/link-to}}
+            {{else}}
+              {{#link-to navItem.link class="te-nav__link"}}
+                {{navItem.title}}
+              {{/link-to}}
+            {{/if}}
+          </li>
+        {{/unless}}
+      {{/each}}
+    </ul>
+
+    {{#if isGlobalNav}}
+       <div class="te-nav__user" role="menu">
+        {{#link-to "self-serve.create-alert" tagName="button" type="button" class="te-nav__button"}}
+          Create Alert
+        {{/link-to}}
+        {{!-- Hide until we have authentification  --}}
+        {{!-- <div class="te-nav__user-dropdown">
+          <a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+            <img src="/assets/images/default-avatar.png" alt="User Avatar" class="te-nav__user-avatar">
+            <i class="glyphicon glyphicon-menu-down"></i>
+          </a>
+        </div> --}}
+      </div> 
+    {{/if}}
+  </div>
 </div>

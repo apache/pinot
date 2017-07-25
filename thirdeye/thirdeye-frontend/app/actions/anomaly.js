@@ -7,7 +7,7 @@ import fetch from 'fetch';
 export const ActionTypes = {
   LOAD: type('[Anomaly] Load'),
   LOADING: type('[Anomaly] Loading'),
-  REQUEST_FAIL: type('[Anomaly] Request Fail'),
+  REQUEST_FAIL: type('[Anomaly] Request Fail')
 };
 
 function loading() {
@@ -25,13 +25,13 @@ function loadAnomaly(response) {
 
 function requestFail() {
   return {
-    type: ActionTypes.REQUEST_FAIL,
+    type: ActionTypes.REQUEST_FAIL
   };
 }
 
 /**
  * Fetches the anomaly details for one anomaly
- * 
+ *
  */
 function fetchData(id) {
   return (dispatch) => {
@@ -41,8 +41,8 @@ function fetchData(id) {
     return fetch(`/anomalies/search/anomalyIds/1492498800000/1492585200000/1?anomalyIds=${id}&functionName=`)
       .then(res => res.json())
       .then(res => dispatch(loadAnomaly(res)))
-      .catch(() => dispatch(requestFail()))
-  }  
+      .catch(() => dispatch(requestFail()));
+  };
 }
 
 export const Actions = {

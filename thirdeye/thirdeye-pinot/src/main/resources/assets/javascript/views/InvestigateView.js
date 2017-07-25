@@ -55,7 +55,7 @@ InvestigateView.prototype = {
       anomalyFunctionDimension
       } = args;
 
-    const granularity = timeUnit === 'MINUTES' ? '5_MINUTES' : timeUnit;
+    const granularity = (timeUnit === 'MINUTES') ? '5_MINUTES' : timeUnit;
     const filters = {};
     const start = moment(currentStart);
     const end = moment(currentEnd);
@@ -65,7 +65,7 @@ InvestigateView.prototype = {
     const parsedDimensions = JSON.parse(anomalyFunctionDimension);
     const dimensionKeys = Object.keys(parsedDimensions);
     const dimension = dimensionKeys.length ? dimensionKeys[0] : 'All';
-    
+
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')
       .map((wow) => {
@@ -81,6 +81,9 @@ InvestigateView.prototype = {
             `heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
             `heatMapCurrentEnd=${heatMapCurrentEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
             `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}&filters=${anomalyFunctionDimension}&heatMapFilters=${anomalyFunctionDimension}`;
+
+        wow.newUrl = `app#/rca/${metricId}/metrics?startDate=${start.valueOf()}&endDate=${end.valueOf()}&` +
+          `compareMode=${wow.compareMode}&filters=&filters=${anomalyFunctionDimension}&granularity=${granularity}`;
         return wow;
       });
   },
