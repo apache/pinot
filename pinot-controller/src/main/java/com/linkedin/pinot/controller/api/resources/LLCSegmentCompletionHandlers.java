@@ -192,15 +192,17 @@ public class LLCSegmentCompletionHandlers {
   public String segmentCommitEnd(
       @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION) String segmentLocation,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset
   ) {
-    if (instanceId == null || segmentName == null || offset == -1) {
-      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
+    if (instanceId == null || segmentName == null || offset == -1 || segmentLocation == null) {
+      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}",
+          offset, segmentName, instanceId, segmentLocation);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withSegmentLocation(segmentLocation);
     LOGGER.info(requestParams.toString());
 
     final boolean isSuccess = true;
@@ -251,6 +253,7 @@ public class LLCSegmentCompletionHandlers {
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
   @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
   public String segmentUpload(
       @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
