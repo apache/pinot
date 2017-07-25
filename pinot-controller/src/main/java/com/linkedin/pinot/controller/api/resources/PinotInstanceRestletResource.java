@@ -101,6 +101,7 @@ public class PinotInstanceRestletResource {
   @POST
   @Path("/instances")
   @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON, notes = "Creates a new instance with given instance config")
   @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully created"),
       @ApiResponse(code=409, message="Instance exists already"),
@@ -119,6 +120,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances/{instanceName}/state")
+  @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON, notes = "Creates a new instance with given instance config")
   @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully created"),
@@ -157,6 +159,7 @@ public class PinotInstanceRestletResource {
   @DELETE
   @Path("/instances/{instanceName}")
   @Consumes(MediaType.TEXT_PLAIN)
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete an instance", consumes = MediaType.APPLICATION_JSON,
       notes = "Deletes an instance of given name")
   @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully deleted"),

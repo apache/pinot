@@ -213,6 +213,7 @@ public class PinotTableRestletResource {
 
   @DELETE
   @Path("/tables/{tableName}")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
@@ -236,6 +237,7 @@ public class PinotTableRestletResource {
 
   @PUT
   @Path("/tables/{tableName}")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Updates table config for a table ", notes = "Deletes a table of specific type")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,

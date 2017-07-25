@@ -33,7 +33,9 @@ import javax.inject.Inject;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 @Api(tags = Constants.TABLE_TAG)
@@ -52,6 +54,7 @@ public class PinotTableIndexingConfigs {
   @PUT
   @Path("/tables/{tableName}/indexingConfigs")
   @ApiOperation(value = "Update table indexing configuration")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Table not found"),

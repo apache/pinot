@@ -32,7 +32,9 @@ import javax.inject.Inject;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 @Api(tags = Constants.TABLE_TAG)
@@ -49,6 +51,7 @@ public class PinotTableSegmentConfigs {
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/segmentConfigs")
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update segments configuration",
       notes = "Updates segmentsConfig section (validation and retention) of a table")
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),

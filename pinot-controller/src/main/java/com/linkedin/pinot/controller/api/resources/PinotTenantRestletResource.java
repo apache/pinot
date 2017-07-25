@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import java.util.HashSet;
+import java.util.Set;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,8 +35,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.util.HashSet;
-import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -45,12 +48,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import javax.ws.rs.core.Response;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import static javax.ws.rs.core.MediaType.*;
 
 
 /**
@@ -91,6 +90,7 @@ public class PinotTenantRestletResource {
   @POST
   @Path("/tenants")
   @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = " Create a tenant")
   @ApiResponses( {
       @ApiResponse(code = 200, message = "Success"),
@@ -122,6 +122,7 @@ public class PinotTenantRestletResource {
   @PUT
   @Path("/tenants")
   @Consumes(APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value =  "Update a tenant")
   @ApiResponses(value =  {
       @ApiResponse(code = 200, message = "Success"),
