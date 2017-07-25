@@ -147,28 +147,28 @@ export default Ember.Controller.extend({
   processNewImportSequence(isRrdImport, importObj) {
     // Make request to create new dataset name in TE Database
     this.onboardNewDataset(importObj)
-    // Make request to trigger instant onboard
-    .then((importResult) => {
-      return this.triggerInstantOnboard();
-    })
-    // Check for metrics in TE that belong to the new dataset name
-    .then((onboardResult) => {
-      return this.fetchMetricsList(importObj.datasetName);
-    })
-    // If this is a custom dashboard import, and no metrics returned, assume something went wrong.
-    .then((metricsList) => {
-      if (isRrdImport && !metricsList.Records.length) {
-        return new Promise.reject();
-      } else {
-        this.setProperties({
-          isImportSuccess: true,
-          importedMetrics: metricsList.Records
-        });
-      }
-    })
-    .catch((error) => {
-      this.set('isImportError', true);
-    });
+      // Make request to trigger instant onboard
+      .then((importResult) => {
+        return this.triggerInstantOnboard();
+      })
+      // Check for metrics in TE that belong to the new dataset name
+      .then((onboardResult) => {
+        return this.fetchMetricsList(importObj.datasetName);
+      })
+      // If this is a custom dashboard import, and no metrics returned, assume something went wrong.
+      .then((metricsList) => {
+        if (isRrdImport && !metricsList.Records.length) {
+          return new Promise.reject();
+        } else {
+          this.setProperties({
+            isImportSuccess: true,
+            importedMetrics: metricsList.Records
+          });
+        }
+      })
+      .catch((error) => {
+        this.set('isImportError', true);
+      });
   },
 
   /**
@@ -217,24 +217,24 @@ export default Ember.Controller.extend({
 
       // Check whether provided dashboard name exists before sending onboard requests.
       this.validateDashboardName(isRrdImport, datasetName)
-      .then((isValid) => {
-        if (isValid) {
-          // Begin onboard sequence
-          this.processNewImportSequence(isRrdImport, importObj);
-          // Disable the form and show options to user
-          this.setProperties({
-            datasetName,
-            isSubmitDone: true,
-            isCustomDashFieldDisabled: true
-          });
-        } else {
-          this.set('isCustomDashFieldDisabled', true);
-          this.set('isDashboardExistError', true);
-        }
-      })
-      .catch((error) => {
-        this.set('isImportError', true);
-      });
+        .then((isValid) => {
+          if (isValid) {
+            // Begin onboard sequence
+            this.processNewImportSequence(isRrdImport, importObj);
+            // Disable the form and show options to user
+            this.setProperties({
+              datasetName,
+              isSubmitDone: true,
+              isCustomDashFieldDisabled: true
+            });
+          } else {
+            this.set('isCustomDashFieldDisabled', true);
+            this.set('isDashboardExistError', true);
+          }
+        })
+        .catch((error) => {
+          this.set('isImportError', true);
+        });
     }
   }
 });
