@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -41,6 +43,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -136,7 +139,7 @@ public class PinotSegmentRestletResource {
       notes = "Toggles segment state if 'state' is specified in query param, otherwise lists segment metadata")
   public String toggleStateOrListMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "online|offline|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
@@ -145,6 +148,14 @@ public class PinotSegmentRestletResource {
     }
     if (segmentName == null || segmentName.length() == 0) {
       throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
+    }
+
+    try {
+      segmentName = URLDecoder.decode(segmentName, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      String errStr = "Could not decode segment name '" + segmentName + "'";
+      LOGGER.info(errStr);
+      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
     }
 
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -191,7 +202,7 @@ public class PinotSegmentRestletResource {
       notes = "Lists segment metadata")
   public String listMetadataForOneSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
     if (tableName == null || tableName.length() == 0) {
@@ -199,6 +210,13 @@ public class PinotSegmentRestletResource {
     }
     if (segmentName == null || segmentName.length() == 0) {
       throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
+    }
+    try {
+      segmentName = URLDecoder.decode(segmentName, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      String errStr = "Could not decode segment name '" + segmentName + "'";
+      LOGGER.info(errStr);
+      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
     }
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     // The code in restlet.resources seems to return an array of arrays, so we will do the same
@@ -229,7 +247,7 @@ public class PinotSegmentRestletResource {
   @ApiOperation(value = "Reloads one segment", notes = "Reloads one segment")
   public String reloadOneSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
     if (tableName == null || tableName.length() == 0) {
@@ -237,6 +255,13 @@ public class PinotSegmentRestletResource {
     }
     if (segmentName == null || segmentName.length() == 0) {
       throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
+    }
+    try {
+      segmentName = URLDecoder.decode(segmentName, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      String errStr = "Could not decode segment name '" + segmentName + "'";
+      LOGGER.info(errStr);
+      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
     }
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
 

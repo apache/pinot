@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLDecoder;
 import java.util.Date;
@@ -159,20 +160,27 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
+    FileUploadPathProvider provider;
     try {
-      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-      segmentName = URLDecoder.decode(segmentName, "UTF-8");
-      final File dataFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
-      if (!dataFile.exists()) {
-        throw new WebApplicationException("Segment " + segmentName + " or table " + tableName + " not found",
-            Response.Status.NOT_FOUND);
-      }
-      Response.ResponseBuilder builder = Response.ok(dataFile);
-      builder.header("Content-Disposition", "attachment; filename=" + dataFile.getName());
-      return builder.build();
+      provider = new FileUploadPathProvider(_controllerConf);
     } catch (Exception e) {
-      throw new WebApplicationException(e);
+      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
+    try {
+      segmentName = URLDecoder.decode(segmentName, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      String errStr = "Could not decode segment name '" + segmentName + "'";
+      LOGGER.info(errStr);
+      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
+    }
+    final File dataFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
+    if (!dataFile.exists()) {
+      throw new WebApplicationException("Segment " + segmentName + " or table " + tableName + " not found",
+          Response.Status.NOT_FOUND);
+    }
+    Response.ResponseBuilder builder = Response.ok(dataFile);
+    builder.header("Content-Disposition", "attachment; filename=" + dataFile.getName());
+    return builder.build();
   }
 
   @DELETE
@@ -181,12 +189,19 @@ public class PinotSegmentUploadRestletResource {
   @ApiOperation(value = "Deletes a segment", notes = "Deletes a segment")
   public SuccessResponse deleteOneSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr
   ) {
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new WebApplicationException("Table type must not be null", Response.Status.BAD_REQUEST);
+    }
+    try {
+      segmentName = URLDecoder.decode(segmentName, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      String errStr = "Could not decode segment name '" + segmentName + "'";
+      LOGGER.info(errStr);
+      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
     }
     PinotSegmentRestletResource.toggleStateInternal(tableName, StateType.DROP, tableType, segmentName, _pinotHelixResourceManager);
 
