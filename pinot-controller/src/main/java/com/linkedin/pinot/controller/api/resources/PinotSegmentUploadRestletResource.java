@@ -25,7 +25,6 @@ import java.net.URLDecoder;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Executor;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -312,7 +311,7 @@ public class PinotSegmentUploadRestletResource {
           final String partName = map.keySet().iterator().next();
           final FormDataBodyPart bodyPart = map.get(partName).get(0);
           is = bodyPart.getValueAs(InputStream.class);
-          dataFile = new File(provider.getFileUploadTmpDir(), partName + UUID.randomUUID().toString());
+          dataFile = new File(provider.getFileUploadTmpDir(), partName);
           dataFile.deleteOnExit();
           os = new FileOutputStream(dataFile);
           IOUtils.copyLarge(is, os);
