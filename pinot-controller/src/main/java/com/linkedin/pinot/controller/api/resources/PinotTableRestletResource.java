@@ -38,7 +38,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
-import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -85,7 +84,6 @@ public class PinotTableRestletResource {
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
   public SuccessResponse addTable(String tableConfigStr) {
@@ -238,7 +236,6 @@ public class PinotTableRestletResource {
 
   @PUT
   @Path("/tables/{tableName}")
-  @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Updates table config for a table ", notes = "Deletes a table of specific type")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
