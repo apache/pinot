@@ -32,6 +32,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.model.IdealState;
+import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.joda.time.Interval;
@@ -59,15 +60,14 @@ import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import com.linkedin.pinot.controller.util.TableSizeReader;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.controller.util.TableSizeReader;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
-import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -218,7 +218,7 @@ public class PinotSegmentUploadRestletResource {
   public Response uploadSegmentAsMultiPart(
       FormDataMultiPart multiPart,
       @Context HttpHeaders headers,
-      @Context HttpServletRequest request
+      @Context Request request
   ) {
     return uploadSegmentInternal(multiPart, null, headers, request);
   }
@@ -232,12 +232,12 @@ public class PinotSegmentUploadRestletResource {
   public Response uploadSegmentAsJson(
       String segmentJsonStr,    // If segment is present as json body
       @Context HttpHeaders headers,
-      @Context HttpServletRequest request
+      @Context Request request
   ) {
     return uploadSegmentInternal(null, segmentJsonStr, headers, request);
   }
 
-  private Response uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr, HttpHeaders headers, HttpServletRequest request) {
+  private Response uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr, HttpHeaders headers, Request request) {
     File dataFile = null;
     String downloadURI = null;
     boolean found = false;
