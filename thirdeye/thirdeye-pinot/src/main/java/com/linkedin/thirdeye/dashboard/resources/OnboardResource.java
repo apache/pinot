@@ -95,33 +95,62 @@ public class OnboardResource {
   }
 
   /**
-   * Copy one anomaly function (with currId) over in total to another anomaly function (with srcId)
-   * "copyTo" updates current anomaly function (with currId) to use srcId and src function name
-   * To explicitly illustrate : denote current anomaly function with (currId, currFunctionName, currProperties, currAnomalyHistory)
-   *                            denote src anomaly function with (srcId, srcFunctionName, srcProperties, srcAnomalyHistory)
-   * After "copyTo", the two functions will become:
-   *        (srcId, srcFunctionName, currProperties, currAnomalyHistory)
-   *        (currId, currFunctionName, currProperties, currAnomalyHistory)
-   * This updates src function's properties and historical anomalies into current function's properties and historical anomalies
-   * @param srcId : the source function Id to be copied to
-   * @param currId : the current function Id that have properties and historical anomalies to be copied to source function
+   * Copy the Identity of source anomaly function (with srcId) over in total to destination anomaly function (with destId)
+   * Explicit representation: denote source anomaly function with (srcId, srcFunctionName, srcProperties)
+   *                          denote destination anomaly function with (destId, destFunctionName, destProperties)
+   * "copyIdentity" will update destination anomaly function into source anomaly function's identity
+   * After "copyIdentity", the two functions will become:
+   *        (srcId, srcFunctionName, destProperties)
+   *        (destId, destFunctionName, destProperties)
+   * This in fact updates source anomaly function's properties into destination function's properties
+   * @param srcId : the source function with Identity to be copied to
+   * @param destId : the destination function Id that have properties to be copied to source function
    * @return OK is success
    */
   @POST
-  @Path("function/{srcId}/copyTo/{currId}")
-  public Response copyTo(@PathParam("srcId") @NotNull Long srcId,
-      @PathParam("currId") @NotNull Long currId) {
-    AnomalyFunctionDTO currAnomalyFunction = anomalyFunctionDAO.findById(currId);
+  @Path("function/{srcId}/copyIdentity/{destId}")
+  public Response copyIdentity(@PathParam("srcId") @NotNull Long srcId,
+      @PathParam("destId") @NotNull Long destId) {
     AnomalyFunctionDTO srcAnomalyFunction = anomalyFunctionDAO.findById(srcId);
-    currAnomalyFunction.setId(srcId);
-    currAnomalyFunction.setFunctionName(srcAnomalyFunction.getFunctionName());
-    anomalyFunctionDAO.update(currAnomalyFunction);
+    AnomalyFunctionDTO destAnomalyFunction = anomalyFunctionDAO.findById(destId);
+    destAnomalyFunction.setId(srcId);
+    destAnomalyFunction.setFunctionName(srcAnomalyFunction.getFunctionName());
+    anomalyFunctionDAO.update(destAnomalyFunction); // update properties
     return Response.ok().build();
   }
 
+  /**
+   * Clone anomalies from source anomaly function to destination anomaly function in time range
+   * @param srcId : function Id of source anomaly function
+   * @param destId : function Id of destination anomaly function
+   * @param startTimeIso : start time of anomalies to be cloned, time in ISO format ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso : end time of anomalies to be cloned, time in ISO format
+   * @return true if at least one anomaly being cloned
+   * @throws Exception
+   */
+  @POST
+  @Path("function/{srcId}/cloneAnomalies/{destId}")
+  public Response ClonedAnomalies(@PathParam("srcId") @NotNull long srcId,
+      @PathParam("destId") @NotNull long destId,
+      @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso) throws Exception{
+
+    long start = 0;
+    long end = DateTime.now().getMillis();
+
+    if (startTimeIso != null) {
+        start = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+    }
+    if (endTimeIso != null) {
+      end = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+    }
+    Boolean isAnyCloned = cloneAnomalyInstances(srcId, destId, start, end);
+    return Response.ok(isAnyCloned).build();
+  }
+
+
 
   // util functions for clone anomaly functions
-
   /**
    * Parse function ids to be cloned and clone name tags together
    * the length should be aligned otherwise name tags are all empty
@@ -206,7 +235,7 @@ public class OnboardResource {
     LOG.info("clone function id: {}, name: {}  to id: {}, name: {}", id, functionName, newId, newFunctionName);
 
     if (doCloneAnomaly) {
-      cloneAnomalyInstances(id, newId);
+      cloneAnomalyInstances(id, newId,null,null);
     }
     return newId;
   }
@@ -218,9 +247,11 @@ public class OnboardResource {
    *   3. save the modified anomaly instances
    * @param srcId the source function Id with anomalies to be cloned.
    * @param destId the destination function Id which source anomalies to be cloned to.
+   * @param start the start time of anomalies from source function Id to be cloned, if null, set to 0.
+   * @param end the end time of anomalies from source function Id to be cloned, if null, set to current time milliseconds
    * @return boolean to indicate if the clone is success or not
    */
-  public Boolean cloneAnomalyInstances(Long srcId, Long destId) {
+  public Boolean cloneAnomalyInstances(Long srcId, Long destId, Long start, Long end) {
 
     // make sure both function can be identified by IDs
 
@@ -230,6 +261,14 @@ public class OnboardResource {
       // LOG and exit
       LOG.error("Source Anomaly Function With id [{}] does not found", srcId);
       return false;
+    }
+
+    // if start is null, set to 0, if end is null, set to current time milliseconds
+    if (start == null) {
+      start = 0l;
+    }
+    if (end == null) {
+      end = DateTime.now().getMillis();
     }
 
     AnomalyFunctionDTO destAnomalyFunction = anomalyFunctionDAO.findById(destId);
@@ -242,7 +281,7 @@ public class OnboardResource {
 
     LOG.info("clone merged anomaly results from source anomaly function id {} to id {}", srcId, destId);
 
-    List<MergedAnomalyResultDTO> mergedAnomalyResultDTOs = mergedAnomalyResultDAO.findByFunctionId(srcId, true);
+    List<MergedAnomalyResultDTO> mergedAnomalyResultDTOs = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(start, end, srcId, true);
     if (mergedAnomalyResultDTOs == null || mergedAnomalyResultDTOs.isEmpty()) {
       LOG.error("No merged anomaly results found for anomaly function Id: {}", srcId);
       return false;
@@ -277,11 +316,15 @@ public class OnboardResource {
       return null;
     }
 
-    long startTime;
-    long endTime;
+    long startTime = 0;
+    long endTime = DateTime.now().getMillis();
     try {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+      if (startTimeIso != null) {
+        startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+      }
+      if (endTimeIso != null) {
+        endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+      }
     } catch (Exception e) {
       throw new WebApplicationException("Unable to parse strings, " + startTimeIso + " and " + endTimeIso
           + ", in ISO DateTime format", e);
@@ -309,8 +352,8 @@ public class OnboardResource {
    * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
    */
   public Map<String, Integer> deleteExistingAnomalies(long functionId,
-      long monitoringWindowStartTime,
-      long monitoringWindowEndTime) {
+      Long monitoringWindowStartTime,
+      Long monitoringWindowEndTime) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
       LOG.info("Anomaly functionId {} is not found", functionId);
