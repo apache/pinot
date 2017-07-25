@@ -17,6 +17,9 @@
         property="importExistingDashboardName"
         disabled=isExistingDashFieldDisabled
       }}
+      {{#if isDashboardExistError}}
+        <div class="alert alert-warning">Warning: This dashboard name does not exist in inGraphs. Please verify.</div>
+      {{/if}}
     </div>
   </fieldset>
 
@@ -51,24 +54,19 @@
 
     {{#if isImportSuccess}}
       {{#bs-alert type="success"}}
-        <strong>Success!</strong> You have successfully imported <strong>{{datasetName}}</strong> dataset, including the following metrics:
+        <strong>Success!</strong> You have successfully onboarded the <strong>{{datasetName}}</strong> dataset
+        {{#if importedMetrics.length}}, including the following metrics:{{/if}}
         {{#each importedMetrics as |metric|}}
           <br>{{metric}}
         {{else}}
-          <br>No metrics imported.
+          <br>But no metrics were imported.
         {{/each}}
-      {{/bs-alert}}
-    {{/if}}
-
-    {{#if isMetricOnboarded}}
-      {{#bs-alert type="success"}}
-        <strong>Success!</strong> The metrics have been onboarded for <strong>{{datasetName}}</strong>
       {{/bs-alert}}
     {{/if}}
 
     {{#if isImportError}}
       {{#bs-alert type="danger"}}
-        <strong>Error:</strong> Metrics not imported. Please check your dashboard, datased, and metric names.
+        <strong>Error:</strong> Metrics not onboarded. Please check your dashboard, datased, and metric names.
       {{/bs-alert}}
     {{/if}}
 
