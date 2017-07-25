@@ -1,41 +1,207 @@
 import Ember from 'ember';
+import _ from 'lodash';
 
-// TODO: save this in a constant file
 const GRANULARITY_MAPPING = {
   DAYS: 'M/D',
   HOURS: 'M/D h a',
-  MINUTES: 'M/D hh:mm a'
+  MINUTES: 'M/D hh:mm a',
+  '5_MINUTES': 'M/D hh:mm a'
+};
+
+/**
+ * Helper Function that filters cells betwen 2 index
+ * @param {Array} rows
+ * @param {Number} startIndex
+ * @param {Number} endIndex
+ * @return {Object} Hash of the rows with ids as key
+ */
+const filterRow = (rows, startIndex, endIndex) => {
+  if (!startIndex && !endIndex) {
+    return rows;
+  }
+
+  const newRows = rows.map((row) => {
+    const All = Object.assign({}, row.subDimensionContributionMap.All);
+
+    const newAll = Object.keys(All).reduce((agg, key) => {
+      agg[key] = _.slice(All[key], startIndex, endIndex);
+      return agg;
+    }, {});
+
+    return Object.assign({}, row, { subDimensionContributionMap: {All: newAll}});
+  });
+
+  return newRows;
 };
 
 export default Ember.Component.extend({
   metrics: null,
   showDetails: false,
   granularity: 'DAYS',
-  primaryMetric: null,
-  relatedMetrics: null,
+  primaryMetric: [],
+  relatedMetrics: [],
+  dimensions: [],
+  start: null,
+  end: null,
+  loading: false,
+
+  // This is needed so that a loading spinner appears for long rendering
+  didUpdateAttrs(...args) {
+    Ember.run.later(() => {
+      this._super(args);
+
+      this.set('loading', false);
+    });
+  },
 
   /**
    * Determines the date format based on granularity
    */
   dateFormat: Ember.computed('granularity', function() {
     const granularity = this.get('granularity');
-    return GRANULARITY_MAPPING[granularity]
+    return GRANULARITY_MAPPING[granularity];
   }),
 
   /**
-   * Derives dates from the primary metric
+   * Contribution data of the primary metric
    */
-  dates: Ember.computed.reads('primaryMetric.timeBucketsCurrent'),
-  
   primaryMetricRows: Ember.computed('primaryMetric', function() {
     const metrics = this.get('primaryMetric');
 
-    return Ember.isArray(metrics) ? metrics : [metrics];
+    return Ember.isArray(metrics) ? [...metrics] : [Object.assign({}, metrics)];
   }),
 
+  /**
+   * Contribution data of the related metrics
+   */
   relatedMetricRows: Ember.computed('relatedMetrics', function() {
     const metrics = this.get('relatedMetrics');
-    
-    return Ember.isArray(metrics) ? metrics : [metrics];
-  })
+
+    return Ember.isArray(metrics) ? [...metrics] : [Object.assign({}, metrics)];
+  }),
+
+  /**
+   * Contribution data of the dimension
+   */
+  dimensionRows: Ember.computed('dimensions', function() {
+    const dimensions = this.get('dimensions');
+
+    return Ember.isArray(dimensions) ? [...dimensions] : [Object.assign({}, dimensions)];
+  }),
+
+  /**
+   * Finds the index of the first date greater than start
+   * @param {Array} dates Array of dates
+   * @param {Number} start Start date in unix ms
+   * @return {Number} The start Index
+   */
+  startIndex: Ember.computed('dates', 'start', function() {
+    const dates = this.get('dates');
+    const start = this.get('start');
+
+    for (let index = 0; index < dates.length; index++) {
+      if (dates[index] > start) {
+        return index;
+      }
+    }
+    return false;
+  }),
+
+  /**
+   * Finds the index of last date smaller than end
+   * @param {Array} dates Array of dates
+   * @param {Number} end end date in unix ms
+   * @return {Number} The end Index
+   */
+  endIndex: Ember.computed('dates', 'end', function() {
+    const dates = this.get('dates');
+    const end = this.get('end');
+
+    for (let index = 0; index < dates.length; index++) {
+      if (dates[index] > end) {
+        return index;
+      }
+    }
+    return dates.length - 1;
+  }),
+
+  /**
+   * Filters the date to return only those in range
+   */
+  filteredDates: Ember.computed(
+    'startIndex',
+    'endIndex',
+    'dates',
+    function() {
+      const start = this.get('startIndex') || 0;
+      const end = this.get('endIndex') || 0;
+
+      const dates = this.get('dates');
+      if (!(start && end)) {
+        return dates;
+      }
+      return _.slice(dates, start, end);
+    }
+  ),
+
+  filteredPrimaryMetricRows: Ember.computed(
+    'startIndex',
+    'endIndex',
+    'primaryMetricRows',
+    function() {
+      const startIndex = this.get('startIndex') || 0;
+      const endIndex = this.get('endIndex') || 0;
+      const rows = this.get('primaryMetricRows');
+
+
+      return filterRow(rows, startIndex, endIndex) || [];
+    }
+  ),
+
+  filteredRelatedMetricRows: Ember.computed(
+    'startIndex',
+    'endIndex',
+    'relatedMetricRows',
+     function() {
+       const startIndex = this.get('startIndex') || 0;
+       const endIndex = this.get('endIndex') || 0;
+       const rows = this.get('relatedMetricRows');
+
+
+       return filterRow(rows, startIndex, endIndex) || [];
+     }
+  ),
+
+  filteredDimensionRows: Ember.computed(
+    'startIndex',
+    'endIndex',
+    'dimensionRows',
+     function() {
+       const startIndex = this.get('startIndex') || 0;
+       const endIndex = this.get('endIndex') || 0;
+       const dimensions = this.get('dimensionRows');
+       const valueKeys = [
+         'baselineValues',
+         'cumulativeBaselineValues',
+         'cumulativeCurrentValues',
+         'cumulativePercentageChange',
+         'currentValues',
+         'percentageChange'
+       ];
+
+       if (!startIndex && !endIndex) {
+         return dimensions;
+       }
+
+       return dimensions.map((dimension) => {
+         const hash = {
+           name: dimension.name
+         };
+         valueKeys.forEach((key) => {
+           hash[key] = _.slice(dimension[key], startIndex, endIndex);
+         });
+         return hash;
+       }) || [];
+     }
+  )
 });

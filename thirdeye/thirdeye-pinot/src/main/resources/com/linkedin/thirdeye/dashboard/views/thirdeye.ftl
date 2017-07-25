@@ -169,34 +169,49 @@
       <div class="">
         <nav class="navbar navbar-inverse" role="navigation">
           <div class="container thirdeye-nav">
-            <div id="global-navbar" class="navbar-header">
-              <a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">ThirdEye</a>
-            </div>
+            <div class="row">
+              <div id="global-navbar" class="navbar-header">
+                <div class="te-nav__logo">
+                    <a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">ThirdEye</a>
+                </div>
+              </div>
 
-            <ul class="nav navbar-nav thirdeye-nav__tabs" id="main-tabs">
-              <li><a href="#anomalies">Anomalies</a></li>
-              <li class="hidden"><a href="#investigate">Investigate</a></li>
-              <li><a href="#analysis">Root Cause Analysis</a></li>
-            </ul>
-            <div class="thirdeye-nav__oldui">
-              <div class="thirdeye-nav__divider"></div>
-              <a class="btn thirdeye-btn thirdeye-btn--secondary" href="dashboard">Old UI</a>
-            </div>
+              <ul class="nav navbar-nav thirdeye-nav__tabs" id="main-tabs">
+                <li class="te-nav__link"><a href="#anomalies">Home</a></li>
+                <li class="te-nav__link"><a href="#anomalies">Anomalies</a></li>
+                <li class="hidden"><a href="#investigate">Investigate</a></li>
+              </ul>
 
-            <!-- Hidding this until it's fully fleshed out -->
-            <!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1042 -->
-            <!--  <ul class="nav navbar-nav navbar-right">
-                <li><a href="#">Manage Anomalies</a></li>
-                <li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
-                  <ul class="dropdown-menu">
-                    <li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
-                    <li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
-                    <li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
-                    <li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
-                  </ul></li>
-                <li><a href="#">Sign In</a></li>
-              </ul> -->
-          </nav>
+              <ul class="nav navbar-nav thirdeye-nav__tabs">
+                <li class="te-nav__link"><a href="app/#/rca">Root Cause Analysis</a></li>
+                <li class="te-nav__link"><a href="app/#/manage/alerts">Manage</a></li>
+              </ul>
+
+              <div class="te-nav__user" role="menu">
+                <a class="te-nav__button" href="/app/#/self-serve/create-alert">Create Alert</a>
+              </div>
+
+              <!--- <div class="thirdeye-nav__oldui">
+                <div class="thirdeye-nav__divider"></div>
+                <a class="btn thirdeye-btn thirdeye-btn--secondary" href="dashboard">Old UI</a>
+              </div>
+              --->
+
+              <!-- Hidding this until it's fully fleshed out -->
+              <!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1042 -->
+              <!--  <ul class="nav navbar-nav navbar-right">
+                  <li><a href="#">Manage Anomalies</a></li>
+                  <li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
+                    <ul class="dropdown-menu">
+                      <li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
+                      <li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
+                      <li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
+                      <li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
+                    </ul></li>
+                  <li><a href="#">Sign In</a></li>
+                </ul> -->
+            </nav>
+            </div>
         </div>
       </div>
     </div>

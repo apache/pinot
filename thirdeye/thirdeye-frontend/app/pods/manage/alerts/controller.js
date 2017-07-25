@@ -46,7 +46,7 @@ export default Ember.Controller.extend({
       const pagesNum = this.get('pagesNum');
       const pageSize = this.get('pageSize');
 
-      return Math.min(pagesNum, pageSize/2)
+      return Math.min(pagesNum, pageSize/2);
     }
   ),
 
@@ -96,7 +96,7 @@ export default Ember.Controller.extend({
       const startingNumber = ((max - currentPage) < step)
         ? Math.max(max - size + 1, 1)
         : Math.max(currentPage - step, 1);
-     
+
       return [...new Array(size)].map((page, index) =>  startingNumber + index);
     }
   ),
@@ -124,7 +124,7 @@ export default Ember.Controller.extend({
 
     const url = `/data/autocomplete/functionByName?name=${alert}`;
     return fetch(url)
-      .then(res => res.json())
+      .then(res => res.json());
   }),
 
   /**
@@ -136,7 +136,7 @@ export default Ember.Controller.extend({
     yield timeout(600);
     const url = `/data/autocomplete/functionByAppname?appname=${appName}`;
 
-    this.set('selectedApplicationName', appName)
+    this.set('selectedApplicationName', appName);
     this.set('currentPage', 1);
 
     return fetch(url)
@@ -164,7 +164,7 @@ export default Ember.Controller.extend({
       .then((filters) => {
         this.set('isLoading', false);
         this.set('selectedAlerts', filters);
-      })
+      });
   }),
 
   actions: {

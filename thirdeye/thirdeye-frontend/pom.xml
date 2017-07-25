@@ -64,6 +64,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-clean-plugin</artifactId>
+        <version>3.0.0</version>
         <executions>
           <execution>
             <phase>clean</phase>
@@ -74,7 +75,14 @@
               <filesets>
                 <fileset>
                   <directory>tmp</directory>
+                </fileset>
+                <fileset>
+                  <directory>node</directory>
+                </fileset>
+                <fileset>
                   <directory>node_modules</directory>
+                </fileset>
+                <fileset>
                   <directory>bower_components</directory>
                 </fileset>
               </filesets>

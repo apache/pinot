@@ -9,7 +9,7 @@ export default Ember.Route.extend({
     const { id } = params;
     const redux = this.get('redux');
 
-    redux.dispatch(AnomalyActions.fetchData(id))
+    redux.dispatch(AnomalyActions.fetchData(id));
     return {};
   }
 });

@@ -26,9 +26,9 @@ export default Ember.Controller.extend({
     },
     {
       className: 'rca',
-      link: '/thirdeye#analysis',
-      isCustomLink: true,
-      title: 'Root Cause Analysis'
+      link: 'rca',
+      title: 'Root Cause Analysis',
+      isCustomLink: false
     },
     {
       className: 'manage',

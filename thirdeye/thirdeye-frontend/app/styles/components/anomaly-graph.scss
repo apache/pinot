@@ -10,10 +10,14 @@
 .anomaly-graph {
   box-sizing: border-box;
   display: flex;
-  border: 1px solid $te-grey;
+  border: 1px solid $te-grey--border;
 
   &:not(:first-child) {
       margin-top: 14px;
+  }
+
+  &--no-border {
+    border: 0;
   }
 }
 
@@ -30,7 +34,13 @@
 
 .anomaly-graph__filter-group {
   padding-left: 14px;
+  margin: 14px 0;
   list-style: none;
+  &--hidden {
+    height: 0;
+    overflow: hidden;
+    margin: 0;
+  }
 }
 
 .anomaly-graph__title {
@@ -43,11 +53,17 @@
 
 .legend-title {
   padding: 14px;
-  color: lighten(black, 30%);
+  color: rgba(0,0,0, 0.55);
   margin: 0;
-  background-color: #f3f6f8;
+  background-color: #F3F6F8;
   font-size: 14px;
-  font-weight: normal;
+  font-weight: 600;
+  position: sticky; 
+  top: 0;
+}
+
+.legend-cta {
+  color: rgba(0, 0, 0, 0.30);
 }
 
 .anomaly-graph__left-panel {
@@ -55,7 +71,7 @@
   flex-grow: 1;
   overflow: scroll;
   position: relative;
-  border-right: 1px solid $te-grey;
+  border-right: 1px solid $te-grey--border;
 }
 
 .anomaly-graph__right-panel {

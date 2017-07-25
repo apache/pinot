@@ -1,0 +1,16 @@
+body {
+  background-color: $te-main-background;
+  margin: 0;
+}
+
+/**
+ * TODO: find better place for this class
+ */
+.anomaly-title-bar {
+  background: white;
+  border-bottom: 1px #e9e9e9 solid;
+}
+
+.te-title {
+  @include app-title-mixin;
+}

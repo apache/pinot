@@ -1,0 +1,103 @@
+<section class="paper-container__body">
+  {{#containers/dimensions-container as |dimensions|}}
+    <div class="row rca-header">
+      <div class="col-xs-9">
+        <h3 class="te-sub-title te-sub-title--flush">Dimensions Analysis</h3>
+      </div>
+      <div class="col-xs-3 pull-right">
+        <label class="te-label" for="select-dimension">Break Dimensions by: </label>
+          {{#power-select 
+            triggerId="select-dimension"
+            selected=dimension
+            options=dimensions.keys
+            onchange=(action (mut dimension))
+            as |dimension|}}
+            {{dimension}}
+          {{/power-select}}
+      </div>
+    </div>
+
+    {{#if dimensions.loading}}
+      <div class="spinner-wrapper">
+        {{ember-spinner}}
+      </div>
+    {{/if}}
+
+    {{#containers/primary-metric-container as |summary actions|}}
+      {{#if summary.loaded}}
+        {{anomaly-graph
+          componentId='correlated-dimensions'
+          showGraphLegend=false
+          showLegend=true
+          showSubchart=true
+          primaryMetric=summary.primaryMetric 
+          dimensions=dimensions.subdimensions
+          selectedDimensions=summary.selectedDimensions
+          onSubchartChange=(action "setDateParams")
+          onSelection=(action actions.onSelection)
+          showDimensions=true}}
+
+        {{#if dimensions.loaded}}
+          <div class="contribution-table paper-container">
+            <div class="contribution-table__header">
+              <div class="contribution-table__subnav">
+                <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "change") "thirdeye-link--active"}}" href="#" {{action "onTabChange" "change"}}>% Change</a>
+              </div>
+              <div class="contribution-table__subnav">
+                <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "number") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "number"}}>Raw Numbers</a>
+              </div>
+               <div class="contribution-table__subnav">
+                <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "details") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "details"}}>Details</a>
+              </div> 
+            </div>
+            <div class="contribution-table__body paper-container__body">
+              {{#if (eq selectedTab "details")}}
+                {{#with dimensions.heatmapData.summary.simpleFields as |summary|}}
+                  {{dimension-summary
+                    data=summary
+                  }}
+                {{/with}}
+                <div class="row rca-header">
+                  <div class="col-xs-9">
+                  </div>
+                  <div class="col-xs-3 pull-right">
+                    <label class="te-label" for="select-heatmap-mode">Mode: </label>
+                    {{#power-select 
+                      triggerId="select-heatmap-mode"
+                      selected=heatmapMode
+                      options=heatmapModes
+                      onchange=(action (mut heatmapMode))
+                      as |mode|}}
+                      {{mode}}
+                    {{/power-select}}
+                  </div>
+                </div>
+                {{dimension-heatmap
+                  heatMapData=dimensions.heatmapData
+                  heatmapMode=heatmapMode}}
+              {{else}}
+                {{#if loading}}
+                  <div class="spinner-wrapper spinner-wrapper--absolute">
+                    {{ember-spinner}}
+                  </div>
+                {{/if}}
+                {{contribution-table
+                  primaryMetric=summary.primaryMetric
+                  dates=summary.primaryMetric.timeBucketsCurrent
+                  granularity=summary.granularity
+                  start=dimensionsStart
+                  end=dimensionsEnd
+                  dimensions=summary.selectedDimensions
+                  showDetails=(eq selectedTab "number")
+                  loading=(mut tableIsLoading)
+                }}
+              {{/if}}
+            </div>
+          </div>
+
+        {{/if}}
+      {{/if}}
+
+    {{/containers/primary-metric-container}}
+  {{/containers/dimensions-container}}
+ </section>

@@ -2,6 +2,11 @@
   margin: $te-default-element-spacing;
   height: 250px;
   position: relative;
+
+  &--absolute {
+    position: absolute;
+    width: 100%;
+  }
 }
 
 .rca-title {
@@ -14,12 +19,32 @@
   color: lighten(black, 25%);
 }
 
+.paper-container {
+  background-color: white;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  margin-top: $te-spacing-lg;
+  margin-bottom: $te-spacing-lg;
+
+  &--padded {
+    padding: 24px;
+  }
+}
+
+
+.paper-container__header,
+.paper-container__body,
+.paper-container__footer {
+  padding: $te-spacing-lg;
+}
+
+.rca-search-bar {
+  background-color: $anomaly-nav-background;
+  padding-top: $te-spacing;
+  padding-bottom: $te-spacing;
+}
+
 .rca-header {
   display: flex;
   justify-content: space-between;
   margin-bottom: $te-default-element-spacing;
-}
-
-.rca-actions {
-  margin-top: $te-default-element-spacing;
 }

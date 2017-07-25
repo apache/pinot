@@ -3,28 +3,20 @@
 
 body {
   font-size: 14px;
-  background-color: lighten($te-grey, 15%);
+  background-color: #F5F5F5;
   color: lighten(black, 40%);
-}
-
-.paper-container {
-  background-color: white;
-  padding: $te-default-element-spacing;
-  padding-bottom: 12px;
-  border: 1px solid $te-grey;
-  margin-top: $te-default-element-spacing;
-  margin-bottom: $te-default-element-spacing;
 }
 
 .thirdeye-link {
   cursor: pointer;
-  color: #0084bf;
+  color: $te-blue-7;
   padding: 0 8px;
   text-decoration: none;
-}
-
-.thirdeye-link:hover {
-  color: #0073b1;
+  &:hover,
+  &:focus {
+    color: $te-blue-7;
+    text-decoration: none;
+  }
 }
 
 .thirdeye-link-secondary {
@@ -43,15 +35,18 @@ body {
 }
 
 .thirdeye-link--nav {
-  font-size: 14px;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 16px;
   color: lighten(black, 30%);
 }
 
 .thirdeye-link--active,
 .thirdeye-link--nav:hover {
-  color: #0073b1;
+  color: $te-blue;
   padding-bottom: 14px;
-  border-bottom: 2px solid #0073B0 !important;
+  border-bottom: 2px solid $te-blue !important;
+  text-decoration: none;
 }
 
 .spinner-wrapper {
@@ -76,7 +71,7 @@ body {
 
   &__summary-item {
     &--title {
-      color: $te-title-blue;
+      color: $te-blue-4;
       font-size: 18px;
       font-weight: 400;
     }
@@ -116,4 +111,17 @@ body {
       font-weight: 600;
     }
   }
+}
+
+.te-toggle {
+  margin-right: 14px;
+  // necessary to override the ember-toggle component
+  .x-toggle:checked + label > .x-toggle-ios.x-toggle-btn {
+    background-color: $te-blue-6;
+  }
+}
+
+.te-label {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.70)
 }

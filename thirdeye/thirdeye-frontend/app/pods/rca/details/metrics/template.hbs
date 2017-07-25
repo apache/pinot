@@ -1,0 +1,119 @@
+<section class="paper-container__body">
+  {{#containers/metrics-container as |metricList|}}
+    {{#containers/primary-metric-container as |summary actions|}}
+      {{#if summary.loaded}}
+        <div class="rca-header">
+          <h3 class="te-sub-title te-sub-title--flush">Metrics Correlation</h3>
+          <div class="rca-actions">
+            {{#if metricList.loaded}}
+              {{#x-toggle 
+                value=splitView 
+                classNames="te-toggle"
+                theme='ios'
+                showLabels=true
+                name="splitViewToggle"
+                onToggle=(action (mut splitView))
+                as |toggle|}}
+                  {{#toggle.label splitView=(not splitView)}}
+                    <span class="te-label">{{if splitView 'Combine View' 'Split View'}}</span>
+                  {{/toggle.label}}
+                  {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+              {{/x-toggle}}
+            {{/if}}
+          </div>
+        </div>
+        <div class="rca-body">
+          {{#if metricList.loading}}
+            <section>
+              <div class="spinner-wrapper">
+                {{ember-spinner}}
+              </div>
+            </section>
+          {{/if}}
+
+          {{#if metricList.failed}}
+            Oops, something went wrong...
+          {{/if}}
+
+          {{#if metricList.loaded}}
+            {{#if splitView}}
+              {{anomaly-graph
+                componentId='correlated-metrics'
+                primaryMetric=summary.primaryMetric 
+                showGraphLegend=false
+                showLegend=false
+                showMetrics=true
+                showTitle=true
+                enableZoom=true
+                onSubchartChange=(action "onDateChange")
+                onSelection=(action actions.onMetricSelection)
+              }}
+              {{#each summary.selectedMetrics as |metric|}}
+                {{anomaly-graph
+                  componentId='correlated-metrics'
+                  primaryMetric=metric
+                  showLegend=false
+                  enableZoom=true
+                  showMetrics=true
+                  showTitle=true
+                  onSelection=(action actions.onMetricSelection)
+                  onSubchartChange=(action "onDateChange")
+                  showGraphLegend=false}}
+                  
+              {{/each}}
+            {{else}}
+              {{anomaly-graph
+                componentId='correlated-metrics'
+                primaryMetric=summary.primaryMetric
+                relatedMetrics=metricList.relatedMetrics
+                selectedMetrics=summary.selectedMetrics
+                showGraphLegend=false
+                showLegend=true
+                showMetrics=true
+                showSubchart=true
+                onSelection=(action actions.onMetricSelection)
+                onSubchartChange=(action "onDateChange")
+              }}
+            {{/if}}
+          {{/if}}
+
+            <div class="contribution-table">
+              <div class="contribution-table__header">
+                <div class="contribution-table__subnav">
+                  <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "change") "thirdeye-link--active"}}" href="#" {{action "onTabChange" "change"}}>% Change</a>
+                </div>
+                <div class="contribution-table__subnav">
+                  <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "number") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "number"}}>Raw Numbers</a>
+                </div>
+              </div>
+              <div class="contribution-table__body">
+                {{#if metricList.loading}}
+                  <div class="spinner-wrapper">
+                    {{ember-spinner}}
+                  </div>
+                {{else}}
+                  {{#if loading}}
+                    <div class="spinner-wrapper spinner-wrapper--absolute">
+                      {{ember-spinner}}
+                    </div>
+                  {{/if}}
+                  {{contribution-table
+                    title="Primary Metric"
+                    dates=summary.primaryMetric.timeBucketsCurrent
+                    granularity=summary.granularity
+                    primaryMetric=summary.primaryMetric
+                    start=analysisStart
+                    end=analysisEnd
+                    relatedMetrics=summary.selectedMetrics
+                    showDetails=(eq selectedTab "number")
+                    loading=(mut loading)
+                  }}
+                {{/if}}
+              </div>
+            </div>
+
+        </div>
+      {{/if}}
+    {{/containers/primary-metric-container}}
+  {{/containers/metrics-container}}
+</section>

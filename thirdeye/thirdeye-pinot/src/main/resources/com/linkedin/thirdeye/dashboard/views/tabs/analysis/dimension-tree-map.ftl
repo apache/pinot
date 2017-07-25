@@ -1,7 +1,7 @@
 <div class="analysis-card top-buffer">
   <div class="analysis-card__header">
     <a class="thirdeye-link thirdeye-link--nav thirdeye-link--active">Dimension Analysis</a>
-    <a class="thirdeye-link thirdeye-link--nav" target="_blank" href={{rcaMetricUrl}}>Metric Correlation</a>
+    {{!-- <a class="thirdeye-link thirdeye-link--nav" target="_blank" href={{rcaMetricUrl}}>Metric Correlation</a> --}}
   </div>
   <div class="analysis-card__body padding-all">
     <h4 class="analysis-title bottom-buffer">Dimension Analysis

@@ -26,6 +26,7 @@ const INITIAL_STATE = {
    */
   relatedMetricIds: [],
 
+  selectedMetricIds: [],
   primaryMetricId: null,
   relatedMetricEntities: {},
   regions: {},
@@ -40,7 +41,7 @@ const INITIAL_STATE = {
 export default function reducer(state = INITIAL_STATE, action = {}) {
   switch (action.type) {
     case ActionTypes.LOADING:
-      return Object.assign(state, {
+      return Object.assign({}, state, {
         loading: true,
         loaded: false,
         failed: false
@@ -48,7 +49,7 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
 
     case ActionTypes.LOAD_PRIMARY_METRIC: {
       let {
-        id,
+        primaryMetricId,
         startDate,
         endDate,
         filters = "{}",
@@ -59,18 +60,21 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
       startDate = Number(startDate);
       endDate = Number(endDate);
 
-      return Object.assign(state, {
-        primaryMetricId: id,
+      return Object.assign({}, state, {
+        primaryMetricId,
         currentStart: startDate,
         currentEnd: endDate,
         filters,
         granularity,
-        compareMode
-      })
+        compareMode,
+        loading: true,
+        loaded: false,
+        failed: false
+      });
     }
 
     case ActionTypes.REQUEST_FAIL:
-      return Object.assign(state, {
+      return Object.assign({}, state, {
         loading: false,
         failed: true
       });
@@ -79,9 +83,9 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
       const relatedMetrics = action.payload;
       const relatedMetricIds = relatedMetrics
         .sort((prev, next) => next.score > prev.score)
-        .map((metric) => Number(metric.urn.split('thirdeye:metric:').pop()))
+        .map((metric) => Number(metric.urn.split('thirdeye:metric:').pop()));
 
-      return Object.assign(state,  {
+      return Object.assign({}, state,  {
         relatedMetricIds
       });
     }
@@ -89,11 +93,14 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
     case ActionTypes.LOAD_REGIONS: {
       const payload = action.payload;
       const regions = Object.keys(payload).reduce((aggr, id) => {
-        aggr[id] = {regions: payload[id]}
+        aggr[id] = {regions: payload[id]};
         return aggr;
       }, {});
 
-      return Object.assign(state, {
+      return Object.assign({}, state, {
+        loading: false,
+        loaded: true,
+        failed: false,
         regions
       });
     }
@@ -101,21 +108,42 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
     case ActionTypes.LOAD_DATA: {
       const relatedMetricEntities = Object.assign({}, action.payload);
 
-      return Object.assign(state, {
-        loading: false,
-        loaded: true,
-        failed: false,
+      return Object.assign({}, state, {
         relatedMetricEntities
       });
     }
 
     case ActionTypes.UPDATE_COMPARE_MODE: {
-      const compareMode = action.payload
+      const compareMode = action.payload;
 
-      return Object.assign(state, {
+      return Object.assign({}, state, {
         compareMode
       });
     }
+
+    case ActionTypes.UPDATE_DATE: {
+      const { currentStart, currentEnd } = action.payload;
+
+      return Object.assign({}, state, {
+        currentStart,
+        currentEnd,
+        loading: true,
+        loaded: false,
+        failed: false
+      });
+    }
+
+    case ActionTypes.SELECT_METRIC: {
+      const { selectedMetricIds } = action.payload;
+
+      return Object.assign({}, state, {
+        selectedMetricIds
+      });
+    }
+
+    case ActionTypes.RESET: {
+      state = undefined;
+    }
   }
-  return state;
+  return state || INITIAL_STATE;
 }
