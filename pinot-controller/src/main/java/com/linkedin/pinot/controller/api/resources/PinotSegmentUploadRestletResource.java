@@ -69,6 +69,7 @@ import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -155,7 +156,7 @@ public class PinotSegmentUploadRestletResource {
   @ApiOperation(value = "Download a segment", notes = "Download a segment")
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
     try {
