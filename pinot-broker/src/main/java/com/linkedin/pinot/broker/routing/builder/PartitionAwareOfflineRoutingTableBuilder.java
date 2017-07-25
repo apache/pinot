@@ -155,8 +155,11 @@ public class PartitionAwareOfflineRoutingTableBuilder extends AbstractPartitionA
           }
         }
       }
-      // Update the final routing look up table
-      segmentIdToServersMapping.put(segmentId, serverInstanceMap);
+
+      // Update the final routing look up table.
+      if (!serverInstanceMap.isEmpty()) {
+        segmentIdToServersMapping.put(segmentId, serverInstanceMap);
+      }
     }
 
     // Delete segment metadata from cache if the segment no longer exists in the external view.
