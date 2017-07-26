@@ -17,6 +17,9 @@ package com.linkedin.pinot.controller.api.resources;
 
 import java.util.List;
 import org.apache.helix.model.InstanceConfig;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -84,7 +87,7 @@ public class PinotInstanceRestletResource {
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
       @ApiResponse(code = 404, message = "Instance not found"),
       @ApiResponse(code=500, message = "Error reading instances")})
-  public Instance getInstance(
+  public String getInstance(
       @ApiParam(value = "Instance name", required = true,
           example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
       @PathParam("instanceName") String instanceName)
@@ -95,7 +98,17 @@ public class PinotInstanceRestletResource {
           javax.ws.rs.core.Response.Status.NOT_FOUND);
     }
     InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
-    return Instance.fromInstanceConfig(instanceConfig);
+    JSONObject response = new JSONObject();
+    try {
+      response.put("instanceName", instanceConfig.getInstanceName());
+      response.put("hostName", instanceConfig.getHostName());
+      response.put("enabled", instanceConfig.getInstanceEnabled());
+      response.put("port", instanceConfig.getPort());
+      response.put("tags", new JSONArray(instanceConfig.getTags()));
+    } catch (JSONException e) {
+      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return response.toString();
   }
 
   @POST

@@ -15,22 +15,21 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.ControllerTest;
 import org.restlet.Client;
 import org.restlet.Request;
 import org.restlet.Response;
 import org.restlet.data.MediaType;
 import org.restlet.data.Method;
 import org.restlet.data.Protocol;
-import org.restlet.data.Status;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.ControllerTest;
 
 
 /**
@@ -46,8 +45,10 @@ public class PinotFileUploadTest extends ControllerTest {
     Request request = new Request(Method.POST, _controllerRequestURLBuilder.forDataFileUpload());
     request.setEntity("blah", MediaType.MULTIPART_ALL);
     Response response = client.handle(request);
+    int statusCode = response.getStatus().getCode();
 
-    Assert.assertEquals(response.getStatus(), Status.SERVER_ERROR_INTERNAL);
+    // TODO: After jersey api migration, change to check for 4xx response code instead of 5xx.
+    Assert.assertTrue(statusCode >= 400, "Status code = " + response.getStatus().toString());
   }
 
   @BeforeClass

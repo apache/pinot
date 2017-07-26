@@ -67,7 +67,7 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
-  public JSONArray listSchemaNames(
+  public String listSchemaNames(
   ) {
     try {
       List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
@@ -78,7 +78,7 @@ public class PinotSchemaRestletResource {
           ret.put(schema);
         }
       }
-      return ret;
+      return ret.toString();
     } catch (Exception e) {
       throw new  WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
