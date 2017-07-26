@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -22,18 +26,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.glassfish.jersey.media.multipart.FormDataBodyPart;
-import org.glassfish.jersey.media.multipart.FormDataMultiPart;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -41,8 +34,14 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.httpclient.URI;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.glassfish.jersey.media.multipart.FormDataBodyPart;
+import org.glassfish.jersey.media.multipart.FormDataMultiPart;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 // Do NOT tag this class with @Api. We don't want these exposed in swagger.
@@ -55,9 +54,6 @@ public class LLCSegmentCompletionHandlers {
 
   @Inject
   ControllerConf _controllerConf;
-
-  @Inject
-  PinotHelixResourceManager _helixResourceManager;
 
   // We don't want to document these in swagger since they are internal APIs
   @GET
@@ -84,17 +80,12 @@ public class LLCSegmentCompletionHandlers {
         extraTimeSec);
     LOGGER.info(requestParams.toString());
 
-    try {
-      SegmentCompletionProtocol.Response response =
-          SegmentCompletionManager.getInstance().extendBuildTime(requestParams);
+    SegmentCompletionProtocol.Response response =
+        SegmentCompletionManager.getInstance().extendBuildTime(requestParams);
 
-      final String responseStr = response.toJsonString();
-      LOGGER.info(responseStr);
-      return responseStr;
-    } catch (Throwable t) {
-      LOGGER.error("Exception handling request", t);
-      throw new WebApplicationException(t);
-    }
+    final String responseStr = response.toJsonString();
+    LOGGER.info(responseStr);
+    return responseStr;
   }
 
   @GET
@@ -115,16 +106,11 @@ public class LLCSegmentCompletionHandlers {
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason);
     LOGGER.info(requestParams.toString());
 
-    try {
-      SegmentCompletionProtocol.Response response =
-          SegmentCompletionManager.getInstance().segmentConsumed(requestParams);
-      final String responseStr = response.toJsonString();
-      LOGGER.info(responseStr);
-      return responseStr;
-    } catch(Throwable t) {
-      LOGGER.error("Exception handling request", t);
-      throw new WebApplicationException(t);
-    }
+    SegmentCompletionProtocol.Response response =
+        SegmentCompletionManager.getInstance().segmentConsumed(requestParams);
+    final String responseStr = response.toJsonString();
+    LOGGER.info(responseStr);
+    return responseStr;
   }
 
   @GET
@@ -145,16 +131,11 @@ public class LLCSegmentCompletionHandlers {
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason);
     LOGGER.info(requestParams.toString());
 
-    try {
-      SegmentCompletionProtocol.Response response =
-          SegmentCompletionManager.getInstance().segmentStoppedConsuming(requestParams);
-      final String responseStr = response.toJsonString();
-      LOGGER.info(responseStr);
-      return responseStr;
-    } catch (Throwable t) {
-      LOGGER.error("Exception handling request", t);
-      throw new WebApplicationException(t);
-    }
+    SegmentCompletionProtocol.Response response =
+        SegmentCompletionManager.getInstance().segmentStoppedConsuming(requestParams);
+    final String responseStr = response.toJsonString();
+    LOGGER.info(responseStr);
+    return responseStr;
   }
 
   @GET
@@ -174,16 +155,11 @@ public class LLCSegmentCompletionHandlers {
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
     LOGGER.info(requestParams.toString());
 
-    try {
-      SegmentCompletionProtocol.Response response =
+    SegmentCompletionProtocol.Response response =
           SegmentCompletionManager.getInstance().segmentCommitStart(requestParams);
-      final String responseStr = response.toJsonString();
-      LOGGER.info(responseStr);
-      return responseStr;
-    } catch (Throwable t) {
-      LOGGER.error("Exception handling request", t);
-      throw new WebApplicationException(t);
-    }
+    final String responseStr = response.toJsonString();
+    LOGGER.info(responseStr);
+    return responseStr;
   }
 
   @GET
@@ -208,16 +184,11 @@ public class LLCSegmentCompletionHandlers {
     final boolean isSuccess = true;
     final boolean isSplitCommit = true;
 
-    try {
-      SegmentCompletionProtocol.Response response =
-          SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit);
-      final String responseStr = response.toJsonString();
-      LOGGER.info(responseStr);
-      return responseStr;
-    } catch (Throwable t) {
-      LOGGER.error("Exception handling request", t);
-      throw new WebApplicationException(t);
-    }
+    SegmentCompletionProtocol.Response response =
+        SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit);
+    final String responseStr = response.toJsonString();
+    LOGGER.info(responseStr);
+    return responseStr;
   }
 
   @POST
@@ -276,7 +247,7 @@ public class LLCSegmentCompletionHandlers {
     return new SegmentCompletionProtocol.Response(responseParams).toJsonString();
   }
 
-  private String uploadSegment(FormDataMultiPart multiPart, final String instanceId, final String segmentName,
+  private @Nullable String uploadSegment(FormDataMultiPart multiPart, final String instanceId, final String segmentName,
       boolean isSplitCommit) {
     Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
     if (!PinotSegmentUploadRestletResource.validateMultiPart(map, segmentName)) {

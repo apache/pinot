@@ -35,7 +35,7 @@ public class Constants {
 
 
   public static CommonConstants.Helix.TableType validateTableType(String tableTypeStr) {
-    if (tableTypeStr == null) {
+    if (tableTypeStr == null || tableTypeStr.isEmpty()) {
       return null;
     }
     try {

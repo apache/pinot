@@ -41,8 +41,8 @@ public class PinotControllerResponseFilter implements ContainerResponseFilter {
   @Override
   public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext)
       throws IOException {
-    responseContext.getHeaders().add(HDR_CONTROLLER_HOST, getControllerHostName());
-    responseContext.getHeaders().add(HDR_CONTROLLER_VERSION, getHdrControllerVersion());
+    responseContext.getHeaders().putSingle(HDR_CONTROLLER_HOST, getControllerHostName());
+    responseContext.getHeaders().putSingle(HDR_CONTROLLER_VERSION, getHdrControllerVersion());
   }
 
   private String getControllerHostName() {

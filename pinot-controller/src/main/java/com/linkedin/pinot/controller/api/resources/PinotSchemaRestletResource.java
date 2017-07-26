@@ -16,19 +16,6 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import org.apache.commons.io.IOUtils;
-import org.glassfish.jersey.media.multipart.FormDataBodyPart;
-import org.glassfish.jersey.media.multipart.FormDataMultiPart;
-import org.json.JSONArray;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -38,6 +25,12 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -50,6 +43,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.glassfish.jersey.media.multipart.FormDataBodyPart;
+import org.glassfish.jersey.media.multipart.FormDataMultiPart;
+import org.json.JSONArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 @Api(tags = Constants.SCHEMA_TAG)
 @Path("/")
@@ -66,35 +65,27 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
-  public String listSchemaNames(
-  ) {
-    try {
-      List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
-      JSONArray ret = new JSONArray();
+  public String listSchemaNames() {
+    List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
+    JSONArray ret = new JSONArray();
 
-      if (schemaNames != null) {
-        for (String schema : schemaNames) {
-          ret.put(schema);
-        }
+    if (schemaNames != null) {
+      for (String schema : schemaNames) {
+        ret.put(schema);
       }
-      return ret.toString();
-    } catch (Exception e) {
-      throw new  WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
+    return ret.toString();
   }
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Get a schema", notes = "Gets a schema by name")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 500, message = "Internal error")})
   public Schema getSchema(
-      @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName
-  ) {
+      @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName) {
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
-    if (schema == null) {
-      throw new WebApplicationException("Schema not found", Response.Status.NOT_FOUND);
-    }
     return schema;
   }
 
@@ -102,50 +93,32 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Delete a schema", notes = "Deletes a schema by name")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully deleted schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 409, message = "Schema is in use"), @ApiResponse(code = 500, message = "Error deleting schema")})
   public SuccessResponse deleteSchema(
-      @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName
-  ) {
-    try {
-      deleteSchemaInternal(schemaName);
-      return new SuccessResponse("Schema " + schemaName + " deleted");
-    } catch (WebApplicationException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
-    }
+      @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName) {
+    deleteSchemaInternal(schemaName);
+    return new SuccessResponse("Schema " + schemaName + " deleted");
   }
 
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      FormDataMultiPart multiPart
-  ) {
-    try {
-      return addOrUpdateSchema(schemaName, multiPart);
-    } catch (WebApplicationException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
-    }
+      FormDataMultiPart multiPart) {
+    return addOrUpdateSchema(schemaName, multiPart);
   }
 
+  // TODO: This should not update if the schema already exists
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
-  public SuccessResponse addSchema(
-      FormDataMultiPart multiPart
-  ) {
-    try {
-      return addOrUpdateSchema(null, multiPart);
-    } catch (WebApplicationException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
-    }
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully deleted schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse addSchema(FormDataMultiPart multiPart) {
+    return addOrUpdateSchema(null, multiPart);
   }
 
   /**
@@ -155,93 +128,60 @@ public class PinotSchemaRestletResource {
    * @return
    */
   private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, FormDataMultiPart multiPart) {
-    File dataFile;
     final String schemaNameForLogging = (schemaName == null) ? "new schema" : schemaName + " schema";
-    try {
-      dataFile = getUploadContents(multiPart);
-    } catch (Exception e) {
-          throw new WebApplicationException(e.getMessage(), Response.Status.BAD_REQUEST);
-    }
-
-    Schema schema = null;
-    if (dataFile == null) {
-      // This should not happen since we handle all possible exceptions above
-      // Safe to check though
-      LOGGER.error("No file was uploaded to add or update {}", schemaNameForLogging);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
-          ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new WebApplicationException("File not received while adding " + schemaNameForLogging, Response.Status.INTERNAL_SERVER_ERROR);
-    }
-
-    try {
-      schema = Schema.fromFile(dataFile);
-    } catch (org.codehaus.jackson.JsonParseException | org.codehaus.jackson.map.JsonMappingException e) {
-      LOGGER.info("Invalid json while adding {}", schemaNameForLogging, e);
-      throw new WebApplicationException("Invalid json in input schema", Response.Status.BAD_REQUEST);
-    } catch (IOException e) {
-      // this can be due to failure to read from dataFile which is stored locally
-      // and hence, server responsibility. return 500 for this error
-      LOGGER.error("Failed to read input json while adding {}", schemaNameForLogging, e);
-      throw new WebApplicationException("Failed to read input json schema", Response.Status.INTERNAL_SERVER_ERROR);
-    }
-
-
+    Schema schema = getSchemaFromMultiPart(multiPart);
     if (!schema.validate(LOGGER)) {
       LOGGER.info("Invalid schema during create/update of {}", schemaNameForLogging);
       throw new WebApplicationException("Invalid schema", Response.Status.BAD_REQUEST);
     }
 
-    if (schemaName != null && ! schema.getSchemaName().equals(schemaName)) {
+    if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {
+      ControllerRestApplication.getControllerMetrics()
+          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       final String message =
-          "Schema name mismatch for uploaded schema, tried to add schema with name " + schema.getSchemaName()
-              + " as " + schemaName;
-      LOGGER.info(message);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new WebApplicationException(message, Response.Status.BAD_REQUEST);
+          "Schema name mismatch for uploaded schema, tried to add schema with name " + schema.getSchemaName() + " as "
+              + schemaName;
+      throw new ControllerApplicationException(LOGGER, message, Response.Status.BAD_REQUEST);
     }
 
     try {
       _pinotHelixResourceManager.addOrUpdateSchema(schema);
-      return new SuccessResponse(dataFile + " successfully added");
+      return new SuccessResponse(schema.getSchemaName() + " successfully added");
     } catch (Exception e) {
-      LOGGER.error("Error updating schema {} ", schemaNameForLogging, e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
-          ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new WebApplicationException("Failed to update schema", Response.Status.INTERNAL_SERVER_ERROR);
+      ControllerRestApplication.getControllerMetrics()
+          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to update schema %s", schemaNameForLogging), Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
-  private File getUploadContents(FormDataMultiPart multiPart) throws Exception {
-    File dataFile = null;
-    FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-
+  private Schema getSchemaFromMultiPart(FormDataMultiPart multiPart) {
     Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
     PinotSegmentUploadRestletResource.validateMultiPart(map, null);
     final String name = map.keySet().iterator().next();
     final FormDataBodyPart bodyPart = map.get(name).get(0);
-    InputStream is = bodyPart.getValueAs(InputStream.class);
-
-    FileOutputStream os = null;
+    InputStream is = null;
     try {
-      dataFile = new File(provider.getSchemasTmpDir(), name + "." + UUID.randomUUID().toString());
-      dataFile.deleteOnExit();
-      os = new FileOutputStream(dataFile);
-      IOUtils.copy(is, os);
-      os.flush();
-      return dataFile;
-    } catch (Exception e) {
-      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+      is = bodyPart.getValueAs(InputStream.class);
+      return Schema.fromInputSteam(is);
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Error reading request body for schema, name %s", name), Response.Status.INTERNAL_SERVER_ERROR,
+          e);
     } finally {
-      os.close();
-      is.close();
+      try {
+        is.close();
+      } catch (IOException e) {
+        LOGGER.warn("Failed to close request input stream");
+      }
     }
   }
 
   private void deleteSchemaInternal(String schemaName) {
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
-      LOGGER.error("Error: could not find schema {}", schemaName);
-      throw new WebApplicationException("Schema not found", Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, String.format("Schema %s not found", schemaName),
+          Response.Status.NOT_FOUND);
     }
 
     // If the schema is associated with a table, we should not delete it.
@@ -251,8 +191,9 @@ public class PinotSchemaRestletResource {
       String tableSchema = config.getValidationConfig().getSchemaName();
 
       if (schemaName.equals(tableSchema)) {
-        LOGGER.error("Cannot delete schema {}, as it is associated with table {}", schemaName, tableName);
-        throw new WebApplicationException("Schema is used by table " + tableName, Response.Status.CONFLICT);
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, tableName),
+            Response.Status.CONFLICT);
       }
     }
 
@@ -260,8 +201,8 @@ public class PinotSchemaRestletResource {
     if (_pinotHelixResourceManager.deleteSchema(schema)) {
       LOGGER.info("Success: Deleted schema {}", schemaName);
     } else {
-      LOGGER.error("Error: could not delete schema {}", schemaName);
-      throw new WebApplicationException("Could not delete schema", Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to delete schema %s", schemaName),
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 }

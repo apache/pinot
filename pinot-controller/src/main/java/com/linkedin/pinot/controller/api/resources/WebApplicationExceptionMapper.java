@@ -15,35 +15,17 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executor;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.BiMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import javax.annotation.Nonnegative;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Provider
 public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable> {

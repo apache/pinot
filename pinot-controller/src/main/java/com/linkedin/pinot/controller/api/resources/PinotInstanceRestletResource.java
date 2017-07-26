@@ -83,7 +83,7 @@ public class PinotInstanceRestletResource {
   @GET
   @Path("/instances/{instanceName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get instance information")
+  @ApiOperation(value = "Get instance information", produces = MediaType.APPLICATION_JSON)
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
       @ApiResponse(code = 404, message = "Instance not found"),
       @ApiResponse(code=500, message = "Error reading instances")})
@@ -131,6 +131,7 @@ public class PinotInstanceRestletResource {
     return new SuccessResponse("Instance successfully created");
   }
 
+  // TODO: @consumes text/plain but swagger doc says json. Does that work. It's better this way if it works
   @POST
   @Path("/instances/{instanceName}/state")
   @Produces(MediaType.APPLICATION_JSON)

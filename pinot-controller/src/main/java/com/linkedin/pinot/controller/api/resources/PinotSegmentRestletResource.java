@@ -41,7 +41,12 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -52,6 +57,14 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Current URI Mappings:
@@ -107,138 +120,92 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Lists metadata or toggles segment states",
-      notes = "Toggles segment states if 'state' is specified in query param, otherwise lists metadata")
+  @ApiOperation(value = "Lists metadata or toggles segment states", notes = "Toggles segment states if 'state' is specified in query param, otherwise lists metadata")
   public String toggleStateOrListMetadata(
-    @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-    @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
-    @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
-    if (tableName == null) {
-      throw new WebApplicationException("Table type cannot be null", BAD_REQUEST);
-    }
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
+    StateType state = Constants.validateState(stateStr);
 
-    try {
-      CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-      StateType state = Constants.validateState(stateStr);
-
-      if (stateStr == null) {
-        JSONArray result = getAllSegmentsMetadataForTable(tableName, tableType);
-        return result.toString();
-      }
-      return toggleStateInternal(tableName, state, tableType, null, _pinotHelixResourceManager).toString();
-    } catch (Exception e) {
-      throw new WebApplicationException(e, INTERNAL_ERROR);
+    if (stateStr == null) {
+      JSONArray result = getAllSegmentsMetadataForTable(tableName, tableType);
+      return result.toString();
     }
+    return toggleStateInternal(tableName, state, tableType, null, _pinotHelixResourceManager).toString();
   }
 
   @GET
   @Path("tables/{tableName}/segments/{segmentName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Lists metadata or toggles state of a segment",
-      notes = "Toggles segment state if 'state' is specified in query param, otherwise lists segment metadata")
+  @ApiOperation(value = "Lists metadata or toggles state of a segment", notes = "Toggles segment state if 'state' is specified in query param, otherwise lists segment metadata")
   public String toggleStateOrListMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "online|offline|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
-    if (tableName == null || tableName.length() == 0) {
-      throw new WebApplicationException("Table name cannot be null", BAD_REQUEST);
-    }
-    if (segmentName == null || segmentName.length() == 0) {
-      throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
-    }
-
-    try {
-      segmentName = URLDecoder.decode(segmentName, "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      String errStr = "Could not decode segment name '" + segmentName + "'";
-      LOGGER.info(errStr);
-      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
-    }
-
+    segmentName = checkGetEncodedParam(segmentName);
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     StateType stateType = Constants.validateState(stateStr);
+    if (stateStr == null) {
+      // This is a list metadata operation
+      return getSegmentMetaData(tableName, segmentName, tableType).toString();
+    } else {
+      return toggleStateInternal(tableName, stateType, tableType, segmentName, _pinotHelixResourceManager).toString();
+    }
+  }
 
+  private String checkGetEncodedParam(String encoded) {
     try {
-      if (stateStr == null) {
-        // This is a list metadata operation
-        return getSegmentMetaData(tableName, segmentName, tableType).toString();
-      } else {
-        return toggleStateInternal(tableName, stateType, tableType, segmentName, _pinotHelixResourceManager).toString();
-      }
-    } catch (Exception e) {
-      throw new WebApplicationException(e, INTERNAL_ERROR);
+      return URLDecoder.decode(encoded, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      String errStr = "Could not decode parameter '" + encoded + "'";
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
   }
 
   @GET
   @Path("tables/{tableName}/segments/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Lists metadata all segments of table",
-      notes = "Lists segment metadata")
+  @ApiOperation(value = "Lists metadata all segments of table", notes = "Lists segment metadata")
   public String listMetadataForAllSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
-    if (tableName == null || tableName.length() == 0) {
-      throw new WebApplicationException("Table name cannot be null", BAD_REQUEST);
-    }
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-    try {
-      JSONArray result = getAllSegmentsMetadataForTable(tableName, tableType);
-      return result.toString();
-    } catch (Exception e) {
-      throw new WebApplicationException(e, INTERNAL_ERROR);
-    }
+    JSONArray result = getAllSegmentsMetadataForTable(tableName, tableType);
+    return result.toString();
   }
 
   @GET
   @Path("tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Lists metadata one segments of table",
-      notes = "Lists segment metadata")
+  @ApiOperation(value = "Lists metadata one segments of table", notes = "Lists segment metadata")
   public String listMetadataForOneSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
-    if (tableName == null || tableName.length() == 0) {
-      throw new WebApplicationException("Table name cannot be null", BAD_REQUEST);
-    }
-    if (segmentName == null || segmentName.length() == 0) {
-      throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
-    }
-    try {
-      segmentName = URLDecoder.decode(segmentName, "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      String errStr = "Could not decode segment name '" + segmentName + "'";
-      LOGGER.info(errStr);
-      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
-    }
+    segmentName = checkGetEncodedParam(segmentName);
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     // The code in restlet.resources seems to return an array of arrays, so we will do the same
     // to maintain backward compatibility
-    try {
-      JSONArray result = new JSONArray();
-      if (tableType != null) {
-        JSONArray metadata = getSegmentMetaData(tableName, segmentName, tableType);
-        result.put(metadata);
-        return result.toString();
-      }
-      // Again,keeping backward compatibility, returning metadata from both table types.
-      // The segment should appear only in one
-      JSONArray metata;
-      metata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.OFFLINE);
-      result.put(metata);
-      metata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.REALTIME);
-      result.put(metata);
+    JSONArray result = new JSONArray();
+    if (tableType != null) {
+      JSONArray metadata = getSegmentMetaData(tableName, segmentName, tableType);
+      result.put(metadata);
       return result.toString();
-    } catch (Exception e) {
-      throw new WebApplicationException(e, INTERNAL_ERROR);
     }
+    // Again,keeping backward compatibility, returning metadata from both table types.
+    // The segment should appear only in one
+    JSONArray metata;
+
+    metata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.OFFLINE);
+    result.put(metata);
+    metata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.REALTIME);
+    result.put(metata);
+    return result.toString();
   }
 
   @GET
@@ -250,21 +217,8 @@ public class PinotSegmentRestletResource {
       @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
-    if (tableName == null || tableName.length() == 0) {
-      throw new WebApplicationException("Table name cannot be null", BAD_REQUEST);
-    }
-    if (segmentName == null || segmentName.length() == 0) {
-      throw new WebApplicationException("Segment name cannot be null", BAD_REQUEST);
-    }
-    try {
-      segmentName = URLDecoder.decode(segmentName, "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      String errStr = "Could not decode segment name '" + segmentName + "'";
-      LOGGER.info(errStr);
-      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
-    }
+    segmentName = checkGetEncodedParam(segmentName);
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-
     return reloadSegmentForTable(tableName, segmentName, tableType);
   }
 
@@ -274,13 +228,8 @@ public class PinotSegmentRestletResource {
   @ApiOperation(value = "Reloads all segments of a table", notes = "Reloads all segments")
   public String reloadAllSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
-    if (tableName == null) {
-      throw new WebApplicationException("Table type cannot be null", BAD_REQUEST);
-    }
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-
     return reloadAllSegmentsForTable(tableName, tableType);
   }
 
@@ -289,24 +238,14 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Gets crc of all segments of a table", notes = "Gets crc of all segments")
   public String getCrcForAllSegments(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
-    if (tableName == null) {
-      throw new WebApplicationException("Table type cannot be null", BAD_REQUEST);
-    }
-    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-
-    try {
-      return getAllCrcMetadataForTable(tableName);
-    } catch (Exception e) {
-      throw new WebApplicationException(e, INTERNAL_ERROR);
-    }
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    return getAllCrcMetadataForTable(tableName);
   }
 
   //////////////////////////////////////////////////////////////////////////////////////
 
-  private String reloadSegmentForTable( String tableName, String segmentName, CommonConstants.Helix.TableType tableType) {
+  private String reloadSegmentForTable(String tableName, String segmentName,
+      CommonConstants.Helix.TableType tableType) {
     int numReloadMessagesSent = 0;
 
     if ((tableType == null) || CommonConstants.Helix.TableType.OFFLINE == tableType) {
@@ -322,7 +261,7 @@ public class PinotSegmentRestletResource {
     return "Sent " + numReloadMessagesSent + " reload messages";
   }
 
-  private String reloadAllSegmentsForTable( String tableName, CommonConstants.Helix.TableType tableType) {
+  private String reloadAllSegmentsForTable(String tableName, @Nullable CommonConstants.Helix.TableType tableType) {
     int numReloadMessagesSent = 0;
 
     if ((tableType == null) || CommonConstants.Helix.TableType.OFFLINE == tableType) {
@@ -338,7 +277,8 @@ public class PinotSegmentRestletResource {
     return "Sent " + numReloadMessagesSent + " reload messages";
   }
 
-  public static JSONArray toggleStateInternal(String tableName, StateType state, CommonConstants.Helix.TableType tableType, String segmentName, PinotHelixResourceManager helixResourceManager) {
+  public static JSONArray toggleStateInternal(String tableName, StateType state,
+      CommonConstants.Helix.TableType tableType, String segmentName, PinotHelixResourceManager helixResourceManager) {
     JSONArray ret = new JSONArray();
     List<String> segmentsToToggle = new ArrayList<>();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -346,50 +286,47 @@ public class PinotSegmentRestletResource {
     String tableNameWithType = "";
     List<String> realtimeSegments = helixResourceManager.getSegmentsFor(realtimeTableName);
     List<String> offlineSegments = helixResourceManager.getSegmentsFor(offlineTableName);
-    try {
-
-      if (tableType == null) {
-        PinotResourceManagerResponse responseRealtime = toggleSegmentsForTable(realtimeSegments, realtimeTableName, segmentName, state, helixResourceManager);
-        PinotResourceManagerResponse responseOffline = toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state, helixResourceManager);
-        if (!responseOffline.isSuccessful() || !responseRealtime.isSuccessful()) {
-          throw new WebApplicationException(
-              "OFFLINE response : " + responseOffline.getMessage() + ", REALTIME response" + responseRealtime
-                  .getMessage(), INTERNAL_ERROR);
-        }
-        List<PinotResourceManagerResponse> responses = new ArrayList<>();
-        responses.add(responseRealtime);
-        responses.add(responseOffline);
-        ret.put(responses);
-        return ret;
-      } else if (CommonConstants.Helix.TableType.REALTIME == tableType) {
-        if (helixResourceManager.hasRealtimeTable(tableName)) {
-          tableNameWithType = realtimeTableName;
-          if (segmentName != null) {
-            segmentsToToggle = Collections.singletonList(segmentName);
-          } else {
-            segmentsToToggle.addAll(realtimeSegments);
-          }
+    if (tableType == null) {
+      PinotResourceManagerResponse responseRealtime =
+          toggleSegmentsForTable(realtimeSegments, realtimeTableName, segmentName, state, helixResourceManager);
+      PinotResourceManagerResponse responseOffline =
+          toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state, helixResourceManager);
+      if (!responseOffline.isSuccessful() || !responseRealtime.isSuccessful()) {
+        throw new WebApplicationException("OFFLINE response : " + responseOffline.getMessage() + ", REALTIME response"
+            + responseRealtime.getMessage(), INTERNAL_ERROR);
+      }
+      List<PinotResourceManagerResponse> responses = new ArrayList<>();
+      responses.add(responseRealtime);
+      responses.add(responseOffline);
+      ret.put(responses);
+      return ret;
+    } else if (CommonConstants.Helix.TableType.REALTIME == tableType) {
+      if (helixResourceManager.hasRealtimeTable(tableName)) {
+        tableNameWithType = realtimeTableName;
+        if (segmentName != null) {
+          segmentsToToggle = Collections.singletonList(segmentName);
         } else {
-          throw new WebApplicationException("There is no realtime table for " + tableName, BAD_REQUEST);
+          segmentsToToggle.addAll(realtimeSegments);
         }
       } else {
-        if (helixResourceManager.hasOfflineTable(tableName)) {
-          tableNameWithType = offlineTableName;
-          if (segmentName != null) {
-            segmentsToToggle = Collections.singletonList(segmentName);
-          } else {
-            segmentsToToggle.addAll(offlineSegments);
-          }
-        } else {
-          throw new WebApplicationException("There is no offline table for: " + tableName, BAD_REQUEST);
-        }
+        throw new WebApplicationException("There is no realtime table for " + tableName, BAD_REQUEST);
       }
-      PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state, helixResourceManager);
-      ret.put(resourceManagerResponse);
-      return ret;
-    } catch (Exception e) {
-      throw new WebApplicationException(e, INTERNAL_ERROR);
+    } else {
+      if (helixResourceManager.hasOfflineTable(tableName)) {
+        tableNameWithType = offlineTableName;
+        if (segmentName != null) {
+          segmentsToToggle = Collections.singletonList(segmentName);
+        } else {
+          segmentsToToggle.addAll(offlineSegments);
+        }
+      } else {
+        throw new WebApplicationException("There is no offline table for: " + tableName, BAD_REQUEST);
+      }
     }
+    PinotResourceManagerResponse resourceManagerResponse =
+        toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state, helixResourceManager);
+    ret.put(resourceManagerResponse);
+    return ret;
   }
 
   /**
@@ -403,8 +340,9 @@ public class PinotSegmentRestletResource {
    * @return
    * @throws JSONException
    */
-  private static PinotResourceManagerResponse toggleSegmentsForTable(@Nonnull List<String> segmentsToToggle, @Nonnull String tableName, String segmentName, @Nonnull StateType state,
-      PinotHelixResourceManager helixResourceManager) throws JSONException {
+  private static PinotResourceManagerResponse toggleSegmentsForTable(@Nonnull List<String> segmentsToToggle,
+      @Nonnull String tableName, String segmentName, @Nonnull StateType state,
+      PinotHelixResourceManager helixResourceManager) {
     long timeOutInSeconds = 10L;
     if (segmentName == null) {
       // For enable, allow 5 seconds per segment for an instance as timeout.
@@ -430,35 +368,37 @@ public class PinotSegmentRestletResource {
     }
   }
 
-
   private JSONArray getAllSegmentsMetadataForTable(String tableName, CommonConstants.Helix.TableType tableType) {
     boolean foundRealtimeTable = false;
     boolean foundOfflineTable = false;
     JSONArray ret = new JSONArray();
-
     try {
       if ((tableType == null || tableType == CommonConstants.Helix.TableType.REALTIME)
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
         JSONObject realtime = new JSONObject();
         realtime.put(FileUploadPathProvider.TABLE_NAME, realtimeTableName);
-        realtime.put("segments", new ObjectMapper()
-            .writeValueAsString(_pinotHelixResourceManager.getInstanceToSegmentsInATableMap(realtimeTableName)));
+        realtime.put("segments", new ObjectMapper().writeValueAsString(
+            _pinotHelixResourceManager.getInstanceToSegmentsInATableMap(realtimeTableName)));
         ret.put(realtime);
         foundRealtimeTable = true;
       }
 
-      if ((tableType == null || tableType == CommonConstants.Helix.TableType.OFFLINE && _pinotHelixResourceManager.hasOfflineTable(tableName))) {
+      if ((tableType == null
+          || tableType == CommonConstants.Helix.TableType.OFFLINE && _pinotHelixResourceManager.hasOfflineTable(
+          tableName))) {
         String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
         JSONObject offline = new JSONObject();
         offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
-        offline.put("segments", new ObjectMapper()
-            .writeValueAsString(_pinotHelixResourceManager.getInstanceToSegmentsInATableMap(offlineTableName)));
+        offline.put("segments", new ObjectMapper().writeValueAsString(
+            _pinotHelixResourceManager.getInstanceToSegmentsInATableMap(offlineTableName)));
         ret.put(offline);
         foundOfflineTable = true;
       }
-    } catch (Exception e) {
-      throw new WebApplicationException(e, INTERNAL_ERROR);
+    } catch (JSONException | JsonProcessingException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to convert segment metadata to json, table: %s", tableName),
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     if (foundOfflineTable || foundRealtimeTable) {
@@ -467,38 +407,43 @@ public class PinotSegmentRestletResource {
       throw new WebApplicationException("Table " + tableName + " not found.", Response.Status.NOT_FOUND);
     }
   }
- private JSONArray getSegmentMetaData(String tableName, String segmentName, CommonConstants.Helix.TableType tableType)
-      throws JSONException {
+
+  private JSONArray getSegmentMetaData(String tableName, String segmentName,
+      CommonConstants.Helix.TableType tableType) {
     if (!ZKMetadataProvider.isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(), tableName, segmentName)) {
       String error = new String("Error: segment " + segmentName + " not found.");
       LOGGER.info(error);
       throw new WebApplicationException(error, BAD_REQUEST);
     }
+    try {
+      JSONArray ret = new JSONArray();
+      JSONObject jsonObj = new JSONObject();
+      jsonObj.put(FileUploadPathProvider.TABLE_NAME, tableName);
 
-    JSONArray ret = new JSONArray();
-    JSONObject jsonObj = new JSONObject();
-    jsonObj.put(FileUploadPathProvider.TABLE_NAME, tableName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+      if (tableType == tableType.OFFLINE) {
+        OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+            ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
+        jsonObj.put(FileUploadPathProvider.STATE, offlineSegmentZKMetadata.toMap());
+      }
 
-    if (tableType == tableType.OFFLINE) {
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
-      jsonObj.put(FileUploadPathProvider.STATE, offlineSegmentZKMetadata.toMap());
+      if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+        RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+            ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
+        jsonObj.put(FileUploadPathProvider.STATE, realtimeSegmentZKMetadata.toMap());
+      }
+      ret.put(jsonObj);
+      return ret;
+    } catch (JSONException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Invalid json for segment metadata, table: %s, segment: %s, type: %s", tableName, segmentName,
+              tableType), Response.Status.INTERNAL_SERVER_ERROR);
     }
-
-    if (tableType == CommonConstants.Helix.TableType.REALTIME) {
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-          ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
-      jsonObj.put(FileUploadPathProvider.STATE, realtimeSegmentZKMetadata.toMap());
-    }
-
-    ret.put(jsonObj);
-    return ret;
   }
 
-  private String getAllCrcMetadataForTable(String tableName) throws JsonProcessingException {
-      PinotResourceManagerResponse response;
+  private String getAllCrcMetadataForTable(String tableName) {
+    PinotResourceManagerResponse response;
 
     // TODO
     // In the restlet.resource version, we see this code block below
@@ -516,7 +461,14 @@ public class PinotSegmentRestletResource {
 
     Map<String, String> segmentCrcForTable = _pinotHelixResourceManager.getSegmentsCrcForTable(offlineTableName);
     ObjectMapper mapper = new ObjectMapper();
-    String result = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(segmentCrcForTable);
+    String result = null;
+    try {
+      result = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(segmentCrcForTable);
+    } catch (JsonProcessingException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to write segment crc values for table: %s", tableName),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
     return result;
   }
 }
