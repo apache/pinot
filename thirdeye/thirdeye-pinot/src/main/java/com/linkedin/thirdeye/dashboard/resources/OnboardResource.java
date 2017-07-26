@@ -98,6 +98,7 @@ public class OnboardResource {
    * Copy the Identity of source anomaly function (with srcId) over in total to destination anomaly function (with destId)
    * Explicit representation: denote source anomaly function with (srcId, srcFunctionName, srcProperties)
    *                          denote destination anomaly function with (destId, destFunctionName, destProperties)
+   * Thirdeye database uses (functionId, functionName) as an identity for each anomaly function
    * "copyIdentity" will update destination anomaly function into source anomaly function's identity
    * After "copyIdentity", the two functions will become:
    *        (srcId, srcFunctionName, destProperties)
@@ -113,6 +114,18 @@ public class OnboardResource {
       @PathParam("destId") @NotNull Long destId) {
     AnomalyFunctionDTO srcAnomalyFunction = anomalyFunctionDAO.findById(srcId);
     AnomalyFunctionDTO destAnomalyFunction = anomalyFunctionDAO.findById(destId);
+    if (srcAnomalyFunction == null) {
+      // LOG and exit
+      LOG.error("Anomaly Function With id [{}] does not found", srcId);
+      return null;
+    }
+
+    if (destAnomalyFunction == null) {
+      // LOG and exit
+      LOG.error("Anomaly Function With id [{}] does not found", destId);
+      return null;
+    }
+
     destAnomalyFunction.setId(srcId);
     destAnomalyFunction.setFunctionName(srcAnomalyFunction.getFunctionName());
     anomalyFunctionDAO.update(destAnomalyFunction); // update properties
@@ -133,16 +146,19 @@ public class OnboardResource {
   public Response ClonedAnomalies(@PathParam("srcId") @NotNull long srcId,
       @PathParam("destId") @NotNull long destId,
       @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso) throws Exception{
+      @QueryParam("end") String endTimeIso) {
 
     long start = 0;
     long end = DateTime.now().getMillis();
-
-    if (startTimeIso != null) {
+    try {
+      if (startTimeIso != null) {
         start = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
-    }
-    if (endTimeIso != null) {
-      end = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+      }
+      if (endTimeIso != null) {
+        end = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException("Failed to parse time, startTime: " + startTimeIso + ", endTime: " + endTimeIso);
     }
     Boolean isAnyCloned = cloneAnomalyInstances(srcId, destId, start, end);
     return Response.ok(isAnyCloned).build();
@@ -235,7 +251,7 @@ public class OnboardResource {
     LOG.info("clone function id: {}, name: {}  to id: {}, name: {}", id, functionName, newId, newFunctionName);
 
     if (doCloneAnomaly) {
-      cloneAnomalyInstances(id, newId,null,null);
+      cloneAnomalyInstances(id, newId, 0, DateTime.now().getMillis());
     }
     return newId;
   }
@@ -247,11 +263,11 @@ public class OnboardResource {
    *   3. save the modified anomaly instances
    * @param srcId the source function Id with anomalies to be cloned.
    * @param destId the destination function Id which source anomalies to be cloned to.
-   * @param start the start time of anomalies from source function Id to be cloned, if null, set to 0.
-   * @param end the end time of anomalies from source function Id to be cloned, if null, set to current time milliseconds
+   * @param start the start time of anomalies from source function Id to be cloned.
+   * @param end the end time of anomalies from source function Id to be cloned.
    * @return boolean to indicate if the clone is success or not
    */
-  public Boolean cloneAnomalyInstances(Long srcId, Long destId, Long start, Long end) {
+  public Boolean cloneAnomalyInstances(Long srcId, Long destId, long start, long end) {
 
     // make sure both function can be identified by IDs
 
@@ -261,14 +277,6 @@ public class OnboardResource {
       // LOG and exit
       LOG.error("Source Anomaly Function With id [{}] does not found", srcId);
       return false;
-    }
-
-    // if start is null, set to 0, if end is null, set to current time milliseconds
-    if (start == null) {
-      start = 0l;
-    }
-    if (end == null) {
-      end = DateTime.now().getMillis();
     }
 
     AnomalyFunctionDTO destAnomalyFunction = anomalyFunctionDAO.findById(destId);
@@ -301,8 +309,8 @@ public class OnboardResource {
 
   /**
    * Delete raw and merged anomalies whose start time is located in the given time ranges
-   * @param startTimeIso The start time of the monitoring window
-   * @param endTimeIso The start time of the monitoring window
+   * @param startTimeIso The start time of the monitoring window, if null, use smallest time
+   * @param endTimeIso The start time of the monitoring window, if null, use current time
    */
   @DELETE
   @Path("function/{id}/anomalies")
@@ -352,8 +360,8 @@ public class OnboardResource {
    * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
    */
   public Map<String, Integer> deleteExistingAnomalies(long functionId,
-      Long monitoringWindowStartTime,
-      Long monitoringWindowEndTime) {
+      long monitoringWindowStartTime,
+      long monitoringWindowEndTime) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
       LOG.info("Anomaly functionId {} is not found", functionId);
