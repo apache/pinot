@@ -16,6 +16,20 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -50,21 +64,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.yammer.metrics.core.Meter;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
 import kafka.message.MessageAndOffset;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -626,19 +626,27 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return destDir.getAbsolutePath();
   }
 
-  protected SegmentCompletionProtocol.Response doSplitCommit(File segmentTarFile, SegmentCompletionProtocol.Response response) {
+  protected SegmentCompletionProtocol.Response doSplitCommit(File segmentTarFile, SegmentCompletionProtocol.Response prevResponse) {
     SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_currentOffset, _segmentNameStr);
     if (!segmentCommitStartResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+      segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
     SegmentCompletionProtocol.Response segmentCommitUploadResponse = _protocolHandler.segmentCommitUpload(
-        _currentOffset, _segmentNameStr, segmentTarFile, response.getSegmentLocation(), response.getControllerVipUrl());
+        _currentOffset, _segmentNameStr, segmentTarFile, prevResponse.getControllerVipUrl());
     if (!segmentCommitUploadResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
+      segmentLogger.warn("Segment upload failed  with response {}", segmentCommitUploadResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    return _protocolHandler.segmentCommitEnd(_currentOffset, _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
+    SegmentCompletionProtocol.Response commitEndResponse =  _protocolHandler.segmentCommitEnd(_currentOffset,
+        _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
+    if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS))  {
+      segmentLogger.warn("CommitEnd failed  with response {}", commitEndResponse.toJsonString());
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+    return commitEndResponse;
   }
 
   protected boolean commitSegment(final String segTarFileName, SegmentCompletionProtocol.Response response) {
@@ -657,7 +665,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       returnedResponse = postSegmentCommitMsg(segTarFile);
     }
     if (!returnedResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
-      segmentLogger.warn("Received controller response {}", response);
       return false;
     }
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
@@ -668,6 +675,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   protected SegmentCompletionProtocol.Response postSegmentCommitMsg(File segmentTarFile) {
     SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(_currentOffset, _segmentNameStr,
         segmentTarFile);
+    if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
+      segmentLogger.warn("Commit failed  with response {}", response.toJsonString());
+    }
     return response;
   }
 
