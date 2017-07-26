@@ -29,7 +29,6 @@ import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -176,7 +175,7 @@ public class PinotSchemaRestletResource {
 
     try {
       schema = Schema.fromFile(dataFile);
-    } catch (org.codehaus.jackson.JsonParseException | JsonMappingException e) {
+    } catch (org.codehaus.jackson.JsonParseException | org.codehaus.jackson.map.JsonMappingException e) {
       LOGGER.info("Invalid json while adding {}", schemaNameForLogging, e);
       throw new WebApplicationException("Invalid json in input schema", Response.Status.BAD_REQUEST);
     } catch (IOException e) {
