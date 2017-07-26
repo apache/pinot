@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -28,7 +27,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -43,6 +41,7 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -106,49 +105,41 @@ public class PinotSegmentUploadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments")
   @Deprecated
-  public JSONArray listAllSegmentNames(
-  ) {
-    try {
-      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-      final JSONArray ret = new JSONArray();
-      for (final File file : provider.getBaseDataDir().listFiles()) {
-        final String fileName = file.getName();
-        if (fileName.equalsIgnoreCase("fileUploadTemp") || fileName.equalsIgnoreCase("schemasTemp")) {
-          continue;
-        }
-
-        final String url = _controllerConf.generateVipUrl() + "/segments/" + fileName;
-        ret.put(url);
+  public String listAllSegmentNames(
+  ) throws Exception {
+    FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
+    final JSONArray ret = new JSONArray();
+    for (final File file : provider.getBaseDataDir().listFiles()) {
+      final String fileName = file.getName();
+      if (fileName.equalsIgnoreCase("fileUploadTemp") || fileName.equalsIgnoreCase("schemasTemp")) {
+        continue;
       }
-      return ret;
-    } catch (Exception e) {
-      throw new WebApplicationException(e);
+
+      final String url = _controllerConf.generateVipUrl() + "/segments/" + fileName;
+      ret.put(url);
     }
+    return ret.toString();
   }
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}")
   @ApiOperation(value = "Lists names of all segments of a table", notes = "Lists names of all segment names of a table")
-  public JSONArray listAllSegmentNames(
+  public String listAllSegmentNames(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
-    try {
-      JSONArray ret = new JSONArray();
-      final String realtime = "REALTIME";
-      final String offline = "OFFLINE";
+  ) throws Exception {
+    JSONArray ret = new JSONArray();
+    final String realtime = "REALTIME";
+    final String offline = "OFFLINE";
 
-      if (tableTypeStr == null) {
-        ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(offline)));
-        ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(realtime)));
-      } else {
-        ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(tableTypeStr)));
-      }
-      return ret;
-    } catch (Exception e) {
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    if (tableTypeStr == null) {
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(offline)));
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(realtime)));
+    } else {
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(tableTypeStr)));
     }
+    return ret.toString();
   }
 
 
