@@ -42,7 +42,8 @@ class PipelineCallable implements Callable<PipelineResult> {
       PipelineContext context = new PipelineContext(inputs);
       PipelineResult result = this.pipeline.run(context);
 
-      LOG.info("Completed pipeline '{}'. Got {} results", this.pipeline.getOutputName(), result.getEntities().size());
+      long runtime = (System.nanoTime() - tStart) / 1000000;
+      LOG.info("Completed pipeline '{}' in {}ms. Got {} results", this.pipeline.getOutputName(), runtime, result.getEntities().size());
       return result;
     } finally {
       ThirdeyeMetricsUtil.rcaPipelineCallCounter.inc();
