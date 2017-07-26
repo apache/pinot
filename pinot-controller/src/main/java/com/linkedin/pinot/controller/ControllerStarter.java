@@ -15,6 +15,22 @@
  */
 package com.linkedin.pinot.controller;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.PreConnectCallback;
+import org.apache.helix.task.TaskDriver;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
+import org.restlet.Application;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.pinot.common.Utils;
@@ -34,26 +50,6 @@ import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentMan
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.io.FileUtils;
-import org.apache.helix.PreConnectCallback;
-import org.apache.helix.task.TaskDriver;
-import org.glassfish.hk2.utilities.binding.AbstractBinder;
-import org.restlet.Application;
-import org.restlet.Component;
-import org.restlet.Context;
-import org.restlet.data.Protocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -63,7 +59,7 @@ public class ControllerStarter {
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
 
   private final ControllerConf config;
-  private final Component component;
+//  private final Component component;
   // TODO: Remove restlet based controllerRestApp when migration to jersey is complete
   private final Application controllerRestApp;
   private final ControllerAdminApiApplication adminApp;
@@ -81,7 +77,7 @@ public class ControllerStarter {
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
-    component = new Component();
+//    component = new Component();
     controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
     adminApp = new ControllerAdminApiApplication();
     helixResourceManager = new PinotHelixResourceManager(config);
@@ -159,22 +155,22 @@ public class ControllerStarter {
       segmentStatusChecker.start(controllerMetrics);
 
       LOGGER.info("Starting Pinot REST API component");
-      component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
-      component.getClients().add(Protocol.FILE);
-      component.getClients().add(Protocol.JAR);
-      Context applicationContext = component.getContext().createChildContext();
+//      component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
+//      component.getClients().add(Protocol.FILE);
+//      component.getClients().add(Protocol.JAR);
+//      Context applicationContext = component.getContext().createChildContext();
       LOGGER.info("Controller download url base: {}", config.generateVipUrl());
       LOGGER.info("Injecting configuration and resource managers to the API context");
       // TODO: Remove attributes map when removing restlet
-      ConcurrentMap<String, Object> attributes = applicationContext.getAttributes();
-      attributes.put(ControllerConf.class.toString(), config);
-      attributes.put(PinotHelixResourceManager.class.toString(), helixResourceManager);
-      attributes.put(PinotHelixTaskResourceManager.class.toString(), _helixTaskResourceManager);
-      attributes.put(PinotTaskManager.class.toString(), _taskManager);
+//      ConcurrentMap<String, Object> attributes = applicationContext.getAttributes();
+//      attributes.put(ControllerConf.class.toString(), config);
+//      attributes.put(PinotHelixResourceManager.class.toString(), helixResourceManager);
+//      attributes.put(PinotHelixTaskResourceManager.class.toString(), _helixTaskResourceManager);
+//      attributes.put(PinotTaskManager.class.toString(), _taskManager);
       final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
       connectionManager.getParams().setConnectionTimeout(config.getServerAdminRequestTimeoutSeconds());
-      attributes.put(HttpConnectionManager.class.toString(), connectionManager);
-      attributes.put(Executor.class.toString(), executorService);
+//      attributes.put(HttpConnectionManager.class.toString(), connectionManager);
+//      attributes.put(Executor.class.toString(), executorService);
       // register all the controller objects for injection to jersey resources
       adminApp.registerBinder(new AbstractBinder() {
         @Override
@@ -188,10 +184,10 @@ public class ControllerStarter {
         }
       });
 
-      controllerRestApp.setContext(applicationContext);
-      component.getDefaultHost().attach(controllerRestApp);
-      component.start();
-      adminApp.start(config.getJerseyAdminApiPort());
+//      controllerRestApp.setContext(applicationContext);
+//      component.getDefaultHost().attach(controllerRestApp);
+//      component.start();
+      adminApp.start(Integer.valueOf(config.getControllerPort()));
       LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
       LOGGER.info("Controller services available at http://{}:{}/", config.getControllerHost(),
           config.getControllerPort());
@@ -293,8 +289,8 @@ public class ControllerStarter {
       LOGGER.info("Stopping retention manager");
       retentionManager.stop();
 
-      LOGGER.info("Stopping API component");
-      component.stop();
+//      LOGGER.info("Stopping API component");
+//      component.stop();
 
       LOGGER.info("Stopping realtime segment manager");
       realtimeSegmentsManager.stop();
