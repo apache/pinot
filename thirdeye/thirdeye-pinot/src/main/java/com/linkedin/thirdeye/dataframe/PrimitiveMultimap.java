@@ -14,13 +14,12 @@ class PrimitiveMultimap {
   private static final int INITIAL_SIZE = 1;
 
   public static final int RESERVED_VALUE = 0xFFFFFFFF;
-
-  private static final int TUPLE_SIZE = 2;
-  private static final double SCALING_FACTOR = 2;
+  public static final double SCALING_FACTOR = 4;
 
   private final int maxSize;
   private final int shift;
   private final long[] data;
+  private int[] writeInfo;
 
   private int size;
   private long collisions = 0;
@@ -44,9 +43,8 @@ class PrimitiveMultimap {
   public PrimitiveMultimap(Series... series) {
     this(series[0].size());
     Series.assertSameLength(series);
-
     for(int i=0; i<series[0].size(); i++) {
-      put(series, i);
+      putFast(hashRow(series, i), i);
     }
   }
 
@@ -77,10 +75,6 @@ class PrimitiveMultimap {
     return k;
   }
 
-  public void put(Series[] series, int row) {
-    put(hashRow(series, row), row);
-  }
-
   /* **************************************************************************
    * Base implementation
    * *************************************************************************/
@@ -91,7 +85,9 @@ class PrimitiveMultimap {
     this.shift = log2(minCapacity) + 1;
 
     final int capacity = pow2(this.shift);
-    this.data = new long[capacity * TUPLE_SIZE];
+    this.data = new long[capacity];
+
+    this.writeInfo = new int[this.data.length];
   }
 
   public void put(final int key, final int value) {
@@ -100,22 +96,24 @@ class PrimitiveMultimap {
       throw new IllegalArgumentException(String.format("Value must be different from %d", RESERVED_VALUE));
     if(this.size >= this.maxSize)
       throw new IllegalArgumentException(String.format("Map is at max size %d", this.maxSize));
+    putFast(key, value);
+  }
 
+  private void putFast(final int key, final int value) {
     final int keyHash = hash(key);
-    final int keyIndex = hash2index(keyHash);
+    final int keyIndex = safeIndex(keyHash);
 
-    int insert = keyIndex;
-    long ttup = this.data[insert];
-    while(ttup != 0) {
-      final long meta = this.data[insert + 1];
-      insert = meta2nextInsert(meta);
-      ttup = this.data[insert];
+    int index = keyIndex;
+    long tuple = this.data[index];
+    while(tuple != 0) {
+      index = this.writeInfo[index];
+      tuple = this.data[index];
       this.collisions++;
     }
 
-    this.data[insert] = tuple(key, value + 1); // ensure 0 indicates empty
-    this.data[insert + 1] = meta(-1, keyIndex);
-    this.data[keyIndex + 1] = meta(-1, safeIndex(insert + TUPLE_SIZE));
+    this.data[index] = tuple(key, value + 1); // ensure 0 indicates empty
+    this.writeInfo[index] = keyIndex;
+    this.writeInfo[keyIndex] = safeIndex(index + 1);
     this.size++;
   }
 
@@ -129,8 +127,7 @@ class PrimitiveMultimap {
 
   private int getInternal(int key, int hash, int offset) {
     int toff = 0;
-    int index = hash2index(hash);
-
+    int index = safeIndex(hash);
     long tuple = this.data[index];
 
     while(tuple != 0) {
@@ -139,12 +136,12 @@ class PrimitiveMultimap {
       if(tkey == key) {
         if(offset == toff++) {
           this.iteratorKey = key;
-          this.iterator = index + TUPLE_SIZE;
+          this.iterator = index + 1;
           return tuple2val(tuple) - 1; // fix value offset
         }
       }
 
-      index = safeIndex(index + TUPLE_SIZE);
+      index = safeIndex(index + 1);
       tuple = this.data[index];
       this.rereads++;
     }
@@ -169,7 +166,7 @@ class PrimitiveMultimap {
   }
 
   public int capacityEffective() {
-    return this.data.length / TUPLE_SIZE;
+    return this.data.length;
   }
 
   public long getCollisions() {
@@ -181,21 +178,17 @@ class PrimitiveMultimap {
   }
 
   public String visualize() {
-    final int rowSize = (int) (Math.ceil(Math.sqrt(this.data.length / TUPLE_SIZE)) * 1.5);
+    final int rowSize = (int) (Math.ceil(Math.sqrt(this.data.length)) * 1.5);
     final StringBuilder sb = new StringBuilder();
     for(int i=0; i<this.size(); i++) {
       if(i % rowSize == 0)
         sb.append('\n');
-      if(this.data[i * TUPLE_SIZE] == 0)
+      if(this.data[i] == 0)
         sb.append('.');
       else
         sb.append('X');
     }
     return sb.toString();
-  }
-
-  int hash2index(int hash) {
-    return (safeIndex(hash) >>> 1) << 1;
   }
 
   int safeIndex(int index) {
@@ -210,20 +203,8 @@ class PrimitiveMultimap {
     return (int) tuple;
   }
 
-  static int meta2nextKey(long meta) {
-    return (int) (meta >>> 32);
-  }
-
-  static int meta2nextInsert(long meta) {
-    return (int) meta;
-  }
-
   static long tuple(int key, int val) {
     return ((key & TO_LONG) << 32) | (val & TO_LONG);
-  }
-
-  static long meta(int nextKey, int nextInsert) {
-    return ((nextKey & TO_LONG) << 32) | (nextInsert & TO_LONG);
   }
 
   static int log2(int value) {

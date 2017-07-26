@@ -40,15 +40,15 @@ public class PrimitiveMultimapTest {
   @Test
   public void testCapacityEffective() {
     Assert.assertEquals(new PrimitiveMultimap(0).capacityEffective(), 2);
-    Assert.assertEquals(new PrimitiveMultimap(1).capacityEffective(), 8);
-    Assert.assertEquals(new PrimitiveMultimap(2).capacityEffective(), 16);
-    Assert.assertEquals(new PrimitiveMultimap(3).capacityEffective(), 16);
-    Assert.assertEquals(new PrimitiveMultimap(4).capacityEffective(), 32);
-    Assert.assertEquals(new PrimitiveMultimap(5).capacityEffective(), 32);
-    Assert.assertEquals(new PrimitiveMultimap(6).capacityEffective(), 32);
-    Assert.assertEquals(new PrimitiveMultimap(7).capacityEffective(), 32);
-    Assert.assertEquals(new PrimitiveMultimap(8).capacityEffective(), 64);
-    Assert.assertEquals(new PrimitiveMultimap(9).capacityEffective(), 64);
+    Assert.assertEquals(new PrimitiveMultimap(1).capacityEffective(), (int) (2 * PrimitiveMultimap.SCALING_FACTOR));
+    Assert.assertEquals(new PrimitiveMultimap(2).capacityEffective(), (int) (4 * PrimitiveMultimap.SCALING_FACTOR));
+    Assert.assertEquals(new PrimitiveMultimap(3).capacityEffective(), (int) (4 * PrimitiveMultimap.SCALING_FACTOR));
+    Assert.assertEquals(new PrimitiveMultimap(4).capacityEffective(), (int) (8 * PrimitiveMultimap.SCALING_FACTOR));
+    Assert.assertEquals(new PrimitiveMultimap(5).capacityEffective(), (int) (8 * PrimitiveMultimap.SCALING_FACTOR));
+    Assert.assertEquals(new PrimitiveMultimap(6).capacityEffective(), (int) (8 * PrimitiveMultimap.SCALING_FACTOR));
+    Assert.assertEquals(new PrimitiveMultimap(7).capacityEffective(), (int) (8 * PrimitiveMultimap.SCALING_FACTOR));
+    Assert.assertEquals(new PrimitiveMultimap(8).capacityEffective(), (int) (16 * PrimitiveMultimap.SCALING_FACTOR));
+    Assert.assertEquals(new PrimitiveMultimap(9).capacityEffective(), (int) (16 * PrimitiveMultimap.SCALING_FACTOR));
   }
 
   @Test

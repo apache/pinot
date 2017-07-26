@@ -860,70 +860,6 @@ public class DataFrameBenchmark {
     logResults("benchmarkMovingWindowSumLongArray", checksum);
   }
 
-  private void benchmarkMergeJoinLongArray() {
-    startTimerOuter();
-    long checksum = 0;
-
-    for(int r=0; r<N_ROUNDS_SLOW; r++) {
-      long[] longValues = generateLongData(N_ELEMENTS);
-      long[] otherValues = shuffle(Arrays.copyOf(longValues, N_ELEMENTS));
-
-      startTimer();
-      // NOTE: this is cheating, could be N_ELEMENTS ^ 2
-      int[] resLeft = new int[N_ELEMENTS];
-      int[] resRight = new int[N_ELEMENTS];
-
-      // NOTE: this is cheating as well. we need the original indices instead
-      Arrays.sort(longValues);
-      Arrays.sort(otherValues);
-
-      int i=0;
-      int j=0;
-      int o=0;
-      while(i < N_ELEMENTS && j < N_ELEMENTS) {
-        // left == right
-        int k=0;
-        while((j+k) < N_ELEMENTS && longValues[i] == otherValues[j+k]) {
-          resLeft[o] = i;
-          resRight[o] = j+k;
-          o++;
-          k++;
-        }
-        if(k > 0) {
-          i++;
-          continue;
-        }
-
-        // left < right
-        if(longValues[i] < otherValues[j]) {
-          resLeft[o] = i;
-          resRight[o] = -1;
-          o++;
-          i++;
-          continue;
-        }
-
-        // left > right
-        resLeft[o] = -1;
-        resRight[o] = j;
-        o++;
-        j++;
-      }
-
-      int[] truncLeft = Arrays.copyOf(resLeft, o);
-      int[] truncRight = Arrays.copyOf(resRight, o);
-      stopTimer();
-
-      if(truncLeft.length != N_ELEMENTS || truncRight.length != N_ELEMENTS)
-        throw new IllegalStateException(String.format("Join incorrect (got %d pairs, should be %d)", truncLeft.length, N_ELEMENTS));
-
-      checksum ^= checksum(truncLeft);
-      checksum ^= checksum(truncRight);
-    }
-
-    logResults("benchmarkMergeJoinLongArray", checksum);
-  }
-
   private void benchmarkHashJoinOuterLongSeries() {
     startTimerOuter();
     long checksum = 0;
@@ -1050,50 +986,49 @@ public class DataFrameBenchmark {
   }
 
   private void benchmarkAll() {
-//    benchmarkGroupByValueLongSeries();
-//    benchmarkGroupByValueMultipleSeries();
-//    benchmarkMergeJoinLongArray();
+    benchmarkGroupByValueLongSeries();
+    benchmarkGroupByValueMultipleSeries();
     benchmarkHashJoinOuterLongSeries();
     benchmarkHashJoinOuterGuavaLongSeries();
-//    benchmarkHashJoinInnerLongSeries();
-//    benchmarkHasNullLongSeries();
-//    benchmarkDropNullLongSeries();
-//    benchmarkDropNullLongArray();
-//    benchmarkAggregateLongSeries();
-//    benchmarkAggregateLongArray();
-//    benchmarkMinMaxLongSeries();
-//    benchmarkMinMaxLongArray();
-//    benchmarkEqualsLongSeries();
-//    benchmarkEqualsLongArray();
-//    benchmarkEqLongSeries();
-//    benchmarkShiftLongSeries();
-//    benchmarkShiftLongArray();
-//    benchmarkSortLongSeries();
-//    benchmarkSortLongArray();
-//    benchmarkUniqueLongSeries();
-//    benchmarkUniqueLongArrayWithObjects();
-//    benchmarkExpandingWindowSumLongSeries();
-//    benchmarkExpandingWindowSumLongArray();
-//    benchmarkExpandingWindowMaxLongSeries();
-//    benchmarkExpandingWindowMaxLongArray();
-//    benchmarkMovingWindowSumLongSeries();
-//    benchmarkMovingWindowSumLongArray();
-//    benchmarkMapDoubleSeries();
-//    benchmarkMapDoubleSeriesOperation();
-//    benchmarkMapDoubleArray();
-//    benchmarkMapLongSeries();
-//    benchmarkMapLongSeriesOperation();
-//    benchmarkMapLongArray();
-//    benchmarkMapLongObjectSeriesOperation();
-//    benchmarkMapLongObjectArray();
-//    benchmarkMapTwoSeries();
-//    benchmarkMapTwoSeriesOperation();
-//    benchmarkMapTwoArrays();
-//    benchmarkMapThreeSeries();
-//    benchmarkMapThreeArrays();
-//    benchmarkMapFourSeriesGeneric();
-//    benchmarkMapFourArrays();
-//    benchmarkMapTwoSeriesExpression();
+    benchmarkHashJoinInnerLongSeries();
+    benchmarkHasNullLongSeries();
+    benchmarkDropNullLongSeries();
+    benchmarkDropNullLongArray();
+    benchmarkAggregateLongSeries();
+    benchmarkAggregateLongArray();
+    benchmarkMinMaxLongSeries();
+    benchmarkMinMaxLongArray();
+    benchmarkEqualsLongSeries();
+    benchmarkEqualsLongArray();
+    benchmarkEqLongSeries();
+    benchmarkShiftLongSeries();
+    benchmarkShiftLongArray();
+    benchmarkSortLongSeries();
+    benchmarkSortLongArray();
+    benchmarkUniqueLongSeries();
+    benchmarkUniqueLongArrayWithObjects();
+    benchmarkExpandingWindowSumLongSeries();
+    benchmarkExpandingWindowSumLongArray();
+    benchmarkExpandingWindowMaxLongSeries();
+    benchmarkExpandingWindowMaxLongArray();
+    benchmarkMovingWindowSumLongSeries();
+    benchmarkMovingWindowSumLongArray();
+    benchmarkMapDoubleSeries();
+    benchmarkMapDoubleSeriesOperation();
+    benchmarkMapDoubleArray();
+    benchmarkMapLongSeries();
+    benchmarkMapLongSeriesOperation();
+    benchmarkMapLongArray();
+    benchmarkMapLongObjectSeriesOperation();
+    benchmarkMapLongObjectArray();
+    benchmarkMapTwoSeries();
+    benchmarkMapTwoSeriesOperation();
+    benchmarkMapTwoArrays();
+    benchmarkMapThreeSeries();
+    benchmarkMapThreeArrays();
+    benchmarkMapFourSeriesGeneric();
+    benchmarkMapFourArrays();
+    benchmarkMapTwoSeriesExpression();
   }
 
   private void startTimer() {
