@@ -110,9 +110,6 @@ public class PinotTableRestletResource {
         LOGGER.info("Invalid table config for table: {}, {}", tableName, e.getMessage());
         throw new WebApplicationException("Invalid table config:" + e.getStackTrace(), Response.Status.BAD_REQUEST);
       } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
-        LOGGER.info("Table: {} already exists", tableName);
-        throw new WebApplicationException("Table already exists", Response.Status.BAD_REQUEST);
-      } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
         throw new WebApplicationException(e, Response.Status.CONFLICT);
       } else {
         throw e;
