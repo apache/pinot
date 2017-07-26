@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -104,7 +106,10 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"),
+      @ApiResponse(code = 404, message = "Schema not found"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       FormDataMultiPart multiPart) {
@@ -164,6 +169,10 @@ public class PinotSchemaRestletResource {
     try {
       is = bodyPart.getValueAs(InputStream.class);
       return Schema.fromInputSteam(is);
+    } catch (JsonParseException | JsonMappingException e) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Invalid json in schema request body, schema: %s", name),
+          Response.Status.BAD_REQUEST);
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Error reading request body for schema, name %s", name), Response.Status.INTERNAL_SERVER_ERROR,
