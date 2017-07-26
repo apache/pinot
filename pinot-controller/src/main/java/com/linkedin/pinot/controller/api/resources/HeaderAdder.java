@@ -34,7 +34,7 @@ public class HeaderAdder implements ContainerRequestFilter {
 
   // Method is PUT or POST, we need to decide if a header is to be inserted for body being JSON
   private String modifiedContentType(String path) {
-t    if (path.startsWith("tenants")) {
+    if (path.startsWith("tenants")) {
       return MediaType.APPLICATION_JSON;
     }
     if (path.startsWith("instances")) {
