@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.api.resources;
 
 import java.util.HashSet;
 import java.util.Set;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +26,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
@@ -48,7 +49,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
-import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import javax.ws.rs.core.Response;
 
 
@@ -84,8 +84,8 @@ public class PinotTenantRestletResource {
   ControllerConf controllerConf;
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
-  @Inject
-  ControllerMetrics metrics;
+//  @Inject
+//  ControllerMetrics metrics;
 
   @POST
   @Path("/tenants")
@@ -111,7 +111,8 @@ public class PinotTenantRestletResource {
     if (response.isSuccessful()) {
       return new SuccessResponse("Successfully created tenant");
     }
-    metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
+    ControllerRestApplication.getControllerMetrics().
+        addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
     throw new WebApplicationException("Failed to create tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 
@@ -121,7 +122,7 @@ public class PinotTenantRestletResource {
   // TODO: should be /tenant/{tenantName}
   @PUT
   @Path("/tenants")
-  @Consumes(APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value =  "Update a tenant")
   @ApiResponses(value =  {
@@ -143,7 +144,8 @@ public class PinotTenantRestletResource {
     if (response.isSuccessful()) {
       return new SuccessResponse("Updated tenant");
     }
-    metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
+    ControllerRestApplication.getControllerMetrics().
+        addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
     throw new WebApplicationException("Failed to update tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 
@@ -178,6 +180,82 @@ public class PinotTenantRestletResource {
     return tenants;
   }
 
+  @GET
+  @Path("/tenants/{tenantName}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List instance for a tenant, or enable/disable/drop a tenant")
+  public String listInstanceOrToggleTenantState(
+      @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Tenant type (sever|broker)", required = false) @QueryParam("type") String tenantType,
+      @ApiParam(value = "state", required = false) @QueryParam("state") String stateStr
+  ) throws Exception {
+    if (stateStr == null) {
+      return listInstancesForTenant(tenantName, tenantType);
+    } else {
+      return toggleTenantState(tenantName, stateStr, tenantType);
+    }
+  }
+
+  private String toggleTenantState(String tenantName, String stateStr, String tenantType) throws JSONException{
+    Set<String> serverInstances = new HashSet<String>();
+    Set<String> brokerInstances = new HashSet<String>();
+    JSONObject instanceResult = new JSONObject();
+
+    if ((tenantType == null) || tenantType.equalsIgnoreCase("server")) {
+      serverInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
+    }
+
+    if ((tenantType == null) || tenantType.equalsIgnoreCase("broker")) {
+      brokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName);
+    }
+
+    Set<String> allInstances = new HashSet<String>(serverInstances);
+    allInstances.addAll(brokerInstances);
+
+    if (StateType.DROP.name().equalsIgnoreCase(stateStr)) {
+      if (!allInstances.isEmpty()) {
+        throw  new WebApplicationException("Error: Tenant " + tenantName + " has live instances, cannot be dropped.",
+            Response.Status.BAD_REQUEST);
+      }
+      pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
+      pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
+      pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
+      return new SuccessResponse("Dropped tenant " + tenantName + " successfully.").toString();
+    }
+
+    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr) ? true : false;
+    for (String instance : allInstances) {
+      if (enable) {
+        instanceResult.put(instance, pinotHelixResourceManager.enableInstance(instance));
+      } else {
+        instanceResult.put(instance, pinotHelixResourceManager.disableInstance(instance));
+      }
+    }
+
+    return null;
+  }
+
+  private String listInstancesForTenant(String tenantName, String tenantType)
+      throws JSONException {
+    Set<String> serverInstances = new HashSet<String>();
+    Set<String> brokerInstances = new HashSet<String>();
+    JSONObject instanceResult = new JSONObject();
+
+    JSONObject resourceGetRet = new JSONObject();
+    if (tenantType == null) {
+      resourceGetRet.put("ServerInstances", pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName));
+      resourceGetRet.put("BrokerInstances", pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
+    } else {
+      if (tenantType.equalsIgnoreCase("server")) {
+        resourceGetRet.put("ServerInstances", pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName));
+      }
+      if (tenantType.equalsIgnoreCase("broker")) {
+        resourceGetRet.put("BrokerInstances", pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
+      }
+    }
+    resourceGetRet.put(TENANT_NAME, tenantName);
+    return resourceGetRet.toString();
+  }
 
   @GET
   @Path("/tenants/{tenantName}/metadata")
@@ -280,7 +358,8 @@ public class PinotTenantRestletResource {
       }
     } catch (Exception e) {
       LOGGER.error("Error enabling/disabling instances for tenant: {}", tenantName, e);
-      metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().
+          addMeteredGlobalValue(ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR, 1L);
       throw new WebApplicationException("Error during " + type + " operation for instance: " + instance, Response.Status.INTERNAL_SERVER_ERROR);
 
     }
@@ -334,7 +413,8 @@ public class PinotTenantRestletResource {
     if (res.isSuccessful()) {
       return new SuccessResponse("Successfully deleted tenant " + tenantName);
     }
-    metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
+    ControllerRestApplication.getControllerMetrics().
+        addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
     throw new WebApplicationException("Error deleting tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 }

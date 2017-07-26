@@ -24,30 +24,41 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.ext.Provider;
 
 
+// A class to add the headers that we expect from clients. Pre-jersey API, the clients have been lax in specifying the
+// actualy content type that they POST or PUT. Most cases, it is JSON. In the jersey API, we have the power to receive
+// objects as a typed object, if it can be de-serialized into one. So, we resort to replacing the content type with
+// the expected one.
 @PreMatching
 @Provider
 public class HeaderAdder implements ContainerRequestFilter {
 
-  private boolean shouldBeJsonInput(String path) {
-    if (
-        path.startsWith("instances") ||
-//            path.startsWith("schemas") ||
-            path.startsWith("tenants")
-        ) {
-      return true;
+  // Method is PUT or POST, we need to decide if a header is to be inserted for body being JSON
+  private String modifiedContentType(String path) {
+t    if (path.startsWith("tenants")) {
+      return MediaType.APPLICATION_JSON;
     }
-    return false;
-
+    if (path.startsWith("instances")) {
+      // If we post a new instance, that is in JSON
+      // But if we enable/disable the state of an instance, that is plain text.
+      String[] pathParts = path.split("/");
+      if (pathParts[pathParts.length-1].equals("state")) {
+        return MediaType.TEXT_PLAIN;
+      }
+      return MediaType.APPLICATION_JSON;
+    }
+    return null;
   }
 
   @Override
   public void filter(ContainerRequestContext req) throws IOException {
     String path = req.getUriInfo().getPath();
     if ((req.getMethod().equalsIgnoreCase("PUT") ||
-        req.getMethod().equalsIgnoreCase("POST") ) &&
-        shouldBeJsonInput(path)) {
-      req.getHeaders().remove(HttpHeaders.CONTENT_TYPE);
-      req.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
+        req.getMethod().equalsIgnoreCase("POST"))) {
+      String mediaType = modifiedContentType(path);
+      if (mediaType != null) {
+        req.getHeaders().remove(HttpHeaders.CONTENT_TYPE);
+        req.getHeaders().add(HttpHeaders.CONTENT_TYPE, mediaType);
+      }
     }
   }
 }

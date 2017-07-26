@@ -42,6 +42,7 @@ import javax.ws.rs.core.Response;
 
 
 @Api(tags = Constants.TABLE_TAG)
+@Path("/")
 public class TableViews {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableViews.class);
@@ -65,7 +66,7 @@ public class TableViews {
   @ApiOperation(value = "Get table ideal state", notes = "Get table ideal state")
   public TableView getIdealState(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr
   ) {
     CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
     return getTableState(tableName, IDEALSTATE, tableType);
@@ -77,7 +78,7 @@ public class TableViews {
   @ApiOperation(value = "Get table external view", notes = "Get table external view")
   public TableView getExternalView(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr
 
   ) {
     CommonConstants.Helix.TableType tableType = validateTableType(tableTypeStr);
@@ -98,7 +99,7 @@ public class TableViews {
     }
 
     if (tableView.offline == null && tableView.realtime == null) {
-      throw new WebApplicationException("Table not found", Response.Status.BAD_REQUEST);
+      throw new WebApplicationException("Table not found", Response.Status.NOT_FOUND);
     }
     return tableView;
   }

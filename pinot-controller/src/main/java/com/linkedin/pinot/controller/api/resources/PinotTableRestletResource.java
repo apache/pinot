@@ -16,10 +16,12 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
@@ -86,32 +88,35 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
-  public SuccessResponse addTable(String tableConfigStr) {
-    try {
+  public SuccessResponse addTable(String tableConfigStr) throws Exception {
       // TODO introduce a table config ctor with json string.
+    TableConfig tableConfig;
+    String tableName;
+    try {
       JSONObject tableConfigJson = new JSONObject(tableConfigStr);
-      TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
-      final String tableName = tableConfig.getTableName();
-      try {
-        ensureMinReplicas(tableConfig);
-        _pinotHelixResourceManager.addTable(tableConfig);
-        return new SuccessResponse("Table " + tableName + " succesfully added");
-      } catch (Exception e) {
-        ControllerRestApplication.getControllerMetrics()
-            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
-        if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
-          LOGGER.info("Invalid table config for table: {}, {}", tableName, e.getMessage());
-          throw new WebApplicationException("Invalid table config:" + e.getStackTrace(), Response.Status.BAD_REQUEST);
-        } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
-          LOGGER.info("Table: {} already exists", tableName);
-          throw new WebApplicationException("Table already exists", Response.Status.BAD_REQUEST);
-        } else {
-          LOGGER.error("Caught exception while adding table: {}", tableName, e);
-          throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
-        }
-      }
+      tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
+      tableName = tableConfig.getTableName();
+    } catch (IOException | JSONException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    }
+    try {
+      ensureMinReplicas(tableConfig);
+      _pinotHelixResourceManager.addTable(tableConfig);
+      return new SuccessResponse("Table " + tableName + " succesfully added");
     } catch (Exception e) {
-      throw new WebApplicationException(e);
+      ControllerRestApplication.getControllerMetrics()
+          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
+      if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
+        LOGGER.info("Invalid table config for table: {}, {}", tableName, e.getMessage());
+        throw new WebApplicationException("Invalid table config:" + e.getStackTrace(), Response.Status.BAD_REQUEST);
+      } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
+        LOGGER.info("Table: {} already exists", tableName);
+        throw new WebApplicationException("Table already exists", Response.Status.BAD_REQUEST);
+      } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
+        throw new WebApplicationException(e, Response.Status.CONFLICT);
+      } else {
+        throw e;
+      }
     }
   }
 
@@ -242,7 +247,7 @@ public class PinotTableRestletResource {
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
       String tableConfigStr
-  ) {
+  ) throws Exception {
     TableConfig tableConfig;
     try {
       JSONObject tableConfigJson = new JSONObject(tableConfigStr);
@@ -267,7 +272,7 @@ public class PinotTableRestletResource {
         }
       } else {
         if (!_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          throw new WebApplicationException("Table " + tableName + " does not exist", Response.Status.BAD_REQUEST);
+          throw new WebApplicationException("Table " + tableName + " does not exist", Response.Status.NOT_FOUND);
         }
       }
 
@@ -279,10 +284,9 @@ public class PinotTableRestletResource {
           ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
     } catch (Exception e) {
-      LOGGER.error("Failed to update table configuration for table: {}", tableName, e);
       ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
           ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
-      throw new WebApplicationException("Internal error while updating table configuration", Response.Status.INTERNAL_SERVER_ERROR);
+      throw e;
     }
 
     return new SuccessResponse("Table config updated for " + tableName);
