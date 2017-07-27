@@ -6,20 +6,18 @@ import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
 import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,9 +39,12 @@ public class RootCauseResource {
   @Path("/query")
   public List<RootCauseEntity> query(
       @QueryParam("framework") String framework,
-      @QueryParam("current") Long current,
-      @QueryParam("baseline") Long baseline,
-      @QueryParam("windowSize") Long windowSize,
+      @QueryParam("anomalyStart") Long anomalyStart,
+      @QueryParam("anomalyEnd") Long anomalyEnd,
+      @QueryParam("baselineStart") Long baselineStart,
+      @QueryParam("baselineEnd") Long baselineEnd,
+      @QueryParam("analysisStart") Long analysisStart,
+      @QueryParam("analysisEnd") Long analysisEnd,
       @QueryParam("urns") List<String> urns) throws Exception {
 
     // configuration validation
@@ -51,25 +52,39 @@ public class RootCauseResource {
       throw new IllegalArgumentException(String.format("Could not resolve framework '%s'", framework));
 
     // input validation
-    if(current == null)
-      throw new IllegalArgumentException("Must provide current timestamp (in milliseconds)");
+    if(anomalyStart == null)
+      throw new IllegalArgumentException("Must provide anomaly start timestamp (in milliseconds)");
 
-    if(baseline == null)
-      throw new IllegalArgumentException("Must provide baseline timestamp (in milliseconds)");
+    if(anomalyEnd == null)
+      throw new IllegalArgumentException("Must provide anomaly end timestamp (in milliseconds)");
 
-    if(windowSize == null)
-      throw new IllegalArgumentException("Must provide windowSize (in milliseconds)");
+    if(baselineStart == null)
+      throw new IllegalArgumentException("Must provide baseline start timestamp (in milliseconds)");
 
-    // parse urns arg
+    if(baselineEnd == null)
+      throw new IllegalArgumentException("Must provide baseline end timestamp (in milliseconds)");
+
+    if(analysisStart == null)
+      throw new IllegalArgumentException("Must provide analysis start timestamp (in milliseconds)");
+
+    if(analysisEnd == null)
+      throw new IllegalArgumentException("Must provide analysis end timestamp (in milliseconds)");
+
     urns = parseUrnsParam(urns);
-
     if(urns.isEmpty())
       throw new IllegalArgumentException("Must provide entity urns");
 
+    // validate window size
+    long anomalyWindow = anomalyEnd - anomalyStart;
+    long baselineWindow = baselineEnd - baselineStart;
+    if(anomalyWindow != baselineWindow)
+      throw new IllegalArgumentException("Must provide equal-sized anomaly and baseline periods");
+
     // format input
     Set<Entity> input = new HashSet<>();
-    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, current, current + windowSize));
-    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baseline, baseline + windowSize));
+    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_ANOMALY, anomalyStart, anomalyEnd));
+    input.add(TimeRangeEntity.fromRange(0.8, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd));
+    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_ANALYSIS, analysisStart, analysisEnd));
     for(String urn : urns) {
       input.add(EntityUtils.parseURN(urn, 1.0));
     }

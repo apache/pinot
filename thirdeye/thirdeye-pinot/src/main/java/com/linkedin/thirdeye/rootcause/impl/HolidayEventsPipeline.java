@@ -38,15 +38,11 @@ public class HolidayEventsPipeline extends Pipeline {
   private static final String PROP_K = "k";
   private static final int PROP_K_DEFAULT = -1;
 
-  private static final String PROP_LOOKBACK = "lookback";
-  private static final String PROP_LOOKBACK_DEFAULT = "1w";
-
   private static final String PROP_STRATEGY = "strategy";
   private static final String PROP_STRATEGY_DEFAULT = StrategyType.TRIANGULAR.toString();
 
   private final StrategyType strategy;
   private final EventDataProviderManager eventDataProvider;
-  private final long lookback;
   private final int k;
 
   /**
@@ -56,13 +52,11 @@ public class HolidayEventsPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param eventDataProvider event data provider manager
    * @param strategy scoring strategy
-   * @param lookback lookback in millis
    */
-  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager eventDataProvider, StrategyType strategy, long lookback, int k) {
+  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager eventDataProvider, StrategyType strategy, int k) {
     super(outputName, inputNames);
     this.eventDataProvider = eventDataProvider;
     this.strategy = strategy;
-    this.lookback = lookback;
     this.k = k;
   }
 
@@ -71,41 +65,30 @@ public class HolidayEventsPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param properties configuration properties ({@code PROP_LOOKBACK}, {@code PROP_STRATEGY})
+   * @param properties configuration properties ({@code PROP_STRATEGY})
    */
   public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.eventDataProvider = EventDataProviderManager.getInstance();
-    this.lookback = ScoreUtils.parsePeriod(MapUtils.getString(properties, PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT));
     this.strategy = StrategyType.valueOf(MapUtils.getString(properties, PROP_STRATEGY, PROP_STRATEGY_DEFAULT));
     this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
   }
 
   @Override
   public PipelineResult run(PipelineContext context) {
-    TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
-    //TimeRangeEntity baseline = TimeRangeEntity.getContextBaseline(context);
+    TimeRangeEntity anomaly = TimeRangeEntity.getTimeRangeAnomaly(context);
+    TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
+    TimeRangeEntity analysis = TimeRangeEntity.getTimeRangeAnalysis(context);
+
+    ScoringStrategy strategyCurrent = makeStrategy(analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
+    ScoringStrategy strategyBaseline = makeStrategy(baseline.getStart(), baseline.getStart(), baseline.getEnd());
 
     Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
-    // TODO evaluate use of baseline events
-    //events.addAll(getHolidayEvents(baseline, dimensionEntities));
-
-    long lookback = current.getStart() - this.lookback;
-    long start = current.getStart();
-    long end = current.getEnd();
-
-    ScoringStrategy strategy = makeStrategy(lookback, start, end);
-
-    List<EventDTO> events = getHolidayEvents(lookback, end, dimensionEntities);
-
     Set<HolidayEventEntity> entities = new HashSet<>();
-    for(EventDTO ev : events) {
-      double score = strategy.score(ev, urn2entity);
-      HolidayEventEntity entity = HolidayEventEntity.fromDTO(score, ev);
-      entities.add(entity);
-    }
+    entities.addAll(score(strategyCurrent, this.getHolidayEvents(analysis.getStart(), anomaly.getEnd(), dimensionEntities), urn2entity, 1.0));
+    entities.addAll(score(strategyBaseline, this.getHolidayEvents(baseline.getStart(), baseline.getEnd(), dimensionEntities), urn2entity, baseline.getScore()));
 
     return new PipelineResult(context, EntityUtils.topk(entities, this.k));
   }
@@ -130,6 +113,18 @@ public class HolidayEventsPipeline extends Pipeline {
     filter.setTargetDimensionMap(filterMap);
 
     return eventDataProvider.getEvents(filter);
+  }
+
+  /* **************************************************************************
+   * Entity scoring
+   * *************************************************************************/
+  private List<HolidayEventEntity> score(ScoringStrategy strategy, Iterable<EventDTO> events, Map<String, DimensionEntity> urn2entity, double coefficient) {
+    List<HolidayEventEntity> entities = new ArrayList<>();
+    for(EventDTO dto : events) {
+      double score = strategy.score(dto, urn2entity) * coefficient;
+      entities.add(HolidayEventEntity.fromDTO(score, dto));
+    }
+    return entities;
   }
 
   private ScoringStrategy makeStrategy(long lookback, long start, long end) {
