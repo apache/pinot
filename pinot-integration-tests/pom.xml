@@ -80,7 +80,7 @@
               <excludes>
                 <!-- Covered by FlakyConsumerRealtimeClusterIntegrationTest -->
                 <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
-                <!-- Covered by MinionClusterIntegrationTest -->
+                <!-- Covered by ConvertToRawIndexMinionClusterIntegrationTest -->
                 <exclude>**/HybridClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>

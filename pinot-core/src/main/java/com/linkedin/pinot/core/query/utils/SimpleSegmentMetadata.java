@@ -16,20 +16,19 @@
 package com.linkedin.pinot.core.query.utils;
 
 import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 
 
 public class SimpleSegmentMetadata implements SegmentMetadata {
@@ -237,6 +236,12 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   @Nullable
   @Override
   public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public List<String> getOptimizations() {
     return null;
   }
 }

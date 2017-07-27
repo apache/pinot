@@ -16,6 +16,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.google.common.collect.Sets;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.tools.AbstractBaseCommand;
 import com.linkedin.pinot.tools.Command;
 import java.util.List;
@@ -58,6 +59,11 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
     List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
 
     for (String resourceName : resourcesInCluster) {
+      // Skip non-table resources
+      if (!TableNameBuilder.isTableResource(resourceName)) {
+        continue;
+      }
+
       if (resourceName.startsWith(tablePrefix)) {
         IdealState resourceIdealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
         ExternalView resourceExternalView = helixAdmin.getResourceExternalView(clusterName, resourceName);

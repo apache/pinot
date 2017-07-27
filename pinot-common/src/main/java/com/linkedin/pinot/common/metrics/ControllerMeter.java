@@ -48,7 +48,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_STATE_MACHINE_ABORTS("aborts", false),
   LLC_AUTO_CREATED_PARTITIONS("creates", false),
   LLC_ZOOKEPER_UPDATE_FAILURES("failures", false),
-  LLC_KAFKA_DATA_LOSS("dataLoss", false);
+  LLC_KAFKA_DATA_LOSS("dataLoss", false),
+  NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
+  NUMBER_TASKS_SUBMITTED("tasks", false);
 
 
   private final String brokerMeterName;

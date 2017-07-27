@@ -15,6 +15,20 @@
  */
 package com.linkedin.pinot.tools.perf;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.TenantRole;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.ControllerStarter;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -28,6 +42,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
@@ -39,20 +54,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
-import javax.annotation.Nullable;
 
 
 @SuppressWarnings("FieldCanBeLocal")
@@ -310,6 +311,12 @@ public class PerfBenchmarkDriver {
         LOGGER.info("Waiting for the cluster to be set up and indexes to be loaded on the servers" + new Timestamp(
             System.currentTimeMillis()));
         for (String resourceName : resourcesInCluster) {
+          // Only check table resources and broker resource
+          if (!TableNameBuilder.isTableResource(resourceName) && !resourceName.equals(
+              CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+            continue;
+          }
+
           IdealState idealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
           ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, resourceName);
           if (idealState == null || externalView == null) {

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -26,13 +27,16 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
@@ -82,17 +86,16 @@ public class SegmentFetcherAndLoader {
   }
 
   public void addOrReplaceOfflineSegment(String tableName, String segmentId, boolean retryOnFailure) {
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+    OfflineSegmentZKMetadata newSegmentZKMetadata =
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
+    Preconditions.checkNotNull(newSegmentZKMetadata);
 
     // Try to load table schema from Helix property store.
     // This schema is used for adding default values for newly added columns.
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
 
-    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentId, tableName, offlineSegmentZKMetadata);
+    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentId, tableName, newSegmentZKMetadata);
     try {
-      SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(offlineSegmentZKMetadata);
-
       // We lock the segment in order to get its metadata, and then release the lock, so it is possible
       // that the segment is dropped after we get its metadata.
       SegmentMetadata localSegmentMetadata = _dataManager.getSegmentMetadata(tableName, segmentId);
@@ -116,7 +119,7 @@ public class SegmentFetcherAndLoader {
             localSegmentMetadata = null;
           }
           try {
-            if (!isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck, segmentId, tableName)) {
+            if (!isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentId,
                   tableName, localSegmentMetadata.getCrc());
               TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
@@ -148,7 +151,7 @@ public class SegmentFetcherAndLoader {
       // If we get here, then either it is the case that we have the segment loaded in memory (and therefore present
       // in disk) or, we need to load from the server. In the former case, we still need to check if the metadata
       // that we have is different from that in zookeeper.
-      if (isNewSegmentMetadata(localSegmentMetadata, segmentMetadataForCheck, segmentId, tableName)) {
+      if (isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
         if (localSegmentMetadata == null) {
           LOGGER.info("Loading new segment {} of table {} from controller", segmentId, tableName);
         } else {
@@ -163,7 +166,7 @@ public class SegmentFetcherAndLoader {
           long attemptStartTime = System.currentTimeMillis();
           try {
             TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-            final String uri = offlineSegmentZKMetadata.getDownloadUrl();
+            final String uri = newSegmentZKMetadata.getDownloadUrl();
             final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
             final SegmentMetadata segmentMetadata =
                 _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
@@ -214,20 +217,35 @@ public class SegmentFetcherAndLoader {
     }
   }
 
-  private boolean isNewSegmentMetadata(SegmentMetadata segmentMetadataFromServer,
-      SegmentMetadata segmentMetadataForCheck, String segmentName, String tableName) {
-    if (segmentMetadataFromServer == null || segmentMetadataForCheck == null) {
-      LOGGER.info("segmentMetadataForCheck = null? {}, segmentMetadataFromServer = null? {} for {} of table {}",
-          segmentMetadataForCheck == null, segmentMetadataFromServer == null, segmentName, tableName);
+  // TODO: revisit to see whether this check is needed (Controller already checked the creation time and crc)
+  private boolean isNewSegmentMetadata(@Nonnull OfflineSegmentZKMetadata newSegmentZKMetadata,
+      @Nullable SegmentMetadata existedSegmentMetadata) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(newSegmentZKMetadata.getTableName());
+    String segmentName = newSegmentZKMetadata.getSegmentName();
+
+    if (existedSegmentMetadata == null) {
+      LOGGER.info("Existed segment metadata is null for segment: {} in table: {}", segmentName, offlineTableName);
       return true;
     }
-    LOGGER.info("segmentMetadataForCheck.crc={},segmentMetadataFromServer.crc={} for {} of table {}",
-        segmentMetadataForCheck.getCrc(), segmentMetadataFromServer.getCrc(), segmentName, tableName);
-    if ((!segmentMetadataFromServer.getCrc().equalsIgnoreCase("null"))
-        && (segmentMetadataFromServer.getCrc().equals(segmentMetadataForCheck.getCrc()))) {
-      return false;
+
+    long newCrc = newSegmentZKMetadata.getCrc();
+    long existedCrc = Long.valueOf(existedSegmentMetadata.getCrc());
+    LOGGER.info("New segment CRC: {}, existed segment CRC: {} for segment: {} in table: {}", newCrc, existedCrc,
+        segmentName, offlineTableName);
+    if (newCrc == existedCrc) {
+      // Treat as new segment if only optimizations changed
+      List<String> newOptimizations = newSegmentZKMetadata.getOptimizations();
+      List<String> existedOptimizations = existedSegmentMetadata.getOptimizations();
+      if (!EqualityUtils.isEqualIgnoreOrder(newOptimizations, existedOptimizations)) {
+        LOGGER.info("Optimizations changed for segment: {} in table: {}, new: {}, existed: {}", segmentName,
+            offlineTableName, newOptimizations, existedOptimizations);
+        return true;
+      } else {
+        return false;
+      }
+    } else {
+      return true;
     }
-    return true;
   }
 
   private String downloadSegmentToLocal(String uri, String tableName, String segmentId)

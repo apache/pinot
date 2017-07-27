@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.minion.executor;
 
+import com.linkedin.pinot.core.common.MinionConstants;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -29,8 +30,7 @@ public class TaskExecutorRegistry {
   private final Map<String, Class<? extends PinotTaskExecutor>> _taskExecutorRegistry = new HashMap<>();
 
   public TaskExecutorRegistry() {
-    // TODO: register all task executors here
-    // E.g. registerTaskExecutor(DummyTaskExecutor.TASK_TYPE, DummyTaskExecutor.class);
+    registerTaskExecutorClass(MinionConstants.ConvertToRawIndexTask.TASK_TYPE, ConvertToRawIndexTaskExecutor.class);
   }
 
   /**

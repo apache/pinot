@@ -15,10 +15,23 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.tools.Command;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.*;
+import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.manager.zk.ZKHelixDataAccessor;
+import org.apache.helix.manager.zk.ZNRecordStreamingSerializer;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
+import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -27,9 +40,6 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
-
-import java.io.StringWriter;
-import java.util.*;
 
 public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ShowClusterInfoCommand.class.getName());
@@ -114,7 +124,8 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
       }
     }
     for (String table : tables) {
-      if ("brokerResource".equalsIgnoreCase(table)) {
+      // Skip non-table resources
+      if (!TableNameBuilder.isTableResource(table)) {
         continue;
       }
 

@@ -66,8 +66,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 /**
@@ -674,6 +673,12 @@ public class ValidationManagerTest {
     @Nullable
     @Override
     public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getOptimizations() {
       return null;
     }
   }

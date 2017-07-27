@@ -32,8 +32,7 @@ public class TaskGeneratorRegistry {
   private final Map<String, PinotTaskGenerator> _taskGeneratorRegistry = new HashMap<>();
 
   public TaskGeneratorRegistry(@Nonnull ClusterInfoProvider clusterInfoProvider) {
-    // TODO: register all task generators here
-    // E.g. registerTaskGenerator(new DummyTaskGenerator(clusterInfoProvider));
+    registerTaskGenerator(new ConvertToRawIndexTaskGenerator(clusterInfoProvider));
   }
 
   /**

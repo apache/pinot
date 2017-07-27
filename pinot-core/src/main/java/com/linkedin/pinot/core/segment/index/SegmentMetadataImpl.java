@@ -59,9 +59,9 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.*;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.*;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 
 
 public class SegmentMetadataImpl implements SegmentMetadata {
@@ -93,6 +93,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private int _totalRawDocs;
   private long _segmentStartTime;
   private long _segmentEndTime;
+  private List<String> _optimizations;
 
   /**
    * Load segment metadata based on the segment version passed in.
@@ -355,6 +356,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Set hll log2m.
     _hllLog2m = _segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_HLL_LOG2M, HllConstants.DEFAULT_LOG2M);
+
+    // Set enabled optimizations
+    _optimizations = _segmentMetadataPropertiesConfiguration.getList(Segment.SEGMENT_OPTIMIZATIONS, null);
 
     // Build column metadata map, schema and hll derived column map.
     for (String column : _allColumns) {
@@ -663,6 +667,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       default:
         throw new IllegalArgumentException();
     }
+  }
+
+  @Nullable
+  @Override
+  public List<String> getOptimizations() {
+    return _optimizations;
   }
 
   /**
