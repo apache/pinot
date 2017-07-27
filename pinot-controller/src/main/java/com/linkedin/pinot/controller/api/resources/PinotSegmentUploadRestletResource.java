@@ -222,7 +222,7 @@ public class PinotSegmentUploadRestletResource {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
-  public Response uploadSegmentAsMultiPart(
+  public SuccessResponse uploadSegmentAsMultiPart(
       FormDataMultiPart multiPart,
       @Context HttpHeaders headers,
       @Context Request request
@@ -236,7 +236,7 @@ public class PinotSegmentUploadRestletResource {
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   // TODO Does it even work if the segment is sent as a JSON body? Need to compare with the other API
-  public Response uploadSegmentAsJson(
+  public SuccessResponse uploadSegmentAsJson(
       String segmentJsonStr,    // If segment is present as json body
       @Context HttpHeaders headers,
       @Context Request request
@@ -244,7 +244,7 @@ public class PinotSegmentUploadRestletResource {
     return uploadSegmentInternal(null, segmentJsonStr, headers, request);
   }
 
-  private Response uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr, HttpHeaders headers,
+  private SuccessResponse uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr, HttpHeaders headers,
       Request request) {
     File tempTarredSegmentFile = null;
     File tempSegmentDir = null;
@@ -352,8 +352,7 @@ public class PinotSegmentUploadRestletResource {
         LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentMetadata.getName(),
             clientAddress);
         uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider);
-        Response.ResponseBuilder builder = Response.ok();
-        return builder.build();
+        return new SuccessResponse("success"); // Current APIs return an empty status string on success.
       } else {
         // Some problem happened, sent back a simple line of text.
         String errorMsg = "No file was uploaded";
