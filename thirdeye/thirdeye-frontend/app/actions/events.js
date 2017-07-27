@@ -77,7 +77,7 @@ function fetchEvents(start, end, mode) {
     const windowSize = Math.max(endDate - startDate, 1);
 
     dispatch(loading());
-    return fetch(`/rootcause/query?framework=relatedEvents&current=${startDate}&baseline=${baselineStart}&windowSize=${windowSize}&urns=thirdeye:metric:${metricId}`)
+    return fetch(`/rootcause/query?framework=relatedEvents&current=${startDate}&baseline=${baselineStart}&windowSize=${windowSize}&displayStart=${currentStart}&displayEnd=${currentEnd}&urns=thirdeye:metric:${metricId}`)
       .then(res => res.json())
       .then((res) => {
         // hidding informed events
