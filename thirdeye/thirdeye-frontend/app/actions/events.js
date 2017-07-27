@@ -68,16 +68,16 @@ function fetchEvents(start, end, mode) {
     } = primaryMetric;
 
     const diff = Math.floor((currentEnd - currentStart) / 4);
-    const endDate = end || (+currentEnd - diff);
-    const startDate = start || (+currentStart + diff);
+    const anomalyEnd = end || (+currentEnd - diff);
+    const anomalyStart = start || (+currentStart + diff);
     mode = mode || compareMode;
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
-    const baselineStart = moment(startDate).clone().subtract(offset, 'week').valueOf();
-    const windowSize = Math.max(endDate - startDate, 1);
+    const baselineStart = moment(anomalyStart).clone().subtract(offset, 'week').valueOf();
+    const baselineEnd = moment(anomalyEnd).clone().subtract(offset, 'week').valueOf();
 
     dispatch(loading());
-    return fetch(`/rootcause/query?framework=relatedEvents&current=${startDate}&baseline=${baselineStart}&windowSize=${windowSize}&displayStart=${currentStart}&displayEnd=${currentEnd}&urns=thirdeye:metric:${metricId}`)
+    return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${currentStart}&analysisEnd=${currentEnd}&urns=thirdeye:metric:${metricId}`)
       .then(res => res.json())
       .then((res) => {
         // hidding informed events
