@@ -198,7 +198,10 @@ public class DimensionAnalysisPipeline extends Pipeline {
     }
 
     if(!dataset.isAdditive()) {
-      throw new IllegalArgumentException(String.format("Requires additive dataset, but '%s' isn't.", dataset.getDataset()));
+      LOG.warn("Contribution analysis on non-additive dataset");
+
+      // TODO read additive from metric property when available
+      //throw new IllegalArgumentException(String.format("Requires additive dataset, but '%s' isn't.", dataset.getDataset()));
     }
 
     Collection<Future<DataFrame>> futures = new ArrayList<>();
