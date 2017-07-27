@@ -117,8 +117,8 @@ public class ScoreUtils {
     private final long duration;
 
     public LinearStartTimeStrategy(long start, long end) {
-      if (start >= end)
-        throw new IllegalArgumentException("Requires start > end");
+      if (start > end)
+        throw new IllegalArgumentException("Requires start <= end");
       this.start = start;
       this.duration = end - start;
     }
@@ -145,10 +145,10 @@ public class ScoreUtils {
     private final long end;
 
     public TriangularStartTimeStrategy(long lookback, long start, long end) {
-      if (lookback >= start)
-        throw new IllegalArgumentException("Requires lookback > start");
-      if (start >= end)
-        throw new IllegalArgumentException("Requires start > end");
+      if (lookback > start)
+        throw new IllegalArgumentException("Requires lookback <= start");
+      if (start > end)
+        throw new IllegalArgumentException("Requires start <= end");
 
       this.lookback = lookback;
       this.start = start;

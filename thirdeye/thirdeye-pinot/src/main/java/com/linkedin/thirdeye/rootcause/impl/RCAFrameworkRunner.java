@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -159,11 +160,18 @@ public class RCAFrameworkRunner {
     long baselineEnd = windowStart - baselineOffset;
     long baselineStart = baselineEnd - windowSize;
 
+    // TODO get from CLI
+    long displayOffset = windowSize / 2;
+    displayOffset = Math.max(displayOffset, TimeUnit.MINUTES.toMillis(30));
+    long displayStart = windowStart - displayOffset;
+    long displayEnd = windowStart + windowSize + displayOffset;
+
     System.out.println(String.format("Using current time range '%d' (%s) to '%d' (%s)", windowStart, ISO8601.print(windowStart), windowEnd, ISO8601.print(windowEnd)));
     System.out.println(String.format("Using baseline time range '%d' (%s) to '%d' (%s)", baselineStart, ISO8601.print(baselineStart), baselineEnd, ISO8601.print(baselineEnd)));
 
-    entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, windowStart, windowEnd));
-    entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd));
+    entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_ANOMALY, windowStart, windowEnd));
+    entities.add(TimeRangeEntity.fromRange(0.8, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd));
+    entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_DISPLAY, displayStart, displayEnd));
 
     if(cmd.hasOption(CLI_ENTITIES)) {
       entities.addAll(parseURNSequence(cmd.getOptionValue(CLI_ENTITIES), 1.0));

@@ -104,14 +104,14 @@ public class DimensionAnalysisPipeline extends Pipeline {
   public PipelineResult run(PipelineContext context) {
     Set<MetricEntity> metricsEntities = context.filter(MetricEntity.class);
 
-    final TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
-    final TimeRangeEntity baseline = TimeRangeEntity.getContextBaseline(context);
+    final TimeRangeEntity anomaly = TimeRangeEntity.getTimeRangeAnomaly(context);
+    final TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
 
     Map<Dimension, Double> scores = new HashMap<>();
     for(MetricEntity me : metricsEntities) {
       try {
-        final long windowSize = current.getEnd() - current.getStart();
-        DataFrame dfScores = getDimensionScores(me.getId(), current.getStart(), baseline.getStart(), windowSize);
+        final long windowSize = anomaly.getEnd() - anomaly.getStart();
+        DataFrame dfScores = getDimensionScores(me.getId(), anomaly.getStart(), baseline.getStart(), windowSize);
 
         for(int i=0; i<dfScores.size(); i++) {
           double score = dfScores.getDouble(COL_SCORE, i);

@@ -6,20 +6,18 @@ import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
 import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +42,8 @@ public class RootCauseResource {
       @QueryParam("current") Long current,
       @QueryParam("baseline") Long baseline,
       @QueryParam("windowSize") Long windowSize,
+      @QueryParam("displayStart") Long displayStart,
+      @QueryParam("displayEnd") Long displayEnd,
       @QueryParam("urns") List<String> urns) throws Exception {
 
     // configuration validation
@@ -66,10 +66,21 @@ public class RootCauseResource {
     if(urns.isEmpty())
       throw new IllegalArgumentException("Must provide entity urns");
 
+    // TODO require display properties from endpoint
+    long displayOffset = windowSize / 2;
+    displayOffset = Math.max(displayOffset, TimeUnit.DAYS.toMillis(3));
+
+    if(displayStart == null)
+      displayStart = current - displayOffset;
+
+    if(displayEnd == null)
+      displayEnd = current + windowSize + displayOffset;
+
     // format input
     Set<Entity> input = new HashSet<>();
-    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, current, current + windowSize));
-    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baseline, baseline + windowSize));
+    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_ANOMALY, current, current + windowSize));
+    input.add(TimeRangeEntity.fromRange(0.8, TimeRangeEntity.TYPE_BASELINE, baseline, baseline + windowSize));
+    input.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_DISPLAY, displayStart, displayEnd));
     for(String urn : urns) {
       input.add(EntityUtils.parseURN(urn, 1.0));
     }

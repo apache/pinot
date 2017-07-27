@@ -109,8 +109,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   public PipelineResult run(PipelineContext context) {
     Set<MetricEntity> candidateMetrics = filterNonBaselineContext(context);
 
-    TimeRangeEntity currentRange = TimeRangeEntity.getContextCurrent(context);
-    TimeRangeEntity baselineRange = TimeRangeEntity.getContextBaseline(context);
+    TimeRangeEntity anomalyRange = TimeRangeEntity.getTimeRangeAnomaly(context);
+    TimeRangeEntity baselineRange = TimeRangeEntity.getTimeRangeBaseline(context);
 
     Set<MetricEntity> targetMetrics = new HashSet<>();
     for(Entity entity : context.getInputs().get(this.targetInput)) {
@@ -127,8 +127,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     // generate requests
     List<DataFrameUtils.RequestContainer> requestList = new ArrayList<>();
-    requestList.addAll(makeRequests(targetMetrics, currentRange, PRE_CURRENT));
-    requestList.addAll(makeRequests(candidateMetrics, currentRange, PRE_CURRENT));
+    requestList.addAll(makeRequests(targetMetrics, anomalyRange, PRE_CURRENT));
+    requestList.addAll(makeRequests(candidateMetrics, anomalyRange, PRE_CURRENT));
     requestList.addAll(makeRequests(targetMetrics, baselineRange, PRE_BASELINE));
     requestList.addAll(makeRequests(candidateMetrics, baselineRange, PRE_BASELINE));
 
