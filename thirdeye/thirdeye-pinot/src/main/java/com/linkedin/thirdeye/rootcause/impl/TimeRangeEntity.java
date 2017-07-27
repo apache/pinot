@@ -8,13 +8,13 @@ import java.util.Set;
 
 /**
  * TimeRangeEntity represents a time-range as investigated by the user for purposes of
- * root cause search. The URN namespace is defined as 'thirdeye:timerange:{start}:{end}'.
+ * root cause search. The URN namespace is defined as 'thirdeye:timerange:{type}:{start}:{end}'.
  */
 public class TimeRangeEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:timerange:");
 
   public static final String TYPE_ANOMALY = "anomaly";
-  public static final String TYPE_DISPLAY = "display";
+  public static final String TYPE_ANALYSIS = "analysis";
   public static final String TYPE_BASELINE = "baseline";
 
   private final String type;
@@ -84,7 +84,7 @@ public class TimeRangeEntity extends Entity {
     return getContextTimeRange(context, TYPE_BASELINE);
   }
 
-  public static TimeRangeEntity getTimeRangeDisplay(PipelineContext context) {
-    return getContextTimeRange(context, TYPE_DISPLAY);
+  public static TimeRangeEntity getTimeRangeAnalysis(PipelineContext context) {
+    return getContextTimeRange(context, TYPE_ANALYSIS);
   }
 }

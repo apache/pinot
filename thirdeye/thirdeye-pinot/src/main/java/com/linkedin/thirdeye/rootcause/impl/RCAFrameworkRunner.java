@@ -171,7 +171,7 @@ public class RCAFrameworkRunner {
 
     entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_ANOMALY, windowStart, windowEnd));
     entities.add(TimeRangeEntity.fromRange(0.8, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd));
-    entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_DISPLAY, displayStart, displayEnd));
+    entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_ANALYSIS, displayStart, displayEnd));
 
     if(cmd.hasOption(CLI_ENTITIES)) {
       entities.addAll(parseURNSequence(cmd.getOptionValue(CLI_ENTITIES), 1.0));
