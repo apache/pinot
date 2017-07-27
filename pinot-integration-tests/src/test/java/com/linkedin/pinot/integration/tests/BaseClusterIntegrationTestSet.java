@@ -124,10 +124,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testQueriesFromQueryFile() throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
     Assert.assertNotNull(resourceUrl);
-    File queriesFile = new File(resourceUrl.getFile());
+    File queryFile = new File(resourceUrl.getFile());
 
     int maxNumQueriesToSkipInQueryFile = getMaxNumQueriesToSkipInQueryFile();
-    try (BufferedReader reader = new BufferedReader(new FileReader(queriesFile))) {
+    try (BufferedReader reader = new BufferedReader(new FileReader(queryFile))) {
       while (true) {
         int numQueriesSkipped = RANDOM.nextInt(maxNumQueriesToSkipInQueryFile);
         for (int i = 0; i < numQueriesSkipped; i++) {
