@@ -95,40 +95,41 @@ public class OnboardResource {
   }
 
   /**
-   * Copy the Identity of source anomaly function (with srcId) over in total to destination anomaly function (with destId)
-   * Explicit representation: denote source anomaly function with (srcId, srcFunctionName, srcProperties)
-   *                          denote destination anomaly function with (destId, destFunctionName, destProperties)
-   * Thirdeye database uses (functionId, functionName) as an identity for each anomaly function
-   * "copyIdentity" will update destination anomaly function into source anomaly function's identity
-   * After "copyIdentity", the two functions will become:
-   *        (srcId, srcFunctionName, destProperties)
-   *        (destId, destFunctionName, destProperties)
+   * Copy total configurations of source anomaly function (with srcId) to destination anomaly function (with destId)
+   * Explicit representation: denote source anomaly function with (srcId, srcFunctionName, srcConfigs)
+   *                          denote destination anomaly function with (destId, destFunctionName, destConfigs)
+   * "copyConfigFromSrcToDest" will update destination anomaly function's configurations by source anomaly function's configurations
+   * After "copyConfigFromSrcToDest", the two functions will become:
+   *        (srcId, srcFunctionName, srcConfigs)
+   *        (destId, destFunctionName, srcConfigs)
    * This in fact updates source anomaly function's properties into destination function's properties
-   * @param srcId : the source function with Identity to be copied to
-   * @param destId : the destination function Id that have properties to be copied to source function
+   * @param srcId : the source function with configurations to be copied to
+   * @param destId : the destination function Id that will have its configurations being overwritten by source function
    * @return OK is success
    */
   @POST
-  @Path("function/{srcId}/copyIdentity/{destId}")
-  public Response copyIdentity(@PathParam("srcId") @NotNull Long srcId,
+  @Path("function/{srcId}/copyTo/{destId}")
+  public Response copyConfigFromSrcToDest(@PathParam("srcId") @NotNull Long srcId,
       @PathParam("destId") @NotNull Long destId) {
     AnomalyFunctionDTO srcAnomalyFunction = anomalyFunctionDAO.findById(srcId);
     AnomalyFunctionDTO destAnomalyFunction = anomalyFunctionDAO.findById(destId);
     if (srcAnomalyFunction == null) {
       // LOG and exit
       LOG.error("Anomaly Function With id [{}] does not found", srcId);
-      return null;
+      return Response.status(Response.Status.BAD_REQUEST).entity("Cannot find function with id: " + srcId).build();
     }
 
     if (destAnomalyFunction == null) {
       // LOG and exit
       LOG.error("Anomaly Function With id [{}] does not found", destId);
-      return null;
+      return Response.status(Response.Status.BAD_REQUEST).entity("Cannot find function with id: " + srcId).build();
     }
-
-    destAnomalyFunction.setId(srcId);
-    destAnomalyFunction.setFunctionName(srcAnomalyFunction.getFunctionName());
-    anomalyFunctionDAO.update(destAnomalyFunction); // update properties
+    // Thirdeye database uses (functionId, functionName) as an identity for each anomaly function,
+    // here by updating the identity of source anomaly function into destination anomaly function's Id and function name,
+    // source anomaly function will inherit destination anomaly function's total configurations
+    srcAnomalyFunction.setId(destId);
+    srcAnomalyFunction.setFunctionName(destAnomalyFunction.getFunctionName());
+    anomalyFunctionDAO.update(srcAnomalyFunction); // update configurations
     return Response.ok().build();
   }
 
