@@ -1,0 +1,7 @@
+{{!-- Custom Cell Template for Ember-models-table  --}}
+
+{{#if record.start}}
+  {{#if record.end}}
+    {{event-duration record.start record.end 5000}}
+  {{/if}}
+{{/if}}

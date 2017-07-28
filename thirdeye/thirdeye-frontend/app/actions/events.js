@@ -75,6 +75,13 @@ const setWeight = (event) => {
 };
 
 
+const assignEventTimeInfo = (anomalyStart, event) => {
+  const relStart = event.start - anomalyStart;
+  const relEnd = event.end - anomalyStart;
+
+  return Object.assign(event, { relStart, relEnd });
+};
+
 /**
  * Fetches all events based for a metric
  * @param {Number} start The start time in unix ms
@@ -87,8 +94,8 @@ function fetchEvents(start, end, mode) {
 
     const {
       primaryMetricId: metricId,
-      currentStart = moment(end).subtract(1, 'week').valueOf(),
-      currentEnd =  moment().subtract(1, 'day').endOf('day').valueOf(),
+      currentEnd = moment().subtract(1, 'day').endOf('day').valueOf(),
+      currentStart = moment(currentEnd).subtract(1, 'week').valueOf(),
       compareMode
     } = primaryMetric;
 
@@ -113,8 +120,9 @@ function fetchEvents(start, end, mode) {
         return _.uniqBy(res, 'urn')
           .filter(event => event.eventType !== 'informed')
           .map(assignEventColor)
-          .sort((a, b) => (b.score - a.score))
           .map(setWeight);
+          .map(event => assignEventTimeInfo(anomalyStart, event))
+          .sort((a, b) => (b.score - a.score));
       })
       .then(res => dispatch(loadEvents(res)
     ));
