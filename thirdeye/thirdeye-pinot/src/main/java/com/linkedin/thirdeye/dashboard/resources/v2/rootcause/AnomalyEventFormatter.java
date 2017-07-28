@@ -40,7 +40,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     AnomalyEventEntity e = (AnomalyEventEntity) entity;
 
     MergedAnomalyResultDTO dto = e.getDto();
-    String label = dto.getFunction().getFunctionName();
+    String label = String.format("Anomaly %d (%s)", dto.getId(), dto.getFunction().getFunctionName());
 
     RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, null, dto.getStartTime(), dto.getEndTime(), null);
 
@@ -51,6 +51,8 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
 
     MetricEntity me = MetricEntity.fromMetric(1.0, metricDTO.getId());
     out.addRelatedEntity(METRIC_FORMATTER.format(me));
+
+    // TODO add filters/dimensions as related entities
 
     return out;
   }
