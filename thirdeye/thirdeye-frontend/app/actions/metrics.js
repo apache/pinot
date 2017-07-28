@@ -113,18 +113,23 @@ function fetchRelatedMetricIds() {
       compareMode
     } = primaryMetric;
 
-    endDate = endDate || moment().subtract(1, 'day').endOf('day').valueOf();
-    startDate = startDate || moment(endDate).subtract(1, 'week').valueOf();
+    // TODO use actual anomaly period only
+    const anomalyEnd = endDate || moment().subtract(1, 'day').endOf('day').valueOf();
+    const anomalyStart = startDate || moment(endDate).subtract(1, 'week').valueOf();
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
-    const windowSize = Math.max(endDate - startDate, 1);
-    const baselineStart = moment(startDate).subtract(offset, 'week').valueOf();
+    const baselineStart = moment(anomalyStart).subtract(offset, 'week').valueOf();
+    const baselineEnd = moment(anomalyEnd).subtract(offset, 'week').valueOf();
+
+    // TODO use currentStart/currentEnd when anomaly period separated
+    const analysisStart = anomalyStart;
+    const analysisEnd = anomalyEnd;
 
     if (!metricId) {
       return Promise.reject(new Error("Must provide a metricId"));
     }
 
-    return fetch(`/rootcause/query?framework=relatedMetrics&current=${startDate}&baseline=${baselineStart}&windowSize=${windowSize}&urns=thirdeye:metric:${metricId}`)
+    return fetch(`/rootcause/query?framework=relatedMetrics&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=thirdeye:metric:${metricId}`)
       .then(res => res.json())
       .then(res => dispatch(loadRelatedMetricIds(res)));
   };
