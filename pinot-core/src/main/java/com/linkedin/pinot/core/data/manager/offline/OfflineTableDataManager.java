@@ -17,11 +17,11 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import javax.annotation.Nonnull;
@@ -53,7 +53,7 @@ public class OfflineTableDataManager extends AbstractTableDataManager {
       @Nullable Schema schema)
       throws Exception {
     IndexSegment indexSegment =
-        ColumnarSegmentLoader.load(new File(segmentMetadata.getIndexDir()), indexLoadingConfig, schema);
+        SegmentLoader.load(new File(segmentMetadata.getIndexDir()), indexLoadingConfig, schema);
     addSegment(indexSegment);
   }
 

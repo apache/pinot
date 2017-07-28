@@ -50,8 +50,6 @@ public class DefaultHelixStarterServerConfig {
         CommonConstants.Server.DEFAULT_READ_MODE);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS,
         CommonConstants.Server.DEFAULT_DATA_MANAGER_CLASS);
-    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_METADATA_LOADER_CLASS,
-        CommonConstants.Server.DEFAULT_SEGMENT_METADATA_LOADER_CLASS);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION,
         CommonConstants.Server.DEFAULT_SEGMENT_FORMAT_VERSION);
 

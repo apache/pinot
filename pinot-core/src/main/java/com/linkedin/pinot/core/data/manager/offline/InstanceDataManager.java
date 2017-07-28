@@ -16,34 +16,64 @@
 package com.linkedin.pinot.core.data.manager.offline;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import java.util.Collection;
+import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
-public interface InstanceDataManager extends DataManager {
-  /**
-   * Get table manager for given table
-   * @param tableName table name
-   * @return Table data manager for table, null if tableName does not exist
-   */
+public interface InstanceDataManager {
+
+  void init(@Nonnull Configuration instanceDataManagerConfig);
+
+  void start();
+
+  boolean isStarted();
+
+  @Nonnull
+  String getInstanceDataDir();
+
+  @Nonnull
+  String getInstanceSegmentTarDir();
+
   @Nullable
-  TableDataManager getTableDataManager(String tableName);
+  TableDataManager getTableDataManager(String tableNameWithType);
 
   @Nonnull
   Collection<TableDataManager> getTableDataManagers();
 
   /**
-   * Adds a segment into the REALTIME table.
-   * <p>The segment could be committed or under consuming.
+   * Add a segment from local disk into an OFFLINE table
+   */
+  void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nullable TableConfig tableConfig, @Nullable Schema schema)
+      throws Exception;
+
+  /**
+   * Add a segment into a REALTIME table
+   * <p>The segment could be committed or under consuming
    */
   void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull TableConfig tableConfig,
       @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
-      @Nonnull String serverInstance)
-      throws Exception;
+      @Nonnull String serverInstance) throws Exception;
+
+  // TODO: add tableName as an argument
+  void removeSegment(@Nonnull String segmentName);
+
+  void reloadSegment(@Nonnull String tableNameWithType, @Nonnull SegmentMetadata segmentMetadata,
+      @Nullable TableConfig tableConfig, @Nullable Schema schema) throws Exception;
+
+  @Nullable
+  SegmentMetadata getSegmentMetadata(@Nonnull String tableNameWithType, @Nonnull String segmentName);
+
+  @Nonnull
+  List<SegmentMetadata> getSegmentsMetadata(@Nonnull String tableNameWithType);
+
+  void shutDown();
 }

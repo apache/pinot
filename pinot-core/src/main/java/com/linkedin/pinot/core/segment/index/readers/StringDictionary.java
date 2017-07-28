@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;

@@ -20,12 +20,6 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
@@ -34,7 +28,13 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
@@ -131,7 +131,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         return;
       }
 
-      IndexSegment segment = ColumnarSegmentLoader.load(indexDir, indexLoadingConfig);
+      IndexSegment segment = SegmentLoader.load(indexDir, indexLoadingConfig);
       addSegment(segment);
       markSegmentAsLoaded(segmentName);
     } else {
@@ -199,7 +199,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   // Replace a committed segment.
   public void replaceLLSegment(@Nonnull String segmentName, @Nonnull IndexLoadingConfig indexLoadingConfig) {
     try {
-      IndexSegment indexSegment = ColumnarSegmentLoader.load(new File(_indexDir, segmentName), indexLoadingConfig);
+      IndexSegment indexSegment = SegmentLoader.load(new File(_indexDir, segmentName), indexLoadingConfig);
       addSegment(indexSegment);
     } catch (Exception e) {
       throw new RuntimeException(e);

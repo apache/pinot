@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.query.planner;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.query.planner.FixedNumJobsQueryPlannerImpl;
 import com.linkedin.pinot.core.query.planner.FixedNumOfSegmentsPerJobQueryPlannerImpl;
 import com.linkedin.pinot.core.query.planner.JobVertex;
@@ -32,7 +32,7 @@ import java.util.List;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.*;
 
 
 public class QueryPlannerTest {

@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.query.aggregation.function;
 
 import com.google.common.math.DoubleMath;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import java.util.List;

@@ -16,6 +16,23 @@
 
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.broker.routing.FakePropertyStore;
+import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
+import com.linkedin.pinot.common.config.RoutingConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.partition.ColumnPartitionMetadata;
+import com.linkedin.pinot.core.metadata.partition.PartitionToReplicaGroupMappingZKMetadata;
+import com.linkedin.pinot.core.metadata.partition.SegmentPartitionMetadata;
+import com.linkedin.pinot.core.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import com.linkedin.pinot.transport.common.SegmentId;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,31 +40,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-
 import java.util.Set;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.broker.routing.FakePropertyStore;
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
-import com.linkedin.pinot.common.config.RoutingConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.transport.common.SegmentId;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 public class PartitionAwareOfflineRoutingTableBuilderTest {
   private static final String OFFLINE_TABLE_NAME = "myTable_OFFLINE";

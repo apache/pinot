@@ -21,14 +21,13 @@ import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.broker.routing.RoutingTableSelector;
 import com.linkedin.pinot.broker.routing.RoutingTableSelectorFactory;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.StringUtil;
-
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;

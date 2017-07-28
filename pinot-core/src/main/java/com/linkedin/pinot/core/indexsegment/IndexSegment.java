@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.indexsegment;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.startree.StarTreeInterf;
 
 

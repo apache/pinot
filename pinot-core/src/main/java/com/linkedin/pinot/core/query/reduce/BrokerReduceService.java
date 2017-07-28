@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.Selection;

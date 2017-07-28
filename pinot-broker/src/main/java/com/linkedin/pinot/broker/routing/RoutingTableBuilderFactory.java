@@ -15,13 +15,19 @@
  */
 package com.linkedin.pinot.broker.routing;
 
+import com.linkedin.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.DefaultOfflineRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.DefaultRealtimeRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.KafkaLowLevelConsumerRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.PartitionAwareOfflineRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.core.metadata.stream.KafkaStreamMetadata;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
@@ -29,15 +35,6 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.DefaultOfflineRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.DefaultRealtimeRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.KafkaLowLevelConsumerRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
 public class RoutingTableBuilderFactory {

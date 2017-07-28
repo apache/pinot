@@ -15,22 +15,20 @@
  */
 package com.linkedin.pinot.core.util;
 
-import com.linkedin.pinot.util.TestUtils;
-import java.io.File;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.io.FileUtils;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.chunk.creator.impl.ChunkIndexCreationDriverImplTest;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 /**

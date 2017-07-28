@@ -15,11 +15,11 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.segment.store;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import org.mockito.invocation.InvocationOnMock;
@@ -26,8 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class ColumnIndexDirectoryTestHelper {

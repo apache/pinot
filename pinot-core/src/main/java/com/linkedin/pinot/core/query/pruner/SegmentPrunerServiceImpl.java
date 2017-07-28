@@ -15,15 +15,13 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.config.SegmentPrunerConfig;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
+import java.util.HashSet;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**

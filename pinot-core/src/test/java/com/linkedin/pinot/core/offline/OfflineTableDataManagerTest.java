@@ -15,6 +15,18 @@
  */
 package com.linkedin.pinot.core.offline;
 
+import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.OfflineTableDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -35,18 +47,7 @@ import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
-import com.google.common.collect.ImmutableList;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineTableDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.yammer.metrics.core.MetricsRegistry;
+
 import static org.mockito.Mockito.*;
 
 

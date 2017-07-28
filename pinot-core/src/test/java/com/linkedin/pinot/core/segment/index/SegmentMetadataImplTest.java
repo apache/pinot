@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.segment.index;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;

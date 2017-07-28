@@ -15,6 +15,21 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
+import com.linkedin.pinot.core.query.utils.Pair;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,21 +40,6 @@ import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.query.utils.Pair;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 class SegmentQueryProcessor {

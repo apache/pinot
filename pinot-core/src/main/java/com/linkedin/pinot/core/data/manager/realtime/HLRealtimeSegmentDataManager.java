@@ -15,6 +15,30 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ServerGauge;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
+import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.core.realtime.StreamProvider;
+import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.StreamProviderFactory;
+import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,30 +50,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ServerGauge;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
-import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.realtime.StreamProvider;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.linkedin.pinot.core.realtime.StreamProviderFactory;
-import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 
 
 public class HLRealtimeSegmentDataManager extends SegmentDataManager {
@@ -280,7 +280,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
 
           TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
           IndexSegment segment =
-              ColumnarSegmentLoader.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), indexLoadingConfig);
+              SegmentLoader.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), indexLoadingConfig);
 
           segmentLogger.info("Committing Kafka offsets");
           boolean commitSuccessful = false;

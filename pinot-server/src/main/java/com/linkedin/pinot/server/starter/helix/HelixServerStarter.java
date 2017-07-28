@@ -19,7 +19,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
@@ -27,7 +26,7 @@ import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.ZkUtils;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.starter.ServerInstance;
@@ -120,8 +119,9 @@ public class HelixServerStarter {
     _helixManager.connect();
     ZkHelixPropertyStore<ZNRecord> zkPropertyStore = ZkUtils.getZkPropertyStore(_helixManager, helixClusterName);
 
-    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverInstance.getInstanceDataManager(),
-        new ColumnarSegmentMetadataLoader(), zkPropertyStore, pinotHelixProperties, _instanceId);
+    SegmentFetcherAndLoader fetcherAndLoader =
+        new SegmentFetcherAndLoader(_serverInstance.getInstanceDataManager(), zkPropertyStore, pinotHelixProperties,
+            _instanceId);
 
     // Register state model factory
     final StateModelFactory<?> stateModelFactory =

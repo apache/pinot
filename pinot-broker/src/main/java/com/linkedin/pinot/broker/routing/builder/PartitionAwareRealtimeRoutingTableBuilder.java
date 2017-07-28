@@ -16,22 +16,20 @@
 
 package com.linkedin.pinot.broker.routing.builder;
 
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.transport.common.SegmentId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
-
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
-
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentId;
 
 /**
  * Partition aware routing table builder for the Kafka low level consumer.

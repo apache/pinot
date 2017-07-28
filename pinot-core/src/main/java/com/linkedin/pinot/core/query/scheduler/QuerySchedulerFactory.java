@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import java.lang.reflect.Constructor;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

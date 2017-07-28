@@ -18,8 +18,8 @@ package com.linkedin.pinot.core.plan.maker;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import java.util.List;
 import java.util.Objects;
 

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.tools.AbstractBaseCommand;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;

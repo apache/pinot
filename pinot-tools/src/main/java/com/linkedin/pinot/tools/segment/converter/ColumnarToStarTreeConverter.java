@@ -16,16 +16,16 @@
 package com.linkedin.pinot.tools.segment.converter;
 
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.lang.reflect.Field;
 import org.apache.commons.io.FileUtils;

@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 

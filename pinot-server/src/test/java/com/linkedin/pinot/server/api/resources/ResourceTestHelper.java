@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -139,7 +139,7 @@ public class ResourceTestHelper {
     driver.init(config);
     driver.build();
     File segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
-    IndexSegment segment = ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
+    IndexSegment segment = SegmentLoader.load(segmentDirectory, ReadMode.mmap);
     serverInstance.getInstanceDataManager().addSegment(segment.getSegmentMetadata(), null, null);
     return segment;
   }

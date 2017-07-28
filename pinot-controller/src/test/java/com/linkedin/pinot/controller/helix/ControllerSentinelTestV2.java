@@ -16,11 +16,11 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import java.io.IOException;
 import org.json.JSONException;

@@ -17,9 +17,9 @@ package com.linkedin.pinot.controller.util;
 
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.segment.OfflineSegmentZKMetadata;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

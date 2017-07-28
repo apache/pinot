@@ -16,8 +16,6 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
@@ -27,14 +25,16 @@ import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
+import com.linkedin.pinot.core.query.reduce.ReduceService;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -89,15 +89,16 @@ public class BrokerReduceServiceTest {
     serverConf.setDelimiterParsingDisabled(false);
     serverConf.load(new File(configFilePath, PINOT_PROPERTIES));
 
-    FileBasedInstanceDataManager instanceDataManager1 = FileBasedInstanceDataManager.getInstanceDataManager();
-    instanceDataManager1.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
-    instanceDataManager1.start();
-    for (int i = 0; i < 2; ++i) {
-      instanceDataManager1.getTableDataManager("midas");
-      instanceDataManager1.getTableDataManager("midas").addSegment(_indexSegmentList.get(i));
+    FileBasedInstanceDataManager instanceDataManager = new FileBasedInstanceDataManager();
+    instanceDataManager.init(serverConf.subset("pinot.server.instance"));
+    instanceDataManager.start();
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager("midas");
+    Assert.assertNotNull(tableDataManager);
+    for (int i = 0; i < 2; i++) {
+      tableDataManager.addSegment(_indexSegmentList.get(i));
     }
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager1,
+    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager,
         new ServerMetrics(new MetricsRegistry()));
   }
 
@@ -133,7 +134,7 @@ public class BrokerReduceServiceTest {
       driver.build();
       File parent = new File(INDEXES_DIR, "segment_" + String.valueOf(i));
       String segmentName = parent.list()[0];
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
+      _indexSegmentList.add(SegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
 //      System.out.println("built at : " + segmentDir.getAbsolutePath());
     }
   }

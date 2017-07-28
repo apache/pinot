@@ -143,10 +143,15 @@
       <version>1.8.4</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>nl.jqno.equalsverifier</groupId>
+      <artifactId>equalsverifier</artifactId>
+      <scope>test</scope>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math</artifactId>
     </dependency>
-   </dependencies>
+  </dependencies>
 </project>

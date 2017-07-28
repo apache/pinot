@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
+import com.linkedin.pinot.common.segment.ReadMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.segment.ReadMode;
 
 
 /**
@@ -33,7 +33,6 @@ import com.linkedin.pinot.common.segment.ReadMode;
 public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileBasedInstanceDataManagerConfig.class);
 
-  private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
   private static final String INSTANCE_ID = "id";
   // Key of instance data directory
@@ -119,11 +118,6 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   }
 
   @Override
-  public String getSegmentMetadataLoaderClass() {
-    return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_METADATA_LOADER_CLASS);
-  }
-
-  @Override
   public ReadMode getReadMode() {
     try {
       return ReadMode.valueOf(_instanceDataManagerConfiguration.getString(READ_MODE));
@@ -161,7 +155,6 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
     configString += "\n\tInstance Data Dir: " + getInstanceDataDir();
     configString += "\n\tInstance Segment Tar Dir: " + getInstanceSegmentTarDir();
     configString += "\n\tBootstrap Segment Dir: " + getInstanceBootstrapSegmentDir();
-    configString += "\n\tSegment Metadata Loader Clas: " + getSegmentMetadataLoaderClass();
     configString += "\n\tRead Mode: " + getReadMode();
     return configString;
   }

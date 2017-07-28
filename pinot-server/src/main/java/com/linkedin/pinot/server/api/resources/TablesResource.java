@@ -22,7 +22,7 @@ import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;

@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.operator.blocks;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 /**

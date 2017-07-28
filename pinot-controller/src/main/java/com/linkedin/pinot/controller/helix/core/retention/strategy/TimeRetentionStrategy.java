@@ -15,16 +15,12 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention.strategy;
 
+import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import java.util.concurrent.TimeUnit;
-
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
 
 
 /**

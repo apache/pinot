@@ -15,14 +15,10 @@
  */
 package com.linkedin.pinot.core.query.executor;
 
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -36,9 +32,11 @@ import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
+import com.linkedin.pinot.core.query.context.TimerContext;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerServiceImpl;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.util.trace.TraceContext;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -72,10 +70,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public void init(Configuration configuration, DataManager dataManager, ServerMetrics serverMetrics)
+  public void init(Configuration configuration, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
       throws ConfigurationException {
     _serverMetrics = serverMetrics;
-    _instanceDataManager = (InstanceDataManager) dataManager;
+    _instanceDataManager = instanceDataManager;
     QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(configuration);
     if (queryExecutorConfig.getTimeOut() > 0) {
       _defaultTimeOutMs = queryExecutorConfig.getTimeOut();

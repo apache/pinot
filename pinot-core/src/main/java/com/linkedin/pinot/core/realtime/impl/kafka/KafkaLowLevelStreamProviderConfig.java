@@ -18,8 +18,8 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
 import java.util.Map;
 
 

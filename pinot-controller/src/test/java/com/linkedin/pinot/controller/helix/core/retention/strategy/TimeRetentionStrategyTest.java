@@ -15,13 +15,12 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention.strategy;
 
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**

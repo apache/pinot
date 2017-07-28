@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.server.integration;
 
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
+import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.server.conf.ServerConf;
@@ -44,8 +44,6 @@ public class HelixStarterTest {
 
   private static final String AVRO_DATA = "data/test_sample_data.avro";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "HelixStarterTest");
-  private static final ColumnarSegmentMetadataLoader columnarSegmentMetadataLoader =
-      new ColumnarSegmentMetadataLoader();
 
   @BeforeClass
   public void setup() {
@@ -76,13 +74,10 @@ public class HelixStarterTest {
     File[] segment2Files = segmentDir2.listFiles();
     Assert.assertNotNull(segment2Files);
 
-    DataManager instanceDataManager = serverInstance.getInstanceDataManager();
-    instanceDataManager.addSegment(
-        columnarSegmentMetadataLoader.loadIndexSegmentMetadataFromDir(segment0Files[0].getAbsolutePath()), null, null);
-    instanceDataManager.addSegment(
-        columnarSegmentMetadataLoader.loadIndexSegmentMetadataFromDir(segment1Files[0].getAbsolutePath()), null, null);
-    instanceDataManager.addSegment(
-        columnarSegmentMetadataLoader.loadIndexSegmentMetadataFromDir(segment2Files[0].getAbsolutePath()), null, null);
+    InstanceDataManager instanceDataManager = serverInstance.getInstanceDataManager();
+    instanceDataManager.addSegment(SegmentMetadataLoader.load(segment0Files[0]), null, null);
+    instanceDataManager.addSegment(SegmentMetadataLoader.load(segment1Files[0]), null, null);
+    instanceDataManager.addSegment(SegmentMetadataLoader.load(segment2Files[0]), null, null);
   }
 
   private void setupSegment(File segmentDir, String tableName)

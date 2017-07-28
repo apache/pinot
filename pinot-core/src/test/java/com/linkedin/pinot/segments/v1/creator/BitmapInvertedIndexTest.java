@@ -18,7 +18,7 @@ package com.linkedin.pinot.segments.v1.creator;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -83,7 +83,7 @@ public class BitmapInvertedIndexTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setReadMode(readMode);
     indexLoadingConfig.setInvertedIndexColumns(INVERTED_INDEX_COLUMNS);
-    IndexSegment indexSegment = ColumnarSegmentLoader.load(_segmentDirectory, indexLoadingConfig);
+    IndexSegment indexSegment = SegmentLoader.load(_segmentDirectory, indexLoadingConfig);
 
     // Compare the loaded inverted index with the record in avro file
     try (DataFileStream<GenericRecord> reader = new DataFileStream<>(new FileInputStream(_avroFile),

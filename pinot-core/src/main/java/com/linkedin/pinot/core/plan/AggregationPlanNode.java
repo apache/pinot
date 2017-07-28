@@ -17,9 +17,9 @@ package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.operator.query.AggregationOperator;
 import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;

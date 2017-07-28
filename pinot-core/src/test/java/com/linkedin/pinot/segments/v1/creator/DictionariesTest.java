@@ -20,23 +20,23 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -142,8 +142,8 @@ public class DictionariesTest {
   @Test
   public void test1()
       throws Exception {
-    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.heap);
-    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
+    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) SegmentLoader.load(segmentDirectory, ReadMode.heap);
+    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) SegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
     for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
         .keySet()) {
@@ -186,8 +186,8 @@ public class DictionariesTest {
   @Test
   public void test2()
       throws Exception {
-    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.heap);
-    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
+    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) SegmentLoader.load(segmentDirectory, ReadMode.heap);
+    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) SegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
     final Map<String, ColumnMetadata> metadataMap =
         ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap();

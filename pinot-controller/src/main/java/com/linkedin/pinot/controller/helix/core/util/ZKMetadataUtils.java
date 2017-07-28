@@ -15,14 +15,14 @@
  */
 package com.linkedin.pinot.controller.helix.core.util;
 
-import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.partition.ColumnPartitionMetadata;
+import com.linkedin.pinot.core.metadata.partition.SegmentPartitionMetadata;
+import com.linkedin.pinot.core.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

@@ -23,8 +23,8 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
 import com.linkedin.pinot.core.operator.docvalsets.SortedSingleValueSet;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 /**

@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import java.util.List;
-import java.util.Map;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 

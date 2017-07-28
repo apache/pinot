@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
 import java.io.IOException;
 import org.json.JSONException;
 import org.json.JSONObject;

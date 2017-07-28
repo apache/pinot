@@ -21,8 +21,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataSchema;
@@ -30,7 +28,9 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.serde.SerDe;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -54,9 +54,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class ScheduledRequestHandlerTest {

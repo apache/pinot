@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 
 
 public interface SegmentPrunerService {

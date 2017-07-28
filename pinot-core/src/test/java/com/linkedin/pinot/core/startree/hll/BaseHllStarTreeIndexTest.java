@@ -18,20 +18,31 @@ package com.linkedin.pinot.core.startree.hll;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.common.*;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
+import com.linkedin.pinot.core.query.utils.StarTreeUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-
-import java.util.*;
 
 
 /**
@@ -85,7 +96,7 @@ public class BaseHllStarTreeIndexTest {
       BrokerRequest brokerRequest = compiler.compileToBrokerRequest(_hardCodedQueries[i]);
 
       FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      Assert.assertTrue(RequestUtils.isFitForStarTreeIndex(segmentMetadata, filterQueryTree, brokerRequest));
+      Assert.assertTrue(StarTreeUtils.isFitForStarTreeIndex(segmentMetadata, filterQueryTree, brokerRequest));
 
       // Group -> Projected values of each group
       Map<String, long[]> expectedResult = computeHllUsingRawDocs(segment, metricNames, brokerRequest);
