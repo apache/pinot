@@ -137,12 +137,13 @@ public abstract class Series {
    */
   static final class JoinPairs {
     private static final long TO_LONG = 0xFFFFFFFFL;
+    private static final int MIN_CAPACITY = 1;
 
     int size = 0;
     long[] pairs;
 
     public JoinPairs(int initialCapacity) {
-      this.pairs = new long[initialCapacity];
+      this.pairs = new long[Math.max(initialCapacity, MIN_CAPACITY)];
     }
 
     public int size() {
