@@ -111,9 +111,20 @@ public class DataResource {
     this.alertConfigDAO = DAO_REGISTRY.getAlertConfigDAO();
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-    this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
+    this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
     this.dimensionsFilterCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
     this.anomaliesResoure = new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory);
+  }
+
+  @GET
+  @Path("datasets")
+  public List<String> getDatasets() {
+    List<String> datasets = new ArrayList<>();
+    List<DatasetConfigDTO> datasetConfigDTOs = datasetConfigDAO.findAll();
+    for (DatasetConfigDTO datasetConfig : datasetConfigDTOs) {
+      datasets.add(datasetConfig.getDataset());
+    }
+    return datasets;
   }
 
 //------------- endpoints to metric config -------------

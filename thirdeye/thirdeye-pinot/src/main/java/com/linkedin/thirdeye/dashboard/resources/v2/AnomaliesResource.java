@@ -1032,7 +1032,7 @@ public class AnomaliesResource {
     long windowStartTime = windowStartDateTime.getMillis();
     long windowEndTime = windowEndDateTime.getMillis();
     try {
-      Long maxDataTime = CACHE_REGISTRY.getCollectionMaxDataTimeCache().get(datasetConfig.getDataset());
+      Long maxDataTime = CACHE_REGISTRY.getDatasetMaxDataTimeCache().get(datasetConfig.getDataset());
       if (windowEndTime > maxDataTime) {
         windowEndTime = maxDataTime;
       }
@@ -1059,7 +1059,7 @@ public class AnomaliesResource {
     anomalyStartTime = anomalyStartDateTime.getMillis();
     anomalyEndTime = anomalyEndDateTime.getMillis();
     try {
-      Long maxDataTime = CACHE_REGISTRY.getCollectionMaxDataTimeCache().get(datasetConfig.getDataset());
+      Long maxDataTime = CACHE_REGISTRY.getDatasetMaxDataTimeCache().get(datasetConfig.getDataset());
       if (anomalyEndTime > maxDataTime) {
         anomalyEndTime = maxDataTime;
       }

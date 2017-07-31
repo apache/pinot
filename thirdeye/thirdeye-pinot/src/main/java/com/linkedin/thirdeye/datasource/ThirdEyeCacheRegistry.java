@@ -18,6 +18,7 @@ import com.google.common.cache.RemovalNotification;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -42,7 +43,7 @@ public class ThirdEyeCacheRegistry {
   private LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache;
   private LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache;
   private LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache;
-  private LoadingCache<String, Long> collectionMaxDataTimeCache;
+  private LoadingCache<String, Long> datasetMaxDataTimeCache;
   private LoadingCache<String, String> dimensionFiltersCache;
   private DatasetListCache datasetsCache;
   private QueryCache queryCache;
@@ -50,6 +51,8 @@ public class ThirdEyeCacheRegistry {
   private static DatasetConfigManager datasetConfigDAO;
   private static MetricConfigManager metricConfigDAO;
   private static DashboardConfigManager dashboardConfigDAO;
+  private static AnomalyFunctionManager anomalyFunctionDAO;
+
   private static Map<String, ThirdEyeDataSource> thirdEyeDataSourcesMap;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -95,6 +98,7 @@ public class ThirdEyeCacheRegistry {
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
       metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
       dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
+      anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
 
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
@@ -154,11 +158,11 @@ public class ThirdEyeCacheRegistry {
     QueryCache queryCache = new QueryCache(thirdEyeDataSourcesMap, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(queryCache);
 
-    // CollectionMaxDataTime Cache
-    LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
+    // DatasetMaxDataTime Cache
+    LoadingCache<String, Long> datasetMaxDataTimeCache = CacheBuilder.newBuilder()
         .refreshAfterWrite(5, TimeUnit.MINUTES)
         .build(new DatasetMaxDataTimeCacheLoader(queryCache, datasetConfigDAO));
-    cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
+    cacheRegistry.registerDatasetMaxDataTimeCache(datasetMaxDataTimeCache);
 
     // Dimension Filter cache
     LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
@@ -166,9 +170,8 @@ public class ThirdEyeCacheRegistry {
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
     // Collections cache
-    DatasetListCache datasetsCache = new DatasetListCache(datasetConfigDAO, thirdeyeConfig);
+    DatasetListCache datasetsCache = new DatasetListCache(anomalyFunctionDAO, datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerDatasetsCache(datasetsCache);
-
 
   }
 
@@ -196,6 +199,7 @@ public class ThirdEyeCacheRegistry {
       @Override
       public void run() {
         try {
+          cacheResource.refreshDatasets();
           cacheResource.refreshMaxDataTimeCache();
         } catch (Exception e) {
           LOGGER.error("Exception while loading collections", e);
@@ -236,12 +240,12 @@ public class ThirdEyeCacheRegistry {
     this.resultSetGroupCache = resultSetGroupCache;
   }
 
-  public LoadingCache<String, Long> getCollectionMaxDataTimeCache() {
-    return collectionMaxDataTimeCache;
+  public LoadingCache<String, Long> getDatasetMaxDataTimeCache() {
+    return datasetMaxDataTimeCache;
   }
 
-  public void registerCollectionMaxDataTimeCache(LoadingCache<String, Long> collectionMaxDataTimeCache) {
-    this.collectionMaxDataTimeCache = collectionMaxDataTimeCache;
+  public void registerDatasetMaxDataTimeCache(LoadingCache<String, Long> datasetMaxDataTimeCache) {
+    this.datasetMaxDataTimeCache = datasetMaxDataTimeCache;
   }
 
   public DatasetListCache getDatasetsCache() {

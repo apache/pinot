@@ -57,7 +57,6 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRequest;
@@ -78,8 +77,7 @@ public class DashboardResource {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private QueryCache queryCache;
-  private DatasetListCache collectionsCache;
-  private LoadingCache<String, Long> collectionMaxDataTimeCache;
+  private LoadingCache<String, Long> datasetMaxDataTimeCache;
   private LoadingCache<String, String> dimensionFiltersCache;
 
   private MetricConfigManager metricConfigDAO;
@@ -87,8 +85,7 @@ public class DashboardResource {
 
   public DashboardResource() {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-    this.collectionsCache = CACHE_REGISTRY_INSTANCE.getDatasetsCache();
-    this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
+    this.datasetMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
@@ -101,19 +98,6 @@ public class DashboardResource {
     return new DashboardView();
   }
 
-
-  @GET
-  @Path(value = "/data/datasets")
-  @Produces(MediaType.APPLICATION_JSON)
-  public List<String> getCollections() throws Exception {
-    try {
-      List<String> collections = collectionsCache.getDatasets();
-      return collections;
-    } catch (Exception e) {
-      LOG.error("Error while fetching datasets", e);
-      throw e;
-    }
-  }
 
   @GET
   @Path(value = "/data/metrics")
@@ -156,7 +140,7 @@ public class DashboardResource {
     try {
 
       HashMap<String, String> map = new HashMap<>();
-      long maxDataTime = collectionMaxDataTimeCache.get(collection);
+      long maxDataTime = datasetMaxDataTimeCache.get(collection);
       DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection);
       TimeSpec timespec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
       TimeGranularity dataGranularity = timespec.getDataGranularity();
@@ -221,7 +205,7 @@ public class DashboardResource {
       }
       request.setMetricExpressions(metricExpressions);
 
-      long maxDataTime = collectionMaxDataTimeCache.get(collection);
+      long maxDataTime = datasetMaxDataTimeCache.get(collection);
       if (currentEnd > maxDataTime) {
         long delta = currentEnd - maxDataTime;
         currentEnd = currentEnd - delta;
@@ -279,7 +263,7 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = collectionMaxDataTimeCache.get(collection);
+    long maxDataTime = datasetMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
@@ -331,7 +315,7 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = collectionMaxDataTimeCache.get(collection);
+    long maxDataTime = datasetMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;
@@ -385,7 +369,7 @@ public class DashboardResource {
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricsJson, MetricAggFunction.SUM, collection);
     request.setMetricExpressions(metricExpressions);
-    long maxDataTime = collectionMaxDataTimeCache.get(collection);
+    long maxDataTime = datasetMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
       long delta = currentEnd - maxDataTime;
       currentEnd = currentEnd - delta;

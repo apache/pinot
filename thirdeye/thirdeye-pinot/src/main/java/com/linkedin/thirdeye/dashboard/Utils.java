@@ -272,7 +272,7 @@ public class Utils {
   public static long getMaxDataTimeForDataset(String dataset) {
     long endTime = 0;
     try {
-      endTime = CACHE_REGISTRY.getCollectionMaxDataTimeCache().get(dataset);
+      endTime = CACHE_REGISTRY.getDatasetMaxDataTimeCache().get(dataset);
     } catch (ExecutionException e) {
       LOG.error("Exception when getting max data time for {}", dataset);
     }

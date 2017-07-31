@@ -73,7 +73,7 @@ public class TimeSeriesResource {
   public static final String DECIMAL_FORMAT = "%+.1f";
 
   private LoadingCache<String, Long> datasetMaxDataTimeCache = CACHE_REGISTRY_INSTANCE
-      .getCollectionMaxDataTimeCache();
+      .getDatasetMaxDataTimeCache();
   private QueryCache queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
 
   private static final long TIMEOUT = 60000;
