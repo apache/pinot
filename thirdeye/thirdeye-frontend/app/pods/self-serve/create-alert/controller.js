@@ -17,11 +17,16 @@ export default Ember.Controller.extend({
   isValidated: false,
   isMetricSelected: false,
   isFormDisabled: false,
+  isMetricDataInvalid: false,
+  isFilterSelectDisabled: false,
+  isGranularitySelectDisabled: false,
   isSubmitDisabled: true,
   isCreateAlertSuccess: false,
   isCreateGroupSuccess: false,
   isCreateAlertError: false,
+  isSelectMetricError: false,
   isReplayComplete: false,
+  isMetricDataLoading: false,
   isReplayTriggeredSuccess: false,
   metricGranularityOptions: [],
 
@@ -66,7 +71,7 @@ export default Ember.Controller.extend({
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
     const url = `/data/autocomplete/metric?name=${metric}`;
-    return fetch(url).then(res => res.json());
+    return fetch(url).then(checkStatus);
   }),
 
   /**
@@ -85,6 +90,20 @@ export default Ember.Controller.extend({
   },
 
   /**
+   * Determines if a metric should be filtered out
+   * @method isMetricGraphable
+   * @param {Object} metric
+   * @returns {Boolean}
+   */
+  isMetricGraphable(metric) {
+    return metric
+    && metric.subDimensionContributionMap['All'].currentValues
+    && metric.subDimensionContributionMap['All'].currentValues.reduce((total, val) => {
+      return total + val;
+    }, 0);
+  },
+
+  /**
    * Fetches the selected metric's dimension data. TODO: Set up custom response handler for HTTP errors.
    * See: https://github.com/github/fetch#handling-http-error-statuses
    * @method fetchMetricDimensions
@@ -93,7 +112,7 @@ export default Ember.Controller.extend({
    */
   fetchMetricDimensions(metricId) {
     const url = `/data/autocomplete/dimensions/metric/${metricId}`;
-    return fetch(url).then(res => res.json());
+    return fetch(url).then(checkStatus);
   },
 
   /**
@@ -105,7 +124,7 @@ export default Ember.Controller.extend({
    */
   fetchFunctionById(functionId) {
     const url = `/onboard/function/${functionId}`;
-    return fetch(url).then(res => res.json());
+    return fetch(url).then(checkStatus);
   },
 
   /**
@@ -117,22 +136,23 @@ export default Ember.Controller.extend({
    */
   fetchAnomalyByName(functionName) {
     const url = `/data/autocomplete/functionByName?name=${functionName}`;
-    return fetch(url).then(res => res.json());
+    return fetch(url).then(checkStatus);
   },
 
   /**
    * Fetches all essential metric properties by metric Id.
    * This is the data we will feed to the graph generating component.
+   * Note: these requests can fail silently and any empty response will fall back on defaults.
    * @method fetchMetricData
    * @param {Number} metricId - Id for the selected metric
    * @return {Ember.RSVP.promise}
    */
   fetchMetricData(metricId) {
     const promiseHash = {
-      maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => res.json()),
-      granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => res.json()),
-      filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => res.json()),
-      selectedMetricDimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res =>res.json())
+      maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => checkStatus(res, 'get', true)),
+      granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
+      filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
+      selectedMetricDimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
     };
 
     return Ember.RSVP.hash(promiseHash);
@@ -145,8 +165,6 @@ export default Ember.Controller.extend({
    * @return {Promise} Returns time-series data for the metric
    */
   fetchAnomalyGraphData(config) {
-    this.set('loading', true);
-
     const {
       id,
       dimension,
@@ -159,8 +177,7 @@ export default Ember.Controller.extend({
     } = config;
 
     const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters=${filters}`;
-
-    return fetch(url).then(res => res.json());
+    return fetch(url).then(checkStatus);
   },
 
   /**
@@ -177,7 +194,7 @@ export default Ember.Controller.extend({
       headers: { 'content-type': 'Application/Json' }
     };
     const url = '/thirdeye/entity?entityType=' + entityType;
-    return fetch(url, postProps);
+    return fetch(url, postProps).then((res) => checkStatus(res, 'post'));
   },
 
   /**
@@ -193,7 +210,7 @@ export default Ember.Controller.extend({
     };
 
     const url = '/dashboard/anomaly-function?' + this.toQueryString(functionData);
-    return fetch(url, postProps).then(res => res.json());
+    return fetch(url, postProps).then(checkStatus);
   },
 
   /**
@@ -204,6 +221,7 @@ export default Ember.Controller.extend({
    */
   triggerGraphFromMetric(metricId) {
     const maxTime = this.get('maxTime');
+    const filters = this.get('filters');
     const currentEnd = moment(maxTime).isValid()
       ? moment(maxTime).valueOf()
       : moment().subtract(1, 'day').endOf('day').valueOf();
@@ -220,8 +238,13 @@ export default Ember.Controller.extend({
       currentEnd,
       baselineStart,
       baselineEnd,
-      granularity
+      granularity: granularity || '',
+      filters
     };
+
+    if (Ember.isEmpty(filters)) {
+      this.set('isFilterSelectDisabled', true);
+    }
 
     this.setProperties({
       graphConfig: graphConfig,
@@ -229,11 +252,17 @@ export default Ember.Controller.extend({
     });
 
     this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
-      this.setProperties({
-        isMetricSelected: true,
-        selectedMetric: metricData,
-        loading: false
-      });
+      this.set('isMetricDataLoading', false);
+      if (!this.isMetricGraphable(metricData)) {
+        this.setProperties({
+          isMetricDataInvalid: true
+        });
+      } else {
+        this.setProperties({
+          isMetricSelected: true,
+          selectedMetric: metricData
+        });
+      }
     });
   },
 
@@ -267,7 +296,7 @@ export default Ember.Controller.extend({
     const gkey = allowedGranularity.includes(granularity) ? granularity : 'minute';
 
     return new Ember.RSVP.Promise((resolve) => {
-      fetch('/detection-job' + replayApi[gkey], postProps).then(res => resolve(checkStatus(res)));
+      fetch('/detection-job' + replayApi[gkey], postProps).then((res) => checkStatus(res, 'post'));
     });
   },
 
@@ -305,9 +334,8 @@ export default Ember.Controller.extend({
 
   /**
    * If these two conditions are true, we assume the user wants to edit an existing alert group
-   * @method isSubmitDisabled
-   * @param {Number} metricId - Id of selected metric to graph
-   * @return {Boolean} PreventSubmit
+   * @method isAlertGroupEditModeActive
+   * @return {Boolean}
    */
   isAlertGroupEditModeActive: Ember.computed(
     'selectedConfigGroup',
@@ -315,6 +343,32 @@ export default Ember.Controller.extend({
     function() {
       return this.get('selectedConfigGroup') && Ember.isNone(this.get('newConfigGroupName'));
     }),
+
+  /**
+   * Determines cases in which the filter field should be disabled
+   * @method isFilterSelectDisabled
+   * @return {Boolean}
+   */
+  isFilterSelectDisabled: Ember.computed(
+    'filters',
+    'isMetricSelected',
+    function() {
+      return (!this.get('isMetricSelected') || Ember.isEmpty(this.get('filters')));
+    }
+  ),
+
+  /**
+   * Determines cases in which the granularity field should be disabled
+   * @method isGranularitySelectDisabled
+   * @return {Boolean}
+   */
+  isGranularitySelectDisabled: Ember.computed(
+    'granularities',
+    'isMetricSelected',
+    function() {
+      return (!this.get('isMetricSelected') || Ember.isEmpty(this.get('granularities')));
+    }
+  ),
 
   /**
    * Enables the submit button when all required fields are filled
@@ -425,6 +479,20 @@ export default Ember.Controller.extend({
   ),
 
   /**
+   * Sets the message text over the graph placeholder before data is loaded
+   * @method graphMessageText
+   * @return {String} the appropriate graph placeholder text
+   */
+  graphMessageText: Ember.computed(
+    'isMetricDataInvalid',
+    function() {
+      const defaultMsg = 'Once a metric is selected, the metric replay graph will show here';
+      const invalidMsg = 'Sorry, metric has no current data';
+      return this.get('isMetricDataInvalid') ? invalidMsg : defaultMsg;
+    }
+  ),
+
+  /**
    * Actions for create alert form view
    */
   actions: {
@@ -436,13 +504,22 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectMetric(selectedObj) {
-      this.set('loading', true);
-      this.set('selectedMetricOption', selectedObj);
-      this.fetchMetricData(selectedObj.id).then((hash) => {
-        this.setProperties(hash);
-        this.set('metricGranularityOptions', hash.granularities);
-        this.triggerGraphFromMetric(selectedObj);
+      this.setProperties({
+        isMetricDataLoading: true,
+        selectedMetricOption: selectedObj
       });
+      this.fetchMetricData(selectedObj.id)
+        .then((hash) => {
+          this.setProperties(hash);
+          this.set('metricGranularityOptions', hash.granularities);
+          this.triggerGraphFromMetric(selectedObj);
+        })
+        .catch((err) => {
+          this.setProperties({
+            isSelectMetricError: true,
+            selectMetricErrMsg: err
+          });
+        });
     },
 
     /**
@@ -454,11 +531,11 @@ export default Ember.Controller.extend({
      */
     onSelectFilter(filters) {
       this.set('graphConfig.filters', filters);
+      this.set('isMetricDataLoading', true);
       this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
         this.setProperties({
-          isMetricSelected: true,
           selectedMetric: metricData,
-          loading: false
+          isMetricDataLoading: false
         });
       });
     },
@@ -575,24 +652,25 @@ export default Ember.Controller.extend({
      */
     clearAll() {
       this.setProperties({
-        isFormDisabled: false,
-        isMetricSelected: false,
-        selectedMetricOption: null,
-        selectedPattern: null,
-        selectedGranularity: null,
-        dimensionSelectorVal: null,
-        alertFunctionName: null,
-        selectedAppName: null,
-        selectedConfigGroup: null,
-        newConfigGroupName: null,
-        alertGroupNewRecipient: null,
-        selectedGroupRecipients: null,
-        isCreateAlertSuccess: null,
-        isCreateAlertError: false,
-        isCreateGroupSuccess: false,
-        isReplayTriggeredSuccess: false,
-        isReplayComplete: false,
-        filterPropNames: JSON.stringify({})
+       isFormDisabled: false,
+       isMetricSelected: false,
+       isMetricDataInvalid: false,
+       selectedMetricOption: null,
+       selectedPattern: null,
+       selectedGranularity: null,
+       dimensionSelectorVal: null,
+       alertFunctionName: null,
+       selectedAppName: null,
+       selectedConfigGroup: null,
+       newConfigGroupName: null,
+       alertGroupNewRecipient: null,
+       selectedGroupRecipients: null,
+       isCreateAlertSuccess: null,
+       isCreateAlertError: false,
+       isCreateGroupSuccess: false,
+       isReplayTriggeredSuccess: false,
+       isReplayComplete: false,
+       filterPropNames: JSON.stringify({})
       });
       this.send('refreshModel');
     },
@@ -648,6 +726,7 @@ export default Ember.Controller.extend({
           finalConfigObj.emailConfig.functionIds.push(newFunctionId);
           // Finally, save our Alert Config Group
           this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
+
             if (alertResult.ok) {
               this.setProperties({
                 selectedGroupRecipients: finalConfigObj.recipients,
@@ -671,7 +750,8 @@ export default Ember.Controller.extend({
               // Now, disable form
               this.setProperties({
                 isFormDisabled: true,
-                isMetricSelected: false
+                isMetricSelected: false,
+                isMetricDataInvalid: false
               });
             } else {
               this.set('isCreateAlertError', true);

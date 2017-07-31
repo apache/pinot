@@ -53,6 +53,12 @@ body {
   margin: $te-default-element-spacing;
   height: 250px;
   position: relative;
+
+  &--self-serve {
+    position: absolute;
+    margin-top: 190px;
+    left: 50%;
+  }
 }
 
 .anomaly-title-bar {
@@ -109,6 +115,29 @@ body {
 
     &--strong {
       font-weight: 600;
+    }
+  }
+
+  &__input {
+    &--required {
+      box-shadow: 0 0 5px rgba(238, 81, 81, 0.69);
+      padding: 3px 0px 3px 3px;
+      margin: 5px 1px 3px 0px;
+      border: 1px solid rgba(238, 81, 81, 0.52);
+    }
+  }
+
+  &__spacer {
+    margin-bottom: 15px;
+  }
+
+  &__alert {
+    &--warning {
+      display: inline-block;
+      margin-left: 5px;
+      padding: 1px 7px;
+      border-radius: 3px;
+      border: 1px solid #faebcc;
     }
   }
 }
