@@ -385,16 +385,16 @@ export default Ember.Controller.extend({
     'newConfigGroupName',
     'alertGroupNewRecipient',
     function() {
-      const requiredFields = this.get('requiredFields');
       let isDisabled = false;
+      const requiredFields = this.get('requiredFields');
       // Any missing required field values?
       for (var field of requiredFields) {
-        if (Ember.isNone(this.get(field))) {
+        if (Ember.isBlank(this.get(field))) {
           isDisabled = true;
         }
       }
       // Enable submit if either of these field values are present
-      if (Ember.isNone(this.get('selectedConfigGroup')) && Ember.isNone(this.get('newConfigGroupName'))) {
+      if (Ember.isBlank(this.get('selectedConfigGroup')) && Ember.isBlank(this.get('newConfigGroupName'))) {
         isDisabled = true;
       }
       return isDisabled;
@@ -416,7 +416,7 @@ export default Ember.Controller.extend({
       const granularity = this.get('graphConfig.granularity').toLowerCase();
       const settingsByGranularity = {
         common: {
-          functionName: this.get('alertFunctionName'),
+          functionName: this.get('alertFunctionName').trim(),
           metric: this.get('selectedMetricOption.name'),
           dataset: this.get('selectedMetricOption.dataset'),
           metricFunction: 'SUM',
@@ -607,11 +607,13 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     validateNewGroupName(name) {
-      this.setProperties({
-        newConfigGroupName: name,
-        selectedConfigGroup: null,
-        selectedGroupRecipients: null
-      });
+      if (name && name.trim().length) {
+        this.setProperties({
+          newConfigGroupName: name,
+          selectedConfigGroup: null,
+          selectedGroupRecipients: null
+        });
+      }
     },
 
     /**
@@ -693,7 +695,7 @@ export default Ember.Controller.extend({
         active: true,
         emailConfig: { "functionIds": [] },
         recipients: this.get('alertGroupNewRecipient'),
-        name: this.get('selectedConfigGroup') || this.get('newConfigGroupName'),
+        name: this.get('selectedConfigGroup') || this.get('newConfigGroupName').trim(),
         application: this.get('selectedAppName').application || null
       };
 
