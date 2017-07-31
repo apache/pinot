@@ -20,7 +20,7 @@ public class DashboardConfigCacheLoader extends CacheLoader<String, List<Dashboa
 
   @Override
   public List<DashboardConfigDTO> load(String collection) throws Exception {
-    LOGGER.info("Loading DashboardConfigCache for {}", collection);
+    LOGGER.debug("Loading DashboardConfigCache for {}", collection);
     List<DashboardConfigDTO> dashboardConfigs = dashboardConfigDAO.findByDataset(collection);
     return dashboardConfigs;
   }

@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -24,7 +23,7 @@ import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 @Produces(MediaType.APPLICATION_JSON)
 public class CacheResource {
 
-  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(10);
+  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(20);
   private ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 

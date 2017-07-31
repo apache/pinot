@@ -32,7 +32,7 @@ public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
    */
   @Override
   public String load(String dataset) throws Exception {
-    LOGGER.info("Loading from dimension filters cache {}", dataset);
+    LOGGER.debug("Loading from dimension filters cache {}", dataset);
     String dimensionFiltersJson = null;
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     String dataSourceName = datasetConfig.getDataSource();
@@ -41,7 +41,7 @@ public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
       Map<String, List<String>> dimensionFilters = dataSource.getDimensionFilters(dataset);
       dimensionFiltersJson = OBJECT_MAPPER.writeValueAsString(dimensionFilters);
     } catch (Exception e) {
-      LOGGER.error("Exception in getting max date time for {} from data source {}", dataset, dataSourceName, e);
+      LOGGER.error("Exception in getting dimension filters for {} from data source {}", dataset, dataSourceName, e);
     }
     return dimensionFiltersJson;
   }

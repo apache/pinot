@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +21,7 @@ public class DatasetListCache {
   private AtomicReference<List<String>> datasetListRef;
   private DatasetConfigManager datasetConfigDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
+  private ThirdEyeConfiguration thirdeyeConfig;
   private static final Logger LOG = LoggerFactory.getLogger(DatasetListCache.class);
 
 
@@ -28,6 +30,7 @@ public class DatasetListCache {
     this.datasetListRef = new AtomicReference<>();
     this.datasetConfigDAO = datasetConfigDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
+    this.thirdeyeConfig = config;
   }
 
 
@@ -42,11 +45,17 @@ public class DatasetListCache {
   public void loadDatasets() {
 
     List<String> datasets = new ArrayList<>();
-
-    List<AnomalyFunctionDTO> findAll = anomalyFunctionDAO.findAllActiveFunctions();
     Set<String> uniqueDatasets = new HashSet<>();
-    for (AnomalyFunctionDTO anomalyFunction : findAll) {
-      uniqueDatasets.add(anomalyFunction.getCollection());
+
+    // Load from whitelist if exists,
+    // this will be useful for dev environments where loading caches for all datasets isn't desirable
+    if (CollectionUtils.isNotEmpty(thirdeyeConfig.getWhitelistDatasets())) {
+      uniqueDatasets.addAll(thirdeyeConfig.getWhitelistDatasets());
+    } else {
+      List<AnomalyFunctionDTO> findAll = anomalyFunctionDAO.findAllActiveFunctions();
+      for (AnomalyFunctionDTO anomalyFunction : findAll) {
+        uniqueDatasets.add(anomalyFunction.getCollection());
+      }
     }
 
     for (String dataset : uniqueDatasets) {

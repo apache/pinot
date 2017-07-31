@@ -185,11 +185,17 @@ public class ThirdEyeCacheRegistry {
     // Start initial cache loading asynchronously to reduce application start time
     Executors.newSingleThreadExecutor().submit(new Runnable() {
       @Override public void run() {
+        LOGGER.info("Refreshing datasets list cache");
         cacheResource.refreshDatasets();
+        LOGGER.info("Refreshing dataset configs cache");
         cacheResource.refreshDatasetConfigCache();
+        LOGGER.info("Refreshing dashboard configs cache");
         cacheResource.refreshDashoardConfigsCache();
+        LOGGER.info("Refreshing metrics config cache");
         cacheResource.refreshMetricConfigCache();
+        LOGGER.info("Refreshing max data dime cache");
         cacheResource.refreshMaxDataTimeCache();
+        LOGGER.info("Refreshing dimension filters cache");
         cacheResource.refreshDimensionFiltersCache();
       }
     });
@@ -199,10 +205,10 @@ public class ThirdEyeCacheRegistry {
       @Override
       public void run() {
         try {
-          cacheResource.refreshDatasets();
+          LOGGER.info("Refreshing dataset max time cache");
           cacheResource.refreshMaxDataTimeCache();
         } catch (Exception e) {
-          LOGGER.error("Exception while loading collections", e);
+          LOGGER.error("Exception while refreshing max time cache", e);
         }
       }
     }, 30, 30, TimeUnit.MINUTES);
@@ -212,9 +218,10 @@ public class ThirdEyeCacheRegistry {
       @Override
       public void run() {
         try {
+          LOGGER.info("Refreshing datasets list cache");
           cacheResource.refreshDatasets();
         } catch (Exception e) {
-          LOGGER.error("Exception while loading collections", e);
+          LOGGER.error("Exception while refreshing datasets list", e);
         }
       }
     }, 1, 1, TimeUnit.HOURS);
@@ -224,6 +231,7 @@ public class ThirdEyeCacheRegistry {
       @Override
       public void run() {
         try {
+          LOGGER.info("Refreshing dimension filters cache");
           cacheResource.refreshDimensionFiltersCache();
         } catch (Exception e) {
           LOGGER.error("Exception while loading filter caches", e);
