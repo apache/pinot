@@ -48,8 +48,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
   private static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   private static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
-  private static final String JERSEY_ADMIN_API_PORT = "controller.jersey.admin.api.port";
-  private static final String JERSEY_ADMIN_PRIMARY = "controller.jersey.primary";
+  private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
+  private static final String JERSEY_ADMIN_PRIMARY = "jersey.primary";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
