@@ -17,8 +17,16 @@ package com.linkedin.pinot.query.transform;
 
 import com.linkedin.pinot.core.operator.docvalsets.ConstantBlockValSet;
 import com.linkedin.pinot.core.operator.transform.function.TimeConversionTransform;
+import com.linkedin.pinot.core.operator.transform.function.time.converter.TimeConverterFactory;
+import com.linkedin.pinot.core.operator.transform.function.time.converter.TimeUnitConverter;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Months;
+import org.joda.time.MutableDateTime;
+import org.joda.time.Weeks;
+import org.joda.time.Years;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -29,6 +37,7 @@ import org.testng.annotations.Test;
 public class TimeConversionTransformTest {
 
   private static final int NUM_ROWS = 10001;
+  private static final DateTime EPOCH_START_DATE = new DateTime(0L, DateTimeZone.UTC);
 
   @Test
   public void test() {
@@ -52,6 +61,51 @@ public class TimeConversionTransformTest {
 
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(actual[i], expected[i]);
+    }
+  }
+
+  @Test
+  public void testCustom() {
+    long inputs[] = new long[NUM_ROWS];
+    long expectedWeeks[] = new long[NUM_ROWS];
+    long expectedMonths[] = new long[NUM_ROWS];
+    long expectedYears[] = new long[NUM_ROWS];
+
+
+    long seed = System.nanoTime();
+    Random random = new Random(seed);
+
+    MutableDateTime dateTime = new MutableDateTime(0L, DateTimeZone.UTC);
+
+    for (int i = 0; i < NUM_ROWS; i++) {
+      inputs[i] = Math.abs(random.nextLong() % System.currentTimeMillis());
+
+      dateTime.setDate(inputs[i]);
+      expectedWeeks[i] = Weeks.weeksBetween(EPOCH_START_DATE, dateTime).getWeeks();
+      expectedMonths[i] = Months.monthsBetween(EPOCH_START_DATE, dateTime).getMonths();
+      expectedYears[i] = Years.yearsBetween(EPOCH_START_DATE, dateTime).getYears();
+    }
+
+    // Test for WEEKS conversion.
+    long output[] = new long[NUM_ROWS];
+    TimeUnitConverter weekConverter = TimeConverterFactory.getTimeConverter("wEeKs");
+    weekConverter.convert(inputs, TimeUnit.MILLISECONDS, NUM_ROWS, output);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(output[i], expectedWeeks[i]);
+    }
+
+    // Test for MONTHS conversion.
+    TimeUnitConverter monthConverter = TimeConverterFactory.getTimeConverter("mOnThS");
+    monthConverter.convert(inputs, TimeUnit.MILLISECONDS, NUM_ROWS, output);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(output[i], expectedMonths[i]);
+    }
+
+    // Test for YEARS conversion.
+    TimeUnitConverter yearConverter = TimeConverterFactory.getTimeConverter("yEaRs");
+    yearConverter.convert(inputs, TimeUnit.MILLISECONDS, NUM_ROWS, output);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(output[i], expectedYears[i]);
     }
   }
 }
