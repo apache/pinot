@@ -136,7 +136,7 @@
           </div>
           {{#unless ../externalUrls.INGRAPH}}
             <div class="wow-card-footer">
-              <a href="{{wow.newUrl}}" target="_blank" class="thirdeye-link">View Contribution Analysis</a>
+              <a href="{{wow.newUrl}}" target="_blank" class="thirdeye-link">Root Cause Analysis</a>
             </div>
           {{/unless}}
         </li>
