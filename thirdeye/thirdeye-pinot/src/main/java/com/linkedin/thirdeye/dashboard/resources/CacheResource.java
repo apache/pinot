@@ -9,9 +9,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -24,7 +21,6 @@ import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 @Produces(MediaType.APPLICATION_JSON)
 public class CacheResource {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(CacheResource.class);
   private ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -47,7 +43,6 @@ public class CacheResource {
 
     refreshMaxDataTimeCache();
     refreshDimensionFiltersCache();
-    refreshDashboardsCache();
 
     return Response.ok().build();
   }
@@ -112,16 +107,6 @@ public class CacheResource {
     return Response.ok().build();
   }
 
-  @POST
-  @Path("/refresh/dashboards")
-  public Response refreshDashboardsCache() {
-    List<String> collections = CACHE_INSTANCE.getDatasetsCache().getDatasets();
-    LoadingCache<String,String> cache = CACHE_INSTANCE.getDashboardsCache();
-    for (String collection : collections) {
-      cache.refresh(collection);
-    }
-    return Response.ok().build();
-  }
 
   @POST
   @Path("/refresh/collections")

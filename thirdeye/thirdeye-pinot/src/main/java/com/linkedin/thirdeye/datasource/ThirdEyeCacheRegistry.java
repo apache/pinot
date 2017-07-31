@@ -27,7 +27,6 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
 import com.linkedin.thirdeye.datasource.cache.DashboardConfigCacheLoader;
-import com.linkedin.thirdeye.datasource.cache.DashboardsCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DimensionFiltersCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.MetricConfigCacheLoader;
@@ -44,7 +43,6 @@ public class ThirdEyeCacheRegistry {
   private LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache;
   private LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
-  private LoadingCache<String, String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
   private DatasetListCache datasetsCache;
   private QueryCache queryCache;
@@ -167,11 +165,6 @@ public class ThirdEyeCacheRegistry {
         .build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
-    // Dashboards cache
-    LoadingCache<String, String> dashboardsCache = CacheBuilder.newBuilder()
-        .build(new DashboardsCacheLoader(dashboardConfigDAO));
-    cacheRegistry.registerDashboardsCache(dashboardsCache);
-
     // Collections cache
     DatasetListCache datasetsCache = new DatasetListCache(datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerDatasetsCache(datasetsCache);
@@ -192,7 +185,6 @@ public class ThirdEyeCacheRegistry {
         cacheResource.refreshDatasets();
         cacheResource.refreshDatasetConfigCache();
         cacheResource.refreshDashoardConfigsCache();
-        cacheResource.refreshDashboardsCache();
         cacheResource.refreshMetricConfigCache();
         cacheResource.refreshMaxDataTimeCache();
         cacheResource.refreshDimensionFiltersCache();
@@ -266,14 +258,6 @@ public class ThirdEyeCacheRegistry {
 
   public void registerDimensionFiltersCache(LoadingCache<String, String> dimensionFiltersCache) {
     this.dimensionFiltersCache = dimensionFiltersCache;
-  }
-
-  public LoadingCache<String, String> getDashboardsCache() {
-    return dashboardsCache;
-  }
-
-  public void registerDashboardsCache(LoadingCache<String, String> dashboardsCache) {
-    this.dashboardsCache = dashboardsCache;
   }
 
   public QueryCache getQueryCache() {

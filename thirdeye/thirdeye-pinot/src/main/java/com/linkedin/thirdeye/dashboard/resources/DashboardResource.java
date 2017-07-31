@@ -80,7 +80,6 @@ public class DashboardResource {
   private QueryCache queryCache;
   private DatasetListCache collectionsCache;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
-  private LoadingCache<String,String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
 
   private MetricConfigManager metricConfigDAO;
@@ -90,7 +89,6 @@ public class DashboardResource {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionsCache = CACHE_REGISTRY_INSTANCE.getDatasetsCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
-    this.dashboardsCache = CACHE_REGISTRY_INSTANCE.getDashboardsCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
@@ -149,18 +147,6 @@ public class DashboardResource {
     return jsonDimensions;
   }
 
-  @GET
-  @Path(value = "/data/dashboards")
-  @Produces(MediaType.APPLICATION_JSON)
-  public String getDashboards(@QueryParam("dataset") String collection) {
-    String jsonDashboards = null;
-    try {
-      jsonDashboards = dashboardsCache.get(collection);
-    } catch (Exception e) {
-      LOG.error("Error while fetching dashboards for collection: " + collection, e);
-    }
-    return jsonDashboards;
-  }
 
   @GET
   @Path(value = "/data/info")

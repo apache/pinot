@@ -127,15 +127,6 @@ public class Utils {
     return dimensionsToGroupBy;
   }
 
-  public static List<String> getDashboards(DashboardConfigManager dashboardConfigDAO, String collection) throws Exception {
-    List<DashboardConfigDTO> dashboardConfigs = dashboardConfigDAO.findActiveByDataset(collection);
-
-    List<String> dashboards = new ArrayList<>();
-    for (DashboardConfigDTO dashboardConfig : dashboardConfigs) {
-      dashboards.add(dashboardConfig.getName());
-    }
-    return dashboards;
-  }
 
   public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
       MetricAggFunction aggFunction, String dataset) throws ExecutionException {
