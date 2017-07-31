@@ -179,7 +179,7 @@ function fetchRelatedMetricData() {
  */
 function updateMetricDate(startDate, endDate) {
   return (dispatch) => {
-    startDate = startDate? moment(Number(startDate)) : startDate;
+    startDate = startDate ? moment(Number(startDate)) : startDate;
     endDate = endDate ? moment(Number(endDate)) : endDate;
 
     dispatch(updateDates({

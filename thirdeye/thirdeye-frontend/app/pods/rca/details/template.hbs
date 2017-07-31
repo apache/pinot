@@ -4,7 +4,7 @@
     <div class="paper-container__body">
       <section class="rca-summary">
         <div class="row">
-          <div class="form-group col-xs-6">
+          <div class="col-xs-4">
             <label class="te-label" for="select-granularity">Granularity: </label>
             {{#power-select
               selected=uiGranularity
@@ -17,7 +17,7 @@
               {{granularity}}
             {{/power-select}}
           </div>
-          <div class="col-xs-6">
+          <div class="col-xs-4">
             <label class="te-label" for="select-mode">Compare Mode: </label>
             {{#power-select
               selected=compareMode
@@ -29,6 +29,28 @@
             }}
               {{mode}}
             {{/power-select}}
+          </div>
+
+          <div class="col-xs-4">
+            <label class="te-label" for="select-anomaly-region">Analysis Region: </label>
+            {{date-range-picker
+              timePicker=true
+              timePicker24Hour=true
+              timePickerIncrement=5
+              minDate=minDate
+              maxDate=maxDate 
+              start=anomalyRegionStart
+              end=anomalyRegionEnd
+              ranges=predefinedRanges
+              showCustomRangeLabel=true
+              format='MMM D, YYYY hh:mm a'
+              serverFormat="YYYY-MM-DD HH:mm"
+              applyAction=(action "onRegionChange")  
+            }}
+              {{!-- hideAction=(action "hideDatePicker")
+              cancelAction=(action "cancelDatePicker") --}}
+              {{!-- start=analysisStart
+              end=analysisEnd --}}
           </div>
         </div>
 
@@ -60,16 +82,20 @@
                 showEvents=true
                 showMetrics=true
                 showDimensions=true
-                onSubchartChange=(action "setDateParams")
                 onSelection=(action actions.onDeselect)
-                subchartStart=analysisStart
-                subchartEnd=analysisEnd
+                onRegionBrush=(action "onRegionBrush")
                 relatedMetrics=summary.selectedMetrics
                 selectedMetrics=summary.selectedMetrics
                 dimensions=summary.selectedDimensions
                 selectedDimensions=summary.selectedDimensions
                 events=summary.selectedEvents
+                onSubchartChange=(action "setDateParams") 
+                regionStart=analysisStart
+                regionEnd=analysisEnd
+                subchartStart=subchartStart
+                subchartEnd=subchartEnd
               }}
+                {{!-- analysisDate=(hash analysisStart=analysisStart analysisEnd=analysisEnd) --}}
             {{/if}}
           {{/containers/primary-metric-container}}
         </main>
@@ -96,6 +122,6 @@
         {{/link-to}}
       </div>
     </div>
-    {{outlet}}
+     {{outlet}} 
   </div>
 </div>

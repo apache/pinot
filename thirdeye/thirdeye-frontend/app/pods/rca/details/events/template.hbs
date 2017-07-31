@@ -1,8 +1,12 @@
 <section class="paper-container__body">
-  <div class="rca-header">
-    <h3 class="te-sub-title te-sub-title--flush">Events Correlation</h3>
-  </div>
   {{#containers/events-table-container as |events|}}
+  <div class="row rca-header rca-header--flush">
+    <div class="col-xs-9">
+      <h3 class="te-sub-title te-sub-title--flush">Events Correlation</h3>
+        <span>(Analysis Region: {{moment-format events.eventStart dateFormat
+          }} - {{moment-format events.eventEnd dateFormat}})</span>
+    </div>
+  </div>
     {{#containers/primary-metric-container as |summary actions|}}
       {{#if summary.loaded }}
 
@@ -12,7 +16,6 @@
           </div>
         {{/if}}
         {{#if events.loaded}}
-
           {{anomaly-graph
             componentId='correlated-events'
             primaryMetric=summary.primaryMetric
@@ -21,6 +24,8 @@
             showLegend=true
             showEvents=true
             showSubchart=true
+            analysisStart=events.eventStart
+            analysisEnd=events.eventEnd
             onSubchartChange=(action "setDateParams")
             onSelection=(action actions.onEventSelection)
           }}

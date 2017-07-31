@@ -2,7 +2,9 @@
   {{#containers/dimensions-container as |dimensions|}}
     <div class="row rca-header">
       <div class="col-xs-9">
-        <h3 class="te-sub-title te-sub-title--flush">Dimensions Analysis</h3>
+         <h3 class="te-sub-title te-sub-title--flush">Dimensions Analysis</h3> 
+        <span>(Analysis Region: {{moment-format dimensions.regionStart dateFormat}} -
+          {{moment-format dimensions.regionEnd dateFormat}})</span>
       </div>
       <div class="col-xs-3 pull-right">
         <label class="te-label" for="select-dimension">Break Dimensions by: </label>
@@ -17,14 +19,14 @@
       </div>
     </div>
 
-    {{#if dimensions.loading}}
+    {{#if (or dimensions.loading )}}
       <div class="spinner-wrapper">
         {{ember-spinner}}
       </div>
     {{/if}}
-
     {{#containers/primary-metric-container as |summary actions|}}
-      {{#if summary.loaded}}
+
+      {{#if (and summary.loaded dimensions.loaded)}}
         {{anomaly-graph
           componentId='correlated-dimensions'
           showGraphLegend=false
@@ -33,6 +35,8 @@
           primaryMetric=summary.primaryMetric 
           dimensions=dimensions.subdimensions
           selectedDimensions=summary.selectedDimensions
+          analysisStart=dimensions.regionStart
+          analysisEnd=dimensions.regionEnd
           onSubchartChange=(action "setDateParams")
           onSelection=(action actions.onSelection)
           showDimensions=true}}
@@ -41,56 +45,49 @@
           <div class="contribution-table paper-container">
             <div class="contribution-table__header">
               <div class="contribution-table__subnav">
-                <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "change") "thirdeye-link--active"}}" href="#" {{action "onTabChange" "change"}}>% Change</a>
-              </div>
-              <div class="contribution-table__subnav">
-                <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "number") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "number"}}>Raw Numbers</a>
+                <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "change") "thirdeye-link--active"}}" href="#" {{action "onTabChange" "change"}}>Trend Analysis</a>
               </div>
                <div class="contribution-table__subnav">
-                <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "details") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "details"}}>Details</a>
+                <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "details") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "details"}}>Contribution Analysis</a>
               </div> 
             </div>
             <div class="contribution-table__body paper-container__body">
               {{#if (eq selectedTab "details")}}
-                {{#with dimensions.heatmapData.summary.simpleFields as |summary|}}
-                  {{dimension-summary
-                    data=summary
-                  }}
-                {{/with}}
-                <div class="row rca-header">
-                  <div class="col-xs-9">
-                  </div>
-                  <div class="col-xs-3 pull-right">
-                    <label class="te-label" for="select-heatmap-mode">Mode: </label>
-                    {{#power-select 
-                      triggerId="select-heatmap-mode"
-                      selected=heatmapMode
-                      options=heatmapModes
-                      onchange=(action (mut heatmapMode))
-                      as |mode|}}
-                      {{mode}}
-                    {{/power-select}}
-                  </div>
-                </div>
-                {{dimension-heatmap
-                  heatMapData=dimensions.heatmapData
-                  heatmapMode=heatmapMode}}
+                {{outlet}}
               {{else}}
-                {{#if loading}}
+                {{#if tableIsLoading}}
                   <div class="spinner-wrapper spinner-wrapper--absolute">
                     {{ember-spinner}}
                   </div>
                 {{/if}}
+                <div class="row rca-header">
+                  <div class="col-xs-9"></div>
+                  <div class="col-xs-3 pull-right">
+                     {{#x-toggle 
+                      value=showDetails 
+                      classNames="te-toggle pull-right"
+                      theme='ios'
+                      showLabels=true
+                      name="splitViewToggle"
+                      onToggle=(action (mut showDetails))
+                      as |toggle|}}
+                        {{#toggle.label splitView=(not showDetails)}}
+                          <span class="te-label">{{if showDetails 'Hide Details' 'Show Details'}}</span>
+                        {{/toggle.label}}
+                        {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+                    {{/x-toggle}} 
+                  </div>
+                </div>
                 {{contribution-table
                   primaryMetric=summary.primaryMetric
                   dates=summary.primaryMetric.timeBucketsCurrent
                   granularity=summary.granularity
                   start=dimensionsStart
                   end=dimensionsEnd
-                  dimensions=summary.selectedDimensions
-                  showDetails=(eq selectedTab "number")
+                  dimensions=dimensions.subdimensions
+                  showDetails=showDetails
                   loading=(mut tableIsLoading)
-                }}
+                }} 
               {{/if}}
             </div>
           </div>

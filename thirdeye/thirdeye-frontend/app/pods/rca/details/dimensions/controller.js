@@ -4,21 +4,15 @@ import moment from 'moment';
 export default Ember.Controller.extend({
   queryParams: ['dimension'],
   dimension: 'All',
-  heatmapMode: 'Percentage Change',
-  heatmapModes: [
-    'Percentage Change',
-    'Change in Contribution',
-    'Contribution To Overall Change'
-  ],
 
   tableIsLoading: false,
 
-  splitView: false,
-  selectedTab: 'change',
+  showDetails: false,
+  selectedTab: 'details',
 
   dimensionsStart: null,
   dimensionsEnd: null,
-
+  dateFormat: 'MMM D, YYYY hh:mm a',
 
   actions: {
     // Sets new dimension start and end
@@ -28,9 +22,9 @@ export default Ember.Controller.extend({
 
       this.setProperties({
         dimensionsStart,
-        dimensionsEnd
+        dimensionsEnd,
+        tableIsLoading: true
       });
-
     },
 
     /**
@@ -47,8 +41,6 @@ export default Ember.Controller.extend({
     onTabChange(tab) {
       const currentTab = this.get('selectedTab');
       if (currentTab !== tab) {
-        this.set('tableIsLoading', true);
-
         Ember.run.later(() => {
           this.setProperties({
             selectedTab: tab

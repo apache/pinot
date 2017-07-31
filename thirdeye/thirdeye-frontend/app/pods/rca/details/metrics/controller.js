@@ -10,6 +10,7 @@ export default Ember.Controller.extend({
   mostRecentTask: null,
   loading: false,
   splitViewLoading: false,
+  dateFormat: 'MMM D, YYYY hh:mm a',
 
   // Ember concurrency task that sets new analysis start and end
   dateChangeTask: task(function* ([start, end]) {

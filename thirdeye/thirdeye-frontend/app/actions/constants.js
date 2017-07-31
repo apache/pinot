@@ -22,11 +22,21 @@ const eventColorMapping = {
   holiday: 'green',
   informed: 'red',
   lix: 'purple',
-  gcn: 'orange'
+  gcn: 'orange',
+  anomaly: 'teal'
+};
+
+const eventWeightMapping = {
+  lix: 0.05,
+  gcn: 0.1,
+  anomaly: 0.15,
+  holiday: 0.2,
+  informed: 0
 };
 
 export {
   COMPARE_MODE_MAPPING,
   colors,
-  eventColorMapping
+  eventColorMapping,
+  eventWeightMapping
 };

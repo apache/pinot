@@ -15,6 +15,187 @@ const COLOR_MAPPING = {
 export default Ember.Component.extend({
   init() {
     this._super(...arguments);
+
+    this.setProperties({
+      _subchartStart: this.get('subchartStart'),
+      _subchartEnd: this.get('subchartEnd')
+    });
+  },
+
+  // Helper function that builds the subchart region buttons
+  buildSliderButton() {
+    const componentId = this.get('componentId');
+    const resizeButtons = d3.select(`#${componentId}.c3-chart-component`).selectAll('.resize');
+
+    resizeButtons.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 30)
+      .attr('r', 10)
+      .attr('fill', '#0091CA');
+    resizeButtons.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", 0)
+      .attr("y1", 27)
+      .attr("x2", 0)
+      .attr("y2", 33);
+
+    resizeButtons.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", -5)
+      .attr("y1", 27)
+      .attr("x2", -5)
+      .attr("y2", 33);
+
+    resizeButtons.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", 5)
+      .attr("y1", 27)
+      .attr("x2", 5)
+      .attr("y2", 33);
+  },
+
+  buildAnomalyRegionSlider(start, end) {
+    const {
+      componentId,
+      regionStart,
+      regionEnd,
+      _subchartStart: subchartStart,
+      _subchartEnd: subchartEnd
+    } = this.getProperties(
+      'componentId',
+      'regionStart',
+      'regionEnd',
+      '_subchartStart',
+      '_subchartEnd');
+
+    start = start || subchartStart;
+    end = end || subchartEnd;
+
+    d3.select(`#${componentId} .anomaly-graph__region-slider`).remove();
+    if (componentId !== 'main-graph') {return;}
+
+    const focus = d3.select(`#${componentId}.c3-chart-component .c3-chart`);
+    const { height, width } = d3.select(`#${componentId} .c3-chart .c3-event-rects`).node().getBoundingClientRect();
+    const dates = this.get('primaryMetric.timeBucketsCurrent');
+    const min = start ? moment(start).valueOf() : d3.min(dates);
+    const max = end ? moment(end).valueOf() : d3.max(dates);
+
+    const x = d3.time.scale()
+      .domain([min, max])
+      .range([0, width]);
+
+    const brush = d3.svg.brush()
+      .on("brushend", brushed.bind(this))
+      .x(x)
+      .extent([+regionStart, +regionEnd]);
+
+    function brushed() {
+      const e = brush.extent();
+      const [ start, end ] = e;
+
+      const regionStart = moment(start).valueOf();
+      const regionEnd = moment(end).valueOf();
+      const subchartStart = this.get('_subchartStart');
+      const subchartEnd = this.get('_subchartEnd');
+
+      this.setProperties({
+        regionStart,
+        regionEnd,
+        subchartStart,
+        subchartEnd
+      });
+    }
+
+    focus.append('g')
+      .attr('class', 'anomaly-graph__region-slider x brush')
+      .call(brush)
+      .selectAll('rect')
+      .attr('y', 0)
+      .attr('height', height);
+
+    const resizeButton = focus.selectAll('.resize');
+    const sliderHeight = height/2;
+    resizeButton.append('circle')
+      .attr('cx', 0)
+      .attr('cy', sliderHeight)
+      .attr('r', 10)
+      .attr('fill', '#E55800');
+    resizeButton.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", 0)
+      .attr("y1", sliderHeight - 3)
+      .attr("x2", 0)
+      .attr("y2", sliderHeight + 3);
+
+    resizeButton.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", -5)
+      .attr("y1", sliderHeight - 3)
+      .attr("x2", -5)
+      .attr("y2", sliderHeight + 3);
+
+    resizeButton.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", 5)
+      .attr("y1", sliderHeight - 3)
+      .attr("x2", 5)
+      .attr("y2", sliderHeight + 3);
+  },
+
+  // Builds the Current/Expected legend for the graph
+  buildCustomLegend() {
+    const componentId = this.get('componentId');
+    const chart = d3.select(`#${componentId}.c3-chart-component`);
+
+    chart.insert('div', '.chart').attr('class', 'anomaly-graph__legend').selectAll('span')
+      .data(['expected', 'current'])
+      .enter().append('svg')
+      .attr('class', 'anomaly-graph__legend-item')
+      .attr('width', 70)
+      .attr('height', 20)
+      .attr('data-id', function (id) { return id; })
+      .each(function (id) {
+        const element = d3.select(this);
+
+        element.append('text')
+          .attr('x', 30)
+          .attr('y', 10)
+          .html(id => id);
+
+        element.append('line')
+          .attr('class', 'anomaly-graph__legend-line')
+          .attr('x1', 0)
+          .attr('y1', 10)
+          .attr('x2', 25)
+          .attr('y2', 10)
+          .attr('stroke-dasharray', (d) => {
+            const dasharrayNum = (d === 'expected') ? '10%' : '0';
+            return dasharrayNum;
+          });
+      });
+  },
+
+  willDestroyElement() {
+    this._super(...arguments);
+
+    const subchartStart = this.get('_subchartStart');
+    const subchartEnd = this.get('_subchartEnd');
+
+    this.setProperties({
+      subchartStart,
+      subchartEnd
+    });
+  },
+
+  didRender(){
+    this._super(...arguments);
+
+    Ember.run.later(() => {
+      this.buildSliderButton();
+      this.buildAnomalyRegionSlider();
+      this.buildCustomLegend();
+    });
+
   },
 
   /**
@@ -64,6 +245,13 @@ export default Ember.Component.extend({
   showSubChart: false,
   subchartStart: null,
   subchartEnd: null,
+
+  _subchartStart: 0,
+  _subchartEnd: 0,
+
+  analysisStart: 0,
+  analysisEnd: 0,
+
   showLegend: false,
 
   showTitle: false,
@@ -72,6 +260,10 @@ export default Ember.Component.extend({
 
   initStart: null,
   initEnd: null,
+  anomalyRegionStart: 0,
+  anomalyRegionEnd: 0,
+  regionStart: 0,
+  regionEnd: 0,
 
   showEvents: false,
   showDimensions: false,
@@ -199,21 +391,18 @@ export default Ember.Component.extend({
     'maxDate',
     function() {
       const dates = this.get('primaryMetric.timeBucketsCurrent');
-      const subchartStart = this.get('subchartStart');
-      const subchartEnd = this.get('subchartEnd');
-
+      const subchartStart = this.get('_subchartStart')
+        || this.get('subchartStart');
+      const subchartEnd = this.get('_subchartEnd')
+        || this.get('subchartEnd');
       const min = dates.get('firstObject');
       const max = dates.get('lastObject');
+      const extentStart = Math.max(min, moment(subchartStart).valueOf());
+      const extentEnd = Math.min(max, moment(subchartEnd).valueOf());
 
-      const startIndex = Math.floor(dates.length / 4);
-      const endIndex = Math.ceil(dates.length * (3/4));
-      const extentStart = subchartStart
-        ? Number(subchartStart)
-        : dates[startIndex];
-
-      const extentEnd = subchartEnd
-        ? Number(subchartEnd)
-        : dates[endIndex];
+      const extentRange = (subchartStart && subchartEnd)
+        ? [extentStart, extentEnd]
+        : null;
 
       return {
         y: {
@@ -241,13 +430,14 @@ export default Ember.Component.extend({
         x: {
           type: 'timeseries',
           show: true,
+          padding: 0,
           min: this.get('minDate') || min,
           max: this.get('maxDate') || max,
           tick: {
             fit: false
             // format: function (x) { return new Date(x).toString(); }
           },
-          extent: [extentStart, extentEnd]
+          extent: extentRange
         }
       };
     }
@@ -262,13 +452,39 @@ export default Ember.Component.extend({
     'showGraphLegend',
     function() {
       const showSubchart = this.get('showGraphLegend') || this.get('showSubchart');
-      const onSubchartBrush = this.get('onSubchartChange');
       return {
         show: showSubchart,
-        onbrush: onSubchartBrush
+        onbrush: this.get('onbrush').bind(this)
       };
     }
   ),
+
+  /**
+   * Callback that handles the anomaly brush event
+   */
+  onbrush: function(dates) {
+    const [ start, end ] = dates;
+    const onSubchartBrush = this.get('onSubchartChange');
+    const graphDates = this.get('primaryMetric.timeBucketsCurrent');
+    const min = graphDates.get('firstObject');
+    const max = graphDates.get('lastObject');
+
+    if ((moment(start).valueOf() == min) && (moment(end).valueOf() == max)) {
+      this.setProperties({
+        _subchartStart: 0,
+        _subchartEnd: 0
+      });
+    } else {
+      this.setProperties({
+        _subchartStart: moment(start).valueOf(),
+        _subchartEnd: moment(end).valueOf()
+      });
+
+      onSubchartBrush && onSubchartBrush(dates);
+    }
+    this.buildAnomalyRegionSlider(start, end);
+
+  },
 
   /**
    * Graph Height Config
@@ -409,12 +625,11 @@ export default Ember.Component.extend({
         axes: Object.assign({ y2: 'y2'}, holidayAxes),
         columns: [
           this.get('chartDates'),
+          ...columns,
           ...holidayEventsColumn,
-          ...holidayEventsDatesColumn,
-          ...columns
+          ...holidayEventsDatesColumn
         ],
         type: 'line',
-        // x: 'date',
         xFormat: '%Y-%m-%d %H:%M',
         colors: this.get('colors'),
         onclick: this.get('onEventClick')
@@ -445,6 +660,32 @@ export default Ember.Component.extend({
 
     });
   }),
+
+  /**
+   * Data massages the anomaly region
+   */
+  anomalyRegion: Ember.computed(
+    'analysisStart',
+    'analysisEnd',
+    function() {
+      const start = this.get('analysisStart');
+      const end = this.get('analysisEnd');
+
+      if (!(start && end)) { return []; }
+
+      const region = {
+        axis: 'x',
+        start,
+        end,
+        tick: {
+          format: '%m %d %Y'
+        },
+        class: `c3-region--dark-orange`
+      };
+
+      return [region];
+    }
+  ),
 
   /**
    * Data massages Primary Metric's region
@@ -496,9 +737,18 @@ export default Ember.Component.extend({
   /**
    * Aggregates chart regions
    */
-  regions: Ember.computed('primaryRegions', 'relatedRegions', function() {
-    return [...this.get('primaryRegions'), ...this.get('relatedRegions')];
-  }),
+  regions: Ember.computed(
+    'primaryRegions',
+    'relatedRegions',
+    'anomalyRegion',
+    function() {
+      return [
+        ...this.get('primaryRegions'),
+        ...this.get('relatedRegions'),
+        ...this.get('anomalyRegion')
+      ];
+    }
+  ),
 
   actions: {
     /**

@@ -1,7 +1,11 @@
 import { type } from './utils';
 import fetch from 'fetch';
 import moment from 'moment';
-import { COMPARE_MODE_MAPPING, eventColorMapping } from './constants';
+import {
+  COMPARE_MODE_MAPPING,
+  eventColorMapping,
+  eventWeightMapping
+} from './constants';
 
 /**
  * Define the metric action types
@@ -10,6 +14,7 @@ export const ActionTypes = {
   LOADING: type('[Events] Loading'),
   LOADED: type('[Events] Data loaded'),
   LOAD_EVENTS: type('[Events] Load events'),
+  SET_DATE: type('[Events] Set new region dates'),
   REQUEST_FAIL: type('[Events] Request Fail'),
   RESET: type('[Event] Reset Data')
 };
@@ -39,14 +44,33 @@ function loaded() {
   };
 }
 
+function setDate(dates) {
+  return {
+    type: ActionTypes.SET_DATE,
+    payload: dates
+  };
+}
+
 /**
  * Helper function assigning colors to events based on the type
  * @param {Object} event The event object
  */
 const assignEventColor = (event) => {
-  const color = eventColorMapping[event.eventType];
+  const { eventType } = event;
+  const color = eventColorMapping[eventType] || 'blue';
 
   return Object.assign(event, { color });
+};
+
+/**
+ * Helper function assigning weight to events based on the type
+ * @param {Object} event The event object
+ */
+const setWeight = (event) => {
+  const { eventType } = event;
+  const weight = eventWeightMapping[eventType] || 0;
+
+  return Object.assign(event, {score: weight});
 };
 
 
@@ -58,14 +82,16 @@ const assignEventColor = (event) => {
  */
 function fetchEvents(start, end, mode) {
   return (dispatch, getState) => {
-    const { primaryMetric, events } = getState();
+    const { primaryMetric } = getState();
 
     const {
       primaryMetricId: metricId,
-      currentStart = moment(endDate).subtract(1, 'week').valueOf(),
+      currentStart = moment(end).subtract(1, 'week').valueOf(),
       currentEnd =  moment().subtract(1, 'day').endOf('day').valueOf(),
       compareMode
     } = primaryMetric;
+
+    if (!metricId) {return;}
 
     const diff = Math.floor((currentEnd - currentStart) / 4);
     const anomalyEnd = end || (+currentEnd - diff);
@@ -76,6 +102,7 @@ function fetchEvents(start, end, mode) {
     const baselineStart = moment(anomalyStart).clone().subtract(offset, 'week').valueOf();
     const baselineEnd = moment(anomalyEnd).clone().subtract(offset, 'week').valueOf();
 
+    dispatch(setDate([anomalyStart, anomalyEnd]));
     dispatch(loading());
     return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${currentStart}&analysisEnd=${currentEnd}&urns=thirdeye:metric:${metricId}`)
       .then(res => res.json())
@@ -84,7 +111,8 @@ function fetchEvents(start, end, mode) {
         return res
           .filter(event => event.eventType !== 'informed')
           .map(assignEventColor)
-          .sort((a, b) => (b.score - a.score));
+          .sort((a, b) => (b.score - a.score))
+          .map(setWeight);
       })
       .then(res => dispatch(loadEvents(res)
     ));
@@ -100,8 +128,6 @@ function fetchEvents(start, end, mode) {
 function updateDates(start, end, compareMode) {
   return (dispatch, getState) => {
     const { primaryMetric } = getState();
-    if (primaryMetric.selectedEvents.length) { return;}
-
     compareMode = compareMode || primaryMetric.compareMode;
 
     return dispatch(fetchEvents(start, end, compareMode));

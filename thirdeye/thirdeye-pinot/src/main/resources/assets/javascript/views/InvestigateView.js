@@ -59,8 +59,12 @@ InvestigateView.prototype = {
     const filters = {};
     const start = moment(currentStart);
     const end = moment(currentEnd);
-    const heatMapCurrentStart = moment(anomalyStart);
-    const heatMapCurrentEnd = moment(anomalyEnd);
+    const anomalyRegionStart = moment(anomalyStart);
+    const anomalyRegionEnd = moment(anomalyEnd);
+
+    const diff = anomalyRegionEnd.valueOf() - anomalyRegionStart.valueOf();
+    const currentViewStart = anomalyRegionStart.valueOf() - diff;
+    const currentViewEnd = anomalyRegionEnd.valueOf() + diff;
 
     const parsedDimensions = JSON.parse(anomalyFunctionDimension);
     const dimensionKeys = Object.keys(parsedDimensions);
@@ -72,18 +76,20 @@ InvestigateView.prototype = {
         const offset = constants.WOW_MAPPING[wow.compareMode];
         const baselineStart = start.clone().subtract(offset, 'days');
         const baselineEnd = end.clone().subtract(offset, 'days');
-        const heatMapBaselineStart = heatMapCurrentStart.clone().subtract(offset, 'days');
-        const heatMapBaselineEnd = heatMapCurrentEnd.clone().subtract(offset, 'days');
+        const heatMapBaselineStart = anomalyRegionStart.clone().subtract(offset, 'days');
+        const heatMapBaselineEnd = anomalyRegionEnd.clone().subtract(offset, 'days');
         wow.change *= 100;
         wow.url = `thirdeye#analysis?metricId=${metricId}&dimension=${dimension}&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
             `baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&` +
             `compareMode=${wow.compareMode}&filters={}&granularity=${granularity}&` +
-            `heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
-            `heatMapCurrentEnd=${heatMapCurrentEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
+            `heatMapCurrentStart=${anomalyRegionStart.valueOf()}&` +
+            `heatMapCurrentEnd=${anomalyRegionEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
             `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}&filters=${anomalyFunctionDimension}&heatMapFilters=${anomalyFunctionDimension}`;
 
-        wow.newUrl = `app#/rca/${metricId}/metrics?startDate=${start.valueOf()}&endDate=${end.valueOf()}&` +
-          `compareMode=${wow.compareMode}&filters=&filters=${anomalyFunctionDimension}&granularity=${granularity}`;
+
+        wow.newUrl = `app#/rca/${metricId}/metrics?analysisStart=${anomalyRegionStart.valueOf()}&analysisEnd=${anomalyRegionEnd.valueOf()}&` +
+          `startDate=${currentViewStart}&endDate=${currentViewEnd}&` +
+          `compareMode=${wow.compareMode}&filters=${anomalyFunctionDimension}&granularity=${granularity}`;
         return wow;
       });
   },

@@ -2,13 +2,17 @@
   {{#containers/metrics-container as |metricList|}}
     {{#containers/primary-metric-container as |summary actions|}}
       {{#if summary.loaded}}
-        <div class="rca-header">
-          <h3 class="te-sub-title te-sub-title--flush">Metrics Correlation</h3>
-          <div class="rca-actions">
+        <div class="rca-header row">
+          <div class="col-xs-9">
+            <h3 class="te-sub-title te-sub-title--flush">Metrics Correlation</h3> 
+            <span>(Analysis Region: {{moment-format metricList.regionStart dateFormat}} -
+          {{moment-format metricList.regionEnd dateFormat}})</span>
+          </div>
+          <div class="rca-actions col-xs-3">
             {{#if metricList.loaded}}
               {{#x-toggle 
                 value=splitView 
-                classNames="te-toggle"
+                classNames="te-toggle pull-right"
                 theme='ios'
                 showLabels=true
                 name="splitViewToggle"
@@ -23,7 +27,7 @@
           </div>
         </div>
         <div class="rca-body">
-          {{#if metricList.loading}}
+          {{#if (or metricList.loading summary.loading)}}
             <section>
               <div class="spinner-wrapper">
                 {{ember-spinner}}
@@ -45,6 +49,8 @@
                 showMetrics=true
                 showTitle=true
                 enableZoom=true
+                analysisStart=metricList.regionStart
+                analysisEnd=metricList.regionEnd
                 onSubchartChange=(action "onDateChange")
                 onSelection=(action actions.onMetricSelection)
               }}
@@ -56,6 +62,8 @@
                   enableZoom=true
                   showMetrics=true
                   showTitle=true
+                  analysisStart=metricList.regionStart
+                  analysisEnd=metricList.regionEnd
                   onSelection=(action actions.onMetricSelection)
                   onSubchartChange=(action "onDateChange")
                   showGraphLegend=false}}
@@ -71,6 +79,8 @@
                 showLegend=true
                 showMetrics=true
                 showSubchart=true
+                analysisStart=metricList.regionStart
+                analysisEnd=metricList.regionEnd
                 onSelection=(action actions.onMetricSelection)
                 onSubchartChange=(action "onDateChange")
               }}
@@ -104,7 +114,7 @@
                     primaryMetric=summary.primaryMetric
                     start=analysisStart
                     end=analysisEnd
-                    relatedMetrics=summary.selectedMetrics
+                    relatedMetrics=metricList.relatedMetrics
                     showDetails=(eq selectedTab "number")
                     loading=(mut loading)
                   }}

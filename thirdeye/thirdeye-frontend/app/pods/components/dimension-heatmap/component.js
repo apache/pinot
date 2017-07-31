@@ -44,11 +44,13 @@ export default Ember.Component.extend({
               baselineValue: record[baselineValueIndex],
               currentContribution: record[currentContributionIndex],
               baselineContribution: record[baselineContributionIndex],
-              percentageChange: record[percentageChangeIndex],
               contributionChange: record[contributionChangeIndex],
+              percentageChange: record[percentageChangeIndex],
               contributionToOverallChange: record[contributionToOverallChangeIndex]
             };
-            row.children.push(item);
+            if (item.t) {
+              row.children.push(item);
+            }
           }
         }
         treeMapData.push(row);
@@ -108,6 +110,8 @@ export default Ember.Component.extend({
     const dimensions = this.get('dimensions');
     const treeMapData = this.get('treeMapData');
 
+    if (!dimensions) { return; }
+
     for (var i = 0; i < dimensions.length; i++) {
       var data = treeMapData[i];
       var dimension = dimensions[i];
@@ -129,6 +133,8 @@ export default Ember.Component.extend({
       }).on("click", function(d) {
         // return zoom(node == d.parent ? root : d.parent);
       }).on("mousemove", function(d) {
+
+        if (!d.percentageChange) { return; }
         const tooltipWidth = 200;
         const xPosition = d3.event.pageX - (tooltipWidth + 20);
         const yPosition = d3.event.pageY + 5;
@@ -155,9 +161,9 @@ export default Ember.Component.extend({
       });
 
       cell.append("svg:rect").attr("width", function(d) {
-        return d.dx - 1;
+        return Math.max(d.dx - 1, 0);
       }).attr("height", function(d) {
-        return d.dy - 1;
+        return Math.max(d.dy - 1, 0);
       }).style("fill", function(d) {
         var factor = getChangeFactor(d);
         return getBackgroundColor(factor);
