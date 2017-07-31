@@ -47,6 +47,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   public ControllerAdminApiApplication(String consoleWebPath) {
     super();
     CONSOLE_WEB_PATH = consoleWebPath;
+    if (!CONSOLE_WEB_PATH.endsWith("/")) {
+      CONSOLE_WEB_PATH += "/";
+    }
     packages(RESOURCE_PACKAGE);
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
