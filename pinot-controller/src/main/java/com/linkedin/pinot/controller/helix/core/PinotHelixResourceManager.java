@@ -972,12 +972,14 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse deleteBrokerTenantFor(String tenantName) {
+    PinotResourceManagerResponse response = new PinotResourceManagerResponse();
     String brokerTag = ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tenantName);
     List<String> instancesInClusterWithTag = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTag);
     for (String instance : instancesInClusterWithTag) {
       retagInstance(instance, brokerTag, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
-    return new PinotResourceManagerResponse("Succcess", true);
+
+    return response;
   }
 
   public Set<String> getAllInstancesForServerTenant(String tenantName) {
