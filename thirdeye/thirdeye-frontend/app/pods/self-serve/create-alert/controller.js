@@ -416,7 +416,7 @@ export default Ember.Controller.extend({
       const granularity = this.get('graphConfig.granularity').toLowerCase();
       const settingsByGranularity = {
         common: {
-          functionName: this.get('alertFunctionName').trim(),
+          functionName: this.get('alertFunctionName') || this.get('alertFunctionName').trim(),
           metric: this.get('selectedMetricOption.name'),
           dataset: this.get('selectedMetricOption.dataset'),
           metricFunction: 'SUM',
