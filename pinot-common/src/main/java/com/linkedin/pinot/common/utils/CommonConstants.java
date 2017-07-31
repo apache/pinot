@@ -198,8 +198,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
     public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
-    public static final String CONFIG_OF_INSTANCE_SEGMENT_METADATA_LOADER_CLASS =
-        "pinot.server.instance.segment.metadata.loader.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS = "pinot.server.query.executor.pruner.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
@@ -218,8 +216,6 @@ public class CommonConstants {
     public static final String DEFAULT_READ_MODE = "heap";
     public static final String DEFAULT_INSTANCE_DATA_DIR = "/tmp/PinotServer/test/index";
     public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR = "/tmp/PinotServer/test/segmentTar";
-    public static final String DEFAULT_SEGMENT_METADATA_LOADER_CLASS =
-        "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader";
     public static final String DEFAULT_DATA_MANAGER_CLASS =
         "com.linkedin.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =

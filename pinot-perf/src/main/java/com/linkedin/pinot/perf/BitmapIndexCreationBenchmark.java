@@ -16,7 +16,7 @@
 package com.linkedin.pinot.perf;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.Arrays;
@@ -34,7 +34,7 @@ public class BitmapIndexCreationBenchmark {
     File indexDir = new File(
         "/home/kgopalak/pinot_perf/index_dir/capReportingEvents_OFFLINE/capReportingEvents_capReportingEvents_daily_2");
     long start = System.currentTimeMillis();
-    ColumnarSegmentLoader.load(indexDir, indexLoadingConfig);
+    SegmentLoader.load(indexDir, indexLoadingConfig);
     long end = System.currentTimeMillis();
     System.out.println("Took " + (end - start) + " to generate bitmap index");
   }

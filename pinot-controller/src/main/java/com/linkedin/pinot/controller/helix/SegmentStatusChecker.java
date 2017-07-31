@@ -16,14 +16,14 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.segment.OfflineSegmentZKMetadata;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;

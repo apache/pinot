@@ -15,27 +15,25 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.partition.ColumnPartitionMetadata;
+import com.linkedin.pinot.core.metadata.partition.PartitionToReplicaGroupMappingZKMetadata;
+import com.linkedin.pinot.core.metadata.partition.SegmentPartitionMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.transport.common.SegmentId;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentId;
 
 /**
  * Partition aware routing table builder for offline table.

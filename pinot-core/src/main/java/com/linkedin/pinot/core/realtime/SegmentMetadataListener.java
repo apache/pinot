@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 
 /**
  * Allows one to listen to segment metadata changes

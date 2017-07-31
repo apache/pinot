@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.realtime;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
 import java.util.Map;
 
 

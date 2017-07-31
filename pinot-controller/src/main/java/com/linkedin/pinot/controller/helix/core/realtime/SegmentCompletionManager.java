@@ -17,13 +17,13 @@
 package com.linkedin.pinot.controller.helix.core.realtime;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.core.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;

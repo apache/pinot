@@ -19,7 +19,7 @@ package com.linkedin.pinot.server.api.resources;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.Response;

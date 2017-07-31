@@ -16,13 +16,12 @@
 package com.linkedin.pinot.core.segment.index.readers;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
-import joptsimple.internal.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -15,12 +15,22 @@
  */
 package com.linkedin.pinot.tools;
 
+import com.google.common.collect.HashBiMap;
+import com.google.common.collect.MinMaxPriorityQueue;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
 import com.linkedin.pinot.core.startree.StarTreeInterf;
 import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,7 +40,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -48,19 +57,6 @@ import org.restlet.routing.Router;
 import org.restlet.routing.VirtualHost;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.HashBiMap;
-import com.google.common.collect.MinMaxPriorityQueue;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class StarTreeIndexViewer {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexViewer.class);

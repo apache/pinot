@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.MultiValueReaderContext;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
 
 public final class MultiValueIterator extends BlockMultiValIterator {
 

@@ -17,9 +17,9 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,10 +30,7 @@ import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig {

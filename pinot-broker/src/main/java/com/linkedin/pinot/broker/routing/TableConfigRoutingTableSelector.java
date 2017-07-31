@@ -18,7 +18,7 @@ package com.linkedin.pinot.broker.routing;
 
 import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;

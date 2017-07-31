@@ -34,6 +34,7 @@ import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
+import com.linkedin.pinot.core.query.utils.StarTreeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -64,7 +65,7 @@ public class FilterPlanNode implements PlanNode {
     Operator operator;
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
     if (_segment.getSegmentMetadata().hasStarTree()
-        && RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), filterQueryTree, _brokerRequest)) {
+        && StarTreeUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), filterQueryTree, _brokerRequest)) {
       operator = new StarTreeIndexOperator(_segment, _brokerRequest);
     } else {
       operator = constructPhysicalOperator(filterQueryTree, _segment, _optimizeAlwaysFalse);

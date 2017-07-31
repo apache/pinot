@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionVisitorBase;
 import com.linkedin.pinot.core.query.aggregation.function.FastHLLAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.FastHLLMVAggregationFunction;

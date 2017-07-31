@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.broker.pruner;
 
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;

@@ -19,12 +19,12 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.DataBlockCache;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -182,7 +182,7 @@ public class HllIndexCreationTest {
 
       // verify that the segment loads correctly. This is necessary and sufficient
       // full proof way to ensure that segment is correctly translated
-      IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDirectory, v3LoadingConfig);
+      IndexSegment indexSegment = SegmentLoader.load(segmentDirectory, v3LoadingConfig);
       Assert.assertNotNull(indexSegment);
       Assert.assertEquals(indexSegment.getSegmentName(), metadata.getName());
       Assert.assertEquals(SegmentVersion.v3,

@@ -16,6 +16,13 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.core.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
@@ -24,17 +31,9 @@ import org.apache.helix.ZNRecord;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.yammer.metrics.core.MetricsRegistry;
-import static com.linkedin.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus;
-import static com.linkedin.pinot.common.protocols.SegmentCompletionProtocol.Request;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+
+import static com.linkedin.pinot.common.protocols.SegmentCompletionProtocol.*;
+import static org.mockito.Mockito.*;
 
 
 public class SegmentCompletionTest {

@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.startree;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -26,8 +25,10 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
+import com.linkedin.pinot.core.query.utils.StarTreeUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.util.Collections;
@@ -74,7 +75,7 @@ public class BaseSumStarTreeIndexTest {
       BrokerRequest brokerRequest = compiler.compileToBrokerRequest(_hardCodedQueries[i]);
 
       FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      Assert.assertTrue(RequestUtils.isFitForStarTreeIndex(segmentMetadata, filterQueryTree, brokerRequest));
+      Assert.assertTrue(StarTreeUtils.isFitForStarTreeIndex(segmentMetadata, filterQueryTree, brokerRequest));
 
       Map<String, double[]> expectedResult = computeSumUsingRawDocs(segment, metricNames, brokerRequest);
       Map<String, double[]> actualResult = computeSumUsingAggregatedDocs(segment, metricNames, brokerRequest);

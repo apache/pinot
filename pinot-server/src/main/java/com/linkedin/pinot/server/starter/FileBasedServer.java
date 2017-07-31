@@ -15,10 +15,14 @@
  */
 package com.linkedin.pinot.server.starter;
 
+import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
+import com.linkedin.pinot.transport.netty.NettyServer;
+import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import com.linkedin.pinot.transport.netty.NettyTCPServer;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -26,12 +30,6 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.transport.netty.NettyServer;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
-import com.linkedin.pinot.transport.netty.NettyTCPServer;
 
 
 /**
@@ -83,7 +81,7 @@ public class FileBasedServer {
     ServerBuilder serverBuilder = new ServerBuilder(new File(_serverConfigPath), metricsRegistry);
 
     LOGGER.info("Trying to build InstanceDataManager");
-    final DataManager instanceDataManager = serverBuilder.buildInstanceDataManager();
+    InstanceDataManager instanceDataManager = serverBuilder.buildInstanceDataManager();
     LOGGER.info("Trying to start InstanceDataManager");
     instanceDataManager.start();
     //    bootstrapSegments(instanceDataManager);

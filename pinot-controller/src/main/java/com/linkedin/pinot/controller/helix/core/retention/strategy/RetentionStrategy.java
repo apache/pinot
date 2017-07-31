@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention.strategy;
 
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 
 
 /**

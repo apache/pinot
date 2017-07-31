@@ -20,11 +20,6 @@ import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
@@ -32,7 +27,11 @@ import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
@@ -53,11 +52,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * InstanceDataManager is the top level DataManger, Singleton.
- *
- *
- */
 // TODO: pass a reference to Helix property store during initialization. Both OFFLINE and REALTIME use case need it.
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
@@ -65,18 +59,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   private boolean _isStarted = false;
-  private SegmentMetadataLoader _segmentMetadataLoader;
-
-  public synchronized void init(HelixInstanceDataManagerConfig instanceDataManagerConfig)
-      throws ConfigurationException, InstantiationException, IllegalAccessException, ClassNotFoundException {
-    _instanceDataManagerConfig = instanceDataManagerConfig;
-    _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-  }
 
   @Override
-  public synchronized void init(Configuration dataManagerConfig) {
+  public synchronized void init(@Nonnull Configuration instanceDataManagerConfig) {
     try {
-      _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(dataManagerConfig);
+      _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(instanceDataManagerConfig);
       LOGGER.info("InstanceDataManager Config:" + _instanceDataManagerConfig.toString());
       File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
       if (!instanceDataDir.exists()) {
@@ -86,27 +73,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       if (!instanceSegmentTarDir.exists()) {
         instanceSegmentTarDir.mkdirs();
       }
-      try {
-        _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-        LOGGER.info("Loaded SegmentMetadataLoader for class name : "
-            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-      } catch (Exception e) {
-        LOGGER
-            .error(
-                "Cannot initialize SegmentMetadataLoader for class name : "
-                    + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : "
-                    + e.getMessage(), e);
-      }
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
       LOGGER.error("Error in initializing HelixDataManager, StackTrace is : " + e.getMessage(), e);
     }
-
-  }
-
-  private static SegmentMetadataLoader getSegmentMetadataLoader(String segmentMetadataLoaderClassName)
-      throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-    return (SegmentMetadataLoader) Class.forName(segmentMetadataLoaderClassName).newInstance();
   }
 
   @Override
@@ -137,8 +107,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Nullable
   @Override
-  public TableDataManager getTableDataManager(String tableName) {
-    return _tableDataManagerMap.get(tableName);
+  public TableDataManager getTableDataManager(String tableNameWithType) {
+    return _tableDataManagerMap.get(tableNameWithType);
   }
 
   @Override
@@ -224,7 +194,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void removeSegment(String segmentName) {
+  public synchronized void removeSegment(@Nonnull String segmentName) {
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
       tableDataManager.removeSegment(segmentName);
     }
@@ -256,7 +226,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
       // Load from index directory
       IndexSegment indexSegment =
-          ColumnarSegmentLoader.load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
+          SegmentLoader.load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
 
       // Replace the old segment in memory
       _tableDataManagerMap.get(tableNameWithType).addSegment(indexSegment);
@@ -278,24 +248,21 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
+  @Nonnull
   @Override
-  public String getSegmentDataDirectory() {
+  public String getInstanceDataDir() {
     return _instanceDataManagerConfig.getInstanceDataDir();
-  }
-
-  @Override
-  public String getSegmentFileDirectory() {
-    return _instanceDataManagerConfig.getInstanceSegmentTarDir();
-  }
-
-  @Override
-  public SegmentMetadataLoader getSegmentMetadataLoader() {
-    return _segmentMetadataLoader;
   }
 
   @Nonnull
   @Override
-  public List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType) {
+  public String getInstanceSegmentTarDir() {
+    return _instanceDataManagerConfig.getInstanceSegmentTarDir();
+  }
+
+  @Nonnull
+  @Override
+  public List<SegmentMetadata> getSegmentsMetadata(@Nonnull String tableNameWithType) {
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager == null) {
       return Collections.emptyList();

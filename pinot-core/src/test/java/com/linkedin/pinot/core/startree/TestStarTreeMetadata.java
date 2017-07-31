@@ -16,12 +16,12 @@
 package com.linkedin.pinot.core.startree;
 
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.startree.StarTreeMetadata;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;

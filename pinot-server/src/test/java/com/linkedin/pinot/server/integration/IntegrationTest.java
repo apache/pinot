@@ -15,7 +15,25 @@
  */
 package com.linkedin.pinot.server.integration;
 
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.request.QuerySource;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.server.conf.ServerConf;
+import com.linkedin.pinot.server.starter.ServerInstance;
+import com.linkedin.pinot.util.TestUtils;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
@@ -25,7 +43,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -33,25 +50,6 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.request.QuerySource;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
-import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.starter.ServerInstance;
-import com.linkedin.pinot.util.TestUtils;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class IntegrationTest {
@@ -125,7 +123,7 @@ public class IntegrationTest {
       driver.init(config);
       driver.build();
 
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_" + String.valueOf(i)), driver.getSegmentName()), ReadMode.mmap));
+      _indexSegmentList.add(SegmentLoader.load(new File(new File(INDEXES_DIR, "segment_" + String.valueOf(i)), driver.getSegmentName()), ReadMode.mmap));
 
 //      System.out.println("built at : " + segmentDir.getAbsolutePath());
     }

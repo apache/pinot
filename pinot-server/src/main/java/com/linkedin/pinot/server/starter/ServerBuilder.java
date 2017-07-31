@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.server.starter;
 
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.operator.transform.TransformUtils;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.QuerySchedulerFactory;
 import com.linkedin.pinot.server.conf.NettyServerConfig;
@@ -126,17 +126,17 @@ public class ServerBuilder {
     initMetrics();
   }
 
-  public DataManager buildInstanceDataManager() throws InstantiationException, IllegalAccessException,
-      ClassNotFoundException {
+  public InstanceDataManager buildInstanceDataManager()
+      throws InstantiationException, IllegalAccessException, ClassNotFoundException {
     String className = _serverConf.getInstanceDataManagerClassName();
-    LOGGER.info("Trying to Load Instance DataManager by Class : " + className);
-    DataManager instanceDataManager = (DataManager) Class.forName(className).newInstance();
+    LOGGER.info("Trying to Load InstanceDataManager by Class : " + className);
+    InstanceDataManager instanceDataManager = (InstanceDataManager) Class.forName(className).newInstance();
     instanceDataManager.init(_serverConf.getInstanceDataManagerConfig());
     return instanceDataManager;
   }
 
-  public QueryExecutor buildQueryExecutor(DataManager instanceDataManager) throws InstantiationException,
-      IllegalAccessException, ClassNotFoundException, ConfigurationException {
+  public QueryExecutor buildQueryExecutor(InstanceDataManager instanceDataManager)
+      throws InstantiationException, IllegalAccessException, ClassNotFoundException, ConfigurationException {
     String className = _serverConf.getQueryExecutorClassName();
     LOGGER.info("Trying to Load Query Executor by Class : " + className);
     QueryExecutor queryExecutor = (QueryExecutor) Class.forName(className).newInstance();

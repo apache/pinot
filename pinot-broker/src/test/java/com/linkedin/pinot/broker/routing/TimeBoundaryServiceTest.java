@@ -15,16 +15,14 @@
  */
 package com.linkedin.pinot.broker.routing;
 
-import com.linkedin.pinot.broker.routing.HelixExternalViewBasedTimeBoundaryService;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService.TimeBoundaryInfo;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
-
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.segment.OfflineSegmentZKMetadata;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;

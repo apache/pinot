@@ -15,13 +15,6 @@
  */
 package com.linkedin.pinot.core.data;
 
-import com.linkedin.pinot.common.data.RowEvent;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.type.TypeReference;
-
-import java.io.IOException;
-import java.io.StringWriter;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,28 +22,24 @@ import java.util.Set;
 
 
 /**
- * A plain implementation of RowEvent based on HashMap. Should be reused as much as possible via
- * {@link GenericRow#createOrReuseRow(GenericRow)}
+ * The <code>GenericRow</code> class contains the data for a row.
+ * <p>Should be reused as much as possible via {@link GenericRow#createOrReuseRow(GenericRow)}
  */
-public class GenericRow implements RowEvent {
-  private Map<String, Object> _fieldMap = new HashMap<String, Object>();
-  private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+public class GenericRow {
+  private Map<String, Object> _fieldMap = new HashMap<>();
 
-  @Override
-  public void init(Map<String, Object> field) {
-    _fieldMap = field;
+  public void init(Map<String, Object> fieldMap) {
+    _fieldMap = fieldMap;
   }
 
   public Set<Map.Entry<String, Object>> getEntrySet() {
     return _fieldMap.entrySet();
   }
 
-  @Override
   public String[] getFieldNames() {
     return _fieldMap.keySet().toArray(new String[_fieldMap.size()]);
   }
 
-  @Override
   public Object getValue(String fieldName) {
     return _fieldMap.get(fieldName);
   }
@@ -97,21 +86,6 @@ public class GenericRow implements RowEvent {
     for (Map.Entry<String, Object> mapEntry : getEntrySet()) {
       mapEntry.setValue(null);
     }
-  }
-
-  static TypeReference typeReference = new TypeReference<Map<String, Object>>() {};
-
-  public static GenericRow fromBytes(byte[] buffer) throws IOException {
-    Map<String, Object> fieldMap = (Map<String, Object>) OBJECT_MAPPER.readValue(buffer, typeReference);
-    GenericRow genericRow = new GenericRow();
-    genericRow.init(fieldMap);
-    return genericRow;
-  }
-
-  public byte[] toBytes() throws IOException {
-    StringWriter writer = new StringWriter();
-    OBJECT_MAPPER.writeValue(writer, _fieldMap);
-    return writer.toString().getBytes(Charset.forName("UTF-8"));
   }
 
   /**

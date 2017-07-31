@@ -19,11 +19,6 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
@@ -31,6 +26,10 @@ import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.NotificationContext;
@@ -51,15 +50,14 @@ import org.slf4j.LoggerFactory;
  * 3. Delete an existed segment.
  */
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
-
-  private DataManager INSTANCE_DATA_MANAGER;
+  private InstanceDataManager INSTANCE_DATA_MANAGER;
   private final String INSTANCE_ID;
   private static String HELIX_CLUSTER_NAME;
   private ZkHelixPropertyStore<ZNRecord> propertyStore;
   private final SegmentFetcherAndLoader _fetcherAndLoader;
 
   public SegmentOnlineOfflineStateModelFactory(String helixClusterName, String instanceId,
-      DataManager instanceDataManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      InstanceDataManager instanceDataManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
       SegmentFetcherAndLoader fetcherAndLoader) {
     _fetcherAndLoader = fetcherAndLoader;
     this.propertyStore = propertyStore;

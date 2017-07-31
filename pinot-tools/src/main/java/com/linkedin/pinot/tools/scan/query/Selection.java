@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.HashMap;
 import java.util.List;

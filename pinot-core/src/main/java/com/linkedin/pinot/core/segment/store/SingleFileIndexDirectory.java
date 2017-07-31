@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.segment.store;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.BufferedWriter;
 import java.io.File;

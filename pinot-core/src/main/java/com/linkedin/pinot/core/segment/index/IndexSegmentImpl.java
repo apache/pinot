@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
@@ -25,6 +24,8 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;

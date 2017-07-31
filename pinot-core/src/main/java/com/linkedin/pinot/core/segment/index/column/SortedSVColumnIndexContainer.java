@@ -18,10 +18,10 @@ package com.linkedin.pinot.core.segment.index.column;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.SortedInvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class SortedSVColumnIndexContainer extends ColumnIndexContainer {

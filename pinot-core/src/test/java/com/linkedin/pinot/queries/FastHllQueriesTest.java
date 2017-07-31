@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -261,7 +261,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig);
     driver.build();
 
-    _indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    _indexSegment = SegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _segmentDataManagers = Arrays.<SegmentDataManager>asList(new OfflineSegmentDataManager(_indexSegment),
         new OfflineSegmentDataManager(_indexSegment));
   }

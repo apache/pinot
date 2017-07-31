@@ -15,11 +15,11 @@
  */
 package com.linkedin.pinot.broker.pruner;
 
-import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.metadata.partition.ColumnPartitionMetadata;
+import com.linkedin.pinot.core.metadata.partition.SegmentPartitionMetadata;
+import com.linkedin.pinot.core.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.util.Collections;
 import java.util.HashMap;

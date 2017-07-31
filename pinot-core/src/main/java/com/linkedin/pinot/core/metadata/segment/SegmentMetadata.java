@@ -1,0 +1,132 @@
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.linkedin.pinot.core.metadata.segment;
+
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.metadata.startree.StarTreeMetadata;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.joda.time.Duration;
+import org.joda.time.Interval;
+
+
+/**
+ * The <code>SegmentMetadata</code> class holds the segment level management information and data statistics.
+ */
+public interface SegmentMetadata {
+
+  String getTableName();
+
+  String getIndexType();
+
+  String getTimeColumn();
+
+  long getStartTime();
+
+  long getEndTime();
+
+  TimeUnit getTimeUnit();
+
+  Duration getTimeGranularity();
+
+  Interval getTimeInterval();
+
+  String getCrc();
+
+  String getVersion();
+
+  Schema getSchema();
+
+  String getShardingKey();
+
+  int getTotalDocs();
+
+  int getTotalRawDocs();
+
+  String getIndexDir();
+
+  String getName();
+
+  long getIndexCreationTime();
+
+  /**
+   * Get the last time that this segment was pushed or <code>Long.MIN_VALUE</code> if it has never been pushed.
+   */
+  long getPushTime();
+
+  /**
+   * Get the last time that this segment was refreshed or <code>Long.MIN_VALUE</code> if it has never been refreshed.
+   */
+  long getRefreshTime();
+
+  boolean hasDictionary(String columnName);
+
+  boolean hasStarTree();
+
+  @Nullable
+  StarTreeMetadata getStarTreeMetadata();
+
+  /**
+   * Get the forward index file name with appropriate extension for a given version.
+   *
+   * @param column column name.
+   * @param segmentVersion segment version.
+   * @return forward index file name.
+   */
+  String getForwardIndexFileName(String column, String segmentVersion);
+
+  /**
+   * Get the dictionary file name with appropriate extension for a given version.
+   *
+   * @param column column name.
+   * @param segmentVersion segment version.
+   * @return dictionary file name.
+   */
+  String getDictionaryFileName(String column, String segmentVersion);
+
+  /**
+   * Get the bitmap inverted index file name with appropriate extension for a given version.
+   *
+   * @param column column name.
+   * @param segmentVersion segment version.
+   * @return bitmap inverted index file name.
+   */
+  String getBitmapInvertedIndexFileName(String column, String segmentVersion);
+
+  @Nullable
+  String getCreatorName();
+
+  char getPaddingCharacter();
+
+  int getHllLog2m();
+
+  /**
+   * Get the derived column name for the given original column and derived metric type.
+   *
+   * @param column original column name.
+   * @param derivedMetricType derived metric type.
+   * @return derived column name if exists.
+   *         null if not.
+   */
+  @Nullable
+  String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType);
+
+  Map<String, String> toMap();
+
+  boolean close();
+}

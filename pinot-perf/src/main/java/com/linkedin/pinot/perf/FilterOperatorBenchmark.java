@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -79,7 +79,7 @@ public class FilterOperatorBenchmark {
       indexLoadingConfig.setInvertedIndexColumns(invertedColumns);
 
       IndexSegmentImpl indexSegmentImpl =
-          (IndexSegmentImpl) ColumnarSegmentLoader.load(indexSegmentDir, indexLoadingConfig);
+          (IndexSegmentImpl) SegmentLoader.load(indexSegmentDir, indexLoadingConfig);
       segmentProcessors.add(new SegmentProcessor(i, indexSegmentImpl, brokerRequest,
           totalDocsMatched, timesSpent));
     }

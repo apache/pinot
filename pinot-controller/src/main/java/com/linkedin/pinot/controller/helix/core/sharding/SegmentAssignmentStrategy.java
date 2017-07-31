@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import java.util.List;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;

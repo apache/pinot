@@ -15,20 +15,18 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 
 
 /**

@@ -15,18 +15,18 @@
  */
 package com.linkedin.pinot.server.starter;
 
-import java.lang.reflect.InvocationTargetException;
-import org.apache.commons.configuration.ConfigurationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.lang.reflect.InvocationTargetException;
+import org.apache.commons.configuration.ConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -41,7 +41,7 @@ public class ServerInstance {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   private ServerConf _serverConf;
-  private DataManager _instanceDataManager;
+  private InstanceDataManager _instanceDataManager;
   private QueryExecutor _queryExecutor;
   private RequestHandlerFactory _requestHandlerFactory;
   private NettyServer _nettyServer;
@@ -120,15 +120,15 @@ public class ServerInstance {
   /**
    * @return instanceDataManager
    */
-  public DataManager getInstanceDataManager() {
+  public InstanceDataManager getInstanceDataManager() {
     return _instanceDataManager;
   }
 
   /**
    * @param instanceDataManager
    */
-  public void setInstanceDataManager(DataManager instanceDataManager) {
-    this._instanceDataManager = instanceDataManager;
+  public void setInstanceDataManager(InstanceDataManager instanceDataManager) {
+    _instanceDataManager = instanceDataManager;
   }
 
   /**

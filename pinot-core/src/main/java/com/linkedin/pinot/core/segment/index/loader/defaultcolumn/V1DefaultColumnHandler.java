@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

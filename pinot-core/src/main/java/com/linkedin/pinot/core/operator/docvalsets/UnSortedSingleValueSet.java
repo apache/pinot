@@ -21,8 +21,8 @@ import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
 import com.linkedin.pinot.core.operator.docvaliterators.UnSortedSingleValueIterator;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 
 public final class UnSortedSingleValueSet extends BaseBlockValSet {

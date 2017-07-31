@@ -15,26 +15,24 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.broker.pruner.SegmentPrunerContext;
+import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
+import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.core.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.transport.common.SegmentId;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.broker.pruner.SegmentPrunerContext;
-import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentId;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 /**

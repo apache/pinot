@@ -19,8 +19,8 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
@@ -41,6 +41,8 @@ public class Loaders {
   private static final Logger LOGGER = LoggerFactory.getLogger(Loaders.class);
 
   public static class IndexSegment {
+    private IndexSegment() {
+    }
 
     /**
      * For tests only.
@@ -53,9 +55,6 @@ public class Loaders {
       return load(indexDir, defaultIndexLoadingConfig, null);
     }
 
-    /**
-     * For tests only.
-     */
     public static com.linkedin.pinot.core.indexsegment.IndexSegment load(@Nonnull File indexDir,
         @Nonnull IndexLoadingConfig indexLoadingConfig)
         throws Exception {

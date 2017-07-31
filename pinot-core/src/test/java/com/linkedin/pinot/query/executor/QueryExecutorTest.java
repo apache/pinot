@@ -16,7 +16,6 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
@@ -24,13 +23,14 @@ import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.SegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -83,13 +83,13 @@ public class QueryExecutorTest {
     serverConf.setDelimiterParsingDisabled(false);
     serverConf.load(new File(configFilePath, PINOT_PROPERTIES));
 
-    FileBasedInstanceDataManager instanceDataManager = FileBasedInstanceDataManager.getInstanceDataManager();
-    instanceDataManager.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
+    FileBasedInstanceDataManager instanceDataManager = new FileBasedInstanceDataManager();
+    instanceDataManager.init(serverConf.subset("pinot.server.instance"));
     instanceDataManager.start();
-
-    for (int i = 0; i < 2; ++i) {
-      instanceDataManager.getTableDataManager("midas");
-      instanceDataManager.getTableDataManager("midas").addSegment(_indexSegmentList.get(i));
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager("midas");
+    Assert.assertNotNull(tableDataManager);
+    for (int i = 0; i < 2; i++) {
+      tableDataManager.addSegment(_indexSegmentList.get(i));
     }
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
@@ -128,7 +128,7 @@ public class QueryExecutorTest {
 
       File parent = new File(INDEXES_DIR, "segment_" + String.valueOf(i));
       String segmentName = parent.list()[0];
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
+      _indexSegmentList.add(SegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
 
 //      System.out.println("built at : " + segmentDir.getAbsolutePath());
     }

@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.data.source;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.core.common.Block;
@@ -29,12 +25,15 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
+import com.linkedin.pinot.core.metadata.column.ColumnMetadata;
 import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
 import com.linkedin.pinot.core.operator.blocks.SortedSingleValueBlock;
 import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Nov 15, 2014

@@ -18,9 +18,10 @@ package com.linkedin.pinot.tools.query.comparison;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.metadata.segment.SegmentMetadata;
+import com.linkedin.pinot.core.query.utils.StarTreeUtils;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
@@ -338,7 +339,7 @@ public class StarTreeQueryGenerator {
       // Verify that query is fit for star tree.
       BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
       Preconditions.checkState(
-          RequestUtils.isFitForStarTreeIndex(segmentMetadata, RequestUtils.generateFilterQueryTree(brokerRequest),
+          StarTreeUtils.isFitForStarTreeIndex(segmentMetadata, RequestUtils.generateFilterQueryTree(brokerRequest),
               brokerRequest));
     }
   }

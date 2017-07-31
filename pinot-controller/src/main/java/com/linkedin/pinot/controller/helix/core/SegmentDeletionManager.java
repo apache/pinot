@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.core.metadata.ZKMetadataProvider;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -40,10 +44,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.SegmentName;
 
 public class SegmentDeletionManager {
 

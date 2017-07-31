@@ -140,11 +140,6 @@
       <version>${kafka.version}</version>
     </dependency>
     <dependency>
-      <groupId>nl.jqno.equalsverifier</groupId>
-      <artifactId>equalsverifier</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.webjars</groupId>
       <artifactId>swagger-ui</artifactId>
     </dependency>
