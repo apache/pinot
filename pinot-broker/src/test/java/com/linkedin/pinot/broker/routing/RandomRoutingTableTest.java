@@ -15,6 +15,12 @@
  */
 package com.linkedin.pinot.broker.routing;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableConfig.Builder;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.URL;
@@ -34,24 +40,11 @@ import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.broker.routing.PercentageBasedRoutingTableSelector;
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TableConfig.Builder;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
-
 
 public class RandomRoutingTableTest {
 
   @Test
-  public void testHelixExternalViewBasedRoutingTable()
-      throws Exception {
+  public void testHelixExternalViewBasedRoutingTable() throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("SampleExternalView.json");
     Assert.assertNotNull(resourceUrl);
     String fileName = resourceUrl.getFile();
@@ -60,12 +53,7 @@ public class RandomRoutingTableTest {
     ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
     ZNRecord externalViewRecord = (ZNRecord) znRecordSerializer.deserialize(IOUtils.toByteArray(evInputStream));
     int totalRuns = 10000;
-    RoutingTableBuilder routingStrategy = new BalancedRandomRoutingTableBuilder(10);
-    HelixExternalViewBasedRouting routingTable =
-        new HelixExternalViewBasedRouting(null, new PercentageBasedRoutingTableSelector(), null,
-            new BaseConfiguration());
-
-    //routingTable.setSmallClusterRoutingTableBuilder(routingStrategy);
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, null, new BaseConfiguration());
 
     ExternalView externalView = new ExternalView(externalViewRecord);
 
@@ -74,9 +62,10 @@ public class RandomRoutingTableTest {
     double[] globalArrays = new double[9];
 
     for (int numRun = 0; numRun < totalRuns; ++numRun) {
-      RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableName, Collections.<String>emptyList(), null);
+      RoutingTableLookupRequest request =
+          new RoutingTableLookupRequest(tableName, Collections.<String>emptyList(), null);
       Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
-      TreeSet<ServerInstance> serverInstances = new TreeSet<ServerInstance>(serversMap.keySet());
+      TreeSet<ServerInstance> serverInstances = new TreeSet<>(serversMap.keySet());
 
       int i = 0;
 
@@ -89,14 +78,11 @@ public class RandomRoutingTableTest {
         Assert.assertTrue(arrays[j] / totalRuns <= 31);
         Assert.assertTrue(arrays[j] / totalRuns >= 28);
       }
-//      System.out.println(Arrays.toString(arrays) + " : " + new StandardDeviation().evaluate(arrays) + " : " + new Mean().evaluate(arrays));
     }
-    for (int i = 0; i < globalArrays.length; ++i) {
-      Assert.assertTrue(globalArrays[i] / totalRuns <= 31);
-      Assert.assertTrue(globalArrays[i] / totalRuns >= 28);
+    for (double globalArray : globalArrays) {
+      Assert.assertTrue(globalArray / totalRuns <= 31);
+      Assert.assertTrue(globalArray / totalRuns >= 28);
     }
-//    System.out.println(Arrays.toString(globalArrays) + " : " + new StandardDeviation().evaluate(globalArrays) + " : "
-//        + new Mean().evaluate(globalArrays));
   }
 
   /**
@@ -120,12 +106,11 @@ public class RandomRoutingTableTest {
 
     return instanceConfigList;
   }
-  
+
   private TableConfig generateTableConfig(String tableName) throws Exception {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     Builder builder = new TableConfig.Builder(tableType);
     builder.setTableName(tableName);
     return builder.build();
   }
-
 }

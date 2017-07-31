@@ -19,8 +19,6 @@ import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.broker.routing.RoutingTableSelector;
-import com.linkedin.pinot.broker.routing.RoutingTableSelectorFactory;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -28,7 +26,6 @@ import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.StringUtil;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -68,9 +65,6 @@ public class HelixBrokerStarter {
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
-
-  private static final String ROUTING_TABLE_SELECTOR_SUBSET_KEY =
-      "pinot.broker.routing.table.selector";
 
   private static final String ROUTING_TABLE_PARAMS_SUBSET_KEY =
       "pinot.broker.routing.table";
@@ -114,9 +108,7 @@ public class HelixBrokerStarter {
     _spectatorHelixManager.connect();
     _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
-    RoutingTableSelector selector = RoutingTableSelectorFactory.getRoutingTableSelector(
-        pinotHelixProperties.subset(ROUTING_TABLE_SELECTOR_SUBSET_KEY), _propertyStore);
-    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector, _spectatorHelixManager,
+    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, _spectatorHelixManager,
         pinotHelixProperties.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     ClusterChangeMediator clusterChangeMediator =
