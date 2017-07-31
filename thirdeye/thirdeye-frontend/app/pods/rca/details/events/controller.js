@@ -2,8 +2,9 @@ import Ember from 'ember';
 import moment from 'moment';
 
 export default Ember.Controller.extend({
-  eventsStart: null,
-  eventsEnd: null,
+  eventStart: null,
+  eventEnd: null,
+  dateFormat: 'MMM D, YYYY hh:mm a',
 
   actions: {
     // Sets new dimension start and end

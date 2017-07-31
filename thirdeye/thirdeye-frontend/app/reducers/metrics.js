@@ -35,7 +35,9 @@ const INITIAL_STATE = {
   filters: {},
   granularity: 'DAYS',
   compareMode: 'WoW',
-  splitView: false
+  splitView: false,
+  regionStart: '',
+  regionEnd: ''
 };
 
 export default function reducer(state = INITIAL_STATE, action = {}) {
@@ -138,6 +140,15 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
 
       return Object.assign({}, state, {
         selectedMetricIds
+      });
+    }
+
+    case ActionTypes.SET_DATE: {
+      const [ regionStart, regionEnd ] = action.payload;
+
+      return Object.assign({}, state, {
+        regionStart,
+        regionEnd
       });
     }
 

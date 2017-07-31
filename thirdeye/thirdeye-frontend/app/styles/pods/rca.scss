@@ -48,3 +48,7 @@
   justify-content: space-between;
   margin-bottom: $te-default-element-spacing;
 }
+
+.rca-header--flush {
+  justify-content: flex-start;
+}

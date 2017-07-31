@@ -1,48 +1,26 @@
 import Ember from 'ember';
-
+import moment from 'moment';
 import { Actions } from 'thirdeye-frontend/actions/dimensions';
 
 export default Ember.Route.extend({
   redux: Ember.inject.service(),
-
-  // queryParam unique to the dimension route
-  queryParams: {
-    dimension: {
-      replace: true,
-      refreshModel: true
-    }
-  },
-
   model(params, transition) {
     const redux = this.get('redux');
     const { metricId } = transition.params['rca.details'];
     const {
-      dimension = 'All',
       analysisStart: start,
       analysisEnd: end
     } = transition.queryParams;
 
     if (!metricId) { return; }
 
-    redux.dispatch(Actions.loading());
-    if (start && end) {
-      redux.dispatch(Actions.updateDates(
-        Number(start),
-        Number(end)
-      ));
-    }
-    Ember.run.later(() => {
-      redux.dispatch(Actions.updateDimension(dimension)).then(() => {
-        redux.dispatch(Actions.fetchDimensions(metricId));
-      });
-    });
-
+    redux.dispatch(Actions.fetchHeatMapData(Number(start), Number(end)));
     return {};
   },
 
   actions: {
     // Dispatches a redux action on query param change
-    // to fetch events in the new date range
+    // to fetch heatmap data in the new date range
     queryParamsDidChange(changedParams, oldParams) {
       const redux = this.get('redux');
       let {
@@ -52,11 +30,12 @@ export default Ember.Route.extend({
       const params = Object.keys(changedParams || {});
 
       if (params.length && (start || end)) {
+
         start = start || oldParams.analysisStart;
         end = end || oldParams.analysisEnd;
 
         Ember.run.later(() => {
-          redux.dispatch(Actions.updateDates(
+          redux.dispatch(Actions.fetchHeatMapData(
             Number(start),
             Number(end)
           ));

@@ -1,7 +1,6 @@
 import { ActionTypes } from '../actions/dimensions';
 import { colors } from '../actions/constants';
 
-import moment from 'moment';
 import _ from 'lodash';
 
 /**
@@ -29,7 +28,9 @@ const INITIAL_STATE = {
   dimensions: {},
   timeseries: [],
   selectedDimension: 'All',
-  heatmapData: {}
+  heatmapData: {},
+  regionStart: '',
+  regionEnd :''
 };
 
 export default function reducer(state = INITIAL_STATE, action = {}) {
@@ -95,6 +96,15 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
         loaded: true,
         loading: false,
         failed: false
+      });
+    }
+
+    case ActionTypes.SET_DATE: {
+      const [ regionStart, regionEnd ] = action.payload;
+
+      return Object.assign({}, state, {
+        regionStart,
+        regionEnd
       });
     }
 

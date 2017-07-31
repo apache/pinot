@@ -20,22 +20,23 @@ export default Ember.Route.extend({
 
     redux.dispatch(Actions.fetchEvents(Number(start), Number(end)));
     return {};
-
   },
 
   actions: {
     // Dispatches a redux action on query param change
     // to fetch events in the new date range
-    queryParamsDidChange(changedParams) {
-
+    queryParamsDidChange(changedParams, oldParams) {
       const redux = this.get('redux');
-      const {
+      let {
         analysisStart: start,
         analysisEnd: end
       } = changedParams;
       const params = Object.keys(changedParams || {});
 
-      if (params.length === 2 && start && end) {
+      if (params.length && (start || end)) {
+        start = start || oldParams.analysisStart;
+        end = end || oldParams.analysisEnd;
+
         Ember.run.later(() => {
           redux.dispatch(Actions.updateDates(
             Number(start),

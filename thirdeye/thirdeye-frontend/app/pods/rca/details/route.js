@@ -95,7 +95,7 @@ export default Ember.Route.extend({
     redux.dispatch(Actions.setPrimaryMetric(params))
       .then((res) => redux.dispatch(Actions.fetchRegions(res)))
       .then((res) => redux.dispatch(Actions.fetchRelatedMetricData(res)));
-
+/*  */
     return {};
   },
 
@@ -121,8 +121,6 @@ export default Ember.Route.extend({
       filters,
       analysisStart: initStart,
       analysisEnd: initEnd,
-      extentStart: initStart,
-      extentEnd: initEnd,
       granularity,
       startDate,
       endDate,

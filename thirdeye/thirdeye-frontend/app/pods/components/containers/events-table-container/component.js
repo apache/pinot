@@ -5,7 +5,9 @@ function select(store) {
   const {
     loading,
     loaded,
-    events
+    events,
+    eventStart,
+    eventEnd
   } = store.events;
 
   const {
@@ -15,6 +17,8 @@ function select(store) {
   return {
     loading,
     loaded,
+    eventStart,
+    eventEnd,
     events: events.map((event) => {
       event = Object.assign({}, event);
       if (selectedEvents.includes(event.urn)) {

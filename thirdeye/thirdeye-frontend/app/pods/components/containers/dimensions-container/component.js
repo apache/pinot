@@ -11,7 +11,9 @@ function select(store) {
     timeseries,
     dimensions,
     selectedDimension,
-    heatmapData
+    heatmapData,
+    regionStart,
+    regionEnd
   } = store.dimensions;
 
   const {
@@ -26,6 +28,8 @@ function select(store) {
     loading,
     loaded,
     failed,
+    regionStart,
+    regionEnd,
     subdimensions: dimensionKeys
       .map((key) => {
         const keyName = `${selectedDimension}-${key}`;

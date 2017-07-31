@@ -30,6 +30,17 @@ export default Ember.Component.extend({
     }
   ),
 
+    /**
+   * anomaly events
+   */
+  anomaly: Ember.computed(
+    'events.@each',
+    function() {
+      return this.get('events')
+        .filter(event => event.eventType === 'anomaly');
+    }
+  ),
+
 
   /**
    * Informed events
@@ -62,6 +73,7 @@ export default Ember.Component.extend({
   gcnCount: Ember.computed.alias('gcn.length'),
   informedCount: Ember.computed.alias('informed.length'),
   lixCount: Ember.computed.alias('lix.length'),
+  anomalyCount: Ember.computed.alias('anomaly.length'),
 
   actions: {
     // Handles tab change on click

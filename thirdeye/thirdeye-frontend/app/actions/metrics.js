@@ -17,6 +17,7 @@ export const ActionTypes = {
   LOAD_PRIMARY_METRIC: type('[Metric] Load Primary Metric'),
   UPDATE_COMPARE_MODE: type('[Metric] Update Compare Mode'),
   UPDATE_DATE: type('[Metric] Update Date'),
+  SET_DATE: type('[Metric] Set new region dates'),
   SELECT_METRIC: type('[Metric] Set Selected Metric'),
   RESET: type('[Metric] Reset Data')
 };
@@ -94,6 +95,12 @@ function resetData() {
   };
 }
 
+function setDate(dates) {
+  return {
+    type: ActionTypes.SET_DATE,
+    payload: dates
+  };
+}
 
 /**
  * Get all related metric's id for the primary metric
@@ -216,8 +223,8 @@ function fetchRelatedMetricData() {
 
 /**
  * Updates the date range for the correlated metrics
- * @param {Number} start The start time in unix ms
- * @param {Number} end The end time in unix ms
+ * @param {Number} startDate The start time in unix ms
+ * @param {Number} endDate The end time in unix ms
  */
 function updateMetricDate(startDate, endDate) {
   return (dispatch, getState) => {
@@ -246,6 +253,20 @@ function updateMetricDate(startDate, endDate) {
   };
 }
 
+/**
+ * Updates the date range for the dimensions and refetches the data
+ * @param {Number} start The start time in unix ms
+ * @param {Number} end The end time in unix ms
+ */
+function updateDates(start, end) {
+  return (dispatch, getState) => {
+    // const { primaryMetric } = getState();
+    //check if dates are stame
+
+    return dispatch(setDate([start, end]));
+  };
+}
+
 // Resets the store to its initial state
 function reset() {
   return (dispatch) => {
@@ -263,6 +284,7 @@ export const Actions = {
   setPrimaryMetric,
   updateCompareMode,
   updateMetricDate,
-  reset
+  reset,
+  updateDates
 };
 

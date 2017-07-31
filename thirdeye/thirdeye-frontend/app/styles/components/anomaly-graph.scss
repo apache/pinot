@@ -1,11 +1,4 @@
 // Overriding default c3
-.c3-lines {
-  stroke-width: 2px;
-}
-
-.c3-chart-line:nth-child(even) > .c3-lines {
-  stroke-dasharray: 1%;
-}
 
 .anomaly-graph {
   box-sizing: border-box;
@@ -18,6 +11,47 @@
 
   &--no-border {
     border: 0;
+  }
+
+  .c3-brush .extent {
+    fill: #4682b4;
+    fill-opacity: .125;
+    stroke: #CCC;
+  }
+
+  .c3-line {
+    stroke-width: 2px;
+  }
+
+  .c3-chart-line:nth-child(even) > .c3-lines {
+    stroke-dasharray: 1%;
+  }
+
+  .anomaly-graph__slider-line {
+    stroke: white;
+    stroke-width: 3;
+  }
+
+  .anomaly-graph__region-slider .extent{
+    stroke: #fff;
+    fill-opacity: .2;
+    fill: $te-orange;
+  }
+
+  &__legend {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  &__legend-item {
+    display: block;
+  }
+
+  &__legend-line {
+    stroke: $te-blue !important;
+    stroke-width: 3;
+        // stroke: white;
   }
 }
 
@@ -90,6 +124,7 @@
   left: 0;
 }
 
+
 $colors:
   "blue" $te-blue,
   "orange" $te-orange,
@@ -97,7 +132,8 @@ $colors:
   "purple" $te-purple,
   "red" $te-red,
   "green" $te-green,
-  "pink" $te-pink;
+  "pink" $te-pink,
+  "dark-orange" #B74700;
 
 // creates .c3-region-"color" classes
 @each $i in $colors{
