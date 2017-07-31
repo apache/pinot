@@ -87,7 +87,7 @@ InvestigateView.prototype = {
             `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}&filters=${anomalyFunctionDimension}&heatMapFilters=${anomalyFunctionDimension}`;
 
 
-        wow.newUrl = `app#/rca/${metricId}/metrics?analysisStart=${anomalyRegionStart.valueOf()}&analysisEnd=${anomalyRegionEnd.valueOf()}&` +
+        wow.newUrl = `app#/rca/${metricId}/dimensions?analysisStart=${anomalyRegionStart.valueOf()}&analysisEnd=${anomalyRegionEnd.valueOf()}&` +
           `startDate=${currentViewStart}&endDate=${currentViewEnd}&` +
           `compareMode=${wow.compareMode}&filters=${anomalyFunctionDimension}&granularity=${granularity}`;
         return wow;
