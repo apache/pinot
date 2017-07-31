@@ -83,7 +83,7 @@ public class ControllerStarter {
     config = conf;
     component = new Component();
     controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
-    adminApp = new ControllerAdminApiApplication();
+    adminApp = new ControllerAdminApiApplication(config.getQueryConsole());
     helixResourceManager = new PinotHelixResourceManager(config);
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds(),
         config.getDeletedSegmentsRetentionInDays());

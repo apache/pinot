@@ -15,15 +15,10 @@
  */
 package com.linkedin.pinot.controller.api;
 
-import com.google.common.base.Preconditions;
-import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerResponseContext;
-import javax.ws.rs.container.ContainerResponseFilter;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -33,6 +28,11 @@ import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
+import io.swagger.jaxrs.config.BeanConfig;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerResponseContext;
+import javax.ws.rs.container.ContainerResponseFilter;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
@@ -42,9 +42,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   private URI baseUri;
   private boolean started = false;
   private static final String RESOURCE_PACKAGE = "com.linkedin.pinot.controller.api.resources";
+  private static String CONSOLE_WEB_PATH;
 
-  public ControllerAdminApiApplication() {
+  public ControllerAdminApiApplication(String consoleWebPath) {
     super();
+    CONSOLE_WEB_PATH = consoleWebPath;
     packages(RESOURCE_PACKAGE);
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
@@ -72,6 +74,10 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     setupSwagger(httpServer);
     // TODO: setup static resources for controller that home page functionality and some
     // java scripts
+    CLStaticHttpHandler queryStaticHttpHandler = new CLStaticHttpHandler(ControllerAdminApiApplication.class.getClassLoader(), CONSOLE_WEB_PATH);
+    httpServer.getServerConfiguration().addHttpHandler(queryStaticHttpHandler, "/query/*");
+    CLStaticHttpHandler landingStaticHttpHandler = new CLStaticHttpHandler(ControllerAdminApiApplication.class.getClassLoader(), "/landing/");
+    httpServer.getServerConfiguration().addHttpHandler(landingStaticHttpHandler, "");
     started = true;
     LOGGER.info("Start jersey admin API on port: {}", httpPort);
     return true;
@@ -92,11 +98,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 
-    CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(ControllerAdminApiApplication.class.getClassLoader(),
+    CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(ControllerAdminApiApplication.class.getClassLoader(),
         "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api");
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help");
+    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api");
+    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help");
 
     URL swaggerDistLocation = ControllerAdminApiApplication.class.getClassLoader()
         .getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
