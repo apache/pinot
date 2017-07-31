@@ -29,13 +29,25 @@ body {
 
   &__group {
     &--horizontal {
-      width: 350px;
       float: left;
-      margin-right: 20px;
+      margin-right: 21px;
     }
 
     &--last {
       margin-right: 0;
+      float: right;
+    }
+
+    &--large {
+      width: 65%;
+    }
+
+    &--medium {
+      width: 33%;
+    }
+
+    &--two-share {
+      width: 49%;
     }
   }
 }

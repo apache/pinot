@@ -13,10 +13,12 @@ export default Ember.Controller.extend({
   isImportSuccess: false,
   isImportError: false,
   isSubmitDone: false,
-  isSubmitDisabled: true,
   isDashboardExistError: false,
   isExistingDashFieldDisabled: false,
   isCustomDashFieldDisabled: false,
+  consolidateOptions: ['Aggregate', 'Average'],
+  selectedConsolidateOption: 'Average',
+  failureMessage: 'Metrics not onboarded. Please check your dashboard name or RRD.',
 
   /**
    * Enables the submit button when all required fields are filled
@@ -28,14 +30,16 @@ export default Ember.Controller.extend({
     'importCustomNewDataset',
     'importCustomNewMetric',
     'importCustomNewRrd',
+    'isDashboardExistError',
     function() {
       let isDisabled = true;
       const existingNameField = this.get('importExistingDashboardName');
+      const isExistingNameError = this.get('isDashboardExistError');
       const newNameField = this.get('importCustomNewDataset');
       const newMetricField = this.get('importCustomNewMetric');
       const newRrdField = this.get('importCustomNewRrd');
       // If existing dashboard field is filled, release submit button.
-      if (Ember.isPresent(existingNameField)) {
+      if (Ember.isPresent(existingNameField) && !isExistingNameError) {
         isDisabled = false;
       }
       // If any of the 'import custom' fields are filled, assume user will go the RRD import route. Disable submit.
@@ -85,15 +89,12 @@ export default Ember.Controller.extend({
    * @return {Promise}
    */
   validateDashboardName(isRrdImport, dashboardName) {
-    // TODO: add correct endpoint
-    const url = `/onboard/validate?dashboard=${dashboardName}`
+    const url = `/autometrics/isIngraphDashboard/${dashboardName}`;
     // Only make the call if we are importing an existing inGraphs dashboard (isRrdImport = false)
     if (isRrdImport) {
       return Promise.resolve(true);
     } else {
-      // TODO: enable when endpoint ready
-      // return fetch(url).then((res) => res.json());
-      return Promise.resolve(true);
+      return fetch(url).then((res) => checkStatus(res, 'get', true));
     }
   },
 
@@ -104,8 +105,8 @@ export default Ember.Controller.extend({
    * @return {Promise}
    */
   fetchMetricsList(dataSet) {
-    const url = `/thirdeye-admin/metric-config/metrics?dataset=${dataSet}`
-    return fetch(url).then((res) => res.json());
+    const url = `/thirdeye-admin/metric-config/metrics?dataset=${dataSet}`;
+    return fetch(url).then(checkStatus);
   },
 
   /**
@@ -116,7 +117,7 @@ export default Ember.Controller.extend({
    */
   triggerInstantOnboard() {
     const url = '/autoOnboard/runAdhoc/AutometricsThirdeyeDataSource';
-    return fetch(url, { method: 'post' }).then(checkStatus);
+    return fetch(url, { method: 'post' }).then((res) => checkStatus(res, 'post'));
   },
 
   /**
@@ -133,7 +134,22 @@ export default Ember.Controller.extend({
       headers: { 'content-type': 'Application/Json' }
     };
     const url = '/onboard/create';
-    return fetch(url, postProps).then(checkStatus);
+    return fetch(url, postProps).then((res) => checkStatus(res, 'post'));
+  },
+
+  /**
+   * Sets the error message for any failed call and throws the error
+   * @method setErrorState
+   * @param {String} error - the error statusText set by our checkStatus helper
+   * @param {String} message - the appropriate error message
+   * @return {undefined}
+   */
+  setErrorState(error, message) {
+    this.setProperties({
+      isImportError: true,
+      failureMessage: `${message}. (${error})`
+    });
+    throw error;
   },
 
   /**
@@ -151,14 +167,20 @@ export default Ember.Controller.extend({
       .then((importResult) => {
         return this.triggerInstantOnboard();
       })
+      .catch((error) => {
+        this.setErrorState(error, 'Failed to create dataset in Third Eye DB');
+      })
       // Check for metrics in TE that belong to the new dataset name
       .then((onboardResult) => {
         return this.fetchMetricsList(importObj.datasetName);
       })
+      .catch((error) => {
+        this.setErrorState(error, 'Failed to trigger metric onboard in Third Eye');
+      })
       // If this is a custom dashboard import, and no metrics returned, assume something went wrong.
       .then((metricsList) => {
         if (isRrdImport && !metricsList.Records.length) {
-          return new Promise.reject();
+          throw new Error('No metrics onboarded');
         } else {
           this.setProperties({
             isImportSuccess: true,
@@ -167,7 +189,7 @@ export default Ember.Controller.extend({
         }
       })
       .catch((error) => {
-        this.set('isImportError', true);
+        this.setErrorState(error, 'Failed to list newly onboarded metrics');
       });
   },
 
@@ -192,8 +214,20 @@ export default Ember.Controller.extend({
        importCustomNewDataset: '',
        importCustomNewMetric: '',
        importCustomNewRrd: '',
+       importCustomConsolidate: 'Average',
        datasetName: '',
       });
+    },
+
+    /**
+     * Clears the validation error as user begins to type in field
+     * @method clearExistingDashboardNameError
+     * @return {undefined}
+     */
+    clearExistingDashboardNameError() {
+      if (this.get('isDashboardExistError')) {
+        this.set('isDashboardExistError', false);
+      }
     },
 
     /**
@@ -209,7 +243,10 @@ export default Ember.Controller.extend({
       // Enhance request payload for custom metrics
       if (isRrdImport) {
         importObj.metricName = this.get('importCustomNewMetric');
-        importObj.properties = { RRD: this.get('importCustomNewRrd') };
+        importObj.properties = {
+          RRD: this.get('importCustomNewRrd'),
+          CONSOLIDATE: this.get('selectedConsolidateOption') || ''
+        };
       }
 
       // Reset error state for existing field validation
@@ -228,12 +265,11 @@ export default Ember.Controller.extend({
               isCustomDashFieldDisabled: true
             });
           } else {
-            this.set('isCustomDashFieldDisabled', true);
-            this.set('isDashboardExistError', true);
+            this.setProperties({
+              isCustomDashFieldDisabled: true,
+              isDashboardExistError: true
+            });
           }
-        })
-        .catch((error) => {
-          this.set('isImportError', true);
         });
     }
   }
