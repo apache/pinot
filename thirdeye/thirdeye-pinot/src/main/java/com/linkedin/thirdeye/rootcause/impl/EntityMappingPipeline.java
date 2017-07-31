@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,7 +15,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,7 +128,7 @@ public class EntityMappingPipeline extends Pipeline {
     for(EntityToEntityMappingDTO match : matches) {
       String postfix = entity.getUrn().substring(match.getFromURN().length());
       String toURN = match.getToURN() + postfix;
-      entities.add(EntityUtils.parseURN(toURN, entity.getScore() * match.getScore()));
+      entities.add(EntityUtils.parseURN(toURN, entity.getScore() * match.getScore()).withRelated(Collections.singletonList(entity)));
     }
 
     return entities;
@@ -143,7 +141,7 @@ public class EntityMappingPipeline extends Pipeline {
 
     Set<Entity> entities = new HashSet<>();
     for(EntityToEntityMappingDTO match : matches) {
-      entities.add(EntityUtils.parseURN(match.getToURN(), entity.getScore() * match.getScore()));
+      entities.add(EntityUtils.parseURN(match.getToURN(), entity.getScore() * match.getScore()).withRelated(Collections.singletonList(entity)));
     }
 
     return entities;

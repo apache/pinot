@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -67,6 +69,7 @@ public class MetricDatasetPipeline extends Pipeline {
 
     Set<String> datasets = new HashSet<>();
     Map<String, Double> datasetScores = new HashMap<>();
+    Multimap<String, MetricEntity> related = ArrayListMultimap.create();
     for(MetricEntity me : metrics) {
       MetricConfigDTO metricDTO = this.metricDAO.findById(me.getId());
 
@@ -77,6 +80,8 @@ public class MetricDatasetPipeline extends Pipeline {
       if(!datasetScores.containsKey(d))
         datasetScores.put(d, 0.0d);
       datasetScores.put(d, datasetScores.get(d) + metricScore);
+
+      related.put(d, me);
     }
 
     Set<Entity> entities = new HashSet<>();
@@ -93,8 +98,7 @@ public class MetricDatasetPipeline extends Pipeline {
       dtos = removeExisting(dtos, metrics);
 
       for(MetricConfigDTO dto : dtos) {
-        double score = datasetScore / dtos.size();
-        entities.add(MetricEntity.fromMetric(score, dto.getId()));
+        entities.add(MetricEntity.fromMetric(datasetScore, related.get(d), dto.getId()));
       }
     }
 

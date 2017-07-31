@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 
 /**
@@ -12,8 +15,8 @@ public class MetricEntity extends Entity {
 
   private final long id;
 
-  protected MetricEntity(String urn, double score, long id) {
-    super(urn, score);
+  protected MetricEntity(String urn, double score, List<? extends Entity> related, long id) {
+    super(urn, score, related);
     this.id = id;
   }
 
@@ -23,11 +26,20 @@ public class MetricEntity extends Entity {
 
   @Override
   public MetricEntity withScore(double score) {
-    return new MetricEntity(this.getUrn(), score, this.id);
+    return new MetricEntity(this.getUrn(), score, this.getRelated(), this.id);
+  }
+
+  @Override
+  public MetricEntity withRelated(List<? extends Entity> related) {
+    return new MetricEntity(this.getUrn(), this.getScore(), related, this.id);
+  }
+
+  public static MetricEntity fromMetric(double score, Collection<? extends Entity> related, long id) {
+    return new MetricEntity(TYPE.formatURN(id), score, new ArrayList<>(related), id);
   }
 
   public static MetricEntity fromMetric(double score, long id) {
-    return new MetricEntity(TYPE.formatURN(id), score, id);
+    return fromMetric(score, new ArrayList<Entity>(), id);
   }
 
   public static MetricEntity fromURN(String urn, double score) {

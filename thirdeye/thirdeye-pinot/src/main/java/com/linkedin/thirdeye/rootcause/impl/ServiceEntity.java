@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -14,8 +16,8 @@ public class ServiceEntity extends Entity {
 
   private final String name;
 
-  protected ServiceEntity(String urn, double score, String name) {
-    super(urn, score);
+  protected ServiceEntity(String urn, double score, List<? extends Entity> related, String name) {
+    super(urn, score, related);
     this.name = name;
   }
 
@@ -25,12 +27,17 @@ public class ServiceEntity extends Entity {
 
   @Override
   public ServiceEntity withScore(double score) {
-    return new ServiceEntity(this.getUrn(), score, this.name);
+    return new ServiceEntity(this.getUrn(), score, this.getRelated(), this.name);
+  }
+
+  @Override
+  public ServiceEntity withRelated(List<? extends Entity> related) {
+    return new ServiceEntity(this.getUrn(), this.getScore(), related, this.name);
   }
 
   public static ServiceEntity fromName(double score, String name) {
     String urn = TYPE.formatURN(name);
-    return new ServiceEntity(urn, score, name);
+    return new ServiceEntity(urn, score, new ArrayList<Entity>(), name);
   }
 
   public static ServiceEntity fromURN(String urn, double score) {
@@ -39,6 +46,6 @@ public class ServiceEntity extends Entity {
     String[] parts = urn.split(":", 3);
     if(parts.length != 3)
       throw new IllegalArgumentException(String.format("URN must have 3 parts but has '%d'", parts.length));
-    return new ServiceEntity(urn, score, parts[2]);
+    return new ServiceEntity(urn, score, new ArrayList<Entity>(), parts[2]);
   }
 }

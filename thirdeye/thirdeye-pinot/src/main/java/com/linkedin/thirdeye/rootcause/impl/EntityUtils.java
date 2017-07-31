@@ -1,11 +1,9 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.PipelineContext;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -186,8 +184,73 @@ public class EntityUtils {
     try {
       return parseURN(urn, score);
     } catch (IllegalArgumentException e) {
-      return new Entity(urn, score);
+      return new Entity(urn, score, new ArrayList<Entity>());
     }
   }
 
+  /**
+   * Sets a list of entities as the related entities set.
+   * <br/><b>NOTE:</b> co-variant. Requires {@code Entity.withRelated(Entity)}
+   * to return an instance of the respective {@code Entity} subclass.
+   *
+   * @param entities base entities to set related entities on
+   * @param related related entities
+   * @return List of base entities with related entities
+   */
+  public static <T extends Entity> List<T> withRelated(Iterable<T> entities, List<? extends Entity> related) {
+    List<T> tagged = new ArrayList<>();
+    for(T e : entities) {
+      tagged.add((T)e.withRelated(related));
+    }
+    return tagged;
+  }
+
+  /**
+   * Sets a single entity as the related entities set.
+   * <br/><b>NOTE:</b> co-variant. Requires {@code Entity.withRelated(Entity)}
+   * to return an instance of the respective {@code Entity} subclass.
+   *
+   * @see EntityUtils#addRelated(Iterable, List)
+   *
+   * @param entities base entities to set related entity on
+   * @param related related entity
+   * @return List of base entities with added related entity
+   */
+  public static <T extends Entity> List<T> withRelated(Iterable<T> entities, Entity related) {
+    return withRelated(entities, Collections.singletonList(related));
+  }
+
+  /**
+   * Adds a list of entities to the related entities set.
+   * <br/><b>NOTE:</b> co-variant. Requires {@code Entity.withRelated(Entity)}
+   * to return an instance of the respective {@code Entity} subclass.
+   *
+   * @param entities base entities to add related entities to
+   * @param related related entities
+   * @return List of base entities with related entities
+   */
+  public static <T extends Entity> List<T> addRelated(Iterable<T> entities, List<? extends Entity> related) {
+    List<T> tagged = new ArrayList<>();
+    for(T e : entities) {
+      List<Entity> newRelated = new ArrayList<>(e.getRelated());
+      newRelated.addAll(related);
+      tagged.add((T)e.withRelated(newRelated));
+    }
+    return tagged;
+  }
+
+  /**
+   * Adds a list of entities to the related entities set.
+   * <br/><b>NOTE:</b> co-variant. Requires {@code Entity.withRelated(Entity)}
+   * to return an instance of the respective {@code Entity} subclass.
+   *
+   * @see EntityUtils#addRelated(Iterable, List)
+   *
+   * @param entities base entities to add related entities to
+   * @param related related entities
+   * @return List of base entities with related entities
+   */
+  public static <T extends Entity> List<T> addRelated(Iterable<T> entities, Entity related) {
+    return addRelated(entities, Collections.singletonList(related));
+  }
 }

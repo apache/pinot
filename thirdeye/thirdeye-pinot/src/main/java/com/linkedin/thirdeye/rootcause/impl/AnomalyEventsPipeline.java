@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -71,13 +72,13 @@ public class AnomalyEventsPipeline extends Pipeline {
     TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
     TimeRangeEntity analysis = TimeRangeEntity.getTimeRangeAnalysis(context);
 
-    ScoreUtils.TimeRangeStrategy strategyCurrent = ScoreUtils.build(this.strategy, analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
+    ScoreUtils.TimeRangeStrategy strategyAnomaly = ScoreUtils.build(this.strategy, analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
     ScoreUtils.TimeRangeStrategy strategyBaseline = ScoreUtils.build(this.strategy, baseline.getStart(), baseline.getStart(), baseline.getEnd());
 
     Set<AnomalyEventEntity> entities = new HashSet<>();
     for(MetricEntity me : metrics) {
-      entities.addAll(score(strategyCurrent, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), analysis.getStart(), anomaly.getEnd()), 1.0));
-      entities.addAll(score(strategyBaseline, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), baseline.getStart(), baseline.getEnd()), baseline.getScore()));
+      entities.addAll(EntityUtils.addRelated(score(strategyAnomaly, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), analysis.getStart(), anomaly.getEnd()), anomaly.getScore()), Arrays.asList(anomaly, me)));
+      entities.addAll(EntityUtils.addRelated(score(strategyBaseline, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), baseline.getStart(), baseline.getEnd()), baseline.getScore()), Arrays.asList(baseline, me)));
     }
 
     return new PipelineResult(context, EntityUtils.topk(entities, this.k));
