@@ -1,6 +1,7 @@
 import { type } from './utils';
 import fetch from 'fetch';
 import moment from 'moment';
+import _ from 'lodash';
 import {
   COMPARE_MODE_MAPPING,
   eventColorMapping,
@@ -108,7 +109,8 @@ function fetchEvents(start, end, mode) {
       .then(res => res.json())
       .then((res) => {
         // hidding informed events
-        return res
+
+        return _.uniqBy(res, 'urn')
           .filter(event => event.eventType !== 'informed')
           .map(assignEventColor)
           .sort((a, b) => (b.score - a.score))
