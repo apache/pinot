@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,8 @@ import org.slf4j.LoggerFactory;
 public class RootCauseResource {
   private static final Logger LOG = LoggerFactory.getLogger(RootCauseResource.class);
 
+  private static final int DEFAULT_FORMATTER_DEPTH = 1;
+
   private final List<RootCauseEntityFormatter> formatters;
   private final Map<String, RCAFramework> frameworks;
 
@@ -45,6 +48,7 @@ public class RootCauseResource {
       @QueryParam("baselineEnd") Long baselineEnd,
       @QueryParam("analysisStart") Long analysisStart,
       @QueryParam("analysisEnd") Long analysisEnd,
+      @QueryParam("formatterDepth") Integer formatterDepth,
       @QueryParam("urns") List<String> urns) throws Exception {
 
     // configuration validation
@@ -70,6 +74,9 @@ public class RootCauseResource {
     if(analysisEnd == null)
       throw new IllegalArgumentException("Must provide analysis end timestamp (in milliseconds)");
 
+    if(formatterDepth == null)
+      formatterDepth = DEFAULT_FORMATTER_DEPTH;
+
     urns = parseUrnsParam(urns);
     if(urns.isEmpty())
       throw new IllegalArgumentException("Must provide entity urns");
@@ -93,18 +100,22 @@ public class RootCauseResource {
     RCAFrameworkExecutionResult result = this.frameworks.get(framework).run(input);
 
     // apply formatters
-    return applyFormatters(result.getResultsSorted());
+    return applyFormatters(result.getResultsSorted(), formatterDepth);
   }
 
   @GET
   @Path("/raw")
   public List<RootCauseEntity> raw(
       @QueryParam("framework") String framework,
+      @QueryParam("formatterDepth") Integer formatterDepth,
       @QueryParam("urns") List<String> urns) throws Exception {
 
     // configuration validation
     if(!this.frameworks.containsKey(framework))
       throw new IllegalArgumentException(String.format("Could not resolve framework '%s'", framework));
+
+    if(formatterDepth == null)
+      formatterDepth = DEFAULT_FORMATTER_DEPTH;
 
     // parse urns arg
     urns = parseUrnsParam(urns);
@@ -119,22 +130,33 @@ public class RootCauseResource {
     RCAFrameworkExecutionResult result = this.frameworks.get(framework).run(input);
 
     // apply formatters
-    return applyFormatters(result.getResultsSorted());
+    return applyFormatters(result.getResultsSorted(), formatterDepth);
   }
 
-  private List<RootCauseEntity> applyFormatters(Iterable<Entity> entities) {
+  private List<RootCauseEntity> applyFormatters(Iterable<Entity> entities, int maxDepth) {
     List<RootCauseEntity> output = new ArrayList<>();
     for(Entity e : entities) {
-      output.add(applyFormatters(e));
+      output.add(this.applyFormatters(e, maxDepth));
     }
     return output;
   }
 
-  private RootCauseEntity applyFormatters(Entity e) {
+  private RootCauseEntity applyFormatters(Entity e, int remainingDepth) {
     for(RootCauseEntityFormatter formatter : this.formatters) {
       if(formatter.applies(e)) {
         try {
-          return formatter.format(e);
+          RootCauseEntity rce = formatter.format(e);
+
+          if(remainingDepth > 1) {
+            for (Entity re : e.getRelated()) {
+              rce.addRelatedEntity(this.applyFormatters(re, remainingDepth - 1));
+            }
+          } else {
+            // clear out any related entities added by the formatter by default
+            rce.setRelatedEntities(Collections.<RootCauseEntity>emptyList());
+          }
+
+          return rce;
         } catch (Exception ex) {
           LOG.warn("Error applying formatter '{}'. Skipping.", formatter.getClass().getName(), ex);
         }
