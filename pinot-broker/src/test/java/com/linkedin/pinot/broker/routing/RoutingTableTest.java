@@ -16,60 +16,42 @@
 package com.linkedin.pinot.broker.routing;
 
 import com.linkedin.pinot.broker.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.RandomRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableConfig.Builder;
-import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.yammer.metrics.core.MetricsRegistry;
-
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.I0Itec.zkclient.IZkDataListener;
 import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.mutable.MutableBoolean;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.zookeeper.data.Stat;
 import org.json.JSONException;
-import org.slf4j.Logger;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class RoutingTableTest {
   public static final String ALL_PARTITIONS = "ALL";
-  private static Logger LOGGER = org.slf4j.LoggerFactory.getLogger(RoutingTableTest.class);
-  private static RoutingTableSelector NO_LLC_ROUTING = new PercentageBasedRoutingTableSelector();
+
   @Test
   public void testHelixExternalViewBasedRoutingTable() throws Exception {
-    RoutingTableBuilder routingStrategy = new RandomRoutingTableBuilder(100);
-    HelixExternalViewBasedRouting routingTable =
-        new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null, new BaseConfiguration());
-
-   // routingTable.setRoutingTableBuilder(routingStrategy);
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, null, new BaseConfiguration());
 
     ExternalView externalView = new ExternalView("testResource0_OFFLINE");
     externalView.setState("segment0", "dataServer_instance_0", "ONLINE");
@@ -130,8 +112,8 @@ public class RoutingTableTest {
 
     final MutableBoolean timeBoundaryUpdated = new MutableBoolean(false);
 
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(propertyStore, NO_LLC_ROUTING, null,
-        new BaseConfiguration()) {
+    HelixExternalViewBasedRouting routingTable =
+        new HelixExternalViewBasedRouting(propertyStore, null, new BaseConfiguration()) {
       @Override
       protected ExternalView fetchExternalView(String table) {
         return offlineExternalView;
@@ -163,18 +145,15 @@ public class RoutingTableTest {
       String expectedSegmentList, int expectedNumSegment) {
     RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList(), null);
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
-    List<String> selectedSegments = new ArrayList<String>();
+    List<String> selectedSegments = new ArrayList<>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
-      LOGGER.trace(serverInstance.toString());
       SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      LOGGER.trace(segmentIdSet.toString());
       selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
     Arrays.sort(selectedSegmentArray);
     Assert.assertEquals(selectedSegments.size(), expectedNumSegment);
     Assert.assertEquals(Arrays.toString(selectedSegmentArray), expectedSegmentList);
-    LOGGER.trace("********************************");
   }
 
   @Test(enabled=false)
@@ -186,8 +165,7 @@ public class RoutingTableTest {
 
     final LLCSegmentName llcSegmentName = new LLCSegmentName("testResource0", 2, 65, System.currentTimeMillis());
 
-    HelixExternalViewBasedRouting routingTable =
-        new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null, new BaseConfiguration());
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, null, new BaseConfiguration());
 
     Field realtimeRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_realtimeHLCRoutingTableBuilder");
     realtimeRTBField.setAccessible(true);
@@ -277,11 +255,9 @@ public class RoutingTableTest {
       String[] expectedSegmentLists, int expectedNumSegment) {
     RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList(), null);
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
-    List<String> selectedSegments = new ArrayList<String>();
+    List<String> selectedSegments = new ArrayList<>();
     for (ServerInstance serverInstance : serversMap.keySet()) {
-      LOGGER.trace(serverInstance.toString());
       SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      LOGGER.trace(segmentIdSet.toString());
       selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
@@ -294,161 +270,6 @@ public class RoutingTableTest {
       }
     }
     Assert.assertTrue(matchedExpectedLists);
-    LOGGER.trace("********************************");
-  }
-
-  // Test that we can switch between llc and hlc routing depending on what the selector tells us.
-  @Test(enabled=false)
-  public void testCombinedKafkaRouting() throws Exception {
-    HelixExternalViewBasedRouting routingTable =
-        new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null, new BaseConfiguration());
-
-    final long now = System.currentTimeMillis();
-    final String tableName = "table";
-    final String resourceName = tableName + "_REALTIME";
-    final String group1 = resourceName + "_" + Long.toString(now) + "_0";
-    final String group2 = resourceName + "_" + Long.toString(now) + "_1";
-    final String online = "ONLINE";
-    final String consuming = "CONSUMING";
-    final int partitionId = 1;
-    final String partitionRange = "JUNK";
-    final int segId1 = 1;
-    final int segId2 = 2;
-    final int port1 = 1;
-    final int port2 = 2;
-    final String host = "host";
-    final ServerInstance serverInstance1 = new ServerInstance(host, port1);
-    final ServerInstance serverInstance2 = new ServerInstance(host, port2);
-    final String helixInstance1 = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + serverInstance1;
-    final String helixInstance2 = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + serverInstance2;
-    final HLCSegmentName s1HlcSegment1 = new HLCSegmentName(group1, partitionRange, Integer.toString(segId1));
-    final HLCSegmentName s1HlcSegment2 = new HLCSegmentName(group1, partitionRange, Integer.toString(segId2));
-    final HLCSegmentName s2HlcSegment1 = new HLCSegmentName(group2, partitionRange, Integer.toString(segId1));
-    final HLCSegmentName s2HlcSegment2 = new HLCSegmentName(group2, partitionRange, Integer.toString(segId2));
-    final LLCSegmentName llcSegment1 = new LLCSegmentName(tableName, partitionId, segId1, now);
-    final LLCSegmentName llcSegment2 = new LLCSegmentName(tableName, partitionId, segId2, now);
-
-    final List<InstanceConfig> instanceConfigs = new ArrayList<>(2);
-    instanceConfigs.add(new InstanceConfig(helixInstance1));
-    instanceConfigs.add(new InstanceConfig(helixInstance2));
-    ExternalView ev = new ExternalView(resourceName);
-    ev.setState(s1HlcSegment1.getSegmentName(), helixInstance1, online);
-    ev.setState(s1HlcSegment2.getSegmentName(), helixInstance1, online);
-    ev.setState(llcSegment1.getSegmentName(), helixInstance2, online);
-    ev.setState(llcSegment2.getSegmentName(), helixInstance2, consuming);
-    routingTable.markDataResourceOnline(generateTableConfig(resourceName), ev, instanceConfigs);
-
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resourceName, Collections.<String>emptyList(), null);
-    for (int i = 0; i < 100; i++) {
-      Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
-      Assert.assertEquals(routingMap.size(), 1);
-      List<String> segments = routingMap.get(serverInstance1).getSegmentsNameList();
-      Assert.assertEquals(segments.size(), 2);
-      Assert.assertTrue(segments.contains(s1HlcSegment1.getSegmentName()));
-      Assert.assertTrue(segments.contains(s1HlcSegment2.getSegmentName()));
-    }
-
-    // Now change the percent value in the routing table selector to be 100, and we should get only LLC segments.
-    Configuration configuration = new PropertiesConfiguration();
-    configuration.addProperty("class", PercentageBasedRoutingTableSelector.class.getName());
-    configuration.addProperty("table." + resourceName, new Integer(100));
-    RoutingTableSelector selector = RoutingTableSelectorFactory.getRoutingTableSelector(configuration, null);
-    selector.init(configuration, null);
-    Field selectorField = HelixExternalViewBasedRouting.class.getDeclaredField("_routingTableSelector");
-    selectorField.setAccessible(true);
-    selectorField.set(routingTable, selector);
-
-    // And we should find only LLC segments.
-    for (int i = 0; i < 100; i++) {
-      Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
-      Assert.assertEquals(routingMap.size(), 1);
-      List<String> segments = routingMap.get(serverInstance2).getSegmentsNameList();
-      Assert.assertEquals(segments.size(), 2);
-      Assert.assertTrue(segments.contains(llcSegment1.getSegmentName()));
-      Assert.assertTrue(segments.contains(llcSegment2.getSegmentName()));
-    }
-
-    // Now change it to 50, and we should find both (at least 10 times each).
-    configuration = new PropertiesConfiguration();
-    configuration.addProperty("table." + resourceName, new Integer(50));
-    selector = new PercentageBasedRoutingTableSelector();
-    selector.init(configuration, null);
-    selectorField.set(routingTable, selector);
-
-    int hlc = 0;
-    int llc = 0;
-    for (int i = 0; i < 100; i++) {
-      Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
-      Assert.assertEquals(routingMap.size(), 1);
-      if (routingMap.containsKey(serverInstance2)) {
-        List<String> segments = routingMap.get(serverInstance2).getSegmentsNameList();
-        Assert.assertEquals(segments.size(), 2);
-        Assert.assertTrue(segments.contains(llcSegment1.getSegmentName()));
-        Assert.assertTrue(segments.contains(llcSegment2.getSegmentName()));
-        llc++;
-      } else {
-        List<String> segments = routingMap.get(serverInstance1).getSegmentsNameList();
-        Assert.assertEquals(segments.size(), 2);
-        Assert.assertTrue(segments.contains(s1HlcSegment1.getSegmentName()));
-        Assert.assertTrue(segments.contains(s1HlcSegment2.getSegmentName()));
-        hlc++;
-      }
-    }
-
-    // If we do the above iteration 100 times, we should get at least 10 of each type of routing.
-    // If this test fails
-    Assert.assertTrue(hlc >= 10, "Got low values hlc=" + hlc + ",llc="  + llc);
-    Assert.assertTrue(llc >= 10, "Got low values hlc=" + hlc + ",llc="  + llc);
-
-    // Check that force HLC works
-    request = new RoutingTableLookupRequest(resourceName, Collections.singletonList("FORCE_HLC"), null);
-    hlc = 0;
-    llc = 0;
-    for (int i = 0; i < 100; i++) {
-      Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
-      Assert.assertEquals(routingMap.size(), 1);
-      if (routingMap.containsKey(serverInstance2)) {
-        List<String> segments = routingMap.get(serverInstance2).getSegmentsNameList();
-        Assert.assertEquals(segments.size(), 2);
-        Assert.assertTrue(segments.contains(llcSegment1.getSegmentName()));
-        Assert.assertTrue(segments.contains(llcSegment2.getSegmentName()));
-        llc++;
-      } else {
-        List<String> segments = routingMap.get(serverInstance1).getSegmentsNameList();
-        Assert.assertEquals(segments.size(), 2);
-        Assert.assertTrue(segments.contains(s1HlcSegment1.getSegmentName()));
-        Assert.assertTrue(segments.contains(s1HlcSegment2.getSegmentName()));
-        hlc++;
-      }
-    }
-
-    Assert.assertEquals(hlc, 100);
-    Assert.assertEquals(llc, 0);
-
-    // Check that force LLC works
-    request = new RoutingTableLookupRequest(resourceName, Collections.singletonList("FORCE_LLC"), null);
-    hlc = 0;
-    llc = 0;
-    for (int i = 0; i < 100; i++) {
-      Map<ServerInstance, SegmentIdSet> routingMap = routingTable.findServers(request);
-      Assert.assertEquals(routingMap.size(), 1);
-      if (routingMap.containsKey(serverInstance2)) {
-        List<String> segments = routingMap.get(serverInstance2).getSegmentsNameList();
-        Assert.assertEquals(segments.size(), 2);
-        Assert.assertTrue(segments.contains(llcSegment1.getSegmentName()));
-        Assert.assertTrue(segments.contains(llcSegment2.getSegmentName()));
-        llc++;
-      } else {
-        List<String> segments = routingMap.get(serverInstance1).getSegmentsNameList();
-        Assert.assertEquals(segments.size(), 2);
-        Assert.assertTrue(segments.contains(s1HlcSegment1.getSegmentName()));
-        Assert.assertTrue(segments.contains(s1HlcSegment2.getSegmentName()));
-        hlc++;
-      }
-    }
-
-    Assert.assertEquals(hlc, 0);
-    Assert.assertEquals(llc, 100);
   }
 
   /**
@@ -475,69 +296,5 @@ public class RoutingTableTest {
     Builder builder = new TableConfig.Builder(tableType);
     builder.setTableName(tableName);
     return builder.build();
-  }
-
-  @Test
-  public void testTableConfigRoutingTableSelector()
-      throws Exception {
-    FakePropertyStore fakePropertyStore = new FakePropertyStore();
-
-    TableConfigRoutingTableSelector tableConfigRoutingTableSelector = new TableConfigRoutingTableSelector();
-    tableConfigRoutingTableSelector.init(null, fakePropertyStore);
-
-    Map<String, String> streamConfigs = new HashMap<>();
-    streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "highLevel, simple");
-    streamConfigs.put("stream.kafka.topic.name", "fakeTopic");
-    streamConfigs.put("stream.kafka.decoder.class.name",
-        "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    streamConfigs.put("stream.kafka.hlc.zk.connect.string", "fakeZK:1234");
-    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url", "fakeSchemaRegistry:1234");
-    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.schema.name", "fakeSchema");
-    TableCustomConfig customConfig = new TableCustomConfig();
-    customConfig.setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "50"));
-    TableConfig tableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("fakeTable")
-            .setLLC(true)
-            .setStreamConfigs(streamConfigs)
-            .setCustomConfig(customConfig)
-            .build();
-
-    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", TableConfig.toZnRecord(tableConfig));
-    tableConfigRoutingTableSelector.registerTable("fakeTable_REALTIME");
-
-    int llcCount = 0;
-    for (int i = 0; i < 10000; ++i) {
-      if (tableConfigRoutingTableSelector.shouldUseLLCRouting("fakeTable_REALTIME")) {
-        llcCount++;
-      }
-    }
-
-    Assert.assertTrue(4500 <= llcCount && llcCount <= 5500,
-        "Expected approximately 50% probability of picking LLC, got " + llcCount / 100.0 + " %");
-
-    tableConfig.getCustomConfig().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "0"));
-    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", TableConfig.toZnRecord(tableConfig));
-
-    llcCount = 0;
-    for (int i = 0; i < 10000; ++i) {
-      if (tableConfigRoutingTableSelector.shouldUseLLCRouting("fakeTable_REALTIME")) {
-        llcCount++;
-      }
-    }
-
-    Assert.assertEquals(llcCount, 0, "Expected 0% probability of picking LLC, got " + llcCount / 100.0 + " %");
-
-    tableConfig.getCustomConfig().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "100"));
-    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", TableConfig.toZnRecord(tableConfig));
-
-    llcCount = 0;
-    for (int i = 0; i < 10000; ++i) {
-      if (tableConfigRoutingTableSelector.shouldUseLLCRouting("fakeTable_REALTIME")) {
-        llcCount++;
-      }
-    }
-
-    Assert.assertEquals(llcCount, 10000, "Expected 100% probability of picking LLC, got " + llcCount / 100.0 + " %");
   }
 }
