@@ -35,7 +35,7 @@
       <label for="select-filters" class="control-label required">Filters</label>
       {{filter-select
         options=filters
-        selected=filterPropNames
+        selected=selectedFilters
         triggerId="select-filters"
         onChange=(action "onSelectFilter")
         disabled=isFilterSelectDisabled
@@ -108,9 +108,9 @@
     <div class="form-group te-form__group--horizontal te-form__group--two-share te-form__group--last">
       <label for="select-dimension" class="control-label">Dimension Exploration</label>
       {{#power-select
-        options=selectedMetricDimensions
-        selected=dimensionSelectorVal
-        onchange=(action (mut dimensionSelectorVal))
+        options=dimensions
+        selected=selectedDimension
+        onchange=(action (mut selectedDimension))
         loadingMessage="Waiting for the server...."
         placeholder="Select a Dimension"
         searchPlaceholder="Type to filter..."

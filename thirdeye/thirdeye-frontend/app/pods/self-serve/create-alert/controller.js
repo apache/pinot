@@ -35,7 +35,7 @@ export default Ember.Controller.extend({
    */
   filters: {},
   graphConfig: {},
-  filterPropNames: JSON.stringify({}),
+  selectedFilters: JSON.stringify({}),
 
   /**
    * Object to cover basic ield 'presence' validation
@@ -104,18 +104,6 @@ export default Ember.Controller.extend({
   },
 
   /**
-   * Fetches the selected metric's dimension data. TODO: Set up custom response handler for HTTP errors.
-   * See: https://github.com/github/fetch#handling-http-error-statuses
-   * @method fetchMetricDimensions
-   * @param {Number} metricId - Id for the selected metric
-   * @return {Promise}
-   */
-  fetchMetricDimensions(metricId) {
-    const url = `/data/autocomplete/dimensions/metric/${metricId}`;
-    return fetch(url).then(checkStatus);
-  },
-
-  /**
    * Fetches an alert function record by Id.
    * Use case: show me the names of all functions monitored by a given alert group.
    * @method fetchFunctionById
@@ -152,7 +140,7 @@ export default Ember.Controller.extend({
       maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => checkStatus(res, 'get', true)),
       granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
       filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
-      selectedMetricDimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
+      dimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
     };
 
     return Ember.RSVP.hash(promiseHash);
@@ -411,9 +399,13 @@ export default Ember.Controller.extend({
   newAlertProperties: Ember.computed(
     'alertFunctionName',
     'selectedMetricOption',
+    'selectedDimension',
+    'selectedFilters',
     function() {
       let gkey = '';
       const granularity = this.get('graphConfig.granularity').toLowerCase();
+      const selectedFilter = this.get('selectedFilters');
+      const selectedDimension = this.get('selectedDimension');
       const settingsByGranularity = {
         common: {
           functionName: this.get('alertFunctionName') || this.get('alertFunctionName').trim(),
@@ -448,9 +440,20 @@ export default Ember.Controller.extend({
         }
       };
 
+      // Set granularity types
       if (granularity.includes('minute') || granularity.includes('5-minute')) { gkey = 'minute'; }
       if (granularity.includes('hour')) { gkey = 'hour'; }
       if (granularity.includes('day')) { gkey = 'day'; }
+
+      // Add filter and dimension choices if available
+      if (gkey !== 'minute') {
+        if (Ember.isPresent(selectedFilter)) {
+          settingsByGranularity.common.filters = selectedFilter;
+        }
+        if (Ember.isPresent(selectedDimension)) {
+          settingsByGranularity.common.exploreDimension = selectedDimension;
+        }
+      }
 
       return Object.assign(settingsByGranularity.common, settingsByGranularity[gkey]);
     }
@@ -532,6 +535,7 @@ export default Ember.Controller.extend({
     onSelectFilter(filters) {
       this.set('graphConfig.filters', filters);
       this.set('isMetricDataLoading', true);
+      // Fetch new graph data with selected filters
       this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
         this.setProperties({
           selectedMetric: metricData,
@@ -660,7 +664,7 @@ export default Ember.Controller.extend({
        selectedMetricOption: null,
        selectedPattern: null,
        selectedGranularity: null,
-       dimensionSelectorVal: null,
+       selectedDimension: null,
        alertFunctionName: null,
        selectedAppName: null,
        selectedConfigGroup: null,
@@ -672,7 +676,7 @@ export default Ember.Controller.extend({
        isCreateGroupSuccess: false,
        isReplayTriggeredSuccess: false,
        isReplayComplete: false,
-       filterPropNames: JSON.stringify({})
+       selectedFilters: JSON.stringify({})
       });
       this.send('refreshModel');
     },
