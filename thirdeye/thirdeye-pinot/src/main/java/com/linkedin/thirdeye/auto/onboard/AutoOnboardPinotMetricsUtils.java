@@ -21,9 +21,9 @@ import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
 
 public class AutoOnboardPinotMetricsUtils {
-  private static final String PINOT_TABLES_ENDPOINT = "tables/";
-  private static final String PINOT_SCHEMA_ENDPOINT = "schemas/%s";
-  private static final String PINOT_SCHEMA_ENDPOINT_TEMPLATE = "tables/%s/schema";
+  private static final String PINOT_TABLES_ENDPOINT = "/tables/";
+  private static final String PINOT_SCHEMA_ENDPOINT = "/schemas/%s";
+  private static final String PINOT_SCHEMA_ENDPOINT_TEMPLATE = "/tables/%s/schema";
   private static final String UTF_8 = "UTF-8";
 
   private CloseableHttpClient pinotControllerClient;
@@ -37,6 +37,7 @@ public class AutoOnboardPinotMetricsUtils {
       this.pinotControllerHost = new HttpHost(pinotThirdeyeDataSourceConfig.getControllerHost(),
           pinotThirdeyeDataSourceConfig.getControllerPort());
   }
+
 
   public JsonNode getAllTablesFromPinot() throws IOException {
     HttpGet tablesReq = new HttpGet(PINOT_TABLES_ENDPOINT);
