@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 
+import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.rootcause.impl.DimensionEntity;
 import com.linkedin.thirdeye.rootcause.impl.EventEntity;
 import com.linkedin.thirdeye.rootcause.impl.HolidayEventEntity;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -20,19 +23,27 @@ public class HolidayEventFormatter extends RootCauseEventEntityFormatter {
 
   @Override
   public RootCauseEventEntity format(EventEntity entity) {
-    HolidayEventEntity e = (HolidayEventEntity) entity;
+    HolidayEventEntity holidayEvent = (HolidayEventEntity) entity;
+    EventDTO eventDto = holidayEvent.getDto();
 
-    EventDTO dto = e.getDto();
-    String link =  String.format("https://www.google.com/search?q=%s", dto.getName());
-
-    RootCauseEventEntity out = makeRootCauseEventEntity(entity, dto.getName(), link, dto.getStartTime(), dto.getEndTime(), "");
-
-    for(Map.Entry<String, List<String>> entry : dto.getTargetDimensionMap().entrySet()) {
+    StringBuilder dimensions = new StringBuilder();
+    List<DimensionEntity> relatedDimensionEntities = new ArrayList<>();
+    for(Map.Entry<String, List<String>> entry : eventDto.getTargetDimensionMap().entrySet()) {
       String dimName = entry.getKey();
+      dimensions.append(" (" + dimName + ":");
+      dimensions.append(Joiner.on(",").join(entry.getValue()) + ")");
       for(String dimValue : entry.getValue()) {
         DimensionEntity de = DimensionEntity.fromDimension(1.0, dimName, dimValue);
-        out.addRelatedEntity(DIMENSION_FORMATTER.format(de));
+        relatedDimensionEntities.add(de);
       }
+    }
+
+    String label = String.format("%s %s", eventDto.getName(), dimensions.toString());
+    String link =  String.format("https://www.google.com/search?q=%s", eventDto.getName());
+    RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, eventDto.getStartTime(), eventDto.getEndTime(), "");
+
+    for (DimensionEntity dimensionEntity : relatedDimensionEntities) {
+      out.addRelatedEntity(DIMENSION_FORMATTER.format(dimensionEntity));
     }
 
     return out;
