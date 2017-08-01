@@ -30,8 +30,6 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONObject;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.Utils;
@@ -39,10 +37,12 @@ import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import javax.inject.Inject;
-import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.QueryParam;
 
 
+@Path("/")
 public class PqlQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PqlQueryResource.class);
@@ -52,10 +52,11 @@ public class PqlQueryResource {
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
+  @Path("pql")
   @GET
-  public Representation get(
-      @FormParam("pql") String pqlQuery,
-      @FormParam("trace") String traceEnabled
+  public String get(
+      @QueryParam("pql") String pqlQuery,
+      @QueryParam("trace") String traceEnabled
   ) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
@@ -66,29 +67,29 @@ public class PqlQueryResource {
         tableName = REQUEST_COMPILER.compileToBrokerRequest(pqlQuery).getQuerySource().getTableName();
       } catch (Exception e) {
         LOGGER.info("Caught exception while compiling PQL query: {}, {}", pqlQuery, e.getMessage());
-        return new StringRepresentation(QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString());
+        return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
       }
 
       // Get brokers for the resource table.
       List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(tableName);
       if (instanceIds.isEmpty()) {
-        return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
+        return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
       }
 
       // Retain only online brokers.
       instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
       if (instanceIds.isEmpty()) {
-        return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
+        return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
       }
 
       // Send query to a random broker.
       String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
       InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
       String url = "http://" + instanceConfig.getHostName().split("_")[1] + ":" + instanceConfig.getPort() + "/query";
-      return new StringRepresentation(sendPQLRaw(url, pqlQuery, traceEnabled));
+      return sendPQLRaw(url, pqlQuery, traceEnabled);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
-      return new StringRepresentation(QueryException.getException(QueryException.INTERNAL_ERROR, e).toString());
+      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
   }
 
