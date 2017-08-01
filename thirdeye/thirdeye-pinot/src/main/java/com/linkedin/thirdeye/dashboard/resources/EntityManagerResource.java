@@ -26,6 +26,8 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import javax.ws.rs.Consumes;
@@ -96,10 +98,26 @@ public class EntityManagerResource {
       results.addAll(dashboardConfigManager.findAll());
       break;
     case DATASET_CONFIG:
-      results.addAll(datasetConfigManager.findAll());
+      List<DatasetConfigDTO> allDatasets = datasetConfigManager.findAll();
+      Collections.sort(allDatasets, new Comparator<DatasetConfigDTO>() {
+
+        @Override
+        public int compare(DatasetConfigDTO o1, DatasetConfigDTO o2) {
+          return o1.getDataset().compareTo(o2.getDataset());
+        }
+      });
+      results.addAll(allDatasets);
       break;
     case METRIC_CONFIG:
-      results.addAll(metricConfigManager.findAll());
+      List<MetricConfigDTO> allMetrics = metricConfigManager.findAll();
+      Collections.sort(allMetrics, new Comparator<MetricConfigDTO>() {
+
+        @Override
+        public int compare(MetricConfigDTO o1, MetricConfigDTO o2) {
+          return o1.getDataset().compareTo(o2.getDataset());
+        }
+      });
+      results.addAll(allMetrics);
       break;
     case OVERRIDE_CONFIG:
       results.addAll(overrideConfigManager.findAll());

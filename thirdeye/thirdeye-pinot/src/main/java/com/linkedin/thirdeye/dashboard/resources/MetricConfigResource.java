@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -161,6 +163,13 @@ public class MetricConfigResource {
     Map<String, Object> filters = new HashMap<>();
     filters.put("dataset", dataset);
     List<MetricConfigDTO> metricConfigDTOs = metricConfigDao.findByParams(filters);
+    Collections.sort(metricConfigDTOs, new Comparator<MetricConfigDTO>() {
+
+      @Override
+      public int compare(MetricConfigDTO m1, MetricConfigDTO m2) {
+        return m1.getName().compareTo(m2.getName());
+      }
+    });
     List<MetricConfigDTO> subList = Utils.sublist(metricConfigDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();

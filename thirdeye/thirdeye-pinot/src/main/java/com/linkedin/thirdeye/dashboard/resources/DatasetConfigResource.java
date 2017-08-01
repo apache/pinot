@@ -5,6 +5,8 @@ import com.google.common.base.Strings;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -166,6 +168,13 @@ public class DatasetConfigResource {
   public String viewDatsetConfig(@DefaultValue("0") @QueryParam("jtStartIndex") int jtStartIndex,
       @DefaultValue("100") @QueryParam("jtPageSize") int jtPageSize) {
     List<DatasetConfigDTO> datasetConfigDTOs = datasetConfigDAO.findAll();
+    Collections.sort(datasetConfigDTOs, new Comparator<DatasetConfigDTO>() {
+
+      @Override
+      public int compare(DatasetConfigDTO d1, DatasetConfigDTO d2) {
+        return d1.getDataset().compareTo(d2.getDataset());
+      }
+    });
     List<DatasetConfigDTO> subList = Utils.sublist(datasetConfigDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();

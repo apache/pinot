@@ -124,6 +124,7 @@ public class DataResource {
     for (DatasetConfigDTO datasetConfig : datasetConfigDTOs) {
       datasets.add(datasetConfig.getDataset());
     }
+    Collections.sort(datasets);
     return datasets;
   }
 
