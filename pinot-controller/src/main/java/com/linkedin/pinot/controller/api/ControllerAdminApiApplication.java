@@ -63,6 +63,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
       }
     });
+//    property("jersey.config.server.tracing.type", "ALL");
+//    property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
 
   public void registerBinder(AbstractBinder binder) {
