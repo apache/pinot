@@ -74,12 +74,49 @@ const setWeight = (event) => {
   return Object.assign(event, {score: weight});
 };
 
-
+/**
+ * Helper function assigning start and end times to events relative
+ * to the anomaly period's start time
+ */
 const assignEventTimeInfo = (anomalyStart, event) => {
   const relStart = event.start - anomalyStart;
-  const relEnd = event.end - anomalyStart;
 
-  return Object.assign(event, { relStart, relEnd });
+  var relEnd = 'ongoing';
+  var duration = 'ongoing';
+  if (moment().isAfter(moment(event.end).add(1, 'minute'))) {
+    relEnd = event.end - anomalyStart;
+    duration = event.end - event.start;
+  }
+
+  return Object.assign(event, { relStart, relEnd, duration });
+};
+
+/**
+ * Helper function to humanize a moment
+ */
+const humanizeShort = (dur) => {
+  return dur.humanize().replace('minute', 'min');
+};
+
+/**
+ * Helper function to add human-readable time labels as record properties
+ */
+const assignHumanTimeInfo = (event) => {
+  var humanRelStart = event.relStart;
+  if (event.relStart >= 0) {
+    const out = humanizeShort(moment.duration(event.relStart));
+    humanRelStart = `${out} after`;
+  } else {
+    const out = humanizeShort(moment.duration(-1 * event.relStart));
+    humanRelStart = `${out} before`;
+  }
+
+  var humanDuration = event.duration;
+  if (!Number.isNaN(event.duration)) {
+    humanDuration = humanizeShort(moment.duration(event.duration));
+  }
+
+  return Object.assign(event, { humanRelStart, humanDuration });
 };
 
 /**
@@ -120,8 +157,9 @@ function fetchEvents(start, end, mode) {
         return _.uniqBy(res, 'urn')
           .filter(event => event.eventType !== 'informed')
           .map(assignEventColor)
-          .map(setWeight);
+          .map(setWeight)
           .map(event => assignEventTimeInfo(anomalyStart, event))
+          .map(assignHumanTimeInfo)
           .sort((a, b) => (b.score - a.score));
       })
       .then(res => dispatch(loadEvents(res)
