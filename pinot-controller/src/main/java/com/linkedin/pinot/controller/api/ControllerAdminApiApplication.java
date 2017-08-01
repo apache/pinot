@@ -15,10 +15,15 @@
  */
 package com.linkedin.pinot.controller.api;
 
+import com.google.common.base.Preconditions;
+import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerResponseContext;
+import javax.ws.rs.container.ContainerResponseFilter;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -28,11 +33,6 @@ import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Preconditions;
-import io.swagger.jaxrs.config.BeanConfig;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerResponseContext;
-import javax.ws.rs.container.ContainerResponseFilter;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
@@ -63,8 +63,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
       }
     });
-//    property("jersey.config.server.tracing.type", "ALL");
-//    property("jersey.config.server.tracing.threshold", "VERBOSE");
+    // property("jersey.config.server.tracing.type", "ALL");
+    // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
 
   public void registerBinder(AbstractBinder binder) {
@@ -76,13 +76,27 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     Preconditions.checkArgument(httpPort > 0);
     baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
     httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, this);
+
     setupSwagger(httpServer);
-    // TODO: setup static resources for controller that home page functionality and some
-    // java scripts
-    CLStaticHttpHandler queryStaticHttpHandler = new CLStaticHttpHandler(ControllerAdminApiApplication.class.getClassLoader(), CONSOLE_WEB_PATH);
-    httpServer.getServerConfiguration().addHttpHandler(queryStaticHttpHandler, "/query/*");
-    CLStaticHttpHandler landingStaticHttpHandler = new CLStaticHttpHandler(ControllerAdminApiApplication.class.getClassLoader(), "/landing/");
-    httpServer.getServerConfiguration().addHttpHandler(landingStaticHttpHandler, "");
+
+    ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
+
+    // This is ugly from typical patterns to setup static resources but all our APIs are
+    // at path "/". So, configuring static handler for path "/" does not work well.
+    // Configuring this as a default servlet is an option but that is still ugly if we evolve
+    // So, we setup specific handlers for static resource directory. index.html is served directly
+    // by a jersey handler
+
+    httpServer.getServerConfiguration().addHttpHandler(
+        new CLStaticHttpHandler(classLoader,"/static/query/"), "/query");
+    httpServer.getServerConfiguration().addHttpHandler(
+        new CLStaticHttpHandler(classLoader, "/static/css/"), "/css");
+    httpServer.getServerConfiguration().addHttpHandler(
+        new CLStaticHttpHandler(classLoader, "/static/js/"), "/js");
+    // without this explicit request to /index.html will not work
+    httpServer.getServerConfiguration().addHttpHandler(
+        new CLStaticHttpHandler(classLoader, "/static/"), "/index.html");
+
     started = true;
     LOGGER.info("Start jersey admin API on port: {}", httpPort);
     return true;
