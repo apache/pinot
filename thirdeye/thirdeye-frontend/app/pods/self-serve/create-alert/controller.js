@@ -29,6 +29,7 @@ export default Ember.Controller.extend({
   isMetricDataLoading: false,
   isReplayTriggeredSuccess: false,
   metricGranularityOptions: [],
+  originalDimensions: [],
 
   /**
    * Component property initial settings
@@ -424,7 +425,7 @@ export default Ember.Controller.extend({
           type: 'REGRESSION_GAUSSIAN_SCAN',
           windowSize: 84,
           windowUnit: 'HOURS',
-          windowDelay: 8,
+          windowDelay: 0,
           windowDelayUnit: 'HOURS',
           cron: '0%200%2014%201%2F1%20*%20%3F%20*',
           properties: 'metricTimezone=America/Los_Angeles;anomalyRemovalWeightThreshold=1.0;scanMinWindowSize=1;continuumOffsetUnit=3600000;scanUseBootstrap=true;scanNumSimulations=500;scanTargetNumAnomalies=1;continuumOffsetSize=1440;scanMaxWindowSize=48;pValueThreshold=0.01;scanStepSize=1'
@@ -514,7 +515,10 @@ export default Ember.Controller.extend({
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {
           this.setProperties(hash);
-          this.set('metricGranularityOptions', hash.granularities);
+          this.setProperties({
+            metricGranularityOptions: hash.granularities,
+            originalDimensions: hash.dimensions
+          });
           this.triggerGraphFromMetric(selectedObj);
         })
         .catch((err) => {
@@ -527,14 +531,24 @@ export default Ember.Controller.extend({
 
     /**
      * When a filter is selected, fetch new anomaly graph data based on that filter
-     * and trigger 'onSelectedMetric' to load the graph again.
+     * and trigger a new graph load. Also filter dimension names already selected as filters.
      * @method onSelectFilter
-     * @param {Object} filters - The selected filter to apply
+     * @param {Object} selectedFilters - The selected filters to apply
      * @return {undefined}
      */
-    onSelectFilter(filters) {
-      this.set('graphConfig.filters', filters);
-      this.set('isMetricDataLoading', true);
+    onSelectFilter(selectedFilters) {
+      const dimensionNameSet = new Set(this.get('originalDimensions'));
+      const filterNames = Object.keys(JSON.parse(selectedFilters));
+      this.set('graphConfig.filters', selectedFilters);
+      // Remove selected filters from dimension options
+      for (var key of filterNames) {
+        dimensionNameSet.delete(key);
+      }
+      // Update dimension options and loader
+      this.setProperties({
+        dimensions: [...dimensionNameSet],
+        isMetricDataLoading: true
+      });
       // Fetch new graph data with selected filters
       this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
         this.setProperties({
