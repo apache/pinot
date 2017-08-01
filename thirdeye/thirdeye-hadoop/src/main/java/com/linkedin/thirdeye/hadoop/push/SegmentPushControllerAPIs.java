@@ -60,6 +60,7 @@ public class SegmentPushControllerAPIs {
   SegmentPushControllerAPIs(String[] controllerHosts, String controllerPort) {
     this.controllerHosts = controllerHosts;
     this.controllerPort = Integer.valueOf(controllerPort);
+    controllerHttpHost = new HttpHost(controllerHosts[0], this.controllerPort);
   }
 
 
@@ -121,7 +122,7 @@ public class SegmentPushControllerAPIs {
     return pattern;
   }
 
-  private List<String> getAllSegments(String tablename, String segmentName) throws IOException {
+  public List<String> getAllSegments(String tablename, String segmentName) throws IOException {
     List<String> allSegments = new ArrayList<>();
 
     HttpClient controllerClient = new DefaultHttpClient();
@@ -151,7 +152,7 @@ public class SegmentPushControllerAPIs {
     return allSegments;
   }
 
-  private boolean isDeleteSuccessful(String tablename, String segmentName) throws IOException {
+  public boolean isDeleteSuccessful(String tablename, String segmentName) throws IOException {
 
     boolean deleteSuccessful = false;
     HttpClient controllerClient = new DefaultHttpClient();
@@ -199,7 +200,7 @@ public class SegmentPushControllerAPIs {
     }
   }
 
-  private boolean deleteSegment(String tablename, String segmentName) throws IOException {
+  public boolean deleteSegment(String tablename, String segmentName) throws IOException {
     boolean deleteSuccessful = false;
 
     HttpClient controllerClient = new DefaultHttpClient();
@@ -221,6 +222,5 @@ public class SegmentPushControllerAPIs {
     }
     return deleteSuccessful;
   }
-
 
 }

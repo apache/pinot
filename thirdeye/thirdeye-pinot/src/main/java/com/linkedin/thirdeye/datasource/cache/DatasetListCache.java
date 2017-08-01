@@ -67,7 +67,7 @@ public class DatasetListCache {
       datasets.add(dataset);
     }
 
-    LOG.info("Loading collections {}", datasets);
+    LOG.info("Loading datasets {}", datasets);
     datasetListRef.set(datasets);
   }
 

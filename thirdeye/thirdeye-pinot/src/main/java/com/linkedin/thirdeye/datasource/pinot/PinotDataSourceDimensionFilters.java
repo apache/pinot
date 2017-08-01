@@ -29,7 +29,7 @@ public class PinotDataSourceDimensionFilters {
 
     Map<String, List<String>> filters = null;
     try {
-      LOG.info("Loading dimension filters cache {}", dataset);
+      LOG.debug("Loading dimension filters cache {}", dataset);
       List<String> dimensions = Utils.getSortedDimensionNames(dataset);
       filters = Utils.getFilters(CACHE_REGISTRY.getQueryCache(), dataset, "filters", dimensions, startDateTime, endDateTime);
     } catch (Exception e) {
