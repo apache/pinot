@@ -1348,6 +1348,20 @@ public class DataFrame {
   }
 
   /**
+   * Returns a DataFrameGrouping based on the labels provided by the series referenced by
+   * {@code seriesNames} row by row.  The method can group across multiple columns.  It returns
+   * the key column as object series of {@code Tuples} constructed from the input columns.
+   *
+   * @see Grouping.GroupingByValue
+   *
+   * @param seriesNames series containing grouping labels
+   * @return DataFrameGrouping
+   */
+  public Grouping.DataFrameGrouping groupByValue(String... seriesNames) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByValue.from(names2series(seriesNames)));
+  }
+
+  /**
    * Returns a DataFrameGrouping based on the labels provided by {@code labels} row by row.
    * The size of {@code labels} must match the size of the DataFrame.
    *
@@ -2159,6 +2173,14 @@ public class DataFrame {
 
     public static Tuple copyFrom(Object... values) {
       return new Tuple(Arrays.copyOf(values, values.length));
+    }
+
+    public static Tuple buildFrom(Series[] series, int row) {
+      Object[] values = new Object[series.length];
+      for(int i=0; i<series.length; i++) {
+        values[i] = series[i].getObject(row);
+      }
+      return new Tuple(values);
     }
 
     private Tuple(Object... values) {

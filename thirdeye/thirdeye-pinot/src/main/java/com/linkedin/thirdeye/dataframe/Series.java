@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dataframe;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -1185,19 +1187,73 @@ public abstract class Series {
     for(int i=0; i<right.length; i++)
       rightTyped[i] = right[i].get(left[i].type());
 
-    JoinHashMap hashRight = new JoinHashMap(rightTyped);
+    PrimitiveMultimap hashRight = new PrimitiveMultimap(rightTyped);
 
     for(int i=0; i<left[0].size(); i++) {
-      int[] rows = hashRight.get(left, i);
+      int[] rows = hashRight.get(left, i, rightTyped);
       if(rows.length <= 0) {
         pairs.add(i, -1);
         continue;
       }
       for(int j : rows) {
-        if(equalsMultiple(left, rightTyped, i, j)) {
-          pairs.add(i, j);
-          touchedRight.set(j);
+        pairs.add(i, j);
+        touchedRight.set(j);
+      }
+    }
+
+    for(int i=0; i<rightTyped[0].size(); i++) {
+      if(!touchedRight.get(i))
+        pairs.add(-1, i);
+    }
+
+    return pairs;
+  }
+
+  /**
+   * Returns a collection of JoinPairs for an outer join performed based on hash and equality.
+   * Can perform joins across multiple columns on both sides.
+   *
+   * @see Series#hashCode(int)
+   *
+   * @param left left side of the join
+   * @param right right side of the join
+   * @return JoinPairs
+   */
+  static JoinPairs hashJoinOuterGuava(Series[] left, Series[] right) {
+    if(left.length != right.length)
+      throw new IllegalArgumentException("Number of series on the left side of the join must be equal to the right side");
+    if(left.length <= 0)
+      throw new IllegalArgumentException("Must join on at least one series");
+    assertSameLength(left);
+    assertSameLength(right);
+
+    JoinPairs pairs = new JoinPairs(left[0].size());
+    BitSet touchedRight = new BitSet(right[0].size());
+
+    Series[] rightTyped = new Series[right.length];
+    for(int i=0; i<right.length; i++)
+      rightTyped[i] = right[i].get(left[i].type());
+
+    Multimap<Integer, Integer> hashRight = ArrayListMultimap.create(right[0].size(), 1);
+    for(int j=0; j<right[0].size(); j++) {
+      hashRight.put(PrimitiveMultimap.hashRow(rightTyped, j), j);
+    }
+
+    for(int i=0; i<left[0].size(); i++) {
+      Collection<Integer> rows = hashRight.get(PrimitiveMultimap.hashRow(left, i));
+      Collection<Integer> actual = new ArrayList<>(rows.size());
+      for(int r : rows) {
+        if(Series.equalsMultiple(left, rightTyped, i, r)) {
+          actual.add(r);
         }
+      }
+      if(actual.isEmpty()) {
+        pairs.add(i, -1);
+        continue;
+      }
+      for(int j : actual) {
+        pairs.add(i, j);
+        touchedRight.set(j);
       }
     }
 
@@ -1236,13 +1292,11 @@ public abstract class Series {
     for(int i=0; i<right.length; i++)
       rightTyped[i] = right[i].get(left[i].type());
 
-    JoinHashMap hashRight = new JoinHashMap(rightTyped);
+    PrimitiveMultimap hashRight = new PrimitiveMultimap(rightTyped);
 
     for(int i=0; i<left[0].size(); i++) {
-      for(int j : hashRight.get(left, i)) {
-        if(equalsMultiple(left, rightTyped, i, j)) {
-          pairs.add(i, j);
-        }
+      for(int j : hashRight.get(left, i, rightTyped)) {
+        pairs.add(i, j);
       }
     }
 

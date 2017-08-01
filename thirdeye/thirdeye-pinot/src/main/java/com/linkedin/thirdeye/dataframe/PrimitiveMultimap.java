@@ -5,21 +5,21 @@ import java.util.Arrays;
 
 /**
  * Custom hash-based multimap implementation for joins. Primitive, fixed size, append only.
- * Minimizes memory footprint and overheads.
+ * Minimizes memory footprint and overheads. Open-addressing, linear scan, block skip.
  */
-class JoinHashMap {
+class PrimitiveMultimap {
   private static final int M = 0x5bd1e995;
   private static final int SEED = 0xb7f93ea;
   private static final long TO_LONG = 0xFFFFFFFFL;
   private static final int INITIAL_SIZE = 1;
 
   public static final int RESERVED_VALUE = 0xFFFFFFFF;
-
-  private static final double SCALING_FACTOR = 2;
+  public static final double SCALING_FACTOR = 4;
 
   private final int maxSize;
   private final int shift;
   private final long[] data;
+  private int[] writeInfo;
 
   private int size;
   private long collisions = 0;
@@ -27,6 +27,7 @@ class JoinHashMap {
 
   private int iteratorKey = -1;
   private int iterator = -1;
+
   private int[] outBuffer = new int[INITIAL_SIZE];
 
   // 0xHHHHHHHHVVVVVVVV
@@ -36,27 +37,31 @@ class JoinHashMap {
   //
   // 0x0000000000000000    indicates empty
 
-  public JoinHashMap(Series... series) {
+  /* **************************************************************************
+   * Series-specific
+   * *************************************************************************/
+  public PrimitiveMultimap(Series... series) {
     this(series[0].size());
     Series.assertSameLength(series);
-
     for(int i=0; i<series[0].size(); i++) {
-      put(hashRow(series, i), i);
+      putFast(hashRow(series, i), i);
     }
   }
 
-  public int[] get(Series[] series, int row) {
+  public int[] get(Series[] series, int row, Series[] compare) {
     int key = hashRow(series, row);
     int val = this.get(key);
 
     int cntr = 0;
     while(val != -1) {
-      if(cntr >= this.outBuffer.length) {
-        int[] newBuffer = new int[this.outBuffer.length * 2];
-        System.arraycopy(this.outBuffer, 0, newBuffer, 0, this.outBuffer.length);
-        this.outBuffer = newBuffer;
+      if(Series.equalsMultiple(series, compare, row, val)) {
+        if(cntr >= this.outBuffer.length) {
+          int[] newBuffer = new int[this.outBuffer.length * 2];
+          System.arraycopy(this.outBuffer, 0, newBuffer, 0, this.outBuffer.length);
+          this.outBuffer = newBuffer;
+        }
+        this.outBuffer[cntr++] = val;
       }
-      this.outBuffer[cntr++] = val;
       val = this.getNext();
     }
     return Arrays.copyOf(this.outBuffer, cntr);
@@ -65,33 +70,50 @@ class JoinHashMap {
   static int hashRow(Series[] series, int row) {
     int k = SEED;
     for(Series s : series) {
-      k = hash(s.hashCode(row) ^ k);
+      k ^= s.hashCode(row);
     }
     return k;
   }
 
-  public JoinHashMap(int maxSize) {
+  /* **************************************************************************
+   * Base implementation
+   * *************************************************************************/
+  public PrimitiveMultimap(final int maxSize) {
     this.maxSize = maxSize;
-    int minCapacity = (int)(maxSize * SCALING_FACTOR);
+
+    final int minCapacity = (int)(maxSize * SCALING_FACTOR);
     this.shift = log2(minCapacity) + 1;
-    this.data = new long[pow2(this.shift)];
+
+    final int capacity = pow2(this.shift);
+    this.data = new long[capacity];
+
+    this.writeInfo = new int[this.data.length];
   }
 
-  public void put(int key, int value) {
+  public void put(final int key, final int value) {
     // NOTE: conservative - (hash, value) must be != 0
     if(value == RESERVED_VALUE)
       throw new IllegalArgumentException(String.format("Value must be different from %d", RESERVED_VALUE));
     if(this.size >= this.maxSize)
       throw new IllegalArgumentException(String.format("Map is at max size %d", this.maxSize));
-    int hash = hash(key);
-    long tuple = tuple(key, value + 1); // ensure 0 indicates empty
-    long ttup = fetch(hash);
-    while(ttup != 0) {
-      hash += 1;
-      ttup = fetch(hash);
+    putFast(key, value);
+  }
+
+  private void putFast(final int key, final int value) {
+    final int keyHash = hash(key);
+    final int keyIndex = safeIndex(keyHash);
+
+    int index = keyIndex;
+    long tuple = this.data[index];
+    while(tuple != 0) {
+      index = this.writeInfo[index];
+      tuple = this.data[index];
       this.collisions++;
     }
-    this.data[hash2index(hash)] = tuple;
+
+    this.data[index] = tuple(key, value + 1); // ensure 0 indicates empty
+    this.writeInfo[index] = keyIndex;
+    this.writeInfo[keyIndex] = safeIndex(index + 1);
     this.size++;
   }
 
@@ -105,20 +127,22 @@ class JoinHashMap {
 
   private int getInternal(int key, int hash, int offset) {
     int toff = 0;
-    long tuple = fetch(hash);
+    int index = safeIndex(hash);
+    long tuple = this.data[index];
+
     while(tuple != 0) {
       int tkey = tuple2key(tuple);
 
       if(tkey == key) {
         if(offset == toff++) {
           this.iteratorKey = key;
-          this.iterator = hash + 1;
+          this.iterator = index + 1;
           return tuple2val(tuple) - 1; // fix value offset
         }
       }
 
-      hash += 1;
-      tuple = fetch(hash);
+      index = safeIndex(index + 1);
+      tuple = this.data[index];
       this.rereads++;
     }
 
@@ -133,16 +157,16 @@ class JoinHashMap {
     return getInternal(this.iteratorKey, this.iterator, 0);
   }
 
-  private long fetch(int hash) {
-    return this.data[hash2index(hash)];
-  }
-
   public int size() {
-    return this.data.length;
+    return this.size;
   }
 
-  public int getMaxSize() {
+  public int capacity() {
     return this.maxSize;
+  }
+
+  public int capacityEffective() {
+    return this.data.length;
   }
 
   public long getCollisions() {
@@ -167,8 +191,8 @@ class JoinHashMap {
     return sb.toString();
   }
 
-  int hash2index(int hash) {
-    return hash & ((1 << this.shift) - 1);
+  int safeIndex(int index) {
+    return index & ((1 << this.shift) - 1);
   }
 
   static int tuple2key(long tuple) {
@@ -199,13 +223,4 @@ class JoinHashMap {
     k ^= k >>> r;
     return k;
   }
-
-  public static void main(String[] args) {
-    JoinHashMap m = new JoinHashMap(100);
-    for(int i=0; i<100; i++) {
-      m.put(i, i);
-    }
-    System.out.println(m.visualize());
-  }
-
 }

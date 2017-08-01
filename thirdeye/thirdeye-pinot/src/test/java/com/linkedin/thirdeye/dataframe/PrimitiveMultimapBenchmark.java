@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.dataframe;
 
-import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,10 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class JoinMapBenchmark {
+public class PrimitiveMultimapBenchmark {
   // TODO: validate benchmarking method - Dead Code Elimination, etc. may be playing tricks on us.
 
-  private static final Logger LOG = LoggerFactory.getLogger(JoinMapBenchmark.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PrimitiveMultimapBenchmark.class);
 
   private static final int N_ROUNDS = 15;
   private static final int N_ELEMENTS = 10_000_000;
@@ -32,7 +32,7 @@ public class JoinMapBenchmark {
   private long timeOuter;
   private DataFrame.Builder results = DataFrame.builder(SERIES_NAMES);
 
-  private void benchmarkJoinMap() {
+  private void benchmarkPrimitiveMap() {
     startTimerOuter();
     long checksum = 0;
     long collisions = 0;
@@ -42,14 +42,14 @@ public class JoinMapBenchmark {
       int[] keys = generateIntData(N_ELEMENTS);
       int[] values = generateIntData(N_ELEMENTS);
       int[] output = new int[N_ELEMENTS];
-      JoinHashMap m = new JoinHashMap(N_ELEMENTS);
+      PrimitiveMultimap m = new PrimitiveMultimap(N_ELEMENTS);
 
       startTimer();
       for(int i=0; i<N_ELEMENTS; i++) {
         m.put(keys[i], values[i]);
       }
       for(int i=0; i<N_ELEMENTS; i++) {
-        output[i] = m.get(keys[i], 0);
+        output[i] = m.get(keys[i]);
       }
       stopTimer();
 
@@ -59,7 +59,7 @@ public class JoinMapBenchmark {
       rereads += m.getRereads();
     }
 
-    logResults("benchmarkJoinMap", checksum, collisions, rereads);
+    logResults("benchmarkPrimitiveMap", checksum, collisions, rereads);
   }
 
   private void benchmarkHashMap() {
@@ -88,7 +88,34 @@ public class JoinMapBenchmark {
     logResults("benchmarkHashMap", checksum, 0, 0);
   }
 
-  private void benchmarkJoinMultiMap() {
+  private void benchmarkArrayListMap() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      int[] keys = generateIntData(N_ELEMENTS);
+      int[] values = generateIntData(N_ELEMENTS);
+      int[] output = new int[N_ELEMENTS];
+      Multimap<Integer, Integer> m = ArrayListMultimap.create(N_ELEMENTS, 1);
+
+      startTimer();
+      for(int i=0; i<N_ELEMENTS; i++) {
+        m.put(keys[i], values[i]);
+      }
+      for(int i=0; i<N_ELEMENTS; i++) {
+        for(int v : m.get(keys[i]))
+          output[i] = v;
+      }
+      stopTimer();
+
+      assertEquals(output, values);
+      checksum ^= checksum(output);
+    }
+
+    logResults("benchmarkArrayListMap", checksum, 0, 0);
+  }
+
+  private void benchmarkPrimitiveMultimap() {
     startTimerOuter();
     long checksum = 0;
     long collisions = 0;
@@ -97,65 +124,210 @@ public class JoinMapBenchmark {
     for (int r = 0; r < N_ROUNDS; r++) {
       int[] values = generateIntData(N_ELEMENTS);
       int[] output = new int[N_ELEMENTS];
-      JoinHashMap m = new JoinHashMap(N_ELEMENTS);
+      PrimitiveMultimap m = new PrimitiveMultimap(N_ELEMENTS);
 
       startTimer();
       for(int i=N_ELEMENTS-1; i>=0; i--) {
-        m.put(i / 10, values[i]);
+        m.put(i & (0x400 - 1), values[i]);
       }
 
       int cntr = 0;
-      for(int i=0; i<N_ELEMENTS / 10; i++) {
-        int val = m.get(i, 0);
-        if(val != -1)
+      for(int i=0; i<0x400; i++) {
+        int val = m.get(i);
+        while(val != -1) {
           output[cntr++] = val;
-        while((val = m.getNext()) != -1)
-          output[cntr++] = val;
+          val = m.getNext();
+        }
       }
       stopTimer();
 
+      if(cntr != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Expected %d elements, but got %d", N_ELEMENTS, cntr));
       assertEqualsSorted(output, values);
       checksum ^= checksum(output);
       collisions += m.getCollisions();
       rereads += m.getRereads();
     }
 
-    logResults("benchmarkJoinMultiMap", checksum, collisions, rereads);
+    logResults("benchmarkPrimitiveMultimap", checksum, collisions, rereads);
   }
 
-  private void benchmarkHashMultiMap() {
+  private void benchmarkArrayListMultimap() {
     startTimerOuter();
     long checksum = 0;
 
     for (int r = 0; r < N_ROUNDS; r++) {
       int[] values = generateIntData(N_ELEMENTS);
       int[] output = new int[N_ELEMENTS];
-      Multimap<Integer, Integer> m = HashMultimap.create(N_ELEMENTS / 10, 10);
+      Multimap<Integer, Integer> m = ArrayListMultimap.create(0x400, (N_ELEMENTS >>> 10) + 1);
 
       startTimer();
       for(int i=N_ELEMENTS-1; i>=0; i--) {
-        m.put(i / 10, values[i]);
+        m.put(i & (0x400 - 1), values[i]);
       }
 
       int cntr = 0;
-      for(int i=0; i<N_ELEMENTS / 10; i++) {
+      for(int i=0; i<0x400; i++) {
         for(int val : m.get(i))
           output[cntr++] = val;
       }
       stopTimer();
 
+      if(cntr != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Expected %d elements, but got %d", N_ELEMENTS, cntr));
       assertEqualsSorted(output, values);
       checksum ^= checksum(output);
     }
 
-    logResults("benchmarkHashMultiMap", checksum, 0, 0);
+    logResults("benchmarkArrayListMultimap", checksum, 0, 0);
+  }
+
+  private void benchmarkPrimitiveMultimapSkewed() {
+    startTimerOuter();
+    long checksum = 0;
+    long collisions = 0;
+    long rereads = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      int[] values = generateIntData(N_ELEMENTS);
+      int[] output = new int[N_ELEMENTS];
+      PrimitiveMultimap m = new PrimitiveMultimap(N_ELEMENTS);
+
+      startTimer();
+      for(int i=N_ELEMENTS-1; i>=0; i--) {
+        m.put(i & (0x10 - 1), values[i]);
+      }
+
+      int cntr = 0;
+      for(int i=0; i<0x10; i++) {
+        int val = m.get(i);
+        while(val != -1) {
+          output[cntr++] = val;
+          val = m.getNext();
+        }
+      }
+      stopTimer();
+
+      if(cntr != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Expected %d elements, but got %d", N_ELEMENTS, cntr));
+      assertEqualsSorted(output, values);
+      checksum ^= checksum(output);
+      collisions += m.getCollisions();
+      rereads += m.getRereads();
+    }
+
+    logResults("benchmarkPrimitiveMultimapSkewed", checksum, collisions, rereads);
+  }
+
+  private void benchmarkArrayListMultimapSkewed() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      int[] values = generateIntData(N_ELEMENTS);
+      int[] output = new int[N_ELEMENTS];
+      Multimap<Integer, Integer> m = ArrayListMultimap.create(0x10, (N_ELEMENTS >>> 4) + 1);
+
+      startTimer();
+      for(int i=N_ELEMENTS-1; i>=0; i--) {
+        m.put(i & (0x10 - 1), values[i]);
+      }
+
+      int cntr = 0;
+      for(int i=0; i<0x10; i++) {
+        for(int val : m.get(i)) {
+          output[cntr++] = val;
+        }
+      }
+      stopTimer();
+
+      if(cntr != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Expected %d elements, but got %d", N_ELEMENTS, cntr));
+      assertEqualsSorted(output, values);
+      checksum ^= checksum(output);
+    }
+
+    logResults("benchmarkArrayListMultimapSkewed", checksum, 0, 0);
+  }
+
+  private void benchmarkPrimitiveMultimapSequential() {
+    startTimerOuter();
+    long checksum = 0;
+    long collisions = 0;
+    long rereads = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      int[] values = generateIntData(N_ELEMENTS);
+      int[] output = new int[N_ELEMENTS];
+      PrimitiveMultimap m = new PrimitiveMultimap(N_ELEMENTS);
+
+      startTimer();
+      for(int i=N_ELEMENTS-1; i>=0; i--) {
+        m.put(i >>> 4, values[i]);
+      }
+
+      int cntr = 0;
+      for(int i=0; i<N_ELEMENTS >>> 4; i++) {
+        int val = m.get(i);
+        while(val != -1) {
+          output[cntr++] = val;
+          val = m.getNext();
+        }
+      }
+      stopTimer();
+
+      if(cntr != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Expected %d elements, but got %d", N_ELEMENTS, cntr));
+      assertEqualsSorted(output, values);
+      checksum ^= checksum(output);
+      collisions += m.getCollisions();
+      rereads += m.getRereads();
+    }
+
+    logResults("benchmarkPrimitiveMultimapSequential", checksum, collisions, rereads);
+  }
+
+  private void benchmarkArrayListMultimapSequential() {
+    startTimerOuter();
+    long checksum = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      int[] values = generateIntData(N_ELEMENTS);
+      int[] output = new int[N_ELEMENTS];
+      Multimap<Integer, Integer> m = ArrayListMultimap.create(N_ELEMENTS >>> 4, 0x10 + 1);
+
+      startTimer();
+      for(int i=N_ELEMENTS-1; i>=0; i--) {
+        m.put(i >>> 4, values[i]);
+      }
+
+      int cntr = 0;
+      for(int i=0; i<N_ELEMENTS >>> 4; i++) {
+        for(int val : m.get(i)) {
+          output[cntr++] = val;
+        }
+      }
+      stopTimer();
+
+      if(cntr != N_ELEMENTS)
+        throw new IllegalStateException(String.format("Expected %d elements, but got %d", N_ELEMENTS, cntr));
+      assertEqualsSorted(output, values);
+      checksum ^= checksum(output);
+    }
+
+    logResults("benchmarkArrayListMultimapSequential", checksum, 0, 0);
   }
 
   private void benchmarkAll() {
-    benchmarkJoinMap();
+    benchmarkPrimitiveMap();
     benchmarkHashMap();
-    benchmarkJoinMultiMap();
-    benchmarkHashMultiMap();
+    benchmarkArrayListMap();
+    benchmarkPrimitiveMultimap();
+    benchmarkArrayListMultimap();
+    benchmarkPrimitiveMultimapSkewed();
+    benchmarkArrayListMultimapSkewed();
+    benchmarkPrimitiveMultimapSequential();
+    benchmarkArrayListMultimapSequential();
   }
 
   private void startTimer() {
@@ -192,8 +364,8 @@ public class JoinMapBenchmark {
     LOG.info("Press Enter key to start.");
     System.in.read();
 
-    LOG.info("Running JoinMap benchmark ...");
-    JoinMapBenchmark b = new JoinMapBenchmark();
+    LOG.info("Running PrimitiveMultimap benchmark ...");
+    PrimitiveMultimapBenchmark b = new PrimitiveMultimapBenchmark();
     b.benchmarkAll();
 
     Series.LongFunction toMillis = new Series.LongFunction() {
