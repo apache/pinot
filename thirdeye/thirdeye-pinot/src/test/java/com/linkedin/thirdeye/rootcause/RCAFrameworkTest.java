@@ -34,10 +34,10 @@ public class RCAFrameworkTest {
   public void testLinearAggregationPipeline() {
     LinearAggregationPipeline agg = new LinearAggregationPipeline("", Collections.<String>emptySet(), -1);
 
-    Entity e1 = new Entity("e:one", 1.0);
-    Entity e2 = new Entity("e:two", 2.1);
-    Entity e3 = new Entity("e:three", 3.2);
-    Entity e4 = new Entity("e:four", 4.0);
+    Entity e1 = new Entity("e:one", 1.0, new ArrayList<Entity>());
+    Entity e2 = new Entity("e:two", 2.1, new ArrayList<Entity>());
+    Entity e3 = new Entity("e:three", 3.2, new ArrayList<Entity>());
+    Entity e4 = new Entity("e:four", 4.0, new ArrayList<Entity>());
 
     Set<Entity> scores1 = new HashSet<>();
     scores1.add(e1);

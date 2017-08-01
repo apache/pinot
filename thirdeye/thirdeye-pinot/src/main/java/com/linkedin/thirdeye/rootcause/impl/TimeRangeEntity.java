@@ -2,7 +2,9 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 
@@ -21,8 +23,8 @@ public class TimeRangeEntity extends Entity {
   private final long start;
   private final long end;
 
-  protected TimeRangeEntity(String urn, double score, String type, long start, long end) {
-    super(urn, score);
+  protected TimeRangeEntity(String urn, double score, List<? extends Entity> related, String type, long start, long end) {
+    super(urn, score, related);
     this.type = type;
     this.start = start;
     this.end = end;
@@ -40,6 +42,16 @@ public class TimeRangeEntity extends Entity {
     return type;
   }
 
+  @Override
+  public TimeRangeEntity withScore(double score) {
+    return new TimeRangeEntity(this.getUrn(), score, this.getRelated(), this.type, this.start, this.end);
+  }
+
+  @Override
+  public TimeRangeEntity withRelated(List<? extends Entity> related) {
+    return new TimeRangeEntity(this.getUrn(), this.getScore(), related, this.type, this.start, this.end);
+  }
+
   public static TimeRangeEntity fromURN(String urn, double score) {
     if(!TYPE.isType(urn))
       throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
@@ -51,7 +63,7 @@ public class TimeRangeEntity extends Entity {
 
   public static TimeRangeEntity fromRange(double score, String type, long start, long end) {
     String urn = TYPE.formatURN(type, start, end);
-    return new TimeRangeEntity(urn, score, type, start, end);
+    return new TimeRangeEntity(urn, score, new ArrayList<Entity>(), type, start, end);
   }
 
   /**

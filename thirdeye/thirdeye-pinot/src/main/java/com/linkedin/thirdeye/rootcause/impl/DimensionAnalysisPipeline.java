@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
@@ -12,6 +14,7 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
@@ -108,6 +111,8 @@ public class DimensionAnalysisPipeline extends Pipeline {
     final TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
 
     Map<Dimension, Double> scores = new HashMap<>();
+    Multimap<Dimension, Entity> related = ArrayListMultimap.create();
+
     for(MetricEntity me : metricsEntities) {
       try {
         final long windowSize = anomaly.getEnd() - anomaly.getStart();
@@ -116,9 +121,12 @@ public class DimensionAnalysisPipeline extends Pipeline {
         for(int i=0; i<dfScores.size(); i++) {
           double score = dfScores.getDouble(COL_SCORE, i);
           Dimension d = new Dimension(dfScores.getString(COL_DIM_NAME, i), dfScores.getString(COL_DIM_VALUE, i));
+
           if(!scores.containsKey(d))
             scores.put(d, 0.0d);
           scores.put(d, scores.get(d) + score * me.getScore());
+
+          related.put(d, me);
         }
       } catch (Exception e) {
         LOG.warn("Error calculating dimension scores for '{}'. Skipping.", me.getUrn(), e);
@@ -126,8 +134,8 @@ public class DimensionAnalysisPipeline extends Pipeline {
     }
 
     Set<DimensionEntity> entities = new HashSet<>();
-    for(Map.Entry<Dimension, Double> entry : scores.entrySet()) {
-      entities.add(entry.getKey().toEntity(entry.getValue()));
+    for(Dimension d : scores.keySet()) {
+      entities.add(d.toEntity(scores.get(d), related.get(d)));
     }
 
     return new PipelineResult(context, EntityUtils.topkNormalized(entities, this.k));
@@ -245,8 +253,8 @@ public class DimensionAnalysisPipeline extends Pipeline {
       return value;
     }
 
-    public DimensionEntity toEntity(double score) {
-      return DimensionEntity.fromDimension(score, this.name, this.value);
+    public DimensionEntity toEntity(double score, Collection<Entity> related) {
+      return DimensionEntity.fromDimension(score, related, this.name, this.value);
     }
 
     @Override

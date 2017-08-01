@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.rootcause;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 
 
 /**
@@ -21,6 +24,7 @@ import java.util.Comparator;
 public class Entity {
   private final String urn;
   private final double score;
+  private final List<Entity> related;
 
   public static final Comparator<Entity> HIGHEST_SCORE_FIRST = new Comparator<Entity>() {
     @Override
@@ -29,9 +33,10 @@ public class Entity {
     }
   };
 
-  public Entity(String urn, double score) {
+  public Entity(String urn, double score, List<? extends Entity> related) {
     this.urn = urn;
     this.score = score;
+    this.related = Collections.unmodifiableList(new ArrayList<>(related));
   }
 
   public String getUrn() {
@@ -42,8 +47,16 @@ public class Entity {
     return score;
   }
 
+  public List<Entity> getRelated() {
+    return related;
+  }
+
   public Entity withScore(double score) {
-    return new Entity(this.urn, score);
+    return new Entity(this.urn, score, this.related);
+  }
+
+  public Entity withRelated(List<? extends Entity> related) {
+    return new Entity(this.urn, this.score, related);
   }
 
   @Override

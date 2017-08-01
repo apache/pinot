@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 
 /**
@@ -14,8 +17,8 @@ public class DimensionEntity extends Entity {
   private final String name;
   private final String value;
 
-  protected DimensionEntity(String urn, double score, String name, String value) {
-    super(urn, score);
+  protected DimensionEntity(String urn, double score, List<? extends Entity> related, String name, String value) {
+    super(urn, score, related);
     this.name = name;
     this.value = value;
   }
@@ -30,11 +33,20 @@ public class DimensionEntity extends Entity {
 
   @Override
   public DimensionEntity withScore(double score) {
-    return new DimensionEntity(this.getUrn(), score, this.name, this.value);
+    return new DimensionEntity(this.getUrn(), score, this.getRelated(), this.name, this.value);
+  }
+
+  public static DimensionEntity fromDimension(double score, Collection<? extends Entity> related, String name, String value) {
+    return new DimensionEntity(TYPE.formatURN(name, value), score, new ArrayList<>(related), name, value);
   }
 
   public static DimensionEntity fromDimension(double score, String name, String value) {
-    return new DimensionEntity(TYPE.formatURN(name, value), score, name, value);
+    return fromDimension(score, new ArrayList<Entity>(), name, value);
+  }
+
+  @Override
+  public DimensionEntity withRelated(List<? extends Entity> related) {
+    return new DimensionEntity(this.getUrn(), this.getScore(), related, this.getName(), this.getValue());
   }
 
   public static DimensionEntity fromURN(String urn, double score) {

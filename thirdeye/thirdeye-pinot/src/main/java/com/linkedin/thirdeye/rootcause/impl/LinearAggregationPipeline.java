@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.StringSeries;
@@ -7,6 +9,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -65,6 +68,7 @@ public class LinearAggregationPipeline extends Pipeline {
     StringSeries.Builder urnBuilder = StringSeries.builder();
     DoubleSeries.Builder scoreBuilder = DoubleSeries.builder();
 
+    Multimap<String, Entity> urn2entity = ArrayListMultimap.create();
     for(Map.Entry<String, Set<Entity>> entry : context.getInputs().entrySet()) {
       DataFrame df = toDataFrame(entry.getValue());
 
@@ -76,6 +80,10 @@ public class LinearAggregationPipeline extends Pipeline {
       LOG.info("{}:\n{}", entry.getKey(), df.toString(50, URN, SCORE));
       urnBuilder.addSeries(df.get(URN));
       scoreBuilder.addSeries(df.getDoubles(SCORE));
+
+      for(Entity e : entry.getValue()) {
+        urn2entity.put(e.getUrn(), e);
+      }
     }
 
     StringSeries urns = urnBuilder.build();
@@ -88,7 +96,7 @@ public class LinearAggregationPipeline extends Pipeline {
     DataFrame grp = df.groupByValue(URN).aggregate(SCORE, DoubleSeries.SUM);
     grp = grp.sortedBy(SCORE).reverse();
 
-    return new PipelineResult(context, toEntities(grp, URN, SCORE));
+    return new PipelineResult(context, toEntities(grp, URN, SCORE, urn2entity));
   }
 
   private static DataFrame toDataFrame(Collection<Entity> entities) {
@@ -103,10 +111,11 @@ public class LinearAggregationPipeline extends Pipeline {
     return new DataFrame().addSeries(URN, urns).addSeries(SCORE, scores);
   }
 
-  private static Set<Entity> toEntities(DataFrame df, String colUrn, String colScore) {
+  private static Set<Entity> toEntities(DataFrame df, String colUrn, String colScore, Multimap<String, Entity> urn2entity) {
     Set<Entity> entities = new HashSet<>();
     for(int i=0; i<df.size(); i++) {
-      entities.add(new Entity(df.getString(colUrn, i), df.getDouble(colScore, i)));
+      final String urn = df.getString(colUrn, i);
+      entities.add(new Entity(urn, df.getDouble(colScore, i), new ArrayList<>(urn2entity.get(urn))));
     }
     return entities;
   }

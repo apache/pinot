@@ -80,15 +80,15 @@ public class HolidayEventsPipeline extends Pipeline {
     TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
     TimeRangeEntity analysis = TimeRangeEntity.getTimeRangeAnalysis(context);
 
-    ScoringStrategy strategyCurrent = makeStrategy(analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
+    ScoringStrategy strategyAnomaly = makeStrategy(analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
     ScoringStrategy strategyBaseline = makeStrategy(baseline.getStart(), baseline.getStart(), baseline.getEnd());
 
     Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
     Set<HolidayEventEntity> entities = new HashSet<>();
-    entities.addAll(score(strategyCurrent, this.getHolidayEvents(analysis.getStart(), anomaly.getEnd(), dimensionEntities), urn2entity, 1.0));
-    entities.addAll(score(strategyBaseline, this.getHolidayEvents(baseline.getStart(), baseline.getEnd(), dimensionEntities), urn2entity, baseline.getScore()));
+    entities.addAll(EntityUtils.addRelated(score(strategyAnomaly, this.getHolidayEvents(analysis.getStart(), anomaly.getEnd(), dimensionEntities), urn2entity, anomaly.getScore()), anomaly));
+    entities.addAll(EntityUtils.addRelated(score(strategyBaseline, this.getHolidayEvents(baseline.getStart(), baseline.getEnd(), dimensionEntities), urn2entity, baseline.getScore()), baseline));
 
     return new PipelineResult(context, EntityUtils.topk(entities, this.k));
   }

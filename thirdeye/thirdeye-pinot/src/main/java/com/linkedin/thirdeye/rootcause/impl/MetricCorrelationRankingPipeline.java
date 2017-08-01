@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
@@ -216,6 +218,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     // determine score
     Map<MetricEntity, Double> scores = new HashMap<>();
+    Multimap<MetricEntity, MetricEntity> related = ArrayListMultimap.create();
+
     for(MetricEntity targetMetric : targetMetrics) {
       if(!pctChanges.containsKey(targetMetric)) {
         LOG.warn("No diff data for target metric '{}'. Skipping.", targetMetric.getUrn());
@@ -249,6 +253,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
           }
           scores.put(candidateMetric, scores.get(candidateMetric) + score);
 
+          related.put(candidateMetric, targetMetric);
+
         } catch (Exception e) {
           LOG.warn("Could not calculate correlation of target '{}' and candidate '{}'. Skipping.", targetMetric.getUrn(), candidateMetric.getUrn(), e);
         }
@@ -257,8 +263,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     // generate output
     Set<MetricEntity> entities = new HashSet<>();
-    for(Map.Entry<MetricEntity, Double> entry : scores.entrySet()) {
-      entities.add(entry.getKey().withScore(entry.getValue()));
+    for(MetricEntity me : scores.keySet()) {
+      entities.add(me.withScore(scores.get(me)).withRelated(new ArrayList<Entity>(related.get(me))));
     }
 
     LOG.info("Generated {} MetricEntities with valid scores", entities.size());
