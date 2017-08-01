@@ -49,7 +49,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   private static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
-  private static final String JERSEY_ADMIN_PRIMARY = "jersey.primary";
+  private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -96,7 +96,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
-    setProperty(jerseyAdminPrimary, jerseyAdminPrimary);
+    setProperty(JERSEY_ADMIN_IS_PRIMARY, jerseyAdminPrimary);
   }
 
   public void setHelixClusterName(String clusterName) {
@@ -142,7 +142,7 @@ public class ControllerConf extends PropertiesConfiguration {
   // A boolean to decide whether Jersey API should be the primary one. For now, we set this to be false,
   // but we turn it on to true when we are sure that jersey api has no backward compatibility problems.
   public boolean isJerseyAdminPrimary() {
-    return getBoolean(JERSEY_ADMIN_PRIMARY, false);
+    return getBoolean(JERSEY_ADMIN_IS_PRIMARY, false);
   }
 
   public String getHelixClusterName() {
