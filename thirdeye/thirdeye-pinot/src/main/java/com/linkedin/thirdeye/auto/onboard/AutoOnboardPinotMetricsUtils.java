@@ -134,5 +134,4 @@ public class AutoOnboardPinotMetricsUtils {
     }
     return isSchemaCorrect;
   }
-
 }
