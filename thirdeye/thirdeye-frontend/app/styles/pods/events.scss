@@ -17,7 +17,7 @@
   flex-basis: 0;
   flex-grow: 1;
 
-  &:last-child() { 
+  &:last-child() {
     border-right: 0;
   }
 
@@ -48,7 +48,10 @@
   font-size: 18px;
 }
 
-.events-table__column {
-  max-width: 33%;
-  width: 33%;
+.events-table {
+  &__column {
+    &--compact {
+      width: 120px;
+    }
+  }
 }

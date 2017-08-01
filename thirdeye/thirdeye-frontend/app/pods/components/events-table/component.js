@@ -72,13 +72,22 @@ export default Ember.Component.extend({
       title: 'Type',
       filterWithSelect: true,
       sortFilterOptions: true,
-      className: 'events-table__column'
+      className: 'events-table__column--compact'
     },
     {
-      template: 'custom/date-cell',
-      title: 'Start Date - End Date',
-      className: 'events-table__column'
-    }
+      propertyName: 'humanRelStart',
+      title: 'Start',
+      className: 'events-table__column--compact',
+      sortedBy: 'relStart',
+      disableFiltering: true
+    },
+    {
+      propertyName: 'humanDuration',
+      title: 'Duration',
+      className: 'events-table__column--compact',
+      sortedBy: 'duration',
+      disableFiltering: true
+    },
     // {
     //   propertyName: 'score',
     //   title: 'Score',
