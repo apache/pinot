@@ -1,10 +1,7 @@
 package com.linkedin.thirdeye.auto.onboard;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URL;
 import java.net.URLEncoder;
 
 import org.apache.commons.lang3.StringUtils;
@@ -40,10 +37,6 @@ public class AutoOnboardPinotMetricsUtils {
       this.pinotControllerHost = new HttpHost(pinotThirdeyeDataSourceConfig.getControllerHost(),
           pinotThirdeyeDataSourceConfig.getControllerPort());
   }
-  public AutoOnboardPinotMetricsUtils(String host, int port) {
-    this.pinotControllerClient = HttpClients.createDefault();
-    this.pinotControllerHost = new HttpHost(host, port);
-}
 
 
   public JsonNode getAllTablesFromPinot() throws IOException {
@@ -68,21 +61,6 @@ public class AutoOnboardPinotMetricsUtils {
     return tables;
   }
 
-  public String getAllTablesFromPinotURLStyle() throws IOException {
-     InputStream is = new URL("http://ssubrama-ld1.linkedin.biz:21000/tables").openStream();
-
-     try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"))) {
-       StringBuilder responseBuilder = new StringBuilder();
-       String line;
-       while ((line = reader.readLine()) != null) {
-         responseBuilder.append(line);
-       }
-       return responseBuilder.toString();
-     }
-
-
-  }
-
   /**
    * Fetches schema from pinot, from the tables endpoint or schema endpoint
    * @param dataset
@@ -101,7 +79,7 @@ public class AutoOnboardPinotMetricsUtils {
     return schema;
   }
 
-  public Schema getSchemaFromTableConfig(String dataset) throws IOException {
+  private Schema getSchemaFromTableConfig(String dataset) throws IOException {
     Schema schema = null;
     HttpGet schemaReq = new HttpGet(String.format(PINOT_SCHEMA_ENDPOINT_TEMPLATE, URLEncoder.encode(dataset, UTF_8)));
     LOG.info("Retrieving schema: {}", schemaReq);
@@ -125,7 +103,7 @@ public class AutoOnboardPinotMetricsUtils {
     return schema;
   }
 
-  public Schema getSchemaFromSchemaEndpoint(String dataset) throws IOException {
+  private Schema getSchemaFromSchemaEndpoint(String dataset) throws IOException {
     Schema schema = null;
     HttpGet schemaReq = new HttpGet(String.format(PINOT_SCHEMA_ENDPOINT, URLEncoder.encode(dataset, UTF_8)));
     LOG.info("Retrieving schema: {}", schemaReq);
@@ -157,26 +135,4 @@ public class AutoOnboardPinotMetricsUtils {
     return isSchemaCorrect;
   }
 
-  public static void main(String[] args) throws IOException {
-    String controllerHost = "lva1-pinot-controller-vip-1.corp.linkedin.com";
-    //int controllerPort = 8100;
-    int controllerPort = 11984;
-    String tableName = "thirdeyeKbmi";
-    String segmentName = "";
-    AutoOnboardPinotMetricsUtils at = new AutoOnboardPinotMetricsUtils(controllerHost, controllerPort);
-
-    //String allTablesFromPinotURL = at.getAllTablesFromPinotURLStyle();
-    //System.out.println(allTablesFromPinotURL);
-
-    JsonNode allTablesFromPinot = at.getAllTablesFromPinot();
-    System.out.println(allTablesFromPinot);
-
-
-    Schema schemaFromTableConfig = at.getSchemaFromTableConfig(tableName);
-    System.out.println(schemaFromTableConfig);
-
-    Schema schemaFromSchemaEndpoint = at.getSchemaFromSchemaEndpoint(tableName);
-    System.out.println(schemaFromSchemaEndpoint);
-
-  }
 }
