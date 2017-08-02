@@ -216,8 +216,11 @@ public class CommonConstants {
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";
-    public static final String DEFAULT_INSTANCE_DATA_DIR = "/tmp/PinotServer/test/index";
-    public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR = "/tmp/PinotServer/test/segmentTar";
+    public static final String DEFAULT_INSTANCE_BASE_DIR =
+        System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
+    public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
+    public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
+        DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
     public static final String DEFAULT_SEGMENT_METADATA_LOADER_CLASS =
         "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader";
     public static final String DEFAULT_DATA_MANAGER_CLASS =
@@ -246,7 +249,9 @@ public class CommonConstants {
 
     // Default settings
     public static final int DEFAULT_HELIX_PORT = 9514;
-    public static final String DEFAULT_DATA_DIR = System.getProperty("java.io.tmpdir") + File.separator + "pinotMinion";
+    public static final String DEFAULT_INSTANCE_BASE_DIR =
+        System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
+    public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "data";
   }
 
   public static class Metric {

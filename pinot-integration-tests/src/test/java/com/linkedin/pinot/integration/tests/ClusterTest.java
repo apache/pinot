@@ -55,6 +55,7 @@ import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,6 +156,7 @@ public abstract class ClusterTest extends ControllerTest {
         Configuration config = new PropertiesConfiguration();
         config.setProperty(Helix.Instance.INSTANCE_ID_KEY,
             Minion.INSTANCE_PREFIX + "minion" + i + "_" + (Minion.DEFAULT_HELIX_PORT + i));
+        config.setProperty(Helix.Instance.DATA_DIR_KEY, Minion.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
         MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, _clusterName, config);
 
         // Register plug-in task executors
@@ -190,12 +192,14 @@ public abstract class ClusterTest extends ControllerTest {
     for (HelixServerStarter helixServerStarter : _serverStarters) {
       helixServerStarter.stop();
     }
+    FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
   }
 
   protected void stopMinion() {
     for (MinionStarter minionStarter : _minionStarters) {
       minionStarter.stop();
     }
+    FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
   }
 
   protected void addSchema(File schemaFile, String schemaName) throws Exception {
