@@ -25,11 +25,13 @@ export default Ember.Controller.extend({
   isCreateGroupSuccess: false,
   isCreateAlertError: false,
   isSelectMetricError: false,
-  isReplayComplete: false,
+  isReplayError: false,
   isMetricDataLoading: false,
+  isReplayStatusPending: true,
   isReplayTriggeredSuccess: false,
   metricGranularityOptions: [],
   originalDimensions: [],
+  replayStatusClass: 'te-form__banner--pending',
 
   legendText: {
     dotted: 'WoW',
@@ -214,25 +216,25 @@ export default Ember.Controller.extend({
    * @return {undefined}
    */
   triggerGraphFromMetric(metricId) {
+    const id = metricId.id;
     const maxTime = this.get('maxTime');
-    const filters = this.get('filters');
     const currentEnd = moment(maxTime).isValid()
       ? moment(maxTime).valueOf()
       : moment().subtract(1, 'day').endOf('day').valueOf();
-    const granularity = this.get('selectedGranularity') || this.get('granularities.firstObject');
+    const filters = this.get('selectedFilters') || '';
+    const dimension = this.get('selectedDimension') || 'All';
     const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
     const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
     const baselineEnd = moment(currentEnd).subtract(1, 'week');
-    const { id } = metricId;
-
+    const granularity = this.get('selectedGranularity') || this.get('granularities.firstObject') || '';
     const graphConfig = {
       id,
-      dimension: 'All',
+      dimension,
       currentStart,
       currentEnd,
       baselineStart,
       baselineEnd,
-      granularity: granularity || '',
+      granularity,
       filters
     };
 
@@ -261,37 +263,70 @@ export default Ember.Controller.extend({
   },
 
   /**
+   * Replay Flow Step 1 - Clones an alert function in preparation for replay.
+   * @method callCloneAlert
+   * @param {Number} functionId - the newly created function's id
+   * @return {Ember.RSVP.Promise}
+   */
+  callCloneAlert(functionId) {
+    const url = `/onboard/function/${functionId}/clone/cloned`;
+    return fetch(url, { method: 'post' }).then(checkStatus);
+  },
+
+  /**
+   * Replay Flow Step 2 - Replay cloned function
+   * @method callReplayStart
+   * @param {Number} clonedId - id of the cloned function
+   * @param {Object} startTime - replay start time stamp
+   * @param {Object} endTime - replay end time stamp
+   * @return {Ember.RSVP.Promise}
+   */
+  callReplayStart(clonedId, startTime, endTime) {
+    const url = `/detection-job/${clonedId}/replay?start=${startTime}&end=${endTime}&speedup=true`;
+    return fetch(url, { method: 'post' }).then(checkStatus);
+  },
+
+ /**
+   * Sets the error message for any failed call and throws the error
+   * @method setErrorState
+   * @param {String} error - the error statusText set by our checkStatus helper
+   * @param {String} message - the appropriate error message
+   * @return {undefined}
+   */
+  setErrorState(error, message) {
+    this.setProperties({
+      isReplayError: true,
+      failureMessage: `${message}. (${error})`
+    });
+    throw error;
+  },
+
+  /**
    * Sends a request to begin advanced replay for a metric. The replay will fetch new
    * time-series data based on user-selected sensitivity settings.
    * @method triggerReplay
-   * @param {Object} functionObj - the alert object
-   * @param {Object} groupObj - the alert notification group object
    * @param {Number} newFuncId - the id for the newly created function (alert)
    * @return {Ember.RSVP.Promise}
    */
-  triggerReplay(functionObj, groupObj, newFuncId) {
-    const startTime = moment().subtract(1, 'month').endOf('day').format("YYYY-MM-DD");
-    const startStamp = moment().subtract(1, 'day').endOf('day').valueOf();
-    const endTime = moment().subtract(1, 'day').endOf('day').format("YYYY-MM-DD");
-    const endStamp = moment().subtract(1, 'month').endOf('day').valueOf();
-    const granularity = this.get('graphConfig.granularity').toLowerCase();
-    const postProps = {
-      method: 'POST',
-      timeout: 120000, // 2 min
-      headers: { 'Content-Type': 'Application/Json' }
-    };
-    const replayApi = {
-      minute: `/replay/singlefunction?functionId=${newFuncId}&start=${startTime}&end=${endTime}`,
-      hour: `/${newFuncId}/replay?start=${startTime}&end=${endTime}`,
-      day: `/replay/function/${newFuncId}?start=${startTime}&end=${endTime}&goal=1.0&evalMethod=F1_SCORE&includeOriginal=false&tune=\{"pValueThreshold":\[0.001,0.005,0.01,0.05\]\}`,
-      reports: `/thirdeye/email/generate/metrics/${startStamp}/${endStamp}?metrics=${functionObj.metric}&subject=Your%20Metric%20Has%20Onboarded%20To%20Thirdeye&from=thirdeye-noreply@linkedin.com&to=${groupObj.recipients}&smtpHost=email.corp.linkedin.com&smtpPort=25&includeSentAnomaliesOnly=true&isApplyFilter=true`
-    };
-    const allowedGranularity = ['minute', 'hour', 'day'];
-    const gkey = allowedGranularity.includes(granularity) ? granularity : 'minute';
+  triggerReplay(newFuncId) {
+    const startTime = moment().subtract(1, 'month').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
+    const endTime = moment().subtract(1, 'day').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
 
-    return new Ember.RSVP.Promise((resolve) => {
-      fetch('/detection-job' + replayApi[gkey], postProps).then((res) => checkStatus(res, 'post'));
-    });
+    this.callCloneAlert(newFuncId)
+      .then((clonedId) => {
+        this.set('isReplayTriggeredSuccess', true);
+        return this.callReplayStart(clonedId, startTime, endTime);
+      })
+      .catch((error) => {
+        this.setErrorState(error, 'Failed to clone new alert function');
+      })
+      .then((jobId) => {
+        this.set('isReplayStatusPending', false);
+        this.set('replayStatusClass', 'te-form__banner--success');
+      })
+      .catch((error) => {
+        this.setErrorState(error, 'Failed to trigger replay');
+      });
   },
 
   /**
@@ -424,7 +459,7 @@ export default Ember.Controller.extend({
           type: 'SIGN_TEST_VANILLA',
           windowSize: 6,
           windowUnit: 'HOURS',
-          properties: 'signTestWindowSize=24;anomalyRemovalWeightThreshold=0.6;signTestPattern=UP,DOWN;pValueThreshold=0.01;signTestBaselineShift=0.0,0.0;signTestBaselineLift=1.10,0.90;baseline=w/4wAvg;decayRate=0.5;signTestStepSize=1'
+          properties: 'signTestWindowSize=24;anomalyRemovalThreshold=0.6;signTestPattern=UP,DOWN;pValueThreshold=0.01;signTestBaselineShift=0.0,0.0;signTestBaselineLift=1.10,0.90;baseline=w/4wAvg;decayRate=0.5;signTestStepSize=1'
         },
         hour: {
           type: 'REGRESSION_GAUSSIAN_SCAN',
@@ -433,7 +468,7 @@ export default Ember.Controller.extend({
           windowDelay: 0,
           windowDelayUnit: 'HOURS',
           cron: '0%200%2014%201%2F1%20*%20%3F%20*',
-          properties: 'metricTimezone=America/Los_Angeles;anomalyRemovalWeightThreshold=1.0;scanMinWindowSize=1;continuumOffsetUnit=3600000;scanUseBootstrap=true;scanNumSimulations=500;scanTargetNumAnomalies=1;continuumOffsetSize=1440;scanMaxWindowSize=48;pValueThreshold=0.01;scanStepSize=1'
+          properties: 'metricTimezone=America/Los_Angeles;anomalyRemovalThreshold=1.0;scanMinWindowSize=1;continuumOffsetUnit=3600000;scanUseBootstrap=true;scanNumSimulations=500;scanTargetNumAnomalies=1;continuumOffsetSize=1440;scanMaxWindowSize=48;pValueThreshold=0.01;scanStepSize=1'
         },
         day: {
           type: 'SPLINE_REGRESSION',
@@ -452,13 +487,11 @@ export default Ember.Controller.extend({
       if (granularity.includes('day')) { gkey = 'day'; }
 
       // Add filter and dimension choices if available
-      if (gkey !== 'minute') {
-        if (Ember.isPresent(selectedFilter)) {
-          settingsByGranularity.common.filters = selectedFilter;
-        }
-        if (Ember.isPresent(selectedDimension)) {
-          settingsByGranularity.common.exploreDimension = selectedDimension;
-        }
+      if (Ember.isPresent(selectedFilter)) {
+        settingsByGranularity.common.filters = selectedFilter;
+      }
+      if (Ember.isPresent(selectedDimension)) {
+        settingsByGranularity.common.exploreDimension = selectedDimension;
       }
 
       return Object.assign(settingsByGranularity.common, settingsByGranularity[gkey]);
@@ -542,25 +575,32 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectFilter(selectedFilters) {
+      const selectedFilterObj = JSON.parse(selectedFilters);
       const dimensionNameSet = new Set(this.get('originalDimensions'));
       const filterNames = Object.keys(JSON.parse(selectedFilters));
+      let isSelectedDimensionEqualToSelectedFilter = false;
+
       this.set('graphConfig.filters', selectedFilters);
-      // Remove selected filters from dimension options
+      // Remove selected filters from dimension options only if filter has single entity
       for (var key of filterNames) {
-        dimensionNameSet.delete(key);
+        if (selectedFilterObj[key].length === 1) {
+          dimensionNameSet.delete(key);
+          if (key === this.get('selectedDimension')) {
+            isSelectedDimensionEqualToSelectedFilter = true;
+          }
+        }
       }
       // Update dimension options and loader
       this.setProperties({
         dimensions: [...dimensionNameSet],
         isMetricDataLoading: true
       });
+      // Do not allow selected dimension to match selected filter
+      if (isSelectedDimensionEqualToSelectedFilter) {
+        this.set('selectedDimension', 'All');
+      };
       // Fetch new graph data with selected filters
-      this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
-        this.setProperties({
-          selectedMetric: metricData,
-          isMetricDataLoading: false
-        });
-      });
+      this.triggerGraphFromMetric(this.get('selectedMetricOption'));
     },
 
     /**
@@ -570,7 +610,10 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectGranularity(selectedObj) {
-      this.set('selectedGranularity', selectedObj);
+      this.setProperties({
+        selectedGranularity: selectedObj,
+        isMetricDataLoading: true
+      });
       this.triggerGraphFromMetric(this.get('selectedMetricOption'));
     },
 
@@ -694,8 +737,9 @@ export default Ember.Controller.extend({
         isCreateAlertError: false,
         isCreateGroupSuccess: false,
         isReplayTriggeredSuccess: false,
-        isReplayComplete: false,
-        selectedFilters: JSON.stringify({})
+        isReplayError: false,
+        selectedFilters: JSON.stringify({}),
+        replayStatusClass: 'te-form__banner--pending'
       });
       this.send('refreshModel');
     },
@@ -766,12 +810,8 @@ export default Ember.Controller.extend({
               this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
                 this.set('selectedGroupFunctions', functionData);
               });
-              // Display alert trigger confirmation
-              this.set('isReplayTriggeredSuccess', true);
-              // Trigger alert replay. TODO: only set 'complete' if response is good
-              this.triggerReplay(newFunctionObj, finalConfigObj, newFunctionId).then(result => {
-                this.set('isReplayComplete', true);
-              });
+              // Trigger alert replay.
+              this.triggerReplay(newFunctionId);
               // Now, disable form
               this.setProperties({
                 isFormDisabled: true,

@@ -108,7 +108,7 @@
       {{/power-select}}
     </div>
     <div class="form-group te-form__group--horizontal te-form__group--two-share te-form__group--last">
-      <label for="select-dimension" class="control-label">Dimension Exploration</label>
+      <label for="select-dimension" class="control-label">Dimension</label>
       {{#power-select
         options=dimensions
         selected=selectedDimension
@@ -238,7 +238,7 @@
   </fieldset>
 
   {{#if isCreateAlertSuccess}}
-    {{#bs-alert type="success"}}
+    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
       <strong>Success!</strong> You have created anomaly alert Id <strong>{{finalFunctionId}}</strong>
       {{#if selectedConfigGroup}}
         ... and assigned it to existing notification group <strong>{{selectedConfigGroup.name}}</strong>.
@@ -247,26 +247,30 @@
   {{/if}}
 
   {{#if isCreateGroupSuccess}}
-    {{#bs-alert type="success"}}
+    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
       <strong>Success!</strong> You have created anomaly notification group <strong>{{newConfigGroupName}}</strong>.
     {{/bs-alert}}
   {{/if}}
 
-  {{#if isCreateAlertError}}
-    {{#bs-alert type="danger"}}
+  {{!-- {{#if isCreateAlertError}} --}}
+    {{#bs-alert type="danger" class="te-form__banner te-form__banner--success"}}
       <strong>Error!</strong> Alert creation has failed. Please try again.
     {{/bs-alert}}
-  {{/if}}
+  {{!-- {{/if}} --}}
 
   {{#if isReplayTriggeredSuccess}}
-    {{#bs-alert type="success"}}
-      <strong>Success!</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has started processing. We will notify <strong>{{alertGroupNewRecipient}}</strong> when the replay is complete.
+    {{#bs-alert type="success" class="te-form__banner" classNameBindings="replayStatusClass"}}
+      {{#if isReplayStatusPending}}
+        ...triggering replay. Please wait.
+      {{else}}
+        <strong>Success!</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has started processing. We will notify <strong>{{alertGroupNewRecipient}}</strong> when the replay is complete.
+      {{/if}}
     {{/bs-alert}}
   {{/if}}
 
-  {{#if isReplayComplete}}
-    {{#bs-alert type="success"}}
-      <strong>Success</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has completed.
+  {{#if isReplayError}}
+    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+      <strong>Error:</strong> {{failureMessage}}
     {{/bs-alert}}
   {{/if}}
 

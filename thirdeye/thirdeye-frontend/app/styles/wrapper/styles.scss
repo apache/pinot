@@ -140,6 +140,41 @@ body {
       border: 1px solid #faebcc;
     }
   }
+
+  &__banner {
+    width: auto;
+    border: none;
+    font-size: 16px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-left: 35px solid;
+
+    &--success {
+      color: #1f5a8c;
+      background-color: rgba(51, 122, 183, 0.22);
+      border-color: #337ab7;
+    }
+
+    &--failure {
+      border-color: #da9898;
+    }
+
+    &--pending {
+      background-color: #f2f2f2;
+      color: app-shade(black, 7);
+      border-color: app-shade(black, 4);
+    }
+
+    button {
+      opacity: 0.5;
+    }
+  }
+
+  &__banner-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
 }
 
 .te-toggle {
