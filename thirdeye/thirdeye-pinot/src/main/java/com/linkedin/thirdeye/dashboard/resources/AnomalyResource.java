@@ -112,7 +112,7 @@ public class AnomalyResource {
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;
-    this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
+    this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/

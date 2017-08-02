@@ -18,6 +18,7 @@ import com.google.common.cache.RemovalNotification;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -27,7 +28,6 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
 import com.linkedin.thirdeye.datasource.cache.DashboardConfigCacheLoader;
-import com.linkedin.thirdeye.datasource.cache.DashboardsCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DimensionFiltersCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.MetricConfigCacheLoader;
@@ -43,8 +43,7 @@ public class ThirdEyeCacheRegistry {
   private LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache;
   private LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache;
   private LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache;
-  private LoadingCache<String, Long> collectionMaxDataTimeCache;
-  private LoadingCache<String, String> dashboardsCache;
+  private LoadingCache<String, Long> datasetMaxDataTimeCache;
   private LoadingCache<String, String> dimensionFiltersCache;
   private DatasetListCache datasetsCache;
   private QueryCache queryCache;
@@ -52,6 +51,8 @@ public class ThirdEyeCacheRegistry {
   private static DatasetConfigManager datasetConfigDAO;
   private static MetricConfigManager metricConfigDAO;
   private static DashboardConfigManager dashboardConfigDAO;
+  private static AnomalyFunctionManager anomalyFunctionDAO;
+
   private static Map<String, ThirdEyeDataSource> thirdEyeDataSourcesMap;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -97,6 +98,7 @@ public class ThirdEyeCacheRegistry {
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
       metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
       dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
+      anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
 
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
@@ -156,26 +158,20 @@ public class ThirdEyeCacheRegistry {
     QueryCache queryCache = new QueryCache(thirdEyeDataSourcesMap, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(queryCache);
 
-    // CollectionMaxDataTime Cache
-    LoadingCache<String, Long> collectionMaxDataTimeCache = CacheBuilder.newBuilder()
+    // DatasetMaxDataTime Cache
+    LoadingCache<String, Long> datasetMaxDataTimeCache = CacheBuilder.newBuilder()
         .refreshAfterWrite(5, TimeUnit.MINUTES)
         .build(new DatasetMaxDataTimeCacheLoader(queryCache, datasetConfigDAO));
-    cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
+    cacheRegistry.registerDatasetMaxDataTimeCache(datasetMaxDataTimeCache);
 
     // Dimension Filter cache
     LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
         .build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
-    // Dashboards cache
-    LoadingCache<String, String> dashboardsCache = CacheBuilder.newBuilder()
-        .build(new DashboardsCacheLoader(dashboardConfigDAO));
-    cacheRegistry.registerDashboardsCache(dashboardsCache);
-
     // Collections cache
-    DatasetListCache datasetsCache = new DatasetListCache(datasetConfigDAO, thirdeyeConfig);
+    DatasetListCache datasetsCache = new DatasetListCache(anomalyFunctionDAO, datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerDatasetsCache(datasetsCache);
-
 
   }
 
@@ -189,12 +185,17 @@ public class ThirdEyeCacheRegistry {
     // Start initial cache loading asynchronously to reduce application start time
     Executors.newSingleThreadExecutor().submit(new Runnable() {
       @Override public void run() {
+        LOGGER.info("Refreshing datasets list cache");
         cacheResource.refreshDatasets();
+        LOGGER.info("Refreshing dataset configs cache");
         cacheResource.refreshDatasetConfigCache();
+        LOGGER.info("Refreshing dashboard configs cache");
         cacheResource.refreshDashoardConfigsCache();
-        cacheResource.refreshDashboardsCache();
+        LOGGER.info("Refreshing metrics config cache");
         cacheResource.refreshMetricConfigCache();
+        LOGGER.info("Refreshing max data dime cache");
         cacheResource.refreshMaxDataTimeCache();
+        LOGGER.info("Refreshing dimension filters cache");
         cacheResource.refreshDimensionFiltersCache();
       }
     });
@@ -204,9 +205,10 @@ public class ThirdEyeCacheRegistry {
       @Override
       public void run() {
         try {
+          LOGGER.info("Refreshing dataset max time cache");
           cacheResource.refreshMaxDataTimeCache();
         } catch (Exception e) {
-          LOGGER.error("Exception while loading collections", e);
+          LOGGER.error("Exception while refreshing max time cache", e);
         }
       }
     }, 30, 30, TimeUnit.MINUTES);
@@ -216,9 +218,10 @@ public class ThirdEyeCacheRegistry {
       @Override
       public void run() {
         try {
+          LOGGER.info("Refreshing datasets list cache");
           cacheResource.refreshDatasets();
         } catch (Exception e) {
-          LOGGER.error("Exception while loading collections", e);
+          LOGGER.error("Exception while refreshing datasets list", e);
         }
       }
     }, 1, 1, TimeUnit.HOURS);
@@ -228,6 +231,7 @@ public class ThirdEyeCacheRegistry {
       @Override
       public void run() {
         try {
+          LOGGER.info("Refreshing dimension filters cache");
           cacheResource.refreshDimensionFiltersCache();
         } catch (Exception e) {
           LOGGER.error("Exception while loading filter caches", e);
@@ -244,12 +248,12 @@ public class ThirdEyeCacheRegistry {
     this.resultSetGroupCache = resultSetGroupCache;
   }
 
-  public LoadingCache<String, Long> getCollectionMaxDataTimeCache() {
-    return collectionMaxDataTimeCache;
+  public LoadingCache<String, Long> getDatasetMaxDataTimeCache() {
+    return datasetMaxDataTimeCache;
   }
 
-  public void registerCollectionMaxDataTimeCache(LoadingCache<String, Long> collectionMaxDataTimeCache) {
-    this.collectionMaxDataTimeCache = collectionMaxDataTimeCache;
+  public void registerDatasetMaxDataTimeCache(LoadingCache<String, Long> datasetMaxDataTimeCache) {
+    this.datasetMaxDataTimeCache = datasetMaxDataTimeCache;
   }
 
   public DatasetListCache getDatasetsCache() {
@@ -266,14 +270,6 @@ public class ThirdEyeCacheRegistry {
 
   public void registerDimensionFiltersCache(LoadingCache<String, String> dimensionFiltersCache) {
     this.dimensionFiltersCache = dimensionFiltersCache;
-  }
-
-  public LoadingCache<String, String> getDashboardsCache() {
-    return dashboardsCache;
-  }
-
-  public void registerDashboardsCache(LoadingCache<String, String> dashboardsCache) {
-    this.dashboardsCache = dashboardsCache;
   }
 
   public QueryCache getQueryCache() {

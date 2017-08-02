@@ -41,7 +41,7 @@ public class PinotDataSourceMaxTime {
    * @return max date time in millis
    */
   public long getMaxDateTime(String dataset) {
-    LOGGER.info("Loading maxDataTime cache {}", dataset);
+    LOGGER.debug("Loading maxDataTime cache {}", dataset);
     long maxTime = 0;
     try {
       DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
@@ -55,7 +55,7 @@ public class PinotDataSourceMaxTime {
       CACHE_REGISTRY.getResultSetGroupCache().refresh(maxTimePinotQuery);
       ResultSetGroup resultSetGroup = CACHE_REGISTRY.getResultSetGroupCache().get(maxTimePinotQuery);
       if (resultSetGroup.getResultSetCount() == 0 || resultSetGroup.getResultSet(0).getRowCount() == 0) {
-        LOGGER.info("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
+        LOGGER.warn("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
         this.collectionToPrevMaxDataTimeMap.remove(dataset);
       } else {
         long endTime = new Double(resultSetGroup.getResultSet(0).getDouble(0)).longValue();

@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.common;
 
-import io.dropwizard.Configuration;
 import java.util.ArrayList;
 import java.util.List;
+
+import io.dropwizard.Configuration;
 
 public abstract class ThirdEyeConfiguration extends Configuration {
   /**
@@ -10,8 +11,7 @@ public abstract class ThirdEyeConfiguration extends Configuration {
    */
   private String rootDir = "";
 
-  private List<String> whitelistCollections = new ArrayList<>();
-  private List<String> blacklistCollections = new ArrayList<>();
+  private List<String> whitelistDatasets = new ArrayList<>();
 
   private String smtpHost = "";
   private int smtpPort = 0;
@@ -43,20 +43,12 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     this.cors = cors;
   }
 
-  public List<String> getWhitelistCollections() {
-    return whitelistCollections;
+  public List<String> getWhitelistDatasets() {
+    return whitelistDatasets;
   }
 
-  public void setWhitelistCollections(List<String> whitelistCollections) {
-    this.whitelistCollections = whitelistCollections;
-  }
-
-  public List<String> getBlacklistCollections() {
-    return blacklistCollections;
-  }
-
-  public void setBlacklistCollections(List<String> blacklistCollections) {
-    this.blacklistCollections = blacklistCollections;
+  public void setWhitelistDatasets(List<String> whitelistDatasets) {
+    this.whitelistDatasets = whitelistDatasets;
   }
 
   public String getFunctionConfigPath() {

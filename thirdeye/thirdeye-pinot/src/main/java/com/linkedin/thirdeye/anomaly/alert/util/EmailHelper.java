@@ -66,7 +66,7 @@ public abstract class EmailHelper {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
-  private static final LoadingCache<String, Long> collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
+  private static final LoadingCache<String, Long> collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
   private static final QueryCache queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
 
   private static final DatasetConfigManager datasetConfigManager = DAO_REGISTRY.getDatasetConfigDAO();

@@ -127,15 +127,6 @@ public class Utils {
     return dimensionsToGroupBy;
   }
 
-  public static List<String> getDashboards(DashboardConfigManager dashboardConfigDAO, String collection) throws Exception {
-    List<DashboardConfigDTO> dashboardConfigs = dashboardConfigDAO.findActiveByDataset(collection);
-
-    List<String> dashboards = new ArrayList<>();
-    for (DashboardConfigDTO dashboardConfig : dashboardConfigs) {
-      dashboards.add(dashboardConfig.getName());
-    }
-    return dashboards;
-  }
 
   public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
       MetricAggFunction aggFunction, String dataset) throws ExecutionException {
@@ -281,7 +272,7 @@ public class Utils {
   public static long getMaxDataTimeForDataset(String dataset) {
     long endTime = 0;
     try {
-      endTime = CACHE_REGISTRY.getCollectionMaxDataTimeCache().get(dataset);
+      endTime = CACHE_REGISTRY.getDatasetMaxDataTimeCache().get(dataset);
     } catch (ExecutionException e) {
       LOG.error("Exception when getting max data time for {}", dataset);
     }
