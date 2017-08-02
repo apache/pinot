@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
-import java.util.Set;
+import java.util.Map;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.json.JSONException;
@@ -25,29 +25,34 @@ import org.json.JSONObject;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableTaskConfig {
-  private static final String ENABLED_TASK_TYPES_KEY = "enabledTaskTypes";
+  private static final String TASK_TYPE_CONFIGS_MAP_KEY = "taskTypeConfigsMap";
 
-  private Set<String> _enabledTaskTypes;
+  private Map<String, Map<String, String>> _taskTypeConfigsMap;
 
-  public void setEnabledTaskTypes(Set<String> enabledTaskTypes) {
-    _enabledTaskTypes = enabledTaskTypes;
+  public void setTaskTypeConfigsMap(Map<String, Map<String, String>> taskTypeConfigsMap) {
+    _taskTypeConfigsMap = taskTypeConfigsMap;
   }
 
-  public Set<String> getEnabledTaskTypes() {
-    return _enabledTaskTypes;
+  public Map<String, Map<String, String>> getTaskTypeConfigsMap() {
+    return _taskTypeConfigsMap;
   }
 
   @JsonIgnore
   public boolean isTaskTypeEnabled(String taskType) {
-    return _enabledTaskTypes.contains(taskType);
+    return _taskTypeConfigsMap.containsKey(taskType);
+  }
+
+  @JsonIgnore
+  public Map<String, String> getConfigsForTaskType(String taskType) {
+    return _taskTypeConfigsMap.get(taskType);
   }
 
   @Override
   public String toString() {
-    JSONObject jsonConfig = new JSONObject();
+    JSONObject jsonTaskConfigsMap = new JSONObject();
     try {
-      jsonConfig.put(ENABLED_TASK_TYPES_KEY, _enabledTaskTypes);
-      return jsonConfig.toString(2);
+      jsonTaskConfigsMap.put(TASK_TYPE_CONFIGS_MAP_KEY, _taskTypeConfigsMap);
+      return jsonTaskConfigsMap.toString(2);
     } catch (JSONException e) {
       return e.toString();
     }

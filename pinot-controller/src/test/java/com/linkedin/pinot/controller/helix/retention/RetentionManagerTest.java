@@ -15,23 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.model.IdealState;
-import org.joda.time.Duration;
-import org.joda.time.Interval;
-import org.json.JSONException;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.testng.Assert;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -52,7 +35,25 @@ import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.model.IdealState;
+import org.joda.time.Duration;
+import org.joda.time.Interval;
+import org.json.JSONException;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyList;
 import static org.mockito.Matchers.anyString;
@@ -481,6 +482,12 @@ public class RetentionManagerTest {
       @Nullable
       @Override
       public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
+        return null;
+      }
+
+      @Nullable
+      @Override
+      public List<String> getOptimizations() {
         return null;
       }
     };

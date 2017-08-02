@@ -16,18 +16,17 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
-import com.linkedin.pinot.minion.exception.FatalException;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import com.linkedin.pinot.minion.executor.BaseTaskExecutor;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
@@ -48,32 +47,34 @@ import org.testng.annotations.Test;
 
 
 /**
- * Integration test that extends HybridClusterIntegrationTest and add minions into the cluster.
+ * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
+ * minion functionality.
  */
-public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
-  private static final String RAW_TABLE_NAME = "mytable";
-  private static final String OFFLINE_TABLE_NAME = "mytable_OFFLINE";
-  private static final String REALTIME_TABLE_NAME = "mytable_REALTIME";
+public class SimpleMinionClusterIntegrationTest extends ClusterTest {
+  private static final String TABLE_NAME_1 = "testTable1";
+  private static final String TABLE_NAME_2 = "testTable2";
+  private static final String TABLE_NAME_3 = "testTable3";
   private static final int NUM_MINIONS = 3;
 
-  private PinotHelixResourceManager _pinotHelixResourceManager;
   private PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private PinotTaskManager _pinotTaskManager;
 
-  @Override
-  protected TableTaskConfig getTaskConfig() {
-    TableTaskConfig tableTaskConfig = new TableTaskConfig();
-    tableTaskConfig.setEnabledTaskTypes(Collections.singleton(TestTaskGenerator.TASK_TYPE));
-    return tableTaskConfig;
-  }
-
   @BeforeClass
-  public void setUp()
-      throws Exception {
-    // The parent setUp() sets up Zookeeper, Kafka, controller, broker and servers
-    super.setUp();
+  public void setUp() throws Exception {
+    startZk();
+    startController();
+    startBroker();
+    startServer();
 
-    _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
+    // Add 3 offline tables, where 2 of them have TestTask enabled
+    TableTaskConfig taskConfig = new TableTaskConfig();
+    Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
+    taskTypeConfigsMap.put(TestTaskGenerator.TASK_TYPE, Collections.<String, String>emptyMap());
+    taskConfig.setTaskTypeConfigsMap(taskTypeConfigsMap);
+    addOfflineTable(TABLE_NAME_1, null, null, null, null, null, SegmentVersion.v1, null, taskConfig);
+    addOfflineTable(TABLE_NAME_2, null, null, null, null, null, SegmentVersion.v1, null, taskConfig);
+    addOfflineTable(TABLE_NAME_3, null, null, null, null, null, SegmentVersion.v1, null, null);
+
     _pinotHelixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _pinotTaskManager = _controllerStarter.getTaskManager();
 
@@ -87,15 +88,13 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
   }
 
   @Test
-  public void testStopAndResumeTaskQueue()
-      throws Exception {
+  public void testStopAndResumeTaskQueue() throws Exception {
     // Generate 4 tasks
     _pinotTaskManager.scheduleTasks();
     _pinotTaskManager.scheduleTasks();
 
     // Wait at most 60 seconds for all tasks showing up in the cluster
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         return _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).size() == 4;
@@ -117,7 +116,6 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
 
     // Wait at most 60 seconds for all tasks STOPPED
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         for (TaskState taskState : _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values()) {
@@ -134,7 +132,6 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
 
     // Wait at most 60 seconds for all tasks COMPLETED
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         for (TaskState taskState : _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values()) {
@@ -150,34 +147,16 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
     _pinotHelixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE);
   }
 
-  @Test
-  public void testPinotHelixResourceManagerAPIs() {
-    // Instance APIs
-    Assert.assertEquals(_pinotHelixResourceManager.getAllInstances().size(), 6);
-    Assert.assertEquals(_pinotHelixResourceManager.getOnlineInstanceList().size(), 6);
-    Assert.assertEquals(_pinotHelixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), 0);
-    Assert.assertEquals(_pinotHelixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);
-
-    // Table APIs
-    List<String> tableNames = _pinotHelixResourceManager.getAllTables();
-    Assert.assertEquals(tableNames.size(), 2);
-    Assert.assertTrue(tableNames.contains(OFFLINE_TABLE_NAME));
-    Assert.assertTrue(tableNames.contains(REALTIME_TABLE_NAME));
-    Assert.assertEquals(_pinotHelixResourceManager.getAllRawTables(), Collections.singletonList(RAW_TABLE_NAME));
-    Assert.assertEquals(_pinotHelixResourceManager.getAllRealtimeTables(),
-        Collections.singletonList(REALTIME_TABLE_NAME));
-
-    // Tenant APIs
-    Assert.assertEquals(_pinotHelixResourceManager.getAllBrokerTenantNames(), Collections.singleton("TestTenant"));
-    Assert.assertEquals(_pinotHelixResourceManager.getAllServerTenantNames(), Collections.singleton("TestTenant"));
-  }
-
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
+    dropOfflineTable(TABLE_NAME_1);
+    dropOfflineTable(TABLE_NAME_2);
+    dropOfflineTable(TABLE_NAME_3);
     stopMinion();
-
-    super.tearDown();
+    stopServer();
+    stopBroker();
+    stopController();
+    stopZk();
   }
 
   private static class TestTaskGenerator implements PinotTaskGenerator {
@@ -198,6 +177,8 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
     @Nonnull
     @Override
     public List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs) {
+      Assert.assertEquals(tableConfigs.size(), 2);
+
       // Generate at most 4 tasks
       if (_clusterInfoProvider.getTaskStates(TASK_TYPE).size() >= 4) {
         return Collections.emptyList();
@@ -217,28 +198,17 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
   public static class TestTaskExecutor extends BaseTaskExecutor {
     @Override
     public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
-      try {
-        Preconditions.checkState(_minionContext.getDataDir().exists());
-        Preconditions.checkNotNull(_minionContext.getMinionMetrics());
+      Assert.assertTrue(_minionContext.getDataDir().exists());
+      Assert.assertNotNull(_minionContext.getMinionMetrics());
 
-        Preconditions.checkArgument(pinotTaskConfig.getTaskType().equals(TestTaskGenerator.TASK_TYPE));
-        Map<String, String> configs = pinotTaskConfig.getConfigs();
-        Preconditions.checkArgument(configs.size() == 2);
-        Preconditions.checkArgument(configs.containsKey("tableName"));
-        Preconditions.checkArgument(configs.containsKey("tableType"));
-        switch (configs.get("tableName")) {
-          case OFFLINE_TABLE_NAME:
-            Preconditions.checkArgument(configs.get("tableType").equals(TableType.OFFLINE.toString()));
-            break;
-          case REALTIME_TABLE_NAME:
-            Preconditions.checkArgument(configs.get("tableType").equals(TableType.REALTIME.toString()));
-            break;
-          default:
-            throw new IllegalArgumentException("Got unexpected table name: " + configs.get("tableName"));
-        }
-      } catch (IllegalArgumentException e) {
-        throw new FatalException("Got unexpected task config: " + pinotTaskConfig, e);
-      }
+      Assert.assertTrue(pinotTaskConfig.getTaskType().equals(TestTaskGenerator.TASK_TYPE));
+      Map<String, String> configs = pinotTaskConfig.getConfigs();
+      Assert.assertTrue(configs.size() == 2);
+      String offlineTableName = configs.get("tableName");
+      Assert.assertEquals(TableNameBuilder.getTableTypeFromTableName(offlineTableName), TableType.OFFLINE);
+      String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
+      Assert.assertTrue(rawTableName.equals(TABLE_NAME_1) || rawTableName.equals(TABLE_NAME_2));
+      Assert.assertEquals(configs.get("tableType"), TableType.OFFLINE.toString());
 
       Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
 

@@ -30,6 +30,8 @@ import org.joda.time.Duration;
 
 
 public class ZKMetadataUtils {
+  private ZKMetadataUtils() {
+  }
 
   public static OfflineSegmentZKMetadata updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata, SegmentMetadata segmentMetadata) {
     offlineSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
@@ -72,6 +74,9 @@ public class ZKMetadataUtils {
     if (!columnPartitionMap.isEmpty()) {
       offlineSegmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
     }
+
+    offlineSegmentZKMetadata.setOptimizations(segmentMetadata.getOptimizations());
+
     return offlineSegmentZKMetadata;
   }
 

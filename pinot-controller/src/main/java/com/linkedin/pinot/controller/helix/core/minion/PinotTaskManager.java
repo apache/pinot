@@ -19,6 +19,9 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableTaskConfig;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import com.linkedin.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
@@ -52,16 +55,20 @@ public class PinotTaskManager {
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
   private final ClusterInfoProvider _clusterInfoProvider;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
+  private final ControllerMetrics _controllerMetrics;
 
   private ScheduledExecutorService _executorService;
 
   public PinotTaskManager(@Nonnull TaskDriver taskDriver, @Nonnull PinotHelixResourceManager pinotHelixResourceManager,
-      @Nonnull PinotHelixTaskResourceManager pinotHelixTaskResourceManager) {
+      @Nonnull PinotHelixTaskResourceManager pinotHelixTaskResourceManager, @Nonnull ControllerConf controllerConf,
+      @Nonnull ControllerMetrics controllerMetrics) {
     _taskDriver = taskDriver;
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
-    _clusterInfoProvider = new ClusterInfoProvider(pinotHelixResourceManager, pinotHelixTaskResourceManager);
+    _clusterInfoProvider =
+        new ClusterInfoProvider(pinotHelixResourceManager, pinotHelixTaskResourceManager, controllerConf);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);
+    _controllerMetrics = controllerMetrics;
   }
 
   /**
@@ -129,6 +136,8 @@ public class PinotTaskManager {
    * Check the Pinot cluster status and schedule new tasks.
    */
   public void scheduleTasks() {
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
+
     // TODO: add JobQueue health check here
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -153,6 +162,7 @@ public class PinotTaskManager {
     }
 
     // Generate each type of tasks
+    // TODO: add config to control the max number of tasks for all task types & each task type
     for (String taskType : taskTypes) {
       LOGGER.info("Generating tasks for task type: {}", taskType);
       PinotTaskGenerator pinotTaskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
@@ -161,6 +171,7 @@ public class PinotTaskManager {
       for (PinotTaskConfig pinotTaskConfig : pinotTaskConfigs) {
         LOGGER.info("Submitting task for task type: {} with task config: {}", taskType, pinotTaskConfig);
         _pinotHelixTaskResourceManager.submitTask(pinotTaskConfig);
+        _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, 1L);
       }
     }
   }

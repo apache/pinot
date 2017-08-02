@@ -20,16 +20,14 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {
@@ -48,6 +46,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private long _crc = -1;
   private long _creationTime = -1;
   private SegmentPartitionMetadata _partitionMetadata = null;
+  private List<String> _optimizations;
 
   public SegmentZKMetadata() {
   }
@@ -58,8 +57,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
     _endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT) &&
-        !znRecord.getSimpleField(CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
+    if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT) && !znRecord.getSimpleField(
+        CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
       _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
     }
     _indexVersion = znRecord.getSimpleField(CommonConstants.Segment.INDEX_VERSION);
@@ -77,6 +76,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
           "Exception caught while reading partition info from zk metadata for segment '{}', partition info dropped.",
           _segmentName, e);
     }
+    _optimizations = znRecord.getListField(CommonConstants.Segment.OPTIMIZATIONS);
   }
 
   public String getSegmentName() {
@@ -167,6 +167,14 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     return _partitionMetadata;
   }
 
+  public List<String> getOptimizations() {
+    return _optimizations;
+  }
+
+  public void setOptimizations(List<String> optimizations) {
+    _optimizations = optimizations;
+  }
+
   @Override
   public boolean equals(Object segmentMetadata) {
     if (isSameReference(this, segmentMetadata)) {
@@ -178,17 +186,18 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
 
     SegmentZKMetadata metadata = (SegmentZKMetadata) segmentMetadata;
-    return isEqual(_segmentName, metadata._segmentName) &&
-        isEqual(_tableName, metadata._tableName) &&
-        isEqual(_indexVersion, metadata._indexVersion) &&
-        isEqual(_timeUnit, metadata._timeUnit) &&
-        isEqual(_startTime, metadata._startTime) &&
-        isEqual(_endTime, metadata._endTime) &&
-        isEqual(_segmentType, metadata._segmentType) &&
-        isEqual(_totalRawDocs, metadata._totalRawDocs) &&
-        isEqual(_crc, metadata._crc) &&
-        isEqual(_creationTime, metadata._creationTime) &&
-        isEqual(_partitionMetadata, metadata._partitionMetadata);
+    return isEqual(_segmentName, metadata._segmentName)
+        && isEqual(_tableName, metadata._tableName)
+        && isEqual(_indexVersion, metadata._indexVersion)
+        && isEqual(_timeUnit, metadata._timeUnit)
+        && isEqual(_startTime, metadata._startTime)
+        && isEqual(_endTime, metadata._endTime)
+        && isEqual(_segmentType, metadata._segmentType)
+        && isEqual(_totalRawDocs, metadata._totalRawDocs)
+        && isEqual(_crc, metadata._crc)
+        && isEqual(_creationTime, metadata._creationTime)
+        && isEqual(_partitionMetadata, metadata._partitionMetadata)
+        && isEqual(_optimizations, metadata._optimizations);
   }
 
   @Override
@@ -204,6 +213,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     result = hashCodeOf(result, _crc);
     result = hashCodeOf(result, _creationTime);
     result = hashCodeOf(result, _partitionMetadata);
+    result = hashCodeOf(result, _optimizations);
     return result;
   }
 
@@ -235,6 +245,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
             "Exception caught while writing partition metadata into ZNRecord for segment '{}', will be dropped",
             _segmentName, e);
       }
+    }
+    if (_optimizations != null) {
+      znRecord.setListField(CommonConstants.Segment.OPTIMIZATIONS, _optimizations);
     }
     return znRecord;
   }

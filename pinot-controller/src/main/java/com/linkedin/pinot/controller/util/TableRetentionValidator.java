@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.util;
 
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
@@ -87,7 +88,7 @@ public class TableRetentionValidator {
 
     for (String tableName : resourcesInCluster) {
       // Skip non-table resources
-      if (!tableName.endsWith("_OFFLINE") && !tableName.endsWith("_REALTIME")) {
+      if (!TableNameBuilder.isTableResource(tableName)) {
         continue;
       }
 

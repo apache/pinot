@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.segment;
 
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -124,6 +125,14 @@ public interface SegmentMetadata {
    */
   @Nullable
   String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType);
+
+  /**
+   * Get the enabled optimizations for the segment.
+   *
+   * @return List of enabled optimizations
+   */
+  @Nullable
+  List<String> getOptimizations();
 
   Map<String, String> toMap();
 

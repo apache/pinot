@@ -14,6 +14,7 @@
  ******************************************************************************/
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -21,8 +22,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-
-import java.nio.file.Path;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpVersion;
@@ -43,8 +42,6 @@ import org.apache.http.entity.ContentType;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.Utils;
 
 public class FileUploadUtils {
 
@@ -80,27 +77,30 @@ public class FileUploadUtils {
 
   public static int sendFile(final String host, final String port, final String path, final String fileName,
       final InputStream inputStream, final long lengthInBytes, SendFileMethod httpMethod) {
+    return sendFile("http://" + host + ":" + port + "/" + path, fileName, inputStream, lengthInBytes, httpMethod);
+  }
+
+  public static int sendFile(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
+      SendFileMethod httpMethod) {
     EntityEnclosingMethod method = null;
     try {
-      method = httpMethod.forUri("http://" + host + ":" + port + "/" + path);
-      Part[] parts = {
-          new FilePart(fileName, new PartSource() {
-            @Override
-            public long getLength() {
-              return lengthInBytes;
-            }
+      method = httpMethod.forUri(uri);
+      Part[] parts = {new FilePart(fileName, new PartSource() {
+        @Override
+        public long getLength() {
+          return lengthInBytes;
+        }
 
-            @Override
-            public String getFileName() {
-              return fileName;
-            }
+        @Override
+        public String getFileName() {
+          return fileName;
+        }
 
-            @Override
-            public InputStream createInputStream() throws IOException {
-              return new BufferedInputStream(inputStream);
-            }
-          })
-      };
+        @Override
+        public InputStream createInputStream() throws IOException {
+          return new BufferedInputStream(inputStream);
+        }
+      })};
       method.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
       FILE_UPLOAD_HTTP_CLIENT.executeMethod(method);
       if (method.getStatusCode() >= 400) {

@@ -44,6 +44,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOn
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkUtils;
@@ -61,7 +62,6 @@ import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrate
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -513,37 +513,6 @@ public class PinotHelixResourceManager {
     // Timed out
     LOGGER.info("Timed out while waiting for segment '{}' to become '{}' in external view.", segmentName, targetState);
     return false;
-  }
-
-  private boolean ifSegmentExisted(SegmentMetadata segmentMetadata) {
-    if (segmentMetadata == null) {
-      return false;
-    }
-    return _propertyStore.exists(ZKMetadataProvider.constructPropertyStorePathForSegment(
-        TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName()), segmentMetadata.getName()),
-        AccessOption.PERSISTENT);
-  }
-
-  private boolean ifRefreshAnExistedSegment(SegmentMetadata segmentMetadata, String segmentName, String tableName) {
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, segmentMetadata.getTableName(),
-            segmentMetadata.getName());
-    if (offlineSegmentZKMetadata == null) {
-      LOGGER.info("Rejecting because Zk metadata is null for segment {} of table {}", segmentName, tableName);
-      return false;
-    }
-    final SegmentMetadata existedSegmentMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
-    if (segmentMetadata.getIndexCreationTime() <= existedSegmentMetadata.getIndexCreationTime()) {
-      LOGGER.info("Rejecting because of older or same creation time {} (we have {}) for segment {} of table {}",
-          segmentMetadata.getIndexCreationTime(), existedSegmentMetadata.getIndexCreationTime(), segmentName, tableName);
-      return false;
-    }
-    if (segmentMetadata.getCrc().equals(existedSegmentMetadata.getCrc())) {
-      LOGGER.info("Rejecting because of matching CRC exists (incoming={}, existing={}) for {} of table {}",
-          segmentMetadata.getCrc(), existedSegmentMetadata.getCrc(), segmentName, tableName);
-      return false;
-    }
-    return true;
   }
 
   public PinotResourceManagerResponse updateBrokerTenant(Tenant tenant) {
@@ -1490,28 +1459,30 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
-  public PinotResourceManagerResponse addSegment(final SegmentMetadata segmentMetadata, String downloadUrl) {
-    final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
-    String segmentName = "Unknown";
-    String tableName = "Unknown";
-    try {
-      if (!matchTableName(segmentMetadata)) {
-        throw new RuntimeException("Reject segment: table name is not registered." + " table name: "
-            + segmentMetadata.getTableName() + "\n");
-      }
-      segmentName = segmentMetadata.getName();
-      tableName = segmentMetadata.getTableName();
+  @Nonnull
+  public PinotResourceManagerResponse addSegment(@Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull String downloadUrl) {
+    PinotResourceManagerResponse res = new PinotResourceManagerResponse();
 
-      if (ifSegmentExisted(segmentMetadata)) {
-        if (ifRefreshAnExistedSegment(segmentMetadata, segmentName, tableName)) {
-          OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-              ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, segmentMetadata.getTableName(),
-                  segmentMetadata.getName());
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+    String segmentName = segmentMetadata.getName();
+    try {
+      if (!getAllResources().contains(offlineTableName)) {
+        throw new RuntimeException(
+            "Reject Segment: " + segmentName + " because table: " + offlineTableName + " is not registered");
+      }
+
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+          ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentName);
+      if (offlineSegmentZKMetadata != null) {
+        // Segment exists, check whether need to refresh
+
+        if (ifRefreshAnExistedSegment(segmentMetadata, offlineSegmentZKMetadata, offlineTableName, segmentName)) {
           offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
           offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
           offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
           ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
-          LOGGER.info("Refresh segment {} of table {} to propertystore ", segmentName, tableName);
+          LOGGER.info("Refresh segment {} of table {} to propertystore ", segmentName, offlineTableName);
           boolean success = true;
           if (shouldSendMessage(offlineSegmentZKMetadata)) {
             // Send a message to the servers to update the segment.
@@ -1526,37 +1497,74 @@ public class PinotHelixResourceManager {
             res.status = ResponseStatus.success;
           } else {
             LOGGER.error("Failed to refresh segment {} of table {}, marking crc and creation time as invalid",
-                segmentName, tableName);
+                segmentName, offlineTableName);
             offlineSegmentZKMetadata.setCrc(-1L);
             offlineSegmentZKMetadata.setCreationTime(-1L);
             ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           }
         } else {
-          String msg =
-              "Not refreshing identical segment " + segmentName + "of table " + tableName + " with creation time "
-                  + segmentMetadata.getIndexCreationTime() + " and crc " + segmentMetadata.getCrc();
+          String msg = "Not refreshing identical segment " + segmentName + "of table " + offlineTableName
+              + " with creation time " + segmentMetadata.getIndexCreationTime() + " and crc "
+              + segmentMetadata.getCrc();
           LOGGER.info(msg);
           res.status = ResponseStatus.success;
           res.message = msg;
         }
       } else {
-        OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
+        // Segment does not exist, add new segment
+
+        offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
         offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
         offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
         offlineSegmentZKMetadata.setPushTime(System.currentTimeMillis());
         ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
-        LOGGER.info("Added segment {} of table {} to propertystore", segmentName, tableName);
+        LOGGER.info("Added segment {} of table {} to propertystore", segmentName, offlineTableName);
 
         addNewOfflineSegment(segmentMetadata);
         res.status = ResponseStatus.success;
       }
     } catch (final Exception e) {
-      LOGGER.error("Caught exception while adding segment {} of table {}", segmentName, tableName, e);
+      LOGGER.error("Caught exception while adding segment {} of table {}", segmentName, offlineTableName, e);
       res.status = ResponseStatus.failure;
       res.message = e.getMessage();
     }
 
     return res;
+  }
+
+  private boolean ifRefreshAnExistedSegment(@Nonnull SegmentMetadata newSegmentMetadata,
+      @Nonnull OfflineSegmentZKMetadata existedSegmentZKMetadata, @Nonnull String offlineTableName,
+      @Nonnull String segmentName) {
+    long newCreationTime = newSegmentMetadata.getIndexCreationTime();
+    long existedCreationTime = existedSegmentZKMetadata.getCreationTime();
+    long newCrc = Long.valueOf(newSegmentMetadata.getCrc());
+    long existedCrc = existedSegmentZKMetadata.getCrc();
+
+    // Allow refresh if only optimizations changed
+    if (newCreationTime == existedCreationTime && newCrc == existedCrc) {
+      List<String> newOptimizations = newSegmentMetadata.getOptimizations();
+      List<String> existedOptimizations = existedSegmentZKMetadata.getOptimizations();
+      if (!EqualityUtils.isEqualIgnoreOrder(newOptimizations, existedOptimizations)) {
+        LOGGER.info("Accept segment: {} in table: {} because optimizations changed, new: {}, existed: {}", segmentName,
+            offlineTableName, newOptimizations, existedOptimizations);
+        return true;
+      }
+    }
+
+    // Check segment creation time
+    if (newCreationTime <= existedCreationTime) {
+      LOGGER.info("Reject segment: {} in table: {} because of older or same creation time, new: {}, existed: {}",
+          segmentName, offlineTableName, newCreationTime, existedCreationTime);
+      return false;
+    }
+
+    // Check segment CRC
+    if (newCrc == existedCrc) {
+      LOGGER.info("Reject segment: {} in table: {} because of same CRC: {}", segmentName, offlineTableName, newCrc);
+      return false;
+    }
+
+    return true;
   }
 
   public int reloadAllSegments(@Nonnull String tableNameWithType) {

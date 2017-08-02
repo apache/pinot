@@ -16,12 +16,12 @@
 
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -34,8 +34,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.LiveInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.Lists;
 
 /**
  * Utility class to obtain the status of the Pinot instance running in this JVM.
@@ -125,6 +123,11 @@ public class ServiceStatus {
       _resourcesToMonitor = new ArrayList<>();
 
       for (String resource : _helixAdmin.getResourcesInCluster(_clusterName)) {
+        // Only monitor table resources and broker resource
+        if (!TableNameBuilder.isTableResource(resource) && !resource.equals(
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+          continue;
+        }
         final IdealState idealState = getResourceIdealState(resource);
         for (String partitionInResource : idealState.getPartitionSet()) {
           if (idealState.getInstanceSet(partitionInResource).contains(_instanceName)) {

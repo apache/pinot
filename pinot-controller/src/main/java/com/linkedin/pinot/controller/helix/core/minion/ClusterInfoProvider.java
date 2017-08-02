@@ -21,8 +21,9 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import java.util.List;
@@ -39,11 +40,13 @@ import org.apache.helix.task.TaskState;
 public class ClusterInfoProvider {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
+  private final ControllerConf _controllerConf;
 
   public ClusterInfoProvider(@Nonnull PinotHelixResourceManager pinotHelixResourceManager,
-      @Nonnull PinotHelixTaskResourceManager pinotHelixTaskResourceManager) {
+      @Nonnull PinotHelixTaskResourceManager pinotHelixTaskResourceManager, @Nonnull ControllerConf controllerConf) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
+    _controllerConf = controllerConf;
   }
 
   /**
@@ -58,37 +61,44 @@ public class ClusterInfoProvider {
   }
 
   /**
-   * Get the table schema for the given table name with type suffix.
+   * Get the table schema for the given table name with or without type suffix.
    *
-   * @param tableNameWithType Table name with type suffix
+   * @param tableName Table name with or without type suffix
    * @return Table schema
    */
   @Nullable
-  public Schema getTableSchema(@Nonnull String tableNameWithType) {
-    return _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+  public Schema getTableSchema(@Nonnull String tableName) {
+    return _pinotHelixResourceManager.getTableSchema(tableName);
   }
 
   /**
-   * Get all segment metadata for the given table name with type suffix.
+   * Get all segments' metadata for the given OFFLINE table name.
    *
-   * @param tableNameWithType Table name with type suffix
-   * @return List of segment metadata
+   * @param offlineTableName Offline table name
+   * @return List of segments' metadata
    */
   @Nonnull
-  public List<? extends SegmentZKMetadata> getSegmentsMetadata(@Nonnull String tableNameWithType) {
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    Preconditions.checkNotNull(tableType);
-    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-      return ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
-          tableNameWithType);
-    } else {
-      return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
-          tableNameWithType);
-    }
+  public List<OfflineSegmentZKMetadata> getOfflineSegmentsMetadata(@Nonnull String offlineTableName) {
+    Preconditions.checkArgument(TableNameBuilder.OFFLINE.tableHasTypeSuffix(offlineTableName));
+    return ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
+        offlineTableName);
   }
 
   /**
-   * Get all task states for the given task type.
+   * Get all segments' metadata for the given REALTIME table name.
+   *
+   * @param realtimeTableName Realtime table name
+   * @return List of segments' metadata
+   */
+  @Nonnull
+  public List<RealtimeSegmentZKMetadata> getRealtimeSegmentsMetadata(@Nonnull String realtimeTableName) {
+    Preconditions.checkArgument(TableNameBuilder.REALTIME.tableHasTypeSuffix(realtimeTableName));
+    return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
+        realtimeTableName);
+  }
+
+  /**
+   * Get all tasks' state for the given task type.
    *
    * @param taskType Task type
    * @return Map from task name to task state
@@ -107,5 +117,15 @@ public class ClusterInfoProvider {
   @Nonnull
   public PinotTaskConfig getTaskConfig(@Nonnull String taskName) {
     return _pinotHelixTaskResourceManager.getTaskConfig(taskName);
+  }
+
+  /**
+   * Get the VIP URL for the controllers.
+   *
+   * @return VIP URL
+   */
+  @Nonnull
+  public String getVipUrl() {
+    return _controllerConf.generateVipUrl();
   }
 }
