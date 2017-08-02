@@ -17,6 +17,7 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import junit.framework.Assert;
 import org.restlet.data.Reference;
 import org.testng.annotations.Test;

@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.restlet.resources;
+package com.linkedin.pinot.controller.util;
 
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import java.util.UUID;
 import org.restlet.data.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 
 
 public class SegmentCompletionUtils {
