@@ -4,98 +4,99 @@
   <a class="thirdeye-link thirdeye-link-secondary" href="https://ingraphs.prod.linkedin.com/" target="_blank">Go to InGraphs</a>
 </div>
 
-
 <main class="alert-onboard paper-container paper-container--padded">
 
   {{#bs-form model=this class="te-form" onSubmit=(action "submit") as |form|}}
 
-  <fieldset class="te-form__section">
-    <legend class="te-form__section-title">Existing Dashboard</legend>
-    <div class="form-group">
-      <label for="existing-dashboard-name" class="control-label">Dashboard Name</label>
-      {{#if isDashboardExistError}}
-        <div class="te-form__alert--warning alert-warning"><strong>Warning...</strong> This dashboard name cannot be found in inGraphs. Please verify.</div>
-      {{/if}}
-      {{input
-        type="text"
-        id="existing-dashboard-name"
-        class="form-control required"
-        placeholder="Type inGraph dashboard name..."
-        value=importExistingDashboardName
-        key-up="clearExistingDashboardNameError"
-        disabled=isExistingDashFieldDisabled
-      }}
-    </div>
-  </fieldset>
+    <fieldset class="te-form__section">
+      <legend class="te-form__section-title">Existing Dashboard</legend>
+      <div class="form-group">
+        <label for="existing-dashboard-name" class="control-label">Dashboard Name</label>
+        {{#if isDashboardExistError}}
+          <div class="te-form__alert--warning alert-warning"><strong>Warning...</strong> This dashboard name cannot be found in inGraphs. Please verify.</div>
+        {{/if}}
+        {{input
+          type="text"
+          id="existing-dashboard-name"
+          class="form-control required"
+          placeholder="Type inGraph dashboard name..."
+          value=importExistingDashboardName
+          key-up="clearExistingDashboardNameError"
+          disabled=isExistingDashFieldDisabled
+        }}
+      </div>
+    </fieldset>
 
-  <p class="te-form-text">Or</p>
+    <p class="te-form-text">Or</p>
 
-  <fieldset class="te-form__section">
-    <legend class="te-form__section-title">New Custom Dashboard</legend>
-    <div class="form-group">
-      <label for="import-custom-dataset" class="control-label">New Dataset Name *</label>
-      {{input
-        type="text"
-        id="import-custom-dataset"
-        class="form-control"
-        placeholder="Type new dataset name..."
-        value=importCustomNewDataset
-        disabled=isCustomDashFieldDisabled
-      }}
-    </div>
-    <div class="form-group">
-      <label for="import-custom-metric" class="control-label">New Metric Name *</label>
-      {{input
-        type="text"
-        id="import-custom-metric"
-        class="form-control"
-        placeholder="Type new metric name..."
-        value=importCustomNewMetric
-        disabled=isCustomDashFieldDisabled
-      }}
+    <fieldset class="te-form__section">
+      <legend class="te-form__section-title">New Custom Dashboard</legend>
+      <div class="form-group">
+        <label for="import-custom-dataset" class="control-label">New Dataset Name *</label>
+        {{input
+          type="text"
+          id="import-custom-dataset"
+          class="form-control"
+          placeholder="Type new dataset name..."
+          value=importCustomNewDataset
+          disabled=isCustomDashFieldDisabled
+        }}
       </div>
       <div class="form-group">
-      <label for="select-dimension" class="control-label">Consolidate</label>
-      {{#power-select
-        options=consolidateOptions
-        selected=selectedConsolidateOption
-        onchange=(action (mut selectedConsolidateOption))
-        placeholder="Select a Consolidation"
-        triggerId="select-consolidate"
-        triggerClass="te-form__spacer"
-        disabled=isCustomDashFieldDisabled
-        as |consolidateOption|
-      }}
-        {{consolidateOption}}
-      {{/power-select}}
+        <label for="import-custom-metric" class="control-label">New Metric Name *</label>
+        {{input
+          type="text"
+          id="import-custom-metric"
+          class="form-control"
+          placeholder="Type new metric name..."
+          value=importCustomNewMetric
+          disabled=isCustomDashFieldDisabled
+        }}
+        </div>
+        <div class="form-group">
+        <label for="select-dimension" class="control-label">Consolidate</label>
+        {{#power-select
+          options=consolidateOptions
+          selected=selectedConsolidateOption
+          onchange=(action (mut selectedConsolidateOption))
+          placeholder="Select a Consolidation"
+          triggerId="select-consolidate"
+          triggerClass="te-form__spacer"
+          disabled=isCustomDashFieldDisabled
+          as |consolidateOption|
+        }}
+          {{consolidateOption}}
+        {{/power-select}}
+        </div>
+        <div class="form-group">
+        <label for="import-custom-rrd" class="control-label">Provide RRD *</label>
+        {{input
+          type="text"
+          id="import-custom-rrd"
+          class="form-control"
+          placeholder="RRD here..."
+          value=importCustomNewRrd
+          disabled=isCustomDashFieldDisabled
+        }}
       </div>
-      <div class="form-group">
-      <label for="import-custom-rrd" class="control-label">Provide RRD *</label>
-      {{input
-        type="text"
-        id="import-custom-rrd"
-        class="form-control"
-        placeholder="RRD here..."
-        value=importCustomNewRrd
-        disabled=isCustomDashFieldDisabled
-      }}
-    </div>
-  </fieldset>
+    </fieldset>
 
     {{#if isImportSuccess}}
-      {{#bs-alert type="success"}}
-        <strong>Success!</strong> You have successfully onboarded the <strong>{{datasetName}}</strong> dataset
-        {{#if importedMetrics.length}}, including the following metrics:{{/if}}
-        {{#each importedMetrics as |metric|}}
-          <br>{{metric}}
-        {{else}}
-          <br>But no metrics were imported.
-        {{/each}}
+      {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+        <div class="te-form__banner-title">Success! Metrics On-boarded</div> You have successfully onboarded the <strong>{{datasetName}}</strong> dataset
+        {{#if importedMetrics.length}}, including the following metrics (dataset/metric_name):{{/if}}
+        <ul class="te-form__banner-list">
+          {{#each importedMetrics as |metric|}}
+            <li>{{metric}}</li>
+          {{else}}
+            <li>Sorry, no metrics were imported.</li>
+          {{/each}}
+        </ul>
       {{/bs-alert}}
     {{/if}}
 
     {{#if isImportError}}
-      {{#bs-alert type="danger"}}
+      {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
         <strong>Error:</strong> {{failureMessage}}
       {{/bs-alert}}
     {{/if}}
