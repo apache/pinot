@@ -252,11 +252,11 @@
     {{/bs-alert}}
   {{/if}}
 
-  {{!-- {{#if isCreateAlertError}} --}}
-    {{#bs-alert type="danger" class="te-form__banner te-form__banner--success"}}
+  {{#if isCreateAlertError}}
+    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
       <strong>Error!</strong> Alert creation has failed. Please try again.
     {{/bs-alert}}
-  {{!-- {{/if}} --}}
+  {{/if}}
 
   {{#if isReplayTriggeredSuccess}}
     {{#bs-alert type="success" class="te-form__banner" classNameBindings="replayStatusClass"}}
