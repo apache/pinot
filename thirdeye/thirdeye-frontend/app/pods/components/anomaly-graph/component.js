@@ -146,19 +146,25 @@ export default Ember.Component.extend({
   buildCustomLegend() {
     const componentId = this.get('componentId');
     const chart = d3.select(`#${componentId}.c3-chart-component`);
+    const legendText = this.get('legendText');
+
+    const {
+      dotted = 'expected',
+      solid = 'current'
+    }  = legendText;
 
     chart.insert('div', '.chart').attr('class', 'anomaly-graph__legend').selectAll('span')
-      .data(['expected', 'current'])
+      .data([dotted, solid])
       .enter().append('svg')
       .attr('class', 'anomaly-graph__legend-item')
-      .attr('width', 70)
+      .attr('width', 80)
       .attr('height', 20)
       .attr('data-id', function (id) { return id; })
       .each(function (id) {
         const element = d3.select(this);
 
         element.append('text')
-          .attr('x', 30)
+          .attr('x', 35)
           .attr('y', 10)
           .html(id => id);
 
@@ -166,10 +172,10 @@ export default Ember.Component.extend({
           .attr('class', 'anomaly-graph__legend-line')
           .attr('x1', 0)
           .attr('y1', 10)
-          .attr('x2', 25)
+          .attr('x2', 30)
           .attr('y2', 10)
           .attr('stroke-dasharray', (d) => {
-            const dasharrayNum = (d === 'expected') ? '10%' : '0';
+            const dasharrayNum = (d === dotted) ? '10%' : '0';
             return dasharrayNum;
           });
       });
@@ -253,6 +259,9 @@ export default Ember.Component.extend({
   analysisEnd: 0,
 
   showLegend: false,
+  // contains copy for the legend
+  // currently supports 'dotted' and 'solid'
+  legendText: {},
 
   showTitle: false,
   height: 0,
@@ -353,7 +362,8 @@ export default Ember.Component.extend({
       const onSubchartBrush = this.get('onSubchartChange');
       return {
         enabled: this.get('enableZoom'),
-        onzoomend: onSubchartBrush
+        onzoomend: onSubchartBrush,
+        rescale: true
       };
     }
   ),

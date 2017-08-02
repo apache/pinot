@@ -31,6 +31,11 @@ export default Ember.Controller.extend({
   metricGranularityOptions: [],
   originalDimensions: [],
 
+  legendText: {
+    dotted: 'WoW',
+    solid: 'Observed'
+  },
+
   /**
    * Component property initial settings
    */
@@ -141,7 +146,7 @@ export default Ember.Controller.extend({
       maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => checkStatus(res, 'get', true)),
       granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
       filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
-      dimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
+      dimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res => checkStatus(res, 'get', true))
     };
 
     return Ember.RSVP.hash(promiseHash);
@@ -672,25 +677,25 @@ export default Ember.Controller.extend({
      */
     clearAll() {
       this.setProperties({
-       isFormDisabled: false,
-       isMetricSelected: false,
-       isMetricDataInvalid: false,
-       selectedMetricOption: null,
-       selectedPattern: null,
-       selectedGranularity: null,
-       selectedDimension: null,
-       alertFunctionName: null,
-       selectedAppName: null,
-       selectedConfigGroup: null,
-       newConfigGroupName: null,
-       alertGroupNewRecipient: null,
-       selectedGroupRecipients: null,
-       isCreateAlertSuccess: null,
-       isCreateAlertError: false,
-       isCreateGroupSuccess: false,
-       isReplayTriggeredSuccess: false,
-       isReplayComplete: false,
-       selectedFilters: JSON.stringify({})
+        isFormDisabled: false,
+        isMetricSelected: false,
+        isMetricDataInvalid: false,
+        selectedMetricOption: null,
+        selectedPattern: null,
+        selectedGranularity: null,
+        selectedDimension: null,
+        alertFunctionName: null,
+        selectedAppName: null,
+        selectedConfigGroup: null,
+        newConfigGroupName: null,
+        alertGroupNewRecipient: null,
+        selectedGroupRecipients: null,
+        isCreateAlertSuccess: null,
+        isCreateAlertError: false,
+        isCreateGroupSuccess: false,
+        isReplayTriggeredSuccess: false,
+        isReplayComplete: false,
+        selectedFilters: JSON.stringify({})
       });
       this.send('refreshModel');
     },
