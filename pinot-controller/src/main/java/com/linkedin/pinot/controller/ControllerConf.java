@@ -155,9 +155,6 @@ public class ControllerConf extends PropertiesConfiguration {
 
   // If jersey admin is the primary one, switch the controller and jersey ports.
   public String getControllerPort() {
-    if (isJerseyAdminPrimary()) {
-      return getString(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
-    }
     return (String) getProperty(CONTROLLER_PORT);
   }
 
@@ -330,9 +327,6 @@ public class ControllerConf extends PropertiesConfiguration {
 
   // If jersey admin is the primary one, switch the controller and jersey ports.
   public String getJerseyAdminApiPort() {
-    if (isJerseyAdminPrimary()) {
-      return (String) getProperty(CONTROLLER_PORT);
-    }
     return getString(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
   }
 }

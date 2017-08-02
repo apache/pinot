@@ -158,8 +158,17 @@ public class ControllerStarter {
       LOGGER.info("Starting segment status manager");
       segmentStatusChecker.start(controllerMetrics);
 
-      LOGGER.info("Starting Pinot REST API component");
-      component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
+      int restletPort = Integer.parseInt(config.getControllerPort());
+      int jerseyPort = Integer.parseInt(config.getJerseyAdminApiPort());
+      if (config.isJerseyAdminPrimary()) {
+        LOGGER.info("Starting Jersey admin as primary REST API");
+        int tmp = restletPort;
+        restletPort = jerseyPort;
+        jerseyPort = tmp;
+      }
+
+      LOGGER.info("Starting Pinot RESTLET API component on port {}", restletPort);
+      component.getServers().add(Protocol.HTTP, restletPort);
       component.getClients().add(Protocol.FILE);
       component.getClients().add(Protocol.JAR);
       Context applicationContext = component.getContext().createChildContext();
@@ -191,7 +200,8 @@ public class ControllerStarter {
       controllerRestApp.setContext(applicationContext);
       component.getDefaultHost().attach(controllerRestApp);
       component.start();
-      adminApp.start(Integer.parseInt(config.getJerseyAdminApiPort()));
+      adminApp.start(jerseyPort);
+      LOGGER.info("Started Jersey API on port {}", jerseyPort);
       LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
       LOGGER.info("Controller services available at http://{}:{}/", config.getControllerHost(),
           config.getControllerPort());
@@ -295,6 +305,9 @@ public class ControllerStarter {
 
       LOGGER.info("Stopping API component");
       component.stop();
+
+      LOGGER.info("Stopping Jersey admin API");
+      adminApp.stop();
 
       LOGGER.info("Stopping realtime segment manager");
       realtimeSegmentsManager.stop();
