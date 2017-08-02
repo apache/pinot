@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang.mutable.MutableInt;
 
 
 public class RequestUtils {
@@ -45,7 +46,8 @@ public class RequestUtils {
    */
   public static void generateFilterFromTree(FilterQueryTree filterQueryTree, BrokerRequest request) {
     Map<Integer, FilterQuery> filterQueryMap = new HashMap<Integer, FilterQuery>();
-    FilterQuery root = traverseFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap);
+    MutableInt currentId = new MutableInt(0);
+    FilterQuery root = traverseFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
     filterQueryMap.put(root.getId(), root);
     request.setFilterQuery(root);
     FilterQueryMap mp = new FilterQueryMap();
@@ -54,18 +56,25 @@ public class RequestUtils {
   }
 
   private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree,
-      Map<Integer, FilterQuery> filterQueryMap) {
+      Map<Integer, FilterQuery> filterQueryMap, MutableInt currentId) {
+    int currentNodeId = currentId.intValue();
+    currentId.increment();
+
     final List<Integer> f = new ArrayList<Integer>();
     if (null != tree.getChildren()) {
       for (final FilterQueryTree c : tree.getChildren()) {
-        f.add(c.getId());
-        final FilterQuery q = traverseFilterQueryAndPopulateMap(c, filterQueryMap);
-        filterQueryMap.put(c.getId(), q);
+        int childNodeId = currentId.intValue();
+        currentId.increment();
+
+        f.add(childNodeId);
+        final FilterQuery q = traverseFilterQueryAndPopulateMap(c, filterQueryMap, currentId);
+        filterQueryMap.put(childNodeId, q);
       }
     }
+
     FilterQuery query = new FilterQuery();
     query.setColumn(tree.getColumn());
-    query.setId(tree.getId());
+    query.setId(currentNodeId);
     query.setNestedFilterQueryIds(f);
     query.setOperator(tree.getOperator());
     query.setValue(tree.getValue());
@@ -103,7 +112,7 @@ public class RequestUtils {
       }
     }
 
-    FilterQueryTree q2 = new FilterQueryTree(id, q.getColumn(), q.getValue(), q.getOperator(), c);
+    FilterQueryTree q2 = new FilterQueryTree(q.getColumn(), q.getValue(), q.getOperator(), c);
     return q2;
   }
 

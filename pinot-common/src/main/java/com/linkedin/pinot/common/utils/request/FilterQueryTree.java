@@ -20,31 +20,16 @@ import java.util.List;
 
 
 public class FilterQueryTree {
-  private final int id;
   private final String column;
   private final List<String> value;
   private final FilterOperator operator;
   private final List<FilterQueryTree> children;
 
   public FilterQueryTree(String column, List<String> value, FilterOperator operator, List<FilterQueryTree> children) {
-    this.id = System.identityHashCode(this);
     this.column = column;
     this.value = value;
     this.operator = operator;
     this.children = children;
-  }
-
-  public FilterQueryTree(int id, String column, List<String> value, FilterOperator operator,
-      List<FilterQueryTree> children) {
-    this.id = id;
-    this.column = column;
-    this.value = value;
-    this.operator = operator;
-    this.children = children;
-  }
-
-  public int getId() {
-    return id;
   }
 
   public String getColumn() {
@@ -74,9 +59,9 @@ public class FilterQueryTree {
       stringBuffer.append(' ');
     }
     if (operator == FilterOperator.OR || operator == FilterOperator.AND) {
-      stringBuffer.append(operator).append(" (").append(id).append(")");
+      stringBuffer.append(operator);
     } else {
-      stringBuffer.append(column).append(" ").append(operator).append(" ").append(value).append(" (").append(id).append(")");
+      stringBuffer.append(column).append(" ").append(operator).append(" ").append(value);
     }
     if (children != null) {
       for (FilterQueryTree child : children) {
