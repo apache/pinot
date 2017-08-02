@@ -57,6 +57,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     DateTime startTime;
     DateTime endTime;
     double severity;
+    double windowSize;
     AnomalyFeedbackType feedbackType;
 
     public ResultNode(){}
@@ -92,14 +93,15 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     }
     public String[] getSchema(){
       return new String[]{
-          "StartDate", "EndDate", "Dimensions", "Filters", "FunctionID", "FunctionName", "Severity, feedbackType"
+          "StartDate", "EndDate", "Dimensions", "Filters", "FunctionID", "FunctionName", "Severity", "WindowSize","feedbackType"
       };
     }
     public String toString(){
-      DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd");
+      DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss");
       return String.format("%s,%s,%s,%s,%s,%s,%s,%s", fmt.print(startTime), fmt.print(endTime),
           dimensionString(), (filters == null)? "":filters,
-          Long.toString(functionId), functionName, Double.toString(severity*100.0),
+          Long.toString(functionId), functionName, Double.toString(severity),
+          Double.toString(windowSize),
           (feedbackType == null)? "N/A" : feedbackType.toString());
     }
   }
@@ -143,6 +145,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       res.dimensions = mergedResult.getDimensions();
       res.setFilters(anomalyFunction.getFilters());
       res.severity = mergedResult.getWeight();
+      res.windowSize = 1.0 * (mergedResult.getEndTime() - mergedResult.getStartTime()) / 3600_000;
       AnomalyFeedback feedback = mergedResult.getFeedback();
       res.feedbackType = (feedback == null)? null : feedback.getFeedbackType();
       resultNodes.add(res);
@@ -190,6 +193,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       res.dimensions = rawResult.getDimensions();
       res.setFilters(anomalyFunction.getFilters());
       res.severity = rawResult.getWeight();
+      res.windowSize = 1.0 * (rawResult.getEndTime() - rawResult.getStartTime()) / 3600_000;
       AnomalyFeedbackDTO feedback = rawResult.getFeedback();
       res.feedbackType = (feedback == null)? null : feedback.getFeedbackType();
       resultNodes.add(res);
