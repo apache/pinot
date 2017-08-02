@@ -20,7 +20,8 @@ export default Ember.Component.extend({
       if (selectedTab === 'all') { return events; }
       return events
         .filter(event => (event.eventType === selectedTab))
-        .sortBy('score');
+        .sortBy('score')
+        .reverse();
     }
   ),
 
