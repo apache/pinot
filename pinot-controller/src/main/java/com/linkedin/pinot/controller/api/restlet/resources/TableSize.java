@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.restlet.swagger.Parameter;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
+import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.io.IOException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.restlet.data.MediaType;

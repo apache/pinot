@@ -19,7 +19,7 @@ package com.linkedin.pinot.controller.validation;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.controller.api.restlet.resources.TableSizeReader;
+import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.io.File;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
