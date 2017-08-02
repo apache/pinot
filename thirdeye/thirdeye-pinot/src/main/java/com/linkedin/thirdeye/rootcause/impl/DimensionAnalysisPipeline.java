@@ -120,6 +120,9 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
         for(int i=0; i<dfScores.size(); i++) {
           double score = dfScores.getDouble(COL_SCORE, i);
+          if (score <= 0)
+            continue;
+
           Dimension d = new Dimension(dfScores.getString(COL_DIM_NAME, i), dfScores.getString(COL_DIM_VALUE, i));
 
           if(!scores.containsKey(d))
