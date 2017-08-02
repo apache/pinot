@@ -113,7 +113,11 @@ const assignHumanTimeInfo = (event) => {
 
   var humanDuration = event.duration;
   if (!Number.isNaN(event.duration)) {
-    humanDuration = humanizeShort(moment.duration(event.duration));
+    if (event.duration < moment.duration(1, 'minute')) {
+      humanDuration = '';
+    } else {
+      humanDuration = humanizeShort(moment.duration(event.duration));
+    }
   }
 
   return Object.assign(event, { humanRelStart, humanDuration });
