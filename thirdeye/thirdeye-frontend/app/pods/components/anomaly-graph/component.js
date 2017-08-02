@@ -314,14 +314,14 @@ export default Ember.Component.extend({
         const {
           // start,
           // end,
-          score,
+          displayScore,
           label
         } = event;
 
         // const scores = (!end || start === end)
         //   ? [score, score]
         //   : [score];
-        return [label, score];
+        return [label, displayScore];
       });
     }
   ),

@@ -27,11 +27,11 @@ const eventColorMapping = {
 };
 
 const eventWeightMapping = {
-  lix: 0.05,
-  gcn: 0.1,
-  anomaly: 0.15,
-  holiday: 0.2,
-  informed: 0
+  informed: 0.025,
+  lix: 0.075,
+  anomaly: 0.125,
+  gcn: 0.175,
+  holiday: 0.175
 };
 
 export {

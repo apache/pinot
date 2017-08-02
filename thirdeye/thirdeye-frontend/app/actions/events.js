@@ -69,9 +69,9 @@ const assignEventColor = (event) => {
  */
 const setWeight = (event) => {
   const { eventType } = event;
-  const weight = eventWeightMapping[eventType] || 0;
+  const displayScore = eventWeightMapping[eventType] || 0;
 
-  return Object.assign(event, {score: weight});
+  return Object.assign(event, { displayScore });
 };
 
 /**
@@ -113,7 +113,11 @@ const assignHumanTimeInfo = (event) => {
 
   var humanDuration = event.duration;
   if (!Number.isNaN(event.duration)) {
-    humanDuration = humanizeShort(moment.duration(event.duration));
+    if (event.duration < moment.duration(1, 'minute')) {
+      humanDuration = '';
+    } else {
+      humanDuration = humanizeShort(moment.duration(event.duration));
+    }
   }
 
   return Object.assign(event, { humanRelStart, humanDuration });
