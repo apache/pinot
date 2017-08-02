@@ -153,7 +153,6 @@ public class ControllerConf extends PropertiesConfiguration {
     return (String) getProperty(CONTROLLER_HOST);
   }
 
-  // If jersey admin is the primary one, switch the controller and jersey ports.
   public String getControllerPort() {
     return (String) getProperty(CONTROLLER_PORT);
   }
@@ -325,7 +324,6 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(TABLE_MIN_REPLICAS, minReplicas);
   }
 
-  // If jersey admin is the primary one, switch the controller and jersey ports.
   public String getJerseyAdminApiPort() {
     return getString(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
   }
