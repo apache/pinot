@@ -69,9 +69,9 @@ const assignEventColor = (event) => {
  */
 const setWeight = (event) => {
   const { eventType } = event;
-  const weight = eventWeightMapping[eventType] || 0;
+  const displayScore = eventWeightMapping[eventType] || 0;
 
-  return Object.assign(event, {score: weight});
+  return Object.assign(event, { displayScore });
 };
 
 /**
