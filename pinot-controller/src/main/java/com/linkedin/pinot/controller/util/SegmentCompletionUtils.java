@@ -27,7 +27,7 @@ public class SegmentCompletionUtils {
   // Used to create temporary segment file names
   private static final String TMP = ".tmp.";
 
-  static SegmentCompletionProtocol.Request.Params extractParams(Reference reference) {
+  public static SegmentCompletionProtocol.Request.Params extractParams(Reference reference) {
     final String offsetStr = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
     final String segmentName = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
     final String instanceId = reference.getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
