@@ -87,7 +87,13 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   @Test
   public void testConvertToRawIndexTask() throws Exception {
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-    final File tableDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-0", offlineTableName);
+
+    File testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-0", offlineTableName);
+    if (!testDataDir.isDirectory()) {
+      testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-1", offlineTableName);
+    }
+    Assert.assertTrue(testDataDir.isDirectory());
+    final File tableDataDir = testDataDir;
 
     // Check that all columns have dictionary
     File[] indexDirs = tableDataDir.listFiles();

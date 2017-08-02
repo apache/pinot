@@ -55,8 +55,7 @@ public class MinionStarter {
 
   private HelixAdmin _helixAdmin;
 
-  public MinionStarter(String zkAddress, String helixClusterName, Configuration config)
-      throws Exception {
+  public MinionStarter(String zkAddress, String helixClusterName, Configuration config) throws Exception {
     _helixClusterName = helixClusterName;
     _config = config;
     _instanceId = config.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
@@ -82,15 +81,14 @@ public class MinionStarter {
    * Start the Pinot Minion instance.
    * <p>Should be called after all classes of task executor get registered.
    */
-  public void start()
-      throws Exception {
+  public void start() throws Exception {
     LOGGER.info("Starting Pinot minion: {}", _instanceId);
     Utils.logVersions();
 
     // Initialize data directory
     LOGGER.info("Initializing data directory");
-    File dataDir = new File(
-        _config.getString(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_DATA_DIR));
+    File dataDir = new File(_config.getString(CommonConstants.Helix.Instance.DATA_DIR_KEY,
+        CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
     if (!dataDir.exists()) {
       Preconditions.checkState(dataDir.mkdirs());
     }
