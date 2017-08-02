@@ -978,7 +978,7 @@ public class PinotHelixResourceManager {
     for (String instance : instancesInClusterWithTag) {
       retagInstance(instance, brokerTag, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
-
+    response.status = ResponseStatus.success;
     return response;
   }
 
