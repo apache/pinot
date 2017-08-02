@@ -18,6 +18,8 @@ package com.linkedin.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.operator.transform.function.time.converter.TimeConverterFactory;
+import com.linkedin.pinot.core.operator.transform.function.time.converter.TimeUnitConverter;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import java.util.concurrent.TimeUnit;
@@ -59,16 +61,12 @@ public class TimeConversionTransform implements TransformFunction {
         outputTimeUnits.length >= length);
 
     TimeUnit inputTimeUnit = getTimeUnit(inputTimeUnits[0]);
-    TimeUnit outputTimeUnit = getTimeUnit(outputTimeUnits[0]);
+    TimeUnitConverter converter = TimeConverterFactory.getTimeConverter(outputTimeUnits[0]);
 
     if (_output == null || _output.length < length) {
       _output = new long[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
     }
-
-    for (int i = 0; i < length; i++) {
-      _output[i] = outputTimeUnit.convert(inputTime[i], inputTimeUnit);
-    }
-
+    converter.convert(inputTime, inputTimeUnit, length, _output);
     return (T) _output;
   }
 
@@ -82,7 +80,7 @@ public class TimeConversionTransform implements TransformFunction {
     try {
       return TimeUnit.valueOf(timeUnitName);
     } catch (IllegalArgumentException e) {
-      throw new BadQueryRequestException("Illegal time unit specified for timeConvert UDF: '" + timeUnitName
+      throw new BadQueryRequestException("Illegal input time unit specified for timeConvert UDF: '" + timeUnitName
           + "', only values defined in java.util.concurrent.TimeUnit supported currently.");
     }
   }
