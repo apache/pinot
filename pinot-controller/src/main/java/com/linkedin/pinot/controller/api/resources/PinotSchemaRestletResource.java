@@ -88,6 +88,9 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName) {
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
+    if (schema == null) {
+      throw new WebApplicationException("Schema not found", Response.Status.NOT_FOUND);
+    }
     return schema;
   }
 
