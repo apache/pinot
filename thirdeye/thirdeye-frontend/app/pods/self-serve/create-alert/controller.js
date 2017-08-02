@@ -28,7 +28,7 @@ export default Ember.Controller.extend({
   isReplayError: false,
   isMetricDataLoading: false,
   isReplayStatusPending: true,
-  isReplayTriggeredSuccess: false,
+  isReplaySuccess: false,
   metricGranularityOptions: [],
   originalDimensions: [],
   replayStatusClass: 'te-form__banner--pending',
@@ -52,8 +52,8 @@ export default Ember.Controller.extend({
     'selectedMetricOption',
     'selectedPattern',
     'alertFunctionName',
-    'selectedAppName',
-    'alertGroupNewRecipient'],
+    'selectedAppName'
+  ],
 
   /**
    * Options for patterns of interest field. These may eventually load from the backend.
@@ -282,23 +282,10 @@ export default Ember.Controller.extend({
    * @return {Ember.RSVP.Promise}
    */
   callReplayStart(clonedId, startTime, endTime) {
-    const url = `/detection-job/${clonedId}/replay?start=${startTime}&end=${endTime}&speedup=true`;
+    const granularity = this.get('graphConfig.granularity').toLowerCase();
+    const speedUp = granularity.includes('hour') || granularity.includes('day');
+    const url = `/detection-job/${clonedId}/replay?start=${startTime}&end=${endTime}&speedup=${speedUp}`;
     return fetch(url, { method: 'post' }).then(checkStatus);
-  },
-
- /**
-   * Sets the error message for any failed call and throws the error
-   * @method setErrorState
-   * @param {String} error - the error statusText set by our checkStatus helper
-   * @param {String} message - the appropriate error message
-   * @return {undefined}
-   */
-  setErrorState(error, message) {
-    this.setProperties({
-      isReplayError: true,
-      failureMessage: `${message}. (${error})`
-    });
-    throw error;
   },
 
   /**
@@ -314,18 +301,20 @@ export default Ember.Controller.extend({
 
     this.callCloneAlert(newFuncId)
       .then((clonedId) => {
-        this.set('isReplayTriggeredSuccess', true);
         return this.callReplayStart(clonedId, startTime, endTime);
       })
-      .catch((error) => {
-        this.setErrorState(error, 'Failed to clone new alert function');
-      })
       .then((jobId) => {
-        this.set('isReplayStatusPending', false);
-        this.set('replayStatusClass', 'te-form__banner--success');
+        this.setProperties({
+          isReplaySuccess: true,
+          isReplayStatusPending: false,
+          replayStatusClass: 'te-form__banner--success'
+        });
       })
       .catch((error) => {
-        this.setErrorState(error, 'Failed to trigger replay');
+        this.setProperties({
+          isReplayError: true,
+          failureMessage: `Failed to trigger replay. (${error})`
+        });
       });
   },
 
@@ -416,6 +405,7 @@ export default Ember.Controller.extend({
     function() {
       let isDisabled = false;
       const requiredFields = this.get('requiredFields');
+      const groupRecipients = this.get('selectedConfigGroup.recipients');
       // Any missing required field values?
       for (var field of requiredFields) {
         if (Ember.isBlank(this.get(field))) {
@@ -424,6 +414,10 @@ export default Ember.Controller.extend({
       }
       // Enable submit if either of these field values are present
       if (Ember.isBlank(this.get('selectedConfigGroup')) && Ember.isBlank(this.get('newConfigGroupName'))) {
+        isDisabled = true;
+      }
+      // For alert group email recipients, require presence only if group recipients is empty
+      if (Ember.isBlank(this.get('alertGroupNewRecipient')) && !groupRecipients) {
         isDisabled = true;
       }
       return isDisabled;
@@ -693,13 +687,13 @@ export default Ember.Controller.extend({
       let existingEmailArr = this.get('selectedGroupRecipients');
       let cleanEmailArr = [];
       let badEmailArr = [];
-      let isDuplicateErr = false;
+      let isDuplicateEmail = false;
 
       if (emailInput.trim() && existingEmailArr) {
         existingEmailArr = existingEmailArr.replace(/\s+/g, '').split(',');
         for (var email of newEmailArr) {
           if (existingEmailArr.includes(email)) {
-            isDuplicateErr = true;
+            isDuplicateEmail = true;
             badEmailArr.push(email);
           } else {
             cleanEmailArr.push(email);
@@ -707,7 +701,7 @@ export default Ember.Controller.extend({
         }
 
         this.setProperties({
-          isDuplicateEmail: isDuplicateErr,
+          isDuplicateEmail,
           duplicateEmails: badEmailArr.join()
         });
       }
@@ -736,7 +730,7 @@ export default Ember.Controller.extend({
         isCreateAlertSuccess: null,
         isCreateAlertError: false,
         isCreateGroupSuccess: false,
-        isReplayTriggeredSuccess: false,
+        isReplaySuccess: false,
         isReplayError: false,
         selectedFilters: JSON.stringify({}),
         replayStatusClass: 'te-form__banner--pending'

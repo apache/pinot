@@ -239,38 +239,38 @@
 
   {{#if isCreateAlertSuccess}}
     {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
-      <strong>Success!</strong> You have created anomaly alert Id <strong>{{finalFunctionId}}</strong>
+      <strong>Create Alert Success!</strong> You have created anomaly alert Id <strong>{{finalFunctionId}}</strong>
       {{#if selectedConfigGroup}}
         ... and assigned it to existing notification group <strong>{{selectedConfigGroup.name}}</strong>.
       {{/if}}
     {{/bs-alert}}
   {{/if}}
 
-  {{#if isCreateGroupSuccess}}
-    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
-      <strong>Success!</strong> You have created anomaly notification group <strong>{{newConfigGroupName}}</strong>.
-    {{/bs-alert}}
-  {{/if}}
-
   {{#if isCreateAlertError}}
     {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
-      <strong>Error!</strong> Alert creation has failed. Please try again.
+      <strong>Create Alert Error!</strong> Alert creation has failed. Please try again.
     {{/bs-alert}}
   {{/if}}
 
-  {{#if isReplayTriggeredSuccess}}
+  {{#if isCreateGroupSuccess}}
+    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+      <strong>New Group Success!</strong> You have created anomaly notification group <strong>{{newConfigGroupName}}</strong>.
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if isReplaySuccess}}
     {{#bs-alert type="success" class="te-form__banner" classNameBindings="replayStatusClass"}}
       {{#if isReplayStatusPending}}
         ...triggering replay. Please wait.
       {{else}}
-        <strong>Success!</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has started processing. We will notify <strong>{{alertGroupNewRecipient}}</strong> when the replay is complete.
+        <strong>Replay Success!</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has started processing. We will notify <strong>{{alertGroupNewRecipient}}</strong> when the replay is complete.
       {{/if}}
     {{/bs-alert}}
   {{/if}}
 
   {{#if isReplayError}}
     {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
-      <strong>Error:</strong> {{failureMessage}}
+      <strong>Replay Error:</strong> {{failureMessage}}
     {{/bs-alert}}
   {{/if}}
 
