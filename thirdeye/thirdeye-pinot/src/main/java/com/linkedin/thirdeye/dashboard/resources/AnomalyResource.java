@@ -331,15 +331,17 @@ public class AnomalyResource {
       break;
     case HOURS:
     default:
-      windowDelayTime = 2;
+      windowDelayTime = 0;
       windowDelayTimeUnit = TimeUnit.HOURS;
     }
     anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
     anomalyFunctionSpec.setWindowDelay(windowDelayTime);
 
     // setup detection frequency if it's minutely function
+    // the default frequency is determined by data granularity
+    // this frequency is a override to lower the system overload
     if (dataGranularity.getUnit().equals(TimeUnit.MINUTES)) {
-      TimeGranularity frequency = new TimeGranularity(30, TimeUnit.MINUTES);
+      TimeGranularity frequency = new TimeGranularity(15, TimeUnit.MINUTES);
       anomalyFunctionSpec.setFrequency(frequency);
     }
 
