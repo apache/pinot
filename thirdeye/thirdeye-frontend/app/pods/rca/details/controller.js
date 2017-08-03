@@ -3,6 +3,14 @@ import moment from 'moment';
 
 const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
+const isBetween = (date, start, end) => {
+  date = Number(date);
+  start = Number(start);
+  end = Number(end);
+
+  return moment(date).isBetween(start, end);
+};
+
 export default Ember.Controller.extend({
   queryParams: [
     'granularity',
@@ -117,27 +125,40 @@ export default Ember.Controller.extend({
   }),
 
   // converts startDate from unix ms to serverDateFormat
-  viewRegionStart: Ember.computed('startDate', {
-    get() {
-      const start = this.get('startDate');
+  viewRegionStart: Ember.computed(
+    'startDate',
+    'analysisStart',
+    'analysisEnd',
+    {
+      get() {
+        const start = this.get('startDate');
 
-      return start ? moment(+start).format(serverDateFormat) : moment().format(serverDateFormat);
-    },
-    set(key, value) {
-      if (!value || value === 'Invalid date') {
-        return this.get('startDate') || 0;
+        return start ? moment(+start).format(serverDateFormat) : moment().format(serverDateFormat);
+      },
+      set(key, value) {
+        if (!value || value === 'Invalid date') {
+          return this.get('startDate') || 0;
+        }
+
+        const start = moment(value).valueOf();
+        const analysisStart = this.get('analysisStart');
+
+        if (+start > analysisStart) {
+          this.set('analysisStart', undefined);
+          this.set('analysisEnd', undefined);
+        }
+
+        this.set('startDate', start);
+        return moment(value).format(serverDateFormat);
       }
-
-      const start = moment(value).valueOf();
-      this.set('startDate', start);
-
-      return moment(value).format(serverDateFormat);
     }
-  }),
+  ),
 
   // converts endDate from unix ms to serverDateFormat
   viewRegionEnd: Ember.computed(
     'endDate',
+    'analysisStart',
+    'analysisEnd',
     'model.maxTime',
     {
       get() {
@@ -150,13 +171,19 @@ export default Ember.Controller.extend({
 
         const maxTime = this.get('model.maxTime');
         const end = moment(value).valueOf();
-
         const newEnd = (+maxTime < +end) ? maxTime : end;
+        const analysisEnd = this.get('analysisEnd');
+
+        if (+newEnd < analysisEnd) {
+          this.set('analysisStart', undefined);
+          this.set('analysisEnd', undefined);
+        }
         this.set('endDate', newEnd);
 
         return moment(value).format(serverDateFormat);
       }
-    }),
+    }
+  ),
 
   // min date for the anomaly region
   minDate: Ember.computed('startDate', function() {

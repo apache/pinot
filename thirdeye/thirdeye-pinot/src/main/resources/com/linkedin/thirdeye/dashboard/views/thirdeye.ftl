@@ -177,7 +177,6 @@
               </div>
 
               <ul class="nav navbar-nav thirdeye-nav__tabs" id="main-tabs">
-                <li class="te-nav__link"><a href="#anomalies">Home</a></li>
                 <li class="te-nav__link"><a href="#anomalies">Anomalies</a></li>
                 <li class="hidden"><a href="#investigate">Investigate</a></li>
               </ul>

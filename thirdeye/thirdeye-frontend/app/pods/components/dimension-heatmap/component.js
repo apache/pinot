@@ -7,7 +7,7 @@ export default Ember.Component.extend({
   metricName: Ember.computed.alias('heatMapData.metrics.firstObject'),
   inverseMetric:Ember.computed.alias('heatMapData.inverseMetric'),
   classNames: ['dimension-heatmap'],
-  heatmapMode: 'Percentage Change',
+  heatmapMode: 'Change in Contribution',
 
   // Copy pasted code from all Thirdeye UI
   treeMapData: Ember.computed(
@@ -83,7 +83,7 @@ export default Ember.Component.extend({
       if (heatmapMode === 'Change in Contribution') {
         factor = dataRow.contributionChange;
       }
-      if (heatmapMode === 'Contribution To Overall Change') {
+      if (heatmapMode === 'Contribution to Overall Change') {
         factor = dataRow.contributionToOverallChange;
       }
       return factor;

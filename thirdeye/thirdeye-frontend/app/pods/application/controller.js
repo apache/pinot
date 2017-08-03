@@ -13,12 +13,6 @@ export default Ember.Controller.extend({
    */
   globalNavItems: [
     {
-      className: 'home',
-      link: '/thirdeye',
-      isCustomLink: true,
-      title: 'Home'
-    },
-    {
       className: 'anomalies',
       link: '/thirdeye#anomalies',
       isCustomLink: true,

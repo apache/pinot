@@ -2,7 +2,7 @@ import Ember from 'ember';
 
 export default Ember.Controller.extend({
   // default heatmap Mode
-  heatmapMode: 'Contribution to Overall Change',
+  heatmapMode: 'Change in Contribution',
   dateFormat: 'MMM D, YYYY hh:mm a',
   heatmapModes: [
     'Percentage Change',
