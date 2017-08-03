@@ -374,7 +374,7 @@ public class PinotTaskRestletResource extends BasePinotControllerRestletResource
   @HttpVerb("delete")
   @Summary("Delete a task queue")
   @Tags({"task"})
-  @Paths({"/tasks/taskqueue", "/tasks/taskqueue/"})
+  @Paths({"/tasks/taskqueue/{taskType}", "/tasks/taskqueue/{taskType}/"})
   private Representation deleteTaskQueue(
       @Parameter(name = "taskType", in = "path", description = "Task type", required = true) String taskType) {
     try {
