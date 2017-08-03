@@ -31,6 +31,7 @@ export default Ember.Controller.extend({
   isReplaySuccess: false,
   metricGranularityOptions: [],
   originalDimensions: [],
+  graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
 
   legendText: {
@@ -248,12 +249,14 @@ export default Ember.Controller.extend({
     });
 
     this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
+      console.log('fetched new graph data');
       this.set('isMetricDataLoading', false);
       if (!this.isMetricGraphable(metricData)) {
-        this.setProperties({
-          isMetricDataInvalid: true
-        });
+        console.log('metric has no data. not graphing');
+        this.clearAll();
+        this.set('isMetricDataInvalid', true);
       } else {
+        console.log('metric has data. now sending new data to graph');
         this.setProperties({
           isMetricSelected: true,
           selectedMetric: metricData
@@ -529,6 +532,56 @@ export default Ember.Controller.extend({
   ),
 
   /**
+   * Preps a mailto link containing the currently selected metric name
+   * @method graphMailtoLink
+   * @return {String} the URI-encoded mailto link
+   */
+  graphMailtoLink: Ember.computed(
+    'selectedMetricOption',
+    function() {
+      const selectedMetric = this.get('selectedMetricOption');
+      const fullMetricName = `${selectedMetric.dataset}::${selectedMetric.name}`;
+      const recipient = 'ask_thirdeye@linkedin.com';
+      const subject = 'TE Self-Serve Create Alert Metric Issue';
+      const body = `TE Team, please look into a possible inconsistency issue with [ ${fullMetricName} ]`;
+      const mailtoString = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      return mailtoString;
+    }
+  ),
+
+  /**
+   * Reset the form... clear all important fields
+   * @method clearAll
+   * @return {undefined}
+   */
+  clearAll() {
+    this.setProperties({
+      isFormDisabled: false,
+      isMetricSelected: false,
+      isMetricDataInvalid: false,
+      selectedMetricOption: null,
+      selectedPattern: null,
+      selectedGranularity: null,
+      selectedDimension: null,
+      alertFunctionName: null,
+      selectedAppName: null,
+      selectedConfigGroup: null,
+      newConfigGroupName: null,
+      alertGroupNewRecipient: null,
+      selectedGroupRecipients: null,
+      isCreateAlertSuccess: null,
+      isCreateAlertError: false,
+      isCreateGroupSuccess: false,
+      isReplaySuccess: false,
+      isReplayError: false,
+      graphEmailLinkProps: '',
+      selectedFilters: JSON.stringify({}),
+      replayStatusClass: 'te-form__banner--pending'
+    });
+    this.send('refreshModel');
+  },
+
+  /**
    * Actions for create alert form view
    */
   actions: {
@@ -542,7 +595,10 @@ export default Ember.Controller.extend({
     onSelectMetric(selectedObj) {
       this.setProperties({
         isMetricDataLoading: true,
-        selectedMetricOption: selectedObj
+        selectedMetricOption: selectedObj,
+        selectedFilters: JSON.stringify({}),
+        selectedPattern: null,
+        selectedDimension: null
       });
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {
@@ -712,30 +768,8 @@ export default Ember.Controller.extend({
      * @method clearAll
      * @return {undefined}
      */
-    clearAll() {
-      this.setProperties({
-        isFormDisabled: false,
-        isMetricSelected: false,
-        isMetricDataInvalid: false,
-        selectedMetricOption: null,
-        selectedPattern: null,
-        selectedGranularity: null,
-        selectedDimension: null,
-        alertFunctionName: null,
-        selectedAppName: null,
-        selectedConfigGroup: null,
-        newConfigGroupName: null,
-        alertGroupNewRecipient: null,
-        selectedGroupRecipients: null,
-        isCreateAlertSuccess: null,
-        isCreateAlertError: false,
-        isCreateGroupSuccess: false,
-        isReplaySuccess: false,
-        isReplayError: false,
-        selectedFilters: JSON.stringify({}),
-        replayStatusClass: 'te-form__banner--pending'
-      });
-      this.send('refreshModel');
+    onResetForm() {
+      this.clearAll();
     },
 
     /**

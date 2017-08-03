@@ -103,6 +103,14 @@ body {
 }
 
 .te-form {
+  &__section {
+    margin-top: 10px;
+
+    &--first {
+      margin-top: 0;
+    }
+  }
+
   &__section-submit {
     margin: $te-default-element-spacing 0 15px 0;
     padding-top: $te-default-element-spacing;
@@ -134,6 +142,7 @@ body {
   &__alert {
     &--warning {
       display: inline-block;
+      vertical-align: text-bottom;
       margin-left: 5px;
       padding: 1px 7px;
       border-radius: 3px;
@@ -174,6 +183,10 @@ body {
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 5px;
+  }
+
+  &__note {
+    padding: 5px;
   }
 }
 
