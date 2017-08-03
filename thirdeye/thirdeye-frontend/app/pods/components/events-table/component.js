@@ -40,8 +40,8 @@ export default Ember.Component.extend({
       if (!(start && end)) { return events; }
 
       return events.filter((event) => {
-        return (event.end && ((event.end > start) && (event.end < end)))
-          || ((event.start < end) && (event.start > start));
+        return (!event.displayEnd || (event.displayEnd > start))
+          && (!event.displayStart || (event.displayStart < end));
       });
     }
   ),
