@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,14 +33,20 @@ public class EntityMappingPipeline extends Pipeline {
   public static final String PROP_MAPPING_TYPE = "mappingType";
   public static final String PROP_IS_REWRITER = "isRewriter";
   public static final String PROP_MATCH_PREFIX = "matchPrefix";
+  public static final String PROP_IS_COLLECTOR = "isCollector";
+  public static final String PROP_ITERATIONS = "iterations";
 
-  public static final String PROP_IS_REWRITER_DEFAULT = "false";
-  public static final String PROP_MATCH_PREFIX_DEFAULT = "false";
+  public static final boolean PROP_IS_REWRITER_DEFAULT = false;
+  public static final boolean PROP_MATCH_PREFIX_DEFAULT = false;
+  public static final boolean PROP_IS_COLLECTOR_DEFAULT = false;
+  public static final int PROP_ITERATIONS_DEFAULT = 1;
 
   private final EntityToEntityMappingManager entityDAO;
   private final String mappingType;
   private final boolean isRewriter;
   private final boolean matchPrefix;
+  private final boolean isCollector;
+  private final int iterations;
 
   /**
    * Constructor for dependency injection
@@ -50,13 +57,17 @@ public class EntityMappingPipeline extends Pipeline {
    * @param mappingType entity mapping type
    * @param isRewriter enable rewriter mode (pass-through for entities without mapping)
    * @param matchPrefix match on URN prefix rather than entire URN
+   * @param isCollector emit iterated entities in output (does not include input entities)
+   * @param iterations number of iterations of transitive hull expansion
    */
-  public EntityMappingPipeline(String outputName, Set<String> inputNames, EntityToEntityMappingManager entityDAO, String mappingType, boolean isRewriter, boolean matchPrefix) {
+  public EntityMappingPipeline(String outputName, Set<String> inputNames, EntityToEntityMappingManager entityDAO, String mappingType, boolean isRewriter, boolean matchPrefix, boolean isCollector, int iterations) {
     super(outputName, inputNames);
     this.entityDAO = entityDAO;
     this.mappingType = mappingType;
     this.isRewriter = isRewriter;
     this.matchPrefix = matchPrefix;
+    this.isCollector = isCollector;
+    this.iterations = iterations;
   }
 
   /**
@@ -64,7 +75,7 @@ public class EntityMappingPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param properties configuration properties ({@code PROP_MAPPING_TYPE}, {@code PROP_IS_REWRITER=false}, {@code PROP_MATCH_PREFIX=false})
+   * @param properties configuration properties ({@code PROP_MAPPING_TYPE}, {@code PROP_IS_REWRITER=false}, {@code PROP_MATCH_PREFIX=false}, {@code PROP_IS_COLLECTOR=false}, {@code PROP_ITERATIONS=1})
    */
   public EntityMappingPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) throws IOException {
     super(outputName, inputNames);
@@ -73,18 +84,12 @@ public class EntityMappingPipeline extends Pipeline {
       throw new IllegalArgumentException(String.format("Property '%s' required, but not found", PROP_MAPPING_TYPE));
     String mappingTypeProp = properties.get(PROP_MAPPING_TYPE).toString();
 
-    String isRewriterProp = String.valueOf(PROP_IS_REWRITER_DEFAULT);
-    if(properties.containsKey(PROP_IS_REWRITER))
-      isRewriterProp = properties.get(PROP_IS_REWRITER).toString();
-
-    String matchPrefixProp = String.valueOf(PROP_MATCH_PREFIX_DEFAULT);
-    if(properties.containsKey(PROP_MATCH_PREFIX))
-      matchPrefixProp = properties.get(PROP_MATCH_PREFIX).toString();
-
     this.entityDAO = DAORegistry.getInstance().getEntityToEntityMappingDAO();
     this.mappingType = mappingTypeProp;
-    this.isRewriter = Boolean.parseBoolean(isRewriterProp);
-    this.matchPrefix = Boolean.parseBoolean(matchPrefixProp);
+    this.isRewriter = MapUtils.getBoolean(properties, PROP_IS_REWRITER, PROP_IS_REWRITER_DEFAULT);
+    this.matchPrefix = MapUtils.getBoolean(properties, PROP_MATCH_PREFIX, PROP_MATCH_PREFIX_DEFAULT);
+    this.isCollector = MapUtils.getBoolean(properties, PROP_IS_COLLECTOR, PROP_IS_COLLECTOR_DEFAULT);
+    this.iterations = MapUtils.getInteger(properties, PROP_ITERATIONS, PROP_ITERATIONS_DEFAULT);
   }
 
   @Override
@@ -93,6 +98,35 @@ public class EntityMappingPipeline extends Pipeline {
 
     Map<String, Set<EntityToEntityMappingDTO>> mappings = toMap(this.entityDAO.findByMappingType(this.mappingType));
 
+    // perform entity urn mapping
+    final int inputSize = entities.size();
+    entities = mapEntities(entities, mappings);
+    LOG.info("Mapped {} entities to {} entities in iteration {}", inputSize, entities.size(), 1);
+
+    for(int i=1; i<this.iterations; i++) {
+      Set<Entity> result = mapEntities(entities, mappings);
+
+      final int originalSize = entities.size();
+      if(this.isCollector) {
+        entities.addAll(result);
+      } else {
+        entities = result;
+      }
+
+      LOG.info("Mapped {} entities to {} entities in iteration {}", originalSize, entities.size(), i + 1);
+    }
+
+    // consolidate entity scores, use max
+    Map<String, Entity> best = new HashMap<>();
+    for(Entity e : entities) {
+      if(!best.containsKey(e.getUrn()) || best.get(e.getUrn()).getScore() < e.getScore())
+        best.put(e.getUrn(), e);
+    }
+
+    return new PipelineResult(context, new HashSet<>(best.values()));
+  }
+
+  private Set<Entity> mapEntities(Set<Entity> entities, Map<String, Set<EntityToEntityMappingDTO>> mappings) {
     Set<Entity> output = new HashSet<>();
     for(Entity entity : entities) {
       try {
@@ -111,8 +145,7 @@ public class EntityMappingPipeline extends Pipeline {
         LOG.warn("Exception while mapping entity '{}'. Skipping.", entity.getUrn(), ex);
       }
     }
-
-    return new PipelineResult(context, output);
+    return output;
   }
 
   private Set<Entity> replace(Entity entity, Map<String, Set<EntityToEntityMappingDTO>> mappings) {
