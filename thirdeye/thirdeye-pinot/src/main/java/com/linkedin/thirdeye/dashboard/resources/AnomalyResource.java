@@ -280,7 +280,7 @@ public class AnomalyResource {
       @QueryParam("type") String type,
       @NotNull @QueryParam("windowSize") String windowSize,
       @NotNull @QueryParam("windowUnit") String windowUnit,
-      @QueryParam("windowDelay") String windowDelay,
+      @QueryParam("windowDelay") @DefaultValue("0") String windowDelay,
       @QueryParam("cron") String cron,
       @QueryParam("windowDelayUnit") String windowDelayUnit,
       @QueryParam("exploreDimension") String exploreDimensions,
@@ -317,29 +317,29 @@ public class AnomalyResource {
     // Setting window delay time / unit
     TimeUnit dataGranularityUnit = dataGranularity.getUnit();
 
-    // default window delay time = 10 hours
-    int windowDelayTime;
+    // default windowDelay = 0, can be adjusted to cope with expected delay for given dataset/metric
+    int windowDelayTime = Integer.valueOf(windowDelay);
     TimeUnit windowDelayTimeUnit;
     switch (dataGranularityUnit) {
     case MINUTES:
-      windowDelayTime = 0;
       windowDelayTimeUnit = TimeUnit.MINUTES;
       break;
     case DAYS:
-      windowDelayTime = 0;
       windowDelayTimeUnit = TimeUnit.DAYS;
       break;
     case HOURS:
     default:
-      windowDelayTime = 2;
       windowDelayTimeUnit = TimeUnit.HOURS;
     }
     anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
     anomalyFunctionSpec.setWindowDelay(windowDelayTime);
 
     // setup detection frequency if it's minutely function
+    // the default frequency in AnomalyDetectionFunctionBean is 1 hour
+    // when detection job is scheduled, the frequency may also be modified by data granularity
+    // this frequency is a override to allow longer time period (lower frequency) and reduce system load
     if (dataGranularity.getUnit().equals(TimeUnit.MINUTES)) {
-      TimeGranularity frequency = new TimeGranularity(30, TimeUnit.MINUTES);
+      TimeGranularity frequency = new TimeGranularity(15, TimeUnit.MINUTES);
       anomalyFunctionSpec.setFrequency(frequency);
     }
 
