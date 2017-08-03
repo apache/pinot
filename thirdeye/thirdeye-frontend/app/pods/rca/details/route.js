@@ -102,7 +102,7 @@ export default Ember.Route.extend({
 
     const params = {
       startDate: startDate || start.valueOf(),
-      endDate: newEndDate,
+      endDate: newEndDate.valueOf(),
       granularity: granularity,
       filters,
       id: model.id,
@@ -153,7 +153,6 @@ export default Ember.Route.extend({
       subchartEnd,
       subchartStart
     } = model;
-
 
     // other dates if analysisStart and analysisEnd exists
     controller.setProperties({
