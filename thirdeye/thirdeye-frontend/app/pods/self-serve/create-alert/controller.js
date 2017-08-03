@@ -249,14 +249,13 @@ export default Ember.Controller.extend({
     });
 
     this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
-      console.log('fetched new graph data');
       this.set('isMetricDataLoading', false);
       if (!this.isMetricGraphable(metricData)) {
-        console.log('metric has no data. not graphing');
+        // Metric has no data. not graphing
         this.clearAll();
         this.set('isMetricDataInvalid', true);
       } else {
-        console.log('metric has data. now sending new data to graph');
+        // Metric has data. now sending new data to graph
         this.setProperties({
           isMetricSelected: true,
           selectedMetric: metricData
