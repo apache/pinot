@@ -112,25 +112,22 @@ function fetchRelatedMetricIds() {
 
     let {
       primaryMetricId: metricId,
-      currentStart: startDate,
-      currentEnd: endDate
+      currentStart: analysisStart,
+      currentEnd: analysisEnd,
+      regionStart: anomalyStart,
+      regionEnd: anomalyEnd
     } = metrics;
 
     const {
-      compareMode
+      compareMode,
     } = primaryMetric;
 
-    // TODO use actual anomaly period only
-    const anomalyEnd = endDate || moment().subtract(1, 'day').endOf('day').valueOf();
-    const anomalyStart = startDate || moment(endDate).subtract(1, 'week').valueOf();
+    // const analysisEnd = currentEnd || moment().subtract(1, 'day').endOf('day').valueOf();
+    // const analysisStart = currentStart || moment(analysisEnd).subtract(1, 'week').valueOf();
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
     const baselineStart = moment(anomalyStart).subtract(offset, 'week').valueOf();
     const baselineEnd = moment(anomalyEnd).subtract(offset, 'week').valueOf();
-
-    // TODO use currentStart/currentEnd when anomaly period separated
-    const analysisStart = anomalyStart;
-    const analysisEnd = anomalyEnd;
 
     if (!metricId) {
       return Promise.reject(new Error("Must provide a metricId"));

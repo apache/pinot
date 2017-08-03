@@ -84,7 +84,7 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
     case ActionTypes.LOAD_IDS: {
       const relatedMetrics = action.payload;
       const relatedMetricIds = relatedMetrics
-        .sort((prev, next) => next.score > prev.score)
+        .sortBy('score').reverse()
         .map((metric) => Number(metric.urn.split('thirdeye:metric:').pop()));
 
       return Object.assign({}, state,  {
