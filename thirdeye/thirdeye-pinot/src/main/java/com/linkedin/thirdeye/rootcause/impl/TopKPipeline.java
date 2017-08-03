@@ -64,9 +64,6 @@ public class TopKPipeline extends Pipeline {
 
   @Override
   public PipelineResult run(PipelineContext context) {
-    List<Entity> entities = new ArrayList<>(context.filter(this.clazz));
-    Collections.sort(entities, Entity.HIGHEST_SCORE_FIRST);
-
-    return new PipelineResult(context, new HashSet<>(entities.subList(0, Math.min(entities.size(), this.k))));
+   return new PipelineResult(context, EntityUtils.topk(context.filter(this.clazz), this.k));
   }
 }

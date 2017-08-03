@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import ch.qos.logback.classic.Level;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -47,16 +48,18 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final String PRE_CURRENT = "current:";
   private static final String PRE_BASELINE = "baseline:";
 
+  private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
   private static final String COL_CURRENT = "current";
   private static final String COL_BASELINE = "baseline";
-  private static final String COL_REL_DIFF = "rel_diff";
+  private static final String COL_CHANGE = "change";
   private static final String COL_TARGET = "target";
   private static final String COL_CANDIDATE = "candidate";
 
   private static final String STRATEGY_CORRELATION = "correlation";
   private static final String STRATEGY_EUCLIDEAN = "euclidean";
   private static final String STRATEGY_STATIC = "static";
+  private static final String STRATEGY_CANDIDATE_MEAN = "candidate_mean";
 
   private final QueryCache cache;
   private final MetricConfigManager metricDAO;
@@ -128,7 +131,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     allMetrics.addAll(targetMetrics);
 
     // generate requests
-    List<DataFrameUtils.RequestContainer> requestList = new ArrayList<>();
+    List<DataFrameUtils.TimeSeriesRequestContainer> requestList = new ArrayList<>();
     requestList.addAll(makeRequests(targetMetrics, anomalyRange, PRE_CURRENT));
     requestList.addAll(makeRequests(candidateMetrics, anomalyRange, PRE_CURRENT));
     requestList.addAll(makeRequests(targetMetrics, baselineRange, PRE_BASELINE));
@@ -136,15 +139,15 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     LOG.info("Requesting {} time series", requestList.size());
 
-    Map<String, DataFrameUtils.RequestContainer> requests = new HashMap<>();
-    for(DataFrameUtils.RequestContainer rc : requestList) {
+    Map<String, DataFrameUtils.TimeSeriesRequestContainer> requests = new HashMap<>();
+    for(DataFrameUtils.TimeSeriesRequestContainer rc : requestList) {
       requests.put(rc.getRequest().getRequestReference(), rc);
     }
 
     // fetch responses and calculate derived metrics
     Map<String, DataFrame> responses = new HashMap<>();
     List<ThirdEyeRequest> thirdeyeRequests = new ArrayList<>();
-    for(DataFrameUtils.RequestContainer rc : requestList) {
+    for(DataFrameUtils.TimeSeriesRequestContainer rc : requestList) {
       thirdeyeRequests.add(rc.getRequest());
     }
 
@@ -168,8 +171,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
       String id = response.getRequest().getRequestReference();
       DataFrame df;
       try {
-        df = DataFrameUtils.parseResponse(response);
-        DataFrameUtils.evaluateExpressions(df, requests.get(id).getExpressions());
+        df = DataFrameUtils.evaluateResponse(response, requests.get(id));
       } catch (Exception e) {
         LOG.warn("Could not parse response for '{}'. Skipping.", id, e);
         continue;
@@ -184,6 +186,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     }
 
     // determine current-baseline changes
+    final long timeRangeDiff = anomalyRange.getStart() - baselineRange.getStart();
+
     Map<MetricEntity, DataFrame> pctChanges = new HashMap<>();
     for(MetricEntity entity : allMetrics) {
       String currentId = makeIdentifier(entity.getUrn(), PRE_CURRENT);
@@ -202,14 +206,17 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
       LOG.info("Preparing data for metric '{}'", entity.getUrn());
       DataFrame current = new DataFrame(responses.get(currentId)).renameSeries(COL_VALUE, COL_CURRENT);
       DataFrame baseline = new DataFrame(responses.get(baselineId)).renameSeries(COL_VALUE, COL_BASELINE);
+
+      baseline.addSeries(COL_TIME, baseline.getLongs(COL_TIME).add(timeRangeDiff));
+
       DataFrame joined = current.joinInner(baseline);
 
       joined.mapInPlace(new Series.DoubleFunction() {
         @Override
         public double apply(double... values) {
-          return (values[0] - values[1]) / values[1];
+          return values[0] / values[1] - 1;
         }
-      }, COL_REL_DIFF, COL_CURRENT, COL_BASELINE);
+      }, COL_CHANGE, COL_CURRENT, COL_BASELINE);
       joined.dropSeries(COL_CURRENT);
       joined.dropSeries(COL_BASELINE);
 
@@ -220,6 +227,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     Map<MetricEntity, Double> scores = new HashMap<>();
     Multimap<MetricEntity, MetricEntity> related = ArrayListMultimap.create();
 
+    LOG.info("Using scoring strategy '{}'", this.strategy.getClass().getSimpleName());
     for(MetricEntity targetMetric : targetMetrics) {
       if(!pctChanges.containsKey(targetMetric)) {
         LOG.warn("No diff data for target metric '{}'. Skipping.", targetMetric.getUrn());
@@ -227,7 +235,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
       }
 
       DataFrame changesTarget = new DataFrame(pctChanges.get(targetMetric))
-          .renameSeries(COL_REL_DIFF, COL_TARGET);
+          .renameSeries(COL_CHANGE, COL_TARGET);
 
       for(MetricEntity candidateMetric : candidateMetrics) {
         if(!pctChanges.containsKey(candidateMetric)) {
@@ -235,9 +243,9 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
           continue;
         }
 
-        LOG.info("Calculating correlation for metric '{}'", candidateMetric.getUrn());
+        LOG.info("Calculating score for metric '{}'", candidateMetric.getUrn());
         DataFrame changesCandidate = new DataFrame(pctChanges.get(candidateMetric))
-            .renameSeries(COL_REL_DIFF, COL_CANDIDATE);
+            .renameSeries(COL_CHANGE, COL_CANDIDATE);
 
         DataFrame joined = changesTarget.joinInner(changesCandidate);
 
@@ -280,8 +288,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     }
   }
 
-  private List<DataFrameUtils.RequestContainer> makeRequests(Collection<MetricEntity> metrics, TimeRangeEntity timerange, String prefix) {
-    List<DataFrameUtils.RequestContainer> requests = new ArrayList<>();
+  private List<DataFrameUtils.TimeSeriesRequestContainer> makeRequests(Collection<MetricEntity> metrics, TimeRangeEntity timerange, String prefix) {
+    List<DataFrameUtils.TimeSeriesRequestContainer> requests = new ArrayList<>();
     for(MetricEntity e : metrics) {
       String id = makeIdentifier(e.getUrn(), prefix);
       try {
@@ -320,6 +328,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         return new EuclideanStrategy();
       case STRATEGY_STATIC:
         return new StaticStrategy();
+      case STRATEGY_CANDIDATE_MEAN:
+        return new CandidateMeanChangeStrategy();
       default:
         throw new IllegalArgumentException(String.format("Unknown strategy '%s'", strategy));
     }
@@ -345,10 +355,17 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     }
   }
 
-  private static class StaticStrategy implements  ScoringStrategy {
+  private static class StaticStrategy implements ScoringStrategy {
     @Override
     public double score(DoubleSeries target, DoubleSeries candidate) {
       return 1.0;
+    }
+  }
+
+  private static class CandidateMeanChangeStrategy implements ScoringStrategy {
+    @Override
+    public double score(DoubleSeries target, DoubleSeries candidate) {
+      return candidate.mean().abs().doubleValue();
     }
   }
 }
