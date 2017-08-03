@@ -65,6 +65,7 @@ export default Ember.Component.extend({
     },
     {
       propertyName: 'label',
+      template: 'custom/eventLabel',
       title: 'Event Name',
       className: 'events-table__column'
     },
@@ -88,7 +89,7 @@ export default Ember.Component.extend({
       className: 'events-table__column--compact',
       sortedBy: 'duration',
       disableFiltering: true
-    },
+    }
     // {
     //   propertyName: 'score',
     //   title: 'Score',
