@@ -91,6 +91,7 @@ public class Utils {
         String dimensionValue = row.get(dimension);
         values.add(dimensionValue);
       }
+      Collections.sort(values);
       result.put(dimension, values);
     }
     return result;
