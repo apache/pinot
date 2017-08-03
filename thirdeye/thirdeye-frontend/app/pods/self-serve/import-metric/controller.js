@@ -205,17 +205,17 @@ export default Ember.Controller.extend({
      */
     clearAll() {
       this.setProperties({
-       isCustomDashFieldDisabled: false,
-       isImportSuccess: false,
-       isImportError: false,
-       isDashboardExistError: false,
-       isSubmitDone: false,
-       importExistingDashboardName: '',
-       importCustomNewDataset: '',
-       importCustomNewMetric: '',
-       importCustomNewRrd: '',
-       importCustomConsolidate: 'Average',
-       datasetName: '',
+        isCustomDashFieldDisabled: false,
+        isImportSuccess: false,
+        isImportError: false,
+        isDashboardExistError: false,
+        isSubmitDone: false,
+        importExistingDashboardName: '',
+        importCustomNewDataset: '',
+        importCustomNewMetric: '',
+        importCustomNewRrd: '',
+        importCustomConsolidate: 'Average',
+        datasetName: ''
       });
     },
 

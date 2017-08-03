@@ -165,7 +165,7 @@ export default Ember.Component.extend({
 
         element.append('text')
           .attr('x', 35)
-          .attr('y', 10)
+          .attr('y', 12)
           .html(id => id);
 
         element.append('line')
@@ -198,7 +198,8 @@ export default Ember.Component.extend({
 
     Ember.run.later(() => {
       this.buildSliderButton();
-      this.buildAnomalyRegionSlider();
+      // hiding this feature until fully fleshed out
+      // this.buildAnomalyRegionSlider();
       this.buildCustomLegend();
     });
 
@@ -492,7 +493,8 @@ export default Ember.Component.extend({
 
       onSubchartBrush && onSubchartBrush(dates);
     }
-    this.buildAnomalyRegionSlider(start, end);
+    // hiding this feature until fully fleshed out
+    // this.buildAnomalyRegionSlider(start, end);
 
   },
 
@@ -672,7 +674,7 @@ export default Ember.Component.extend({
   }),
 
   /**
-   * Data massages the anomaly region
+   * Data massages the main anomaly region
    */
   anomalyRegion: Ember.computed(
     'analysisStart',
@@ -685,8 +687,8 @@ export default Ember.Component.extend({
 
       const region = {
         axis: 'x',
-        start,
-        end,
+        start: Number(start),
+        end: Number(end),
         tick: {
           format: '%m %d %Y'
         },

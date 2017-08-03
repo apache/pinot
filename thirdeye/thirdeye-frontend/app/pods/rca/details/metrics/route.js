@@ -10,6 +10,7 @@ export default Ember.Route.extend({
     const redux = this.get('redux');
     if (!metricId) { return; }
 
+
     const defaultQueryParams = {
       startDate: moment().subtract(1, 'day').endOf('day'),
       endDate: moment().subtract(1, 'week').endOf('day'),
@@ -47,6 +48,7 @@ export default Ember.Route.extend({
         analysisStart: start,
         analysisEnd: end
       } = changedParams;
+
       const params = Object.keys(changedParams || {});
 
       if (params.length && (start || end)) {

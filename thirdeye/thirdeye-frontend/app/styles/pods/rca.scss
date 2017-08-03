@@ -19,6 +19,10 @@
   color: lighten(black, 25%);
 }
 
+.te-range-picker .form-control {
+  height: 30px;
+}
+
 .paper-container {
   background-color: white;
   border: 1px solid rgba(0, 0, 0, 0.15);

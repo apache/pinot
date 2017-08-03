@@ -5,6 +5,23 @@
       <section class="rca-summary">
         <div class="row">
           <div class="col-xs-4">
+            <label class="te-label" for="select-anomaly-region">Investigation Period: </label>
+            {{date-range-picker
+              class="te-range-picker"
+              timePicker=showTimePicker
+              timePicker24Hour=true
+              timePickerIncrement=timePickerIncrement
+              minDate=minDate
+              maxDate=maxDate 
+              start=anomalyRegionStart
+              end=anomalyRegionEnd
+              ranges=predefinedRanges
+              showCustomRangeLabel=false
+              format=uiDateFormat
+              serverFormat="YYYY-MM-DD HH:mm"
+            }}
+          </div>
+          <div class="col-xs-4">
             <label class="te-label" for="select-granularity">Granularity: </label>
             {{#power-select
               selected=uiGranularity
@@ -31,37 +48,36 @@
             {{/power-select}}
           </div>
 
+        </div>
+        <div class="row">
+
           <div class="col-xs-4">
-            <label class="te-label" for="select-anomaly-region">Analysis Region: </label>
+            <label class="te-label" for="select-view-region">Display Period: </label>
             {{date-range-picker
-              timePicker=true
+              class="te-range-picker"
+              timePicker=showTimePicker
               timePicker24Hour=true
-              timePickerIncrement=5
-              minDate=minDate
-              maxDate=maxDate 
-              start=anomalyRegionStart
-              end=anomalyRegionEnd
+              timePickerIncrement=timePickerIncrement
+              maxDate=maxTime 
+              start=viewRegionStart
+              end=viewRegionEnd
               ranges=predefinedRanges
-              showCustomRangeLabel=true
-              format='MMM D, YYYY hh:mm a'
+              showCustomRangeLabel=false
+              format=uiDateFormat
               serverFormat="YYYY-MM-DD HH:mm"
-              applyAction=(action "onRegionChange")  
             }}
-              {{!-- hideAction=(action "hideDatePicker")
-              cancelAction=(action "cancelDatePicker") --}}
-              {{!-- start=analysisStart
-              end=analysisEnd --}}
           </div>
+          <div class="form-group col-xs-8">
+            <label class="te-label" for="select-filters">Filters: </label>
+            {{filter-select
+              options=metricFilters
+              selected=filters
+              triggerId="select-filter"
+            }}
+          </div>
+
         </div>
 
-        <div class="form-group">
-          <label class="te-label" for="select-filters">Filters: </label>
-          {{filter-select
-            options=metricFilters
-            selected=filters
-            triggerId="select-filter"
-          }}
-        </div>
         <main class="paper-container">
           {{#containers/primary-metric-container as |summary actions|}}
             {{#if summary.loading}}
@@ -90,12 +106,11 @@
                 selectedDimensions=summary.selectedDimensions
                 events=summary.selectedEvents
                 onSubchartChange=(action "setDateParams") 
-                regionStart=analysisStart
-                regionEnd=analysisEnd
+                analysisStart=analysisStart
+                analysisEnd=analysisEnd
                 subchartStart=subchartStart
                 subchartEnd=subchartEnd
               }}
-                {{!-- analysisDate=(hash analysisStart=analysisStart analysisEnd=analysisEnd) --}}
             {{/if}}
           {{/containers/primary-metric-container}}
         </main>

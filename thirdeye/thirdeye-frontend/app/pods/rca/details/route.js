@@ -33,7 +33,7 @@ export default Ember.Route.extend({
     const redux = this.get('redux');
 
     if (transition.targetName === 'rca.details.index') {
-      this.replaceWith('rca.details.events');
+      this.replaceWith('rca.details.dimensions');
     }
 
     return redux.dispatch(Actions.reset())
@@ -69,25 +69,48 @@ export default Ember.Route.extend({
       compareMode = 'WoW'
     } = transition.queryParams;
 
+    const newEndDate = maxTime.isValid() && maxTime.isBefore(moment(+endDate))
+        ? maxTime
+        : moment(+endDate);
 
     if (granularity === 'DAYS') {
-      start = moment().subtract(29, 'days').startOf('day');
+      start = newEndDate.clone().subtract(29, 'days').startOf('day');
+    } else if (granularity === 'HOURS') {
+      start = newEndDate.clone().subtract(1, 'week').startOf('day');
     } else {
-      start = moment().subtract(24, 'hours').startOf('hour');
+      start = newEndDate.clone().subtract(24, 'hours').startOf('hour');
+    }
+    const momentEndDate = moment(+newEndDate);
+    let initStart = 0;
+    let initEnd = 0;
+    let subchartStart = 0;
+    let subchartEnd = momentEndDate.clone();
+
+    if (granularity === 'DAYS') {
+      initEnd = momentEndDate.clone().startOf('day');
+      initStart = initEnd.clone().subtract('1', 'day');
+      subchartStart = subchartEnd.clone().subtract(1, 'week').startOf('day');
+    } else if (granularity === 'HOURS') {
+      initEnd = momentEndDate.clone().startOf('hour');
+      initStart = initEnd.clone().subtract('1', 'hour');
+      subchartStart = subchartEnd.clone().subtract(1, 'day').startOf('day');
+    } else {
+      initEnd =  momentEndDate.clone().startOf('hour');
+      initStart = initEnd.clone().subtract('1', 'hour');
+      subchartStart = subchartEnd.clone().subtract(3, 'hours').startOf('hour');
     }
 
-
     const params = {
-      startDate: startDate || start,
-      endDate: maxTime.isValid() ? maxTime.valueOf() : endDate,
+      startDate: startDate || start.valueOf(),
+      endDate: newEndDate,
       granularity: granularity,
       filters,
       id: model.id,
-      analysisStart,
-      analysisEnd,
-      graphStart: analysisStart,
-      graphEnd: analysisEnd,
-      compareMode
+      analysisStart: analysisStart || initStart.valueOf(),
+      analysisEnd: analysisEnd || initEnd.valueOf(),
+      compareMode,
+      subchartStart: subchartStart.valueOf(),
+      subchartEnd: subchartEnd.valueOf()
     };
 
     Object.assign(model, params);
@@ -95,8 +118,25 @@ export default Ember.Route.extend({
     redux.dispatch(Actions.setPrimaryMetric(params))
       .then((res) => redux.dispatch(Actions.fetchRegions(res)))
       .then((res) => redux.dispatch(Actions.fetchRelatedMetricData(res)));
-/*  */
+
     return {};
+  },
+
+  resetController(controller, isExiting, transition) {
+    this._super(...arguments);
+
+    if (isExiting) {
+      controller.setProperties({
+        model: null,
+        filters: {},
+        analysisStart: undefined,
+        analysisEnd: undefined,
+        granularity: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        compareMode: 'WoW'
+      });
+    }
   },
 
   setupController(controller, model) {
@@ -109,22 +149,24 @@ export default Ember.Route.extend({
       filters,
       analysisStart,
       analysisEnd,
-      compareMode
+      compareMode,
+      subchartEnd,
+      subchartStart
     } = model;
 
-    let diff = Math.floor((+endDate - startDate) / 4);
-    let initStart = analysisStart || (+startDate + diff);
-    let initEnd = analysisEnd || (+endDate - diff);
 
+    // other dates if analysisStart and analysisEnd exists
     controller.setProperties({
       model,
       filters,
-      analysisStart: initStart,
-      analysisEnd: initEnd,
+      analysisStart: analysisStart,
+      analysisEnd: analysisEnd,
       granularity,
       startDate,
       endDate,
-      compareMode
+      compareMode,
+      subchartEnd,
+      subchartStart
     });
   },
 
