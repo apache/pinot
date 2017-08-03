@@ -123,6 +123,23 @@ public class DataFrameUtils {
   }
 
   /**
+   * Returns the DataFrame with timestamps offset with by a start offset and an interval.
+   *
+   * @param df thirdeye response dataframe
+   * @param start start offset
+   * @param interval timestep multiple
+   * @return dataframe with modified timestamps
+   */
+  public static DataFrame offsetTimestamps(DataFrame df, final long start, final long interval) {
+    return df.mapInPlace(new Series.LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return (values[0] * interval) + start;
+      }
+    }, COL_TIME);
+  }
+
+  /**
    * Returns a Thirdeye response parsed as a DataFrame. The method stores the time values in
    * {@code COL_TIME} by default, and creates columns for each groupBy attribute and for each
    * MetricFunction specified in the request. It further evaluates expressions for derived
@@ -136,6 +153,22 @@ public class DataFrameUtils {
    */
   public static DataFrame evaluateResponse(ThirdEyeResponse response, RequestContainer rc) throws Exception {
     return evaluateExpressions(parseResponse(response), rc.getExpressions());
+  }
+
+  /**
+   * Returns a Thirdeye response parsed as a DataFrame. The method stores the time values in
+   * {@code COL_TIME} by default, and creates columns for each groupBy attribute and for each
+   * MetricFunction specified in the request. It evaluates expressions for derived
+   * metrics and offsets timestamp based on the original timeseries request.
+   * @see DataFrameUtils#makeTimeSeriesRequest(long, long, long, String, MetricConfigManager, DatasetConfigManager)
+   *
+   * @param response thirdeye client response
+   * @param rc TimeSeriesRequestContainer
+   * @return response as dataframe
+   */
+  public static DataFrame evaluateResponse(ThirdEyeResponse response, TimeSeriesRequestContainer rc) throws Exception {
+    long start = (long) Math.ceil(rc.start / (double) rc.interval) * rc.interval;
+    return offsetTimestamps(evaluateExpressions(parseResponse(response), rc.getExpressions()), start, rc.getInterval());
   }
 
   /**
@@ -205,7 +238,7 @@ public class DataFrameUtils {
    * @return RequestContainer
    * @throws Exception
    */
-  public static RequestContainer makeTimeSeriesRequest(long metricId, long start, long end, String reference) throws Exception {
+  public static TimeSeriesRequestContainer makeTimeSeriesRequest(long metricId, long start, long end, String reference) throws Exception {
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     return makeTimeSeriesRequest(metricId, start, end, reference, metricDAO, datasetDAO);
@@ -221,10 +254,10 @@ public class DataFrameUtils {
    * @param reference unique identifier for request
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
-   * @return RequestContainer
+   * @return TimeSeriesRequestContainer
    * @throws Exception
    */
-  public static RequestContainer makeTimeSeriesRequest(long metricId, long start, long end, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
+  public static TimeSeriesRequestContainer makeTimeSeriesRequest(long metricId, long start, long end, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
     MetricConfigDTO metric = metricDAO.findById(metricId);
     if(metric == null)
       throw new IllegalArgumentException(String.format("Could not resolve metric id %d", metricId));
@@ -248,7 +281,9 @@ public class DataFrameUtils {
         .setDataSource(dataset.getDataSource())
         .build(reference);
 
-    return new RequestContainer(request, expressions);
+    final long timeGranularity = dataset.bucketTimeGranularity().toMillis();
+
+    return new TimeSeriesRequestContainer(request, expressions, start, end, timeGranularity);
   }
 
   /**
@@ -294,7 +329,7 @@ public class DataFrameUtils {
   /**
    * Wrapper for ThirdEye request with derived metric expressions
    */
-  public static final class RequestContainer {
+  public static class RequestContainer {
     final ThirdEyeRequest request;
     final List<MetricExpression> expressions;
 
@@ -309,6 +344,31 @@ public class DataFrameUtils {
 
     public List<MetricExpression> getExpressions() {
       return expressions;
+    }
+  }
+
+  public static class TimeSeriesRequestContainer extends RequestContainer {
+    final long start;
+    final long end;
+    final long interval;
+
+    public TimeSeriesRequestContainer(ThirdEyeRequest request, List<MetricExpression> expressions, long start, long end, long interval) {
+      super(request, expressions);
+      this.start = start;
+      this.end = end;
+      this.interval = interval;
+    }
+
+    public long getStart() {
+      return start;
+    }
+
+    public long getEnd() {
+      return end;
+    }
+
+    public long getInterval() {
+      return interval;
     }
   }
 }
