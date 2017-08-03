@@ -9,10 +9,20 @@ export default Ember.Route.extend({
     } = transition.params;
 
     const { metricId = null } = detailsParams;
-    if (!metricId) { return; }
+
+    if (!metricId) { return {}; }
 
     return fetch(`/data/metric/${metricId}`)
       .then(res => res.json());
+  },
+
+  setupController(controller, model) {
+    this._super(...arguments);
+
+    // clears the controller's primaryMetric
+    if (!Object.keys(model).length) {
+      controller.set('primaryMetric', null);
+    }
   },
 
   actions: {

@@ -17,20 +17,27 @@ export default Ember.Route.extend({
     const redux = this.get('redux');
     const { metricId } = transition.params['rca.details'];
     const {
+      analysisStart: initStart,
+      analysisEnd: initEnd
+     } = this.modelFor('rca.details');
+
+    const {
       dimension = 'All',
-      analysisStart: start,
-      analysisEnd: end
+      analysisStart,
+      analysisEnd
     } = transition.queryParams;
+
+    const start = analysisStart || initStart;
+    const end = analysisEnd || initEnd;
 
     if (!metricId) { return; }
 
     redux.dispatch(Actions.loading());
-    if (start && end) {
-      redux.dispatch(Actions.updateDates(
-        Number(start),
-        Number(end)
-      ));
-    }
+    redux.dispatch(Actions.updateDates(
+      Number(start),
+      Number(end)
+    ));
+
     Ember.run.later(() => {
       redux.dispatch(Actions.updateDimension(dimension)).then(() => {
         redux.dispatch(Actions.fetchDimensions(metricId));

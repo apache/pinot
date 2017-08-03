@@ -8,11 +8,17 @@ export default Ember.Route.extend({
     const redux = this.get('redux');
     const { metricId } = transition.params['rca.details'];
     const {
-      analysisStart: start,
-      analysisEnd: end
+      analysisStart: initStart,
+      analysisEnd: initEnd
+     } = this.modelFor('rca.details');
+    const {
+      analysisStart,
+      analysisEnd
     } = transition.queryParams;
 
     if (!metricId) { return; }
+    const start = analysisStart || initStart;
+    const end = analysisEnd || initEnd;
 
     redux.dispatch(Actions.fetchHeatMapData(Number(start), Number(end)));
     return {};

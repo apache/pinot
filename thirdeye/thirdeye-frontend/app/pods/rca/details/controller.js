@@ -24,8 +24,60 @@ export default Ember.Controller.extend({
   subchartEnd: 0,
   predefinedRanges: {},
 
-  regionDates: Ember.computed(function(){
-    return [this.get('analysisStart'), this.get('analysisEnd')];
+  /**
+   * Upper bound (end) for date range
+   * @type {String}
+   */
+  maxTime: Ember.computed('model.maxTime', function() {
+    const maxTime = this.get('model.maxTime');
+
+    return maxTime
+      ? moment(maxTime).format(serverDateFormat)
+      : moment().format(serverDateFormat);
+  }),
+
+  /**
+   * Indicates the date format to be used based on granularity
+   * @type {String}
+   */
+  uiDateFormat: Ember.computed('granularity', function() {
+    const granularity = this.get('granularity');
+
+    switch(granularity) {
+      case 'DAYS':
+        return 'MMM D, YYYY';
+      case 'HOURS':
+        return 'MMM D, YYYY h a';
+      default:
+        return 'MMM D, YYYY hh:mm a';
+    }
+  }),
+
+  /**
+   * Indicates the allowed date range picker increment based on granularity
+   * @type {Number}
+   */
+  timePickerIncrement: Ember.computed('granularity', function() {
+    const granularity = this.get('granularity');
+
+    switch(granularity) {
+      case 'DAYS':
+        return 1440;
+      case 'HOURS':
+        return 60;
+      default:
+        return 5;
+    }
+  }),
+
+  /**
+   * Determines if the date range picker should show time selection
+   * @type {Boolean}
+   */
+  showTimePicker: Ember.computed('granularity', function() {
+    const granularity = this.get('granularity');
+
+    return granularity !== 'DAYS';
   }),
 
   // converts analysisStart from unix ms to serverDateFormat
@@ -64,6 +116,48 @@ export default Ember.Controller.extend({
     }
   }),
 
+  // converts startDate from unix ms to serverDateFormat
+  viewRegionStart: Ember.computed('startDate', {
+    get() {
+      const start = this.get('startDate');
+
+      return start ? moment(+start).format(serverDateFormat) : moment().format(serverDateFormat);
+    },
+    set(key, value) {
+      if (!value || value === 'Invalid date') {
+        return this.get('startDate') || 0;
+      }
+
+      const start = moment(value).valueOf();
+      this.set('startDate', start);
+
+      return moment(value).format(serverDateFormat);
+    }
+  }),
+
+  // converts endDate from unix ms to serverDateFormat
+  viewRegionEnd: Ember.computed(
+    'endDate',
+    'model.maxTime',
+    {
+      get() {
+        const end = this.get('endDate');
+
+        return end ? moment(+end).format(serverDateFormat) : moment().format(serverDateFormat);
+      },
+      set(key, value) {
+        if (!value || value === 'Invalid date') { return this.get('endDate') || 0; }
+
+        const maxTime = this.get('model.maxTime');
+        const end = moment(value).valueOf();
+
+        const newEnd = (+maxTime < +end) ? maxTime : end;
+        this.set('endDate', newEnd);
+
+        return moment(value).format(serverDateFormat);
+      }
+    }),
+
   // min date for the anomaly region
   minDate: Ember.computed('startDate', function() {
     const start = this.get('startDate');
@@ -78,33 +172,57 @@ export default Ember.Controller.extend({
     return moment(+end).format(serverDateFormat);
   }),
 
+  uiGranularity: Ember.computed(
+    'granularity',
+    'model.maxTime',
+    'startDate', {
+      get() {
+        return this.get('granularity');
+      },
+      // updates dates on granularity change
+      set(key, value){
+        const endDate = moment(+this.get('model.maxTime'));
+        let startDate = 0;
+        let analysisEnd = 0;
+        let analysisStart = 0;
+        let subchartStart = 0;
+        let subchartEnd = endDate.clone();
 
-  uiGranularity: Ember.computed('granularity', {
-    get() {
-      return this.get('granularity');
-    },
-    set(key, value){
-      this.setProperties({
-        granularity: value,
-        startDate: undefined,
-        endDate: undefined,
-        analysisEnd: undefined,
-        analysisStart: undefined
-      });
 
-      return value;
-    }
-  }),
+        // Handles this logic here instead of inside SetupController
+        // so that query params are updating properly
+        if (value === 'DAYS') {
+          analysisEnd = endDate.clone().startOf('day');
+          startDate = endDate.clone().subtract(29, 'days').startOf('day').valueOf();
+          analysisStart = analysisEnd.clone().subtract('1', 'day');
+          subchartStart = endDate.clone().subtract(1, 'week').startOf('day');
+        } else if (value === 'HOURS') {
+          analysisEnd = endDate.clone().startOf('hour');
+          startDate = endDate.clone().subtract(1, 'week').startOf('day').valueOf();
+          analysisStart = analysisEnd.clone().subtract('1', 'hour');
+          subchartStart =  analysisEnd.clone().subtract('1', 'day').startOf('day');
+        } else {
+          analysisEnd =  endDate.clone().startOf('hour');
+          startDate = endDate.clone().subtract(24, 'hours').startOf('hour').valueOf();
+          analysisStart = analysisEnd.clone().subtract('1', 'hour');
+          subchartStart = analysisEnd.clone().subtract('3', 'hours').startOf('hour');
+        }
+
+        this.setProperties({
+          granularity: value,
+          startDate,
+          endDate: endDate.valueOf(),
+          subchartStart: subchartStart.valueOf(),
+          subchartEnd: subchartEnd.valueOf(),
+          analysisEnd: analysisEnd.valueOf(),
+          analysisStart: analysisStart.valueOf()
+        });
+
+        return value;
+      }
+    }),
 
   actions: {
-    // handles datepicker date changes
-    onRegionChange(start, end) {
-      this.setProperties({
-        anomalyRegionStart: start,
-        anomalyRegionEnd: end
-      });
-    },
-
     // handles graph region date change
     onRegionBrush(start, end) {
       this.setProperties({
