@@ -178,7 +178,8 @@ public class PinotInstanceRestletResource {
       notes = "Deletes an instance of given name")
   @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully deleted"),
       @ApiResponse(code = 404, message = "Instance not found"),
-      @ApiResponse(code = 409, message = "Instance can not be deleted"),
+      @ApiResponse(code = 409, message = "Forbidden operation typically because the instance is live or "
+          + "idealstates still contain some information of this instance"),
       @ApiResponse(code = 400, message = "Bad Request"),
       @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse deleteInstance(

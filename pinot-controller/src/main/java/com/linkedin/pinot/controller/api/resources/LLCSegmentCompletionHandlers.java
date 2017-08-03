@@ -73,7 +73,7 @@ public class LLCSegmentCompletionHandlers {
     }
     if (extraTimeSec <= 0) {
       LOGGER.warn("Invalid value {} for extra build time from instance {} for segment {}", extraTimeSec, instanceId, segmentName);
-      extraTimeSec = 30;
+      extraTimeSec = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds();
     }
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
@@ -221,7 +221,8 @@ public class LLCSegmentCompletionHandlers {
     return response.toJsonString();
   }
 
-  // This method may be called in any controller, leader or non-leader.
+  // This method may be called in any controller, leader or non-leader. It is used only when the server decides to use
+  // split commit protocol for the segment commit.
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
   @Produces(MediaType.APPLICATION_JSON)
