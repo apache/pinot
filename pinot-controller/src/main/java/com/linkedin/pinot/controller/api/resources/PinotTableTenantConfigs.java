@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
@@ -29,8 +27,10 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import org.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Api(tags = {"table", "tenant"})
@@ -46,17 +46,14 @@ public class PinotTableTenantConfigs {
   @Path("/tables/{tableName}/rebuildBrokerResourceFromHelixTags")
   @ApiOperation(value = "Rebuild broker resource for table", notes = "when new brokers are added")
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found")})
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")})
   public String rebuildBrokerResource(
       @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType
-  ) {
-    try {
-      final PinotResourceManagerResponse pinotResourceManagerResponse =
-          _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
+  ) throws JSONException {
+    final PinotResourceManagerResponse pinotResourceManagerResponse =
+        _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
 
-      return pinotResourceManagerResponse.toJSON().toString();
-    } catch (Exception e) {
-      throw new WebApplicationException("Failed to update broker resource", e);
-    }
+    return pinotResourceManagerResponse.toJSON().toString();
   }
 }

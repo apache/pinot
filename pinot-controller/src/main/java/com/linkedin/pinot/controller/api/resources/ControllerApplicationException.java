@@ -31,11 +31,11 @@ class ControllerApplicationException extends WebApplicationException {
     this(logger, message, status, null);
   }
 
-  ControllerApplicationException(Logger logger, String message, Response.Status status, @Nullable Exception e) {
+  ControllerApplicationException(Logger logger, String message, Response.Status status, @Nullable Throwable e) {
     this(logger, message, status.getStatusCode(), e);
   }
 
-  ControllerApplicationException(Logger logger, String message, int status, @Nullable Exception e) {
+  ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e) {
     super(message, status);
     if (status >= 300 && status < 500) {
       if (e == null) {

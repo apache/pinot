@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import java.util.concurrent.Executor;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.util.TableSizeReader;
@@ -28,6 +23,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.concurrent.Executor;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -38,6 +34,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
@@ -48,8 +47,6 @@ public class TableSize {
   ControllerConf controllerConf;
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
-  @Inject
-  ControllerMetrics metrics;
   @Inject
   Executor executor;
   @Inject
@@ -76,9 +73,8 @@ public class TableSize {
       tableSizeDetails = tableSizeReader.getTableSizeDetails(tableName,
           controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Throwable t) {
-      LOGGER.error("Failed to read table size for: {}", tableName, t);
-      throw new WebApplicationException("Error reading size information for " + tableName,
-          Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to read table size for %s", tableName),
+          Response.Status.INTERNAL_SERVER_ERROR, t);
     }
 
     if (tableSizeDetails == null) {

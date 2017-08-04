@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -36,6 +35,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -81,11 +81,7 @@ public class PinotTenantRestletResource {
   private static final String TENANT_NAME = "tenantName";
 
   @Inject
-  ControllerConf controllerConf;
-  @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
-//  @Inject
-//  ControllerMetrics metrics;
 
   @POST
   @Path("/tenants")
@@ -184,10 +180,14 @@ public class PinotTenantRestletResource {
   @Path("/tenants/{tenantName}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List instance for a tenant, or enable/disable/drop a tenant")
+   @ApiResponses(value = {
+       @ApiResponse(code = 200, message = "Success"),
+       @ApiResponse(code = 500, message = "Error reading tenants list")
+  })
   public String listInstanceOrToggleTenantState(
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Tenant type (sever|broker)", required = false) @QueryParam("type") String tenantType,
-      @ApiParam(value = "state", required = false) @QueryParam("state") String stateStr
+      @ApiParam(value = "Tenant type (server|broker)") @QueryParam("type") String tenantType,
+      @ApiParam(value = "state") @QueryParam("state") String stateStr
   ) throws Exception {
     if (stateStr == null) {
       return listInstancesForTenant(tenantName, tenantType);
@@ -196,7 +196,7 @@ public class PinotTenantRestletResource {
     }
   }
 
-  private String toggleTenantState(String tenantName, String stateStr, String tenantType) throws JSONException{
+  private String toggleTenantState(String tenantName, String stateStr, @Nullable String tenantType) throws JSONException{
     Set<String> serverInstances = new HashSet<String>();
     Set<String> brokerInstances = new HashSet<String>();
     JSONObject instanceResult = new JSONObject();
@@ -357,11 +357,11 @@ public class PinotTenantRestletResource {
         }
       }
     } catch (Exception e) {
-      LOGGER.error("Error enabling/disabling instances for tenant: {}", tenantName, e);
       ControllerRestApplication.getControllerMetrics().
           addMeteredGlobalValue(ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR, 1L);
-      throw new WebApplicationException("Error during " + type + " operation for instance: " + instance, Response.Status.INTERNAL_SERVER_ERROR);
-
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Error during %s operation for instance: %s", type, instance),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     return instanceResult.toString();
   }

@@ -33,7 +33,6 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -67,15 +66,15 @@ public class PinotTableSegmentConfigs {
           tableConfig.getTableType(), tableConfig.getValidationConfig());
       return new SuccessResponse("Update segmentsConfig for table: " + tableName);
     } catch (JSONException e) {
-      LOGGER.info("Invalid json while updating segments config for table: {}", tableName, e);
       metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_UPDATE_ERROR, 1L);
-      throw new WebApplicationException("Invalid json while updating segments config for table: " + tableName,
-          Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Invalid json while updating segments config for table: %s", tableName),
+          Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
-       LOGGER.error("Failed to update segments config for table: {}", tableName, e);
       metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_UPDATE_ERROR, 1L);
-      throw new WebApplicationException("Error while updating segments config for table: " + tableName,
-          Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to update segments config for table: %s", tableName),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 }
