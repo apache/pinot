@@ -72,6 +72,10 @@
       <artifactId>dropwizard-views-freemarker</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.dropwizard-bundles</groupId>
+      <artifactId>dropwizard-redirect-bundle</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>
     </dependency>

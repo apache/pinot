@@ -41,6 +41,8 @@ import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
 
 import io.dropwizard.assets.AssetsBundle;
+import io.dropwizard.bundles.redirect.PathRedirect;
+import io.dropwizard.bundles.redirect.RedirectBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
@@ -75,6 +77,7 @@ public class ThirdEyeDashboardApplication
   public void initialize(Bootstrap<ThirdEyeDashboardConfiguration> bootstrap) {
     bootstrap.addBundle(new ViewBundle());
     bootstrap.addBundle(new HelperBundle());
+    bootstrap.addBundle(new RedirectBundle(new PathRedirect("/", "/thirdeye")));
     bootstrap.addBundle(new AssetsBundle("/app/", "/app", "index.html", "app"));
     bootstrap.addBundle(new AssetsBundle("/assets", "/assets", null, "assets"));
     bootstrap.addBundle(new AssetsBundle("/assets/css", "/assets/css", null, "css"));
