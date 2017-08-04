@@ -6,6 +6,8 @@ import org.apache.commons.lang.builder.ToStringStyle;
 public abstract class AbstractDTO {
   private Long id;
   private int version;
+  protected String createdBy;
+  protected String updatedBy;
 
   public Long getId() {
     return id;
@@ -21,6 +23,22 @@ public abstract class AbstractDTO {
 
   public void setVersion(int version) {
     this.version = version;
+  }
+
+  public String getCreatedBy() {
+    return createdBy;
+  }
+
+  public void setCreatedBy(String createdBy) {
+    this.createdBy = createdBy;
+  }
+
+  public String getUpdatedBy() {
+    return updatedBy;
+  }
+
+  public void setUpdatedBy(String updatedBy) {
+    this.updatedBy = updatedBy;
   }
 
   @Override
