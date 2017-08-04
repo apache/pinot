@@ -28,9 +28,12 @@ body {
   margin-top: $te-default-element-spacing;
 
   &__group {
+    clear: left;
+
     &--horizontal {
       float: left;
       margin-right: 21px;
+      clear: right;
     }
 
     &--last {
@@ -43,7 +46,11 @@ body {
     }
 
     &--medium {
-      width: 33%;
+      width: 56%;
+    }
+
+    &--small {
+      width: 20%;
     }
 
     &--two-share {
