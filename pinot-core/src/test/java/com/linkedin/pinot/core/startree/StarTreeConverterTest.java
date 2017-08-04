@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import java.io.File;
 import java.io.IOException;
@@ -29,9 +28,9 @@ import org.testng.annotations.Test;
 /**
  * Test for Star Tree OnHeap-OffHeap converter.
  */
-public class TestStarTreeConverter {
-  private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
-  private static final String SEGMENT_DIR_NAME = TMP_DIR + File.separator + "StarTreeFormatConverter";
+public class StarTreeConverterTest {
+  private static final String SEGMENT_DIR_NAME =
+      System.getProperty("java.io.tmpdir") + File.separator + "StarTreeConverterTest";
   private static final String SEGMENT_NAME = "starTreeSegment";
 
   private File _indexDir;
@@ -41,8 +40,7 @@ public class TestStarTreeConverter {
    * @throws Exception
    */
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setUp() throws Exception {
     StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
     _indexDir = new File(SEGMENT_DIR_NAME, SEGMENT_NAME);
   }
@@ -55,8 +53,7 @@ public class TestStarTreeConverter {
    * @throws ClassNotFoundException
    */
   @Test
-  public void testConverter()
-      throws IOException, ClassNotFoundException {
+  public void testConverter() throws IOException, ClassNotFoundException {
 
     // Convert from ON_HEAP to ON_HEAP, this should be no-op.
     StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.ON_HEAP);
@@ -75,9 +72,8 @@ public class TestStarTreeConverter {
     assertStarTreeVersion(StarTreeFormatVersion.ON_HEAP);
   }
 
-  private void assertStarTreeVersion(StarTreeFormatVersion expectedVersion)
-      throws IOException {
-    File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(_indexDir, SegmentVersion.v3);
+  private void assertStarTreeVersion(StarTreeFormatVersion expectedVersion) throws IOException {
+    File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(_indexDir);
     Assert.assertEquals(StarTreeSerDe.getStarTreeVersion(starTreeFile), expectedVersion);
   }
 
@@ -86,8 +82,7 @@ public class TestStarTreeConverter {
    * @throws IOException
    */
   @AfterClass
-  public void tearDown()
-      throws IOException {
-    FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
+  public void tearDown() throws IOException {
+    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
   }
 }

@@ -300,13 +300,13 @@ public class ForwardIndexReaderBenchmark {
       }
       if (!columnMetadata.isSingleValue()) {
 
-        String fwdIndexFileName = segmentMetadata.getForwardIndexFileName(column, segmentVersion);
+        String fwdIndexFileName = segmentMetadata.getForwardIndexFileName(column);
         File fwdIndexFile = new File(indexDir, fwdIndexFileName);
         multiValuedReadBenchMark(segmentVersion, fwdIndexFile, segmentMetadata.getTotalDocs(),
             columnMetadata.getTotalNumberOfEntries(), columnMetadata.getMaxNumberOfMultiValues(),
             columnMetadata.getBitsPerElement());
       } else if (columnMetadata.isSingleValue() && !columnMetadata.isSorted()) {
-        String fwdIndexFileName = segmentMetadata.getForwardIndexFileName(column, segmentVersion);
+        String fwdIndexFileName = segmentMetadata.getForwardIndexFileName(column);
         File fwdIndexFile = new File(indexDir, fwdIndexFileName);
         singleValuedReadBenchMark(segmentVersion, fwdIndexFile, segmentMetadata.getTotalDocs(),
             columnMetadata.getBitsPerElement());

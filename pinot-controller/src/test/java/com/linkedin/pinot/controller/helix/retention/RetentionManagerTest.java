@@ -449,17 +449,17 @@ public class RetentionManagerTest {
       }
 
       @Override
-      public String getForwardIndexFileName(String column, String segmentVersion) {
+      public String getForwardIndexFileName(String column) {
         throw new UnsupportedOperationException("getForwardIndexFileName not supported in " + this.getClass());
       }
 
       @Override
-      public String getDictionaryFileName(String column, String segmentVersion) {
+      public String getDictionaryFileName(String column) {
         throw new UnsupportedOperationException("getDictionaryFileName not supported in " + this.getClass());
       }
 
       @Override
-      public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
+      public String getBitmapInvertedIndexFileName(String column) {
         throw new UnsupportedOperationException("getBitmapInvertedIndexFileName not supported in " + this.getClass());
       }
 

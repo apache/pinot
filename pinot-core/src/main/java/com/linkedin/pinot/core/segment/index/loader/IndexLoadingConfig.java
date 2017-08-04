@@ -41,7 +41,7 @@ public class IndexLoadingConfig {
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
-  private SegmentVersion _segmentVersion = SegmentVersion.DEFAULT_VERSION;
+  private SegmentVersion _segmentVersion;
   private StarTreeFormatVersion _starTreeVersion = StarTreeFormatVersion.DEFAULT_VERSION;
   private boolean _enableDefaultColumns = true;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
@@ -163,7 +163,7 @@ public class IndexLoadingConfig {
     return _onHeapDictionaryColumns;
   }
 
-  @Nonnull
+  @Nullable
   public SegmentVersion getSegmentVersion() {
     return _segmentVersion;
   }

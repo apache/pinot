@@ -45,7 +45,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -96,41 +95,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private List<String> _optimizations;
 
   /**
-   * Load segment metadata based on the segment version passed in.
-   * <p>Index directory passed in should be top level segment directory.
-   */
-  public SegmentMetadataImpl(@Nonnull File indexDir, @Nonnull SegmentVersion segmentVersion)
-      throws ConfigurationException, IOException {
-    _metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir, segmentVersion);
-    Preconditions.checkNotNull(_metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
-
-    _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(_metadataFile);
-    _columnMetadataMap = new HashMap<>();
-    _allColumns = new HashSet<>();
-    _schema = new Schema();
-    _indexDir = indexDir.getPath();
-
-    init();
-    File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir, segmentVersion);
-    if (creationMetaFile != null) {
-      loadCreationMeta(creationMetaFile);
-    }
-
-    setTimeInfo();
-    _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
-    _totalRawDocs =
-        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
-            _totalDocs);
-  }
-
-  /**
    * Load segment metadata in any segment version.
    * <p>Index directory passed in should be top level segment directory.
-   * <p>If segment metadata file exists in multiple segment version, load the one in lowest segment version.
+   * <p>If segment metadata file exists in multiple segment version, load the one in highest segment version.
    */
-  // TODO: check if loading file in highest segment version is better
-  public SegmentMetadataImpl(File indexDir)
-      throws ConfigurationException, IOException {
+  public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     _metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
     Preconditions.checkNotNull(_metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
 
@@ -611,7 +580,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getForwardIndexFileName(String column, String segmentVersion) {
+  public String getForwardIndexFileName(String column) {
     ColumnMetadata columnMetadata = getColumnMetadataFor(column);
     StringBuilder fileNameBuilder = new StringBuilder(column);
     // starting v2 we will append the forward index files with version
@@ -633,12 +602,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getDictionaryFileName(String column, String segmentVersion) {
+  public String getDictionaryFileName(String column) {
     return column + V1Constants.Dict.FILE_EXTENTION;
   }
 
   @Override
-  public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
+  public String getBitmapInvertedIndexFileName(String column) {
     return column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
   }
 
