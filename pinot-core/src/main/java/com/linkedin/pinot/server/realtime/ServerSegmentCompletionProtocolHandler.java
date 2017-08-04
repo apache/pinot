@@ -23,6 +23,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import org.apache.commons.httpclient.Header;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethodBase;
 import org.apache.commons.httpclient.URI;
@@ -94,7 +95,7 @@ public class ServerSegmentCompletionProtocolHandler {
     params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
     SegmentCompletionProtocol.SegmentCommitUploadRequest request = new SegmentCompletionProtocol.SegmentCommitUploadRequest(params);
 
-    return doHttp(request, createFileParts(segmentName, segmentTarFile), controllerVipUrl);
+    return postSegmentToVip(request, createFileParts(segmentName, segmentTarFile), controllerVipUrl);
   }
 
   public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, String segmentLocation) {
@@ -131,26 +132,67 @@ public class ServerSegmentCompletionProtocolHandler {
     return doHttp(request, null);
   }
 
-  private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts, String uploadHost) {
-    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
+  // Much as it is tempting to merge postSegmentToVip() and doHttp() into one method, it is probably better to
+  // keep them separate. One posts to the vip, whereas the other posts (or gets) from the current leader controller.
+
+  // Post a segment to the VIP (used during split commit).
+  // Note that the VipURL may either be http or https (depending on controller configuration).
+  private SegmentCompletionProtocol.Response postSegmentToVip(SegmentCompletionProtocol.Request request, Part[] parts,
+      String vipUrl) {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_NOT_SENT;
     HttpClient httpClient = new HttpClient();
 
-    String hostPort = uploadHost;
-    String protocol = "http";
-    if (uploadHost.startsWith(protocol)) {
-      try {
-        URI uri = new URI(uploadHost, /* boolean escaped */ false);
-        protocol = uri.getScheme();
-        hostPort = uri.getAuthority();
-      } catch (Exception e) {
-        throw new RuntimeException("Could not make URI", e);
-      }
+    String hostPort;
+    String protocol;
+    try {
+      URI uri = new URI(vipUrl, /* boolean escaped */ false);
+      protocol = uri.getScheme();
+      hostPort = uri.getAuthority();
+    } catch (Exception e) {
+      throw new RuntimeException("Could not make URI", e);
     }
-
 
     final String url;
     url = request.getUrl(hostPort, protocol);
+    PostMethod postMethod = new PostMethod(url);
+    postMethod.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
+    LOGGER.info("Sending request {} for {}", url, this.toString());
+    try {
+      int responseCode = httpClient.executeMethod(postMethod);
+      // TODO Pick these up from constants defined in a common place.
+      Header controllerHostNameHdr =  postMethod.getResponseHeader("Pinot-Controller-Host");
+      Header controllerVersionHdr = postMethod.getResponseHeader("Pinot-Controller-Version");
+
+      if (responseCode >= 300) {
+        LOGGER.error("Bad controller response code {} for {} from {}, version {}", responseCode, request,
+            controllerHostNameHdr.toExternalForm(), controllerVersionHdr.toExternalForm());
+        return response;
+      } else {
+        response = new SegmentCompletionProtocol.Response(postMethod.getResponseBodyAsString());
+        LOGGER.info("Controller response {} for {} from {}", response.toJsonString(), request,
+            controllerHostNameHdr.toExternalForm());
+        return response;
+      }
+    } catch (IOException e) {
+      LOGGER.error("IOException {}", this.toString(), e);
+      return response;
+    }
+  }
+
+  // Do GET or POST operations on the leader controller. Since we are communicating directly with the leader controller,
+  // we must handle NOT_LEADER errors.
+  private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts) {
+    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
+    final String leaderHostPort = leaderLocator.getControllerLeader();
+    if (leaderHostPort == null) {
+      LOGGER.warn("No leader found {}", this.toString());
+      return SegmentCompletionProtocol.RESP_NOT_LEADER;
+    }
+    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_NOT_SENT;
+    HttpClient httpClient = new HttpClient();
+
+    final String url;
+    url = request.getUrl(leaderHostPort, "http");
     HttpMethodBase method;
     if (parts != null) {
       PostMethod postMethod = new PostMethod(url);
@@ -163,11 +205,11 @@ public class ServerSegmentCompletionProtocolHandler {
     try {
       int responseCode = httpClient.executeMethod(method);
       if (responseCode >= 300) {
-        LOGGER.error("Bad controller response code {} for {}", responseCode, this.toString());
+        LOGGER.error("Bad controller response code {} for {}", responseCode, request);
         return response;
       } else {
         response = new SegmentCompletionProtocol.Response(method.getResponseBodyAsString());
-        LOGGER.info("Controller response {} for {}", response.toJsonString(), this.toString());
+        LOGGER.info("Controller response {} for {}", response.toJsonString(), request);
         if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
           leaderLocator.refreshControllerLeader();
         }
@@ -178,16 +220,5 @@ public class ServerSegmentCompletionProtocolHandler {
       leaderLocator.refreshControllerLeader();
       return response;
     }
-  }
-
-  private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts) {
-    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
-    final String leaderAddress = leaderLocator.getControllerLeader();
-    if (leaderAddress == null) {
-      LOGGER.warn("No leader found {}", this.toString());
-      return SegmentCompletionProtocol.RESP_NOT_LEADER;
-    }
-
-    return doHttp(request, parts, leaderAddress);
   }
 }
