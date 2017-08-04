@@ -53,9 +53,7 @@ public class SortedInvertedIndexReader implements InvertedIndexReader {
     MutableRoaringBitmap rr = new MutableRoaringBitmap();
     int min = indexReader.getInt(idx, 0);
     int max = indexReader.getInt(idx, 1);
-    for (int i = min; i <= max; i++) {
-      rr.add(i);
-    }
+    rr.add(min, max + 1);
     return rr;
   }
 
