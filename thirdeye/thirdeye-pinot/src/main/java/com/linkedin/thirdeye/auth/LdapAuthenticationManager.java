@@ -1,17 +1,17 @@
 package com.linkedin.thirdeye.auth;
 
+import com.google.common.base.Optional;
 import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
 import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
 import java.security.Key;
-import java.util.Base64;
 import java.util.Hashtable;
-import java.util.Optional;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import javax.naming.Context;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
+import org.apache.commons.codec.binary.Base64;
 
 
 public class LdapAuthenticationManager implements IAuthManager, Authenticator<AuthRequest, PrincipalAuthContext> {
@@ -23,7 +23,7 @@ public class LdapAuthenticationManager implements IAuthManager, Authenticator<Au
   public LdapAuthenticationManager(AuthConfiguration authConfiguration) {
     this.authConfiguration = authConfiguration;
     this.principalAuthContextThreadLocal = new ThreadLocal<>();
-    this.aesKey = new SecretKeySpec(Base64.getDecoder().decode(authConfiguration.getAuthKey()), "AES");
+    this.aesKey = new SecretKeySpec(Base64.decodeBase64(authConfiguration.getAuthKey()), "AES");
   }
 
   public PrincipalAuthContext authenticate(String principal, String password) throws Exception {
@@ -42,7 +42,7 @@ public class LdapAuthenticationManager implements IAuthManager, Authenticator<Au
     try {
       if (authRequest.getPrincipal() != null) {
 
-        Hashtable<String, String> env = new Hashtable<String, String>();
+        Hashtable<String, String> env = new Hashtable<>();
         env.put(Context.INITIAL_CONTEXT_FACTORY, LDAP_CONTEXT_FACTORY);
         env.put(Context.PROVIDER_URL, authConfiguration.getLdapUrl());  //"ldaps://lca1-lds02.linkedin.biz:636");
 
@@ -98,13 +98,13 @@ public class LdapAuthenticationManager implements IAuthManager, Authenticator<Au
     Cipher cipher = Cipher.getInstance("AES"); // not threadsafe
     cipher.init(Cipher.ENCRYPT_MODE, aesKey);
     byte[] encrypted = cipher.doFinal(plain.getBytes());
-    return Base64.getEncoder().encodeToString(encrypted);
+    return Base64.encodeBase64String(encrypted);
   }
 
   private String decrypt(String crypted) throws Exception {
     Cipher cipher = Cipher.getInstance("AES");
     cipher.init(Cipher.DECRYPT_MODE, aesKey);
-    return new String(cipher.doFinal(Base64.getDecoder().decode(crypted)));
+    return new String(cipher.doFinal(Base64.decodeBase64(crypted)));
   }
 
   /**
