@@ -122,9 +122,6 @@ function fetchRelatedMetricIds() {
       compareMode,
     } = primaryMetric;
 
-    // const analysisEnd = currentEnd || moment().subtract(1, 'day').endOf('day').valueOf();
-    // const analysisStart = currentStart || moment(analysisEnd).subtract(1, 'week').valueOf();
-
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
     const baselineStart = moment(anomalyStart).subtract(offset, 'week').valueOf();
     const baselineEnd = moment(anomalyEnd).subtract(offset, 'week').valueOf();
