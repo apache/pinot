@@ -78,18 +78,50 @@ const setWeight = (event) => {
  * Helper function assigning start and end times to events relative
  * to the anomaly period's start time
  */
-const assignEventTimeInfo = (anomalyStart, event) => {
+const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, baselineEnd) => {
+  const duration = event.end - event.start;
+  const baselineOffset = baselineStart - anomalyStart;
+
   const relStart = event.start - anomalyStart;
 
   var relEnd = 'ongoing';
-  var duration = 'ongoing';
+  var relDuration = 'ongoing';
   if (moment().isAfter(moment(event.end).add(1, 'minute'))) {
     relEnd = event.end - anomalyStart;
-    duration = event.end - event.start;
+    relDuration = event.end - event.start;
   }
 
-  return Object.assign(event, { relStart, relEnd, duration });
+  var isBaseline = false;
+  var displayStart = event.start;
+  var displayEnd = event.end;
+  if (displayStart < baselineEnd) {
+    isBaseline = true;
+    displayStart -= baselineOffset;
+    displayEnd -= baselineOffset;
+  }
+
+  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd });
 };
+
+/**
+ * Helper function to offset Holiday dates to local timezone midnight rather than UTC
+ */
+const adjustHolidayTimestamp = (event) => {
+  const startUtc = moment(event.start).utc();
+  const endUtc = moment(event.start).utc();
+
+  if (event.eventType == 'holiday') {
+    if (startUtc.isSame(startUtc.startOf('day'))) {
+      const utcOffset = moment().utcOffset();
+      const start = startUtc.add(-utcOffset, 'minutes').valueOf();
+      const end = endUtc.add(-utcOffset, 'minutes').valueOf();
+
+      return Object.assign(event, { start, end });
+    }
+  }
+
+  return event;
+}
 
 /**
  * Helper function to humanize a moment
@@ -142,6 +174,9 @@ function fetchEvents(start, end, mode) {
 
     if (!metricId) {return;}
 
+    const analysisStart = currentStart;
+    const analysisEnd = currentEnd;
+
     const diff = Math.floor((currentEnd - currentStart) / 4);
     const anomalyEnd = end || (+currentEnd - diff);
     const anomalyStart = start || (+currentStart + diff);
@@ -153,16 +188,17 @@ function fetchEvents(start, end, mode) {
 
     dispatch(setDate([anomalyStart, anomalyEnd]));
     dispatch(loading());
-    return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${currentStart}&analysisEnd=${currentEnd}&urns=thirdeye:metric:${metricId}`)
+    return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=thirdeye:metric:${metricId}`)
       .then(res => res.json())
       .then((res) => {
         // hidding informed events
 
         return _.uniqBy(res, 'urn')
           .filter(event => event.eventType !== 'informed')
+          .map(adjustHolidayTimestamp)
           .map(assignEventColor)
           .map(setWeight)
-          .map(event => assignEventTimeInfo(anomalyStart, event))
+          .map(event => assignEventTimeInfo(event, anomalyStart, anomalyEnd, baselineStart, baselineEnd))
           .map(assignHumanTimeInfo)
           .sort((a, b) => (b.score - a.score));
       })

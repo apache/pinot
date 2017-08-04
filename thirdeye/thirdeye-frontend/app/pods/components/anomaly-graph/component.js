@@ -333,7 +333,10 @@ export default Ember.Component.extend({
       const holidays = this.get('holidayEvents');
 
       return holidays.map((holiday) => {
-        const { start, end } = holiday;
+        const { displayStart, displayEnd } = holiday;
+
+        const start = displayStart;
+        const end = displayEnd;
 
         const date = !end ? [end] : [start];
 
