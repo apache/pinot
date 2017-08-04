@@ -31,6 +31,7 @@ export default Ember.Controller.extend({
   isReplaySuccess: false,
   metricGranularityOptions: [],
   originalDimensions: [],
+  graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
 
   legendText: {
@@ -53,6 +54,24 @@ export default Ember.Controller.extend({
     'selectedPattern',
     'alertFunctionName',
     'selectedAppName'
+  ],
+
+  /**
+   * Array to define alerts table columns for selected config group
+   */
+  alertsTableColumns: [
+    {
+      propertyName: 'name',
+      title: 'Alert Name'
+    },
+    {
+      propertyName: 'metric',
+      title: 'Alert Metric'
+    },
+    {
+      propertyName: 'type',
+      title: 'Alert Type'
+    }
   ],
 
   /**
@@ -250,10 +269,11 @@ export default Ember.Controller.extend({
     this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
       this.set('isMetricDataLoading', false);
       if (!this.isMetricGraphable(metricData)) {
-        this.setProperties({
-          isMetricDataInvalid: true
-        });
+        // Metric has no data. not graphing
+        this.clearAll();
+        this.set('isMetricDataInvalid', true);
       } else {
+        // Metric has data. now sending new data to graph
         this.setProperties({
           isMetricSelected: true,
           selectedMetric: metricData
@@ -299,17 +319,28 @@ export default Ember.Controller.extend({
     const startTime = moment().subtract(1, 'month').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
     const endTime = moment().subtract(1, 'day').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
 
+    // Set banner to 'pending' state
+    this.setProperties({
+      isReplaySuccess: true,
+      isReplayStatusPending: true
+    });
+
+    // Begin replay sequence. Simulate trigger response time since we don't yet need
+    // to wait for the actual response, which takes 30+ seconds
     this.callCloneAlert(newFuncId)
       .then((clonedId) => {
+        const that = this;
+        Ember.run.later((function() {
+          that.setProperties({
+            isReplaySuccess: true,
+            isReplayStatusPending: false,
+            replayStatusClass: 'te-form__banner--success'
+          });
+        }), 3000);
         return this.callReplayStart(clonedId, startTime, endTime);
       })
-      .then((jobId) => {
-        this.setProperties({
-          isReplaySuccess: true,
-          isReplayStatusPending: false,
-          replayStatusClass: 'te-form__banner--success'
-        });
-      })
+      // NOTE: Once we decide how to "listen" for replay end in the UI, we will do something here.
+      // .then((jobId) => {})
       .catch((error) => {
         this.setProperties({
           isReplayError: true,
@@ -529,6 +560,68 @@ export default Ember.Controller.extend({
   ),
 
   /**
+   * Preps a mailto link containing the currently selected metric name
+   * @method graphMailtoLink
+   * @return {String} the URI-encoded mailto link
+   */
+  graphMailtoLink: Ember.computed(
+    'selectedMetricOption',
+    function() {
+      const selectedMetric = this.get('selectedMetricOption');
+      const fullMetricName = `${selectedMetric.dataset}::${selectedMetric.name}`;
+      const recipient = 'ask_thirdeye@linkedin.com';
+      const subject = 'TE Self-Serve Create Alert Metric Issue';
+      const body = `TE Team, please look into a possible inconsistency issue with [ ${fullMetricName} ]`;
+      const mailtoString = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      return mailtoString;
+    }
+  ),
+
+  /**
+   * Returns the appropriate subtitle for selected config group monitored alerts
+   * @method selectedConfigGroupSubtitle
+   * @return {String} title of expandable section for selected config group
+   */
+  selectedConfigGroupSubtitle: Ember.computed(
+    'selectedConfigGroup',
+    function () {
+      return `Alerts Monitored by: ${this.get('selectedConfigGroup.name')}`;
+    }
+  ),
+
+  /**
+   * Reset the form... clear all important fields
+   * @method clearAll
+   * @return {undefined}
+   */
+  clearAll() {
+    this.setProperties({
+      isFormDisabled: false,
+      isMetricSelected: false,
+      isMetricDataInvalid: false,
+      selectedMetricOption: null,
+      selectedPattern: null,
+      selectedGranularity: null,
+      selectedDimension: null,
+      alertFunctionName: null,
+      selectedAppName: null,
+      selectedConfigGroup: null,
+      newConfigGroupName: null,
+      alertGroupNewRecipient: null,
+      selectedGroupRecipients: null,
+      isCreateAlertSuccess: null,
+      isCreateAlertError: false,
+      isCreateGroupSuccess: false,
+      isReplaySuccess: false,
+      isReplayError: false,
+      graphEmailLinkProps: '',
+      selectedFilters: JSON.stringify({}),
+      replayStatusClass: 'te-form__banner--pending'
+    });
+    this.send('refreshModel');
+  },
+
+  /**
    * Actions for create alert form view
    */
   actions: {
@@ -542,7 +635,10 @@ export default Ember.Controller.extend({
     onSelectMetric(selectedObj) {
       this.setProperties({
         isMetricDataLoading: true,
-        selectedMetricOption: selectedObj
+        selectedMetricOption: selectedObj,
+        selectedFilters: JSON.stringify({}),
+        selectedPattern: null,
+        selectedDimension: null
       });
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {
@@ -712,30 +808,8 @@ export default Ember.Controller.extend({
      * @method clearAll
      * @return {undefined}
      */
-    clearAll() {
-      this.setProperties({
-        isFormDisabled: false,
-        isMetricSelected: false,
-        isMetricDataInvalid: false,
-        selectedMetricOption: null,
-        selectedPattern: null,
-        selectedGranularity: null,
-        selectedDimension: null,
-        alertFunctionName: null,
-        selectedAppName: null,
-        selectedConfigGroup: null,
-        newConfigGroupName: null,
-        alertGroupNewRecipient: null,
-        selectedGroupRecipients: null,
-        isCreateAlertSuccess: null,
-        isCreateAlertError: false,
-        isCreateGroupSuccess: false,
-        isReplaySuccess: false,
-        isReplayError: false,
-        selectedFilters: JSON.stringify({}),
-        replayStatusClass: 'te-form__banner--pending'
-      });
-      this.send('refreshModel');
+    onResetForm() {
+      this.clearAll();
     },
 
     /**
@@ -792,7 +866,7 @@ export default Ember.Controller.extend({
 
             if (alertResult.ok) {
               this.setProperties({
-                selectedGroupRecipients: finalConfigObj.recipients,
+                selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
                 isCreateAlertSuccess: true,
                 finalFunctionId: newFunctionId
               });
