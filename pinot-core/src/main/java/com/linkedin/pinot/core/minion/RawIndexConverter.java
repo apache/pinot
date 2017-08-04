@@ -93,17 +93,18 @@ public class RawIndexConverter {
   }
 
   @SuppressWarnings("unchecked")
-  public void convert() throws Exception {
+  public boolean convert() throws Exception {
     String segmentName = _originalSegmentMetadata.getName();
     String tableName = _originalSegmentMetadata.getTableName();
     LOGGER.info("Start converting segment: {} in table: {}", segmentName, tableName);
 
+    List<FieldSpec> columnsToConvert = new ArrayList<>();
     Schema schema = _originalSegmentMetadata.getSchema();
     if (_columnsToConvert == null) {
       LOGGER.info("Columns to convert are not specified, check each metric column");
       for (MetricFieldSpec metricFieldSpec : schema.getMetricFieldSpecs()) {
         if (_originalSegmentMetadata.hasDictionary(metricFieldSpec.getName()) && shouldConvertColumn(metricFieldSpec)) {
-          convertColumn(metricFieldSpec);
+          columnsToConvert.add(metricFieldSpec);
         }
       }
     } else {
@@ -122,8 +123,12 @@ public class RawIndexConverter {
           LOGGER.warn("Skip converting column: {} because its index is not dictionary-based");
           continue;
         }
-        convertColumn(fieldSpec);
+        columnsToConvert.add(fieldSpec);
       }
+    }
+
+    for (FieldSpec columnToConvert : columnsToConvert) {
+      convertColumn(columnToConvert);
     }
 
     // Update optimizations field
@@ -134,7 +139,13 @@ public class RawIndexConverter {
     _convertedProperties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_OPTIMIZATIONS, optimizations);
     _convertedProperties.save();
 
-    LOGGER.info("Finish converting segment: {} in table: {}", segmentName, tableName);
+    if (columnsToConvert.isEmpty()) {
+      LOGGER.info("No column converted for segment: {} in table: {}", segmentName, tableName);
+      return false;
+    } else {
+      LOGGER.info("{} columns converted for segment: {} in table: {}", columnsToConvert.size(), segmentName, tableName);
+      return true;
+    }
   }
 
   private boolean shouldConvertColumn(FieldSpec fieldSpec) {
@@ -155,8 +166,9 @@ public class RawIndexConverter {
     long dictionaryBasedIndexSize =
         (long) numTotalDocs * columnMetadata.getBitsPerElement() + (long) cardinality * lengthOfEachEntry;
     long rawIndexSize = (long) numTotalDocs * lengthOfEachEntry;
-    LOGGER.info("For column: {}, size of dictionary based index: {} bits, size of raw index: {} bits", columnName,
-        dictionaryBasedIndexSize, rawIndexSize);
+    LOGGER.info(
+        "For column: {}, size of dictionary based index: {} bits, size of raw index (without compression): {} bits",
+        columnName, dictionaryBasedIndexSize, rawIndexSize);
 
     return rawIndexSize <= dictionaryBasedIndexSize * CONVERSION_THRESHOLD;
   }
