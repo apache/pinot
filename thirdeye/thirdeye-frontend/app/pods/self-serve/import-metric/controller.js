@@ -14,7 +14,6 @@ export default Ember.Controller.extend({
   isImportError: false,
   isSubmitDone: false,
   isDashboardExistError: false,
-  isExistingDashFieldDisabled: false,
   isCustomDashFieldDisabled: false,
   consolidateOptions: ['Aggregate', 'Average'],
   selectedConsolidateOption: 'Average',
