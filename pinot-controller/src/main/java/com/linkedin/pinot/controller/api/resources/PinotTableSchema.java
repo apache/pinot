@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
@@ -36,7 +34,6 @@ import javax.ws.rs.core.Response;
 @Api(tags = Constants.SCHEMA_TAG)
 @Path("/")
 public class PinotTableSchema {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableSchema.class);
 
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
