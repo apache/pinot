@@ -5,7 +5,14 @@
       <section class="rca-summary">
         <div class="row">
           <div class="col-xs-4">
-            <label class="te-label" for="select-anomaly-region">Investigation Period: </label>
+            <label class="te-label" for="select-anomaly-region">Investigation Period:
+              <span>
+                <i class="glyphicon glyphicon-question-sign"></i>
+                {{#tooltip-on-element}}
+                  Typically, this is your anomaly region. It's highlighted in orange in the graph below.
+                {{/tooltip-on-element}} 
+              </span>
+            </label>
             {{date-range-picker
               class="te-range-picker"
               timePicker=showTimePicker
@@ -52,7 +59,14 @@
         <div class="row">
 
           <div class="col-xs-4">
-            <label class="te-label" for="select-view-region">Display Period: </label>
+            <label class="te-label" for="select-view-region">Display Period: 
+              <span>
+                <i class="glyphicon glyphicon-question-sign"></i>
+                {{#tooltip-on-element}}
+                  This is the whole period that you'd like to view. This sets the boundaries for your subchart.
+                {{/tooltip-on-element}} 
+              </span>
+            </label>
             {{date-range-picker
               class="te-range-picker"
               timePicker=showTimePicker
