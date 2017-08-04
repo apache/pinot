@@ -57,6 +57,24 @@ export default Ember.Controller.extend({
   ],
 
   /**
+   * Array to define alerts table columns for selected config group
+   */
+  alertsTableColumns: [
+    {
+      propertyName: 'name',
+      title: 'Alert Name'
+    },
+    {
+      propertyName: 'metric',
+      title: 'Alert Metric'
+    },
+    {
+      propertyName: 'type',
+      title: 'Alert Type'
+    }
+  ],
+
+  /**
    * Options for patterns of interest field. These may eventually load from the backend.
    */
   patternsOfInterest: ['Up and Down', 'Up only', 'Down only'],
@@ -301,17 +319,28 @@ export default Ember.Controller.extend({
     const startTime = moment().subtract(1, 'month').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
     const endTime = moment().subtract(1, 'day').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
 
+    // Set banner to 'pending' state
+    this.setProperties({
+      isReplaySuccess: true,
+      isReplayStatusPending: true
+    });
+
+    // Begin replay sequence. Simulate trigger response time since we don't yet need
+    // to wait for the actual response, which takes 30+ seconds
     this.callCloneAlert(newFuncId)
       .then((clonedId) => {
+        const that = this;
+        Ember.run.later((function() {
+          that.setProperties({
+            isReplaySuccess: true,
+            isReplayStatusPending: false,
+            replayStatusClass: 'te-form__banner--success'
+          });
+        }), 3000);
         return this.callReplayStart(clonedId, startTime, endTime);
       })
-      .then((jobId) => {
-        this.setProperties({
-          isReplaySuccess: true,
-          isReplayStatusPending: false,
-          replayStatusClass: 'te-form__banner--success'
-        });
-      })
+      // NOTE: Once we decide how to "listen" for replay end in the UI, we will do something here.
+      // .then((jobId) => {})
       .catch((error) => {
         this.setProperties({
           isReplayError: true,
@@ -545,6 +574,18 @@ export default Ember.Controller.extend({
       const body = `TE Team, please look into a possible inconsistency issue with [ ${fullMetricName} ]`;
       const mailtoString = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       return mailtoString;
+    }
+  ),
+
+  /**
+   * Returns the appropriate subtitle for selected config group monitored alerts
+   * @method selectedConfigGroupSubtitle
+   * @return {String} title of expandable section for selected config group
+   */
+  selectedConfigGroupSubtitle: Ember.computed(
+    'selectedConfigGroup',
+    function () {
+      return `Alerts Monitored by: ${this.get('selectedConfigGroup.name')}`;
     }
   ),
 
@@ -825,7 +866,7 @@ export default Ember.Controller.extend({
 
             if (alertResult.ok) {
               this.setProperties({
-                selectedGroupRecipients: finalConfigObj.recipients,
+                selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
                 isCreateAlertSuccess: true,
                 finalFunctionId: newFunctionId
               });

@@ -104,8 +104,6 @@ body {
 
 .te-form {
   &__section {
-    margin-top: 10px;
-
     &--first {
       margin-top: 0;
     }
@@ -156,7 +154,7 @@ body {
     font-size: 16px;
     margin-top: 10px;
     padding-top: 10px;
-    border-left: 35px solid;
+    border-left: 30px solid;
 
     &--success {
       color: #1f5a8c;
@@ -187,6 +185,24 @@ body {
 
   &__note {
     padding: 5px;
+  }
+
+  &__custom-label {
+    font-size: 14px;
+  }
+
+  // overriding bootstrap for create alert form
+  .panel-title {
+    font-size: 15px;
+    color: #369ece;
+    font-weight: 600;
+    letter-spacing: .1px;
+  }
+
+  // overriding power-select basic field style
+  .ember-power-select-trigger {
+    padding-top: 2px;
+    min-height: 2.4em !important;
   }
 }
 
