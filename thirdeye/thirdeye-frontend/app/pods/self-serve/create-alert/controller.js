@@ -25,12 +25,14 @@ export default Ember.Controller.extend({
   isCreateGroupSuccess: false,
   isCreateAlertError: false,
   isSelectMetricError: false,
-  isReplayError: false,
+  isReplayStatusError: false,
   isMetricDataLoading: false,
   isReplayStatusPending: true,
-  isReplaySuccess: false,
+  isReplayStatusSuccess: false,
+  isReplayStarted: false,
   metricGranularityOptions: [],
   originalDimensions: [],
+  bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
 
@@ -60,6 +62,11 @@ export default Ember.Controller.extend({
    * Array to define alerts table columns for selected config group
    */
   alertsTableColumns: [
+    {
+      propertyName: 'id',
+      title: 'Id',
+      className: 'te-form__table-index'
+    },
     {
       propertyName: 'name',
       title: 'Alert Name'
@@ -290,7 +297,7 @@ export default Ember.Controller.extend({
    */
   callCloneAlert(functionId) {
     const url = `/onboard/function/${functionId}/clone/cloned`;
-    return fetch(url, { method: 'post' }).then(checkStatus);
+    return fetch(url, { method: 'post' }).then((res) => checkStatus(res, 'post'));
   },
 
   /**
@@ -301,11 +308,21 @@ export default Ember.Controller.extend({
    * @param {Object} endTime - replay end time stamp
    * @return {Ember.RSVP.Promise}
    */
-  callReplayStart(clonedId, startTime, endTime) {
+  callReplayStart(functionId, startTime, endTime) {
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = granularity.includes('hour') || granularity.includes('day');
-    const url = `/detection-job/${clonedId}/replay?start=${startTime}&end=${endTime}&speedup=${speedUp}`;
-    return fetch(url, { method: 'post' }).then(checkStatus);
+    const url = `/detection-job/${functionId}/replay?start=${startTime}&end=${endTime}&speedup=${speedUp}`;
+    return fetch(url, { method: 'post' })
+      .then((res) => checkStatus(res, 'post'))
+      .catch((error) => {
+        this.setProperties({
+          isReplayStatusError: true,
+          isReplayStatusPending: false,
+          bsAlertBannerType: 'danger',
+          replayStatusClass: 'te-form__banner--failure',
+          failureMessage: `The replay sequence has been interrupted. (${error})`
+        });
+      });
   },
 
   /**
@@ -318,35 +335,27 @@ export default Ember.Controller.extend({
   triggerReplay(newFuncId) {
     const startTime = moment().subtract(1, 'month').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
     const endTime = moment().subtract(1, 'day').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
+    const that = this;
 
     // Set banner to 'pending' state
     this.setProperties({
-      isReplaySuccess: true,
+      isReplayStarted: true,
       isReplayStatusPending: true
     });
 
-    // Begin replay sequence. Simulate trigger response time since we don't yet need
-    // to wait for the actual response, which takes 30+ seconds
-    this.callCloneAlert(newFuncId)
-      .then((clonedId) => {
-        const that = this;
-        Ember.run.later((function() {
-          that.setProperties({
-            isReplaySuccess: true,
-            isReplayStatusPending: false,
-            replayStatusClass: 'te-form__banner--success'
-          });
-        }), 3000);
-        return this.callReplayStart(clonedId, startTime, endTime);
-      })
-      // NOTE: Once we decide how to "listen" for replay end in the UI, we will do something here.
-      // .then((jobId) => {})
-      .catch((error) => {
-        this.setProperties({
-          isReplayError: true,
-          failureMessage: `Failed to trigger replay. (${error})`
+    // Begin triggering of replay sequence
+    this.callReplayStart(newFuncId, startTime, endTime);
+
+    // Simulate trigger response time since currently response takes 30+ seconds
+    Ember.run.later((function() {
+      if (!that.get('isReplayStatusError')) {
+        that.setProperties({
+          isReplayStatusSuccess: true,
+          isReplayStatusPending: false,
+          replayStatusClass: 'te-form__banner--success'
         });
-      });
+      }
+    }), 3000);
   },
 
   /**
@@ -361,10 +370,13 @@ export default Ember.Controller.extend({
     const newFunctionList = [];
     const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
     let cnt = 0;
+
+    // Build object for each function(alert) to display in results table
     return new Ember.RSVP.Promise((resolve) => {
       for (var functionId of existingFunctionList) {
         this.fetchFunctionById(functionId).then(functionData => {
           newFunctionList.push({
+            number: cnt + 1,
             id: functionData.id,
             name: functionData.functionName,
             metric: functionData.metric + '::' + functionData.collection,
@@ -374,6 +386,9 @@ export default Ember.Controller.extend({
           });
           cnt ++;
           if (existingFunctionList.length === cnt) {
+            if (newId) {
+              newFunctionList.reverse();
+            }
             resolve(newFunctionList);
           }
         });
@@ -612,9 +627,11 @@ export default Ember.Controller.extend({
       isCreateAlertSuccess: null,
       isCreateAlertError: false,
       isCreateGroupSuccess: false,
-      isReplaySuccess: false,
-      isReplayError: false,
+      isReplayStatusSuccess: false,
+      isReplayStarted: false,
+      isReplayStatusError: false,
       graphEmailLinkProps: '',
+      bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({}),
       replayStatusClass: 'te-form__banner--pending'
     });
@@ -728,10 +745,11 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectConfigGroup(selectedObj) {
+      const emails = selectedObj.recipients || '';
       this.setProperties({
         selectedConfigGroup: selectedObj,
         newConfigGroupName: null,
-        selectedGroupRecipients: selectedObj.recipients.replace(/,+/g, ', ')
+        selectedGroupRecipients: emails.split(',').filter(e => String(e).trim()).join(', ')
       });
       this.prepareFunctions(selectedObj).then(functionData => {
         this.set('selectedGroupFunctions', functionData);
@@ -842,6 +860,8 @@ export default Ember.Controller.extend({
 
       // A reference to whichever 'alert config' object will be sent. Let's default to the new one
       let finalConfigObj = newConfigObj;
+      let functionArray = [];
+      let that = this;
 
       // First, save our new alert function. TODO: deal with request failure case.
       this.saveThirdEyeFunction(newFunctionObj).then(newFunctionId => {
@@ -889,6 +909,9 @@ export default Ember.Controller.extend({
             } else {
               this.set('isCreateAlertError', true);
             }
+          })
+          .catch((error) => {
+            this.set('isCreateAlertError', true);
           });
         } else {
           this.set('isCreateAlertError', true);

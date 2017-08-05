@@ -191,6 +191,11 @@ body {
     font-size: 14px;
   }
 
+  &__table-index {
+    text-align: right;
+    width: 100px;
+  }
+
   // overriding bootstrap for create alert form
   .panel-title {
     font-size: 15px;

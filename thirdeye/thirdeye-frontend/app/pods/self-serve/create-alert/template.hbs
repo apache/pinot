@@ -44,23 +44,6 @@
     </div>
 
     <div class="form-group te-form__group--horizontal te-form__group--small">
-      <label for="select-granularity" class="control-label">Desired Granularity</label>
-      {{#power-select
-        options=metricGranularityOptions
-        selected=selectedGranularity
-        onchange=(action "onSelectGranularity")
-        placeholder="Select a Granularity"
-        searchPlaceholder="Type to filter..."
-        triggerId="select-granularity"
-        triggerClass="te-form__select"
-        disabled=isGranularitySelectDisabled
-        as |granularity|
-      }}
-        {{granularity}}
-      {{/power-select}}
-    </div>
-
-    <div class="form-group te-form__group--horizontal te-form__group--small te-form__group--last">
       <label for="select-dimension" class="control-label">Dimension</label>
       {{#power-select
         options=dimensions
@@ -75,6 +58,23 @@
         as |dimension|
       }}
         {{dimension}}
+      {{/power-select}}
+    </div>
+
+    <div class="form-group te-form__group--horizontal te-form__group--small te-form__group--last">
+      <label for="select-granularity" class="control-label">Desired Granularity</label>
+      {{#power-select
+        options=metricGranularityOptions
+        selected=selectedGranularity
+        onchange=(action "onSelectGranularity")
+        placeholder="Select a Granularity"
+        searchPlaceholder="Type to filter..."
+        triggerId="select-granularity"
+        triggerClass="te-form__select"
+        disabled=isGranularitySelectDisabled
+        as |granularity|
+      }}
+        {{granularity}}
       {{/power-select}}
     </div>
 
@@ -268,19 +268,17 @@
     {{/bs-alert}}
   {{/if}}
 
-  {{#if isReplaySuccess}}
-    {{#bs-alert type="success" class="te-form__banner" classNameBindings="replayStatusClass"}}
+  {{#if isReplayStarted}}
+    {{#bs-alert type=bsAlertBannerType class="te-form__banner" classNameBindings="replayStatusClass"}}
       {{#if isReplayStatusPending}}
         ...triggering replay. Please wait.
-      {{else}}
+      {{/if}}
+      {{#if isReplayStatusSuccess}}
         <strong>Replay Success!</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has started processing.
       {{/if}}
-    {{/bs-alert}}
-  {{/if}}
-
-  {{#if isReplayError}}
-    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
-      <strong>Replay Error:</strong> {{failureMessage}}
+      {{#if isReplayStatusError}}
+        <strong>Replay Warning:</strong> {{failureMessage}}
+      {{/if}}
     {{/bs-alert}}
   {{/if}}
 
