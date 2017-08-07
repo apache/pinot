@@ -41,16 +41,15 @@ public class LdapAuthenticationManager implements IAuthManager, Authenticator<Au
     PrincipalAuthContext authContext = null;
     try {
       if (authRequest.getPrincipal() != null) {
-
         Hashtable<String, String> env = new Hashtable<>();
         env.put(Context.INITIAL_CONTEXT_FACTORY, LDAP_CONTEXT_FACTORY);
-        env.put(Context.PROVIDER_URL, authConfiguration.getLdapUrl());  //"ldaps://lca1-lds02.linkedin.biz:636");
+        env.put(Context.PROVIDER_URL, authConfiguration.getLdapUrl());
 
         if (authConfiguration.getLdapUrl().startsWith("ldaps")) {
           env.put(Context.SECURITY_PROTOCOL, "ssl");
         }
         env.put(Context.SECURITY_AUTHENTICATION, "simple");
-        env.put(Context.SECURITY_PRINCIPAL, authRequest.getPrincipal() + authConfiguration.getDomainSuffix());
+        env.put(Context.SECURITY_PRINCIPAL, authRequest.getPrincipal() + '@' + authConfiguration.getDomainSuffix());
         env.put(Context.SECURITY_CREDENTIALS, authRequest.getPassword());
 
         // Create the initial context

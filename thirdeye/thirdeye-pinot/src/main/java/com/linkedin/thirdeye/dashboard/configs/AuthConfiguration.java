@@ -4,6 +4,7 @@ import java.util.List;
 
 
 public class AuthConfiguration {
+  boolean authEnabled;
 
   String authKey;
 
@@ -21,6 +22,14 @@ public class AuthConfiguration {
    * System admins
    */
   List<String> adminUsers;
+
+  public boolean isAuthEnabled() {
+    return authEnabled;
+  }
+
+  public void setAuthEnabled(boolean authEnabled) {
+    this.authEnabled = authEnabled;
+  }
 
   public String getAuthKey() {
     return authKey;

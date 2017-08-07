@@ -7,7 +7,7 @@ import java.util.List;
 
 
 public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
-  AuthConfiguration authConfig;
+  AuthConfiguration authConfig = new AuthConfiguration();
   RootCauseConfiguration rootCause;
   List<ResourceConfiguration> resourceConfig;
 

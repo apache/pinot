@@ -3,6 +3,11 @@ package com.linkedin.thirdeye.dashboard;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.auth.AuthRequest;
+import com.linkedin.thirdeye.auth.ThirdeyeAuthFilter;
+import com.linkedin.thirdeye.auth.IAuthManager;
+import com.linkedin.thirdeye.auth.LdapAuthenticationManager;
+import com.linkedin.thirdeye.auth.PrincipalAuthContext;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
@@ -26,6 +31,7 @@ import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import com.linkedin.thirdeye.dashboard.resources.v2.AuthResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.ConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
@@ -34,6 +40,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -41,6 +48,7 @@ import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
 
 import io.dropwizard.assets.AssetsBundle;
+import io.dropwizard.auth.Authenticator;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
@@ -143,22 +151,33 @@ public class ThirdEyeDashboardApplication
     AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
     env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
 
-    if(config.getRootCause() != null) {
-      env.jersey().register(makeRootCauseResource(config));
-    }
+    try {
+      // root cause resource
+      if (config.getRootCause() != null) {
+        env.jersey().register(makeRootCauseResource(config));
+      }
 
-    // Load external resources
-    if (config.getResourceConfig() != null) {
-      List<ResourceConfiguration> resourceConfigurations = config.getResourceConfig();
-      for(ResourceConfiguration resourceConfiguration : resourceConfigurations) {
-        try {
+      // Load external resources
+      if (config.getResourceConfig() != null) {
+        List<ResourceConfiguration> resourceConfigurations = config.getResourceConfig();
+        for (ResourceConfiguration resourceConfiguration : resourceConfigurations) {
           env.jersey().register(Class.forName(resourceConfiguration.getClassName()));
           LOG.info("Registering resource [{}]", resourceConfiguration.getClassName());
-        } catch (Exception e) {
-          LOG.error("Could not instantiate resource", e);
         }
       }
+    } catch (Exception e) {
+      LOG.error("Error loading the resource", e);
     }
+
+
+    IAuthManager authManager = new LdapAuthenticationManager(config.getAuthConfig());
+    DAORegistry.getInstance().setAuthManager(authManager);
+    env.jersey().register(new AuthResource());
+
+    // add default auth filter
+    env.jersey()
+        .register(new ThirdeyeAuthFilter((Authenticator<AuthRequest, PrincipalAuthContext>) authManager,
+            config.getAuthConfig().isAuthEnabled()));
   }
 
   private static RootCauseResource makeRootCauseResource(ThirdEyeDashboardConfiguration config) throws Exception {
