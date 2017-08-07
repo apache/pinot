@@ -51,26 +51,32 @@ public class ConvertToRawIndexTaskExecutor extends BaseTaskExecutor {
     Preconditions.checkState(tempDataDir.mkdirs());
     try {
       // Download the tarred segment file
-      File tempTarredSegmentFile = new File(tempDataDir, "tarredSegmentFile");
+      File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile");
       SegmentFetcherFactory.getSegmentFetcherBasedOnURI(downloadURL)
-          .fetchSegmentToLocal(downloadURL, tempTarredSegmentFile);
+          .fetchSegmentToLocal(downloadURL, tarredSegmentFile);
 
       // Un-tar the segment file
-      File tempSegmentDir = new File(tempDataDir, "segmentDir");
-      TarGzCompressionUtils.unTar(tempTarredSegmentFile, tempSegmentDir);
-      File[] files = tempSegmentDir.listFiles();
+      File segmentDir = new File(tempDataDir, "segmentDir");
+      TarGzCompressionUtils.unTar(tarredSegmentFile, segmentDir);
+      File[] files = segmentDir.listFiles();
       Preconditions.checkState(files != null && files.length == 1);
       File indexDir = files[0];
 
       // Convert the segment
-      File convertedIndexDir = new File(tempDataDir, "convertedIndexDir");
+      // NOTE: even no column is converted, still need to upload the segment to update the segment ZK metadata so that
+      // segment will not be submitted again
+      File convertedSegmentDir = new File(tempDataDir, "convertedSegmentDir");
+      Preconditions.checkState(convertedSegmentDir.mkdir());
+      File convertedIndexDir = new File(convertedSegmentDir, segmentName);
       new RawIndexConverter(indexDir, convertedIndexDir,
           configs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
 
       // Tar the converted segment
+      File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
+      Preconditions.checkState(convertedTarredSegmentDir.mkdir());
       File convertedTarredSegmentFile = new File(
           TarGzCompressionUtils.createTarGzOfDirectory(convertedIndexDir.getPath(),
-              new File(tempDataDir, "convertedTarredSegmentFile").getPath()));
+              new File(convertedTarredSegmentDir, segmentName).getPath()));
 
       // Check whether the task get cancelled before uploading the segment
       if (_cancelled) {
@@ -80,8 +86,9 @@ public class ConvertToRawIndexTaskExecutor extends BaseTaskExecutor {
       }
 
       // Upload the converted tarred segment file
-      FileUploadUtils.sendFile(uploadURL, "convertedTarredSegmentFile", new FileInputStream(convertedTarredSegmentFile),
-          convertedTarredSegmentFile.length(), FileUploadUtils.SendFileMethod.POST);
+      FileUploadUtils.sendFile(uploadURL, convertedTarredSegmentFile.getName(),
+          new FileInputStream(convertedTarredSegmentFile), convertedTarredSegmentFile.length(),
+          FileUploadUtils.SendFileMethod.POST);
 
       LOGGER.info("Done executing ConvertToRawIndexTask on table: {}, segment: {}", tableName, segmentName);
     } catch (TaskCancelledException e) {
