@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;

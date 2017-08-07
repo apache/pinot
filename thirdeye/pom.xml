@@ -21,6 +21,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.7</jdk.version>
     <dropwizard.version>0.8.4</dropwizard.version>
+    <dropwizard-auth.version>0.9.2</dropwizard-auth.version>
     <dropwizard.redirect.bundle.version>1.0.5</dropwizard.redirect.bundle.version>
     <jackson.version>2.8.3</jackson.version>
     <mysql.connector.version>5.1.39</mysql.connector.version>
@@ -143,6 +144,11 @@
         <groupId>io.dropwizard</groupId>
         <artifactId>dropwizard-views-freemarker</artifactId>
         <version>${dropwizard.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard</groupId>
+        <artifactId>dropwizard-auth</artifactId>
+        <version>${dropwizard-auth.version}</version>
       </dependency>
       <dependency>
         <groupId>io.dropwizard-bundles</groupId>
