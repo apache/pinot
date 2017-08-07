@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
@@ -25,7 +24,6 @@ import com.linkedin.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnH
 import com.linkedin.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
 import com.linkedin.pinot.core.segment.index.loader.invertedindex.InvertedIndexHandler;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import java.io.File;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -34,12 +32,13 @@ import javax.annotation.Nullable;
 /**
  * Use mmap to load the segment and perform all pre-processing steps. (This can be slow)
  * <p>Pre-processing steps include:
- * <p>- Use {@link InvertedIndexHandler} to create inverted indices.
- * <p>- Use {@link DefaultColumnHandler} to update auto-generated default columns.
+ * <ul>
+ *   <li>Use {@link InvertedIndexHandler} to create inverted indices</li>
+ *   <li>Use {@link DefaultColumnHandler} to update auto-generated default columns</li>
+ *   <li>Use {@link ColumnMinMaxValueGenerator} to add min/max value to column metadata</li>
+ * </ul>
  */
 public class SegmentPreProcessor implements AutoCloseable {
-  private final SegmentVersion _segmentVersion;
-  private final File _segmentDirectoryPath;
   private final File _indexDir;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
@@ -47,68 +46,56 @@ public class SegmentPreProcessor implements AutoCloseable {
   private SegmentMetadataImpl _segmentMetadata;
 
   public SegmentPreProcessor(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
-      throws Exception {
-    // Note: here we should already converted the segment into desired version, use the version in index loading config
-    _segmentVersion = indexLoadingConfig.getSegmentVersion();
-
-    _segmentDirectoryPath = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentVersion);
-    _segmentMetadata = new SegmentMetadataImpl(indexDir, _segmentVersion);
+      @Nullable Schema schema) throws Exception {
     _indexDir = indexDir;
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
+    _segmentMetadata = new SegmentMetadataImpl(indexDir);
 
     // Always use mmap to load the segment because it is safest and performs well without impact from -Xmx params.
     // This is not the final load of the segment.
-    _segmentDirectory = SegmentDirectory.createFromLocalFS(_segmentDirectoryPath, _segmentMetadata, ReadMode.mmap);
+    _segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, _segmentMetadata, ReadMode.mmap);
   }
 
-  public void process()
-      throws Exception {
-    SegmentDirectory.Writer segmentWriter = null;
-    try {
-      segmentWriter = _segmentDirectory.createWriter();
+  public void process() throws Exception {
+    if (_segmentMetadata.getTotalDocs() == 0) {
+      return;
+    }
 
+    try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Create column inverted indices according to the index config.
       InvertedIndexHandler invertedIndexHandler =
-          new InvertedIndexHandler(_segmentDirectoryPath, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
 
-      if (_segmentMetadata.getTotalDocs() != 0) {
-        if (_indexLoadingConfig.isEnableDefaultColumns() && (_schema != null)) {
-          // Update default columns according to the schema.
-          // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
-          DefaultColumnHandler defaultColumnHandler =
-              DefaultColumnHandlerFactory.getDefaultColumnHandler(_segmentDirectoryPath, _schema, _segmentMetadata,
-                  segmentWriter);
-          defaultColumnHandler.updateDefaultColumns();
-        }
-
-        ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
-            _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
-        if (columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
-          // Add min/max value to column metadata according to the prune mode.
-          // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
-          // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
-
-          // Reload the metadata.
-          _segmentMetadata = new SegmentMetadataImpl(_indexDir, _segmentVersion);
-          ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
-              new ColumnMinMaxValueGenerator(_segmentDirectoryPath, _segmentMetadata, segmentWriter,
-                  columnMinMaxValueGeneratorMode);
-          columnMinMaxValueGenerator.addColumnMinMaxValue();
-        }
+      // Update default columns according to the schema.
+      // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
+      if (_indexLoadingConfig.isEnableDefaultColumns() && (_schema != null)) {
+        DefaultColumnHandler defaultColumnHandler =
+            DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
+        defaultColumnHandler.updateDefaultColumns();
       }
-    } finally {
-      if (segmentWriter != null) {
-        segmentWriter.saveAndClose();
+
+      // Add min/max value to column metadata according to the prune mode.
+      // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
+      // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
+      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
+          _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
+      if (columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
+        // Reload the metadata.
+        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+
+        ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
+            new ColumnMinMaxValueGenerator(_segmentMetadata, segmentWriter, columnMinMaxValueGeneratorMode);
+        columnMinMaxValueGenerator.addColumnMinMaxValue();
       }
+
+      segmentWriter.save();
     }
   }
 
   @Override
-  public void close()
-      throws Exception {
+  public void close() throws Exception {
     _segmentDirectory.close();
   }
 }

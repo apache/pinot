@@ -15,12 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime.converter;
 
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -28,6 +24,10 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nullable;
 
 
 public class RealtimeSegmentConverter {
@@ -83,7 +83,7 @@ public class RealtimeSegmentConverter {
         new ArrayList<String>(), null/*StarTreeIndexSpec*/);
   }
 
-  public void build(SegmentVersion segmentVersion) throws Exception {
+  public void build(@Nullable SegmentVersion segmentVersion) throws Exception {
     // lets create a record reader
     RealtimeSegmentRecordReader reader;
     if (sortedColumn == null) {
@@ -109,7 +109,9 @@ public class RealtimeSegmentConverter {
 
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
-    genConfig.setSegmentVersion(segmentVersion);
+    if (segmentVersion != null) {
+      genConfig.setSegmentVersion(segmentVersion);
+    }
     genConfig.setTableName(tableName);
     genConfig.setOutDir(outputPath);
     genConfig.setSegmentName(segmentName);

@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
 
-import java.io.File;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -39,6 +29,16 @@ import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForward
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
+import java.io.File;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
@@ -120,14 +120,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.METRICS, metricColumns);
 
     // Create a back up for origin metadata.
-    File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    File metadataFile = _segmentProperties.getFile();
     File metadataBackUpFile = new File(metadataFile + ".bak");
     if (!metadataBackUpFile.exists()) {
       FileUtils.copyFile(metadataFile, metadataBackUpFile);
     }
 
     // Save the new metadata.
-    _segmentProperties.save(metadataFile);
+    _segmentProperties.save();
   }
 
   /**

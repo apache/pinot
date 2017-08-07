@@ -230,8 +230,7 @@ public abstract class SegmentDirectory implements AutoCloseable {
       close();
     }
 
-    abstract void save()
-        throws IOException;
+    public abstract void save() throws IOException;
 
     abstract void abort();
 

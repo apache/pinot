@@ -428,8 +428,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    void save()
-        throws IOException {
+    public void save() throws IOException {
     }
 
     void abort() {

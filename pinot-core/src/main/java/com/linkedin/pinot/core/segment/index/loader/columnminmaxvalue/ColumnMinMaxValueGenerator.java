@@ -19,7 +19,6 @@ import com.clearspring.analytics.util.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
@@ -30,12 +29,10 @@ import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import java.io.File;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
 
 public class ColumnMinMaxValueGenerator {
-  private final File _indexDir;
   private final SegmentMetadataImpl _segmentMetadata;
   private final PropertiesConfiguration _segmentProperties;
   private final SegmentDirectory.Writer _segmentWriter;
@@ -43,17 +40,15 @@ public class ColumnMinMaxValueGenerator {
 
   private boolean _minMaxValueAdded;
 
-  public ColumnMinMaxValueGenerator(File indexDir, SegmentMetadataImpl segmentMetadata,
-      SegmentDirectory.Writer segmentWriter, ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode) {
-    _indexDir = indexDir;
+  public ColumnMinMaxValueGenerator(SegmentMetadataImpl segmentMetadata, SegmentDirectory.Writer segmentWriter,
+      ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode) {
     _segmentMetadata = segmentMetadata;
     _segmentProperties = segmentMetadata.getSegmentMetadataPropertiesConfiguration();
     _segmentWriter = segmentWriter;
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
 
-  public void addColumnMinMaxValue()
-      throws Exception {
+  public void addColumnMinMaxValue() throws Exception {
     Preconditions.checkState(_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE);
 
     Schema schema = _segmentMetadata.getSchema();
@@ -84,8 +79,7 @@ public class ColumnMinMaxValueGenerator {
     saveMetadata();
   }
 
-  private void addColumnMinMaxValueForColumn(String columnName)
-      throws Exception {
+  private void addColumnMinMaxValueForColumn(String columnName) throws Exception {
     // Skip column without dictionary or with min/max value already set
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     if ((!columnMetadata.hasDictionary()) || (columnMetadata.getMinValue() != null)) {
@@ -127,11 +121,9 @@ public class ColumnMinMaxValueGenerator {
     _minMaxValueAdded = true;
   }
 
-  private void saveMetadata()
-      throws Exception {
+  private void saveMetadata() throws Exception {
     if (_minMaxValueAdded) {
-      File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      _segmentProperties.save(metadataFile);
+      _segmentProperties.save();
     }
   }
 }

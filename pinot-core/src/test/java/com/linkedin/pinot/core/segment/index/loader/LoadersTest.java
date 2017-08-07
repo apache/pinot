@@ -34,40 +34,33 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
-import java.nio.file.Files;
-import java.util.concurrent.TimeUnit;
+import java.net.URL;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class LoadersTest {
+  private static final File INDEX_DIR = new File(LoadersTest.class.getName());
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final String PADDING_OLD = "data/paddingOld.tar.gz";
   private static final String PADDING_PERCENT = "data/paddingPercent.tar.gz";
   private static final String PADDING_NULL = "data/paddingNull.tar.gz";
 
+  private File _avroFile;
   private File _indexDir;
-  private File _segmentDirectory;
   private IndexLoadingConfig _v1IndexLoadingConfig;
   private IndexLoadingConfig _v3IndexLoadingConfig;
 
-  @BeforeMethod
-  public void setUp()
-      throws Exception {
-    _indexDir = Files.createTempDirectory(LoadersTest.class.getName() + "_segmentDir").toFile();
-    final String filePath = TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(AVRO_DATA));
-    final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), _indexDir, "daysSinceEpoch",
-            TimeUnit.HOURS, "testTable");
-    config.setSegmentNamePostfix("1");
-    config.setTimeColumnName("daysSinceEpoch");
-    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    driver.init(config);
-    driver.build();
-    _segmentDirectory = new File(_indexDir, driver.getSegmentName());
+  @BeforeClass
+  public void setUp() throws Exception {
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA);
+    Assert.assertNotNull(resourceUrl);
+    _avroFile = new File(resourceUrl.getFile());
 
     _v1IndexLoadingConfig = new IndexLoadingConfig();
     _v1IndexLoadingConfig.setReadMode(ReadMode.mmap);
@@ -78,65 +71,65 @@ public class LoadersTest {
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
   }
 
-  @AfterMethod
-  public void tearDownClass() {
-    if (_indexDir != null) {
-      FileUtils.deleteQuietly(_indexDir);
-    }
+  private void constructV1Segment() throws Exception {
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    SegmentGeneratorConfig segmentGeneratorConfig =
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "testTable");
+    segmentGeneratorConfig.setSegmentVersion(SegmentVersion.v1);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(segmentGeneratorConfig);
+    driver.build();
+
+    _indexDir = new File(INDEX_DIR, driver.getSegmentName());
   }
 
   @Test
-  public void testLoad()
-      throws Exception {
-    SegmentMetadataImpl originalMetadata = new SegmentMetadataImpl(_segmentDirectory);
-    Assert.assertEquals(originalMetadata.getSegmentVersion(), SegmentVersion.v1);
-    // note: ordering of these two test blocks matters
-    {
-      // Explicitly pass v1 format since we will convert by default to v3
-      IndexSegment indexSegment = Loaders.IndexSegment.load(_segmentDirectory, _v1IndexLoadingConfig);
-      Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), originalMetadata.getVersion());
-      Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_segmentDirectory, SegmentVersion.v3).exists());
-    }
-    {
-      // with this code and converter in place, make sure we still load original version
-      // by default. We require specific configuration for v3.
-      IndexSegment indexSegment = Loaders.IndexSegment.load(_segmentDirectory, ReadMode.mmap);
-      Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
-      Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_segmentDirectory, SegmentVersion.v3).exists());
-    }
+  public void testLoad() throws Exception {
+    constructV1Segment();
+    Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v1);
+    Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
+
+    testConversion();
+  }
+
+  /**
+   * Format converter will leave stale directory around if there were conversion failures. This test checks loading in
+   * that scenario.
+   */
+  @Test
+  public void testLoadWithStaleConversionDir() throws Exception {
+    constructV1Segment();
+
+    File v3TempDir = new SegmentV1V2ToV3FormatConverter().v3ConversionTempDirectory(_indexDir);
+    Assert.assertTrue(v3TempDir.isDirectory());
+    testConversion();
+    Assert.assertFalse(v3TempDir.exists());
+  }
+
+  private void testConversion() throws Exception {
+    // Do not set segment version, should not convert the segment
+    IndexSegment indexSegment = Loaders.IndexSegment.load(_indexDir, ReadMode.mmap);
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
+    Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
+
+    // Set segment version to v1, should not convert the segment
+    indexSegment = Loaders.IndexSegment.load(_indexDir, _v1IndexLoadingConfig);
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
+    Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
+
+    // Set segment version to v3, should convert the segment to v3
+    indexSegment = Loaders.IndexSegment.load(_indexDir, _v3IndexLoadingConfig);
+    Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+    Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
   }
 
   @Test
-  public void testLoadWithStaleConversionDir()
-      throws Exception {
-    // Format converter will leave stale directories around if there was
-    // conversion failure. This test case checks loading in that scenario
-    SegmentMetadataImpl originalMetadata = new SegmentMetadataImpl(_segmentDirectory);
-    Assert.assertEquals(originalMetadata.getSegmentVersion(), SegmentVersion.v1);
-    Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_segmentDirectory, SegmentVersion.v3).exists());
-    File v3TempDir = new SegmentV1V2ToV3FormatConverter().v3ConversionTempDirectory(_segmentDirectory);
-    FileUtils.touch(v3TempDir);
-
-    {
-      IndexSegment indexSegment = Loaders.IndexSegment.load(_segmentDirectory, ReadMode.mmap);
-      Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
-      Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_segmentDirectory, SegmentVersion.v3).exists());
-    }
-    {
-      IndexSegment indexSegment = Loaders.IndexSegment.load(_segmentDirectory, _v3IndexLoadingConfig);
-      Assert.assertEquals(SegmentVersion.valueOf(indexSegment.getSegmentMetadata().getVersion()), SegmentVersion.v3);
-      Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_segmentDirectory, SegmentVersion.v3).exists());
-      Assert.assertFalse(v3TempDir.exists());
-    }
-  }
-
-  @Test
-  public void testPadding()
-      throws Exception {
+  public void testPadding() throws Exception {
     // Old Format
     TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_OLD))), _indexDir);
-    File segmentDirectory = new File(_indexDir, "paddingOld");
+        new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_OLD))), INDEX_DIR);
+    File segmentDirectory = new File(INDEX_DIR, "paddingOld");
     SegmentMetadataImpl originalMetadata = new SegmentMetadataImpl(segmentDirectory);
     Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
         V1Constants.Str.LEGACY_STRING_PAD_CHAR);
@@ -155,8 +148,8 @@ public class LoadersTest {
     // New Format Padding character %
     TarGzCompressionUtils.unTar(
         new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_PERCENT))),
-        _indexDir);
-    segmentDirectory = new File(_indexDir, "paddingPercent");
+        INDEX_DIR);
+    segmentDirectory = new File(INDEX_DIR, "paddingPercent");
     originalMetadata = new SegmentMetadataImpl(segmentDirectory);
     Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
         V1Constants.Str.LEGACY_STRING_PAD_CHAR);
@@ -175,8 +168,8 @@ public class LoadersTest {
     // New Format Padding character Null
     TarGzCompressionUtils.unTar(
         new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_NULL))),
-        _indexDir);
-    segmentDirectory = new File(_indexDir, "paddingNull");
+        INDEX_DIR);
+    segmentDirectory = new File(INDEX_DIR, "paddingNull");
     originalMetadata = new SegmentMetadataImpl(segmentDirectory);
     Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
         V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
@@ -191,5 +184,10 @@ public class LoadersTest {
     Assert.assertEquals(dict.get(1), "lynda 2.0");
     Assert.assertEquals(dict.indexOf("lynda\0"), 0);
     Assert.assertEquals(dict.indexOf("lynda\0\0"), 0);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    FileUtils.deleteQuietly(INDEX_DIR);
   }
 }
