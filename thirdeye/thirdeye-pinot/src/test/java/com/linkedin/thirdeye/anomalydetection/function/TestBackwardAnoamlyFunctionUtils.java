@@ -35,5 +35,12 @@ public class TestBackwardAnoamlyFunctionUtils {
     assert(timeSeriesList.size() == 2);
     assert(timeSeriesList.get(0).size() == 1);
     assert(timeSeriesList.get(1).size() == 5);
+
+    // assert current time series
+    assert(timeSeriesList.get(0).get(5).equals(5.0));
+
+    for (int i = 0; i < 5; i++) {
+      assert (timeSeriesList.get(1).get(i).equals(Double.valueOf(i)));
+    }
   }
 }
