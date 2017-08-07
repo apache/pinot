@@ -118,7 +118,7 @@ public class BackwardAnomalyFunctionUtils {
     @Override public int compare(TimeSeries ts1, TimeSeries ts2) {
       long startTime1 = ts1.getTimeSeriesInterval().getStartMillis();
       long startTime2 = ts2.getTimeSeriesInterval().getStartMillis();
-      return (int) (startTime1 - startTime2);
+      return Long.compare(startTime1, startTime2);
     }
   }
 }
