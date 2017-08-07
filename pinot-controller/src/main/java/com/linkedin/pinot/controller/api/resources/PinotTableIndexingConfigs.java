@@ -66,9 +66,9 @@ public class PinotTableIndexingConfigs {
   ) {
     TableConfig tableConfig = null;
     try {
-       tableConfig = TableConfig.fromJSONConfig(new JSONObject(body));
+      tableConfig = TableConfig.fromJSONConfig(new JSONObject(body));
       pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
-        tableConfig.getIndexingConfig());
+          tableConfig.getIndexingConfig());
       return new SuccessResponse("Updated indexing config for table " + tableName);
     } catch (JSONException | IOException e) {
       LOGGER.info("Error converting request to table config for table: {}", tableName, e);
