@@ -13,8 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.restlet.resources;
+package com.linkedin.pinot.controller.util;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executor;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -23,18 +31,11 @@ import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.api.restlet.resources.ServerTableSizeReader;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**

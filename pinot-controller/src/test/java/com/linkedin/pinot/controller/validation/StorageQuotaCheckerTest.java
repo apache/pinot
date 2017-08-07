@@ -19,7 +19,7 @@ package com.linkedin.pinot.controller.validation;
 import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.controller.api.restlet.resources.TableSizeReader;
+import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;

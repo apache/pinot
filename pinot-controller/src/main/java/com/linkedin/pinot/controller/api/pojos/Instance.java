@@ -35,6 +35,24 @@ public class Instance {
   private final String _tag;
   private final String _instancePrefix;
 
+  public static Instance fromInstanceConfig(InstanceConfig instanceConfig) {
+    InstanceConfig ic = instanceConfig;
+    String instanceName = ic.getInstanceName();
+    String type;
+    if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      type = CommonConstants.Helix.SERVER_INSTANCE_TYPE;
+    } else if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      type = CommonConstants.Helix.BROKER_INSTANCE_TYPE;
+    } else {
+      throw new RuntimeException("Unknown instance type for: " + instanceName);
+    }
+
+    Instance instance = new Instance(ic.getHostName(),
+        ic.getPort(),
+        type, org.apache.commons.lang.StringUtils.join(ic.getTags(), ','));
+    return instance;
+  }
+
   @JsonCreator
   public Instance(
       @JsonProperty(value = "host", required = true) String host,

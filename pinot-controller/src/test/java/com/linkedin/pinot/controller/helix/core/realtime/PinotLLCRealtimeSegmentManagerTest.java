@@ -30,7 +30,7 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentCommitUpload;
-import com.linkedin.pinot.controller.api.restlet.resources.SegmentCompletionUtils;
+import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;

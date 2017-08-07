@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.alibaba.fastjson.JSON;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import java.net.MalformedURLException;
 import java.net.URL;
 import org.json.JSONException;
