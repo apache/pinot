@@ -25,12 +25,15 @@ export default Ember.Controller.extend({
   isCreateGroupSuccess: false,
   isCreateAlertError: false,
   isSelectMetricError: false,
-  isReplayError: false,
+  isReplayStatusError: false,
   isMetricDataLoading: false,
   isReplayStatusPending: true,
-  isReplaySuccess: false,
+  isReplayStatusSuccess: false,
+  isReplayStarted: false,
   metricGranularityOptions: [],
   originalDimensions: [],
+  bsAlertBannerType: 'success',
+  graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
 
   legendText: {
@@ -53,6 +56,29 @@ export default Ember.Controller.extend({
     'selectedPattern',
     'alertFunctionName',
     'selectedAppName'
+  ],
+
+  /**
+   * Array to define alerts table columns for selected config group
+   */
+  alertsTableColumns: [
+    {
+      propertyName: 'id',
+      title: 'Id',
+      className: 'te-form__table-index'
+    },
+    {
+      propertyName: 'name',
+      title: 'Alert Name'
+    },
+    {
+      propertyName: 'metric',
+      title: 'Alert Metric'
+    },
+    {
+      propertyName: 'type',
+      title: 'Alert Type'
+    }
   ],
 
   /**
@@ -250,10 +276,11 @@ export default Ember.Controller.extend({
     this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
       this.set('isMetricDataLoading', false);
       if (!this.isMetricGraphable(metricData)) {
-        this.setProperties({
-          isMetricDataInvalid: true
-        });
+        // Metric has no data. not graphing
+        this.clearAll();
+        this.set('isMetricDataInvalid', true);
       } else {
+        // Metric has data. now sending new data to graph
         this.setProperties({
           isMetricSelected: true,
           selectedMetric: metricData
@@ -270,7 +297,7 @@ export default Ember.Controller.extend({
    */
   callCloneAlert(functionId) {
     const url = `/onboard/function/${functionId}/clone/cloned`;
-    return fetch(url, { method: 'post' }).then(checkStatus);
+    return fetch(url, { method: 'post' }).then((res) => checkStatus(res, 'post'));
   },
 
   /**
@@ -281,11 +308,21 @@ export default Ember.Controller.extend({
    * @param {Object} endTime - replay end time stamp
    * @return {Ember.RSVP.Promise}
    */
-  callReplayStart(clonedId, startTime, endTime) {
+  callReplayStart(functionId, startTime, endTime) {
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = granularity.includes('hour') || granularity.includes('day');
-    const url = `/detection-job/${clonedId}/replay?start=${startTime}&end=${endTime}&speedup=${speedUp}`;
-    return fetch(url, { method: 'post' }).then(checkStatus);
+    const url = `/detection-job/${functionId}/replay?start=${startTime}&end=${endTime}&speedup=${speedUp}`;
+    return fetch(url, { method: 'post' })
+      .then((res) => checkStatus(res, 'post'))
+      .catch((error) => {
+        this.setProperties({
+          isReplayStatusError: true,
+          isReplayStatusPending: false,
+          bsAlertBannerType: 'danger',
+          replayStatusClass: 'te-form__banner--failure',
+          failureMessage: `The replay sequence has been interrupted. (${error})`
+        });
+      });
   },
 
   /**
@@ -298,24 +335,27 @@ export default Ember.Controller.extend({
   triggerReplay(newFuncId) {
     const startTime = moment().subtract(1, 'month').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
     const endTime = moment().subtract(1, 'day').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
+    const that = this;
 
-    this.callCloneAlert(newFuncId)
-      .then((clonedId) => {
-        return this.callReplayStart(clonedId, startTime, endTime);
-      })
-      .then((jobId) => {
-        this.setProperties({
-          isReplaySuccess: true,
+    // Set banner to 'pending' state
+    this.setProperties({
+      isReplayStarted: true,
+      isReplayStatusPending: true
+    });
+
+    // Begin triggering of replay sequence
+    this.callReplayStart(newFuncId, startTime, endTime);
+
+    // Simulate trigger response time since currently response takes 30+ seconds
+    Ember.run.later((function() {
+      if (!that.get('isReplayStatusError')) {
+        that.setProperties({
+          isReplayStatusSuccess: true,
           isReplayStatusPending: false,
           replayStatusClass: 'te-form__banner--success'
         });
-      })
-      .catch((error) => {
-        this.setProperties({
-          isReplayError: true,
-          failureMessage: `Failed to trigger replay. (${error})`
-        });
-      });
+      }
+    }), 3000);
   },
 
   /**
@@ -330,10 +370,13 @@ export default Ember.Controller.extend({
     const newFunctionList = [];
     const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
     let cnt = 0;
+
+    // Build object for each function(alert) to display in results table
     return new Ember.RSVP.Promise((resolve) => {
       for (var functionId of existingFunctionList) {
         this.fetchFunctionById(functionId).then(functionData => {
           newFunctionList.push({
+            number: cnt + 1,
             id: functionData.id,
             name: functionData.functionName,
             metric: functionData.metric + '::' + functionData.collection,
@@ -343,6 +386,9 @@ export default Ember.Controller.extend({
           });
           cnt ++;
           if (existingFunctionList.length === cnt) {
+            if (newId) {
+              newFunctionList.reverse();
+            }
             resolve(newFunctionList);
           }
         });
@@ -529,6 +575,70 @@ export default Ember.Controller.extend({
   ),
 
   /**
+   * Preps a mailto link containing the currently selected metric name
+   * @method graphMailtoLink
+   * @return {String} the URI-encoded mailto link
+   */
+  graphMailtoLink: Ember.computed(
+    'selectedMetricOption',
+    function() {
+      const selectedMetric = this.get('selectedMetricOption');
+      const fullMetricName = `${selectedMetric.dataset}::${selectedMetric.name}`;
+      const recipient = 'ask_thirdeye@linkedin.com';
+      const subject = 'TE Self-Serve Create Alert Metric Issue';
+      const body = `TE Team, please look into a possible inconsistency issue with [ ${fullMetricName} ]`;
+      const mailtoString = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      return mailtoString;
+    }
+  ),
+
+  /**
+   * Returns the appropriate subtitle for selected config group monitored alerts
+   * @method selectedConfigGroupSubtitle
+   * @return {String} title of expandable section for selected config group
+   */
+  selectedConfigGroupSubtitle: Ember.computed(
+    'selectedConfigGroup',
+    function () {
+      return `Alerts Monitored by: ${this.get('selectedConfigGroup.name')}`;
+    }
+  ),
+
+  /**
+   * Reset the form... clear all important fields
+   * @method clearAll
+   * @return {undefined}
+   */
+  clearAll() {
+    this.setProperties({
+      isFormDisabled: false,
+      isMetricSelected: false,
+      isMetricDataInvalid: false,
+      selectedMetricOption: null,
+      selectedPattern: null,
+      selectedGranularity: null,
+      selectedDimension: null,
+      alertFunctionName: null,
+      selectedAppName: null,
+      selectedConfigGroup: null,
+      newConfigGroupName: null,
+      alertGroupNewRecipient: null,
+      selectedGroupRecipients: null,
+      isCreateAlertSuccess: null,
+      isCreateAlertError: false,
+      isCreateGroupSuccess: false,
+      isReplayStatusSuccess: false,
+      isReplayStarted: false,
+      isReplayStatusError: false,
+      graphEmailLinkProps: '',
+      bsAlertBannerType: 'success',
+      selectedFilters: JSON.stringify({}),
+      replayStatusClass: 'te-form__banner--pending'
+    });
+    this.send('refreshModel');
+  },
+
+  /**
    * Actions for create alert form view
    */
   actions: {
@@ -542,7 +652,10 @@ export default Ember.Controller.extend({
     onSelectMetric(selectedObj) {
       this.setProperties({
         isMetricDataLoading: true,
-        selectedMetricOption: selectedObj
+        selectedMetricOption: selectedObj,
+        selectedFilters: JSON.stringify({}),
+        selectedPattern: null,
+        selectedDimension: null
       });
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {
@@ -632,10 +745,11 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectConfigGroup(selectedObj) {
+      const emails = selectedObj.recipients || '';
       this.setProperties({
         selectedConfigGroup: selectedObj,
         newConfigGroupName: null,
-        selectedGroupRecipients: selectedObj.recipients.replace(/,+/g, ', ')
+        selectedGroupRecipients: emails.split(',').filter(e => String(e).trim()).join(', ')
       });
       this.prepareFunctions(selectedObj).then(functionData => {
         this.set('selectedGroupFunctions', functionData);
@@ -712,30 +826,8 @@ export default Ember.Controller.extend({
      * @method clearAll
      * @return {undefined}
      */
-    clearAll() {
-      this.setProperties({
-        isFormDisabled: false,
-        isMetricSelected: false,
-        isMetricDataInvalid: false,
-        selectedMetricOption: null,
-        selectedPattern: null,
-        selectedGranularity: null,
-        selectedDimension: null,
-        alertFunctionName: null,
-        selectedAppName: null,
-        selectedConfigGroup: null,
-        newConfigGroupName: null,
-        alertGroupNewRecipient: null,
-        selectedGroupRecipients: null,
-        isCreateAlertSuccess: null,
-        isCreateAlertError: false,
-        isCreateGroupSuccess: false,
-        isReplaySuccess: false,
-        isReplayError: false,
-        selectedFilters: JSON.stringify({}),
-        replayStatusClass: 'te-form__banner--pending'
-      });
-      this.send('refreshModel');
+    onResetForm() {
+      this.clearAll();
     },
 
     /**
@@ -768,6 +860,8 @@ export default Ember.Controller.extend({
 
       // A reference to whichever 'alert config' object will be sent. Let's default to the new one
       let finalConfigObj = newConfigObj;
+      let functionArray = [];
+      let that = this;
 
       // First, save our new alert function. TODO: deal with request failure case.
       this.saveThirdEyeFunction(newFunctionObj).then(newFunctionId => {
@@ -792,7 +886,7 @@ export default Ember.Controller.extend({
 
             if (alertResult.ok) {
               this.setProperties({
-                selectedGroupRecipients: finalConfigObj.recipients,
+                selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
                 isCreateAlertSuccess: true,
                 finalFunctionId: newFunctionId
               });
@@ -815,6 +909,9 @@ export default Ember.Controller.extend({
             } else {
               this.set('isCreateAlertError', true);
             }
+          })
+          .catch((error) => {
+            this.set('isCreateAlertError', true);
           });
         } else {
           this.set('isCreateAlertError', true);

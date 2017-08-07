@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
+import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import java.io.IOException;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;

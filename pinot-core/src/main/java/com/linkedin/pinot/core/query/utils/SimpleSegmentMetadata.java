@@ -200,19 +200,19 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public String getForwardIndexFileName(String column, String segmentVersion) {
+  public String getForwardIndexFileName(String column) {
     // TODO Auto-generated method stub
     return null;
   }
 
   @Override
-  public String getDictionaryFileName(String column, String segmentVersion) {
+  public String getDictionaryFileName(String column) {
     // TODO Auto-generated method stub
     return null;
   }
 
   @Override
-  public String getBitmapInvertedIndexFileName(String column, String segmentVersion) {
+  public String getBitmapInvertedIndexFileName(String column) {
     // TODO Auto-generated method stub
     return null;
   }

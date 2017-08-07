@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.StringUtil;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -24,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.StringUtil;
 
 public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
@@ -48,6 +48,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
   private static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   private static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
+  private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
+  private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -59,6 +61,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = false;
+  private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -90,6 +93,10 @@ public class ControllerConf extends PropertiesConfiguration {
       return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
     }
     return ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm();
+  }
+
+  public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
+    setProperty(JERSEY_ADMIN_IS_PRIMARY, jerseyAdminPrimary);
   }
 
   public void setHelixClusterName(String clusterName) {
@@ -130,6 +137,12 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setZkStr(String zkStr) {
     setProperty(ZK_STR, zkStr);
+  }
+
+  // A boolean to decide whether Jersey API should be the primary one. For now, we set this to be false,
+  // but we turn it on to true when we are sure that jersey api has no backward compatibility problems.
+  public boolean isJerseyAdminPrimary() {
+    return getBoolean(JERSEY_ADMIN_IS_PRIMARY, false);
   }
 
   public String getHelixClusterName() {
@@ -202,7 +215,7 @@ public class ControllerConf extends PropertiesConfiguration {
     if (containsKey(CONTROLLER_VIP_PORT) && ((String) getProperty(CONTROLLER_VIP_PORT)).length() > 0) {
       return (String) getProperty(CONTROLLER_VIP_PORT);
     }
-    return (String) getProperty(CONTROLLER_PORT);
+    return getControllerPort();
   }
 
   public String getControllerVipProtocol() {
@@ -309,5 +322,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setTableMinReplicas(int minReplicas) {
     setProperty(TABLE_MIN_REPLICAS, minReplicas);
+  }
+
+  public String getJerseyAdminApiPort() {
+    return getString(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
   }
 }

@@ -135,13 +135,13 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     String filename;
     switch (indexType) {
       case DICTIONARY:
-        filename = metadata.getDictionaryFileName(column, metadata.getVersion());
+        filename = metadata.getDictionaryFileName(column);
         break;
       case FORWARD_INDEX:
-        filename = metadata.getForwardIndexFileName(column, metadata.getVersion());
+        filename = metadata.getForwardIndexFileName(column);
         break;
       case INVERTED_INDEX:
-        filename = metadata.getBitmapInvertedIndexFileName(column, metadata.getVersion());
+        filename = metadata.getBitmapInvertedIndexFileName(column);
         break;
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());

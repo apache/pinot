@@ -103,6 +103,12 @@ body {
 }
 
 .te-form {
+  &__section {
+    &--first {
+      margin-top: 0;
+    }
+  }
+
   &__section-submit {
     margin: $te-default-element-spacing 0 15px 0;
     padding-top: $te-default-element-spacing;
@@ -134,6 +140,7 @@ body {
   &__alert {
     &--warning {
       display: inline-block;
+      vertical-align: text-bottom;
       margin-left: 5px;
       padding: 1px 7px;
       border-radius: 3px;
@@ -147,7 +154,7 @@ body {
     font-size: 16px;
     margin-top: 10px;
     padding-top: 10px;
-    border-left: 35px solid;
+    border-left: 30px solid;
 
     &--success {
       color: #1f5a8c;
@@ -174,6 +181,33 @@ body {
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 5px;
+  }
+
+  &__note {
+    padding: 5px;
+  }
+
+  &__custom-label {
+    font-size: 14px;
+  }
+
+  &__table-index {
+    text-align: right;
+    width: 100px;
+  }
+
+  // overriding bootstrap for create alert form
+  .panel-title {
+    font-size: 15px;
+    color: #369ece;
+    font-weight: 600;
+    letter-spacing: .1px;
+  }
+
+  // overriding power-select basic field style
+  .ember-power-select-trigger {
+    padding-top: 2px;
+    min-height: 2.4em !important;
   }
 }
 

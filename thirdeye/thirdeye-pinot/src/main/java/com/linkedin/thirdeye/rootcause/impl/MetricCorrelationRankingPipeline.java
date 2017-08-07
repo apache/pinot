@@ -60,6 +60,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final String STRATEGY_EUCLIDEAN = "euclidean";
   private static final String STRATEGY_STATIC = "static";
   private static final String STRATEGY_CANDIDATE_MEAN = "candidate_mean";
+  private static final String STRATEGY_CANDIDATE_MAX = "candidate_max";
 
   private final QueryCache cache;
   private final MetricConfigManager metricDAO;
@@ -330,6 +331,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         return new StaticStrategy();
       case STRATEGY_CANDIDATE_MEAN:
         return new CandidateMeanChangeStrategy();
+      case STRATEGY_CANDIDATE_MAX:
+        return new CandidateMaxChangeStrategy();
       default:
         throw new IllegalArgumentException(String.format("Unknown strategy '%s'", strategy));
     }
@@ -366,6 +369,13 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     @Override
     public double score(DoubleSeries target, DoubleSeries candidate) {
       return candidate.mean().abs().doubleValue();
+    }
+  }
+
+  private static class CandidateMaxChangeStrategy implements ScoringStrategy {
+    @Override
+    public double score(DoubleSeries target, DoubleSeries candidate) {
+      return candidate.abs().max().doubleValue();
     }
   }
 }

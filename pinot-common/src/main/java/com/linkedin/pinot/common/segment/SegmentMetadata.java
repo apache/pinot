@@ -81,32 +81,11 @@ public interface SegmentMetadata {
   @Nullable
   StarTreeMetadata getStarTreeMetadata();
 
-  /**
-   * Get the forward index file name with appropriate extension for a given version.
-   *
-   * @param column column name.
-   * @param segmentVersion segment version.
-   * @return forward index file name.
-   */
-  String getForwardIndexFileName(String column, String segmentVersion);
+  String getForwardIndexFileName(String column);
 
-  /**
-   * Get the dictionary file name with appropriate extension for a given version.
-   *
-   * @param column column name.
-   * @param segmentVersion segment version.
-   * @return dictionary file name.
-   */
-  String getDictionaryFileName(String column, String segmentVersion);
+  String getDictionaryFileName(String column);
 
-  /**
-   * Get the bitmap inverted index file name with appropriate extension for a given version.
-   *
-   * @param column column name.
-   * @param segmentVersion segment version.
-   * @return bitmap inverted index file name.
-   */
-  String getBitmapInvertedIndexFileName(String column, String segmentVersion);
+  String getBitmapInvertedIndexFileName(String column);
 
   @Nullable
   String getCreatorName();

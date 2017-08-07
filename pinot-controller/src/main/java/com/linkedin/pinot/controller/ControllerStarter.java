@@ -15,24 +15,6 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.google.common.primitives.Longs;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
-import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
-import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
-import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
-import com.linkedin.pinot.controller.validation.ValidationManager;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -46,12 +28,32 @@ import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.PreConnectCallback;
 import org.apache.helix.task.TaskDriver;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
 import org.restlet.data.Protocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.primitives.Longs;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
+import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
+import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.yammer.metrics.core.MetricsRegistry;
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -62,7 +64,9 @@ public class ControllerStarter {
 
   private final ControllerConf config;
   private final Component component;
+  // TODO: Remove restlet based controllerRestApp when migration to jersey is complete
   private final Application controllerRestApp;
+  private final ControllerAdminApiApplication adminApp;
   private final PinotHelixResourceManager helixResourceManager;
   private final RetentionManager retentionManager;
   private final MetricsRegistry _metricsRegistry;
@@ -79,6 +83,7 @@ public class ControllerStarter {
     config = conf;
     component = new Component();
     controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
+    adminApp = new ControllerAdminApiApplication(config.getQueryConsole());
     helixResourceManager = new PinotHelixResourceManager(config);
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds(),
         config.getDeletedSegmentsRetentionInDays());
@@ -153,26 +158,50 @@ public class ControllerStarter {
       LOGGER.info("Starting segment status manager");
       segmentStatusChecker.start(controllerMetrics);
 
-      LOGGER.info("Starting Pinot REST API component");
-      component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
+      int restletPort = Integer.parseInt(config.getControllerPort());
+      int jerseyPort = Integer.parseInt(config.getJerseyAdminApiPort());
+      if (config.isJerseyAdminPrimary()) {
+        LOGGER.info("Starting Jersey admin as primary REST API");
+        int tmp = restletPort;
+        restletPort = jerseyPort;
+        jerseyPort = tmp;
+      }
+
+      LOGGER.info("Starting Pinot RESTLET API component on port {}", restletPort);
+      component.getServers().add(Protocol.HTTP, restletPort);
       component.getClients().add(Protocol.FILE);
       component.getClients().add(Protocol.JAR);
       Context applicationContext = component.getContext().createChildContext();
       LOGGER.info("Controller download url base: {}", config.generateVipUrl());
       LOGGER.info("Injecting configuration and resource managers to the API context");
+      // TODO: Remove attributes map when removing restlet
       ConcurrentMap<String, Object> attributes = applicationContext.getAttributes();
       attributes.put(ControllerConf.class.toString(), config);
       attributes.put(PinotHelixResourceManager.class.toString(), helixResourceManager);
       attributes.put(PinotHelixTaskResourceManager.class.toString(), _helixTaskResourceManager);
       attributes.put(PinotTaskManager.class.toString(), _taskManager);
-      MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
+      final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
       connectionManager.getParams().setConnectionTimeout(config.getServerAdminRequestTimeoutSeconds());
       attributes.put(HttpConnectionManager.class.toString(), connectionManager);
       attributes.put(Executor.class.toString(), executorService);
+      // register all the controller objects for injection to jersey resources
+      adminApp.registerBinder(new AbstractBinder() {
+        @Override
+        protected void configure() {
+          bind(config).to(ControllerConf.class);
+          bind(helixResourceManager).to(PinotHelixResourceManager.class);
+          bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
+          bind(_taskManager).to(PinotTaskManager.class);
+          bind(connectionManager).to(HttpConnectionManager.class);
+          bind(executorService).to(Executor.class);
+        }
+      });
+
       controllerRestApp.setContext(applicationContext);
       component.getDefaultHost().attach(controllerRestApp);
       component.start();
-
+      adminApp.start(jerseyPort);
+      LOGGER.info("Started Jersey API on port {}", jerseyPort);
       LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
       LOGGER.info("Controller services available at http://{}:{}/", config.getControllerHost(),
           config.getControllerPort());
@@ -276,6 +305,9 @@ public class ControllerStarter {
 
       LOGGER.info("Stopping API component");
       component.stop();
+
+      LOGGER.info("Stopping Jersey admin API");
+      adminApp.stop();
 
       LOGGER.info("Stopping realtime segment manager");
       realtimeSegmentsManager.stop();
