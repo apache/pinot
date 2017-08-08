@@ -1,8 +1,7 @@
-package com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider;
+package com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.alert.grouping.BaseAlertGrouper;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Collections;
@@ -13,13 +12,13 @@ import java.util.TreeMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-public class DimensionalAlertGroupRecipientProviderTest {
+public class DimensionalAlertGroupAuxiliaryRecipientProviderTest {
   private final static String EMAIL1 = "k1v1.com,k1v1.com2";
   private final static String EMAIL2 = "k1v2.com,k1v2.com2";
   private final static String EMAIL_NOT_USED = "k1v1k2v3.com";
   private final static String GROUP_BY_DIMENSION_NAME = "K1";
 
-  private DimensionalAlertGroupRecipientProvider recipientProvider;
+  private DimensionalAlertGroupAuxiliaryRecipientProvider recipientProvider;
 
   @Test
   public void testCreate() {
@@ -40,9 +39,9 @@ public class DimensionalAlertGroupRecipientProviderTest {
     try {
       ObjectMapper OBJECT_MAPPER = new ObjectMapper();
       String writeValueAsString = OBJECT_MAPPER.writeValueAsString(auxiliaryRecipients);
-      props.put(DimensionalAlertGroupRecipientProvider.AUXILIARY_RECIPIENTS_MAP_KEY, writeValueAsString);
+      props.put(DimensionalAlertGroupAuxiliaryRecipientProvider.AUXILIARY_RECIPIENTS_MAP_KEY, writeValueAsString);
 
-      recipientProvider = new DimensionalAlertGroupRecipientProvider();
+      recipientProvider = new DimensionalAlertGroupAuxiliaryRecipientProvider();
       recipientProvider.setParameters(props);
       NavigableMap<DimensionMap, String> auxiliaryRecipientsRecovered = recipientProvider.getAuxiliaryEmailRecipients();
 
@@ -61,27 +60,29 @@ public class DimensionalAlertGroupRecipientProviderTest {
     // Test AlertGroupKey to auxiliary recipients
     DimensionMap alertGroupKey1 = new DimensionMap();
     alertGroupKey1.put(GROUP_BY_DIMENSION_NAME, "V1");
-    Assert.assertEquals(
-        recipientProvider.getAlertGroupRecipients(alertGroupKey1, Collections.<MergedAnomalyResultDTO>emptyList()),
-        EMAIL1);
+    AuxiliaryAlertGroupInfo auxiliaryAlertGroupInfo1 =
+        recipientProvider.getAlertGroupAuxiliaryInfo(alertGroupKey1, Collections.<MergedAnomalyResultDTO>emptyList());
+    Assert.assertNotNull(auxiliaryAlertGroupInfo1);
+    Assert.assertEquals(auxiliaryAlertGroupInfo1.getAuxiliaryRecipients(), EMAIL1);
 
     DimensionMap alertGroupKey2 = new DimensionMap();
     alertGroupKey2.put(GROUP_BY_DIMENSION_NAME, "V1");
-    Assert.assertEquals(
-        recipientProvider.getAlertGroupRecipients(alertGroupKey2, Collections.<MergedAnomalyResultDTO>emptyList()),
-        EMAIL1);
+    AuxiliaryAlertGroupInfo auxiliaryAlertGroupInfo2 =
+        recipientProvider.getAlertGroupAuxiliaryInfo(alertGroupKey2, Collections.<MergedAnomalyResultDTO>emptyList());
+    Assert.assertNotNull(auxiliaryAlertGroupInfo2);
+    Assert.assertEquals(auxiliaryAlertGroupInfo2.getAuxiliaryRecipients(), EMAIL1);
 
     // Test empty recipients
     Assert.assertEquals(
-        recipientProvider.getAlertGroupRecipients(new DimensionMap(), Collections.<MergedAnomalyResultDTO>emptyList()),
-        BaseAlertGrouper.EMPTY_RECIPIENTS);
+        recipientProvider.getAlertGroupAuxiliaryInfo(new DimensionMap(), Collections.<MergedAnomalyResultDTO>emptyList()),
+        BaseAlertGroupAuxiliaryInfoProvider.EMPTY_AUXILIARY_ALERT_GROUP_INFO);
     Assert
-        .assertEquals(recipientProvider.getAlertGroupRecipients(null, Collections.<MergedAnomalyResultDTO>emptyList()),
-            BaseAlertGrouper.EMPTY_RECIPIENTS);
+        .assertEquals(recipientProvider.getAlertGroupAuxiliaryInfo(null, Collections.<MergedAnomalyResultDTO>emptyList()),
+            BaseAlertGroupAuxiliaryInfoProvider.EMPTY_AUXILIARY_ALERT_GROUP_INFO);
     DimensionMap dimensionMapNonExist = new DimensionMap();
     dimensionMapNonExist.put("K2", "V1");
     Assert.assertEquals(recipientProvider
-            .getAlertGroupRecipients(dimensionMapNonExist, Collections.<MergedAnomalyResultDTO>emptyList()),
-        BaseAlertGrouper.EMPTY_RECIPIENTS);
+            .getAlertGroupAuxiliaryInfo(dimensionMapNonExist, Collections.<MergedAnomalyResultDTO>emptyList()),
+        BaseAlertGroupAuxiliaryInfoProvider.EMPTY_AUXILIARY_ALERT_GROUP_INFO);
   }
 }
