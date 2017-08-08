@@ -1,5 +1,5 @@
 <div class="container">
-  <div class="row">
+  <div class="row te-nav__row">
     {{#if isGlobalNav}}
       <div class="te-nav__logo">
         {{#link-to "index" class="te-nav__link te-nav__link--home"}}
@@ -36,12 +36,22 @@
           Create Alert
         {{/link-to}}
         {{!-- Hide until we have authentification  --}}
-        {{!-- <div class="te-nav__user-dropdown">
-          <a class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+         {{!-- <div class="te-nav__user-dropdown">
+          <a class="dropdown-toggle te-nav__dropdown-link" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
             <img src="/assets/images/default-avatar.png" alt="User Avatar" class="te-nav__user-avatar">
-            <i class="glyphicon glyphicon-menu-down"></i>
+          </a> --}}
+        <div class="te-nav__user-dropdown">
+          <a {{action "onToggleExpanded"}} class="dropdown-toggle te-nav__dropdown-link" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="help center">
+            <span class="te-nav__help-icon"><i class="te-icon glyphicon glyphicon-question-sign"></i></span>
+            <span><i class="te-icon glyphicon {{if isExpanded 'glyphicon-menu-up' 'glyphicon-menu-down'}}"></i> </span>
           </a>
-        </div> --}}
+          {{#if isExpanded}}
+            <div class="te-nav__dropdown-wrapper">
+              <a class="te-nav__dropdown-item" href="mailto:ask_thirdeye@linkedin.com?Subject=TE-Feedback" target="_blank">Submit Feedback</a>
+              <a class="te-nav__dropdown-item" href="https://iwww.corp.linkedin.com/wiki/cf/display/PRT/ThirdEye+Help+Page">Help page</a>
+            </div>
+          {{/if}}
+        </div> 
       </div> 
     {{/if}}
   </div>

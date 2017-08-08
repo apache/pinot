@@ -26,5 +26,20 @@ export default Ember.Component.extend({
   /**
    * App name from environment settings (string)
    */
-  webappName: config.appName
+  webappName: config.appName,
+
+  /**
+   * Expanded flag for the help icon
+   * @type {boolean}
+   */
+  isExpanded: false,
+
+  actions: {
+    /**
+     * Toggles the isExpanded property on click
+     */
+    onToggleExpanded() {
+      this.toggleProperty('isExpanded');
+    }
+  }
 });

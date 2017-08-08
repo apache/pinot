@@ -26,8 +26,35 @@ body {
     margin-right: 60px;
 }
 
+.te-nav__row {
+    position: relative;
+}
+
 .te-nav__link {
     padding-right: 45px;
+}
+
+.te-nav__dropdown-link {
+  display: flex; 
+  align-items: center;
+}
+
+.te-nav__dropdown-item {
+  display: block;
+  padding: 3px 20px;
+  line-height: 1.42857;
+  white-space: nowrap;
+  color: black;
+}
+
+.te-nav__dropdown-item:hover {
+  text-decoration: none;
+  color: #262626;
+  background-color: #f5f5f5;
+}
+
+.te-nav__dropdown-link:hover .te-icon {
+  color: white;
 }
 
 .te-nav__link a{
@@ -71,12 +98,59 @@ body {
     width: auto;
     margin-top: 10px;
     text-align: right;
+    display: flex; 
+    align-items: center;
+}
+
+.te-icon {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.te-nav__dropdown-wrapper:hover .te-icon {
+  color: white;
+}
+
+.te-nav__help-icon {
+    font-size: 24px;
+}
+
+.te-nav__dropdown-wrapper {
+    position: absolute;
+    text-align: left;
+    background-color: white;
+    color: white;
+    z-index: 10;
+    right: 0;
+    top: 50px;
+    padding: 8px 0;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    border: 1px solid rgba(0,0,0,.15);
+    box-shadow: 0 6px 12px rgba(0,0,0,.175);
+}
+
+.te-nav__dropdown-item {
+  display: block;
+  padding: 3px 20px;
+  line-height: 1.42857;
+  white-space: nowrap;
+  color: black;
+}
+
+.te-nav__dropdown-item :hover {
+  text-decoration: none;
+  color: #262626;
+  background-color: #f5f5f5;
 }
 
 .te-nav__button:hover {
     border-color: white;
     color: white;
     text-decoration: none;
+}
+
+.te-nav___user-dropdown {
+    float: right;
 }
 
 .navbar-inverse {

@@ -169,7 +169,7 @@
       <div class="">
         <nav class="navbar navbar-inverse" role="navigation">
           <div class="container thirdeye-nav">
-            <div class="row">
+            <div class="row te-nav__row">
               <div id="global-navbar" class="navbar-header">
                 <div class="te-nav__logo">
                     <a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">ThirdEye</a>
@@ -188,6 +188,16 @@
 
               <div class="te-nav__user" role="menu">
                 <a class="te-nav__button" href="/app/#/self-serve/create-alert">Create Alert</a>
+                <div class="te-nav__user-dropdown">
+                  <a id="nav-help" class="dropdown-toggle te-nav__dropdown-link" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="help center">
+                    <span class="te-nav__help-icon"><i class="te-icon glyphicon glyphicon-question-sign"></i></span>
+                    <span><i id="chevron-icon" class="te-icon glyphicon glyphicon-menu-down"></i> </span>
+                  </a>
+                  <div id="help-menu" class="te-nav__dropdown-wrapper hidden">
+                    <a class="te-nav__dropdown-item" href="mailto:ask_thirdeye@linkedin.com?Subject=TE-Feedback" target="_blank">Submit Feedback</a>
+                    <a class="te-nav__dropdown-item" href="https://iwww.corp.linkedin.com/wiki/cf/display/PRT/ThirdEye+Help+Page" target="_blank">Help page</a>
+                  </div>
+                </div> 
               </div>
 
               <!--- <div class="thirdeye-nav__oldui">
