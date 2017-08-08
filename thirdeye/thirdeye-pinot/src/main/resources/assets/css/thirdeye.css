@@ -114,6 +114,10 @@ body {
     font-size: 24px;
 }
 
+.te-nav__beta-badge {
+  letter-spacing: 5px;
+}
+
 .te-nav__dropdown-wrapper {
     position: absolute;
     text-align: left;

@@ -172,7 +172,10 @@
             <div class="row te-nav__row">
               <div id="global-navbar" class="navbar-header">
                 <div class="te-nav__logo">
-                    <a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">ThirdEye</a>
+                    <a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">
+                      ThirdEye
+                      <sup class="te-nav__beta-badge">(Beta)</sup>
+                    </a>
                 </div>
               </div>
 
