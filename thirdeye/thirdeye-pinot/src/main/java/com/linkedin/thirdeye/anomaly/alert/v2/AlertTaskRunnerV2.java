@@ -5,11 +5,12 @@ import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.DummyAlertGrouper;
+import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AuxiliaryAlertGroupInfo;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
-import com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider.AlertGroupRecipientProvider;
-import com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider.AlertGroupRecipientProviderFactory;
+import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupAuxiliaryInfoProvider;
+import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupRecipientProviderFactory;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
@@ -73,7 +74,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   private AlertConfigDTO alertConfig;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
   private AlertFilterFactory alertFilterFactory;
-  private AlertGroupRecipientProviderFactory alertGroupRecipientProviderFactory;
+  private AlertGroupRecipientProviderFactory alertGroupAuxiliaryInfoProviderFactory;
   private final String MAX_ALLOWED_MERGE_GAP_KEY = "maxAllowedMergeGap";
   private final long DEFAULT_MAX_ALLOWED_MERGE_GAP = 14400000L;
 
@@ -93,7 +94,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     alertConfig = alertConfigDAO.findById(alertTaskInfo.getAlertConfigDTO().getId());
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
     alertFilterFactory = new AlertFilterFactory(thirdeyeConfig.getAlertFilterConfigPath());
-    alertGroupRecipientProviderFactory =
+    alertGroupAuxiliaryInfoProviderFactory =
         new AlertGroupRecipientProviderFactory(thirdeyeConfig.getAlertGroupRecipientProviderConfigPath());
 
     try {
@@ -179,15 +180,24 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           // Append auxiliary recipients for this group
           String recipientsForThisGroup = alertConfig.getRecipients();
           //   Get auxiliary email recipient from provider
-          AlertGroupRecipientProvider recipientProvider =
-              alertGroupRecipientProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
-          String auxiliaryRecipients = recipientProvider.getAlertGroupRecipients(dimensions, anomalyResultListOfGroup);
-          if (StringUtils.isNotBlank(auxiliaryRecipients)) {
-            recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
+          AlertGroupAuxiliaryInfoProvider auxiliaryInfoProvider =
+              alertGroupAuxiliaryInfoProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
+          AuxiliaryAlertGroupInfo auxiliaryInfo =
+              auxiliaryInfoProvider.getAlertGroupAuxiliaryInfo(dimensions, anomalyResultListOfGroup);
+          // Check if this group should be skipped
+          if (auxiliaryInfo.isSkipGroupAlert()) {
+            continue;
           }
-
-          // Append group name after config name if dimensions of this group is not empty
+          // Append group tag to subject
           String emailSubjectName = alertConfig.getName();
+          if (StringUtils.isNotBlank(auxiliaryInfo.getGroupTag())) {
+            emailSubjectName = emailSubjectName + " (" + auxiliaryInfo.getGroupTag() + ") ";
+          }
+          // Append auxiliary recipients
+          if (StringUtils.isNotBlank(auxiliaryInfo.getAuxiliaryRecipients())) {
+            recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryInfo;
+          }
+          // Construct group name if dimensions of this group is not empty
           String groupName = null;
           if (dimensions.size() != 0) {
             StringBuilder sb = new StringBuilder();

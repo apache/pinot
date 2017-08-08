@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider;
+package com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -13,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This factory instantiates the implementation (class) of AlertGroupRecipientProvider from two sources: 1. The
+ * This factory instantiates the implementation (class) of AlertGroupAuxiliaryInfoProvider from two sources: 1. The
  * classes that are specified from a configuration file. 2. The classes in ThirdEye open source project. Given
  * the type of recipient provider, this class tries the first type of classes using Java reflection; if it fails,
  * then it looks for the internal classes.
@@ -25,8 +25,8 @@ import org.slf4j.LoggerFactory;
  */
 public class AlertGroupRecipientProviderFactory {
   private static final Logger LOG = LoggerFactory.getLogger(AlertGroupRecipientProviderFactory.class);
-  private static final AlertGroupRecipientProvider DUMMY_ALERT_GROUP_RECIPIENT_PROVIDER =
-      new DummyAlertGroupRecipientProvider();
+  private static final AlertGroupAuxiliaryInfoProvider DUMMY_ALERT_GROUP_RECIPIENT_PROVIDER =
+      new DummyAlertGroupAuxiliaryInfoProvider();
   public static final String GROUP_RECIPIENT_PROVIDER_TYPE_KEY = "type";
 
   private final Properties props = new Properties();
@@ -85,19 +85,19 @@ public class AlertGroupRecipientProviderFactory {
    *
    * @return a recipient provider instance.
    */
-  public AlertGroupRecipientProvider fromSpec(Map<String, String> spec) {
+  public AlertGroupAuxiliaryInfoProvider fromSpec(Map<String, String> spec) {
     if (spec == null) {
       spec = Collections.emptyMap();
     }
     // the default recipient provider is a dummy recipient provider
-    AlertGroupRecipientProvider recipientProvider = DUMMY_ALERT_GROUP_RECIPIENT_PROVIDER;
+    AlertGroupAuxiliaryInfoProvider recipientProvider = DUMMY_ALERT_GROUP_RECIPIENT_PROVIDER;
     if (spec.containsKey(GROUP_RECIPIENT_PROVIDER_TYPE_KEY)) {
       String recipientProviderType = spec.get(GROUP_RECIPIENT_PROVIDER_TYPE_KEY);
       // We first check if the implementation (class) of this provider comes from external packages
       if(props.containsKey(recipientProviderType.toUpperCase())) {
         String className = props.getProperty(recipientProviderType.toUpperCase());
         try {
-          recipientProvider = (AlertGroupRecipientProvider) Class.forName(className).newInstance();
+          recipientProvider = (AlertGroupAuxiliaryInfoProvider) Class.forName(className).newInstance();
         } catch (Exception e) {
           LOG.warn(e.getMessage());
         }
@@ -121,7 +121,7 @@ public class AlertGroupRecipientProviderFactory {
    *
    * @return a instance of recipient provider.
    */
-  private static AlertGroupRecipientProvider fromStringType(String type) {
+  private static AlertGroupAuxiliaryInfoProvider fromStringType(String type) {
     if (StringUtils.isBlank(type)) { // safety check and backward compatibility
       return DUMMY_ALERT_GROUP_RECIPIENT_PROVIDER;
     }
@@ -138,7 +138,7 @@ public class AlertGroupRecipientProviderFactory {
     case DUMMY: // speed optimization for most use cases
       return DUMMY_ALERT_GROUP_RECIPIENT_PROVIDER;
     case DIMENSIONAL:
-      return new DimensionalAlertGroupRecipientProvider();
+      return new DimensionalAlertGroupAuxiliaryRecipientProvider();
     default:
       return DUMMY_ALERT_GROUP_RECIPIENT_PROVIDER;
     }

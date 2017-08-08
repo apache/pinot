@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider;
+package com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -12,8 +12,8 @@ import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DimensionalAlertGroupRecipientProvider extends BaseAlertGroupRecipientProvider {
-  private static final Logger LOG = LoggerFactory.getLogger(DimensionalAlertGroupRecipientProvider.class);
+public class DimensionalAlertGroupAuxiliaryRecipientProvider extends BaseAlertGroupAuxiliaryInfoProvider {
+  private static final Logger LOG = LoggerFactory.getLogger(DimensionalAlertGroupAuxiliaryRecipientProvider.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   public static final String AUXILIARY_RECIPIENTS_MAP_KEY = "auxiliaryRecipients";
 
@@ -46,11 +46,13 @@ public class DimensionalAlertGroupRecipientProvider extends BaseAlertGroupRecipi
   }
 
   @Override
-  public String getAlertGroupRecipients(DimensionMap dimensions, List<MergedAnomalyResultDTO> anomalyResultList) {
+  public AuxiliaryAlertGroupInfo getAlertGroupAuxiliaryInfo(DimensionMap dimensions, List<MergedAnomalyResultDTO> anomalyResultList) {
     if (dimensions == null || !auxiliaryEmailRecipients.containsKey(dimensions)) {
-      return EMPTY_RECIPIENTS;
+      return EMPTY_AUXILIARY_ALERT_GROUP_INFO;
     } else {
-      return auxiliaryEmailRecipients.get(dimensions);
+      AuxiliaryAlertGroupInfo info = new AuxiliaryAlertGroupInfo();
+      info.setAuxiliaryRecipients(auxiliaryEmailRecipients.get(dimensions));
+      return info;
     }
   }
 }

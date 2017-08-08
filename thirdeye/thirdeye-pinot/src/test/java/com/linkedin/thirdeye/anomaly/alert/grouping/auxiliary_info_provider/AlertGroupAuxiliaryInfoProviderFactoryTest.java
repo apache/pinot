@@ -1,16 +1,16 @@
-package com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider;
+package com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
 
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-public class AlertGroupRecipientProviderFactoryTest {
+public class AlertGroupAuxiliaryInfoProviderFactoryTest {
   @Test
   public void testFromSpecNull() throws Exception {
     AlertGroupRecipientProviderFactory alertGroupRecipientProviderFactory = new AlertGroupRecipientProviderFactory();
-    AlertGroupRecipientProvider recipientProvider = alertGroupRecipientProviderFactory.fromSpec(null);
-    Assert.assertEquals(recipientProvider.getClass(), DummyAlertGroupRecipientProvider.class);
+    AlertGroupAuxiliaryInfoProvider recipientProvider = alertGroupRecipientProviderFactory.fromSpec(null);
+    Assert.assertEquals(recipientProvider.getClass(), DummyAlertGroupAuxiliaryInfoProvider.class);
   }
 
   @Test
@@ -18,7 +18,7 @@ public class AlertGroupRecipientProviderFactoryTest {
     AlertGroupRecipientProviderFactory alertGroupRecipientProviderFactory = new AlertGroupRecipientProviderFactory();
     Map<String, String> spec = new HashMap<>();
     spec.put(AlertGroupRecipientProviderFactory.GROUP_RECIPIENT_PROVIDER_TYPE_KEY, "diMenSionAL");
-    AlertGroupRecipientProvider alertGrouper = alertGroupRecipientProviderFactory.fromSpec(spec);
-    Assert.assertEquals(alertGrouper.getClass(), DimensionalAlertGroupRecipientProvider.class);
+    AlertGroupAuxiliaryInfoProvider alertGrouper = alertGroupRecipientProviderFactory.fromSpec(spec);
+    Assert.assertEquals(alertGrouper.getClass(), DimensionalAlertGroupAuxiliaryRecipientProvider.class);
   }
 }
