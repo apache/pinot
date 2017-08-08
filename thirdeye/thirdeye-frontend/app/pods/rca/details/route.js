@@ -61,7 +61,7 @@ export default Ember.Route.extend({
 
     const {
       startDate,
-      endDate = moment().subtract(1, 'day').endOf('day').valueOf(),
+      endDate = moment().valueOf(),
       analysisStart,
       analysisEnd,
       granularity = model.granularities[0],

@@ -208,7 +208,7 @@ export default Ember.Controller.extend({
       },
       // updates dates on granularity change
       set(key, value){
-        const endDate = moment(+this.get('model.maxTime'));
+        let endDate = moment(+this.get('model.maxTime'));
         let startDate = 0;
         let analysisEnd = 0;
         let analysisStart = 0;
@@ -219,7 +219,8 @@ export default Ember.Controller.extend({
         // Handles this logic here instead of inside SetupController
         // so that query params are updating properly
         if (value === 'DAYS') {
-          analysisEnd = endDate.clone().startOf('day');
+          endDate = endDate.clone().startOf('day');
+          analysisEnd = endDate.clone();
           startDate = endDate.clone().subtract(29, 'days').startOf('day').valueOf();
           analysisStart = analysisEnd.clone().subtract('1', 'day');
           subchartStart = endDate.clone().subtract(1, 'week').startOf('day');
