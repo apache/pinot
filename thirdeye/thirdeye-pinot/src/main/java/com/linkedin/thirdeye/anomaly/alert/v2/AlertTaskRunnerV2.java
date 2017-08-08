@@ -195,7 +195,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           }
           // Append auxiliary recipients
           if (StringUtils.isNotBlank(auxiliaryInfo.getAuxiliaryRecipients())) {
-            recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryInfo;
+            recipientsForThisGroup =
+                recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryInfo.getAuxiliaryRecipients();
           }
           // Construct group name if dimensions of this group is not empty
           String groupName = null;
