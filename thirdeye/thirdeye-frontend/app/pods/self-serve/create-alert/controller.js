@@ -885,8 +885,6 @@ export default Ember.Controller.extend({
 
       // A reference to whichever 'alert config' object will be sent. Let's default to the new one
       let finalConfigObj = newConfigObj;
-      let functionArray = [];
-      let that = this;
 
       // URL encode filters to avoid API issues
       newFunctionObj.filters = encodeURIComponent(newFunctionObj.filters);
