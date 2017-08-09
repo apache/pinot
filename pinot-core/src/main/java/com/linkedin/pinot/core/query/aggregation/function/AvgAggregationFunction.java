@@ -139,6 +139,11 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     return intermediateResult1;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return true;
+  }
+
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {

@@ -238,6 +238,11 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     return intermediateResult1;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return false;
+  }
+
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {

@@ -147,6 +147,11 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     return intermediateResult1;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return true;
+  }
+
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {

@@ -100,6 +100,11 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
     return intermediateResult1 + intermediateResult2;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return true;
+  }
+
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {

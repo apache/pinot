@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.core.common.Block;
@@ -25,6 +24,7 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
@@ -147,10 +147,13 @@ public class MCombineGroupByOperator extends BaseOperator {
     final Map<String, Object[]> resultsMap = new ConcurrentHashMap<>();
     final ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
-    List<AggregationInfo> aggregationInfos = _brokerRequest.getAggregationsInfo();
-    final AggregationFunctionContext[] aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(aggregationInfos, null);
+    AggregationFunctionContext[] aggregationFunctionContexts =
+        AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest.getAggregationsInfo(), null);
     final int numAggregationFunctions = aggregationFunctionContexts.length;
+    final AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      aggregationFunctions[i] = aggregationFunctionContexts[i].getAggregationFunction();
+    }
 
     for (int i = 0; i < numOperators; i++) {
       final int index = i;
@@ -193,8 +196,8 @@ public class MCombineGroupByOperator extends BaseOperator {
                     resultsMap.put(groupKeyString, results);
                   } else {
                     for (int j = 0; j < numAggregationFunctions; j++) {
-                      results[j] = aggregationFunctionContexts[j].getAggregationFunction()
-                          .merge(results[j], aggregationGroupByResult.getResultForKey(groupKey, j));
+                      results[j] = aggregationFunctions[j].merge(results[j],
+                          aggregationGroupByResult.getResultForKey(groupKey, j));
                     }
                   }
                 }
@@ -220,7 +223,7 @@ public class MCombineGroupByOperator extends BaseOperator {
 
     // Trim the results map.
     AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-        new AggregationGroupByTrimmingService(aggregationFunctionContexts, (int) _brokerRequest.getGroupBy().getTopN());
+        new AggregationGroupByTrimmingService(aggregationFunctions, (int) _brokerRequest.getGroupBy().getTopN());
     List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
     IntermediateResultsBlock mergedBlock =
         new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);

@@ -157,6 +157,11 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
     return intermediateResult1;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return false;
+  }
+
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {

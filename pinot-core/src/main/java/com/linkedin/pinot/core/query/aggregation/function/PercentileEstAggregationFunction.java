@@ -157,6 +157,11 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
     return intermediateResult1;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return false;
+  }
+
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {

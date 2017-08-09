@@ -241,6 +241,11 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     return intermediateResult1;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return false;
+  }
+
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {

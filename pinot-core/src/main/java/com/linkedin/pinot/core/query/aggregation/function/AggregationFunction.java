@@ -99,6 +99,11 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
       @Nonnull IntermediateResult intermediateResult2);
 
   /**
+   * Return whether the intermediate result is comparable.
+   */
+  boolean isIntermediateResultComparable();
+
+  /**
    * Get the {@link FieldSpec.DataType} of the intermediate result.
    * <p>This data type is used for transferring data in data table.
    */
