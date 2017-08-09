@@ -218,7 +218,8 @@ public class DataResource {
   public List<MetricConfigDTO> getMetricsWhereNameLike(@QueryParam("name") String name) {
     List<MetricConfigDTO> metricConfigs = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
-      metricConfigs = metricConfigDAO.findWhereNameOrAliasLikeAndActive("%" + name + "%");
+      Set<String> aliasParts = new HashSet<>(Arrays.asList(name.split("\\s+")));
+      metricConfigs = metricConfigDAO.findWhereAliasLikeAndActive(aliasParts);
     }
     return metricConfigs;
   }

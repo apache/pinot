@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -18,6 +19,9 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
     implements MetricConfigManager {
 
   private static final String FIND_BY_NAME_OR_ALIAS_LIKE = " WHERE active = :active and (alias like :name or name like :name)";
+
+  private static final String FIND_BY_ALIAS_LIKE = " WHERE active = :active";
+  private static final String FIND_BY_ALIAS_LIKE_PART = " AND alias LIKE :alias__%d";
 
   public MetricConfigManagerImpl() {
     super(MetricConfigDTO.class, MetricConfigBean.class);
@@ -75,6 +79,29 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
     parameterMap.put("active", true);
     List<MetricConfigBean> list =
         genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_OR_ALIAS_LIKE, parameterMap, MetricConfigBean.class);
+    List<MetricConfigDTO> result = new ArrayList<>();
+    for (MetricConfigBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, MetricConfigDTO.class));
+    }
+    return result;
+  }
+
+  @Override
+  public List<MetricConfigDTO> findWhereAliasLikeAndActive(Set<String> aliasParts) {
+    StringBuilder query = new StringBuilder();
+    query.append(FIND_BY_ALIAS_LIKE);
+
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("active", true);
+    int i = 0;
+    for (String n : aliasParts) {
+      query.append(String.format(FIND_BY_ALIAS_LIKE_PART, i));
+      parameterMap.put(String.format("alias__%d", i), "%" + n + "%"); // using field name decomposition
+      i++;
+    }
+
+    List<MetricConfigBean> list =
+        genericPojoDao.executeParameterizedSQL(query.toString(), parameterMap, MetricConfigBean.class);
     List<MetricConfigDTO> result = new ArrayList<>();
     for (MetricConfigBean bean : list) {
       result.add(MODEL_MAPPER.map(bean, MetricConfigDTO.class));

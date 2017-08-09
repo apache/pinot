@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 import org.testng.Assert;
@@ -78,7 +80,7 @@ public class TestMetricConfigManager extends AbstractManagerTestBase {
     Assert.assertEquals(metricConfigs.size(), 0);
   }
 
-  @Test(dependsOnMethods = { "testFindLike" })
+  @Test(dependsOnMethods = { "testFindLike", "testFindByAlias" })
   public void testUpdate() {
     MetricConfigDTO metricConfig = metricConfigDAO.findById(metricConfigId1);
     Assert.assertNotNull(metricConfig);
@@ -95,5 +97,16 @@ public class TestMetricConfigManager extends AbstractManagerTestBase {
     metricConfigDAO.deleteById(metricConfigId2);
     MetricConfigDTO metricConfig = metricConfigDAO.findById(metricConfigId2);
     Assert.assertNull(metricConfig);
+  }
+
+  @Test(dependsOnMethods = {"testFind"})
+  public void testFindByAlias() {
+    List<MetricConfigDTO> metricConfigs = metricConfigDAO.findWhereAliasLikeAndActive(
+        new HashSet<>(Arrays.asList("1", "3")));
+    Assert.assertEquals(metricConfigs.size(), 1);
+
+    metricConfigs = metricConfigDAO.findWhereAliasLikeAndActive(
+        new HashSet<>(Arrays.asList("etric", "m")));
+    Assert.assertEquals(metricConfigs.size(), 2);
   }
 }
