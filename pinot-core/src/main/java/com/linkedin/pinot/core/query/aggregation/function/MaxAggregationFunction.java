@@ -120,6 +120,11 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
     }
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return true;
+  }
+
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {

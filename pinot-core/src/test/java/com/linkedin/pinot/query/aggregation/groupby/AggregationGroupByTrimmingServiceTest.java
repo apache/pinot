@@ -16,10 +16,10 @@
 package com.linkedin.pinot.query.aggregation.groupby;
 
 import com.linkedin.pinot.common.response.broker.GroupByResult;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,82 +39,100 @@ public class AggregationGroupByTrimmingServiceTest {
   private static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
 
   private static final AggregationFunction SUM = AggregationFunctionFactory.getAggregationFunction("SUM");
-  private static final AggregationFunctionContext[] AGGREGATION_FUNCTION_CONTEXTS =
-      {new AggregationFunctionContext(new String[]{"column"}, SUM)};
-  private static final AggregationFunction[] AGGREGATION_FUNCTIONS = {SUM};
+  private static final AggregationFunction DISTINCTCOUNT =
+      AggregationFunctionFactory.getAggregationFunction("DISTINCTCOUNT");
+  private static final AggregationFunction[] AGGREGATION_FUNCTIONS = {SUM, DISTINCTCOUNT};
   private static final int NUM_GROUP_KEYS = 3;
   private static final int GROUP_BY_TOP_N = 100;
   private static final int NUM_GROUPS = 50000;
+  private static final int MAX_SIZE_OF_SET = 50;
 
   private List<String> _groups;
-  private AggregationGroupByTrimmingService _serverTrimmingService;
-  private AggregationGroupByTrimmingService _brokerTrimmingService;
+  private AggregationGroupByTrimmingService _trimmingService;
 
   @BeforeClass
   public void setUp() {
     // Generate a list of random groups.
     Set<String> groupSet = new HashSet<>(NUM_GROUPS);
     while (groupSet.size() < NUM_GROUPS) {
-      String group = "";
+      List<String> group = new ArrayList<>(NUM_GROUP_KEYS);
       for (int i = 0; i < NUM_GROUP_KEYS; i++) {
-        if (i != 0) {
-          group += '\t';
-        }
-        // Random generate group key without '\t'.
-        String groupKey = RandomStringUtils.random(RANDOM.nextInt(10));
-        while (groupKey.contains("\t")) {
-          groupKey = RandomStringUtils.random(RANDOM.nextInt(10));
-        }
-        group += groupKey;
+        // Randomly generate group key without GROUP_KEY_DELIMITER
+        group.add(RandomStringUtils.random(RANDOM.nextInt(10))
+            .replace(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER, ""));
       }
-      groupSet.add(group);
+      groupSet.add(buildGroupString(group));
     }
     _groups = new ArrayList<>(groupSet);
 
-    // Explicitly set an empty group.
-    String emptyGroup = "";
+    // Explicitly set an empty group
+    StringBuilder emptyGroupBuilder = new StringBuilder();
     for (int i = 1; i < NUM_GROUP_KEYS; i++) {
-      emptyGroup += '\t';
+      emptyGroupBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
     }
-    _groups.set(NUM_GROUPS - 1, emptyGroup);
+    _groups.set(NUM_GROUPS - 1, emptyGroupBuilder.toString());
 
-    _serverTrimmingService = new AggregationGroupByTrimmingService(AGGREGATION_FUNCTION_CONTEXTS, GROUP_BY_TOP_N);
-    _brokerTrimmingService = new AggregationGroupByTrimmingService(AGGREGATION_FUNCTIONS, GROUP_BY_TOP_N);
+    _trimmingService = new AggregationGroupByTrimmingService(AGGREGATION_FUNCTIONS, GROUP_BY_TOP_N);
   }
 
   @SuppressWarnings("unchecked")
   @Test
   public void testTrimming() {
-    // Test server side trimming.
+    // Test Server side trimming
     Map<String, Object[]> intermediateResultsMap = new HashMap<>(NUM_GROUPS);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      intermediateResultsMap.put(_groups.get(i), new Double[]{(double) i});
+      IntOpenHashSet set = new IntOpenHashSet();
+      for (int j = 0; j <= i; j += NUM_GROUPS / MAX_SIZE_OF_SET) {
+        set.add(j);
+      }
+      intermediateResultsMap.put(_groups.get(i), new Object[]{(double) i, set});
     }
-    Map<String, Object> trimmedIntermediateResultsMap =
-        _serverTrimmingService.trimIntermediateResultsMap(intermediateResultsMap).get(0);
-    int trimSize = trimmedIntermediateResultsMap.size();
+    List<Map<String, Object>> trimmedIntermediateResultMaps =
+        _trimmingService.trimIntermediateResultsMap(intermediateResultsMap);
+    Map<String, Object> trimmedSumResultMap = trimmedIntermediateResultMaps.get(0);
+    Map<String, Object> trimmedDistinctCountResultMap = trimmedIntermediateResultMaps.get(1);
+    int trimSize = trimmedSumResultMap.size();
+    Assert.assertEquals(trimmedDistinctCountResultMap.size(), trimSize, ERROR_MESSAGE);
     for (int i = NUM_GROUPS - trimSize; i < NUM_GROUPS; i++) {
-      Assert.assertEquals(trimmedIntermediateResultsMap.get(_groups.get(i)), (double) i, ERROR_MESSAGE);
+      String group = _groups.get(i);
+      Assert.assertEquals(((Double) trimmedSumResultMap.get(group)).intValue(), i, ERROR_MESSAGE);
+      Assert.assertEquals(((IntOpenHashSet) trimmedDistinctCountResultMap.get(group)).size(),
+          i / (NUM_GROUPS / MAX_SIZE_OF_SET) + 1, ERROR_MESSAGE);
     }
 
-    // Test broker side trimming.
-    List<GroupByResult> groupByResults =
-        _brokerTrimmingService.trimFinalResults(new Map[]{trimmedIntermediateResultsMap})[0];
+    // Test Broker side trimming
+    Map<String, Comparable> finalDistinctCountResultMap = new HashMap<>(trimSize);
+    for (Map.Entry<String, Object> entry : trimmedDistinctCountResultMap.entrySet()) {
+      finalDistinctCountResultMap.put(entry.getKey(), ((IntOpenHashSet) entry.getValue()).size());
+    }
+    List[] groupByResultLists =
+        _trimmingService.trimFinalResults(new Map[]{trimmedSumResultMap, finalDistinctCountResultMap});
+    List<GroupByResult> sumGroupByResultList = groupByResultLists[0];
+    List<GroupByResult> distinctCountGroupByResultList = groupByResultLists[1];
     for (int i = 0; i < GROUP_BY_TOP_N; i++) {
       int expectedGroupIndex = NUM_GROUPS - 1 - i;
-      GroupByResult groupByResult = groupByResults.get(i);
-      List<String> group = groupByResult.getGroup();
-      Assert.assertEquals(group.size(), NUM_GROUP_KEYS, ERROR_MESSAGE);
-      String groupString = "";
-      for (int j = 0; j < NUM_GROUP_KEYS; j++) {
-        if (j != 0) {
-          groupString += '\t';
-        }
-        groupString += group.get(j);
-      }
-      Assert.assertEquals(groupString, _groups.get(expectedGroupIndex), ERROR_MESSAGE);
-      Assert.assertEquals(Double.parseDouble((String) groupByResult.getValue()), (double) expectedGroupIndex,
+      GroupByResult sumGroupByResult = sumGroupByResultList.get(i);
+      List<String> sumGroup = sumGroupByResult.getGroup();
+      Assert.assertEquals(sumGroup.size(), NUM_GROUP_KEYS, ERROR_MESSAGE);
+      Assert.assertEquals(buildGroupString(sumGroup), _groups.get(expectedGroupIndex), ERROR_MESSAGE);
+      Assert.assertEquals((int) Double.parseDouble((String) sumGroupByResult.getValue()), expectedGroupIndex,
           ERROR_MESSAGE);
+      // For distinctCount, because multiple groups have same value, so there is no guarantee on the order of groups,
+      // just check the value
+      GroupByResult distinctCountGroupByResult = distinctCountGroupByResultList.get(i);
+      Assert.assertEquals(Integer.parseInt((String) distinctCountGroupByResult.getValue()),
+          expectedGroupIndex / (NUM_GROUPS / MAX_SIZE_OF_SET) + 1, ERROR_MESSAGE);
     }
+  }
+
+  private static String buildGroupString(List<String> group) {
+    StringBuilder groupStringBuilder = new StringBuilder();
+    for (int i = 0; i < NUM_GROUP_KEYS; i++) {
+      if (i != 0) {
+        groupStringBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+      }
+      groupStringBuilder.append(group.get(i));
+    }
+    return groupStringBuilder.toString();
   }
 }
