@@ -124,6 +124,19 @@ export default Ember.Controller.extend({
   },
 
   /**
+   * Sets error message to alert create error state and disables form
+   * @method setAlertCreateErrorState
+   * @returns {undefined}
+   */
+  setAlertCreateErrorState(error) {
+    // TODO: Log alert creation errors with Piwik
+    this.setProperties({
+      isCreateAlertError: true,
+      isFormDisabled: true
+    });
+  },
+
+  /**
    * Determines if a metric should be filtered out
    * @method isMetricGraphable
    * @param {Object} metric
@@ -176,7 +189,6 @@ export default Ember.Controller.extend({
       filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
       dimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res => checkStatus(res, 'get', true))
     };
-
     return Ember.RSVP.hash(promiseHash);
   },
 
@@ -197,7 +209,6 @@ export default Ember.Controller.extend({
       granularity,
       filters
     } = config;
-
     const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters=${filters}`;
     return fetch(url).then(checkStatus);
   },
@@ -230,8 +241,22 @@ export default Ember.Controller.extend({
       method: 'post',
       headers: { 'content-type': 'Application/Json' }
     };
-
     const url = '/dashboard/anomaly-function?' + this.toQueryString(functionData);
+    return fetch(url, postProps).then(checkStatus);
+  },
+
+  /**
+   * Send a DELETE request to the function delete endpoint.
+   * @method removeThirdEyeFunction
+   * @param {Object} functionId - The id of the alert to remove
+   * @return {Promise}
+   */
+  removeThirdEyeFunction(functionId) {
+    const postProps = {
+      method: 'delete',
+      headers: { 'content-type': 'text/plain' }
+    };
+    const url = '/dashboard/anomaly-function?id=' + functionId;
     return fetch(url, postProps).then(checkStatus);
   },
 
@@ -848,7 +873,7 @@ export default Ember.Controller.extend({
         active: true,
         emailConfig: { "functionIds": [] },
         recipients: this.get('alertGroupNewRecipient'),
-        name: this.get('selectedConfigGroup') || this.get('newConfigGroupName').trim(),
+        name: this.get('selectedConfigGroup.name') || this.get('newConfigGroupName').trim(),
         application: this.get('selectedAppName').application || null
       };
 
@@ -863,7 +888,10 @@ export default Ember.Controller.extend({
       let functionArray = [];
       let that = this;
 
-      // First, save our new alert function. TODO: deal with request failure case.
+      // URL encode filters to avoid API issues
+      newFunctionObj.filters = encodeURIComponent(newFunctionObj.filters);
+
+      // First, save our new alert function.
       this.saveThirdEyeFunction(newFunctionObj).then(newFunctionId => {
 
         // Add new email recipients if we are dealing with an existing Alert Group
@@ -877,45 +905,43 @@ export default Ember.Controller.extend({
           finalConfigObj = this.selectedConfigGroup;
         }
 
-        // Proceed only if function creation succeeds and returns an ID
-        if (Ember.typeOf(newFunctionId) === 'number') {
-          // Add our new Alert Function Id to the Alert Config Object
-          finalConfigObj.emailConfig.functionIds.push(newFunctionId);
-          // Finally, save our Alert Config Group
-          this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
+        // Add our new Alert Function Id to the Alert Config Object
+        finalConfigObj.emailConfig.functionIds.push(newFunctionId);
 
-            if (alertResult.ok) {
-              this.setProperties({
-                selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
-                isCreateAlertSuccess: true,
-                finalFunctionId: newFunctionId
-              });
-              // Confirm group creation if not in group edit mode
-              if (!isEditGroupMode) {
-                this.set('isCreateGroupSuccess', true);
-              }
-              // Display function added to group confirmation
-              this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
-                this.set('selectedGroupFunctions', functionData);
-              });
-              // Trigger alert replay.
-              this.triggerReplay(newFunctionId);
-              // Now, disable form
-              this.setProperties({
-                isFormDisabled: true,
-                isMetricSelected: false,
-                isMetricDataInvalid: false
-              });
-            } else {
-              this.set('isCreateAlertError', true);
-            }
-          })
-          .catch((error) => {
-            this.set('isCreateAlertError', true);
+        // Finally, save our Alert Config Group
+        this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
+          // Display success confirmations including new alert Id and recipients
+          this.setProperties({
+            selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
+            isCreateAlertSuccess: true,
+            finalFunctionId: newFunctionId
           });
-        } else {
-          this.set('isCreateAlertError', true);
-        }
+          // Confirm group creation if not in group edit mode
+          if (!isEditGroupMode) {
+            this.set('isCreateGroupSuccess', true);
+          }
+          // Display function added to group confirmation
+          this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
+            this.set('selectedGroupFunctions', functionData);
+          });
+          // Trigger alert replay.
+          this.triggerReplay(newFunctionId);
+          // Now, disable form
+          this.setProperties({
+            isFormDisabled: true,
+            isMetricSelected: false,
+            isMetricDataInvalid: false
+          });
+        })
+        // If Alert Group edit/create fails, remove the orphaned anomaly Id
+        .catch((error) => {
+          this.setAlertCreateErrorState(error);
+          this.removeThirdEyeFunction(newFunctionId);
+        });
+      })
+      // Alert creation call has failed
+      .catch((error) => {
+        this.setAlertCreateErrorState(error);
       });
     }
   }
