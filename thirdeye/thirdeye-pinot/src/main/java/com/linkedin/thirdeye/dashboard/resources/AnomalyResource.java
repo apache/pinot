@@ -270,6 +270,27 @@ public class AnomalyResource {
     return anomalyFunctions;
   }
 
+  /**
+   * Endpoint to be used for creating new anomaly function
+   * @param dataset name of dataset for the new anomaly function
+   * @param functionName name of the new anomaly function. Should follow convention "productName_metricName_dimensionName_other"
+   * @param metric name of metric on Thirdeye of the new anomaly function
+   * @param metric_function was using as a consolidation function, now by default use "SUM"
+   * @param type type of anomaly function. Minutely metrics use SIGN_TEST_VANILLA,
+   *             Hourly metrics use REGRESSION_GAUSSIAN_SCAN, Daily metrics use SPLINE_REGRESSION
+   * @param windowSize Detection window size
+   * @param windowUnit Detection window unit
+   * @param windowDelay Detection window delay (wait for data completeness)
+   * @param windowDelayUnit Detection window delay unit
+   * @param cron cron of detection
+   * @param exploreDimensions explore dimensions in JSON
+   * @param filters filters on dimensions
+   * @param userInputDataGranularity user input metric granularity, if null uses dataset granularity
+   * @param properties properties for anomaly function
+   * @param isActive whether set the new anomaly function to be active or not
+   * @return new anomaly function Id if successfully create new anomaly function
+   * @throws Exception
+   */
   // Add anomaly function
   @POST
   @Path("/anomaly-function")
@@ -285,6 +306,7 @@ public class AnomalyResource {
       @QueryParam("windowDelayUnit") String windowDelayUnit,
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters,
+      @QueryParam("dataGranularity") String userInputDataGranularity,
       @NotNull @QueryParam("properties") String properties,
       @QueryParam("isActive") boolean isActive)
           throws Exception {
@@ -296,9 +318,15 @@ public class AnomalyResource {
           + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", properties" + properties);
     }
 
-    DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
-    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-    TimeGranularity dataGranularity = timespec.getDataGranularity();
+    TimeGranularity dataGranularity;
+    if (userInputDataGranularity == null) {
+      DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+      TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+      dataGranularity = timespec.getDataGranularity();
+    } else {
+      dataGranularity = TimeGranularity.fromString(userInputDataGranularity);
+    }
+
 
     AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
     anomalyFunctionSpec.setActive(isActive);
