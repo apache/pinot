@@ -15,40 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import org.apache.helix.AccessOption;
-import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixDataAccessor;
-import org.apache.helix.HelixManager;
-import org.apache.helix.InstanceType;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.CurrentState;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.model.LiveInstance;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.zookeeper.data.Stat;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.json.JSONException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -107,9 +73,31 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ClusterMessagingService;
+import org.apache.helix.Criteria;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.LiveInstance;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.zookeeper.data.Stat;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotHelixResourceManager {
@@ -1494,7 +1482,6 @@ public class PinotHelixResourceManager {
           offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
           offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
           offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
-          ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           LOGGER.info("Refresh segment {} of table {} to propertystore ", segmentName, offlineTableName);
           boolean success = true;
           if (shouldSendMessage(offlineSegmentZKMetadata)) {
@@ -1508,6 +1495,7 @@ public class PinotHelixResourceManager {
           }
           if (success) {
             res.status = ResponseStatus.success;
+            ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           } else {
             LOGGER.error("Failed to refresh segment {} of table {}, marking crc and creation time as invalid",
                 segmentName, offlineTableName);
@@ -1526,6 +1514,7 @@ public class PinotHelixResourceManager {
       } else {
         // Segment does not exist, add new segment
 
+        addNewOfflineSegment(segmentMetadata);
         offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
         offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
         offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
@@ -1533,7 +1522,6 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
         LOGGER.info("Added segment {} of table {} to propertystore", segmentName, offlineTableName);
 
-        addNewOfflineSegment(segmentMetadata);
         res.status = ResponseStatus.success;
       }
     } catch (final Exception e) {
