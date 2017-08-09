@@ -209,7 +209,7 @@ export default Ember.Controller.extend({
       granularity,
       filters
     } = config;
-    const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters=${filters}`;
+    const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters=${encodeURIComponent(filters)}`;
     return fetch(url).then(checkStatus);
   },
 
@@ -311,6 +311,16 @@ export default Ember.Controller.extend({
           selectedMetric: metricData
         });
       }
+    })
+    .catch((error) => {
+      // The request failed. No graph to render.
+      this.clearAll();
+      this.setProperties({
+        isSelectMetricError: true,
+        isMetricDataInvalid: true,
+        isMetricDataLoading: false,
+        selectMetricErrMsg: error
+      });
     });
   },
 
@@ -507,6 +517,7 @@ export default Ember.Controller.extend({
     'selectedMetricOption',
     'selectedDimension',
     'selectedFilters',
+    'selectedGranularity',
     function() {
       let gkey = '';
       const granularity = this.get('graphConfig.granularity').toLowerCase();
@@ -517,6 +528,7 @@ export default Ember.Controller.extend({
           functionName: this.get('alertFunctionName') || this.get('alertFunctionName').trim(),
           metric: this.get('selectedMetricOption.name'),
           dataset: this.get('selectedMetricOption.dataset'),
+          dataGranularity: this.get('selectedGranularity'),
           metricFunction: 'SUM',
           isActive: true
         },
@@ -677,6 +689,7 @@ export default Ember.Controller.extend({
     onSelectMetric(selectedObj) {
       this.setProperties({
         isMetricDataLoading: true,
+        isSelectMetricError: false,
         selectedMetricOption: selectedObj,
         selectedFilters: JSON.stringify({}),
         selectedPattern: null,

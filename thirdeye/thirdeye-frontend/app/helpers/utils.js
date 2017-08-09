@@ -10,7 +10,12 @@ import Ember from 'ember';
  */
 export function checkStatus(response, mode = 'get', recoverBlank = false) {
   if (response.status >= 200 && response.status < 300) {
-    return (mode === 'get') ? response.json() : JSON.parse(JSON.stringify(response));
+    // Prevent parsing of null response
+    if (response.status === 204) {
+      return '';
+    } else {
+      return (mode === 'get') ? response.json() : JSON.parse(JSON.stringify(response));
+    }
   } else {
     const error = new Error(response.statusText);
     error.response = response;
