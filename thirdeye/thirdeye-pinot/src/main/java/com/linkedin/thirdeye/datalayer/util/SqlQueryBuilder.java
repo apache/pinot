@@ -413,7 +413,10 @@ public class SqlQueryBuilder {
     LinkedHashMap<String, ColumnInfo> columnInfo =
         entityMappingHolder.columnInfoPerTable.get(tableName);
     for (String entityFieldName : paramNames) {
-      String dbFieldName = dbNameToEntityNameMapping.inverse().get(entityFieldName);
+      String[] entityFieldNameParts = entityFieldName.split("__", 2);
+      if (entityFieldNameParts.length > 1)
+        LOG.info("Using field name decomposition: '{}' to '{}'", entityFieldName, entityFieldNameParts[0]);
+      String dbFieldName = dbNameToEntityNameMapping.inverse().get(entityFieldNameParts[0]);
 
       Object val = parameterMap.get(entityFieldName);
       if (Enum.class.isAssignableFrom(val.getClass())) {
