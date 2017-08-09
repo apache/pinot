@@ -393,17 +393,18 @@ public class HelixHelper {
     updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
   }
 
-  public static List<String> getEnabledInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName, String instanceTag) {
+  public static List<String> getEnabledInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName,
+      String instanceTag) {
     List<String> instances = helixAdmin.getInstancesInCluster(helixClusterName);
     List<String> enabledInstances = new ArrayList<>();
     for (String instance : instances) {
-      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instance);
-      if (instanceConfig == null) {
-        LOGGER.warn("InstanceConfig not found for instance: {}", instance);
-        continue;
-      }
-      if (instanceConfig.containsTag(instanceTag) && instanceConfig.getInstanceEnabled()) {
-        enabledInstances.add(instance);
+      try {
+        InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instance);
+        if (instanceConfig.containsTag(instanceTag) && instanceConfig.getInstanceEnabled()) {
+          enabledInstances.add(instance);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while fetching instance config for instance: {}", instance, e);
       }
     }
     return enabledInstances;
