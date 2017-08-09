@@ -41,10 +41,6 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -57,13 +53,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -121,7 +110,7 @@ public class PinotSegmentRestletResource {
   @Path("tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Lists metadata or toggles segment states", notes = "Toggles segment states if 'state' is specified in query param, otherwise lists metadata")
-  public String toggleStateOrListMetadata(
+  public String toggleStateOrListMetadataForAllSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
@@ -139,19 +128,30 @@ public class PinotSegmentRestletResource {
   @Path("tables/{tableName}/segments/{segmentName}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Lists metadata or toggles state of a segment", notes = "Toggles segment state if 'state' is specified in query param, otherwise lists segment metadata")
-  public String toggleStateOrListMetadata(
+  public String toggleStateOrListMetadataForOneSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "online|offline|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
   ) {
     segmentName = checkGetEncodedParam(segmentName);
+    // segmentName will never be null,otherwise we would reach the method toggleStateOrListMetadataForAllSegments()
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     StateType stateType = Constants.validateState(stateStr);
     if (stateStr == null) {
       // This is a list metadata operation
       return getSegmentMetaData(tableName, segmentName, tableType).toString();
     } else {
+      // We need to toggle state
+      if (tableType == null) {
+        List<String> realtimeSegments = _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+        List<String> offlineSegments = _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+        if (realtimeSegments.contains(segmentName)) {
+          tableType = CommonConstants.Helix.TableType.REALTIME;
+        } else if (offlineSegments.contains(segmentName)) {
+          tableType = CommonConstants.Helix.TableType.OFFLINE;
+        }
+      }
       return toggleStateInternal(tableName, stateType, tableType, segmentName, _pinotHelixResourceManager).toString();
     }
   }
@@ -354,6 +354,20 @@ public class PinotSegmentRestletResource {
           return new PinotResourceManagerResponse("Error: could not find any instances in table " + tableName, false);
         }
       }
+    }
+    if (segmentsToToggle == null || segmentsToToggle.isEmpty()) {
+      // Nothing to do. Not sure if 404 is a response here, but since they are asking us to toggle states of all
+      // segments, and there are none to do, 200 is an equally valid response, in that we succeeded in changing the
+      // state of 0 segments.
+      //
+      // If a table has only one type of segment (e.g. only realtime), the restlet API returned a 500, since helixi
+      // throws a NPE. It tried the realtime segments first, and if there were none, then the operation would fail.
+      // If only realtime segments existed, then we would still return 500 even though the realtime segments were
+      // changed state correctly.
+      //
+      // In jersey, API, if there are no segments in realtime (or in offline), we succeed the operation AND return 200
+      // if we succeeded.
+      return new PinotResourceManagerResponse("No segments to toggle", true);
     }
 
     switch (state) {
