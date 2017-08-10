@@ -50,6 +50,9 @@
 
 .events-table {
   &__column {
+    &--checkbox {
+      width: 30px;
+    }
     &--compact {
       width: 120px;
     }

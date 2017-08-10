@@ -65,7 +65,7 @@ export default Ember.Component.extend({
       template: 'custom/checkbox',
       useFilter: false,
       mayBeHidden: false,
-      className: 'events-table__column--flush'
+      className: 'events-table__column--checkbox'
     },
     {
       propertyName: 'label',
@@ -98,7 +98,7 @@ export default Ember.Component.extend({
     //   propertyName: 'score',
     //   title: 'Score',
     //   disableFiltering: true,
-    //   className: 'events-table__column',
+    //   className: 'events-table__column--compact',
     //   sortDirection: 'desc'
     // }
   ],
