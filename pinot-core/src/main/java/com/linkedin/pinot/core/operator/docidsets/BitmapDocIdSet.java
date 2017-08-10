@@ -70,11 +70,10 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
         orBitmap.flip(startDocId, endDocId + 1); // end is exclusive
       }
       answer = orBitmap;
-
-    } else if (bitmaps.length == 1){
+    } else if (bitmaps.length == 1) {
       answer = bitmaps[0];
     } else {
-      answer = new MutableRoaringBitmap().toMutableRoaringBitmap();
+      answer = new MutableRoaringBitmap();
     }
 
     //by default bitmap is created for the all documents (raw docs + agg docs of star tree).

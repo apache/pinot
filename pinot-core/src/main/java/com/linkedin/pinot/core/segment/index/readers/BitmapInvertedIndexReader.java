@@ -54,13 +54,13 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
    * @see InvertedIndexReader#getImmutable(int)
    */
   @Override
-  public ImmutableRoaringBitmap getImmutable(int idx) {
+  public ImmutableRoaringBitmap getImmutable(int dictId) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
     // Return the bitmap if it's still on heap
     if (bitmaps != null) {
       bitmapArrayReference = bitmaps.get();
       if (bitmapArrayReference != null) {
-        SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[idx];
+        SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
         if (bitmapReference != null) {
           ImmutableRoaringBitmap value = bitmapReference.get();
           if (value != null) {
@@ -77,11 +77,11 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
     }
     synchronized (this) {
       ImmutableRoaringBitmap value;
-      if (bitmapArrayReference[idx] == null || bitmapArrayReference[idx].get() == null) {
-        value = buildRoaringBitmapForIndex(idx);
-        bitmapArrayReference[idx] = new SoftReference<ImmutableRoaringBitmap>(value);
+      if (bitmapArrayReference[dictId] == null || bitmapArrayReference[dictId].get() == null) {
+        value = buildRoaringBitmapForIndex(dictId);
+        bitmapArrayReference[dictId] = new SoftReference<ImmutableRoaringBitmap>(value);
       } else {
-        value = bitmapArrayReference[idx].get();
+        value = bitmapArrayReference[dictId].get();
       }
       return value;
     }
@@ -122,7 +122,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public IntPair getMinMaxRangeFor(int dicId) {
+  public IntPair getMinMaxRangeFor(int dictId) {
     throw new UnsupportedOperationException("not supported in inverted index type bitmap");
   }
 }
