@@ -143,7 +143,7 @@ export default Ember.Controller.extend({
         const start = moment(value).valueOf();
         const analysisStart = this.get('analysisStart');
 
-        if (+start > analysisStart) {
+        if (+start > +analysisStart) {
           this.set('analysisStart', undefined);
           this.set('analysisEnd', undefined);
         }
@@ -168,13 +168,12 @@ export default Ember.Controller.extend({
       },
       set(key, value) {
         if (!value || value === 'Invalid date') { return this.get('endDate') || 0; }
-
         const maxTime = this.get('model.maxTime');
         const end = moment(value).valueOf();
         const newEnd = (+maxTime < +end) ? maxTime : end;
         const analysisEnd = this.get('analysisEnd');
 
-        if (+newEnd < analysisEnd) {
+        if (+newEnd < +analysisEnd) {
           this.set('analysisStart', undefined);
           this.set('analysisEnd', undefined);
         }
@@ -193,11 +192,25 @@ export default Ember.Controller.extend({
   }),
 
   // max date for the anomaly region
-  maxDate: Ember.computed('endDate', function() {
-    const end = this.get('endDate');
+  maxDate: Ember.computed(
+    'endDate',
+    'granularity',
+    function() {
+      const {
+        endDate: end,
+        granularity
+      } = this.getProperties('endDate', 'granularity');
 
-    return moment(+end).format(serverDateFormat);
-  }),
+      if (granularity === 'DAYS') {
+        return moment(+end)
+          .subtract(1, 'day')
+          .endOf('day')
+          .format(serverDateFormat);
+      }
+
+      return moment(+end).format(serverDateFormat);
+    }
+  ),
 
   uiGranularity: Ember.computed(
     'granularity',
