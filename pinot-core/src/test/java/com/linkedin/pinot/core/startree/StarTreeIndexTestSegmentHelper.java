@@ -80,14 +80,14 @@ public class StarTreeIndexTestSegmentHelper {
     for (int i = 0; i < NUM_DIMENSIONS; i++) {
       String dimName = "d" + (i + 1);
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, FieldSpec.DataType.STRING, true);
-      schema.addField(dimName, dimensionFieldSpec);
+      schema.addField(dimensionFieldSpec);
     }
 
     schema.setTimeFieldSpec(new TimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < NUM_METRICS; i++) {
       String metricName = "m" + (i + 1);
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.INT);
-      schema.addField(metricName, metricFieldSpec);
+      schema.addField(metricFieldSpec);
     }
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
@@ -138,30 +138,11 @@ public class StarTreeIndexTestSegmentHelper {
 
   /**
    * Builds a star tree index spec for the test.
-   * - Use MaxLeafRecords as 1 to stress test.
-   * @return
-   * @param enableOffHeapFormat
    */
   private static StarTreeIndexSpec buildStarTreeIndexSpec(boolean enableOffHeapFormat) {
     StarTreeIndexSpec spec = new StarTreeIndexSpec();
-    spec.setMaxLeafRecords(1);
+    spec.setMaxLeafRecords(10);
     spec.setEnableOffHeapFormat(enableOffHeapFormat);
     return spec;
-  }
-
-  /**
-   * Helper method to load the segment.
-   *
-   * @param segmentDirName
-   * @param segmentName
-   * @throws Exception
-   */
-  public static IndexSegment loadSegment(String segmentDirName, String segmentName)
-      throws Exception {
-    LOGGER.info("Loading segment {}", segmentName);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setReadMode(ReadMode.heap);
-    indexLoadingConfig.setStarTreeVersion(StarTreeFormatVersion.ON_HEAP);
-    return Loaders.IndexSegment.load(new File(segmentDirName, segmentName), indexLoadingConfig);
   }
 }
