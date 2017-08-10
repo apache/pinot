@@ -3,11 +3,14 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Multimap;
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -23,7 +26,6 @@ import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
@@ -42,7 +44,7 @@ import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
+import com.linkedin.thirdeye.util.TimeSeriesUtils;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -54,22 +56,32 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
 import javax.validation.constraints.NotNull;
-import javax.ws.rs.*;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
+import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
 import org.json.JSONObject;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Tuple2;
 
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.*;
 
@@ -91,12 +103,12 @@ public class AnomalyResource {
   private AlertConfigManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private OverrideConfigManager overrideConfigDAO;
   private AutotuneConfigManager autotuneConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
+  private LoadingCache<String, String> dimensionFiltersCache;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -107,12 +119,12 @@ public class AnomalyResource {
     this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    this.overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
     this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
+    this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
@@ -561,7 +573,22 @@ public class AnomalyResource {
   }
 
   /**
-   * Get the timeseries with function baseline for an anomaly function
+   * Get the timeseries with function baseline for an anomaly function.
+   * The function baseline can be 1) the baseline for online analysis, including baseline in training and testing range,
+   * and 2) the baseline for offline analysis, where only training time rage is included.
+   *
+   * Online Analysis
+   *  This mode take the monitoring window as the testing window; the training time range is requested based on the
+   *  given testing window. The function returns the baseline and observed values in both testing and training window.
+   *  Note that, different from offline analysis, the size of the training window is fixed. Users are able to trim the
+   *  window, but not extend.
+   *
+   * Offline Analysis
+   *  This mode take the monitoring window as the training window, while the testing window is empty. The function only
+   *  fits the time series in training window. The fitted time series is then returned.
+   *
+   * For the data points removed because of anomalies, the second part of this function will make up the time series by
+   * the information provided by the anomalies.
    *
    * The baseline is generated from getTimeSeriesView() in each detection function.
    * @param functionId
@@ -570,6 +597,8 @@ public class AnomalyResource {
    *      the start time of the monitoring window (inclusive)
    * @param endTimeIso
    *      the end time of the monitoring window (exclusive)
+   * @param mode
+   *      the mode of the baseline calculation
    * @return
    *      the Map that maps dimension string to the AnomalyTimelinesView
    * @throws Exception
@@ -577,16 +606,18 @@ public class AnomalyResource {
   @GET
   @Path(value = "/anomaly-function/{id}/baseline")
   @Produces(MediaType.APPLICATION_JSON)
-  public Map<String, AnomalyTimelinesView> getTimeSeriesAndBaselineData(@PathParam("id") long functionId,
-      @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso) throws Exception {
+  public Response getTimeSeriesAndBaselineData(@PathParam("id") long functionId,
+      @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
+      @QueryParam("mode") @DefaultValue("ONLINE") String mode) throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
     if(anomalyFunctionSpec == null) {
       LOG.warn("Cannot find anomaly function {}", functionId);
-      return null;
+      return Response.status(Response.Status.BAD_REQUEST).entity("Cannot find anomaly function " + functionId).build();
     }
 
     TimeGranularity bucketTimeGranularity =
         new TimeGranularity(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
+    // If startTime is not assigned, use the max date time as the start time
     DateTime startTime = new DateTime(collectionMaxDataTimeCache.get(anomalyFunctionSpec.getCollection()));
     DateTime endTime = startTime.plus(bucketTimeGranularity.toPeriod());
     if (StringUtils.isNotBlank(startTimeIso)) {
@@ -598,26 +629,175 @@ public class AnomalyResource {
 
     if (startTime.isAfter(endTime)) {
       LOG.warn("Start time {} is after end time {}", startTime, endTime);
-      return null;
+      return Response.status(Response.Status.BAD_REQUEST).entity("Start time is after end time").build();
     }
 
-    Map<String, AnomalyTimelinesView> dimensionMapAnomalyTimelinesViewMap = new HashMap<>();
-    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
-        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-    anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec);
-    // Take start time == end time to generate the baseline before end time
-    AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder
-        .fetchTimeSeriesData(startTime, endTime, true).fetchExistingMergedAnomalies(startTime, endTime, false)
-        .fetchScalingFactors(startTime, endTime).build();
-
+    // Get the anomaly time lines view of the anomaly function on each dimension
+    List<DimensionMap> dimensions = enumerateDimensionMapCombinations(anomalyFunctionSpec);
+    HashMap<String, AnomalyTimelinesView> dimensionMapAnomalyTimelinesViewMap = new HashMap<>();
     AnomaliesResource anomaliesResource = new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory);
     DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection());
-    for(DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap().keySet()) {
-      AnomalyTimelinesView anomalyTimelinesView = anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO,
-          startTime, endTime, dimensionMap);
-      dimensionMapAnomalyTimelinesViewMap.put(dimensionMap.toString(), anomalyTimelinesView);
+    for(DimensionMap dimensionMap : dimensions) {
+      AnomalyTimelinesView anomalyTimelinesView = null;
+      if(mode.equalsIgnoreCase("ONLINE")) {
+        // If online, use the monitoring time window to query time range and generate the baseline
+        anomalyTimelinesView = anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec,
+            datasetConfigDTO, startTime, endTime, dimensionMap);
+      } else {
+        // If offline, request baseline in user-defined data range
+        List<Pair<Long, Long>> dataRangeIntervals = new ArrayList<>();
+        dataRangeIntervals.add(new Pair<Long, Long>(endTime.getMillis(), endTime.getMillis()));
+        dataRangeIntervals.add(new Pair<Long, Long>(startTime.getMillis(), endTime.getMillis()));
+        anomalyTimelinesView = anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec,
+            datasetConfigDTO, dataRangeIntervals, dimensionMap);
+      }
+      dimensionMapAnomalyTimelinesViewMap.put(dimensionMap.toJavaString(), anomalyTimelinesView);
     }
-    return dimensionMapAnomalyTimelinesViewMap;
+
+    // Amend the anomaly time lines view by adding merged anomaly information
+    for (String dimension : dimensionMapAnomalyTimelinesViewMap.keySet()) {
+      DimensionMap dimensionMap = new DimensionMap();
+      AnomalyTimelinesView anomalyTimelinesView = amendAnomalyTimelinesViewWithAnomalyResults(anomalyFunctionSpec,
+          dimensionMapAnomalyTimelinesViewMap.get(dimension), dimensionMap);
+      dimensionMapAnomalyTimelinesViewMap.put(dimension, anomalyTimelinesView);
+    }
+
+    return Response.ok(dimensionMapAnomalyTimelinesViewMap).build();
+  }
+
+  /**
+   * Amend the anomaly time lines view with the information in anomaly results
+   *  - if the anomaly result contains view, override the timeseries by the view
+   *  - if the anomaly result contains raw anomalies, override the timeseries by the current and baseline values inside
+   *  - otherwise, use the merged anomaly information for all missing points
+   * @param anomalyFunctionSpec
+   * @param originalTimelinesView
+   * @param dimensionMap
+   * @return
+   */
+  public AnomalyTimelinesView amendAnomalyTimelinesViewWithAnomalyResults(AnomalyFunctionDTO anomalyFunctionSpec,
+      AnomalyTimelinesView originalTimelinesView, DimensionMap dimensionMap) {
+    if (originalTimelinesView == null || anomalyFunctionSpec == null) {
+      LOG.error("AnomalyTimelinesView or AnomalyFunctionDTO is null");
+      return null;
+    }
+    long bucketMillis =
+        (new TimeGranularity(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit())).toMillis();
+    Tuple2<TimeSeries, TimeSeries> timeSeriesTuple = TimeSeriesUtils.toTimeSeries(originalTimelinesView);
+    TimeSeries observed = timeSeriesTuple._1();
+    TimeSeries expected = timeSeriesTuple._2();
+    Interval timeSeriesInterval = observed.getTimeSeriesInterval();
+    List<MergedAnomalyResultDTO> mergedAnomalyResults = mergedAnomalyResultDAO
+        .findByStartTimeInRangeAndFunctionId(timeSeriesInterval.getStartMillis(), timeSeriesInterval.getEndMillis(),
+            anomalyFunctionSpec.getId(), true);
+
+    for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
+      if (mergedAnomalyResult.getDimensions().equals(dimensionMap)) {
+        String viewString = mergedAnomalyResult.getProperties().get("anomalyTimelinesView");
+        // Strategy 1: override the timeseries by the view
+        if (StringUtils.isNotBlank(viewString)) { // Update TimeSeries using the view in the anomaly result
+          AnomalyTimelinesView anomalyView;
+          try {
+            anomalyView = AnomalyTimelinesView.fromJsonString(viewString);
+          } catch (Exception e) {
+            LOG.warn("Unable to fetch view from anomaly result; use anomaly result directly");
+            break;
+          }
+          timeSeriesTuple = TimeSeriesUtils.toTimeSeries(anomalyView);
+          TimeSeries anomalyObserved = timeSeriesTuple._1();
+          TimeSeries anomalyExpected = timeSeriesTuple._2();
+
+          for (long timestamp : anomalyObserved.timestampSet()) {
+            if (timeSeriesInterval.contains(timestamp)) {
+              observed.set(timestamp, anomalyObserved.get(timestamp));
+              expected.set(timestamp, anomalyExpected.get(timestamp));
+            }
+          }
+          continue;
+        }
+
+        // Strategy 2: override the timeseries by the current and baseline values inside
+        if (mergedAnomalyResult.getAnomalyResults().size() > 0) {
+          for(RawAnomalyResultDTO rawAnomalyResult : mergedAnomalyResult.getAnomalyResults()) {
+            if (!observed.hasTimestamp(rawAnomalyResult.getStartTime())) {
+              // if the observed value in the timeseries is not removed, use the original observed value
+              observed.set(rawAnomalyResult.getStartTime(), rawAnomalyResult.getAvgCurrentVal());
+            }
+            if (!expected.hasTimestamp(rawAnomalyResult.getStartTime())) {
+              // if the expected value in the timeserie is not removed, use the original expected value
+              expected.set(rawAnomalyResult.getStartTime(), rawAnomalyResult.getAvgBaselineVal());
+            }
+          }
+        } else {
+          // Strategy 3: use the merged anomaly information for all missing points
+          for (long start = mergedAnomalyResult.getStartTime(); start < mergedAnomalyResult.getEndTime(); start += bucketMillis) {
+            if (!observed.hasTimestamp(mergedAnomalyResult.getStartTime())) {
+              // if the observed value in the timeseries is not removed, use the original observed value
+              observed.set(start, mergedAnomalyResult.getAvgCurrentVal());
+            }
+            if (!expected.hasTimestamp(mergedAnomalyResult.getStartTime())) {
+              // if the expected value in the timeserie is not removed, use the original expected value
+              expected.set(start, mergedAnomalyResult.getAvgBaselineVal());
+            }
+          }
+        }
+      }
+    }
+    return TimeSeriesUtils.toAnomalyTimeLinesView(observed, expected, bucketMillis);
+  }
+
+  /**
+   * Enumerate all possible DimensionMap for a given anomaly detection function spec
+   * @param anomalyFunctionSpec
+   * @return
+   */
+  public List<DimensionMap> enumerateDimensionMapCombinations(AnomalyFunctionDTO anomalyFunctionSpec)
+      throws ExecutionException {
+    List<DimensionMap> dimensionMapEnumeration = new ArrayList<>();
+    if (StringUtils.isBlank(anomalyFunctionSpec.getExploreDimensions())) {
+      dimensionMapEnumeration.add(new DimensionMap());
+      return dimensionMapEnumeration;
+    }
+    String jsonFilters = dimensionFiltersCache.get(anomalyFunctionSpec.getCollection());
+    HashMap<String, List<String>> collectionFilters;
+    try {
+      collectionFilters = OBJECT_MAPPER.readValue(jsonFilters, HashMap.class);
+    } catch (Exception e) {
+      LOG.error("Unable to cast or parse json value: {}", jsonFilters, e);
+      dimensionMapEnumeration.add(new DimensionMap());
+      return dimensionMapEnumeration;
+    }
+    String[] exploreDimensions = anomalyFunctionSpec.getExploreDimensions().split(",");
+    Multimap<String, String> functionFilters = anomalyFunctionSpec.getFilterSet();
+
+    List<String> dimensionStringEnumeration = new ArrayList<>();
+    dimensionStringEnumeration.add("");
+    for (String exploreDimension : exploreDimensions) {
+      if (!collectionFilters.containsKey(exploreDimension)) {
+        continue;
+      }
+      // Get the full list of attributes from dataset metaData
+      List<String> possibleAttributes = collectionFilters.get(exploreDimension);
+      // If there is user pre-defined attributes, use user's definition
+      if (functionFilters.containsKey(exploreDimension)) {
+        possibleAttributes = new ArrayList<>(functionFilters.get(exploreDimension));
+      }
+
+      // Append new attribute to the dimension string
+      List<String> targetEnumerations = dimensionStringEnumeration;
+      dimensionStringEnumeration = new ArrayList<>();
+      for (String targetEntry : targetEnumerations) {
+        for (String attribute : possibleAttributes) {
+          dimensionStringEnumeration.add(targetEntry + "," + exploreDimension + "=" + attribute);
+        }
+      }
+    }
+
+    for (String dimensionString : dimensionStringEnumeration) {
+      // remove the first comma from the dimension string
+      dimensionMapEnumeration.add(new DimensionMap("{" + dimensionString.substring(1) + "}"));
+    }
+    return dimensionMapEnumeration;
   }
 
   /**
