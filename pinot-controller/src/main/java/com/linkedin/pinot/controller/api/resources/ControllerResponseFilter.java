@@ -19,9 +19,11 @@ package com.linkedin.pinot.controller.api.resources;
 import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.ext.Provider;
 
 
@@ -29,6 +31,10 @@ import javax.ws.rs.ext.Provider;
 // https://jersey.github.io/documentation/latest/logging_chapter.html#d0e15719
 @Provider
 public class ControllerResponseFilter implements ContainerResponseFilter {
+
+  @Inject
+  private javax.inject.Provider<org.glassfish.grizzly.http.server.Request> request;
+
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerResponseFilter.class);
   @Override
   public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext)
@@ -37,6 +43,8 @@ public class ControllerResponseFilter implements ContainerResponseFilter {
     final String uri = requestContext.getUriInfo().getRequestUri().toString();
     final int respStatus = responseContext.getStatus();
     final String reasonPhrase = responseContext.getStatusInfo().getReasonPhrase();
-    LOGGER.info("Handled request {} {} status code {} {}", method, uri, respStatus, reasonPhrase);
+    final String srcIpAddr = request.get().getRemoteAddr();
+    final String contentType = requestContext.getHeaderString(HttpHeaders.CONTENT_TYPE);
+    LOGGER.info("Handled request from {} {} {}, content-type {} status code {} {}", srcIpAddr, method, uri, contentType, respStatus, reasonPhrase);
   }
 }
