@@ -248,7 +248,7 @@ public class DetectionJobResource {
     // run replay, update function with jobId
     long jobId;
     try {
-      Response response = generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup);
+      Response response = generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup, false);
       Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
       jobId = entity.get(id);
     } catch (Exception e) {
@@ -299,9 +299,10 @@ public class DetectionJobResource {
       @QueryParam("start") @NotNull String startTimeIso,
       @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
-      @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
+      @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
+      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow) throws Exception {
     Response response = generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso,
-        isForceBackfill, speedup);
+        isForceBackfill, speedup, isRemoveAnomaliesInWindow);
     return response;
   }
 
@@ -324,6 +325,7 @@ public class DetectionJobResource {
    * @param speedup
    *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
    *      WoW-based algorithm, or Seasonal Data Model.
+   * @param isRemoveAnomaliesInWindow whether remove existing anomalies in replay window
    * @return HTTP response of this request with a map from function id to its job execution id
    * @throws Exception
    */
@@ -333,7 +335,8 @@ public class DetectionJobResource {
       @QueryParam("start") @NotNull String startTimeIso,
       @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
-      @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
+      @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
+      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow) throws Exception {
     final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
     final List<Long> functionIdList = new ArrayList<>();
     final Map<Long, Long> detectionJobIdMap = new HashMap<>();
@@ -397,9 +400,12 @@ public class DetectionJobResource {
         anomalyFunction.setActive(true);
         anomalyFunctionDAO.update(anomalyFunction);
       }
-      // remove existing anomalies within same replay window
-      OnboardResource onboardResource = new OnboardResource();
-      onboardResource.deleteExistingAnomalies(functionId, startTime.getMillis(), endTime.getMillis());
+      // if isRemoveAnomaliesInWindow is true, remove existing anomalies within same replay window
+      if (isRemoveAnomaliesInWindow) {
+        OnboardResource onboardResource = new OnboardResource();
+        onboardResource.deleteExistingAnomalies(functionId, startTime.getMillis(), endTime.getMillis());
+      }
+
       // run backfill
       long detectionJobId = detectionJobScheduler.runBackfill(functionId, startTime, endTime, forceBackfill);
       // Put back activation status
