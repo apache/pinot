@@ -117,12 +117,13 @@ public class ThirdEyeDashboardApplication
 
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+    EmailResource emailResource = new EmailResource(config);
 
     env.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
     env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new EmailResource(config));
+    env.jersey().register(emailResource);
     env.jersey().register(new EntityManagerResource());
     env.jersey().register(new MetricConfigResource());
     env.jersey().register(new DatasetConfigResource());
@@ -152,7 +153,7 @@ public class ThirdEyeDashboardApplication
      */
     DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
     AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
-    env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
+    env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory, emailResource));
 
     try {
       // root cause resource

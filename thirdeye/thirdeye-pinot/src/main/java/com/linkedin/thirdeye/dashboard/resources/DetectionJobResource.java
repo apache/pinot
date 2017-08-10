@@ -71,10 +71,11 @@ public class DetectionJobResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private final AlertFilterFactory alertFilterFactory;
+  private EmailResource emailResource;
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
 
-  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
+  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionSpecDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
@@ -83,6 +84,7 @@ public class DetectionJobResource {
     this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.alertFilterFactory = alertFilterFactory;
+    this.emailResource = emailResource;
   }
 
 
@@ -211,6 +213,72 @@ public class DetectionJobResource {
   }
 
   /**
+   * The wrapper endpoint to do first time replay, tuning and send out notification to user
+   * @param id new anomaly function id
+   * @param startTimeIso start time of replay
+   * @param endTimeIso end time of replay
+   * @param isForceBackfill whether force back fill or not
+   * @param speedup whether use speedUp or not
+   * @param userDefinedPattern tuning paramter, user defined pattern can be "UP", "DOWN", or "UP&DOWN"
+   * @param sensitivity sensitivity level for initial tuning
+   * @param fromAddr email notification from address
+   * @param toAddr email notification to address
+   * @param subject subject of email
+   * @param teHost thirdeye host
+   * @param smtpHost smtp host
+   * @param smtpPort smtp port
+   * @param phantomJsPath phantomJSpath
+   * @return
+   */
+  @POST
+  @Path("/{id}/notifyreplaytuning")
+  public Response triggerReplayTuningAndNotification(@PathParam("id") @NotNull final long id,
+      @QueryParam("start") @NotNull String startTimeIso,
+      @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("force") @DefaultValue("false") String isForceBackfill,
+      @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
+      @QueryParam("userDefinedPattern") @DefaultValue("UP") String userDefinedPattern,
+      @QueryParam("sensitivity") @DefaultValue("MEDIAN") final String sensitivity,
+      @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr, @QueryParam("subject") String subject,
+      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") int smtpPort,
+      @QueryParam("phantomJsPath") String phantomJsPath) {
+
+    // run replay, update function with jobId
+    long jobId;
+    try {
+      Response response = generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup);
+      Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
+      jobId = entity.get(id);
+    } catch (Exception e) {
+      return Response.ok("Failed to start replay!").build();
+    }
+
+    JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
+    if (!jobStatus.equals(JobStatus.COMPLETED)) {
+      return Response.ok("Replay job error with job status: {}" + jobStatus).build();
+    } else {
+      LOG.info("Replay completed");
+    }
+
+    // create initial tuning and apply filter
+    Response initialAutotuneResponse = initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso,"AUTOTUNE", 10, "", "");
+    updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
+    LOG.info("Initial alert filter applied");
+
+    // send out email
+    long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+    long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject, true, true, teHost, smtpHost, smtpPort, phantomJsPath);
+    LOG.info("Sent out email");
+    return Response.ok("Replay, Tuning and Notification finished!").build();
+  }
+
+
+
+
+  /**
    * Breaks down the given range into consecutive monitoring windows as per function definition
    * Regenerates anomalies for each window separately
    *
@@ -234,10 +302,9 @@ public class DetectionJobResource {
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup) throws Exception {
     Response response = generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso,
         isForceBackfill, speedup);
-    // As there is only one function id, simplify the response message to a single job execution id
-    Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
-    return Response.status(response.getStatus()).entity(entity.values()).build();
+    return response;
   }
+
 
   /**
    * Breaks down the given range into consecutive monitoring windows as per function definition
