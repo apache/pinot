@@ -130,7 +130,7 @@ const humanizeStart = (offset) =>
 {
   const dur = moment.duration(Math.abs(offset));
 
-  var out = 'just';
+  let out = 'just';
   if (dur >= moment.duration(1, 'minute')) {
     out = dur.humanize().replace('minute', 'min').replace('second', 'sec');
   }
@@ -163,7 +163,7 @@ const humanizeDuration = (duration) =>
  * Helper function to add human-readable time labels as record properties
  */
 const assignHumanTimeInfo = (event) => {
-  var humanRelStart = humanizeStart(event.relStart);
+  const humanRelStart = humanizeStart(event.relStart);
   const humanDuration = humanizeDuration(event.relDuration);
 
   return Object.assign(event, { humanRelStart, humanDuration });
