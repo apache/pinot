@@ -84,8 +84,8 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
 
   const relStart = event.start - anomalyStart;
 
-  var relEnd = 'ongoing';
-  var relDuration = 'ongoing';
+  var relEnd = Infinity;
+  var relDuration = Infinity;
   if (moment().isAfter(moment(event.end).add(1, 'minute'))) {
     relEnd = event.end - anomalyStart;
     relDuration = event.end - event.start;
@@ -121,36 +121,50 @@ const adjustHolidayTimestamp = (event) => {
   }
 
   return event;
-}
+};
 
 /**
- * Helper function to humanize a moment
+ * Helper function to humanize a start offset
  */
-const humanizeShort = (dur) => {
-  return dur.humanize().replace('minute', 'min');
+const humanizeStart = (offset) =>
+{
+  const dur = moment.duration(Math.abs(offset));
+
+  let out = 'just';
+  if (dur >= moment.duration(1, 'minute')) {
+    out = dur.humanize().replace('minute', 'min').replace('second', 'sec');
+  }
+
+  if (offset >= 0) {
+    return `${out} after`;
+  } else {
+    return `${out} before`;
+  }
+};
+
+/**
+ * Helper function to humanize a duration
+ */
+const humanizeDuration = (duration) =>
+{
+  if (!Number.isFinite(duration)) {
+    return 'ongoing';
+  }
+
+  const dur = moment.duration(duration);
+  if (dur <= moment.duration(1, 'minute')) {
+    return '';
+  }
+
+  return dur.humanize().replace('minute', 'min').replace('second', 'sec');
 };
 
 /**
  * Helper function to add human-readable time labels as record properties
  */
 const assignHumanTimeInfo = (event) => {
-  var humanRelStart = event.relStart;
-  if (event.relStart >= 0) {
-    const out = humanizeShort(moment.duration(event.relStart));
-    humanRelStart = `${out} after`;
-  } else {
-    const out = humanizeShort(moment.duration(-1 * event.relStart));
-    humanRelStart = `${out} before`;
-  }
-
-  var humanDuration = event.duration;
-  if (!Number.isNaN(event.duration)) {
-    if (event.duration < moment.duration(1, 'minute')) {
-      humanDuration = '';
-    } else {
-      humanDuration = humanizeShort(moment.duration(event.duration));
-    }
-  }
+  const humanRelStart = humanizeStart(event.relStart);
+  const humanDuration = humanizeDuration(event.relDuration);
 
   return Object.assign(event, { humanRelStart, humanDuration });
 };
