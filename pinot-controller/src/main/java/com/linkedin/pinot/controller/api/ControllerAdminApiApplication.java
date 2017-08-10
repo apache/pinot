@@ -51,6 +51,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       CONSOLE_WEB_PATH += "/";
     }
     packages(RESOURCE_PACKAGE);
+    // TODO See ControllerResponseFilter
+//    register(new LoggingFeature());
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
