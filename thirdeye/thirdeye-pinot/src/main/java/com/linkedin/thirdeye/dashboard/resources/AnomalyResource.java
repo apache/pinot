@@ -453,6 +453,13 @@ public class AnomalyResource {
     if (StringUtils.isNotBlank(windowUnit)) {
       anomalyFunctionSpec.setWindowUnit(TimeUnit.valueOf(windowUnit));
     }
+    // window delay
+    if (StringUtils.isNotBlank(windowDelay)) {
+      anomalyFunctionSpec.setWindowDelay(Integer.valueOf(windowDelay));
+    }
+    if (StringUtils.isNotBlank(windowDelayUnit)) {
+      anomalyFunctionSpec.setWindowDelayUnit(TimeUnit.valueOf(windowDelayUnit));
+    }
 
     if (StringUtils.isNotBlank(filters)) {
       filters = URLDecoder.decode(filters, UTF8);
