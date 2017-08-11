@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Properties;
 
 
-public class DummyAlertFilter implements AlertFilter {
+public class DummyAlertFilter extends BaseAlertFilter {
   @Override
   public List<String> getPropertyNames() {
     return Collections.EMPTY_LIST;

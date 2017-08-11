@@ -59,18 +59,18 @@ public class AlertFilterFactory {
    * does not have an alert filter spec or this method fails to initiates an alert filter from the
    * spec.
    */
-  public AlertFilter fromSpec(Map<String, String> alertFilterSpec) {
+  public BaseAlertFilter fromSpec(Map<String, String> alertFilterSpec) {
     if (alertFilterSpec == null) {
       alertFilterSpec = Collections.emptyMap();
     }
     // the default alert filter is DummyAlertFilter
-    AlertFilter alertFilter = new DummyAlertFilter();
+    BaseAlertFilter alertFilter = new DummyAlertFilter();
     if (alertFilterSpec.containsKey(FILTER_TYPE_KEY)) {
       String alertFilterType = alertFilterSpec.get(FILTER_TYPE_KEY);
       if(props.containsKey(alertFilterType.toUpperCase())) {
         String className = props.getProperty(alertFilterType.toUpperCase());
         try {
-          alertFilter = (AlertFilter) Class.forName(className).newInstance();
+          alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
         } catch (Exception e) {
           LOGGER.warn(e.getMessage());
         }

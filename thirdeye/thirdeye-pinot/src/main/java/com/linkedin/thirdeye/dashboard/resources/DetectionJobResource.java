@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.ALERT_FILTER_LOGISITC_AUTO_TUNE;
-import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE;
 
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
+import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -483,6 +483,7 @@ public class DetectionJobResource {
       @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso,
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
+      @QueryParam("FilterPattern") @DefaultValue("TWO_SIDED") String userDefinedPattern,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
@@ -491,50 +492,50 @@ public class DetectionJobResource {
 
     // get anomalies by function id, start time and end time
     AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
-    List<MergedAnomalyResultDTO> anomalyResultDTOS = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
-    AutotuneConfigDTO target = new AutotuneConfigDTO();
-
-    // create alert filter and evaluator
-    AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-    PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, null);
-
+    List<MergedAnomalyResultDTO> anomalies = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
+    // get current alert filter, TODO: if no need to create blank alert filter
+    BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     // create alert filter auto tune
-    AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
+    BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
+    AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(alertFilter);
+
+    //init
+    alertFilterAutotune.init(anomalies, autotuneConfig);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
     long autotuneId = -1;
-    double currPrecision = 0;
-    double currRecall = 0;
-    try {
-      //evaluate current alert filter (calculate current precision and recall)
-      evaluator.init(anomalyResultDTOS);
-      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall: {}", alertFilter.getClass().toString(), evaluator.getPrecision(), evaluator.getRecall());
-    } catch (Exception e) {
-      LOG.info(e.getMessage());
-    }
-    currPrecision = evaluator.getWeightedPrecision();
-    currRecall = evaluator.getRecall();
-    try {
-      // get tuned alert filter
-      Map<String, String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, currPrecision, currRecall);
-      LOG.info("tuned AlertFilter");
 
-      // if alert filter auto tune has updated alert filter, write to autotune_config_index, and get the autotuneId
-      // otherwise do nothing and return alert filter
-      if (alertFilterAutotune.isUpdated()) {
-        target.setFunctionId(id);
-        target.setAutotuneMethod(ALERT_FILTER_LOGISITC_AUTO_TUNE);
-        target.setConfiguration(tunedAlertFilter);
-        target.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.PRECISION_AND_RECALL);
-        autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(target);
-        LOG.info("Model has been updated");
-      } else {
-        LOG.info("Model hasn't been updated because tuned model cannot beat original model");
-      }
+    // tune
+    try {
+      Map<String, String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter();
+      alertFilter.setParameters(alertFilterAutotune.getAlertFilter());
     } catch (Exception e) {
-      LOG.warn("AutoTune throws exception due to: {}", e.getMessage());
+      e.printStackTrace();
     }
+
+    // write to DB
+    autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig);
+
+//    try {
+//      // get tuned alert filter
+//      Map<String, String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter();
+//      LOG.info("tuned AlertFilter");
+//
+//      // if alert filter auto tune has updated alert filter, write to autotune_config_index, and get the autotuneId
+//      // otherwise do nothing and return alert filter
+//      if (alertFilterAutotune.isUpdated()) {
+//        target.setConfiguration(tunedAlertFilter);
+//        autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(target);
+//        LOG.info("Model has been updated");
+//      } else {
+//        LOG.info("Model hasn't been updated because tuned model cannot beat original model");
+//      }
+//    } catch (Exception e) {
+//      LOG.warn("AutoTune throws exception due to: {}", e.getMessage());
+//    }
     return Response.ok(autotuneId).build();
   }
+
+
 
   /**
    * Endpoint to check if merged anomalies given a time period have at least one positive label
