@@ -341,6 +341,9 @@ public class DetectionJobResource {
       detectionJobIdMap.put(functionId, detectionJobId);
     }
 
+    /**
+     * Check the job status in thread and recover the function
+     */
     new Thread(new Runnable() {
       @Override
       public void run() {
@@ -350,7 +353,7 @@ public class DetectionJobResource {
         // Revert window setup
         revertFunctionWindow(functionIdList, originalWindowSize, originalWindowUnit, originalCron);
       }
-    }).run();
+    }).start();
 
     return Response.ok(detectionJobIdMap).build();
   }
