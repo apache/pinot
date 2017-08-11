@@ -6,12 +6,12 @@
         <section class="rca-summary">
           <div class="row">
             <div class="col-xs-4">
-              <label class="te-label" for="select-anomaly-region">Investigation Period:
+              <label class="te-label" for="select-view-region">Display Period:
                 <span>
                   <i class="glyphicon glyphicon-question-sign"></i>
                   {{#tooltip-on-element}}
-                    Typically, this is your anomaly region. It's highlighted in orange in the graph below.
-                  {{/tooltip-on-element}} 
+                    This is the whole period that you'd like to view. This sets the boundaries for your subchart.
+                  {{/tooltip-on-element}}
                 </span>
               </label>
               {{date-range-picker
@@ -19,10 +19,9 @@
                 timePicker=showTimePicker
                 timePicker24Hour=true
                 timePickerIncrement=timePickerIncrement
-                minDate=minDate
-                maxDate=maxDate 
-                start=anomalyRegionStart
-                end=anomalyRegionEnd
+                maxDate=maxTime
+                start=viewRegionStart
+                end=viewRegionEnd
                 ranges=predefinedRanges
                 showCustomRangeLabel=false
                 format=uiDateFormat
@@ -35,7 +34,7 @@
                 selected=uiGranularity
                 options=granularities
                 triggerId="select-granularity"
-                onchange=(action "onGranularityChange") 
+                onchange=(action "onGranularityChange")
                 searchEnabled=false
                 as |granularity|
               }}
@@ -55,17 +54,15 @@
                 {{mode}}
               {{/power-select}}
             </div>
-
           </div>
           <div class="row">
-
             <div class="col-xs-4">
-              <label class="te-label" for="select-view-region">Display Period: 
+              <label class="te-label" for="select-anomaly-region">Investigation Period:
                 <span>
                   <i class="glyphicon glyphicon-question-sign"></i>
                   {{#tooltip-on-element}}
-                    This is the whole period that you'd like to view. This sets the boundaries for your subchart.
-                  {{/tooltip-on-element}} 
+                    Typically, this is your anomaly region. It's highlighted in orange in the graph below.
+                  {{/tooltip-on-element}}
                 </span>
               </label>
               {{date-range-picker
@@ -73,9 +70,10 @@
                 timePicker=showTimePicker
                 timePicker24Hour=true
                 timePickerIncrement=timePickerIncrement
-                maxDate=maxTime 
-                start=viewRegionStart
-                end=viewRegionEnd
+                minDate=minDate
+                maxDate=maxDate
+                start=anomalyRegionStart
+                end=anomalyRegionEnd
                 ranges=predefinedRanges
                 showCustomRangeLabel=false
                 format=uiDateFormat
@@ -90,7 +88,6 @@
                 triggerId="select-filter"
               }}
             </div>
-
           </div>
 
           <main class="paper-container">
@@ -104,9 +101,9 @@
               {{/if}}
 
               {{#if summary.loaded}}
-                {{anomaly-graph 
+                {{anomaly-graph
                   classNames='anomaly-graph--no-border'
-                  primaryMetric=summary.primaryMetric 
+                  primaryMetric=summary.primaryMetric
                   showLegend=true
                   showSubchart=true
                   showGraphLegend=false
@@ -120,7 +117,7 @@
                   dimensions=summary.selectedDimensions
                   selectedDimensions=summary.selectedDimensions
                   events=summary.selectedEvents
-                  onSubchartChange=(action "setDateParams") 
+                  onSubchartChange=(action "setDateParams")
                   analysisStart=analysisStart
                   analysisEnd=analysisEnd
                   subchartStart=subchartStart
@@ -138,21 +135,21 @@
       <div class="contribution-table__header">
         <div class="contribution-table__subnav">
           {{#link-to "rca.details.events" class="thirdeye-link thirdeye-link--nav" activeClass="thirdeye-link--active"}}
-            Events Correlation 
+            Events Correlation
           {{/link-to}}
         </div>
         <div class="contribution-table__subnav">
           {{#link-to "rca.details.dimensions" class="thirdeye-link thirdeye-link--nav" activeClass="thirdeye-link--active"}}
-            Dimensions Analysis 
+            Dimensions Analysis
           {{/link-to}}
         </div>
         <div class="contribution-table__subnav">
           {{#link-to "rca.details.metrics" class="thirdeye-link thirdeye-link--nav" activeClass="thirdeye-link--active"}}
-            Metrics Correlation 
+            Metrics Correlation
           {{/link-to}}
         </div>
       </div>
-      {{outlet}} 
+      {{outlet}}
     </div>
   </div>
 </div>
