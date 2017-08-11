@@ -24,8 +24,6 @@ import javax.annotation.Nonnull;
  * Factory to build instances of {@link PartitionFunction}.
  */
 public class PartitionFunctionFactory {
-  public static final String PARTITION_FUNCTION_DELIMITER = "\t\t";
-
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
     Modulo,
@@ -60,14 +58,11 @@ public class PartitionFunctionFactory {
   /**
    * This method generates and returns a partition function based on the provided string.
    *
-   * @param partitionFunctionString String containing function name and its arguments.
+   * @param functionName Name of partition function
    * @param numPartitions Number of partitions.
    * @return Partition function
    */
-  public static PartitionFunction getPartitionFunction(@Nonnull String partitionFunctionString, int numPartitions) {
-    String[] tokens = partitionFunctionString.split(PARTITION_FUNCTION_DELIMITER);
-    String functionName = tokens[0];
-
+  public static PartitionFunction getPartitionFunction(@Nonnull String functionName, int numPartitions) {
     PartitionFunctionType function = PartitionFunctionType.fromString(functionName);
     switch (function) {
       case Modulo:
