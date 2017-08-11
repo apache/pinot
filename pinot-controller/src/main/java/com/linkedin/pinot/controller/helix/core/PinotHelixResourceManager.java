@@ -1479,10 +1479,15 @@ public class PinotHelixResourceManager {
         // Segment exists, check whether need to refresh
 
         if (ifRefreshAnExistedSegment(segmentMetadata, offlineSegmentZKMetadata, offlineTableName, segmentName)) {
+          // NOTE: must first set the segment ZK metadata before trying to refresh because server will pick up the
+          // latest segment ZK metadata and compare with local segment metadata to decide whether to download the new
+          // segment or load from local
           offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
           offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
           offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
+          ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           LOGGER.info("Refresh segment {} of table {} to propertystore ", segmentName, offlineTableName);
+
           boolean success = true;
           if (shouldSendMessage(offlineSegmentZKMetadata)) {
             // Send a message to the servers to update the segment.
@@ -1495,7 +1500,6 @@ public class PinotHelixResourceManager {
           }
           if (success) {
             res.status = ResponseStatus.success;
-            ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           } else {
             LOGGER.error("Failed to refresh segment {} of table {}, marking crc and creation time as invalid",
                 segmentName, offlineTableName);
@@ -1514,7 +1518,8 @@ public class PinotHelixResourceManager {
       } else {
         // Segment does not exist, add new segment
 
-        addNewOfflineSegment(segmentMetadata);
+        // NOTE: must first set the segment ZK metadata before trying to update ideal state because server will need the
+        // segment ZK metadata to download and load the segment
         offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
         offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
         offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
@@ -1522,6 +1527,7 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
         LOGGER.info("Added segment {} of table {} to propertystore", segmentName, offlineTableName);
 
+        addNewOfflineSegment(segmentMetadata);
         res.status = ResponseStatus.success;
       }
     } catch (final Exception e) {
