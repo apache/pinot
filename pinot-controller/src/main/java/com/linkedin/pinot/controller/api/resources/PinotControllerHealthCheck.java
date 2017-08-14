@@ -35,7 +35,7 @@ public class PinotControllerHealthCheck {
   ControllerConf controllerConf;
 
   @GET
-  @Path("/pinot-controller/admin")
+  @Path("/")
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)
