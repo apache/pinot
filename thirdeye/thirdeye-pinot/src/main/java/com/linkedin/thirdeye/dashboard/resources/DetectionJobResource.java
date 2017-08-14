@@ -227,6 +227,7 @@ public class DetectionJobResource {
    * @param sensitivity sensitivity level for initial tuning
    * @param fromAddr email notification from address
    * @param toAddr email notification to address
+   * @param toTEAddr email notification to be sent to internal when replay fail
    * @param teHost thirdeye host
    * @param smtpHost smtp host
    * @param smtpPort smtp port
@@ -242,7 +243,8 @@ public class DetectionJobResource {
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
       @QueryParam("userDefinedPattern") @DefaultValue("UP") String userDefinedPattern,
       @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr, @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("to") String toAddr, @QueryParam("toTE") String toTEAddr,
+      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
       @QueryParam("smtpPort") int smtpPort, @QueryParam("phantomJsPath") String phantomJsPath) {
 
     // run replay, update function with jobId
@@ -266,7 +268,7 @@ public class DetectionJobResource {
       String replayFailureSubject =
           new StringBuilder("Replay failed on metric: " + anomalyFunctionDAO.findById(id).getMetric()).toString();
       String replayFailureText = new StringBuilder("Failed on Function: " + id + "with Job Id: " + jobId).toString();
-      emailResource.sendEmailWithText(fromAddr, "thirdeye-dev@linkedin.com", replayFailureSubject, replayFailureText,
+      emailResource.sendEmailWithText(fromAddr, toTEAddr, replayFailureSubject, replayFailureText,
           smtpHost, smtpPort);
       return Response.ok("Replay job error with job status: {}" + jobStatus).build();
     } else {
