@@ -1,12 +1,13 @@
 package com.linkedin.thirdeye.auth;
 
 import java.security.Principal;
+import java.util.HashSet;
 import java.util.Set;
 
 
 public class PrincipalAuthContext implements Principal {
   String principal;
-  Set<String> groups;
+  Set<String> groups = new HashSet<>();
 
   @Override
   public String getName() {

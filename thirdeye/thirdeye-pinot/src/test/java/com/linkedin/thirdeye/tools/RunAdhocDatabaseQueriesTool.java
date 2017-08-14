@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.tools;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.auto.onboard.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
@@ -12,7 +9,6 @@ import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -26,7 +22,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
@@ -40,7 +35,6 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -57,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javafx.scene.control.Alert;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +64,6 @@ public class RunAdhocDatabaseQueriesTool {
   private static final Logger LOG = LoggerFactory.getLogger(RunAdhocDatabaseQueriesTool.class);
 
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private EmailConfigurationManager emailConfigurationDAO;
   private RawAnomalyResultManager rawResultDAO;
   private MergedAnomalyResultManager mergedResultDAO;
   private MetricConfigManager metricConfigDAO;
@@ -91,7 +85,6 @@ public class RunAdhocDatabaseQueriesTool {
   public void init(File persistenceFile) throws Exception {
     DaoProviderUtil.init(persistenceFile);
     anomalyFunctionDAO = DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
-    emailConfigurationDAO = DaoProviderUtil.getInstance(EmailConfigurationManagerImpl.class);
     rawResultDAO = DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
     mergedResultDAO = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     metricConfigDAO = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
@@ -110,13 +103,6 @@ public class RunAdhocDatabaseQueriesTool {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
     anomalyFunction.setActive(true);
     anomalyFunctionDAO.update(anomalyFunction);
-  }
-
-  private void updateFields() {
-    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findAll();
-    for (EmailConfigurationDTO emailConfig : emailConfigs) {
-      LOG.info(emailConfig.getId() + " " + emailConfig.getToAddresses());
-    }
   }
 
   private void updateField(Long id) {
@@ -139,14 +125,6 @@ public class RunAdhocDatabaseQueriesTool {
     for (MergedAnomalyResultDTO mergedResult : mergedResults) {
       mergedResult.setNotified(true);
       mergedResultDAO.update(mergedResult);
-    }
-  }
-
-  private void updateEmailConfigs() {
-    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findAll();
-    for (EmailConfigurationDTO emailConfig : emailConfigs) {
-      emailConfig.setActive(false);
-      emailConfigurationDAO.update(emailConfig);
     }
   }
 
@@ -254,44 +232,6 @@ public class RunAdhocDatabaseQueriesTool {
     for (AlertConfigDTO alertConfigDTO : alertConfigs) {
       alertConfigDTO.setActive(false);
       alertConfigDAO.save(alertConfigDTO);
-    }
-  }
-
-  private void playWithAlertCOnfigs() {
-    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findAll();
-    Multimap<String, EmailConfigurationDTO> datasetToEmailConfig = ArrayListMultimap.create();
-    for (EmailConfigurationDTO emailConfig : emailConfigs) {
-      if (emailConfig.isActive() && !emailConfig.getFunctionIds().isEmpty()) {
-        datasetToEmailConfig.put(emailConfig.getCollection(), emailConfig);
-      }
-    }
-    for (String dataset : datasetToEmailConfig.keySet()) {
-      List<EmailConfigurationDTO> emailConfigsList = Lists.newArrayList(datasetToEmailConfig.get(dataset));
-
-      String name = "Beta " + dataset + " Alert Config";
-      String cron = emailConfigsList.get(0).getCron();
-      boolean active = true;
-      long watermark = 0L;
-      Set<Long> functionIds = new HashSet<>();
-      for (EmailConfigurationDTO config : emailConfigsList) {
-        functionIds.addAll(config.getFunctionIds());
-      }
-      EmailConfig emailConfig = new EmailConfig();
-      emailConfig.setAnomalyWatermark(watermark);
-      emailConfig.setFunctionIds(Lists.newArrayList(functionIds));
-      String recipients = "thirdeyeproductteam@linkedin.com";
-      String fromAddress = "thirdeye-dev@linkedin.com";
-
-      AlertConfigDTO alertConfig = new AlertConfigDTO();
-      alertConfig.setName(name);
-      alertConfig.setCronExpression(cron);
-      alertConfig.setActive(active);
-      alertConfig.setEmailConfig(emailConfig);
-      alertConfig.setRecipients(recipients);
-      alertConfig.setFromAddress(fromAddress);
-      System.out.println(alertConfig);
-      alertConfigDAO.save(alertConfig);
-
     }
   }
 

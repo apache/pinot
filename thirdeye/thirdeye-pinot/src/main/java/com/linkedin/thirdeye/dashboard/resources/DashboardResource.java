@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
+import io.dropwizard.auth.Auth;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;

@@ -38,8 +38,13 @@ public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
     String dataSourceName = datasetConfig.getDataSource();
     try {
       ThirdEyeDataSource dataSource = queryCache.getDataSource(dataSourceName);
-      Map<String, List<String>> dimensionFilters = dataSource.getDimensionFilters(dataset);
-      dimensionFiltersJson = OBJECT_MAPPER.writeValueAsString(dimensionFilters);
+      if (dataSource == null) {
+        LOGGER.warn("datasource [{}] found null in queryCache", dataSourceName);
+      }
+      else {
+        Map<String, List<String>> dimensionFilters = dataSource.getDimensionFilters(dataset);
+        dimensionFiltersJson = OBJECT_MAPPER.writeValueAsString(dimensionFilters);
+      }
     } catch (Exception e) {
       LOGGER.error("Exception in getting dimension filters for {} from data source {}", dataset, dataSourceName, e);
     }

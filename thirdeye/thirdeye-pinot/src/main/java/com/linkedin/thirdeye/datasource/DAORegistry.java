@@ -10,7 +10,6 @@ import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
@@ -31,7 +30,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EntityToEntityMappingManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
@@ -88,12 +86,6 @@ public class DAORegistry {
     return DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
   }
 
-
-  public EmailConfigurationManager getEmailConfigurationDAO() {
-    return DaoProviderUtil.getInstance(EmailConfigurationManagerImpl.class);
-  }
-
-
   public AlertConfigManager getAlertConfigDAO() {
     return DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
   }
@@ -102,7 +94,6 @@ public class DAORegistry {
   public RawAnomalyResultManager getRawAnomalyResultDAO() {
     return DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
   }
-
 
   public MergedAnomalyResultManager getMergedAnomalyResultDAO() {
     return DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
