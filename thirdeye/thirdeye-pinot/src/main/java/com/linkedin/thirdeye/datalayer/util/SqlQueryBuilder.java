@@ -40,7 +40,7 @@ public class SqlQueryBuilder {
   private static final Pattern PARAM_PATTERN =
       Pattern.compile(PARAM_REGEX, Pattern.CASE_INSENSITIVE);
   private static Set<String> AUTO_UPDATE_COLUMN_SET =
-      Sets.newHashSet("id", "last_modified", "update_time");
+      Sets.newHashSet("id", "last_modified");
 
   private EntityMappingHolder entityMappingHolder;;
 
