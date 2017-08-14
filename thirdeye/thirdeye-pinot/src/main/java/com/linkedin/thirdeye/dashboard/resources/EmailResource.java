@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
+import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -29,6 +30,9 @@ import javax.ws.rs.core.Response;
 
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.HtmlEmail;
+
 
 @Path("thirdeye/email")
 @Produces(MediaType.APPLICATION_JSON)
@@ -264,4 +268,30 @@ public class EmailResource {
             includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }
+
+
+  @GET
+  @Path("notification/")
+  public Response sendEmailWithText(
+      @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr,
+      @QueryParam("subject") String subject,
+      @QueryParam("text") String text,
+      @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") int smtpPort
+      ){
+    HtmlEmail email = new HtmlEmail();
+    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
+    smtpConfiguration.setSmtpHost(smtpHost);
+    smtpConfiguration.setSmtpPort(smtpPort);
+    try {
+      EmailHelper.sendEmailWithTextBody(email, smtpConfiguration, subject, text,
+         fromAddr, toAddr
+      );
+    } catch (EmailException e) {
+      return Response.ok("Exception in sending out message").build();
+    }
+    return Response.ok().build();
+  }
+
 }
