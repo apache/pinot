@@ -25,6 +25,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
@@ -52,7 +53,7 @@ public class SegmentPushControllerAPIs {
   private static String HOURLY_SCHEDULE = "HOURLY";
   private static String SEGMENTS_ENDPOINT = "/segments/";
   private static String TABLES_ENDPOINT = "/tables/";
-  private static String DROP_PARAMETERS = "?state=drop&type=offline";
+  private static String TYPE_PARAMETER = "?type=offline";
   private static String UTF_8 = "UTF-8";
   private static long TIMEOUT = 120000;
   private static String DATE_JOINER = "-";
@@ -61,7 +62,6 @@ public class SegmentPushControllerAPIs {
     this.controllerHosts = controllerHosts;
     this.controllerPort = Integer.valueOf(controllerPort);
   }
-
 
   public void deleteOverlappingSegments(String tableName, String segmentName) throws IOException {
     if (segmentName.contains(DAILY_SCHEDULE)) {
@@ -203,9 +203,9 @@ public class SegmentPushControllerAPIs {
     boolean deleteSuccessful = false;
 
     HttpClient controllerClient = new DefaultHttpClient();
-    HttpGet req = new HttpGet(TABLES_ENDPOINT + URLEncoder.encode(tablename, UTF_8)
-        + SEGMENTS_ENDPOINT + URLEncoder.encode(segmentName, UTF_8)
-        + DROP_PARAMETERS);
+    HttpDelete req = new HttpDelete(SEGMENTS_ENDPOINT + URLEncoder.encode(tablename, UTF_8) + "/"
+        + URLEncoder.encode(segmentName, UTF_8)
+        + TYPE_PARAMETER);
     HttpResponse res = controllerClient.execute(controllerHttpHost, req);
     try {
       if (res == null || res.getStatusLine() == null || res.getStatusLine().getStatusCode() != 200
@@ -221,6 +221,5 @@ public class SegmentPushControllerAPIs {
     }
     return deleteSuccessful;
   }
-
 
 }
