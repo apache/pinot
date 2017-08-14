@@ -468,16 +468,11 @@ public class DetectionJobScheduler implements Runnable {
     long functionId = jobDAO.findById(jobExecutionId).getConfigId();
     long jobCheckEndTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(MAXIMAL_WAIT_SECONDS);
     while (scheduledTaskDTO.size() > 0 && System.currentTimeMillis() <= jobCheckEndTime) {
-      List<Long> failedTaskIds = new ArrayList<>();
       for (TaskDTO taskDTO : scheduledTaskDTO) {
         if (taskDTO.getStatus() == TaskStatus.FAILED) {
-          failedTaskIds.add(taskDTO.getId());
+          LOG.info("Tasks failed on taskId: {}", taskDTO.getId());
+          return JobStatus.FAILED;
         }
-      }
-
-      if(failedTaskIds.size() > 0) {
-        LOG.info("Tasks Failed under Job {}: {}", jobDAO, failedTaskIds);
-        return JobStatus.FAILED;
       }
 
       try {
@@ -490,17 +485,15 @@ public class DetectionJobScheduler implements Runnable {
     }
 
     jobDTO = jobDAO.findById(jobExecutionId);
-    // If wait time is longer than MAXINMAL_WAIT_SECONDS, update job status to be TIMEOUT,
+    // If wait time is longer than MAXINMAL_WAIT_SECONDS and still scheduled jobs left, update job status to be TIMEOUT,
     // else update job status to be complete since all scheduled tasks are done
-    if (System.currentTimeMillis() > jobCheckEndTime) {
+    if (scheduledTaskDTO.size() > 0) {
       jobDTO.setStatus(JobStatus.TIMEOUT);
       jobDAO.save(jobDTO);
     } else {
       // Set job to be completed
-      if (!jobDTO.getStatus().equals(JobStatus.COMPLETED)) {
-        jobDTO.setStatus(JobStatus.COMPLETED);
-        jobDAO.save(jobDTO);
-      }
+      jobDTO.setStatus(JobStatus.COMPLETED);
+      jobDAO.save(jobDTO);
     }
     return jobDTO.getStatus();
   }

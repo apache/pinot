@@ -214,7 +214,7 @@ public class DetectionJobResource {
 
   /**
    * The wrapper endpoint to do first time replay, tuning and send out notification to user
-   * @param id new anomaly function id
+   * @param id anomaly function id
    * @param startTimeIso start time of replay
    * @param endTimeIso end time of replay
    * @param isForceBackfill whether force back fill or not
@@ -223,7 +223,6 @@ public class DetectionJobResource {
    * @param sensitivity sensitivity level for initial tuning
    * @param fromAddr email notification from address
    * @param toAddr email notification to address
-   * @param subject subject of email
    * @param teHost thirdeye host
    * @param smtpHost smtp host
    * @param smtpPort smtp port
@@ -235,12 +234,13 @@ public class DetectionJobResource {
   public Response triggerReplayTuningAndNotification(@PathParam("id") @NotNull final long id,
       @QueryParam("start") @NotNull String startTimeIso,
       @QueryParam("end") @NotNull String endTimeIso,
-      @QueryParam("force") @DefaultValue("false") String isForceBackfill,
+      @QueryParam("force") @DefaultValue("true") String isForceBackfill,
+      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow,
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
       @QueryParam("userDefinedPattern") @DefaultValue("UP") String userDefinedPattern,
-      @QueryParam("sensitivity") @DefaultValue("MEDIAN") final String sensitivity,
+      @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity,
       @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr, @QueryParam("subject") String subject,
+      @QueryParam("to") String toAddr,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
       @QueryParam("smtpPort") int smtpPort,
       @QueryParam("phantomJsPath") String phantomJsPath) {
@@ -248,35 +248,43 @@ public class DetectionJobResource {
     // run replay, update function with jobId
     long jobId;
     try {
-      Response response = generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup, false);
+      Response response = generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup, isRemoveAnomaliesInWindow);
       Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
       jobId = entity.get(id);
     } catch (Exception e) {
       return Response.ok("Failed to start replay!").build();
     }
 
-    JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
-    if (!jobStatus.equals(JobStatus.COMPLETED)) {
-      return Response.ok("Replay job error with job status: {}" + jobStatus).build();
-    } else {
-      LOG.info("Replay completed");
-    }
-
-    // create initial tuning and apply filter
-    Response initialAutotuneResponse = initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso,"AUTOTUNE", 10, "", "");
-    updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
-    LOG.info("Initial alert filter applied");
-
-    // send out email
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
-    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject, true, true, teHost, smtpHost, smtpPort, phantomJsPath);
-    LOG.info("Sent out email");
+    JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
+    int numReplayedAnomalies = 0;
+    if (!jobStatus.equals(JobStatus.COMPLETED)) {
+      //TODO: cleanup done tasks and replay results under this failed job
+      return Response.ok("Replay job error with job status: {}" + jobStatus).build();
+    } else {
+      numReplayedAnomalies = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id, false).size();
+      LOG.info("Replay completed with {} anomalies generated.", numReplayedAnomalies);
+    }
+
+    if (numReplayedAnomalies > 0) {
+      // create initial tuning and apply filter
+      Response initialAutotuneResponse = initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso,"AUTOTUNE", 10, "", "");
+      updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
+      LOG.info("Initial alert filter applied");
+
+      // send out email
+      String subject = new StringBuilder("Replay results for "
+          + anomalyFunctionDAO.findById(id).getFunctionName()
+          + " is ready for review!")
+          .toString();
+
+      emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject, true, true, teHost, smtpHost, smtpPort, phantomJsPath);
+      LOG.info("Sent out email");
+    }
+
     return Response.ok("Replay, Tuning and Notification finished!").build();
   }
-
-
-
 
   /**
    * Breaks down the given range into consecutive monitoring windows as per function definition
