@@ -3,6 +3,9 @@ package com.linkedin.thirdeye.dashboard.resources;
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.ALERT_FILTER_LOGISITC_AUTO_TUNE;
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE;
 
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.rootcause.Entity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -218,6 +221,7 @@ public class DetectionJobResource {
    * @param startTimeIso start time of replay
    * @param endTimeIso end time of replay
    * @param isForceBackfill whether force back fill or not
+   * @param isRemoveAnomaliesInWindow whether need to remove exsiting anomalies within replay time window
    * @param speedup whether use speedUp or not
    * @param userDefinedPattern tuning paramter, user defined pattern can be "UP", "DOWN", or "UP&DOWN"
    * @param sensitivity sensitivity level for initial tuning
@@ -232,23 +236,20 @@ public class DetectionJobResource {
   @POST
   @Path("/{id}/notifyreplaytuning")
   public Response triggerReplayTuningAndNotification(@PathParam("id") @NotNull final long id,
-      @QueryParam("start") @NotNull String startTimeIso,
-      @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("true") String isForceBackfill,
       @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow,
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
       @QueryParam("userDefinedPattern") @DefaultValue("UP") String userDefinedPattern,
-      @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity,
-      @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,
-      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort,
-      @QueryParam("phantomJsPath") String phantomJsPath) {
+      @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity, @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr, @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") int smtpPort, @QueryParam("phantomJsPath") String phantomJsPath) {
 
     // run replay, update function with jobId
     long jobId;
     try {
-      Response response = generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup, isRemoveAnomaliesInWindow);
+      Response response =
+          generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup, isRemoveAnomaliesInWindow);
       Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
       jobId = entity.get(id);
     } catch (Exception e) {
@@ -261,27 +262,36 @@ public class DetectionJobResource {
     int numReplayedAnomalies = 0;
     if (!jobStatus.equals(JobStatus.COMPLETED)) {
       //TODO: cleanup done tasks and replay results under this failed job
+      // send email to internal
+      String replayFailureSubject =
+          new StringBuilder("Replay failed on metric: " + anomalyFunctionDAO.findById(id).getMetric()).toString();
+      String replayFailureText = new StringBuilder("Failed on Function: " + id + "with Job Id: " + jobId).toString();
+      emailResource.sendEmailWithText(fromAddr, "thirdeye-dev@linkedin.com", replayFailureSubject, replayFailureText,
+          smtpHost, smtpPort);
       return Response.ok("Replay job error with job status: {}" + jobStatus).build();
     } else {
-      numReplayedAnomalies = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id, false).size();
+      numReplayedAnomalies =
+          mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id, false).size();
       LOG.info("Replay completed with {} anomalies generated.", numReplayedAnomalies);
     }
 
-    if (numReplayedAnomalies > 0) {
-      // create initial tuning and apply filter
-      Response initialAutotuneResponse = initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso,"AUTOTUNE", 10, "", "");
+    // create initial tuning and apply filter
+    Response initialAutotuneResponse =
+        initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", 10, "", "");
+    if (initialAutotuneResponse.getEntity() != null) {
       updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
       LOG.info("Initial alert filter applied");
-
-      // send out email
-      String subject = new StringBuilder("Replay results for "
-          + anomalyFunctionDAO.findById(id).getFunctionName()
-          + " is ready for review!")
-          .toString();
-
-      emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject, true, true, teHost, smtpHost, smtpPort, phantomJsPath);
-      LOG.info("Sent out email");
+    } else {
+      LOG.info("AutoTune doesn't applied");
     }
+
+    // send out email
+    String subject = new StringBuilder(
+        "Replay results for " + anomalyFunctionDAO.findById(id).getFunctionName() + " is ready for review!").toString();
+
+    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject,
+        true, true, teHost, smtpHost, smtpPort, phantomJsPath);
+    LOG.info("Sent out email");
 
     return Response.ok("Replay, Tuning and Notification finished!").build();
   }
@@ -585,7 +595,7 @@ public class DetectionJobResource {
     // create alert filter auto tune
     AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
-    long autotuneId = -1;
+    String autotuneId = null;
     double currPrecision = 0;
     double currRecall = 0;
     try {
@@ -609,7 +619,7 @@ public class DetectionJobResource {
         target.setAutotuneMethod(ALERT_FILTER_LOGISITC_AUTO_TUNE);
         target.setConfiguration(tunedAlertFilter);
         target.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.PRECISION_AND_RECALL);
-        autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(target);
+        autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(target).toString();
         LOG.info("Model has been updated");
       } else {
         LOG.info("Model hasn't been updated because tuned model cannot beat original model");
@@ -673,7 +683,7 @@ public class DetectionJobResource {
 
     // create alert filter auto tune
     AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
-    long autotuneId = -1;
+    String autotuneId = null;
     try {
       Map<String, String> tunedAlertFilter = alertFilterAutotune.initiateAutoTune(anomalyResultDTOS, nExpectedAnomalies);
 
@@ -682,7 +692,7 @@ public class DetectionJobResource {
         target.setFunctionId(id);
         target.setConfiguration(tunedAlertFilter);
         target.setAutotuneMethod(INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE);
-        autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(target);
+        autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(target).toString();
       } else {
         LOG.info("Failed init alert filter since model hasn't been updated");
       }
