@@ -19,7 +19,6 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
 
 /**

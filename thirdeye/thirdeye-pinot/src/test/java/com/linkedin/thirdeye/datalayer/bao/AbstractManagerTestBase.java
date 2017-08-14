@@ -18,7 +18,6 @@ import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;

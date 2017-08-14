@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 public class AuthConfiguration {
@@ -22,6 +24,16 @@ public class AuthConfiguration {
    * System admins
    */
   List<String> adminUsers;
+
+  Set<String> allowedPaths = new HashSet<>();
+
+  public Set<String> getAllowedPaths() {
+    return allowedPaths;
+  }
+
+  public void setAllowedPaths(Set<String> allowedPaths) {
+    this.allowedPaths = allowedPaths;
+  }
 
   public boolean isAuthEnabled() {
     return authEnabled;

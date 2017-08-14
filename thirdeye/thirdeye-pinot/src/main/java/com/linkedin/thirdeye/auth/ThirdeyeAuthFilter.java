@@ -1,10 +1,14 @@
 package com.linkedin.thirdeye.auth;
 
+import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.v2.AuthResource;
+import io.dropwizard.auth.AuthFilter;
 import io.dropwizard.auth.Authenticator;
 import java.io.IOException;
+import java.util.Map;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.Response;
 import com.google.common.base.Optional;
 import joptsimple.internal.Strings;
@@ -12,23 +16,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ThirdeyeAuthFilter extends io.dropwizard.auth.AuthFilter {
+public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthContext> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdeyeAuthFilter.class);
-  final boolean enableFilter;
-  final Authenticator<AuthRequest, PrincipalAuthContext> authenticator;
-
-  public ThirdeyeAuthFilter(Authenticator<AuthRequest, PrincipalAuthContext> authenticator, boolean enableFilter) {
+  private final Authenticator<AuthRequest, PrincipalAuthContext> authenticator;
+  private final AuthConfiguration authConfig;
+  public ThirdeyeAuthFilter(Authenticator<AuthRequest, PrincipalAuthContext> authenticator, AuthConfiguration authConfig) {
     this.authenticator = authenticator;
-    this.enableFilter = enableFilter;
+    this.authConfig = authConfig;
   }
 
   @Override
   public void filter(ContainerRequestContext containerRequestContext) throws IOException {
     String uriPath = containerRequestContext.getUriInfo().getPath();
-    if (!enableFilter || uriPath.startsWith("auth") || uriPath.equals("thirdeye")) {
+    if (!authConfig.isAuthEnabled() || uriPath.startsWith("auth") || uriPath.equals("thirdeye")
+        || authConfig.getAllowedPaths().contains(uriPath)) {
       return;
     }
-
     Optional<PrincipalAuthContext> authenticatedUser;
     try {
       AuthRequest credentials = getCredentials(containerRequestContext);
@@ -45,8 +48,11 @@ public class ThirdeyeAuthFilter extends io.dropwizard.auth.AuthFilter {
   private AuthRequest getCredentials(ContainerRequestContext requestContext) {
     AuthRequest credentials = new AuthRequest();
     try {
-      String rawToken = requestContext.getCookies().get(AuthResource.AUTH_TOKEN_NAME).getValue();
-      credentials.setToken(rawToken);
+      Map<String, Cookie> cookies = requestContext.getCookies();
+      if (cookies != null) {
+        String rawToken = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
+        credentials.setToken(rawToken);
+      }
     } catch (Exception e) {
       LOG.warn(e.getMessage(), e);
       throw new WebApplicationException("Unable to parse credentials", Response.Status.UNAUTHORIZED);

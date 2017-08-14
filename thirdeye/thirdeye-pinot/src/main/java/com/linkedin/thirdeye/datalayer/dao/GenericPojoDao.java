@@ -18,7 +18,6 @@ import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
-import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.EntityToEntityMappingIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
@@ -42,7 +41,6 @@ import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DetectionStatusBean;
-import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.pojo.GroupedAnomalyResultsBean;
@@ -88,8 +86,6 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFeedbackIndex.class));
     pojoInfoMap.put(AnomalyFunctionBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFunctionIndex.class));
-    pojoInfoMap.put(EmailConfigurationBean.class,
-        newPojoInfo(DEFAULT_BASE_TABLE_NAME, EmailConfigurationIndex.class));
     pojoInfoMap.put(JobBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, JobIndex.class));
     pojoInfoMap.put(TaskBean.class,
