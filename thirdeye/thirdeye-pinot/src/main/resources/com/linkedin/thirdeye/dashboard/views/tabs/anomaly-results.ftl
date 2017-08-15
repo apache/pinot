@@ -18,7 +18,7 @@
   <div class="anomaly-cards-wrapper padding-all">
     {{#each this.anomalyDetailsList as |anomalyData anomalyIndex|}}
       {{#with anomalyData}}
-        <div class="anomaly-card">
+        <div class="anomaly-card" id="anomaly-card-{{anomalyIndex}}">
           <div class="anomaly-result-header">
             <div class="anomaly-result-title">
               <span class="anomaly-result-metric">{{metric}}</span> from <span class="anomaly-result-dataset">{{dataset}}</span>
@@ -44,11 +44,27 @@
               <div class="anomaly-details-items anomaly-details-items--small">
                 <label class="label-medium-semibold">Status</label>
                 <span>
-                  {{#if anomalyFeedback}}
-                    Resolved ({{anomalyFeedback}})
-                  {{else}}
-                    Not Resolved
-                  {{/if}}
+                  <select class="card-feedback-select hidden">
+                    <option value="ANOMALY">Yes (True Anomaly)</option>
+                    <option value="ANOMALY_NEW_TREND">Yes (New Trend)</option>
+                    <option value="NOT_ANOMALY">No (False Alarm)</option>
+                  </select>
+                  <span class="card-feedback-final"> 
+                    {{#if anomalyFeedback}}
+                      Resolved ({{anomalyFeedback}})
+                    {{else}}
+                      Not Resolved
+                    {{/if}}
+                  </span>
+                  <button class="thirdeye-link thirdeye-link--secondary" id="feedback-edit-{{anomalyIndex}}" title="edit">
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-pencil"></i></span> 
+                  </button>
+                  <button class="thirdeye-link thirdeye-link--secondary hidden" id="feedback-submit-{{anomalyIndex}}" title="submit">
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-ok"></i></span> 
+                  </button>
+                  <button class="thirdeye-link thirdeye-link--secondary thirdeye-link--delimited hidden" id="feedback-cancel-{{anomalyIndex}}" title="cancel">
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-remove"></i></span> 
+                  </button>
                 </span>
               </div>
               {{#if issueType}}
@@ -73,7 +89,7 @@
               </div>
 
               <div class="anomaly-details-items">
-                <label class="label-medium-semibold">Function</label>
+                <label class="label-medium-semibold">Alert Name</label>
                 <span>{{anomalyFunctionName}}</span>
               </div>
             </div>
