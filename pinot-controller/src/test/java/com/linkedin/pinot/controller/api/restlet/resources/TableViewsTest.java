@@ -23,7 +23,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -47,7 +46,6 @@ public class TableViewsTest extends ControllerTest {
   public void setUp() throws Exception {
     startZk();
     startController();
-    PinotHelixResourceManager helixResourceManager = _controllerStarter.getHelixResourceManager();
 
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
         ZkStarter.DEFAULT_ZK_STR, NUM_BROKER_INSTANCES, true);
@@ -59,14 +57,14 @@ public class TableViewsTest extends ControllerTest {
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
             .setNumReplicas(2)
             .build();
-    helixResourceManager.addTable(tableConfig);
-    helixResourceManager.addSegment(new SimpleSegmentMetadata(OFFLINE_TABLE_NAME), "downloadUrl");
+    _helixResourceManager.addTable(tableConfig);
+    _helixResourceManager.addSegment(new SimpleSegmentMetadata(OFFLINE_TABLE_NAME), "downloadUrl");
 
     // Create the hybrid table
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME)
         .setNumReplicas(2)
         .build();
-    helixResourceManager.addTable(tableConfig);
+    _helixResourceManager.addTable(tableConfig);
 
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.CONSUMER_TYPE,
@@ -75,7 +73,7 @@ public class TableViewsTest extends ControllerTest {
         .setNumReplicas(2)
         .setStreamConfigs(streamConfigs)
         .build();
-    helixResourceManager.addTable(tableConfig);
+    _helixResourceManager.addTable(tableConfig);
 
     // Wait for external view get updated
     long endTime = System.currentTimeMillis() + 10_000L;

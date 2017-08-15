@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.core.common.MinionConstants;
@@ -51,9 +50,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   private static final int NUM_MINIONS = 3;
   private static final String COLUMNS_TO_CONVERT = "ActualElapsedTime,ArrDelay,DepDelay";
 
-  private PinotHelixResourceManager _pinotHelixResourceManager;
-  private PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
-  private PinotTaskManager _pinotTaskManager;
+  private PinotHelixTaskResourceManager _helixTaskResourceManager;
+  private PinotTaskManager _taskManager;
 
   @Nullable
   @Override
@@ -79,9 +77,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
 
     startMinions(NUM_MINIONS, null);
 
-    _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
-    _pinotHelixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
-    _pinotTaskManager = _controllerStarter.getTaskManager();
+    _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
+    _taskManager = _controllerStarter.getTaskManager();
   }
 
   @Test
@@ -106,31 +103,29 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     }
 
     // Should generate 5 ConvertToRawIndexTask tasks
-    _pinotTaskManager.scheduleTasks();
+    _taskManager.scheduleTasks();
     // Wait at most 60 seconds for all 5 tasks showing up in the cluster
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
-        return _pinotHelixTaskResourceManager.getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size()
-            == 5;
+        return _helixTaskResourceManager.getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size() == 5;
       }
     }, 60_000L, "Failed to get all tasks showing up in the cluster");
 
     // Should generate 3 more ConvertToRawIndexTask tasks
-    _pinotTaskManager.scheduleTasks();
+    _taskManager.scheduleTasks();
     // Wait at most 60 seconds for all 8 tasks showing up in the cluster
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
-        return _pinotHelixTaskResourceManager.getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size()
-            == 8;
+        return _helixTaskResourceManager.getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size() == 8;
       }
     }, 60_000L, "Failed to get all tasks showing up in the cluster");
 
     // Should not generate more tasks
-    _pinotTaskManager.scheduleTasks();
-    Assert.assertEquals(
-        _pinotHelixTaskResourceManager.getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 8);
+    _taskManager.scheduleTasks();
+    Assert.assertEquals(_helixTaskResourceManager.getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(),
+        8);
 
     // Wait at most 600 seconds for all tasks COMPLETED and new segments refreshed
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
@@ -138,7 +133,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
       public Boolean apply(@Nullable Void aVoid) {
         try {
           // Check task state
-          for (TaskState taskState : _pinotHelixTaskResourceManager.getTaskStates(
+          for (TaskState taskState : _helixTaskResourceManager.getTaskStates(
               MinionConstants.ConvertToRawIndexTask.TASK_TYPE).values()) {
             if (taskState != TaskState.COMPLETED) {
               return false;
@@ -146,7 +141,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
           }
 
           // Check segment ZK metadata
-          for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _pinotHelixResourceManager.getOfflineSegmentMetadata(
+          for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _helixResourceManager.getOfflineSegmentMetadata(
               offlineTableName)) {
             List<String> optimizations = offlineSegmentZKMetadata.getOptimizations();
             if (optimizations == null || optimizations.size() != 1 || !optimizations.get(0)
@@ -192,26 +187,25 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   @Test
   public void testPinotHelixResourceManagerAPIs() {
     // Instance APIs
-    Assert.assertEquals(_pinotHelixResourceManager.getAllInstances().size(), 6);
-    Assert.assertEquals(_pinotHelixResourceManager.getOnlineInstanceList().size(), 6);
-    Assert.assertEquals(_pinotHelixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), 0);
-    Assert.assertEquals(_pinotHelixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);
+    Assert.assertEquals(_helixResourceManager.getAllInstances().size(), 6);
+    Assert.assertEquals(_helixResourceManager.getOnlineInstanceList().size(), 6);
+    Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), 0);
+    Assert.assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);
 
     // Table APIs
     String rawTableName = getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
-    List<String> tableNames = _pinotHelixResourceManager.getAllTables();
+    List<String> tableNames = _helixResourceManager.getAllTables();
     Assert.assertEquals(tableNames.size(), 2);
     Assert.assertTrue(tableNames.contains(offlineTableName));
     Assert.assertTrue(tableNames.contains(realtimeTableName));
-    Assert.assertEquals(_pinotHelixResourceManager.getAllRawTables(), Collections.singletonList(rawTableName));
-    Assert.assertEquals(_pinotHelixResourceManager.getAllRealtimeTables(),
-        Collections.singletonList(realtimeTableName));
+    Assert.assertEquals(_helixResourceManager.getAllRawTables(), Collections.singletonList(rawTableName));
+    Assert.assertEquals(_helixResourceManager.getAllRealtimeTables(), Collections.singletonList(realtimeTableName));
 
     // Tenant APIs
-    Assert.assertEquals(_pinotHelixResourceManager.getAllBrokerTenantNames(), Collections.singleton("TestTenant"));
-    Assert.assertEquals(_pinotHelixResourceManager.getAllServerTenantNames(), Collections.singleton("TestTenant"));
+    Assert.assertEquals(_helixResourceManager.getAllBrokerTenantNames(), Collections.singleton("TestTenant"));
+    Assert.assertEquals(_helixResourceManager.getAllServerTenantNames(), Collections.singleton("TestTenant"));
   }
 
   @AfterClass
