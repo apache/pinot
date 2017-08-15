@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -32,7 +34,6 @@ import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
@@ -84,6 +85,9 @@ public class PinotTableRestletResource {
   @Inject
   ControllerConf _controllerConf;
 
+  @Inject
+  ControllerMetrics _controllerMetrics;
+
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
@@ -104,8 +108,7 @@ public class PinotTableRestletResource {
       _pinotHelixResourceManager.addTable(tableConfig);
       return new SuccessResponse("Table " + tableName + " succesfully added");
     } catch (Exception e) {
-      ControllerRestApplication.getControllerMetrics()
-          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
         LOGGER.info("Invalid table config for table: {}, {}", tableName, e.getMessage());
         throw new WebApplicationException("Invalid table config:" + e.getStackTrace(), Response.Status.BAD_REQUEST);
@@ -135,7 +138,7 @@ public class PinotTableRestletResource {
     }
   }
 
-  private String listTableConfigs(@Nonnull String tableName, @Nonnull String tableTypeStr) {
+  private String listTableConfigs(@Nonnull String tableName, String tableTypeStr) {
     try {
       JSONObject ret = new JSONObject();
 
@@ -277,12 +280,10 @@ public class PinotTableRestletResource {
       _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       LOGGER.info("Failed to update configuration for table {}, message: {}", tableName, e.getMessage());
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
-          ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
     } catch (Exception e) {
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
-          ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw e;
     }
 

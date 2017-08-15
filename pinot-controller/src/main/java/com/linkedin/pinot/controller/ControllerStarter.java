@@ -194,6 +194,7 @@ public class ControllerStarter {
           bind(_taskManager).to(PinotTaskManager.class);
           bind(connectionManager).to(HttpConnectionManager.class);
           bind(executorService).to(Executor.class);
+          bind(controllerMetrics).to(ControllerMetrics.class);
         }
       });
 

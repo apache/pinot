@@ -44,11 +44,7 @@ public class PinotTableIndexingConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIndexingConfigs.class);
 
   @Inject
-  ControllerConf controllerConf;
-  @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
-  @Inject
-  ControllerMetrics metrics;
 
   @Deprecated
   @PUT

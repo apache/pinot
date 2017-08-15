@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -56,7 +58,6 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -94,6 +95,9 @@ public class PinotSegmentUploadRestletResource {
 
   @Inject
   ControllerConf _controllerConf;
+
+  @Inject
+  ControllerMetrics _controllerMetrics;
 
   @Inject
   HttpConnectionManager _connectionManager;
@@ -282,8 +286,7 @@ public class PinotSegmentUploadRestletResource {
                 String.format("Failed to get download Uri for upload file type: %s, with error %s", uploadType,
                     e.getMessage());
             LOGGER.warn(errorMsg);
-            ControllerRestApplication.getControllerMetrics()
-                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
             throw new WebApplicationException(errorMsg, Response.Status.BAD_REQUEST);
           }
 
@@ -294,8 +297,7 @@ public class PinotSegmentUploadRestletResource {
           } catch (Exception e) {
             String errorMsg = String.format("Failed to get SegmentFetcher from download Uri: %s", downloadURI);
             LOGGER.warn(errorMsg);
-            ControllerRestApplication.getControllerMetrics()
-                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
             throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
           }
 
@@ -307,8 +309,7 @@ public class PinotSegmentUploadRestletResource {
             String errorMsg = String.format("Failed to fetch segment tar from download Uri: %s to %s", downloadURI,
                 tempTarredSegmentFile.toString());
             LOGGER.warn(errorMsg);
-            ControllerRestApplication.getControllerMetrics()
-                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
             throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
           }
           if (tempTarredSegmentFile.length() > 0) {
@@ -357,8 +358,7 @@ public class PinotSegmentUploadRestletResource {
         // Some problem happened, sent back a simple line of text.
         String errorMsg = "No file was uploaded";
         LOGGER.warn(errorMsg);
-        ControllerRestApplication.getControllerMetrics()
-            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
         throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
       }
     } catch (WebApplicationException e) {
@@ -409,8 +409,7 @@ public class PinotSegmentUploadRestletResource {
     }
 
     if (!response.isSuccessful()) {
-      ControllerRestApplication.getControllerMetrics()
-          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       throw new WebApplicationException("Error uploading segment", Response.Status.INTERNAL_SERVER_ERROR);
     }
     return response;

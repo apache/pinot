@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;

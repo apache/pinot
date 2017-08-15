@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import java.util.HashSet;
 import java.util.Set;
 import org.json.JSONException;
@@ -27,7 +29,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
@@ -83,6 +84,9 @@ public class PinotTenantRestletResource {
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
 
+  @Inject
+  ControllerMetrics _controllerMetrics;
+
   @POST
   @Path("/tenants")
   @Consumes(MediaType.APPLICATION_JSON)
@@ -107,8 +111,7 @@ public class PinotTenantRestletResource {
     if (response.isSuccessful()) {
       return new SuccessResponse("Successfully created tenant");
     }
-    ControllerRestApplication.getControllerMetrics().
-        addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
     throw new WebApplicationException("Failed to create tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 
@@ -140,8 +143,7 @@ public class PinotTenantRestletResource {
     if (response.isSuccessful()) {
       return new SuccessResponse("Updated tenant");
     }
-    ControllerRestApplication.getControllerMetrics().
-        addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
     throw new WebApplicationException("Failed to update tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 
@@ -357,8 +359,7 @@ public class PinotTenantRestletResource {
         }
       }
     } catch (Exception e) {
-      ControllerRestApplication.getControllerMetrics().
-          addMeteredGlobalValue(ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
           String.format("Error during %s operation for instance: %s", type, instance),
           Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -413,8 +414,7 @@ public class PinotTenantRestletResource {
     if (res.isSuccessful()) {
       return new SuccessResponse("Successfully deleted tenant " + tenantName);
     }
-    ControllerRestApplication.getControllerMetrics().
-        addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
     throw new WebApplicationException("Error deleting tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 }
