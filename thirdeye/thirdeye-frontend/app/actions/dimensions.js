@@ -114,7 +114,7 @@ function updateDimension(newDimension) {
     const baselineEnd = moment(+currentEnd).subtract(offset, 'week').valueOf();
     newDimension = newDimension || dimensions.selectedDimension;
 
-    const url = `/timeseries/compare/${primaryMetricId}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${newDimension}&filters=${filters}&granularity=${granularity}`;
+    const url = `/timeseries/compare/${primaryMetricId}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${newDimension}&filters=${encodeURIComponent(filters)}&granularity=${granularity}`;
 
     dispatch(setDimension(newDimension));
     return fetch(url)
@@ -143,7 +143,7 @@ function fetchHeatMapData(start, end) {
     const baselineStart = moment(+start).subtract(offset, 'week').valueOf();
     const baselineEnd = moment(+end).subtract(offset, 'week').valueOf();
 
-    const heatmapUrl = `/data/heatmap/${primaryMetricId}/${start}/${end}/${baselineStart}/${baselineEnd}?filters=${filters}`;
+    const heatmapUrl = `/data/heatmap/${primaryMetricId}/${start}/${end}/${baselineStart}/${baselineEnd}?filters=${encodeURIComponent(filters)}`;
 
     return fetch(heatmapUrl)
       .then(res => res.json())

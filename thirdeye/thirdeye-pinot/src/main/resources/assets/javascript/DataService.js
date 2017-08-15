@@ -146,7 +146,7 @@ DataService.prototype = {
     fetchAnomaliesForMetricIds : function(startTime, endTime, pageNumber, metricIds, functionName, filterOnly, callback, spinner) {
       const url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       const data = {
-        metricIds,
+        metricIds: JSON.stringify(metricIds),
         functionName,
         filterOnly
       };
@@ -227,14 +227,14 @@ DataService.prototype = {
         dimension = "ALL", filters = {}, granularity = "DAYS") {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
           + baselineStart + "/" + baselineEnd + "?dimension=" + dimension + "&filters="
-          + JSON.stringify(filters) + "&granularity=" + granularity;
+          + encodeURIComponent(JSON.stringify(filters)) + "&granularity=" + granularity;
       return this.getDataAsynchronous(url, {}, null, 'analysis-graph-spin-area');
     },
 
   fetchHeatmapData: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
       filters = {}) {
     var url = "/data/heatmap/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
-        + baselineStart + "/" + baselineEnd + "?filters=" + JSON.stringify(filters);
+        + baselineStart + "/" + baselineEnd + "?filters=" + encodeURIComponent(JSON.stringify(filters));
     return this.getDataAsynchronous(url, {}, null, 'dimension-tree-spin-area');
   },
 
