@@ -84,7 +84,9 @@ public final class Schema {
     return MAPPER.readValue(schemaInputStream, Schema.class);
   }
 
-  @Nonnull
+  /**
+   * NOTE: schema name could be null in tests
+   */
   public String getSchemaName() {
     return _schemaName;
   }

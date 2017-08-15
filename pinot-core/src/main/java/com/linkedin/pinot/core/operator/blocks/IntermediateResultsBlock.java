@@ -86,7 +86,7 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull AggregationGroupByResult aggregationGroupByResults) {
+      @Nullable AggregationGroupByResult aggregationGroupByResults) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _aggregationGroupByResult = aggregationGroupByResults;
   }
