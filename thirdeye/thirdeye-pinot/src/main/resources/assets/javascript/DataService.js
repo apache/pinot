@@ -146,7 +146,7 @@ DataService.prototype = {
     fetchAnomaliesForMetricIds : function(startTime, endTime, pageNumber, metricIds, functionName, filterOnly, callback, spinner) {
       const url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       const data = {
-        metricIds: JSON.stringify(metricIds),
+        metricIds: metricIds,
         functionName,
         filterOnly
       };
