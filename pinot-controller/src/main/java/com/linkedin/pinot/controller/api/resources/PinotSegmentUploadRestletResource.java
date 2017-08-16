@@ -16,6 +16,31 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import com.linkedin.pinot.controller.util.TableSizeReader;
+import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,45 +52,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.helix.model.IdealState;
-import org.glassfish.grizzly.http.server.Request;
-import org.glassfish.jersey.media.multipart.FormDataBodyPart;
-import org.glassfish.jersey.media.multipart.FormDataMultiPart;
-import org.joda.time.Interval;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
-import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
-import com.linkedin.pinot.controller.util.TableSizeReader;
-import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -82,6 +68,20 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.helix.model.IdealState;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.jersey.media.multipart.FormDataBodyPart;
+import org.glassfish.jersey.media.multipart.FormDataMultiPart;
+import org.joda.time.Interval;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.SEGMENT_TAG)
@@ -94,6 +94,9 @@ public class PinotSegmentUploadRestletResource {
 
   @Inject
   ControllerConf _controllerConf;
+
+  @Inject
+  ControllerMetrics _controllerMetrics;
 
   @Inject
   HttpConnectionManager _connectionManager;
@@ -282,8 +285,7 @@ public class PinotSegmentUploadRestletResource {
                 String.format("Failed to get download Uri for upload file type: %s, with error %s", uploadType,
                     e.getMessage());
             LOGGER.warn(errorMsg);
-            ControllerRestApplication.getControllerMetrics()
-                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
             throw new WebApplicationException(errorMsg, Response.Status.BAD_REQUEST);
           }
 
@@ -294,8 +296,7 @@ public class PinotSegmentUploadRestletResource {
           } catch (Exception e) {
             String errorMsg = String.format("Failed to get SegmentFetcher from download Uri: %s", downloadURI);
             LOGGER.warn(errorMsg);
-            ControllerRestApplication.getControllerMetrics()
-                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
             throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
           }
 
@@ -307,8 +308,7 @@ public class PinotSegmentUploadRestletResource {
             String errorMsg = String.format("Failed to fetch segment tar from download Uri: %s to %s", downloadURI,
                 tempTarredSegmentFile.toString());
             LOGGER.warn(errorMsg);
-            ControllerRestApplication.getControllerMetrics()
-                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
             throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
           }
           if (tempTarredSegmentFile.length() > 0) {
@@ -357,8 +357,7 @@ public class PinotSegmentUploadRestletResource {
         // Some problem happened, sent back a simple line of text.
         String errorMsg = "No file was uploaded";
         LOGGER.warn(errorMsg);
-        ControllerRestApplication.getControllerMetrics()
-            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
         throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
       }
     } catch (WebApplicationException e) {
@@ -409,8 +408,7 @@ public class PinotSegmentUploadRestletResource {
     }
 
     if (!response.isSuccessful()) {
-      ControllerRestApplication.getControllerMetrics()
-          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       throw new WebApplicationException("Error uploading segment", Response.Status.INTERNAL_SERVER_ERROR);
     }
     return response;

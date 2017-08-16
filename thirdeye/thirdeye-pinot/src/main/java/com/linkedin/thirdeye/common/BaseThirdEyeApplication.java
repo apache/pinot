@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -13,7 +12,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
@@ -34,7 +32,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
 
   protected AnomalyFunctionManager anomalyFunctionDAO;
   protected RawAnomalyResultManager rawAnomalyResultDAO;
-  protected EmailConfigurationManager emailConfigurationDAO;
   protected JobManager jobDAO;
   protected MergedAnomalyResultManager mergedAnomalyResultDAO;
   protected DatasetConfigManager datasetConfigDAO;
@@ -50,7 +47,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     DaoProviderUtil.init(new File(persistenceConfig));
     anomalyFunctionDAO = DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
     rawAnomalyResultDAO = DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
-    emailConfigurationDAO = DaoProviderUtil.getInstance(EmailConfigurationManagerImpl.class);
     jobDAO = DaoProviderUtil.getInstance(JobManagerImpl.class);
     mergedAnomalyResultDAO = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     datasetConfigDAO = DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);

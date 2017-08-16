@@ -48,13 +48,7 @@ public class PinotTableInstances {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableInstances.class);
 
   @Inject
-  ControllerConf controllerConf;
-
-  @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
-
-  @Inject
-  ControllerMetrics metrics;
 
   @GET
   @Path("/tables/{tableName}/instances")
@@ -76,30 +70,52 @@ public class PinotTableInstances {
 
       if (type == null || type.isEmpty() || type.toLowerCase().equals("broker")) {
         if (pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          List<String> brokerInstances =
-              pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.OFFLINE);
-          brokers.add(getInstances(brokerInstances, TableType.OFFLINE));
+          JSONObject e = new JSONObject();
+          e.put("tableType", "offline");
+          JSONArray a = new JSONArray();
+          for (String ins : pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.OFFLINE)) {
+            a.add(ins);
+          }
+          e.put("instances", a);
+          brokers.add(e);
         }
         if (pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          List<String> bi =
-              pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.REALTIME);
-          brokers.add(getInstances(bi, TableType.REALTIME));
+          JSONObject e = new JSONObject();
+          e.put("tableType", "realtime");
+          JSONArray a = new JSONArray();
+          for (String ins : pinotHelixResourceManager.getBrokerInstancesForTable(tableName, TableType.REALTIME)) {
+            a.add(ins);
+          }
+          e.put("instances", a);
+          brokers.add(e);
         }
       }
 
-      if (type == null || type.toLowerCase().equals("server")) {
+      if (type == null || type.isEmpty() || type.toLowerCase().equals("server")) {
         if (pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          List<String> si =
-              pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.OFFLINE);
-          servers.add(getInstances(si, TableType.OFFLINE));
+          JSONObject e = new JSONObject();
+          e.put("tableType", "offline");
+          JSONArray a = new JSONArray();
+          for (String ins : pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.OFFLINE)) {
+            a.add(ins);
+          }
+          e.put("instances", a);
+          servers.add(e);
         }
 
         if (pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          List<String> si =
-              pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.REALTIME);
-          servers.add(getInstances(si, TableType.REALTIME));
+          JSONObject e = new JSONObject();
+          e.put("tableType", "realtime");
+          JSONArray a = new JSONArray();
+          for (String ins : pinotHelixResourceManager.getServerInstancesForTable(tableName, TableType.REALTIME)) {
+            a.add(ins);
+          }
+          e.put("instances", a);
+          servers.add(e);
         }
       }
+      ret.put("brokers", brokers);
+      ret.put("server", servers);   // Keeping compatibility with previous API, so "server" and "brokers"
       return ret.toString();
     } catch (JSONException e) {
       LOGGER.error("Error listing all table instances for table: {}", tableName, e);

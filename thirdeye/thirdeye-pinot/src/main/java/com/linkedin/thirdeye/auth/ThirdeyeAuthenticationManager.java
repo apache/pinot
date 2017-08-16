@@ -14,13 +14,13 @@ import javax.naming.directory.InitialDirContext;
 import org.apache.commons.codec.binary.Base64;
 
 
-public class LdapAuthenticationManager implements IAuthManager, Authenticator<AuthRequest, PrincipalAuthContext> {
+public class ThirdeyeAuthenticationManager implements IAuthManager, Authenticator<AuthRequest, PrincipalAuthContext> {
   private static final String LDAP_CONTEXT_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
   private final AuthConfiguration authConfiguration;
   private final ThreadLocal<PrincipalAuthContext> principalAuthContextThreadLocal;
   private final Key aesKey;
 
-  public LdapAuthenticationManager(AuthConfiguration authConfiguration) {
+  public ThirdeyeAuthenticationManager(AuthConfiguration authConfiguration) {
     this.authConfiguration = authConfiguration;
     this.principalAuthContextThreadLocal = new ThreadLocal<>();
     this.aesKey = new SecretKeySpec(Base64.decodeBase64(authConfiguration.getAuthKey()), "AES");

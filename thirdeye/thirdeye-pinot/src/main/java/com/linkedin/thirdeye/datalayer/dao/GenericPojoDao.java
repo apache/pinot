@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import com.linkedin.thirdeye.auth.IAuthManager;
+import com.linkedin.thirdeye.auth.PrincipalAuthContext;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
@@ -18,7 +20,6 @@ import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
-import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.EntityToEntityMappingIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
@@ -42,7 +43,6 @@ import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DetectionStatusBean;
-import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.pojo.GroupedAnomalyResultsBean;
@@ -56,6 +56,7 @@ import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -88,8 +89,6 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFeedbackIndex.class));
     pojoInfoMap.put(AnomalyFunctionBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFunctionIndex.class));
-    pojoInfoMap.put(EmailConfigurationBean.class,
-        newPojoInfo(DEFAULT_BASE_TABLE_NAME, EmailConfigurationIndex.class));
     pojoInfoMap.put(JobBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, JobIndex.class));
     pojoInfoMap.put(TaskBean.class,
@@ -167,8 +166,23 @@ public class GenericPojoDao {
     return dataSource.getConnection();
   }
 
+  private String getCurrentPrincipal() {
+    IAuthManager authManager = DAORegistry.getInstance().getAuthManager();
+    String user = "no-auth-user";
+    if (authManager != null) {
+      PrincipalAuthContext authContext = authManager.getCurrentPrincipal();
+      if (authContext != null) {
+        user = authContext.getPrincipal();
+      }
+    }
+    return user;
+  }
+
   public <E extends AbstractBean> Long put(final E pojo) {
     long tStart = System.nanoTime();
+    String currentUser = getCurrentPrincipal();
+    pojo.setCreatedBy(currentUser);
+    pojo.setUpdatedBy(currentUser);
     try {
       //insert into its base table
       //get the generated id
@@ -231,6 +245,7 @@ public class GenericPojoDao {
 
   public <E extends AbstractBean> int update(final E pojo, final Predicate predicate) {
     long tStart = System.nanoTime();
+    pojo.setUpdatedBy(getCurrentPrincipal());
     try {
       //update base table
       //update indexes

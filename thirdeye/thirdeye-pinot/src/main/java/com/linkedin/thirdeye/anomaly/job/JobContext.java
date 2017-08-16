@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomaly.job;
 
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
@@ -13,7 +12,6 @@ public abstract class JobContext {
   private JobManager jobDAO;
   private TaskManager taskDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private EmailConfigurationManager emailConfigurationDAO;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
 
@@ -61,14 +59,6 @@ public abstract class JobContext {
     this.jobName = jobName;
   }
 
-  public EmailConfigurationManager getEmailConfigurationDAO() {
-    return emailConfigurationDAO;
-  }
-
-  public void setEmailConfigurationDAO(EmailConfigurationManager emailConfigurationDAO) {
-    this.emailConfigurationDAO = emailConfigurationDAO;
-  }
-
   public DatasetConfigManager getDatasetConfigDAO() {
     return datasetConfigDAO;
   }
@@ -84,7 +74,5 @@ public abstract class JobContext {
   public void setMetricConfigDAO(MetricConfigManager metricConfigDAO) {
     this.metricConfigDAO = metricConfigDAO;
   }
-
-
 
 }

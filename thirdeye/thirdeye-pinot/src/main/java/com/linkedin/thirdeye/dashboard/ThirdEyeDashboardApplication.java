@@ -6,7 +6,7 @@ import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAut
 import com.linkedin.thirdeye.auth.AuthRequest;
 import com.linkedin.thirdeye.auth.ThirdeyeAuthFilter;
 import com.linkedin.thirdeye.auth.IAuthManager;
-import com.linkedin.thirdeye.auth.LdapAuthenticationManager;
+import com.linkedin.thirdeye.auth.ThirdeyeAuthenticationManager;
 import com.linkedin.thirdeye.auth.PrincipalAuthContext;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
@@ -117,12 +117,13 @@ public class ThirdEyeDashboardApplication
 
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+    EmailResource emailResource = new EmailResource(config);
 
     env.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
     env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new EmailResource(config));
+    env.jersey().register(emailResource);
     env.jersey().register(new EntityManagerResource());
     env.jersey().register(new MetricConfigResource());
     env.jersey().register(new DatasetConfigResource());
@@ -152,7 +153,7 @@ public class ThirdEyeDashboardApplication
      */
     DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
     AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
-    env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
+    env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory, emailResource));
 
     try {
       // root cause resource
@@ -172,15 +173,16 @@ public class ThirdEyeDashboardApplication
       LOG.error("Error loading the resource", e);
     }
 
+    if (config.getAuthConfig() != null) {
+      IAuthManager authManager = new ThirdeyeAuthenticationManager(config.getAuthConfig());
+      DAORegistry.getInstance().setAuthManager(authManager);
+      env.jersey().register(new AuthResource());
 
-    IAuthManager authManager = new LdapAuthenticationManager(config.getAuthConfig());
-    DAORegistry.getInstance().setAuthManager(authManager);
-    env.jersey().register(new AuthResource());
-
-    // add default auth filter
-    env.jersey()
-        .register(new ThirdeyeAuthFilter((Authenticator<AuthRequest, PrincipalAuthContext>) authManager,
-            config.getAuthConfig().isAuthEnabled()));
+      // add default auth filter
+      env.jersey()
+          .register(new ThirdeyeAuthFilter((Authenticator<AuthRequest, PrincipalAuthContext>) authManager,
+              config.getAuthConfig()));
+    }
   }
 
   private static RootCauseResource makeRootCauseResource(ThirdEyeDashboardConfiguration config) throws Exception {

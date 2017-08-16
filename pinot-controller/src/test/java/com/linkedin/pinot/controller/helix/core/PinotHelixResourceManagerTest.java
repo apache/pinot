@@ -15,15 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import java.util.List;
-import java.util.Set;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.model.IdealState;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -33,177 +24,149 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+import com.linkedin.pinot.controller.helix.ControllerTest;
+import java.util.List;
+import java.util.Set;
+import org.apache.helix.model.IdealState;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
-public class PinotHelixResourceManagerTest {
-  ZkStarter.ZookeeperInstance zkServer;
-  private PinotHelixResourceManager pinotHelixResourceManager;
-  private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
-  private final static String HELIX_CLUSTER_NAME = "PinotHelixResourceManagerTest";
-  private HelixManager helixZkManager;
-  private HelixAdmin helixAdmin;
-  private final int adminPortStart = 10000;
-  private final int numInstances = 10;
+public class PinotHelixResourceManagerTest extends ControllerTest {
+  private static final int BASE_SERVER_ADMIN_PORT = 10000;
+  private static final int NUM_INSTANCES = 5;
+  private static final String BROKER_TENANT_NAME = "brokerTenant";
+  private static final String SERVER_TENANT_NAME = "serverTenant";
+  private static final String TABLE_NAME = "testTable";
+  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+
+  private final String _helixClusterName = getHelixClusterName();
+
   @BeforeClass
-  public void setUp()
-      throws Exception {
-    zkServer = ZkStarter.startLocalZkServer();
-    final String instanceId = "localhost_helixController";
-    pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, false, /*isUpdateStateModel=*/false);
-    pinotHelixResourceManager.start();
+  public void setUp() throws Exception {
+    startZk();
+    ControllerConf config = getDefaultControllerConfiguration();
+    config.setTenantIsolationEnabled(false);
+    startController(config);
 
-    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
-    helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false);
-    helixAdmin = helixZkManager.getClusterManagmentTool();
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,ZK_SERVER, numInstances);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, numInstances, true, adminPortStart);
-  }
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName,
+        ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES, false);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR,
+        NUM_INSTANCES, false, BASE_SERVER_ADMIN_PORT);
 
-  @AfterClass
-  public void tearDown() {
-    pinotHelixResourceManager.stop();
-    ZkStarter.stopLocalZkServer(zkServer);
-  }
-
-  @Test
-  public void testGetInstanceEndpoints()
-      throws InterruptedException {
-    Set<String> servers = pinotHelixResourceManager.getAllInstancesForServerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME);
-    BiMap<String, String> endpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(servers);
-//    for (Map.Entry<String, String> endpointEntry : endpoints.entrySet()) {
-//      System.out.println(endpointEntry.getKey() + " -- " + endpointEntry.getValue());
-//    }
-
-    for (int i = 0; i < numInstances; i++) {
-      Assert.assertTrue(endpoints.inverse().containsKey("localhost:" + String.valueOf(adminPortStart + i)));
-    }
-  }
-
-  @Test
-  public void testRebuildBrokerResourceFromHelixTags()
-      throws Exception {
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName("faketable")
-        .setNumReplicas(3)
-        .setBrokerTenant("brokerTenant")
-        .setServerTenant("serverTenant")
+    // Create server tenant on all Servers
+    Tenant serverTenant = new Tenant.TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER)
+        .setOfflineInstances(NUM_INSTANCES)
         .build();
+    _helixResourceManager.createServerTenant(serverTenant);
+  }
 
-    Tenant tenant = new Tenant();
-    tenant.setTenantName("brokerTenant");
-    tenant.setTenantRole("BROKER");
-    tenant.setNumberOfInstances(3);
-    pinotHelixResourceManager.createBrokerTenant(tenant);
-    pinotHelixResourceManager.addTable(tableConfig);
+  @Test
+  public void testGetInstanceEndpoints() {
+    Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
+    BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(servers);
+    for (int i = 0; i < NUM_INSTANCES; i++) {
+      Assert.assertTrue(endpoints.inverse().containsKey("localhost:" + String.valueOf(BASE_SERVER_ADMIN_PORT + i)));
+    }
+  }
 
-    // Check that the broker ideal state has 3 brokers assigned to it for faketable_OFFLINE
-    IdealState idealState = pinotHelixResourceManager.getHelixAdmin()
-        .getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceStateMap("faketable_OFFLINE").size(), 3);
+  @Test
+  public void testRebuildBrokerResourceFromHelixTags() throws Exception {
+    // Create broker tenant on 3 Brokers
+    Tenant brokerTenant =
+        new Tenant.TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(3).build();
+    _helixResourceManager.createBrokerTenant(brokerTenant);
 
-    // Retag all instances current assigned to brokerTenant to be unassigned
-    Set<String> brokerInstances = pinotHelixResourceManager.getAllInstancesForBrokerTenant("brokerTenant");
-    for (String brokerInstance : brokerInstances) {
-      pinotHelixResourceManager.getHelixAdmin().removeInstanceTag(HELIX_CLUSTER_NAME, brokerInstance,
-          "brokerTenant_BROKER");
-      pinotHelixResourceManager.getHelixAdmin().addInstanceTag(HELIX_CLUSTER_NAME, brokerInstance,
-          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+    // Create the table
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNumReplicas(3)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    _helixResourceManager.addTable(tableConfig);
+
+    // Check that the BrokerResource ideal state has 3 Brokers assigned to the table
+    IdealState idealState = _helixResourceManager.getHelixAdmin()
+        .getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), 3);
+
+    // Untag all Brokers assigned to broker tenant
+    for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
+      _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
+          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(BROKER_TENANT_NAME));
+      _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 
     // Rebuilding the broker tenant should update the ideal state size
-    pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags("faketable_OFFLINE");
-    idealState = pinotHelixResourceManager.getHelixAdmin()
-        .getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceStateMap("faketable_OFFLINE").size(), 0);
+    _helixResourceManager.rebuildBrokerResourceFromHelixTags(OFFLINE_TABLE_NAME);
+    idealState = _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), 0);
 
-    // Tag five instances
-    int instancesRemainingToTag = 5;
-    List<String> instances = pinotHelixResourceManager.getAllInstances();
-    for (String instance : instances) {
-      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-        pinotHelixResourceManager.getHelixAdmin()
-            .removeInstanceTag(HELIX_CLUSTER_NAME, instance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
-        pinotHelixResourceManager.getHelixAdmin()
-            .addInstanceTag(HELIX_CLUSTER_NAME, instance, "brokerTenant_BROKER");
-        instancesRemainingToTag--;
-        if (instancesRemainingToTag == 0) {
-          break;
-        }
-      }
-    }
+    // Create broker tenant on 5 Brokers
+    brokerTenant.setNumberOfInstances(5);
+    _helixResourceManager.createBrokerTenant(brokerTenant);
 
     // Rebuilding the broker tenant should update the ideal state size
-    pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags("faketable_OFFLINE");
-    idealState = pinotHelixResourceManager.getHelixAdmin()
-        .getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceStateMap("faketable_OFFLINE").size(), 5);
+    _helixResourceManager.rebuildBrokerResourceFromHelixTags(OFFLINE_TABLE_NAME);
+    idealState = _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), 5);
 
-    // Untag all instances for other tests
-    for (String instance : instances) {
-      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-        pinotHelixResourceManager.getHelixAdmin()
-            .removeInstanceTag(HELIX_CLUSTER_NAME, instance, "brokerTenant_BROKER");
-        pinotHelixResourceManager.getHelixAdmin()
-            .addInstanceTag(HELIX_CLUSTER_NAME, instance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
-      }
+    // Untag all Brokers for other tests
+    for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
+      _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
+          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(BROKER_TENANT_NAME));
+      _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 
-    // Delete table
-    pinotHelixResourceManager.deleteOfflineTable("faketable");
+    // Delete the table
+    _helixResourceManager.deleteOfflineTable(TABLE_NAME);
   }
 
   @Test
   public void testRetrieveMetadata() throws Exception {
-    final String tableName = "fakeTable";
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName("faketable")
-        .setNumReplicas(3)
-        .setBrokerTenant("brokerTenant")
-        .setServerTenant("serverTenant")
-        .build();
+    String segmentName = "testSegment";
 
-    Tenant tenant = new Tenant();
-    tenant.setTenantName("brokerTenant");
-    tenant.setTenantRole("BROKER");
-    tenant.setNumberOfInstances(3);
-    pinotHelixResourceManager.createBrokerTenant(tenant);
-    pinotHelixResourceManager.addTable(tableConfig);
-
+    // Test retrieving OFFLINE segment ZK metadata
     {
-      final String segmentName = "OfflineSegment";
-      final String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-
-      OfflineSegmentZKMetadata offlineMetadata = new OfflineSegmentZKMetadata();
-      offlineMetadata.setSegmentName(segmentName);
-      offlineMetadata.setTableName(tableNameWithType);
-      ZKMetadataProvider.setOfflineSegmentZKMetadata(pinotHelixResourceManager.getPropertyStore(), offlineMetadata);
-      List<OfflineSegmentZKMetadata> metadataList = pinotHelixResourceManager.getOfflineSegmentMetadata(tableNameWithType);
-      Assert.assertEquals(metadataList.size(), 1);
-      OfflineSegmentZKMetadata retrievedMetadata = metadataList.get(0);
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
+      offlineSegmentZKMetadata.setTableName(OFFLINE_TABLE_NAME);
+      offlineSegmentZKMetadata.setSegmentName(segmentName);
+      ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
+      List<OfflineSegmentZKMetadata> retrievedMetadataList =
+          _helixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME);
+      Assert.assertEquals(retrievedMetadataList.size(), 1);
+      OfflineSegmentZKMetadata retrievedMetadata = retrievedMetadataList.get(0);
+      Assert.assertEquals(retrievedMetadata.getTableName(), OFFLINE_TABLE_NAME);
       Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
-      Assert.assertEquals(retrievedMetadata.getTableName(), tableNameWithType);
     }
 
+    // Test retrieving REALTIME segment ZK metadata
     {
-      final String segmentName = "RealtimeSegment";
-      final String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-
       RealtimeSegmentZKMetadata realtimeMetadata = new RealtimeSegmentZKMetadata();
+      realtimeMetadata.setTableName(REALTIME_TABLE_NAME);
       realtimeMetadata.setSegmentName(segmentName);
-      realtimeMetadata.setTableName(tableNameWithType);
       realtimeMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-      ZKMetadataProvider.setRealtimeSegmentZKMetadata(pinotHelixResourceManager.getPropertyStore(), realtimeMetadata);
-      List<RealtimeSegmentZKMetadata> metadataList = pinotHelixResourceManager.getRealtimeSegmentMetadata(tableNameWithType);
-      Assert.assertEquals(metadataList.size(), 1);
-      RealtimeSegmentZKMetadata retrievedMetadata = metadataList.get(0);
+      ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, realtimeMetadata);
+      List<RealtimeSegmentZKMetadata> retrievedMetadataList =
+          _helixResourceManager.getRealtimeSegmentMetadata(REALTIME_TABLE_NAME);
+      Assert.assertEquals(retrievedMetadataList.size(), 1);
+      RealtimeSegmentZKMetadata retrievedMetadata = retrievedMetadataList.get(0);
+      Assert.assertEquals(retrievedMetadata.getTableName(), REALTIME_TABLE_NAME);
       Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
-      Assert.assertEquals(retrievedMetadata.getTableName(), tableNameWithType);
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
     }
+  }
 
-    pinotHelixResourceManager.deleteOfflineTable("faketable");
+  @AfterClass
+  public void tearDown() {
+    stopController();
+    stopZk();
   }
 }

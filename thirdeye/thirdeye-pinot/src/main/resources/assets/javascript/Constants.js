@@ -62,6 +62,12 @@ function Constants() {
   this.FEEDBACK_TYPE_NOT_ANOMALY = 'NOT_ANOMALY';
   this.FEEDBACK_TYPE_ANOMALY_NEW_TREND = 'ANOMALY_NEW_TREND';
 
+  this.FEEDBACK_TYPE_MAPPING = {
+    ANOMALY: 'Confirmed Anomaly',
+    ANOMALY_NEW_TREND: 'Confirmed - New Trend',
+    NOT_ANOMALY: 'False Alarm'
+  };
+
   this.DEFAULT_COMPARE_MODE = 'WoW';
   this.COMPARE_MODE_OPTIONS = ['WoW', 'Wo2W', 'Wo3W'];
 

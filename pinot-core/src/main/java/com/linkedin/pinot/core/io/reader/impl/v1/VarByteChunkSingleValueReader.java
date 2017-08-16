@@ -75,11 +75,10 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
     }
 
     int length = nextRowOffset - rowOffset;
-    ByteBuffer byteBuffer = chunkBuffer.duplicate();
-    byteBuffer.position(rowOffset);
+    chunkBuffer.position(rowOffset);
 
     byte[] bytes = _reusableBytes.get();
-    byteBuffer.get(bytes, 0, length);
+    chunkBuffer.get(bytes, 0, length);
     return new String(bytes, 0, length, UTF_8);
   }
 

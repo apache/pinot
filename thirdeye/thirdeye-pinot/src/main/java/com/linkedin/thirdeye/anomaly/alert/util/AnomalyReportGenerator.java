@@ -161,6 +161,10 @@ public class AnomalyReportGenerator {
 
         String feedbackVal = getFeedbackValue(feedback);
 
+        double lift = anomaly.getWeight();
+        if (anomaly.getAvgBaselineVal() > 0.0) {
+          lift = (anomaly.getAvgCurrentVal() - anomaly.getAvgBaselineVal()) / anomaly.getAvgBaselineVal();
+        }
         AnomalyReportDTO anomalyReportDTO = new AnomalyReportDTO(String.valueOf(anomaly.getId()),
             getAnomalyURL(anomaly, configuration.getDashboardHost()),
             ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
@@ -169,7 +173,7 @@ public class AnomalyReportGenerator {
             getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
             feedbackVal,
             anomaly.getFunction().getFunctionName(),
-            ThirdEyeUtils.getRoundedValue(anomaly.getWeight() * 100) + "%",
+            ThirdEyeUtils.getRoundedValue(lift * 100) + "%",
             getLiftDirection(anomaly.getWeight()),
             anomaly.getMetric(),
             getDateString(anomaly.getStartTime(), timeZone),
@@ -365,13 +369,13 @@ public class AnomalyReportGenerator {
   public static class AnomalyReportDTO {
     String metric;
     String startDateTime;
-    String lift;
+    String lift; // percentage change
     boolean positiveLift;
     String feedback;
     String anomalyId;
     String anomalyURL;
-    String currentVal;
-    String baselineVal;
+    String currentVal; // avg current val
+    String baselineVal; // avg baseline val
     List<String> dimensions;
     String function;
     String duration;

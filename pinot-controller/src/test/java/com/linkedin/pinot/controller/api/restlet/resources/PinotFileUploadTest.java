@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.ControllerTest;
 import org.restlet.Client;
 import org.restlet.Request;
 import org.restlet.Response;
@@ -25,11 +30,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.ControllerTest;
 
 
 /**
@@ -68,7 +68,7 @@ public class PinotFileUploadTest extends ControllerTest {
         .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
         .setNumReplicas(2)
         .build();
-    _controllerStarter.getHelixResourceManager().addTable(tableConfig);
+    _helixResourceManager.addTable(tableConfig);
   }
 
   @AfterClass

@@ -61,6 +61,7 @@ public class DetectionJobScheduler implements Runnable {
 
   private final int MAX_BACKFILL_RETRY = 3;
   private final long SYNC_SLEEP_SECONDS = 5;
+  private final long MAXIMAL_WAIT_SECONDS = 600;
 
   public void start() throws SchedulerException {
     scheduledExecutorService.scheduleWithFixedDelay(this, 0, 5, TimeUnit.MINUTES);
@@ -452,24 +453,26 @@ public class DetectionJobScheduler implements Runnable {
     }
   }
 
+  /**
+   * Wait for job to be done given jobExecutionId. With each SYNC_SLEEP_SECONDS check failed tasks, if there is any, return JobStatus.FAILED
+   * If wait time is longer than MAXIMAL_WAIT_SECONDS, update jobStatus to JobStatus.TIMEOUT and return
+   * If all scheduled tasks have finished, update jobStatus to JobStatus.COMPLETE and return
+   * @param jobExecutionId Execution Id for a job
+   * @return Updated job status after checking
+   */
   public JobStatus waitForJobDone(long jobExecutionId) {
     TaskManager taskDAO = DAO_REGISTRY.getTaskDAO();
     JobManager jobDAO = DAO_REGISTRY.getJobDAO();
     JobDTO jobDTO;
     List<TaskDTO> scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
     long functionId = jobDAO.findById(jobExecutionId).getConfigId();
-
-    while (scheduledTaskDTO.size() > 0) {
-      List<Long> failedTaskIds = new ArrayList<>();
+    long jobCheckEndTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(MAXIMAL_WAIT_SECONDS);
+    while (scheduledTaskDTO.size() > 0 && System.currentTimeMillis() <= jobCheckEndTime) {
       for (TaskDTO taskDTO : scheduledTaskDTO) {
         if (taskDTO.getStatus() == TaskStatus.FAILED) {
-          failedTaskIds.add(taskDTO.getId());
+          LOG.info("Tasks failed on taskId: {}", taskDTO.getId());
+          return JobStatus.FAILED;
         }
-      }
-
-      if(failedTaskIds.size() > 0) {
-        LOG.info("Tasks Failed under Job {}: {}", jobDAO, failedTaskIds);
-        return JobStatus.FAILED;
       }
 
       try {
@@ -480,9 +483,15 @@ public class DetectionJobScheduler implements Runnable {
       }
       scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
     }
-    // Set job to be completed
+
     jobDTO = jobDAO.findById(jobExecutionId);
-    if (!jobDTO.getStatus().equals(JobStatus.COMPLETED)) {
+    // If wait time is longer than MAXINMAL_WAIT_SECONDS and still scheduled jobs left, update job status to be TIMEOUT,
+    // else update job status to be complete since all scheduled tasks are done
+    if (scheduledTaskDTO.size() > 0) {
+      jobDTO.setStatus(JobStatus.TIMEOUT);
+      jobDAO.save(jobDTO);
+    } else {
+      // Set job to be completed
       jobDTO.setStatus(JobStatus.COMPLETED);
       jobDAO.save(jobDTO);
     }

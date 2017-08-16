@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
+import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
@@ -46,6 +47,7 @@ public class ThirdEyeAnomalyApplication
   private AnomalyClassifierFactory anomalyClassifierFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
   private ClassificationJobScheduler classificationJobScheduler = null;
+  private EmailResource emailResource = null;
 
   public static void main(final String[] args) throws Exception {
 
@@ -102,8 +104,9 @@ public class ThirdEyeAnomalyApplication
           detectionJobScheduler = new DetectionJobScheduler();
           alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
           alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
+          emailResource = new EmailResource(config);
           detectionJobScheduler.start();
-          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
+          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory, emailResource));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {

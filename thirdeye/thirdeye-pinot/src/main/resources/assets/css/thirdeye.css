@@ -726,6 +726,40 @@ text {
   opacity: 1;
 }
 
+.thirdeye-link--secondary {
+  background-color: transparent;
+  color: #0084bf;
+  cursor: pointer;
+  outline-width: 2px;
+  position: relative;
+  padding: 0;
+  text-align: center;
+  text-decoration: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+}
+
+.thirdeye-link--delimited:before {
+  height: 100%;
+  position: absolute;
+  bottom: 0;
+  left: -3px;
+  display: block;
+  border-right: 1px solid #CCC;
+  content: '';
+}
+
+.thirdeye-link--secondary:hover {
+  color: #0073b1;
+  background-color: rgba(0,96,151,.1);
+}
+
+.thirdeye-link__icon {
+  font-size: 10px;
+}
+
 .thirdeye-link:hover {
   color: #0073b1;
   text-decoration: none;

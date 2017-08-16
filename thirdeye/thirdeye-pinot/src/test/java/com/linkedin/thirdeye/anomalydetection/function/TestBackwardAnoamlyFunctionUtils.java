@@ -31,6 +31,7 @@ public class TestBackwardAnoamlyFunctionUtils {
     List<Interval> intervalList = new ArrayList<>();
     intervalList.add(new Interval(TimeUnit.DAYS.toMillis(140), TimeUnit.DAYS.toMillis(168)));
     intervalList.add(new Interval(0, TimeUnit.DAYS.toMillis(140)));
+
     List<TimeSeries> timeSeriesList =
         BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(metricTimeSeries, TEST_METRIC, intervalList);
     assert(timeSeriesList.size() == 2);

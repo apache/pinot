@@ -42,7 +42,11 @@ public class DatasetMaxDataTimeCacheLoader extends CacheLoader<String, Long> {
     String dataSourceName = datasetConfig.getDataSource();
     try {
       ThirdEyeDataSource dataSource = queryCache.getDataSource(dataSourceName);
-      maxTime = dataSource.getMaxDataTime(dataset);
+      if (dataSource == null) {
+       LOGGER.warn("dataSource [{}] found null in the query cache", dataSourceName);
+      } else {
+        maxTime = dataSource.getMaxDataTime(dataset);
+      }
     } catch (Exception e) {
       LOGGER.error("Exception in getting max date time for {} from data source {}", dataset, dataSourceName, e);
     }
