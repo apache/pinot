@@ -119,7 +119,7 @@ function fetchRelatedMetricIds() {
     } = metrics;
 
     const {
-      compareMode,
+      compareMode
     } = primaryMetric;
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
@@ -163,7 +163,7 @@ function fetchRegions() {
 
     const metricIds = [primaryMetricId, ...relatedMetricIds].join(',');
 
-    return fetch(`/data/anomalies/ranges?metricIds=${metricIds}&start=${currentStart}&end=${currentEnd}&filters=${filters}`)
+    return fetch(`/data/anomalies/ranges?metricIds=${metricIds}&start=${currentStart}&end=${currentEnd}&filters=${encodeURIComponent(filters)}`)
       .then(res => res.json())
       .then(res => dispatch(loadRegions(res)));
   };
@@ -192,7 +192,7 @@ function fetchRelatedMetricData() {
 
     if (!metricIds.length) { return; }
     const promiseHash = metricIds.reduce((hash, id) => {
-      const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=All&granularity=${granularity}&filters=${filters}`;
+      const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=All&granularity=${granularity}&filters=${encodeURIComponent(filters)}`;
       hash[id] = fetch(url).then(res => res.json());
 
       return hash;
