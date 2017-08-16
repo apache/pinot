@@ -428,14 +428,45 @@ AnomalyResultView.prototype = {
   },
 
   /**
+   * Toggles between the read-only and edit mode
+   */
+  toggleEdit(anomalyCard) {
+    anomalyCard.find('.card-feedback-final').toggleClass('hidden');
+    anomalyCard.find('.card-feedback-select').toggleClass('hidden');
+    anomalyCard.find('.thirdeye-link--secondary').toggleClass('hidden');
+  },
+
+  /**
    * Event Listener for each anomaly results
    */
-  setupListenersOnAnomaly(idx, anomaly) {
+  setupListenersOnAnomaly(index, anomaly) {
     const investigateParams = {
-      anomalyId : anomaly.anomalyId,
+      anomalyId: anomaly.anomalyId,
     }
+    const anomalyCard = $(`#anomaly-card-${index}`);
+    
+    $(`#feedback-edit-${index}`).click(() => {
+      this.toggleEdit(anomalyCard);
+    });
 
-    $(`#investigate-button-${idx}`).click(investigateParams, this.dataEventHandler.bind(this));
+    $(`#feedback-cancel-${index}`).click(() => {
+      this.toggleEdit(anomalyCard);
+    });
+
+    $(`#feedback-submit-${index}`).click(() => {
+      this.toggleEdit(anomalyCard);
+      const userFeedback = anomalyCard.find('.card-feedback-select')[0].value;
+      const feedbackString = constants.FEEDBACK_TYPE_MAPPING[userFeedback];
+
+      if (feedbackString) {
+        dataService.updateFeedback(anomaly.anomalyId, userFeedback);
+        anomaly.anomalyFeedback = feedbackString;
+        anomalyCard.find('.card-feedback-final').html(`Resolved (${feedbackString})`);
+      }
+    });
+
+
+    $(`#investigate-button-${index}`).click(investigateParams, this.dataEventHandler.bind(this));
 
     var rootCauseAnalysisParams = {
       metric : anomaly.metric,
@@ -446,7 +477,7 @@ AnomalyResultView.prototype = {
       // not needed at the moment since it returns {}
       // dimension : anomaly.anomalyFunctionDimension
     }
-    $('#root-cause-analysis-button-' + idx).click(rootCauseAnalysisParams, this.dataEventHandler.bind(this));
+    $('#root-cause-analysis-button-' + index).click(rootCauseAnalysisParams, this.dataEventHandler.bind(this));
     var showDetailsParams = {
       anomalyId : anomaly.anomalyId,
       metric : anomaly.metric,
@@ -454,12 +485,12 @@ AnomalyResultView.prototype = {
       rangeEnd : anomaly.currentEnd,
       dimension : anomaly.anomalyFunctionDimension
     }
-    $('#show-details-' + idx).click(showDetailsParams, this.dataEventHandler.bind(this));
+    $('#show-details-' + index).click(showDetailsParams, this.dataEventHandler.bind(this));
     var anomalyFeedbackParams = {
-      idx : idx,
-      anomalyId : anomaly.anomalyId
+      idx: index,
+      anomalyId: anomaly.anomalyId
     }
-    $('#anomaly-feedback-' + idx).change(anomalyFeedbackParams, this.dataEventHandler.bind(this));
+    $('#anomaly-feedback-' + index).change(anomalyFeedbackParams, this.dataEventHandler.bind(this));
   }
 
 

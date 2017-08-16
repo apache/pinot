@@ -84,7 +84,7 @@
           </div>
 
           <div class="anomaly-details-items">
-            <label class="label-medium-semibold">Function</label>
+            <label class="label-medium-semibold">Alert Name</label>
             <span>{{anomalyFunctionName}}</span>
           </div>
         </div>
