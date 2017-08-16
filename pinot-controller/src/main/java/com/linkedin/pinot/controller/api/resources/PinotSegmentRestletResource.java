@@ -16,19 +16,6 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -41,6 +28,12 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -53,6 +46,16 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static com.linkedin.pinot.controller.api.resources.Constants.TABLE_NAME;
+import static com.linkedin.pinot.controller.api.resources.FileUploadPathProvider.*;
 
 
 /**
@@ -133,14 +136,14 @@ public class PinotSegmentRestletResource {
       @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "online|offline|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
+  ) throws JSONException {
     segmentName = checkGetEncodedParam(segmentName);
     // segmentName will never be null,otherwise we would reach the method toggleStateOrListMetadataForAllSegments()
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     StateType stateType = Constants.validateState(stateStr);
     if (stateStr == null) {
       // This is a list metadata operation
-      return getSegmentMetaData(tableName, segmentName, tableType).toString();
+      return listSegmentMetadataInternal(tableName, segmentName, tableType);
     } else {
       // We need to toggle state
       if (tableType == null) {
@@ -186,14 +189,24 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
+  ) throws JSONException {
     segmentName = checkGetEncodedParam(segmentName);
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
+    return listSegmentMetadataInternal(tableName, segmentName, tableType);
+  }
+
+  private String listSegmentMetadataInternal(@Nonnull  String tableName, @Nonnull String segmentName,
+      @Nullable CommonConstants.Helix.TableType tableType) throws JSONException {
     // The code in restlet.resources seems to return an array of arrays, so we will do the same
     // to maintain backward compatibility
     JSONArray result = new JSONArray();
     if (tableType != null) {
-      JSONArray metadata = getSegmentMetaData(tableName, segmentName, tableType);
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      JSONArray metadata = getSegmentMetaData(tableNameWithType, segmentName, tableType);
+      if (metadata == null) {
+        throw new ControllerApplicationException(LOGGER, "Segment " + segmentName + " not found in table " +
+            tableNameWithType, Response.Status.NOT_FOUND);
+      }
       result.put(metadata);
       return result.toString();
     }
@@ -201,11 +214,23 @@ public class PinotSegmentRestletResource {
     // The segment should appear only in one
     JSONArray metata;
 
-    metata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.OFFLINE);
-    result.put(metata);
-    metata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.REALTIME);
-    result.put(metata);
-    return result.toString();
+    if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      metata = getSegmentMetaData(TableNameBuilder.OFFLINE.tableNameWithType(tableName), segmentName, CommonConstants.Helix.TableType.OFFLINE);
+      if (metata != null) {
+        result.put(metata);
+        return result.toString();
+      }
+    }
+
+    if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      metata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.REALTIME);
+      if (metata != null) {
+        result.put(metata);
+        return result.toString();
+      }
+    }
+    throw new ControllerApplicationException(LOGGER, "Segment " + segmentName + " not found in table " +
+        tableName, Response.Status.NOT_FOUND);
   }
 
   @GET
@@ -422,38 +447,43 @@ public class PinotSegmentRestletResource {
     }
   }
 
-  private JSONArray getSegmentMetaData(String tableName, String segmentName,
-      CommonConstants.Helix.TableType tableType) {
-    if (!ZKMetadataProvider.isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(), tableName, segmentName)) {
-      String error = new String("Error: segment " + segmentName + " not found.");
-      LOGGER.info(error);
-      throw new WebApplicationException(error, BAD_REQUEST);
+  /**
+   * Get meta-data for segment of table. Table name is the suffixed (offline/realtime)
+   * name.
+   * @param tableNameWithType: Suffixed (realtime/offline) table Name
+   * @param segmentName: Segment for which to get the meta-data.
+   * @return A json array that is to be returned to the client.
+   * @throws JSONException
+   * XXX
+   * @note: Previous restlet API retuned a toString from this method, so if compat is desired, then change this method to return a String type
+   */
+  private @Nullable JSONArray getSegmentMetaData(String tableNameWithType, String segmentName, @Nonnull  CommonConstants.Helix.TableType tableType)
+      throws JSONException {
+    if (!ZKMetadataProvider.isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType, segmentName)) {
+      return null;
     }
-    try {
-      JSONArray ret = new JSONArray();
-      JSONObject jsonObj = new JSONObject();
-      jsonObj.put(FileUploadPathProvider.TABLE_NAME, tableName);
 
-      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    JSONArray ret = new JSONArray();
+    JSONObject jsonObj = new JSONObject();
+    jsonObj.put(TABLE_NAME, tableNameWithType);
 
-      if (tableType == tableType.OFFLINE) {
-        OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-            ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
-        jsonObj.put(FileUploadPathProvider.STATE, offlineSegmentZKMetadata.toMap());
-      }
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
-      if (tableType == CommonConstants.Helix.TableType.REALTIME) {
-        RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-            ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
-        jsonObj.put(FileUploadPathProvider.STATE, realtimeSegmentZKMetadata.toMap());
-      }
-      ret.put(jsonObj);
-      return ret;
-    } catch (JSONException e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid json for segment metadata, table: %s, segment: %s, type: %s", tableName, segmentName,
-              tableType), Response.Status.INTERNAL_SERVER_ERROR);
+    if (tableType == tableType.OFFLINE) {
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
+      jsonObj.put(STATE, offlineSegmentZKMetadata.toMap());
+
     }
+
+    if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+          ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableNameWithType, segmentName);
+      jsonObj.put(STATE, realtimeSegmentZKMetadata.toMap());
+    }
+
+    ret.put(jsonObj);
+    return ret;
   }
 
   private String getAllCrcMetadataForTable(String tableName) {
