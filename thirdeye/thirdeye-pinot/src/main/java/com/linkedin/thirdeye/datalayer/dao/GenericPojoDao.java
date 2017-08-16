@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import com.linkedin.thirdeye.auth.IAuthManager;
+import com.linkedin.thirdeye.auth.PrincipalAuthContext;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
@@ -54,6 +56,7 @@ import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -163,8 +166,23 @@ public class GenericPojoDao {
     return dataSource.getConnection();
   }
 
+  private String getCurrentPrincipal() {
+    IAuthManager authManager = DAORegistry.getInstance().getAuthManager();
+    String user = "no-auth-user";
+    if (authManager != null) {
+      PrincipalAuthContext authContext = authManager.getCurrentPrincipal();
+      if (authContext != null) {
+        user = authContext.getPrincipal();
+      }
+    }
+    return user;
+  }
+
   public <E extends AbstractBean> Long put(final E pojo) {
     long tStart = System.nanoTime();
+    String currentUser = getCurrentPrincipal();
+    pojo.setCreatedBy(currentUser);
+    pojo.setUpdatedBy(currentUser);
     try {
       //insert into its base table
       //get the generated id
@@ -227,6 +245,7 @@ public class GenericPojoDao {
 
   public <E extends AbstractBean> int update(final E pojo, final Predicate predicate) {
     long tStart = System.nanoTime();
+    pojo.setUpdatedBy(getCurrentPrincipal());
     try {
       //update base table
       //update indexes
