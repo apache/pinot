@@ -303,7 +303,6 @@ public class AnomalyResource {
    * @return new anomaly function Id if successfully create new anomaly function
    * @throws Exception
    */
-  // Add anomaly function
   @POST
   @Path("/anomaly-function")
   public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
@@ -371,6 +370,9 @@ public class AnomalyResource {
     default:
       windowDelayTimeUnit = TimeUnit.HOURS;
     }
+    if (StringUtils.isNotBlank(windowDelayUnit)) {
+      windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit.toUpperCase());
+    }
     anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
     anomalyFunctionSpec.setWindowDelay(windowDelayTime);
 
@@ -411,7 +413,46 @@ public class AnomalyResource {
     return Response.ok(id).build();
   }
 
-  // Edit anomaly function
+  /**
+   * Edit Anomaly function
+   * @param id
+   *    the id of the anomaly function to be updated
+   * @param dataset
+   *    the dataset to be monitored
+   * @param metric
+   *    the metric to be monitored
+   * @param functionName
+   *    the function name of the anomaly detection function
+   * @param type
+   *    the type of algorithm to be used in the detection function
+   * @param windowSize
+   *    the size of the monitoring window
+   * @param windowUnit
+   *    the unit of the monitoring window
+   * @param windowDelay
+   *    the delay of the monitoring window, that is the delay after the cron.
+   *    ex: cron is set to every day at 10AM and the dealy is 1 hour, and the detection is triggered at 11am
+   * @param windowDelayUnit
+   *    the unit of the window delay
+   * @param cron
+   *    the schedule time of the detection, ref: http://www.cronmaker.com/
+   * @param exploreDimensions
+   *    the dimension to be drilled down for detection. Dimensions are separated by comma, e.g. dim1,dim2,dim3
+   * @param filters
+   *    the filter of the metric time series. the filter defines the domain of the time series.
+   *    For example, filter is set to US and exploreDimensions is on pagekeys, then the detection is run on all pagekeys
+   *    in the US
+   * @param properties
+   *    the properties of the detection function. The anomaly detection takes user-defined parameters via the properties.
+   * @param isActive
+   *    TRUE if the anomaly function is ready to be scheduled.
+   * @param frequency
+   *    The frequency is currently used to align the monitoring window. For example, frequency is 15 min, then the window
+   *    is set to [0, 15), [15, 30), [30, 45) and [45, 0/60)
+   * @return
+   *    200 OK if the function is successfully updated
+   * @throws Exception
+   */
   @PUT
   @Path("/anomaly-function/{id}")
   public Response updateAnomalyFunction(@NotNull @PathParam("id") Long id,
@@ -427,7 +468,8 @@ public class AnomalyResource {
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters,
       @QueryParam("properties") String properties,
-      @QueryParam("isActive") Boolean isActive) throws Exception {
+      @QueryParam("isActive") Boolean isActive,
+      @QueryParam("frequency") String frequency) throws Exception {
 
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
@@ -497,6 +539,11 @@ public class AnomalyResource {
         throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
       }
       anomalyFunctionSpec.setCron(cron);
+    }
+
+    if (StringUtils.isNotEmpty(frequency)) {
+      // frequency string should be in the format of "5_MINUTES", "1_HOURS"
+      anomalyFunctionSpec.setFrequency(TimeGranularity.fromString(frequency));
     }
 
     anomalyFunctionDAO.update(anomalyFunctionSpec);
