@@ -25,7 +25,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,7 +35,6 @@ import org.testng.annotations.Test;
 
 
 public class PinotSegmentRestletResourceTest extends ControllerTest {
-  private PinotHelixResourceManager _pinotHelixResourceManager;
   private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
   private final static String TABLE_NAME = "testTable";
   private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -45,7 +43,6 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
   public void setUp() throws Exception {
     startZk();
     startController();
-    _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
 
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(
         getHelixClusterName(), ZK_SERVER, 1, true);
@@ -74,10 +71,10 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNumReplicas(1)
         .build();
-    _pinotHelixResourceManager.addTable(tableConfig);
+    _helixResourceManager.addTable(tableConfig);
 
     // Wait for the table addition
-    while (!_pinotHelixResourceManager.hasOfflineTable(TABLE_NAME)) {
+    while (!_helixResourceManager.hasOfflineTable(TABLE_NAME)) {
       Thread.sleep(100);
     }
 
@@ -104,7 +101,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
     checkCrcRequest(segmentMetadataTable, 10);
 
     // Delete segments
-    _pinotHelixResourceManager.deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
+    _helixResourceManager.deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
         segmentMetadataTable.values().iterator().next().getName());
 
     // Check crc api
@@ -125,7 +122,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
 
   private SegmentMetadata addOneSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
-    _pinotHelixResourceManager.addSegment(segmentMetadata, "downloadUrl");
+    _helixResourceManager.addSegment(segmentMetadata, "downloadUrl");
     return segmentMetadata;
   }
 }

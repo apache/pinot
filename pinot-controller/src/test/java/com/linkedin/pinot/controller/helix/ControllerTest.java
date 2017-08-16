@@ -61,6 +61,7 @@ public abstract class ControllerTest {
 
   protected ZkClient _zkClient;
   protected ControllerStarter _controllerStarter;
+  protected PinotHelixResourceManager _helixResourceManager;
   protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -121,10 +122,10 @@ public abstract class ControllerTest {
     _controllerStarter = new ControllerStarter(config);
     _controllerStarter.start();
 
-    PinotHelixResourceManager helixResourceManager = _controllerStarter.getHelixResourceManager();
-    _helixManager = helixResourceManager.getHelixZkManager();
-    _helixAdmin = helixResourceManager.getHelixAdmin();
-    _propertyStore = helixResourceManager.getPropertyStore();
+    _helixResourceManager = _controllerStarter.getHelixResourceManager();
+    _helixManager = _helixResourceManager.getHelixZkManager();
+    _helixAdmin = _helixResourceManager.getHelixAdmin();
+    _propertyStore = _helixResourceManager.getPropertyStore();
   }
 
   protected void stopController() {

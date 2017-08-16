@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import java.io.IOException;
 import org.json.JSONException;
@@ -33,13 +32,10 @@ import org.testng.annotations.Test;
 public class ControllerSentinelTestV2 extends ControllerTest {
   private final String _helixClusterName = getHelixClusterName();
 
-  private PinotHelixResourceManager _pinotResourceManager;
-
   @BeforeClass
   public void setup() throws Exception {
     startZk();
     startController();
-    _pinotResourceManager = _controllerStarter.getHelixResourceManager();
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName,
         ZkStarter.DEFAULT_ZK_STR, 20, true);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR,
@@ -100,6 +96,6 @@ public class ControllerSentinelTestV2 extends ControllerTest {
 
   private void addOneOfflineSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
-    _pinotResourceManager.addSegment(segmentMetadata, "downloadUrl");
+    _helixResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }
 }
