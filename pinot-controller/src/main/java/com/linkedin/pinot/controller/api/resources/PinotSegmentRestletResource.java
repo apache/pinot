@@ -212,20 +212,20 @@ public class PinotSegmentRestletResource {
     }
     // Again,keeping backward compatibility, returning metadata from both table types.
     // The segment should appear only in one
-    JSONArray metata;
+    JSONArray metadata;
 
     if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      metata = getSegmentMetaData(TableNameBuilder.OFFLINE.tableNameWithType(tableName), segmentName, CommonConstants.Helix.TableType.OFFLINE);
-      if (metata != null) {
-        result.put(metata);
+      metadata = getSegmentMetaData(TableNameBuilder.OFFLINE.tableNameWithType(tableName), segmentName, CommonConstants.Helix.TableType.OFFLINE);
+      if (metadata != null) {
+        result.put(metadata);
         return result.toString();
       }
     }
 
     if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      metata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.REALTIME);
-      if (metata != null) {
-        result.put(metata);
+      metadata = getSegmentMetaData(tableName, segmentName, CommonConstants.Helix.TableType.REALTIME);
+      if (metadata != null) {
+        result.put(metadata);
         return result.toString();
       }
     }
