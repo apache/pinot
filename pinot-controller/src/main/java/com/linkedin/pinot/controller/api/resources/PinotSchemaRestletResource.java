@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -30,8 +32,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -61,7 +61,7 @@ public class PinotSchemaRestletResource {
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
-  ControllerConf _controllerConf;
+  ControllerMetrics _controllerMetrics;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -144,8 +144,7 @@ public class PinotSchemaRestletResource {
     }
 
     if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {
-      ControllerRestApplication.getControllerMetrics()
-          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       final String message =
           "Schema name mismatch for uploaded schema, tried to add schema with name " + schema.getSchemaName() + " as "
               + schemaName;
@@ -156,8 +155,7 @@ public class PinotSchemaRestletResource {
       _pinotHelixResourceManager.addOrUpdateSchema(schema);
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
     } catch (Exception e) {
-      ControllerRestApplication.getControllerMetrics()
-          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to update schema %s", schemaNameForLogging), Response.Status.INTERNAL_SERVER_ERROR);
     }
