@@ -480,12 +480,8 @@ public class AnomalyDetectionInputContextBuilder {
 
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
-
-    DatasetConfigDTO dataset = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(anomalyFunctionSpec.getCollection());
-    boolean doRollUp = true;
-    if (!dataset.isAdditive()) {
-      doRollUp = false;
-    }
+    // if doRollUp, small categories (<1% to total) will be aggregated to "OTHER"
+    boolean doRollUp = false;  // do anomaly detection on every categories for the dimension to explore, no rollup
 
     TimeSeriesResponse timeSeriesResponse =
         getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges,
