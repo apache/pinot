@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.io.writer.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -80,12 +81,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  *
  */
 public class MutableOffHeapByteArrayStore implements Closeable {
-  private static final int START_SIZE = 32 * 1024;
   private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
-
-  public static int getStartSize() {
-    return START_SIZE;
-  }
 
   private static class Buffer implements Closeable {
 
@@ -174,11 +170,19 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   private final RealtimeIndexOffHeapMemoryManager _memoryManager;
   private final String _columnName;
   private long _totalStringSize = 0;
+  private final int _startSize;
 
-  public MutableOffHeapByteArrayStore(RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
+  @VisibleForTesting
+  public int getStartSize() {
+    return _startSize;
+  }
+
+  public MutableOffHeapByteArrayStore(RealtimeIndexOffHeapMemoryManager memoryManager, String columnName, int numArrays,
+      int avgArrayLen) {
     _memoryManager = memoryManager;
     _columnName = columnName;
-    expand(START_SIZE, 0L);
+    _startSize = numArrays * (avgArrayLen + 4); // For each array, we store the array and its startoffset (4 bytes)
+    expand(_startSize, 0L);
   }
 
   /**

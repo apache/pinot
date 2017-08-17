@@ -83,6 +83,8 @@ public abstract class MutableDictionary implements Dictionary, Closeable {
   @Nonnull
   public abstract Object getSortedValues();
 
+  public abstract int getAvgValueSize();
+
   public abstract boolean isEmpty();
 
   public abstract void close() throws IOException;

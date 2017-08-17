@@ -29,12 +29,15 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /*
  * Keeps history of statistics for segments consumed from kafka for a single table.
  */
 public class RealtimeSegmentStatsHistory implements Serializable {
+  public static Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentStatsHistory.class);
   private static final long serialVersionUID = 1L;  // Change this if a new field is added to this class
   // XXX MAX_NUM_ENTRIES should be a final variable, but we need to modify it for testing.
   private static int MAX_NUM_ENTRIES = 16;  // Max number of past segments for which stats are kept
@@ -42,6 +45,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   private int _cursor = 0;
   private SegmentStats[] _entries;
   private boolean _isFull;
+  private String _historyFilePath;
 
   // We return these values when we don't have any prior statistics.
   private final int DEFAULT_EST_AVG_STRING_LEN = 32;
@@ -49,6 +53,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
 
   // Not to be serialized
   transient int _arraySize;
+  transient File _historyFile;
 
   @VisibleForTesting
   public static int getMaxNumEntries() {
@@ -63,8 +68,8 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   public static class SegmentStats implements Serializable {
     private static final long serialVersionUID = 1L;
     private int _numRowsConsumed;   // Number of rows consumed
-    private int _numMinutes;        // Number of minutes taken to consume them
-    private long _memUsed;          // Memory used for consumption (bytes)
+    private int _numSeconds;        // Number of seconds taken to consume them
+    private long _memUsedBytes;          // Memory used for consumption (bytes)
     private Map<String, ColumnStats> _colNameToStats = new HashMap();
 
     public int getNumRowsConsumed() {
@@ -75,20 +80,20 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       _numRowsConsumed = numRowsConsumed;
     }
 
-    public int getNumMinutes() {
-      return _numMinutes;
+    public int getNumSeconds() {
+      return _numSeconds;
     }
 
-    public void setNumMinutes(int numMinutes) {
-      _numMinutes = numMinutes;
+    public void setNumSeconds(int numSeconds) {
+      _numSeconds = numSeconds;
     }
 
-    public long getMemUsed() {
-      return _memUsed;
+    public long getMemUsedBytes() {
+      return _memUsedBytes;
     }
 
-    public void setMemUsed(long memUsed) {
-      _memUsed = memUsed;
+    public void setMemUsedBytes(long memUsedBytes) {
+      _memUsedBytes = memUsedBytes;
     }
 
     public void setColumnStats(@Nonnull String columnName, @Nonnull ColumnStats columnStats) {
@@ -103,8 +108,8 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     public String toString() {
       StringBuilder sb = new StringBuilder();
       sb.append("nRows=" + getNumRowsConsumed())
-          .append(",nMinutes=" + getNumMinutes())
-          .append(",memUsed=" + getMemUsed());
+          .append(",nMinutes=" + getNumSeconds())
+          .append(",memUsed=" + getMemUsedBytes());
 
       for (Map.Entry<String, ColumnStats> entry : _colNameToStats.entrySet()) {
         sb.append(",")
@@ -118,8 +123,9 @@ public class RealtimeSegmentStatsHistory implements Serializable {
 
   public static class ColumnStats implements Serializable {
     private static final long serialVersionUID = 1L;  // Change this if a new field is added to this class
-    private int _avgStringSize;     // Only for string columns, if they have a dictionary
-    private int _cardinality;       // Only if a column has a dictionary
+
+    private int _avgColumnSize;     // Used only for string columns when building dictionary
+    private int _cardinality;       // Used for all dictionary columns
 
     public int getCardinality() {
       return _cardinality;
@@ -129,22 +135,29 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       _cardinality = cardinality;
     }
 
-    public int getAvgStringSize() {
-      return _avgStringSize;
+    public int getAvgColumnSize() {
+      return _avgColumnSize;
     }
 
-    public void setAvgStringSize(int avgStringSize) {
-      _avgStringSize = avgStringSize;
+    public void setAvgColumnSize(int avgColumnSize) {
+      _avgColumnSize = avgColumnSize;
     }
 
     @Override
     public String toString() {
-      return "cardinality=" + getCardinality() + ",avgSize=" + getAvgStringSize();
+      return "cardinality=" + getCardinality() + ",avgSize=" + getAvgColumnSize();
     }
   }
 
-  public RealtimeSegmentStatsHistory() {
+  /**
+   * Constructor called when there is no file present.
+   *
+   * @param historyFilePath
+   */
+  private RealtimeSegmentStatsHistory(String historyFilePath) {
     _entries = new SegmentStats[MAX_NUM_ENTRIES];
+    _historyFilePath = historyFilePath;
+    _historyFile = new File(_historyFilePath);
     normalize();
   }
 
@@ -234,12 +247,13 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   public synchronized int getEstimatedAvgColSize(@Nonnull String columnName) {
     int numEntriesToScan = getNumntriesToScan();
     if (numEntriesToScan == 0) {
+
       return DEFAULT_EST_AVG_STRING_LEN;
     }
     int estCardinality = 0;
     for (int i = 0; i < numEntriesToScan; i++) {
       SegmentStats segmentStats = getSegmentStatsAt(i);
-      estCardinality += segmentStats.getColumnStats(columnName).getAvgStringSize();
+      estCardinality += segmentStats.getColumnStats(columnName).getAvgColumnSize();
     }
     return estCardinality/numEntriesToScan;
   }
@@ -253,23 +267,27 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return "cursor=" + getCursor() + ",numEntries=" + getArraySize() + ",isFull=" + isFull();
   }
 
-  public synchronized void serializeInto(File outFile) throws IOException {
-    try (OutputStream os = new FileOutputStream(outFile);
+  public synchronized void save() {
+    try (OutputStream os = new FileOutputStream(new File(_historyFilePath));
         ObjectOutputStream obos = new ObjectOutputStream(os)
     ) {
       obos.writeObject(this);
       obos.flush();
       os.flush();
+    } catch (IOException e) {
+      LOGGER.warn("Could not update stats file {}", _historyFile, e);
     }
   }
 
-  public static RealtimeSegmentStatsHistory deserialzeFrom(File inFile) throws IOException, ClassNotFoundException {
-    try (FileInputStream is = new FileInputStream(inFile);
-        ObjectInputStream obis = new ObjectInputStream(is)
-    ) {
-      RealtimeSegmentStatsHistory history = (RealtimeSegmentStatsHistory) (obis.readObject());
-      history.normalize();
-      return history;
+  public static synchronized RealtimeSegmentStatsHistory deserialzeFrom(File inFile) throws IOException, ClassNotFoundException {
+    if (inFile.exists()) {
+      try (FileInputStream is = new FileInputStream(inFile); ObjectInputStream obis = new ObjectInputStream(is)) {
+        RealtimeSegmentStatsHistory history = (RealtimeSegmentStatsHistory) (obis.readObject());
+        history.normalize();
+        return history;
+      }
+    } else {
+      return new RealtimeSegmentStatsHistory(inFile.getAbsolutePath());
     }
   }
 

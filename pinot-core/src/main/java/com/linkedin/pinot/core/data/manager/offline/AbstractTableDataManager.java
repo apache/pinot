@@ -65,7 +65,6 @@ public abstract class AbstractTableDataManager implements TableDataManager {
     _serverMetrics = serverMetrics;
 
     _tableName = _tableDataManagerConfig.getTableName();
-    doInit();
 
     _tableDataDir = _tableDataManagerConfig.getDataDir();
     _indexDir = new File(_tableDataDir);
@@ -73,6 +72,7 @@ public abstract class AbstractTableDataManager implements TableDataManager {
       _indexDir.mkdirs();
     }
 
+    doInit();
     LOGGER.info("Initialized table: {} with data directory: {}", _tableName, _tableDataDir);
   }
 

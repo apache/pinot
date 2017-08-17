@@ -125,6 +125,11 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
+  public int getAvgValueSize() {
+    return V1Constants.Numbers.INTEGER_SIZE;
+  }
+
+  @Override
   protected void setRawValueAt(int dictId, Object value, byte[] serializedValue) {
     _dictIdToValue.setInt(dictId, (Integer) value);
   }

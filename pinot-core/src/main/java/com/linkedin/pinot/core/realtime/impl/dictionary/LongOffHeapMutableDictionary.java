@@ -125,6 +125,11 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
+  public int getAvgValueSize() {
+    return V1Constants.Numbers.LONG_SIZE;
+  }
+
+  @Override
   protected void setRawValueAt(int dictId, Object value, byte[] serializedValue) {
     _dictIdToValue.setLong(dictId, (Long) value);
   }

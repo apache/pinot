@@ -125,6 +125,11 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
+  public int getAvgValueSize() {
+    return V1Constants.Numbers.DOUBLE_SIZE;
+  }
+
+  @Override
   protected void setRawValueAt(int dictId, Object value, byte[] serializedValue) {
     _dictIdToValue.setDouble(dictId, (Double) value);
   }
