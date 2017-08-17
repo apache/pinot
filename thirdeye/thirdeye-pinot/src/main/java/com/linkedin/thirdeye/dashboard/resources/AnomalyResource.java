@@ -415,7 +415,8 @@ public class AnomalyResource {
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters,
       @QueryParam("properties") String properties,
-      @QueryParam("isActive") Boolean isActive) throws Exception {
+      @QueryParam("isActive") Boolean isActive,
+      @QueryParam("frequency") String frequency) throws Exception {
 
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
@@ -485,6 +486,11 @@ public class AnomalyResource {
         throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
       }
       anomalyFunctionSpec.setCron(cron);
+    }
+
+    if (StringUtils.isNotEmpty(frequency)) {
+      // frequency string should be in the format of "5_MINUTES", "1_HOURS"
+      anomalyFunctionSpec.setFrequency(TimeGranularity.fromString(frequency));
     }
 
     anomalyFunctionDAO.update(anomalyFunctionSpec);

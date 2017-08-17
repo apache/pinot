@@ -450,7 +450,7 @@ public class DashboardResource {
       request.setEndDateInclusive(true);
     }
 
-    TimeSeriesHandler handler = new TimeSeriesHandler(queryCache);
+    TimeSeriesHandler handler = new TimeSeriesHandler(queryCache, false);
     String jsonResponse = "";
     try {
       TimeSeriesResponse response = handler.handle(request);
