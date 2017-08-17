@@ -75,6 +75,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
+import org.joda.time.Hours;
 import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
 import org.json.JSONObject;
@@ -703,7 +704,7 @@ public class AnomalyResource {
 
     // Amend the anomaly time lines view by adding merged anomaly information
     for (String dimension : dimensionMapAnomalyTimelinesViewMap.keySet()) {
-      DimensionMap dimensionMap = new DimensionMap();
+      DimensionMap dimensionMap = new DimensionMap(dimension);
       AnomalyTimelinesView anomalyTimelinesView = amendAnomalyTimelinesViewWithAnomalyResults(anomalyFunctionSpec,
           dimensionMapAnomalyTimelinesViewMap.get(dimension), dimensionMap);
       dimensionMapAnomalyTimelinesViewMap.put(dimension, anomalyTimelinesView);
@@ -735,8 +736,8 @@ public class AnomalyResource {
     TimeSeries expected = timeSeriesTuple._2();
     Interval timeSeriesInterval = observed.getTimeSeriesInterval();
     List<MergedAnomalyResultDTO> mergedAnomalyResults = mergedAnomalyResultDAO
-        .findByStartTimeInRangeAndFunctionId(timeSeriesInterval.getStartMillis(), timeSeriesInterval.getEndMillis(),
-            anomalyFunctionSpec.getId(), true);
+        .findOverlappingByFunctionIdDimensions(anomalyFunctionSpec.getId(), timeSeriesInterval.getStartMillis(),
+            timeSeriesInterval.getEndMillis(), dimensionMap.toString(), true);
 
     for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
       if (mergedAnomalyResult.getDimensions().equals(dimensionMap)) {
@@ -755,9 +756,20 @@ public class AnomalyResource {
           TimeSeries anomalyExpected = timeSeriesTuple._2();
 
           for (long timestamp : anomalyObserved.timestampSet()) {
+            // align timestamp to the begin of the day if Bucket is in DAYS
+            long indexTimestamp = timestamp;
+            if (TimeUnit.DAYS.toMillis(1l) == bucketMillis) {
+              DateTime timestampDateTime = new DateTime(timestamp);
+              // the timestamp shifts ahead of correct timestamp because of start of DST
+              if (timestampDateTime.minusHours(1).toLocalDate().equals(timestampDateTime.toLocalDate())) {
+                timestamp = timestampDateTime.minusHours(1).getMillis();
+              } else if (timestampDateTime.plusHours(1).toLocalDate().equals(timestampDateTime.plusDays(1).toLocalDate())) {
+                timestamp = (new DateTime(timestamp)).plusDays(1).withTimeAtStartOfDay().getMillis();
+              }
+            }
             if (timeSeriesInterval.contains(timestamp)) {
-              observed.set(timestamp, anomalyObserved.get(timestamp));
-              expected.set(timestamp, anomalyExpected.get(timestamp));
+              observed.set(timestamp, anomalyObserved.get(indexTimestamp));
+              expected.set(timestamp, anomalyExpected.get(indexTimestamp));
             }
           }
           continue;
