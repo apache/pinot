@@ -3,9 +3,6 @@ package com.linkedin.thirdeye.dashboard.resources;
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.ALERT_FILTER_LOGISITC_AUTO_TUNE;
 import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE;
 
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
-import com.linkedin.thirdeye.rootcause.Entity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -245,7 +242,7 @@ public class DetectionJobResource {
       @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity, @QueryParam("from") String fromAddr,
       @QueryParam("to") String toAddr, @QueryParam("toTE") String toTEAddr,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort, @QueryParam("phantomJsPath") String phantomJsPath) {
+      @QueryParam("smtpPort") Integer smtpPort, @QueryParam("phantomJsPath") String phantomJsPath) {
 
     // run replay, update function with jobId
     long jobId;
@@ -278,14 +275,19 @@ public class DetectionJobResource {
     }
 
     // create initial tuning and apply filter
-    Response initialAutotuneResponse =
-        initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", 10, "", "");
-    if (initialAutotuneResponse.getEntity() != null) {
-      updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
-      LOG.info("Initial alert filter applied");
-    } else {
-      LOG.info("AutoTune doesn't applied");
+    try{
+      Response initialAutotuneResponse =
+          initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", 10, "", "");
+      if (initialAutotuneResponse.getEntity() != null) {
+        updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
+        LOG.info("Initial alert filter applied");
+      } else {
+        LOG.info("AutoTune doesn't applied");
+      }
+    } catch (Exception e) {
+      LOG.warn("Exception with initiate tuning", e.getMessage());
     }
+
 
     // send out email
     String subject = new StringBuilder(

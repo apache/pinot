@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.common;
 
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,8 +16,12 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   private String smtpHost = "";
   private int smtpPort = 0;
+  private String dashboardHost;
+  private SmtpConfiguration smtpConfiguration;
 
   private String phantomJsPath = "";
+  private String failureFromAddress;
+  private String failureToAddress;
 
   /**
    * allow cross request for local development
@@ -89,12 +94,44 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     this.smtpPort = smtpPort;
   }
 
+  public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
+    this.smtpConfiguration = smtpConfiguration;
+  }
+
+  public SmtpConfiguration getSmtpConfiguration(){
+    return this.smtpConfiguration;
+  }
+
   public String getPhantomJsPath() {
     return phantomJsPath;
   }
 
   public void setPhantomJsPath(String phantomJsPath) {
     this.phantomJsPath = phantomJsPath;
+  }
+
+  public String getDashboardHost() {
+    return dashboardHost;
+  }
+
+  public void setDashboardHost(String dashboardHost) {
+    this.dashboardHost = dashboardHost;
+  }
+
+  public String getFailureFromAddress() {
+    return failureFromAddress;
+  }
+
+  public void setFailureFromAddress(String failureFromAddress) {
+    this.failureFromAddress = failureFromAddress;
+  }
+
+  public String getFailureToAddress() {
+    return failureToAddress;
+  }
+
+  public void setFailureToAddress(String failureToAddress) {
+    this.failureToAddress = failureToAddress;
   }
 
 }
