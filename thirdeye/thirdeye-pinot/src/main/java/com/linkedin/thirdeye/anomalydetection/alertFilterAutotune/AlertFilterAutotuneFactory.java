@@ -71,11 +71,5 @@ public class AlertFilterAutotuneFactory {
   }
 
 
-  public BaseAlertFilterAutoTune initAlertFilterAutoTune(AutotuneMethodType autotuneMethodType, List<MergedAnomalyResultDTO> anomalies, BaseAlertFilter alertFilter){
-    AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(autotuneMethodType, alertFilter);
-    BaseAlertFilterAutoTune alertFilterAutoTune = fromSpec(autotuneConfig.getAutotuneMethod().toString());
-    alertFilterAutoTune.init(anomalies, autotuneConfig);
-    return alertFilterAutoTune;
-  }
 
 }

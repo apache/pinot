@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.FilterPattern;
 import com.linkedin.thirdeye.datalayer.pojo.AutotuneConfigBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
@@ -31,6 +30,12 @@ public class AutotuneConfigDTO extends AutotuneConfigBean {
     setAutoTuneConfigByAlertFilter(alertFilter);
   }
 
+
+  public AutotuneConfigDTO(FilterPattern userDefinedPattern, String sensitivity){
+    this.userDefinedPattern = userDefinedPattern;
+    this.sensitivity = sensitivity;
+  }
+
   public void setAlertFilter(AlertFilter alertFilter) {
     this.alertFilter = alertFilter;
   }
@@ -45,6 +50,14 @@ public class AutotuneConfigDTO extends AutotuneConfigBean {
 
   public FilterPattern getUserDefinedPattern() {
     return this.userDefinedPattern;
+  }
+
+  public void setSensitivity(String sensitivity) {
+    this.sensitivity = sensitivity;
+  }
+
+  public String getSensitivity(){
+    return this.sensitivity;
   }
 
   public void setFeatures(String features) {

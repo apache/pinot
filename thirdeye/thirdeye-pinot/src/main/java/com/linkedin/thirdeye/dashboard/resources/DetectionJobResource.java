@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.FilterPattern;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -276,7 +277,7 @@ public class DetectionJobResource {
 
     // create initial tuning and apply filter
     Response initialAutotuneResponse =
-        initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", 10, "", "");
+        initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", userDefinedPattern,sensitivity, "", "");
     if (initialAutotuneResponse.getEntity() != null) {
       updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
       LOG.info("Initial alert filter applied");
@@ -595,20 +596,20 @@ public class DetectionJobResource {
     //init
     alertFilterAutotune.init(anomalies, autotuneConfig);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
-    
-    long autotuneId = -1;
+
+    String autotuneId = null;
 
     // tune
     try {
       Map<String, String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter();
-      alertFilter.setParameters(alertFilterAutotune.getAlertFilter());
+//      alertFilter.setParameters(tunedAlertFilter);
 
     } catch (Exception e) {
       e.printStackTrace();
     }
 
     // write to DB
-    autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig);
+    autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig).toString();
 
 //    try {
 //      // get tuned alert filter
@@ -660,7 +661,6 @@ public class DetectionJobResource {
    * @param startTimeIso: training data starts time ex: 2016-5-23T00:00:00Z
    * @param endTimeIso: training data ends time ex: 2016-5-23T00:00:00Z
    * @param autoTuneType: By default is "AUTOTUNE"
-   * @param nExpectedAnomalies: number of expected anomalies to recommend users to label
    * @param holidayStarts optional: holidayStarts in ISO format: start1,start2,...
    * @param holidayEnds optional:holidayEnds in ISO format: end1,end2,...
    * @return true if alert filter has successfully being initiated, false otherwise
@@ -670,7 +670,9 @@ public class DetectionJobResource {
   public Response initiateAlertFilterAutoTune(@PathParam("functionId") long id,
       @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso,
-      @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType, @QueryParam("nExpected") int nExpectedAnomalies,
+      @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
+      @QueryParam("userDefinedPattern") @DefaultValue("TWO_SIDED") String userDefinedPattern,
+      @QueryParam("Sensitivity") @DefaultValue("MEDIUM") String sensitivity,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
@@ -678,29 +680,27 @@ public class DetectionJobResource {
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
 
     // get anomalies by function id, start time and end time
-    List<MergedAnomalyResultDTO> anomalyResultDTOS = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
+    List<MergedAnomalyResultDTO> anomalies = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
 
     //initiate AutoTuneConfigDTO
-    AutotuneConfigDTO target = new AutotuneConfigDTO();
+    AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(FilterPattern.valueOf(userDefinedPattern), sensitivity);
 
     // create alert filter auto tune
-    AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
-    String autotuneId = null;
-    try {
-      Map<String, String> tunedAlertFilter = alertFilterAutotune.initiateAutoTune(anomalyResultDTOS, nExpectedAnomalies);
+    BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
+    alertFilterAutotune.init(anomalies, autotuneConfig);
+    LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
-      // if achieved the initial alert filter
-      if (alertFilterAutotune.isUpdated()) {
-        target.setFunctionId(id);
-        target.setConfiguration(tunedAlertFilter);
-        target.setAutotuneMethod(INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE);
-        autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(target).toString();
-      } else {
-        LOG.info("Failed init alert filter since model hasn't been updated");
-      }
+    String autotuneId = null;
+    // tune
+    try {
+      Map<String, String> tunedAlertFilterConfig = alertFilterAutotune.tuneAlertFilter();
+      autotuneConfig.setConfiguration(tunedAlertFilterConfig);
     } catch (Exception e) {
-      LOG.warn("Failed to achieve init alert filter: {}", e.getMessage());
+      e.printStackTrace();
     }
+    // write to DB
+    autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig).toString();
+
     return Response.ok(autotuneId).build();
   }
 
