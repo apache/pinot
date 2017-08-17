@@ -173,6 +173,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   private volatile Buffer _currentBuffer;
   private final RealtimeIndexOffHeapMemoryManager _memoryManager;
   private final String _columnName;
+  private long _totalStringSize = 0;
 
   public MutableOffHeapByteArrayStore(RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
     _memoryManager = memoryManager;
@@ -220,6 +221,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
 
   // Adds a byte array and returns the index. No verification is made as to whether the byte array already exists or not
   public int add(byte[] value) {
+    _totalStringSize += value.length;
     Buffer buffer = _currentBuffer;
     int index = buffer.add(value);
     if (index < 0) {
@@ -248,5 +250,20 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       buffer.close();
     }
     _buffers.clear();
+  }
+
+  public long getTotalOffHeapMemUsed() {
+    long ret = 0;
+    for (Buffer buffer : _buffers) {
+      ret += buffer.getSize();
+    }
+    return ret;
+  }
+
+  public long getAvgValueSize() {
+    if (_numElements > 0) {
+      return _totalStringSize / _numElements;
+    }
+    return 0;
   }
 }

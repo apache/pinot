@@ -162,4 +162,9 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
       _max = value;
     }
   }
+
+  @Override
+  public long getTotalOffHeapMemUsed() {
+    return super.getTotalOffHeapMemUsed() + V1Constants.Numbers.FLOAT_SIZE * length();
+  }
 }
