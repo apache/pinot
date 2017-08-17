@@ -16,20 +16,6 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -52,7 +38,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.RealtimeSegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
@@ -64,13 +50,27 @@ import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.yammer.metrics.core.Meter;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import kafka.message.MessageAndOffset;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
  */
-public class LLRealtimeSegmentDataManager extends SegmentDataManager {
+public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected enum State {
     // The state machine starts off with this state. While in this state we consume kafka events
     // and index them in memory. We continue to be in this state until the end criteria is satisfied
@@ -934,9 +934,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _segmentMaxRowCount = segmentMaxRowCount;
 
     // Start new realtime segment
-    _realtimeSegment = new RealtimeSegmentImpl(schema, _segmentMaxRowCount, tableConfig.getTableName(),
-        segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics, _invertedIndexColumns,
-        indexLoadingConfig.getRealtimeAvgMultiValueCount(), _noDictionaryColumns);
+    _realtimeSegment = new RealtimeSegmentImpl(_serverMetrics, this, indexLoadingConfig, _segmentMaxRowCount,
+        _kafkaTopic);
     _realtimeSegment.setSegmentMetadata(segmentZKMetadata, schema);
 
     // Create message decoder
@@ -1048,4 +1047,30 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   public int getMaxTimeForConsumingToOnlineSec() {
     return _maxTimeForConsumingToOnlineSec;
   }
+
+  @Override
+  public String getTableName() {
+    return _tableName;
+  }
+
+  @Override
+  public Schema getSchema() {
+    return _schema;
+  }
+
+  @Override
+  public List<String> getNoDictionaryColumns() {
+    return _noDictionaryColumns;
+  }
+
+  @Override
+  public List<String> getInvertedIndexColumns() {
+    return _invertedIndexColumns;
+  }
+
+  @Override
+  public File getTableDataDir() {
+    return new File(_resourceDataDir);
+  }
+
 }

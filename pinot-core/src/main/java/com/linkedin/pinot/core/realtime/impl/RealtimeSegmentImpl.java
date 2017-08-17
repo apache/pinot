@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
+import com.linkedin.pinot.core.data.manager.offline.RealtimeSegmentDataManager;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -108,19 +110,22 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   // Maximum number of multi-values per row. We assert on this.
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
 
-  public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName,
-      ServerMetrics serverMetrics, List<String> invertedIndexColumns, int avgMultiValueCount,
-      List<String> noDictionaryColumns)
+  public RealtimeSegmentImpl(ServerMetrics serverMetrics, RealtimeSegmentDataManager segmentDataManager,
+      IndexLoadingConfig indexLoadingConfig, int capacity, String streamName)
   {
     // initial variable setup
-    this.segmentName = segmentName;
+    this.segmentName = segmentDataManager.getSegmentName();
     this.serverMetrics = serverMetrics;
     LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class.getName() + "_" + segmentName + "_" + streamName);
-    dataSchema = schema;
+    dataSchema = segmentDataManager.getSchema();
     dictionaryMap = new HashMap<String, MutableDictionary>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
     outgoingTimeColumnName = dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName();
     this.memoryManager = new DirectMemoryManager(segmentName);
+    final List<String> noDictionaryColumns = segmentDataManager.getNoDictionaryColumns();
+    final List<String> invertedIndexColumns = segmentDataManager.getInvertedIndexColumns();
+    final String tableName = segmentDataManager.getTableName();
+    final int avgMultiValueCount = indexLoadingConfig.getRealtimeAvgMultiValueCount();
 
     for (final String column : noDictionaryColumns) {
       // Not all no-dictionary columns can be so while the segment is being consumed.
@@ -156,22 +161,22 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     // docId generator and time granularity converter
     docIdGenerator = new AtomicInteger(-1);
-    incomingGranularitySpec = schema.getTimeFieldSpec().getIncomingGranularitySpec();
-    outgoingGranularitySpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
+    incomingGranularitySpec = dataSchema.getTimeFieldSpec().getIncomingGranularitySpec();
+    outgoingGranularitySpec = dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec();
     timeConverter = TimeConverterProvider.getTimeConverter(incomingGranularitySpec, outgoingGranularitySpec);
 
     // forward index and inverted index setup
     columnIndexReaderWriterMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
 
-    for (String dimension : schema.getDimensionNames()) {
+    for (String dimension : dataSchema.getDimensionNames()) {
       if (invertedIndexColumns.contains(dimension)) {
         invertedIndexMap.put(dimension, new DimensionInvertertedIndex(dimension));
       }
-      if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
+      if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
         int colSize = V1Constants.Numbers.INTEGER_SIZE;
         if (consumingNoDictionaryColumns.contains(dimension)) {
-          colSize = getColWidth(schema.getFieldSpecFor(dimension).getDataType());
+          colSize = getColWidth(dataSchema.getFieldSpecFor(dimension).getDataType());
         }
         columnIndexReaderWriterMap.put(dimension,
               new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize, memoryManager, dimension));
@@ -183,13 +188,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
     }
 
-    for (String metric : schema.getMetricNames()) {
+    for (String metric : dataSchema.getMetricNames()) {
       if (invertedIndexColumns.contains(metric)) {
         invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
       }
       int colSize = V1Constants.Numbers.INTEGER_SIZE;
       if (consumingNoDictionaryColumns.contains(metric)) {
-        colSize = getColWidth(schema.getFieldSpecFor(metric).getDataType());
+        colSize = getColWidth(dataSchema.getFieldSpecFor(metric).getDataType());
       }
       columnIndexReaderWriterMap.put(metric,
           new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize, memoryManager, metric));

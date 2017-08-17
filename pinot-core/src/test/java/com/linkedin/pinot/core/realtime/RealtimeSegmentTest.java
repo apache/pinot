@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime;
 
+import com.linkedin.pinot.core.data.manager.offline.RealtimeSegmentDataManager;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -49,6 +51,9 @@ import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.RealtimeSegmentImplTest;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
+
+import static org.mockito.Mockito.*;
+
 
 public class RealtimeSegmentTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
@@ -86,8 +91,17 @@ public class RealtimeSegmentTest {
 
     List<String> invertedIdxCols = new ArrayList<>();
     invertedIdxCols.add("count");
-    segmentWithInvIdx = new RealtimeSegmentImpl(schema, 100000, tableName, "noSegment", AVRO_DATA, new ServerMetrics(new MetricsRegistry()),
-        invertedIdxCols, 2, new ArrayList<String>());
+    RealtimeSegmentDataManager segmentDataManager = mock(RealtimeSegmentDataManager.class);
+    when(segmentDataManager.getSegmentName()).thenReturn("noSegment");
+    when(segmentDataManager.getTableName()).thenReturn(tableName);
+    when(segmentDataManager.getInvertedIndexColumns()).thenReturn(invertedIdxCols);
+    when(segmentDataManager.getNoDictionaryColumns()).thenReturn(new ArrayList<String>());
+    when(segmentDataManager.getSchema()).thenReturn(schema);
+
+    IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
+    when(indexLoadingConfig.getRealtimeAvgMultiValueCount()).thenReturn(2);
+    segmentWithInvIdx = new RealtimeSegmentImpl(new ServerMetrics(new MetricsRegistry()), segmentDataManager,
+        indexLoadingConfig, 100000, AVRO_DATA);
     segmentWithoutInvIdx = RealtimeSegmentImplTest.createRealtimeSegmentImpl(schema, 100000, tableName, "noSegment",
         AVRO_DATA, new ServerMetrics(new MetricsRegistry()));
     GenericRow row = provider.next(new GenericRow());

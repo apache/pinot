@@ -15,6 +15,14 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.manager.offline.RealtimeSegmentDataManager;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,12 +30,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.yammer.metrics.core.MetricsRegistry;
+
+import static org.mockito.Mockito.*;
 
 
 /**
@@ -36,8 +40,17 @@ import com.yammer.metrics.core.MetricsRegistry;
 public class RealtimeSegmentImplTest {
   public static RealtimeSegmentImpl createRealtimeSegmentImpl(Schema schema, int sizeThresholdToFlushSegment, String tableName, String segmentName, String streamName,
       ServerMetrics serverMetrics) throws IOException {
-    return new RealtimeSegmentImpl(schema, sizeThresholdToFlushSegment, tableName, segmentName, streamName, serverMetrics, new ArrayList<String>(),
-        2, new ArrayList<String>());
+    RealtimeSegmentDataManager segmentDataManager = mock(RealtimeSegmentDataManager.class);
+    when(segmentDataManager.getSchema()).thenReturn(schema);
+    when(segmentDataManager.getTableName()).thenReturn(tableName);
+    when(segmentDataManager.getNoDictionaryColumns()).thenReturn(new ArrayList<String>());
+    when(segmentDataManager.getSegmentName()).thenReturn(segmentName);
+    when(segmentDataManager.getInvertedIndexColumns()).thenReturn(new ArrayList<String>());
+
+    IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
+    when(indexLoadingConfig.getRealtimeAvgMultiValueCount()).thenReturn(2);
+    return new RealtimeSegmentImpl(serverMetrics, segmentDataManager, indexLoadingConfig, sizeThresholdToFlushSegment,
+        streamName);
   }
   @Test
   public void testDropInvalidRows() throws Exception {
