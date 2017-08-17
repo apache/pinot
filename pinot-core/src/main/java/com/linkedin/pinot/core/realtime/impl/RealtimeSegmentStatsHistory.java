@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
@@ -37,6 +36,7 @@ import javax.annotation.Nullable;
  */
 public class RealtimeSegmentStatsHistory implements Serializable {
   private static final long serialVersionUID = 1L;  // Change this if a new field is added to this class
+  // XXX MAX_NUM_ENTRIES should be a final variable, but we need to modify it for testing.
   private static int MAX_NUM_ENTRIES = 16;  // Max number of past segments for which stats are kept
   // Fields to be serialzied.
   private int _cursor = 0;
@@ -254,20 +254,23 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   }
 
   public synchronized void serializeInto(File outFile) throws IOException {
-    OutputStream os = new FileOutputStream(outFile);
-    ObjectOutputStream obos = new ObjectOutputStream(os);
-    obos.writeObject(this);
-    obos.flush();
-    os.close();
+    try (OutputStream os = new FileOutputStream(outFile);
+        ObjectOutputStream obos = new ObjectOutputStream(os)
+    ) {
+      obos.writeObject(this);
+      obos.flush();
+      os.flush();
+    }
   }
 
   public static RealtimeSegmentStatsHistory deserialzeFrom(File inFile) throws IOException, ClassNotFoundException {
-    InputStream is = new FileInputStream(inFile);
-    ObjectInputStream obis = new ObjectInputStream(is);
-    RealtimeSegmentStatsHistory history = (RealtimeSegmentStatsHistory)(obis.readObject());
-    is.close();
-    history.normalize();
-    return history;
+    try (FileInputStream is = new FileInputStream(inFile);
+        ObjectInputStream obis = new ObjectInputStream(is)
+    ) {
+      RealtimeSegmentStatsHistory history = (RealtimeSegmentStatsHistory) (obis.readObject());
+      history.normalize();
+      return history;
+    }
   }
 
   private int getNumntriesToScan() {
