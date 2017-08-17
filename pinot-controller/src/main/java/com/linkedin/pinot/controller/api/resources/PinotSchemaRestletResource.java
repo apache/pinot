@@ -16,28 +16,20 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.glassfish.jersey.media.multipart.FormDataBodyPart;
-import org.glassfish.jersey.media.multipart.FormDataMultiPart;
-import org.json.JSONArray;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -50,6 +42,13 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.glassfish.jersey.media.multipart.FormDataBodyPart;
+import org.glassfish.jersey.media.multipart.FormDataMultiPart;
+import org.json.JSONArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.SCHEMA_TAG)
@@ -84,14 +83,16 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Get a schema", notes = "Gets a schema by name")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 500, message = "Internal error")})
-  public Schema getSchema(
+  public String getSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName) {
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
       throw new WebApplicationException("Schema not found", Response.Status.NOT_FOUND);
     }
-    return schema;
+    // We need to return schema.getJSONSchema(). Returning schema ends up with many extra fields, "jsonSchema" being one of them,
+    // Others like fieldSpecMap, etc., serialzing the entire Schema object.
+    return schema.getJSONSchema();
   }
 
   @DELETE
