@@ -180,7 +180,7 @@ public class MCombineGroupByOperator extends BaseOperator {
               Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
               while (groupKeyIterator.hasNext()) {
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-                String groupKeyString = groupKey.getStringKey();
+                String groupKeyString = groupKey._stringKey;
 
                 // HashCode method might return negative value, make it non-negative
                 int lockIndex = (groupKeyString.hashCode() & Integer.MAX_VALUE) % NUM_LOCKS;

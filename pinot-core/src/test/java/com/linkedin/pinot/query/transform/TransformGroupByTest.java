@@ -319,7 +319,7 @@ public class TransformGroupByTest {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       Double actual = (Double) groupByResult.getResultForKey(groupKey, 0 /* aggregation function index */);
 
-      String stringKey = groupKey.getStringKey();
+      String stringKey = groupKey._stringKey;
       Double expected = expectedValuesMap.get(stringKey);
       Assert.assertNotNull(expected, "Unexpected key in actual result: " + stringKey);
       Assert.assertEquals(actual, expected, EPSILON);

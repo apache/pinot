@@ -295,7 +295,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         _groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(transformBlock, _groupByColumns);
       }
     } else {
-      _groupKeyGenerator = new DefaultGroupKeyGenerator(transformBlock, _groupByColumns);
+      _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformBlock, _groupByColumns);
     }
 
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();

@@ -17,7 +17,12 @@ package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.core.operator.ExecutionStatistics;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
+import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.List;
 import org.testng.Assert;
 
@@ -26,7 +31,52 @@ public class QueriesTestUtils {
   private QueriesTestUtils() {
   }
 
-  public static void verifyAggregationResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
+  public static void testInnerSegmentExecutionStatistics(ExecutionStatistics executionStatistics,
+      long expectedNumDocsScanned, long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter,
+      long expectedNumTotalRawDocs) {
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), expectedNumDocsScanned);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), expectedNumEntriesScannedInFilter);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), expectedNumEntriesScannedPostFilter);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), expectedNumTotalRawDocs);
+  }
+
+  public static void testInnerSegmentAggregationResult(List<Object> aggregationResult, long expectedCountResult,
+      long expectedSumResult, int expectedMaxResult, int expectedMinResult, long expectedAvgResultSum,
+      long expectedAvgResultCount) {
+    Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), expectedCountResult);
+    Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), expectedSumResult);
+    Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), expectedMaxResult);
+    Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), expectedMinResult);
+    AvgPair avgResult = (AvgPair) aggregationResult.get(4);
+    Assert.assertEquals((long) avgResult.getSum(), expectedAvgResultSum);
+    Assert.assertEquals(avgResult.getCount(), expectedAvgResultCount);
+  }
+
+  public static void testInnerSegmentAggregationGroupByResult(AggregationGroupByResult aggregationGroupByResult,
+      String expectedGroupKey, long expectedCountResult, long expectedSumResult, int expectedMaxResult,
+      int expectedMinResult, long expectedAvgResultSum, long expectedAvgResultCount) {
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+    while (groupKeyIterator.hasNext()) {
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      if (groupKey._stringKey.equals(expectedGroupKey)) {
+        Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 0)).longValue(),
+            expectedCountResult);
+        Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 1)).longValue(),
+            expectedSumResult);
+        Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 2)).intValue(),
+            expectedMaxResult);
+        Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(groupKey, 3)).intValue(),
+            expectedMinResult);
+        AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(groupKey, 4);
+        Assert.assertEquals((long) avgResult.getSum(), expectedAvgResultSum);
+        Assert.assertEquals(avgResult.getCount(), expectedAvgResultCount);
+        return;
+      }
+    }
+    Assert.fail("Failed to find group key: " + expectedGroupKey);
+  }
+
+  public static void testInterSegmentAggregationResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
       String[] expectedAggregationResults) {
     Assert.assertEquals(brokerResponse.getNumDocsScanned(), expectedNumDocsScanned);
