@@ -18,6 +18,7 @@ import java.util.List;
 
 import java.util.Map;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -43,9 +44,9 @@ public class EmailResource {
   private ThirdEyeConfiguration thirdeyeConfiguration = null;
   private AlertFilterFactory alertFilterFactory;
 
-  public EmailResource(ThirdEyeConfiguration thirdeyeConfiguration) {
+  public EmailResource(ThirdEyeConfiguration thirdEyeConfiguration) {
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
-    this.thirdeyeConfiguration = thirdeyeConfiguration;
+    this.thirdeyeConfiguration = thirdEyeConfiguration;
     this.alertFilterFactory = new AlertFilterFactory(this.thirdeyeConfiguration.getAlertFilterConfigPath());
   }
 
@@ -111,7 +112,7 @@ public class EmailResource {
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort) {
+      @QueryParam("smtpPort") Integer smtpPort) {
     if (Strings.isNullOrEmpty(datasets)) {
       throw new WebApplicationException("datasets null or empty : " + datasets);
     }
@@ -122,11 +123,17 @@ public class EmailResource {
     if (Strings.isNullOrEmpty(toAddr)) {
       throw new WebApplicationException("Empty : list of recipients" + toAddr);
     }
-    if(Strings.isNullOrEmpty(teHost)) {
-      throw new WebApplicationException("Invalid TE host" + teHost);
+
+    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
+    if (!Strings.isNullOrEmpty(smtpHost)) {
+      smtpConfiguration.setSmtpHost(smtpHost);
     }
-    if (Strings.isNullOrEmpty(smtpHost)) {
-      throw new WebApplicationException("invalid smtp host" + smtpHost);
+    if (smtpPort != null) {
+      smtpConfiguration.setSmtpPort(smtpPort);
+    }
+
+    if(Strings.isNullOrEmpty(teHost)) {
+      teHost = thirdeyeConfiguration.getDashboardHost();
     }
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
@@ -135,10 +142,6 @@ public class EmailResource {
       anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
     }
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
-    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
-    smtpConfiguration.setSmtpHost(smtpHost);
-    smtpConfiguration.setSmtpPort(smtpPort);
-
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
     configuration.setPhantomJsPath(thirdeyeConfiguration.getPhantomJsPath());
@@ -178,7 +181,7 @@ public class EmailResource {
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort,
+      @QueryParam("smtpPort") Integer smtpPort,
       @QueryParam("phantomJsPath") String phantomJsPath) {
     if (Strings.isNullOrEmpty(metrics)) {
       throw new WebApplicationException("metrics null or empty: " + metrics);
@@ -190,11 +193,16 @@ public class EmailResource {
     if (Strings.isNullOrEmpty(toAddr)) {
       throw new WebApplicationException("Empty : list of recipients" + toAddr);
     }
-    if(Strings.isNullOrEmpty(teHost)) {
-      throw new WebApplicationException("Invalid TE host" + teHost);
+    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
+    if (!Strings.isNullOrEmpty(smtpHost)) {
+      smtpConfiguration.setSmtpHost(smtpHost);
     }
-    if (Strings.isNullOrEmpty(smtpHost)) {
-      throw new WebApplicationException("invalid smtp host" + smtpHost);
+    if (smtpPort != null) {
+      smtpConfiguration.setSmtpPort(smtpPort);
+    }
+
+    if(Strings.isNullOrEmpty(teHost)) {
+      teHost = thirdeyeConfiguration.getDashboardHost();
     }
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
@@ -203,10 +211,6 @@ public class EmailResource {
       anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
     }
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
-    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
-    smtpConfiguration.setSmtpHost(smtpHost);
-    smtpConfiguration.setSmtpPort(smtpPort);
-
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
     configuration.setPhantomJsPath(phantomJsPath);
@@ -227,7 +231,7 @@ public class EmailResource {
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort,
+      @QueryParam("smtpPort") Integer smtpPort,
       @QueryParam("phantomJsPath") String phantomJsPath) {
     if (Strings.isNullOrEmpty(functions)) {
       throw new WebApplicationException("metrics null or empty: " + functions);
@@ -242,12 +246,24 @@ public class EmailResource {
     if (Strings.isNullOrEmpty(toAddr)) {
       throw new WebApplicationException("Empty : list of recipients" + toAddr);
     }
+
+    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
+
+    if (!Strings.isNullOrEmpty(smtpHost)) {
+      smtpConfiguration.setSmtpHost(smtpHost);
+    }
+    if (smtpPort != null) {
+      smtpConfiguration.setSmtpPort(smtpPort);
+    }
+
     if(Strings.isNullOrEmpty(teHost)) {
-      throw new WebApplicationException("Invalid TE host" + teHost);
+      teHost = thirdeyeConfiguration.getDashboardHost();
     }
-    if (Strings.isNullOrEmpty(smtpHost)) {
-      throw new WebApplicationException("invalid smtp host" + smtpHost);
+
+    if (Strings.isNullOrEmpty(fromAddr)) {
+      fromAddr = thirdeyeConfiguration.getFailureFromAddress();
     }
+
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForFunctions(functionList, startTime, endTime);
@@ -255,10 +271,6 @@ public class EmailResource {
       anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
     }
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
-    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
-    smtpConfiguration.setSmtpHost(smtpHost);
-    smtpConfiguration.setSmtpPort(smtpPort);
-
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
     configuration.setPhantomJsPath(phantomJsPath);
@@ -278,12 +290,36 @@ public class EmailResource {
       @QueryParam("subject") String subject,
       @QueryParam("text") String text,
       @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort
+      @QueryParam("smtpPort") Integer smtpPort
       ){
+
+    if (Strings.isNullOrEmpty(toAddr)) {
+      throw new WebApplicationException("Empty : list of recipients" + toAddr);
+    }
+
+    if (Strings.isNullOrEmpty(smtpHost)) {
+      smtpHost = thirdeyeConfiguration.getSmtpHost();
+    }
+
+    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
+    if (smtpPort != null) {
+      smtpConfiguration.setSmtpPort(smtpPort);
+    }
+
+    if (smtpHost != null) {
+      smtpConfiguration.setSmtpHost(smtpHost);
+    }
+
+    if (Strings.isNullOrEmpty(fromAddr)) {
+      fromAddr = thirdeyeConfiguration.getFailureFromAddress();
+    }
+
+    if (Strings.isNullOrEmpty(toAddr)) {
+      toAddr = thirdeyeConfiguration.getFailureToAddress();
+    }
+
     HtmlEmail email = new HtmlEmail();
-    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
-    smtpConfiguration.setSmtpHost(smtpHost);
-    smtpConfiguration.setSmtpPort(smtpPort);
+
     try {
       EmailHelper.sendEmailWithTextBody(email, smtpConfiguration, subject, text,
          fromAddr, toAddr
