@@ -16,11 +16,6 @@
 
 package com.linkedin.pinot.controller.api.resources;
 
-import java.util.Map;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -28,6 +23,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -36,9 +32,12 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.TABLE_TAG)
@@ -94,12 +93,12 @@ public class TableViews {
     } else if (view.equalsIgnoreCase(EXTERNALVIEW)) {
       tableView = getTableExternalView(tableName, tableType);
     } else {
-      throw new WebApplicationException("Bad view name: " + view + ". Expected idealstate or externalview",
+      throw new ControllerApplicationException(LOGGER, "Bad view name: " + view + ". Expected idealstate or externalview",
           Response.Status.BAD_REQUEST);
     }
 
     if (tableView.offline == null && tableView.realtime == null) {
-      throw new WebApplicationException("Table not found", Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, "Table not found", Response.Status.NOT_FOUND);
     }
     return tableView;
   }
@@ -134,8 +133,8 @@ public class TableViews {
     try {
       return CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
     } catch (IllegalArgumentException e) {
-      LOGGER.info("Illegal table type '{}'", tableTypeStr);
-      throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'", Response.Status.BAD_REQUEST);
+      String errStr = "Illegal table type '" + tableTypeStr + "'";
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     }
   }
 

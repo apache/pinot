@@ -15,12 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -31,9 +26,11 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
@@ -59,9 +56,8 @@ public class PinotTableMetadataConfigs {
         tableConfig.getCustomConfig());
       return new SuccessResponse("Successfully updated " + tableName + " configuration");
     } catch (Exception e) {
-      LOGGER.error("Error while updating table configuration, table: {}, error: {}", tableName, e);
-      throw new WebApplicationException("Server error while update table configuration",
-          Response.Status.INTERNAL_SERVER_ERROR);
+      String errStr = "Error while updating table configuration, table: " + tableName;
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 }
