@@ -274,17 +274,13 @@ public class DetectionJobResource {
     }
 
     // create initial tuning and apply filter
-    try{
-      Response initialAutotuneResponse =
-          initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", 10, "", "");
-      if (initialAutotuneResponse.getEntity() != null) {
-        updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
-        LOG.info("Initial alert filter applied");
-      } else {
-        LOG.info("AutoTune doesn't applied");
-      }
-    } catch (Exception e) {
-      LOG.warn("Exception with initiate tuning", e.getMessage());
+    Response initialAutotuneResponse =
+        initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", 10, "", "");
+    if (initialAutotuneResponse.getEntity() != null) {
+      updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
+      LOG.info("Initial alert filter applied");
+    } else {
+      LOG.info("AutoTune doesn't applied");
     }
 
 
