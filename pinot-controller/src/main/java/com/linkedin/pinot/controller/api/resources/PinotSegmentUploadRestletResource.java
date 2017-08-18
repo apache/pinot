@@ -159,18 +159,17 @@ public class PinotSegmentUploadRestletResource {
     try {
       provider = new FileUploadPathProvider(_controllerConf);
     } catch (Exception e) {
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     try {
       segmentName = URLDecoder.decode(segmentName, "UTF-8");
     } catch (UnsupportedEncodingException e) {
       String errStr = "Could not decode segment name '" + segmentName + "'";
-      LOGGER.info(errStr);
-      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
     final File dataFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
     if (!dataFile.exists()) {
-      throw new WebApplicationException("Segment " + segmentName + " or table " + tableName + " not found",
+      throw new ControllerApplicationException(LOGGER, "Segment " + segmentName + " or table " + tableName + " not found",
           Response.Status.NOT_FOUND);
     }
     Response.ResponseBuilder builder = Response.ok(dataFile);
@@ -189,14 +188,13 @@ public class PinotSegmentUploadRestletResource {
   ) {
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
-      throw new WebApplicationException("Table type must not be null", Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
     }
     try {
       segmentName = URLDecoder.decode(segmentName, "UTF-8");
     } catch (UnsupportedEncodingException e) {
       String errStr = "Could not decode segment name '" + segmentName + "'";
-      LOGGER.info(errStr);
-      throw new WebApplicationException(errStr, Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
     PinotSegmentRestletResource.toggleStateInternal(tableName, StateType.DROP, tableType, segmentName, _pinotHelixResourceManager);
 
@@ -213,7 +211,7 @@ public class PinotSegmentUploadRestletResource {
   ) {
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
-      throw new WebApplicationException("Table type must not be null", Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
     }
     PinotSegmentRestletResource.toggleStateInternal(tableName, StateType.DROP, tableType, null, _pinotHelixResourceManager);
 
@@ -284,9 +282,8 @@ public class PinotSegmentUploadRestletResource {
             String errorMsg =
                 String.format("Failed to get download Uri for upload file type: %s, with error %s", uploadType,
                     e.getMessage());
-            LOGGER.warn(errorMsg);
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-            throw new WebApplicationException(errorMsg, Response.Status.BAD_REQUEST);
+            throw new ControllerApplicationException(LOGGER, errorMsg, Response.Status.BAD_REQUEST);
           }
 
           // Get segment fetcher based on the download URI
@@ -295,9 +292,8 @@ public class PinotSegmentUploadRestletResource {
             segmentFetcher = SegmentFetcherFactory.getSegmentFetcherBasedOnURI(downloadURI);
           } catch (Exception e) {
             String errorMsg = String.format("Failed to get SegmentFetcher from download Uri: %s", downloadURI);
-            LOGGER.warn(errorMsg);
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-            throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
+            throw new ControllerApplicationException(LOGGER, errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
           }
 
           // Download segment tar to local.
@@ -307,9 +303,8 @@ public class PinotSegmentUploadRestletResource {
           } catch (Exception e) {
             String errorMsg = String.format("Failed to fetch segment tar from download Uri: %s to %s", downloadURI,
                 tempTarredSegmentFile.toString());
-            LOGGER.warn(errorMsg);
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-            throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
+            throw new ControllerApplicationException(LOGGER, errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
           }
           if (tempTarredSegmentFile.length() > 0) {
             found = true;
@@ -319,7 +314,7 @@ public class PinotSegmentUploadRestletResource {
         case TAR:
           Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
           if (!validateMultiPart(map, "UNKNOWN")) {
-            throw new WebApplicationException("Invalid multi-part form", Response.Status.BAD_REQUEST);
+            throw new ControllerApplicationException(LOGGER, "Invalid multi-part form", Response.Status.BAD_REQUEST);
           }
           String partName = map.keySet().iterator().next();
           FormDataBodyPart bodyPart = map.get(partName).get(0);
@@ -356,14 +351,13 @@ public class PinotSegmentUploadRestletResource {
       } else {
         // Some problem happened, sent back a simple line of text.
         String errorMsg = "No file was uploaded";
-        LOGGER.warn(errorMsg);
         _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-        throw new WebApplicationException(errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
+        throw new ControllerApplicationException(LOGGER, errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
       }
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
-      throw new WebApplicationException(e);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {
       FileUtils.deleteQuietly(tempTarredSegmentFile);
       FileUtils.deleteQuietly(tempSegmentDir);
@@ -379,17 +373,16 @@ public class PinotSegmentUploadRestletResource {
         ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), tableName);
 
     if (offlineTableConfig == null) {
-      LOGGER.info("Missing configuration for table: {} in helix", tableName);
-      throw new WebApplicationException("Missing table: " + tableName, Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, "Missing table: " + tableName, Response.Status.NOT_FOUND);
     }
 
     StorageQuotaChecker.QuotaCheckerResponse quotaResponse =
         checkStorageQuota(indexDir, segmentMetadata, offlineTableConfig);
     if (!quotaResponse.isSegmentWithinQuota) {
       // this is not an "error" hence we don't increment segment upload errors
-      LOGGER.info("Rejecting segment upload for table: {}, segment: {}, reason: {}", tableName, segmentName,
-          quotaResponse.reason);
-      throw new WebApplicationException(quotaResponse.reason, Response.Status.FORBIDDEN);
+      String errStr = "Rejecting segment upload for table: " + tableName + "segment: " +
+          segmentName + "reason: {}" + quotaResponse.reason;
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.FORBIDDEN);
     }
 
     PinotResourceManagerResponse response;
@@ -409,7 +402,7 @@ public class PinotSegmentUploadRestletResource {
 
     if (!response.isSuccessful()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-      throw new WebApplicationException("Error uploading segment", Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, "Error uploading segment", Response.Status.INTERNAL_SERVER_ERROR);
     }
     return response;
   }

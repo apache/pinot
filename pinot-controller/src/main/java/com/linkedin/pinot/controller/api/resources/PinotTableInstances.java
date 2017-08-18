@@ -15,21 +15,15 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import java.util.List;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.alibaba.fastjson.JSONArray;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -37,9 +31,12 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.TABLE_TAG)
@@ -118,9 +115,8 @@ public class PinotTableInstances {
       ret.put("server", servers);   // Keeping compatibility with previous API, so "server" and "brokers"
       return ret.toString();
     } catch (JSONException e) {
-      LOGGER.error("Error listing all table instances for table: {}", tableName, e);
-      throw new WebApplicationException("Failed to list instances for table " + tableName,
-          Response.Status.INTERNAL_SERVER_ERROR);
+      String errStr = "Error listing all table instances for table: " + tableName;
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
     private JSONObject getInstances(List<String> instanceList, TableType tableType)

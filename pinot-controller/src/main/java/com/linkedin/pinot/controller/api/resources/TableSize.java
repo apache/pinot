@@ -31,7 +31,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -78,7 +77,7 @@ public class TableSize {
     }
 
     if (tableSizeDetails == null) {
-      throw new WebApplicationException("Table " + tableName + " not found",
+      throw new ControllerApplicationException(LOGGER, "Table " + tableName + " not found",
           Response.Status.NOT_FOUND);
     }
     return tableSizeDetails;
