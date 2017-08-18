@@ -33,7 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@Api(tags = {"table", "tenant"})
+@Path("/")
+@Api(tags = {Constants.TABLE_TAG, Constants.TENANT_TAG})
 public class PinotTableTenantConfigs {
 
   @Inject
