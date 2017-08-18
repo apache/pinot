@@ -248,6 +248,7 @@ public class EmailResource {
     }
 
     SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
+
     if (!Strings.isNullOrEmpty(smtpHost)) {
       smtpConfiguration.setSmtpHost(smtpHost);
     }
@@ -300,18 +301,24 @@ public class EmailResource {
       smtpHost = thirdeyeConfiguration.getSmtpHost();
     }
 
-    if (smtpPort == null) {
-      smtpPort = thirdeyeConfiguration.getSmtpPort();
+    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
+    if (smtpPort != null) {
+      smtpConfiguration.setSmtpPort(smtpPort);
+    }
+
+    if (smtpHost != null) {
+      smtpConfiguration.setSmtpHost(smtpHost);
     }
 
     if (Strings.isNullOrEmpty(fromAddr)) {
       fromAddr = thirdeyeConfiguration.getFailureFromAddress();
     }
 
+    if (Strings.isNullOrEmpty(toAddr)) {
+      toAddr = thirdeyeConfiguration.getFailureToAddress();
+    }
+
     HtmlEmail email = new HtmlEmail();
-    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
-    smtpConfiguration.setSmtpHost(smtpHost);
-    smtpConfiguration.setSmtpPort(smtpPort);
 
     try {
       EmailHelper.sendEmailWithTextBody(email, smtpConfiguration, subject, text,
