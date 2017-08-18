@@ -27,7 +27,6 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,7 +38,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
@@ -346,10 +344,13 @@ public class AnomalyDetectionInputContextBuilder {
    * @return
    */
   public AnomalyDetectionInputContextBuilder fetchScalingFactors(DateTime windowStart, DateTime windowEnd) {
+    return fetchScalingFactors(anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+  }
+  public AnomalyDetectionInputContextBuilder fetchScalingFactors(List<Pair<Long, Long>> dataRangeIntervals) {
     List<ScalingFactor> scalingFactors = OverrideConfigHelper
         .getTimeSeriesScalingFactors(DAO_REGISTRY.getOverrideConfigDAO(), anomalyFunctionSpec.getCollection(),
             anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(),
-            anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+            dataRangeIntervals);
     this.anomalyDetectionInputContext.setScalingFactors(scalingFactors);
     return this;
   }
@@ -480,12 +481,8 @@ public class AnomalyDetectionInputContextBuilder {
 
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
-
-    DatasetConfigDTO dataset = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(anomalyFunctionSpec.getCollection());
-    boolean doRollUp = true;
-    if (!dataset.isAdditive()) {
-      doRollUp = false;
-    }
+    // if doRollUp, small categories (<1% to total) will be aggregated to "OTHER"
+    boolean doRollUp = false;  // do anomaly detection on every categories for the dimension to explore, no rollup
 
     TimeSeriesResponse timeSeriesResponse =
         getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges,

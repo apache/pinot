@@ -100,7 +100,7 @@ public class PinotTableRestletResource {
       JSONObject tableConfigJson = new JSONObject(tableConfigStr);
       tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       tableName = tableConfig.getTableName();
-    } catch (IOException | JSONException e) {
+    } catch (IOException | JSONException | IllegalArgumentException e) {
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
     }
     try {

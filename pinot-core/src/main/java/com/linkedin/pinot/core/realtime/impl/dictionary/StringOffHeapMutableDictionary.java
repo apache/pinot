@@ -151,4 +151,13 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
       }
     }
   }
+
+  @Override
+  public long getTotalOffHeapMemUsed() {
+    return super.getTotalOffHeapMemUsed() + _byteStore.getTotalOffHeapMemUsed();
+  }
+
+  public int getAvgStringSize() {
+    return (int)_byteStore.getAvgValueSize();
+  }
 }
