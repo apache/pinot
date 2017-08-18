@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.pinot.core.data.manager.offline;
+package com.linkedin.pinot.core.data.manager.realtime;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import java.io.File;
 import java.util.List;
 

@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime;
 
-import com.linkedin.pinot.core.data.manager.offline.RealtimeSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
