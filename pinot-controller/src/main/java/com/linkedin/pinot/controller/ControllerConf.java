@@ -142,7 +142,7 @@ public class ControllerConf extends PropertiesConfiguration {
   // A boolean to decide whether Jersey API should be the primary one. For now, we set this to be false,
   // but we turn it on to true when we are sure that jersey api has no backward compatibility problems.
   public boolean isJerseyAdminPrimary() {
-    return getBoolean(JERSEY_ADMIN_IS_PRIMARY, false);
+    return getBoolean(JERSEY_ADMIN_IS_PRIMARY, true);
   }
 
   public String getHelixClusterName() {
