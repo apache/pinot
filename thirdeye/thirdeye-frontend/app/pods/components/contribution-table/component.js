@@ -43,14 +43,15 @@ export default Ember.Component.extend({
   dimensions: [],
   start: null,
   end: null,
-  loading: false,
+
+  stopLoading: () => {},
 
   // This is needed so that a loading spinner appears for long rendering
-  didUpdateAttrs(...args) {
-    Ember.run.later(() => {
-      this._super(args);
+  didRender(...args) {
+    this._super(args);
 
-      this.set('loading', false);
+    Ember.run.later(() => {
+      this.attrs.stopLoading();
     });
   },
 

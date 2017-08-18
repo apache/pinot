@@ -24,7 +24,9 @@ export default Ember.Route.extend({
     const {
       dimension = 'All',
       analysisStart,
-      analysisEnd
+      analysisEnd,
+      displayStart,
+      displayEnd
     } = transition.queryParams;
 
     const start = analysisStart || initStart;
@@ -44,31 +46,76 @@ export default Ember.Route.extend({
       });
     });
 
-    return {};
+    return {
+      displayStart,
+      displayEnd
+    };
+  },
+
+  setupController(controller, model) {
+    this._super(controller, model);
+
+    const {
+      displayStart,
+      displayEnd
+    } = model;
+
+    controller.setProperties({
+      dimensionsStart: Number(displayStart),
+      dimensionsEnd: Number(displayEnd),
+      displayStart: Number(displayStart),
+      displayEnd: Number(displayEnd)
+    });
   },
 
   actions: {
     // Dispatches a redux action on query param change
-    // to fetch events in the new date range
     queryParamsDidChange(changedParams, oldParams) {
       const redux = this.get('redux');
+      const controller = this.controller;
       let {
         analysisStart: start,
-        analysisEnd: end
+        analysisEnd: end,
+        displayStart,
+        displayEnd
       } = changedParams;
       const params = Object.keys(changedParams || {});
 
-      if (params.length && (start || end)) {
-        start = start || oldParams.analysisStart;
-        end = end || oldParams.analysisEnd;
+      if (params.length) {
+        redux.dispatch(Actions.loading());
+        if ((start || end)) {
+          start = start || oldParams.analysisStart;
+          end = end || oldParams.analysisEnd;
+
+          Ember.run.later(() => {
+            redux.dispatch(Actions.updateDates(
+              Number(start),
+              Number(end)
+            ));
+          });
+        }
+
+        if (controller && displayStart) {
+
+          controller.setProperties({
+            displayStart: Number(displayStart),
+            dimensionsStart: Number(displayStart)
+          });
+        }
+
+        if (controller && displayEnd) {
+
+          controller.setProperties({
+            displayEnd: Number(displayEnd),
+            dimensionsEnd: Number(displayEnd)
+          });
+        }
 
         Ember.run.later(() => {
-          redux.dispatch(Actions.updateDates(
-            Number(start),
-            Number(end)
-          ));
+          redux.dispatch(Actions.loaded());
         });
       }
+
       this._super(...arguments);
 
       return true;

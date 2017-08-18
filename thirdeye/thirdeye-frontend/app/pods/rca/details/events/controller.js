@@ -2,8 +2,11 @@ import Ember from 'ember';
 import moment from 'moment';
 
 export default Ember.Controller.extend({
-  eventStart: null,
-  eventEnd: null,
+  eventStart: 0,
+  eventEnd: 0,
+  displayStart: 0,
+  displayEnd: 0,
+
   dateFormat: 'MMM D, YYYY hh:mm a',
 
   actions: {
@@ -22,7 +25,7 @@ export default Ember.Controller.extend({
      * Handles subchart date change (debounced)
      */
     setDateParams([start, end]) {
-      Ember.run.debounce(this, this.get('actions.setNewDate'), { start, end }, 1000);
+      Ember.run.debounce(this, this.get('actions.setNewDate'), { start, end }, 500);
     }
   }
 });

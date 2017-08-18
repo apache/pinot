@@ -39,6 +39,9 @@ function loadEvents(response) {
   };
 }
 
+/**
+ * Set Events Status to loaded
+ */
 function loaded() {
   return {
     type: ActionTypes.LOADED
@@ -177,7 +180,10 @@ const assignHumanTimeInfo = (event) => {
  */
 function fetchEvents(start, end, mode) {
   return (dispatch, getState) => {
-    const { primaryMetric } = getState();
+    const {
+      primaryMetric,
+      events: eventsState
+    } = getState();
 
     const {
       primaryMetricId: metricId,
@@ -185,8 +191,9 @@ function fetchEvents(start, end, mode) {
       currentStart = moment(currentEnd).subtract(1, 'week').valueOf(),
       compareMode
     } = primaryMetric;
+    const { events } = eventsState;
 
-    if (!metricId) {return;}
+    if (!metricId || events.length) { return; }
 
     const analysisStart = currentStart;
     const analysisEnd = currentEnd;
@@ -205,8 +212,6 @@ function fetchEvents(start, end, mode) {
     return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=thirdeye:metric:${metricId}`)
       .then(res => res.json())
       .then((res) => {
-        // hidding informed events
-
         return _.uniqBy(res, 'urn')
           .filter(event => event.eventType !== 'informed')
           .map(adjustHolidayTimestamp)
@@ -231,8 +236,8 @@ function updateDates(start, end, compareMode) {
   return (dispatch, getState) => {
     const { primaryMetric } = getState();
     compareMode = compareMode || primaryMetric.compareMode;
-
-    return dispatch(fetchEvents(start, end, compareMode));
+    return dispatch(reset())
+      .then(() => dispatch(fetchEvents(start, end, compareMode)));
   };
 }
 

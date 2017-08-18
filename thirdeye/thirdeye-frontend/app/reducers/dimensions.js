@@ -108,6 +108,14 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
       });
     }
 
+    case ActionTypes.LOADED: {
+      return Object.assign({}, state, {
+        loaded: true,
+        loading: false,
+        failed: false
+      });
+    }
+
     case ActionTypes.REQUEST_FAIL:
       return Object.assign({}, state, {
         loaded: false,

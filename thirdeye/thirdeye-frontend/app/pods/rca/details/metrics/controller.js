@@ -12,11 +12,18 @@ export default Ember.Controller.extend({
   splitViewLoading: false,
   dateFormat: 'MMM D, YYYY hh:mm a',
 
+  analysisStart: 0,
+  analysisEnd: 0,
+
+  displayStart:0,
+  displayEnd: 0,
+
+  subchartStart: 0,
+  subchartEnd: 0,
   // Ember concurrency task that sets new analysis start and end
   dateChangeTask: task(function* ([start, end]) {
-    yield timeout(600);
+    yield timeout(500);
 
-    this.set('loading', true);
     let startDate = moment(start).valueOf();
     let endDate = moment(end).valueOf();
 
@@ -31,6 +38,7 @@ export default Ember.Controller.extend({
   actions: {
     // Handles subgraph date change
     onDateChange(date) {
+      this.set('loading', true);
       const mostRecentTask = this.get('mostRecentTask');
       mostRecentTask && mostRecentTask.cancel();
 
@@ -39,6 +47,10 @@ export default Ember.Controller.extend({
       this.set('mostRecentTask', taskInstance);
 
       return date;
+    },
+
+    onRendering() {
+      this.set('loading', false);
     },
 
     /**
