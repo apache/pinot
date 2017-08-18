@@ -148,21 +148,27 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
         segmentFileName = name;
       }
     }
-    File file = new File(segmentTarDir, segmentFileName);
-    long segmentLength = file.length();
-    final File segmentTarDir1 = new File(_tarDir, segmentName);
-    FileUtils.deleteQuietly(segmentTarDir);
+    final File generatedFile = new File(segmentTarDir, segmentFileName);
+    Assert.assertTrue(generatedFile.exists());
+    final long segmentLength = generatedFile.length();
+    final File tmpGeneratedFile = new File(segmentTarDir, segmentFileName + "." + System.currentTimeMillis());
+    generatedFile.renameTo(tmpGeneratedFile);
+    LOGGER.info("Stashed segment away in {}", tmpGeneratedFile.getAbsolutePath());
     new Thread(new Runnable() {
       @Override
       public void run() {
         try {
-          buildSegment(segmentTarDir1, avroFile, segmentIndex, segmentName, 5);
+          // Make the segment file available after 5s
+          Thread.sleep(5000);
+          tmpGeneratedFile.renameTo(generatedFile);
+          LOGGER.info("Segment moved to {}", generatedFile.getAbsolutePath());
         } catch (Exception e) {
         }
       }
     }).start();
 
-    FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentFileName, file,
+    LOGGER.info("Uploading {} of length {}", generatedFile.getAbsolutePath(), segmentLength);
+    FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentFileName, generatedFile,
         segmentLength, 5, 5);
 
     avroFile.delete();

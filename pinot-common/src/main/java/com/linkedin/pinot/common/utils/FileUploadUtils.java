@@ -137,7 +137,7 @@ public class FileUploadUtils {
           throw new RuntimeException(e);
         }
         LOGGER.warn("Retry " + numRetries + " of Upload of File " + fileName + " to host " + host
-            + " after error trying to send file ");
+            + " after error trying to send file ", e);
         try {
           Thread.sleep(sleepTimeSec * 1000);
         } catch (Exception e1) {
