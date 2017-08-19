@@ -14,6 +14,10 @@ const queryParamsConfig = {
   replace: false
 };
 
+const replaceConfig = {
+  replace: true
+};
+
 export default Ember.Route.extend({
   // queryParams for rca
   queryParams: {
@@ -22,8 +26,10 @@ export default Ember.Route.extend({
     granularity: queryParamsConfig,
     filters: queryParamsConfig,
     compareMode: queryParamsConfig,
-    analysisStart: {replace: true},
-    analysisEnd: {replace: true}
+    analysisStart: replaceConfig,
+    analysisEnd: replaceConfig,
+    displayStart: replaceConfig,
+    displayEnd: replaceConfig
   },
 
   redux: Ember.inject.service(),
@@ -64,6 +70,8 @@ export default Ember.Route.extend({
       endDate = moment().valueOf(),
       analysisStart,
       analysisEnd,
+      displayStart,
+      displayEnd,
       granularity = model.granularities[0],
       filters = JSON.stringify({}),
       compareMode = 'WoW'
@@ -109,8 +117,10 @@ export default Ember.Route.extend({
       analysisStart: analysisStart || initStart.valueOf(),
       analysisEnd: analysisEnd || initEnd.valueOf(),
       compareMode,
-      subchartStart: subchartStart.valueOf(),
-      subchartEnd: subchartEnd.valueOf()
+      subchartStart: displayStart || subchartStart.valueOf(),
+      subchartEnd: displayEnd || subchartEnd.valueOf(),
+      displayStart: displayStart || subchartStart.valueOf(),
+      displayEnd: displayEnd || subchartEnd.valueOf()
     };
 
     Object.assign(model, params);
@@ -134,6 +144,10 @@ export default Ember.Route.extend({
         granularity: undefined,
         startDate: undefined,
         endDate: undefined,
+        subchartStart: undefined,
+        subchartEnd: undefined,
+        displayStart: undefined,
+        displayEnd: undefined,
         compareMode: 'WoW'
       });
     }
@@ -151,21 +165,24 @@ export default Ember.Route.extend({
       analysisEnd,
       compareMode,
       subchartEnd,
-      subchartStart
+      subchartStart,
+      displayStart,
+      displayEnd
     } = model;
 
-    // other dates if analysisStart and analysisEnd exists
     controller.setProperties({
       model,
       filters,
-      analysisStart: analysisStart,
-      analysisEnd: analysisEnd,
+      analysisStart,
+      analysisEnd,
       granularity,
       startDate,
       endDate,
       compareMode,
       subchartEnd,
-      subchartStart
+      subchartStart,
+      displayStart,
+      displayEnd
     });
   },
 

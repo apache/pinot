@@ -28,7 +28,9 @@
             </li>
           {{else}}
             No Related Events. 
-            {{#link-to 'rca.details.events' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add an event) </a>{{/link-to}}
+            {{#if (eq componentId "main-graph")}}
+              {{#link-to 'rca.details.events' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add an event) </a>{{/link-to}}
+            {{/if}}
           {{/each}}
           
         </ul>
@@ -52,7 +54,9 @@
             </li>
           {{else}}
             No Dimensions.
-            {{#link-to 'rca.details.dimensions' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add a dimension) </a>{{/link-to}}
+            {{#if (eq componentId "main-graph")}}
+              {{#link-to 'rca.details.dimensions' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add a dimension) </a>{{/link-to}}
+            {{/if}}
           {{/each}}
         </ul>
       {{/if}}
@@ -76,7 +80,9 @@
           </li>
         {{else}}
           No Related Metrics.
-          {{#link-to 'rca.details.metrics' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add a metric) </a>{{/link-to}}
+          {{#if (eq componentId "main-graph")}}
+            {{#link-to 'rca.details.metrics' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add a metric) </a>{{/link-to}}
+          {{/if}}
         {{/each}}
         </ul>
       {{/if}}

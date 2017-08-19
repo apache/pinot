@@ -18,6 +18,8 @@ export default Ember.Controller.extend({
     'compareMode',
     'startDate',
     'endDate',
+    'displayStart',
+    'displayEnd',
     'analysisStart',
     'analysisEnd'
   ],
@@ -256,7 +258,9 @@ export default Ember.Controller.extend({
           subchartStart: subchartStart.valueOf(),
           subchartEnd: subchartEnd.valueOf(),
           analysisEnd: analysisEnd.valueOf(),
-          analysisStart: analysisStart.valueOf()
+          analysisStart: analysisStart.valueOf(),
+          displayStart: subchartStart.valueOf(),
+          displayEnd: subchartEnd.valueOf()
         });
 
         return value;
@@ -281,6 +285,11 @@ export default Ember.Controller.extend({
     setNewDate({ start, end }) {
       const rangeStart = moment(start).valueOf();
       const rangeEnd = moment(end).valueOf();
+
+      this.setProperties({
+        displayStart: rangeStart.valueOf(),
+        displayEnd: rangeEnd.valueOf()
+      });
 
       const {
           startDate: currentStart,

@@ -10,9 +10,14 @@ export default Ember.Controller.extend({
   showDetails: false,
   selectedTab: 'details',
 
-  dimensionsStart: null,
-  dimensionsEnd: null,
+  dimensionsStart: 0,
+  dimensionsEnd: 0,
+  displayStart: 0,
+  displayEnd: 0,
   dateFormat: 'MMM D, YYYY hh:mm a',
+
+  subchartStart: 0,
+  subchartEnd: 0,
 
   actions: {
     // Sets new dimension start and end
@@ -21,8 +26,21 @@ export default Ember.Controller.extend({
       const dimensionsEnd = moment(end).valueOf();
 
       this.setProperties({
-        dimensionsStart,
         dimensionsEnd,
+        dimensionsStart
+      });
+    },
+
+    /**
+     * Setting loading state to false on component's didRender
+     */
+    onRendering() {
+      this.set('tableIsLoading', false);
+    },
+
+    onToggle(showDetails) {
+      this.setProperties({
+        showDetails,
         tableIsLoading: true
       });
     },
@@ -31,7 +49,8 @@ export default Ember.Controller.extend({
      * Handles subchart date change (debounced)
      */
     setDateParams([start, end]) {
-      Ember.run.debounce(this, this.get('actions.setNewDate'), { start, end }, 1000);
+      this.set('tableIsLoading', true);
+      Ember.run.debounce(this, this.get('actions.setNewDate'), { start, end }, 500);
     },
 
     /**

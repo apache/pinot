@@ -17,8 +17,8 @@ export default Ember.Component.extend({
     this._super(...arguments);
 
     this.setProperties({
-      _subchartStart: this.get('subchartStart'),
-      _subchartEnd: this.get('subchartEnd')
+      _subchartStart: Number(this.get('subchartStart')),
+      _subchartEnd: Number(this.get('subchartEnd'))
     });
   },
 
@@ -186,6 +186,7 @@ export default Ember.Component.extend({
 
     const subchartStart = this.get('_subchartStart');
     const subchartEnd = this.get('_subchartEnd');
+
 
     this.setProperties({
       subchartStart,
