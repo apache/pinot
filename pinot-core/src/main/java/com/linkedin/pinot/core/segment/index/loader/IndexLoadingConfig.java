@@ -43,78 +43,83 @@ public class IndexLoadingConfig {
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private SegmentVersion _segmentVersion;
   private StarTreeFormatVersion _starTreeVersion = StarTreeFormatVersion.DEFAULT_VERSION;
+  // This value will remain true only when the empty constructor is invoked.
   private boolean _enableDefaultColumns = true;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
-  private boolean _enableSplitCommit = false;
+  private boolean _enableSplitCommit;
 
-  public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
+  public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
       @Nullable TableConfig tableConfig) {
-    // Extract config from instance config
-    if (instanceDataManagerConfig != null) {
-      ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
-      if (instanceReadMode != null) {
-        _readMode = instanceReadMode;
-      }
+    extractFromInstanceConfig(instanceDataManagerConfig);
 
-      String instanceSegmentVersion = instanceDataManagerConfig.getSegmentFormatVersion();
-      if (instanceSegmentVersion != null) {
-        _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
-      }
+    if (tableConfig != null) {
+      extractFromTableConfig(tableConfig);
+    }
+  }
 
-      _enableDefaultColumns = instanceDataManagerConfig.isEnableDefaultColumns();
-
-      _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
-
-      String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
-      if (avgMultiValueCount != null) {
-        _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
-      }
+  private void extractFromTableConfig(@Nullable TableConfig tableConfig) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    String tableReadMode = indexingConfig.getLoadMode();
+    if (tableReadMode != null) {
+      _readMode = ReadMode.getEnum(tableReadMode);
     }
 
-    // Extract config from table indexing config
-    if (tableConfig != null) {
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      String tableReadMode = indexingConfig.getLoadMode();
-      if (tableReadMode != null) {
-        _readMode = ReadMode.getEnum(tableReadMode);
-      }
+    List<String> sortedColumns = indexingConfig.getSortedColumn();
+    if (sortedColumns != null) {
+      _sortedColumns = sortedColumns;
+    }
 
-      List<String> sortedColumns = indexingConfig.getSortedColumn();
-      if (sortedColumns != null) {
-        _sortedColumns = sortedColumns;
-      }
+    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
+    if (invertedIndexColumns != null) {
+      _invertedIndexColumns.addAll(invertedIndexColumns);
+    }
 
-      List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-      if (invertedIndexColumns != null) {
-        _invertedIndexColumns.addAll(invertedIndexColumns);
-      }
+    List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
+    if (noDictionaryColumns != null) {
+      _noDictionaryColumns.addAll(noDictionaryColumns);
+    }
 
-      List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
-      if (noDictionaryColumns != null) {
-        _noDictionaryColumns.addAll(noDictionaryColumns);
-      }
+    List<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
+    if (onHeapDictionaryColumns != null) {
+      _onHeapDictionaryColumns.addAll(onHeapDictionaryColumns);
+    }
 
-      List<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
-      if (onHeapDictionaryColumns != null) {
-        _onHeapDictionaryColumns.addAll(onHeapDictionaryColumns);
-      }
+    String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
+    if (tableSegmentVersion != null) {
+      _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
+    }
 
-      String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
-      if (tableSegmentVersion != null) {
-        _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
-      }
+    String starTreeFormat = indexingConfig.getStarTreeFormat();
+    if (starTreeFormat != null) {
+      _starTreeVersion = StarTreeFormatVersion.valueOf(starTreeFormat.toUpperCase());
+    }
 
-      String starTreeFormat = indexingConfig.getStarTreeFormat();
-      if (starTreeFormat != null) {
-        _starTreeVersion = StarTreeFormatVersion.valueOf(starTreeFormat.toUpperCase());
-      }
+    String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
+    if (columnMinMaxValueGeneratorMode != null) {
+      _columnMinMaxValueGeneratorMode =
+          ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
+    }
+  }
 
-      String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
-      if (columnMinMaxValueGeneratorMode != null) {
-        _columnMinMaxValueGeneratorMode =
-            ColumnMinMaxValueGeneratorMode.valueOf(columnMinMaxValueGeneratorMode.toUpperCase());
-      }
+  private void extractFromInstanceConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig) {
+    ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();
+    if (instanceReadMode != null) {
+      _readMode = instanceReadMode;
+    }
+
+    String instanceSegmentVersion = instanceDataManagerConfig.getSegmentFormatVersion();
+    if (instanceSegmentVersion != null) {
+      _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
+    }
+
+    _enableDefaultColumns = instanceDataManagerConfig.isEnableDefaultColumns();
+
+    _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
+
+    String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
+    if (avgMultiValueCount != null) {
+      _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
   }
 

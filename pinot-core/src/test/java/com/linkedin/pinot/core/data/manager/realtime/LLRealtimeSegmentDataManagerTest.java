@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
@@ -627,12 +628,22 @@ public class LLRealtimeSegmentDataManagerTest {
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
 
+    private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
+      InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
+      when(dataManagerConfig.getReadMode()).thenReturn(null);
+      when(dataManagerConfig.getAvgMultiValueCount()).thenReturn(null);
+      when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
+      when(dataManagerConfig.isEnableDefaultColumns()).thenReturn(false);
+      when(dataManagerConfig.isEnableSplitCommit()).thenReturn(false);
+      return dataManagerConfig;
+    }
+
     public FakeLLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager,
         String resourceDataDir, Schema schema, ServerMetrics serverMetrics)
         throws Exception {
       super(segmentZKMetadata, tableConfig, instanceZKMetadata, realtimeTableDataManager, resourceDataDir,
-          new IndexLoadingConfig(null, tableConfig), schema, serverMetrics);
+          new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, serverMetrics);
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
