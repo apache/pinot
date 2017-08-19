@@ -346,7 +346,9 @@ export default Ember.Controller.extend({
   callReplayStart(functionId, startTime, endTime) {
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = granularity.includes('hour') || granularity.includes('day');
-    const url = `/detection-job/${functionId}/replay?start=${startTime}&end=${endTime}&speedup=${speedUp}`;
+    const recipients = this.get('selectedConfigGroup.recipients');
+
+    const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}&end=${endTime}&speedup=${speedUp}&removeAnomaliesInWindow=true&to=${recipients}`;
     return fetch(url, { method: 'post' })
       .then((res) => checkStatus(res, 'post'))
       .catch((error) => {
@@ -441,7 +443,8 @@ export default Ember.Controller.extend({
     'newConfigGroupName',
     function() {
       return this.get('selectedConfigGroup') && Ember.isNone(this.get('newConfigGroupName'));
-    }),
+    }
+  ),
 
   /**
    * Determines cases in which the filter field should be disabled
@@ -743,7 +746,7 @@ export default Ember.Controller.extend({
       // Do not allow selected dimension to match selected filter
       if (isSelectedDimensionEqualToSelectedFilter) {
         this.set('selectedDimension', 'All');
-      };
+      }
       // Fetch new graph data with selected filters
       this.triggerGraphFromMetric(this.get('selectedMetricOption'));
     },
