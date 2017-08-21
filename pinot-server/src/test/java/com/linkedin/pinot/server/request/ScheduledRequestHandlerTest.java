@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
+import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import com.linkedin.pinot.serde.SerDe;
 import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.buffer.ByteBuf;
@@ -45,6 +46,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -54,9 +56,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class ScheduledRequestHandlerTest {
@@ -67,6 +67,8 @@ public class ScheduledRequestHandlerTest {
   private ChannelHandlerContext channelHandlerContext;
   private QueryScheduler queryScheduler;
   private QueryExecutor queryExecutor;
+  private UnboundedResourceManager resourceManager;
+
   @BeforeTest
   public void setupTestMethod() {
     serverMetrics = new ServerMetrics(new MetricsRegistry());
@@ -82,6 +84,7 @@ public class ScheduledRequestHandlerTest {
 
     queryScheduler = mock(QueryScheduler.class);
     queryExecutor = new ServerQueryExecutorV1Impl();
+    resourceManager = new UnboundedResourceManager(new PropertiesConfiguration());
   }
 
   @Test
@@ -120,10 +123,10 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testQueryProcessingException()
       throws Exception {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor, serverMetrics) {
+    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
       @Override
       public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
-        ListenableFuture<DataTable> dataTable = queryWorkers.submit(new Callable<DataTable>() {
+        ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(new Callable<DataTable>() {
           @Override
           public DataTable call()
               throws Exception {
@@ -167,10 +170,10 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testValidQueryResponse()
       throws InterruptedException, ExecutionException, TimeoutException, IOException {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor, serverMetrics) {
+    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
       @Override
       public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
-        ListenableFuture<DataTable> response = queryRunners.submit(new Callable<DataTable>() {
+        ListenableFuture<DataTable> response = resourceManager.getQueryRunners().submit(new Callable<DataTable>() {
           @Override
           public DataTable call()
               throws Exception {

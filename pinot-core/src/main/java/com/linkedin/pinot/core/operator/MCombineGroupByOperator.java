@@ -157,7 +157,6 @@ public class MCombineGroupByOperator extends BaseOperator {
 
     for (int i = 0; i < numOperators; i++) {
       final int index = i;
-
       _executorService.execute(new TraceRunnable() {
         @SuppressWarnings("unchecked")
         @Override

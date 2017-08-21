@@ -87,6 +87,10 @@ public class TimerContext {
     return queryArrivalTimeNs;
   }
 
+  public long getQueryArrivalTimeMs() {
+    return TimeUnit.MILLISECONDS.convert(queryArrivalTimeNs, TimeUnit.NANOSECONDS);
+  }
+
   /**
    * Creates and starts a new timer for query phase.
    * Calling this again for same phase will overwrite existing timing information

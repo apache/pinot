@@ -46,7 +46,7 @@ public class ServerQueryRequest {
   private final TimerContext timerContext;
 
   private final ServerMetrics serverMetrics;
-  private int segmentCountAfterPruning;
+  private int segmentCountAfterPruning = -1;
 
   public ServerQueryRequest(InstanceRequest request, ServerMetrics serverMetrics) {
     this.instanceRequest = request;

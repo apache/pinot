@@ -14,48 +14,58 @@
  * limitations under the License.
  */
 
-package com.linkedin.pinot.core.query.scheduler;
+package com.linkedin.pinot.core.query.scheduler.fcfs;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
+import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
+import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 /**
  * First Come First Served(FCFS) query scheduler. The FCFS policy applies across all tables.
  * This implementation does not throttle resource utilization. That makes it unsafe in
  * the multi-tenant clusters.
- *
- * This is similar to the existing query scheduling logic.
  */
 public class FCFSQueryScheduler extends QueryScheduler {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(FCFSQueryScheduler.class);
 
-  public FCFSQueryScheduler(@Nonnull Configuration schedulerConfig, @Nonnull QueryExecutor queryExecutor, @Nonnull
-      ServerMetrics serverMetrics) {
-    super(schedulerConfig, queryExecutor, serverMetrics);
+  public FCFSQueryScheduler(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
+      @Nonnull ServerMetrics serverMetrics) {
+    super(queryExecutor, new UnboundedResourceManager(config), serverMetrics);
   }
 
   @Override
   public ListenableFuture<byte[]> submit(final ServerQueryRequest queryRequest) {
     Preconditions.checkNotNull(queryRequest);
+    if (! isRunning) {
+      return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
+    }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
-    ListenableFutureTask<byte[]> queryTask = getQueryFutureTask(queryRequest);
-    queryRunners.submit(queryTask);
+    QueryExecutorService queryExecutorService =
+        resourceManager.getExecutorService(queryRequest, null);
+    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, queryExecutorService);
+    resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;
   }
 
   @Override
   public void start() {
-    // no-op
+    super.start();
+  }
+
+  @Override
+  public void stop() {
+    super.stop();
   }
 
   @Override

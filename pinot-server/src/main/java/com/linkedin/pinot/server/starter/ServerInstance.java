@@ -15,18 +15,21 @@
  */
 package com.linkedin.pinot.server.starter;
 
-import java.lang.reflect.InvocationTargetException;
-import org.apache.commons.configuration.ConfigurationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
+import com.linkedin.pinot.core.query.scheduler.QuerySchedulerFactory;
 import com.linkedin.pinot.server.conf.ServerConf;
+import com.linkedin.pinot.server.request.ScheduledRequestHandler;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.lang.reflect.InvocationTargetException;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -50,6 +53,8 @@ public class ServerInstance {
   private Thread _serverThread;
 
   private boolean _istarted = false;
+  private MetricsRegistry _metricsRegistry;
+  private ScheduledRequestHandler requestHandler;
 
   public ServerInstance() {
 
@@ -74,9 +79,12 @@ public class ServerInstance {
     LOGGER.info("Trying to build QueryExecutor");
     _queryExecutor = serverBuilder.buildQueryExecutor(_instanceDataManager);
     _queryScheduler = serverBuilder.buildQueryScheduler(_queryExecutor);
-
+    _queryScheduler.start();
+    _metricsRegistry = metricsRegistry;
     LOGGER.info("Trying to build RequestHandlerFactory");
-    setRequestHandlerFactory(serverBuilder.buildRequestHandlerFactory(_queryScheduler));
+    _serverMetrics = serverBuilder.getServerMetrics();
+    requestHandler = new ScheduledRequestHandler(_queryScheduler, _serverMetrics);
+    setRequestHandlerFactory(createRequestHandlerFactory());
 
     LOGGER.info("Trying to build TransformFunctionFactory");
     serverBuilder.init(_serverConf);
@@ -85,7 +93,7 @@ public class ServerInstance {
     _nettyServer = serverBuilder.buildNettyServer(_serverConf.getNettyConfig(), _requestHandlerFactory);
     setServerThread(new Thread(_nettyServer));
     LOGGER.info("ServerInstance Initialization is Done!");
-    _serverMetrics = serverBuilder.getServerMetrics();
+
   }
 
   /**
@@ -110,6 +118,7 @@ public class ServerInstance {
       _queryExecutor.shutDown();
       _instanceDataManager.shutDown();
       _nettyServer.shutdownGracefully();
+      _queryScheduler.stop();
       _istarted = false;
       LOGGER.info("ServerInstance is ShutDown Completely!");
     } else {
@@ -193,5 +202,27 @@ public class ServerInstance {
 
   public ServerMetrics getServerMetrics() {
     return _serverMetrics;
+  }
+
+
+  public void resetQueryScheduler(String schedulerName) {
+    Configuration schedulerConfig = _serverConf.getSchedulerConfig();
+    schedulerConfig.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, schedulerName);
+    _queryScheduler = QuerySchedulerFactory.create(schedulerConfig, _queryExecutor, _serverMetrics);
+    _queryScheduler.start();
+    requestHandler.setScheduler(_queryScheduler);
+  }
+
+  public QueryScheduler getQueryScheduler() {
+    return _queryScheduler;
+  }
+
+  private RequestHandlerFactory createRequestHandlerFactory() {
+    return new RequestHandlerFactory() {
+      @Override
+      public NettyServer.RequestHandler createNewRequestHandler() {
+        return requestHandler;
+      }
+    };
   }
 }
