@@ -9,7 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.Interval;
-import org.junit.Test;
+import org.testng.annotations.Test;
 
 
 public class TestBackwardAnoamlyFunctionUtils {
