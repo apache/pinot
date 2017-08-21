@@ -69,6 +69,11 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   public boolean execute() throws Exception {
     Schema schema = null;
 
+    if (_dimensions == null && _metrics == null) {
+      LOGGER.error("Error: Missing required argument, please specify -dimensions, -metrics, or both");
+      return false;
+    }
+    
     if (_avroSchemaFileName != null) {
       schema = AvroUtils.getPinotSchemaFromAvroSchemaFile(_avroSchemaFileName, buildFieldTypesMap(), _timeUnit);
     } else if (_avroDataFileName != null) {
