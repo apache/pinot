@@ -140,7 +140,14 @@ public class ValidationManager {
       List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
 
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      TableConfig tableConfig = null;
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
+      // Validate that the table config is in proper JSON format
+      try {
+        tableConfig.toJSONConfigString();
+      } catch (Exception e) {
+        LOGGER.error("Invalid JSON table config for table {}", tableName);
+      }
+
       _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName);
       // For each table, fetch the metadata for all its segments
       if (tableType.equals(TableType.OFFLINE)) {
@@ -151,7 +158,11 @@ public class ValidationManager {
         boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
         KafkaStreamMetadata streamMetadata = null;
         try {
-          tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+          _pinotHelixResourceManager.getTableSchema(tableName).getJSONSchema();
+        } catch (Exception e) {
+          LOGGER.error("Invalid JSON schema for table {}", tableName);
+        }
+        try {
           streamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
           if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
             countHLCSegments = false;
