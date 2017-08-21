@@ -8,8 +8,7 @@ import java.util.Map;
  */
 public interface AlertFilterAutoTune {
 
-  // Tune the alert filter properties using labeled anomalies
-  // precision and recall need to be improved over old setting
+  // Tune alert filter based on training data
   Map<String, String> tuneAlertFilter() throws Exception;
 
 }
