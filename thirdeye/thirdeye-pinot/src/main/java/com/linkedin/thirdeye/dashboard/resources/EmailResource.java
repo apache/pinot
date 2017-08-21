@@ -88,6 +88,17 @@ public class EmailResource {
     return mapping;
   }
 
+  /**
+   * Generate an instance of SmtpConfiguration
+   * This smtp configuration will take the default setting from thirdeye configuration first. If there is user defined
+   * smtp setting, then use the user's definition.
+   * @param smtpHost
+   *    the host of the smtp server; no change if null
+   * @param smtpPort
+   *    the port of the smtp server; no change if null
+   * @return
+   *    an instance of smtp configuration with user defined host and port
+   */
   public SmtpConfiguration getSmtpConfiguration(String smtpHost, Integer smtpPort) {
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     if (thirdeyeConfiguration.getSmtpConfiguration() != null) {
