@@ -105,7 +105,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   }
 
   public String getConsumerDir() {
-    return _tableDataDir + "/" + CONSUMERS_DIR;
+    return _tableDataDir + File.separator + CONSUMERS_DIR;
   }
 
   public void notifySegmentCommitted(RealtimeSegmentZKMetadata metadata, IndexSegment segment) {

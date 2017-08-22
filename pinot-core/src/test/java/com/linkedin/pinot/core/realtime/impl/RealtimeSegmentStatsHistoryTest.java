@@ -148,6 +148,12 @@ public class RealtimeSegmentStatsHistoryTest {
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
     }
+    // Now add a new column
+    {
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      Assert.assertEquals(history.getEstimatedAvgColSize("new"), RealtimeSegmentStatsHistory.getDefaultEstAvgColSize());
+      Assert.assertEquals(history.getEstimatedCardinality("new"), RealtimeSegmentStatsHistory.getDefaultEstCardinality());
+    }
   }
 
   @Test
@@ -170,11 +176,6 @@ public class RealtimeSegmentStatsHistoryTest {
     for (int i = 0; i < numThreads; i++) {
       threads[i].join();
     }
-
-    System.out.println(statsHistory.getEstimatedCardinality(COL1));
-    System.out.println(statsHistory.getEstimatedCardinality(COL2));
-    System.out.println(statsHistory.getEstimatedAvgColSize(COL1));
-    System.out.println(statsHistory.getEstimatedAvgColSize(COL2));
 
     FileUtils.deleteQuietly(serializedFile);
   }
@@ -211,13 +212,11 @@ public class RealtimeSegmentStatsHistoryTest {
         columnStats.setAvgColumnSize(_random.nextInt(MAX_AVGLEN));
         columnStats.setCardinality(_random.nextInt(MAX_CARDINALITY));
         segmentStats.setColumnStats(COL1, columnStats);
-        System.out.println("Setting column stats for " + COL1 + ":" + columnStats.toString());
 
         columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
         columnStats.setAvgColumnSize(_random.nextInt(MAX_AVGLEN));
         columnStats.setCardinality(_random.nextInt(MAX_CARDINALITY));
         segmentStats.setColumnStats(COL2, columnStats);
-        System.out.println("Setting column stats for " + COL2 + ":" + columnStats.toString());
 
         _statsHistory.addSegmentStats(segmentStats);
         _statsHistory.save();

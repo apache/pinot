@@ -48,8 +48,8 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   private String _historyFilePath;
 
   // We return these values when we don't have any prior statistics.
-  private final int DEFAULT_EST_AVG_STRING_LEN = 32;
-  private final int DEFAULT_EST_CARDINALITY = 5000;
+  private final static int DEFAULT_EST_AVG_COL_SIZE = 32;
+  private final static int DEFAULT_EST_CARDINALITY = 5000;
 
   // Not to be serialized
   transient int _arraySize;
@@ -58,6 +58,16 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   @VisibleForTesting
   public static int getMaxNumEntries() {
     return MAX_NUM_ENTRIES;
+  }
+
+  @VisibleForTesting
+  public static int getDefaultEstAvgColSize() {
+    return DEFAULT_EST_AVG_COL_SIZE;
+  }
+
+  @VisibleForTesting
+  public static int getDefaultEstCardinality() {
+    return DEFAULT_EST_CARDINALITY;
   }
 
   @VisibleForTesting
@@ -230,11 +240,19 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       return DEFAULT_EST_CARDINALITY;
     }
     int estCardinality = 0;
+    int numValidValues = 0;
     for (int i = 0; i < numEntriesToScan; i++) {
       SegmentStats segmentStats = getSegmentStatsAt(i);
-      estCardinality += segmentStats.getColumnStats(columnName).getCardinality();
+      ColumnStats columnStats = segmentStats.getColumnStats(columnName);
+      if (columnStats != null) {
+        estCardinality += columnStats.getCardinality();
+        numValidValues++;
+      }
     }
-    return estCardinality/numEntriesToScan;
+    if (numValidValues > 0) {
+      return estCardinality / numValidValues;
+    }
+    return DEFAULT_EST_CARDINALITY;
   }
 
   /**
@@ -248,14 +266,22 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     int numEntriesToScan = getNumntriesToScan();
     if (numEntriesToScan == 0) {
 
-      return DEFAULT_EST_AVG_STRING_LEN;
+      return DEFAULT_EST_AVG_COL_SIZE;
     }
-    int estCardinality = 0;
+    int estAvgColSize = 0;
+    int numValidValues = 0;
     for (int i = 0; i < numEntriesToScan; i++) {
       SegmentStats segmentStats = getSegmentStatsAt(i);
-      estCardinality += segmentStats.getColumnStats(columnName).getAvgColumnSize();
+      ColumnStats columnStats = segmentStats.getColumnStats(columnName);
+      if (columnStats != null) {
+        estAvgColSize += columnStats.getAvgColumnSize();
+        numValidValues++;
+      }
     }
-    return estCardinality/numEntriesToScan;
+    if (numValidValues > 0) {
+      return estAvgColSize / numValidValues;
+    }
+    return DEFAULT_EST_AVG_COL_SIZE;
   }
 
   public SegmentStats getSegmentStatsAt(int index) {

@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.List;
 import org.apache.avro.reflect.Nullable;
+import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -38,6 +39,12 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Override
   protected String getLoadMode() {
     return "MMAP";
+  }
+
+  @Override
+  protected void overrideOfflineServerConf(Configuration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION,
+        "true");
   }
 
   @Test
