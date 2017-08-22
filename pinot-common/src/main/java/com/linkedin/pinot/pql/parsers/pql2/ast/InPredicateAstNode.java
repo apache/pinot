@@ -21,7 +21,8 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.TreeSet;
+import java.util.HashSet;
+import java.util.Set;
 
 
 /**
@@ -67,7 +68,7 @@ public class InPredicateAstNode extends PredicateAstNode {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
 
-    TreeSet<String> values = new TreeSet<>();
+    Set<String> values = new HashSet<>();
 
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
