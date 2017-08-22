@@ -49,10 +49,10 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   @Option(name = "-pinotSchemaFileName", required = false, metaVar = "<string>", usage = "Path to pinot schema file.")
   String _pinotSchemaFileName;
 
-  @Option(name = "-dimensions", required = false, metaVar = "<string>", usage = "Comma seperated dimension columns.")
+  @Option(name = "-dimensions", required = false, metaVar = "<string>", forbids = {"-metrics"}, usage = "Comma separated dimension columns.")
   String _dimensions;
 
-  @Option(name = "-metrics", required = false, metaVar = "<string>", usage = "Comma seperated metric columns.")
+  @Option(name = "-metrics", required = false, metaVar = "<string>", forbids = {"-dimensions"}, usage = "Comma separated metric columns.")
   String _metrics;
 
   @Option(name = "-timeColumnName", required = false, metaVar = "<string>", usage = "Name of Time Column.")
@@ -73,7 +73,7 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
       LOGGER.error("Error: Missing required argument, please specify -dimensions, -metrics, or both");
       return false;
     }
-    
+
     if (_avroSchemaFileName != null) {
       schema = AvroUtils.getPinotSchemaFromAvroSchemaFile(_avroSchemaFileName, buildFieldTypesMap(), _timeUnit);
     } else if (_avroDataFileName != null) {
