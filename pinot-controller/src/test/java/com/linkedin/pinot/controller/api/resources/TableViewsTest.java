@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.restlet.resources;
+package com.linkedin.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -79,11 +79,12 @@ public class TableViewsTest extends ControllerTest {
     long endTime = System.currentTimeMillis() + 10_000L;
     while (System.currentTimeMillis() < endTime) {
       Thread.sleep(100L);
-      TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+      TableViews.TableView
+          tableView = getTableView(OFFLINE_TABLE_NAME, com.linkedin.pinot.controller.api.restlet.resources.TableViews.EXTERNALVIEW, null);
       if ((tableView.offline == null) || (tableView.offline.size() != 1)) {
         continue;
       }
-      tableView = getTableView(HYBRID_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+      tableView = getTableView(HYBRID_TABLE_NAME, com.linkedin.pinot.controller.api.restlet.resources.TableViews.EXTERNALVIEW, null);
       if (tableView.offline == null) {
         continue;
       }
@@ -116,7 +117,8 @@ public class TableViewsTest extends ControllerTest {
 
   @Test(dataProvider = "viewProvider")
   public void testOfflineTableState(String view) throws Exception {
-    TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
+    TableViews.TableView
+        tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
     Assert.assertNotNull(tableView.offline);
     Assert.assertEquals(tableView.offline.size(), 1);
     Assert.assertNull(tableView.realtime);
@@ -134,7 +136,8 @@ public class TableViewsTest extends ControllerTest {
 
   @Test(dataProvider = "viewProvider")
   public void testHybridTableState(String state) throws Exception {
-    TableViews.TableView tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
+    TableViews.TableView
+        tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
     Assert.assertNull(tableView.offline);
     Assert.assertNotNull(tableView.realtime);
     Assert.assertEquals(tableView.realtime.size(), NUM_SERVER_INSTANCES);
