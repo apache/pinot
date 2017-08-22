@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.TreeSet;
 
@@ -27,11 +28,14 @@ import java.util.TreeSet;
  * AST node for IN predicates.
  */
 public class InPredicateAstNode extends PredicateAstNode {
+  private static final String DELIMITER = "\t\t";
   private final boolean _isNotInClause;
   private String _identifier;
+  private final boolean _splitInClause;
 
-  public InPredicateAstNode(boolean isNotInClause) {
+  public InPredicateAstNode(boolean isNotInClause, boolean splitInClause) {
     _isNotInClause = isNotInClause;
+    _splitInClause = splitInClause;
   }
 
   @Override
@@ -72,14 +76,19 @@ public class InPredicateAstNode extends PredicateAstNode {
       }
     }
 
-    String[] valueArray = values.toArray(new String[values.size()]);
     FilterOperator filterOperator;
     if (_isNotInClause) {
       filterOperator = FilterOperator.NOT_IN;
     } else {
       filterOperator = FilterOperator.IN;
     }
-    return new FilterQueryTree(_identifier, Collections.singletonList(StringUtil.join("\t\t", valueArray)),
-        filterOperator, null);
+
+    if (_splitInClause) {
+      return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
+    } else {
+      String[] valueArray = values.toArray(new String[values.size()]);
+      return new FilterQueryTree(_identifier, Collections.singletonList(StringUtil.join(DELIMITER, valueArray)),
+          filterOperator, null);
+    }
   }
 }

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.BinaryMathOpAstNode;
@@ -59,9 +57,11 @@ public class Pql2AstListener extends PQL2BaseListener {
   Stack<AstNode> _nodeStack = new Stack<>();
   AstNode _rootNode = null;
   private String _expression;
+  private final boolean _splitInClause;
 
-  public Pql2AstListener(String expression) {
+  public Pql2AstListener(String expression, boolean splitInClause) {
     _expression = expression; // Original expression being parsed.
+    _splitInClause = splitInClause;
   }
 
   private void pushNode(AstNode node) {
@@ -271,7 +271,7 @@ public class Pql2AstListener extends PQL2BaseListener {
     if ("not".equalsIgnoreCase(ctx.getChild(0).getChild(1).getText())) {
       isNotInClause = true;
     }
-    pushNode(new InPredicateAstNode(isNotInClause));
+    pushNode(new InPredicateAstNode(isNotInClause, _splitInClause));
   }
 
   @Override
@@ -333,13 +333,12 @@ public class Pql2AstListener extends PQL2BaseListener {
   @Override
   public void enterLimit(@NotNull PQL2Parser.LimitContext ctx) {
     // Can either be LIMIT <maxRows> or LIMIT <offset>, <maxRows> (the second is a MySQL syntax extension)
-    if (ctx.getChild(0).getChildCount() == 2)
+    if (ctx.getChild(0).getChildCount() == 2) {
       pushNode(new LimitAstNode(Integer.parseInt(ctx.getChild(0).getChild(1).getText())));
-    else
-      pushNode(new LimitAstNode(
-          Integer.parseInt(ctx.getChild(0).getChild(3).getText()),
-          Integer.parseInt(ctx.getChild(0).getChild(1).getText())
-      ));
+    } else {
+      pushNode(new LimitAstNode(Integer.parseInt(ctx.getChild(0).getChild(3).getText()),
+          Integer.parseInt(ctx.getChild(0).getChild(1).getText())));
+    }
   }
 
   @Override
