@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.predicate;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
@@ -52,18 +53,22 @@ public class InPredicateTest {
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
     InPredicate predicate = (InPredicate) Predicate.newPredicate(filterQueryTree);
     String[] actualValues = predicate.getInRange();
+    Arrays.sort(actualValues);
 
     Assert.assertEquals(actualValues, expectedValues);
-    Assert.assertEquals(filterQueryTree.getValue(), Arrays.asList(expectedValues));
+    Assert.assertTrue(EqualityUtils.isEqualIgnoreOrder(filterQueryTree.getValue(), Arrays.asList(expectedValues)));
 
     /* Test join case */
     brokerRequest = compiler.compileToBrokerRequest(query, false /*splitInClause*/);
     filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
     predicate = (InPredicate) Predicate.newPredicate(filterQueryTree);
     actualValues = predicate.getInRange();
+    Arrays.sort(actualValues);
 
     Assert.assertEquals(actualValues, expectedValues);
-    Assert.assertEquals(filterQueryTree.getValue().get(0), StringUtil.join(InPredicate.DELIMITER, expectedValues));
+    actualValues = filterQueryTree.getValue().get(0).split(InPredicate.DELIMITER);
+    Arrays.sort(actualValues);
+    Assert.assertEquals(actualValues, expectedValues);
   }
 }
 
