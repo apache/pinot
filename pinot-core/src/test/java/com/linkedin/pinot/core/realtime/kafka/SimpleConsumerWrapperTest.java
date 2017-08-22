@@ -202,7 +202,7 @@ public class SimpleConsumerWrapperTest {
     }
 
     @Override
-    public SimpleConsumer buildSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId) {
+    public SimpleConsumer buildConsumer(String host, int port, int soTimeout, int bufferSize, String clientId) {
       for (int i = 0; i < brokerCount; i++) {
         if (hosts[i].equalsIgnoreCase(host) && ports[i] == port) {
           return new MockSimpleConsumer(host, port, soTimeout, bufferSize, clientId, i);

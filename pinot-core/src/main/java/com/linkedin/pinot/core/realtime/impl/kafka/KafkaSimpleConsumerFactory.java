@@ -24,5 +24,5 @@ import kafka.javaapi.consumer.SimpleConsumer;
  * unit tests.
  */
 public interface KafkaSimpleConsumerFactory {
-  SimpleConsumer buildSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId);
+  SimpleConsumer buildConsumer(String host, int port, int soTimeout, int bufferSize, String clientId);
 }

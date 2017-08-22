@@ -26,7 +26,9 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerWrapperInterface;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactoryImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import java.util.List;
 import java.util.Map;
@@ -308,9 +310,10 @@ public class PinotTableIdealStateBuilder {
       if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
         throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
       }
-      SimpleConsumerWrapper consumerWrapper = SimpleConsumerWrapper.forMetadataConsumption(
-          new KafkaSimpleConsumerFactoryImpl(), bootstrapHosts,
-          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, KAFKA_CONNECTION_TIMEOUT_MILLIS);
+      KafkaConsumerFactory _kafkaConsumerFactory = new SimpleConsumerFactoryImpl();
+      KafkaConsumerWrapperInterface consumerWrapper = _kafkaConsumerFactory.buildConsumerWrapper(bootstrapHosts,
+          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, null, 0,
+          KAFKA_CONNECTION_TIMEOUT_MILLIS);
 
       try {
         _partitionCount = consumerWrapper.getPartitionCount(kafkaTopicName, /*maxWaitTimeMs=*/5000L);
@@ -327,7 +330,9 @@ public class PinotTableIdealStateBuilder {
         _exception = e;
         throw e;
       } finally {
-        IOUtils.closeQuietly(consumerWrapper);
+        if (consumerWrapper instanceof SimpleConsumerWrapper) {
+          IOUtils.closeQuietly((SimpleConsumerWrapper) consumerWrapper);
+        }
       }
     }
   }
