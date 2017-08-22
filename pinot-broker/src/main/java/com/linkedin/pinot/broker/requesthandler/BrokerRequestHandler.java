@@ -67,6 +67,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -85,14 +86,17 @@ public class BrokerRequestHandler {
   private static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
   private static final String BROKER_QUERY_RESPONSE_LIMIT_CONFIG = "pinot.broker.query.response.limit";
   private static final String BROKER_QUERY_SPLIT_IN_CLAUSE = "pinot.broker.query.split.in.clause";
+  private static final String BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
   public static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
   private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
   private static final String DEFAULT_BROKER_ID;
   public static final String BROKER_ID_CONFIG_KEY = "pinot.broker.id";
   private static final ResponseType DEFAULT_BROKER_RESPONSE_TYPE = ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
   private static final boolean DEFAULT_BROKER_QUERY_SPLIT_IN_CLAUSE = false;
+  private static final int DEFAULT_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
   private final SegmentZKMetadataPrunerService _segmentPrunerService;
   private final boolean _splitInClause;
+  private final int _queryLogLength;
 
   static {
     String defaultBrokerId = "";
@@ -130,6 +134,7 @@ public class BrokerRequestHandler {
     _requestIdGenerator = new AtomicLong(0);
     _queryResponseLimit = config.getInt(BROKER_QUERY_RESPONSE_LIMIT_CONFIG, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _splitInClause = config.getBoolean(BROKER_QUERY_SPLIT_IN_CLAUSE, DEFAULT_BROKER_QUERY_SPLIT_IN_CLAUSE);
+    _queryLogLength = config.getInt(BROKER_QUERY_LOG_LENGTH, DEFAULT_QUERY_LOG_LENGTH);
     _brokerTimeOutMs = config.getLong(BROKER_TIME_OUT_CONFIG, DEFAULT_BROKER_TIME_OUT_MS);
     _brokerId = config.getString(BROKER_ID_CONFIG_KEY, DEFAULT_BROKER_ID);
     _segmentPrunerService = segmentPrunerService;
@@ -252,7 +257,7 @@ public class BrokerRequestHandler {
             + "numEntriesScannedPostFilter: {}, totalDocs: {}, scatterGatherStats: {}, query: {}", requestId,
         brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
         brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
-        brokerResponse.getTotalDocs(), scatterGatherStats, pql);
+        brokerResponse.getTotalDocs(), scatterGatherStats, StringUtils.substring(pql, 0, _queryLogLength));
 
     return brokerResponse;
   }
