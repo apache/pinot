@@ -300,11 +300,12 @@ export default Ember.Component.extend({
 
   // filtered events for graph
   holidayEvents: Ember.computed('events', function() {
-    const events = this.get('events');
-    const hiddenEvents = ['informed'];
-    return events.filter((event) => {
-      return !hiddenEvents.includes(event.eventType);
-    });
+    return this.get('events');
+    // const events = this.get('events');
+    // const hiddenEvents = [];
+    // return events.filter((event) => {
+    //   return !hiddenEvents.includes(event.eventType);
+    // });
   }),
 
   holidayEventsColumn: Ember.computed(
