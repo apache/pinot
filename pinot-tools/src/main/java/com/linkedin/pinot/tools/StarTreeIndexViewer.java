@@ -15,40 +15,6 @@
  */
 package com.linkedin.pinot.tools;
 
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
-import com.linkedin.pinot.core.startree.StarTreeInterf;
-import com.linkedin.pinot.core.startree.StarTreeSerDe;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
-import org.restlet.Application;
-import org.restlet.Component;
-import org.restlet.Restlet;
-import org.restlet.data.Protocol;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Directory;
-import org.restlet.resource.Get;
-import org.restlet.resource.ServerResource;
-import org.restlet.routing.Router;
-import org.restlet.routing.VirtualHost;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -57,10 +23,38 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
+import com.linkedin.pinot.core.startree.StarTreeInterf;
+import com.linkedin.pinot.core.startree.StarTreeSerDe;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
+import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.glassfish.jersey.server.ResourceConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StarTreeIndexViewer {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexViewer.class);
@@ -173,37 +167,38 @@ public class StarTreeIndexViewer {
     new StarTreeIndexViewer(new File(segmentDir));
   }
 
-  private void startServer(final File segmentDirectory, final String json) throws Exception {
-
-    Component component = new Component();
-    int port = 8090;
-    component.getServers().add(Protocol.HTTP, port);
-    component.getClients().add(Protocol.FILE);
-    Application application = new Application() {
-      @Override
-      public Restlet createInboundRoot() {
-        Router router = new Router(getContext());
-        StarTreeViewRestResource.json = json;
-        router.attach("/data", StarTreeViewRestResource.class);
-        Directory directory = new Directory(getContext(),
-            getClass().getClassLoader().getResource("star-tree.html").toString());
-        router.attach(directory);
-        return router;
-      }
-    };
-    VirtualHost defaultHost = component.getDefaultHost();
-    defaultHost.attach(application);
-    component.start();
-    LOGGER.info("Go to http://{}:{}/  to view the star tree", VirtualHost.getLocalHostName(), port );
+  private static class StarTreeResource extends ResourceConfig {
+    StarTreeResource(String json) {
+      StarTreeViewRestResource resource = new StarTreeViewRestResource();
+      StarTreeViewRestResource.json = json;
+      register(resource.getClass());
+    }
   }
 
-  public static final class StarTreeViewRestResource extends ServerResource {
+  private void startServer(final File segmentDirectory, final String json) throws Exception {
+    int httpPort = 8090;
+    URI baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
+    HttpServer httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, new StarTreeResource(json));
+
+    LOGGER.info("Go to http://{}:{}/  to view the star tree", "localhost", httpPort );
+  }
+
+  @Path("/")
+  public static final class StarTreeViewRestResource {
     public static String json;
 
-    @Get
-    @Override
-    public Representation get() {
-      return new StringRepresentation(json);
+    @GET
+    @Path("/data")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String getStarTree() {
+      return json;
+    }
+
+    @GET
+    @Path("/")
+    @Produces(MediaType.TEXT_HTML)
+    public InputStream getStarTreeHtml() {
+      return getClass().getClassLoader().getResourceAsStream("star-tree.html");
     }
   }
 }
