@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -96,7 +97,12 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         LOGGER.error("Could not move {} to {}", statsFile.getAbsolutePath(), savedFile.getAbsolutePath(), e1);
         throw new RuntimeException(e);
       }
-      LOGGER.warn("Saved unreadable {} into {}", statsFile.getAbsolutePath(), savedFile.getAbsolutePath());
+      LOGGER.warn("Saved unreadable {} into {}. Creating a fresh instance", statsFile.getAbsolutePath(), savedFile.getAbsolutePath());
+      try {
+        _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+      } catch (Exception e2) {
+        Utils.rethrowException(e2);
+      }
     }
   }
 
