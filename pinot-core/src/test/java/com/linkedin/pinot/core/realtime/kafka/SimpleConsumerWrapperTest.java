@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.kafka;
 
-import com.linkedin.pinot.core.realtime.impl.kafka.IPinotKafkaConsumer;
+import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import java.util.Collections;
@@ -48,7 +48,7 @@ import static org.testng.Assert.assertEquals;
  * Tests for the SimpleConsumerWrapper.
  */
 public class SimpleConsumerWrapperTest {
-  public class MockSimpleConsumerWrapper extends SimpleConsumerWrapper implements IPinotKafkaConsumer {
+  public class MockSimpleConsumerWrapper extends SimpleConsumerWrapper implements PinotKafkaConsumer {
     public MockSimpleConsumerWrapper(String bootstrapNodes, String clientId, String topic, int partition,
         long connectTimeoutMillis) {
       super(bootstrapNodes, clientId, topic, partition, connectTimeoutMillis);
@@ -61,7 +61,7 @@ public class SimpleConsumerWrapperTest {
   public class MockKafkaSimpleConsumerFactory implements KafkaConsumerFactory {
 
     @Override
-    public IPinotKafkaConsumer buildConsumerWrapper(String bootstrapNodes, String clientId, String topic, int partition,
+    public PinotKafkaConsumer buildConsumer(String bootstrapNodes, String clientId, String topic, int partition,
         long connectTimeoutMillis) {
       return new MockSimpleConsumerWrapper(bootstrapNodes, clientId, topic, partition, connectTimeoutMillis);
     }
@@ -189,7 +189,8 @@ public class SimpleConsumerWrapperTest {
   @Test
   public void testGetPartitionCount() {
     KafkaConsumerFactory kafkaConsumerFactory = new MockKafkaSimpleConsumerFactory();
-    SimpleConsumerWrapper consumerWrapper = (MockSimpleConsumerWrapper) kafkaConsumerFactory.buildConsumerWrapper("node1:1234,node2:2345", "clientId", "topic", 1, 123456L);
+    SimpleConsumerWrapper consumerWrapper = (MockSimpleConsumerWrapper) kafkaConsumerFactory.buildConsumer(
+        "node1:1234,node2:2345", "clientId", "topic", 1, 123456L);
 
     assertEquals(consumerWrapper.getPartitionCount("topic", 12345L), 2);
   }
@@ -198,7 +199,8 @@ public class SimpleConsumerWrapperTest {
   public void testFetchMessages()
       throws Exception {
     KafkaConsumerFactory kafkaConsumerFactory = new MockKafkaSimpleConsumerFactory();
-    SimpleConsumerWrapper consumerWrapper = (MockSimpleConsumerWrapper) kafkaConsumerFactory.buildConsumerWrapper("node1:1234,node2:2345", "clientId", "topic", 1, 123456L);
+    SimpleConsumerWrapper consumerWrapper = (MockSimpleConsumerWrapper) kafkaConsumerFactory.buildConsumer(
+        "node1:1234,node2:2345", "clientId", "topic", 1, 123456L);
 
     consumerWrapper.fetchMessages(12345L, 23456L, 10000);
   }
@@ -207,7 +209,7 @@ public class SimpleConsumerWrapperTest {
   public void testFetchOffsets()
       throws Exception {
 //    KafkaConsumerFactory kafkaConsumerFactory = new MockKafkaSimpleConsumerFactory();
-//    IPinotKafkaConsumer consumerWrapper = kafkaConsumerFactory.buildConsumerWrapper("node1:1234,node2:2345", "clientId", "topic", 1, 123456L);
+//    PinotKafkaConsumer consumerWrapper = kafkaConsumerFactory.buildConsumer("node1:1234,node2:2345", "clientId", "topic", 1, 123456L);
 //
 //    consumerWrapper.fetchPartitionOffset("smallest", 10000);
   }

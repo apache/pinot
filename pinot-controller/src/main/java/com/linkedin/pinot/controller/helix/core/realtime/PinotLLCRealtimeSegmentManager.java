@@ -45,10 +45,10 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.core.realtime.impl.kafka.IPinotKafkaConsumer;
+import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactoryImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -1181,7 +1181,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     private Exception _exception = null;
     private long _offset = -1;
-    private KafkaConsumerFactory _kafkaConsumerFactory = new SimpleConsumerFactoryImpl();
+    private KafkaConsumerFactory _kafkaConsumerFactory = new SimpleConsumerFactory();
 
 
     private KafkaOffsetFetcher(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
@@ -1202,8 +1202,8 @@ public class PinotLLCRealtimeSegmentManager {
     @Override
     public Boolean call() throws Exception {
 
-      IPinotKafkaConsumer
-          consumerWrapper = _kafkaConsumerFactory.buildConsumerWrapper(_bootstrapHosts, "dummyClientId", _topicName,
+      PinotKafkaConsumer
+          consumerWrapper = _kafkaConsumerFactory.buildConsumer(_bootstrapHosts, "dummyClientId", _topicName,
           _partitionId, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
       try {
         _offset = consumerWrapper.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);

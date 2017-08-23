@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
-public class SimpleConsumerWrapper implements Closeable, IPinotKafkaConsumer {
+public class SimpleConsumerWrapper implements Closeable, PinotKafkaConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleConsumerWrapper.class);
   private static final int SOCKET_TIMEOUT_MILLIS = 10000;
   private static final int SOCKET_BUFFER_SIZE = 512000;
