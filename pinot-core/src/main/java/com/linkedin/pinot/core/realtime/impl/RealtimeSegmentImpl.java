@@ -566,6 +566,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
       segmentStats.setNumRowsConsumed(numDocsIndexed);
       segmentStats.setMemUsedBytes(memoryManager.getTotalMemBytes());
+      LOGGER.info("Segment used {} bytes of memory", memoryManager.getTotalMemBytes());
       final long now = System.currentTimeMillis();
       segmentStats.setNumSeconds((int)((now - startTimeMillis)/1000));
       statsHistory.addSegmentStats(segmentStats);
