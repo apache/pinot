@@ -96,7 +96,12 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         LOGGER.error("Could not move {} to {}", statsFile.getAbsolutePath(), savedFile.getAbsolutePath(), e1);
         throw new RuntimeException(e);
       }
-      LOGGER.warn("Saved unreadable {} into {}", statsFile.getAbsolutePath(), savedFile.getAbsolutePath());
+      LOGGER.warn("Saved unreadable {} into {}. Creating a fresh instance", statsFile.getAbsolutePath(), savedFile.getAbsolutePath());
+      try {
+        _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+      } catch (Exception e2) {
+        throw new RuntimeException(e2);
+      }
     }
   }
 
