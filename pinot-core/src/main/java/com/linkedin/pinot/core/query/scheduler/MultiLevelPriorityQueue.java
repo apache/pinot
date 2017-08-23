@@ -173,6 +173,10 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
       //     ii. continue with currentWinnerGroup otherwise
       int comparison = group.compareTo(currentWinnerGroup);
       if (comparison < 0) {
+        if (currentWinnerGroup.totalReservedThreads() > resourceManager.getTableThreadsSoftLimit() &&
+            group.totalReservedThreads() < resourceManager.getTableThreadsSoftLimit()) {
+          currentWinnerGroup = group;
+        }
         continue;
       }
       if (comparison >= 0) {
