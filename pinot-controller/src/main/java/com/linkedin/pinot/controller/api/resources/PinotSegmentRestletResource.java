@@ -93,7 +93,6 @@ import static com.linkedin.pinot.controller.api.resources.FileUploadPathProvider
  * </ul>
  *
  * {@inheritDoc}
- * @see org.restlet.resource.ServerResource#get()
  */
 
 @Api(tags = Constants.TABLE_TAG)
