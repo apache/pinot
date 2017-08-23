@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -100,7 +101,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       try {
         _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
       } catch (Exception e2) {
-        throw new RuntimeException(e2);
+        Utils.rethrowException(e2);
       }
     }
   }
