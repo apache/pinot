@@ -27,14 +27,13 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerWrapperInterface;
+import com.linkedin.pinot.core.realtime.impl.kafka.IPinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactoryImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
@@ -311,7 +310,7 @@ public class PinotTableIdealStateBuilder {
         throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
       }
       KafkaConsumerFactory _kafkaConsumerFactory = new SimpleConsumerFactoryImpl();
-      KafkaConsumerWrapperInterface consumerWrapper = _kafkaConsumerFactory.buildConsumerWrapper(bootstrapHosts,
+      IPinotKafkaConsumer consumerWrapper = _kafkaConsumerFactory.buildConsumerWrapper(bootstrapHosts,
           PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, null, 0,
           KAFKA_CONNECTION_TIMEOUT_MILLIS);
 
@@ -330,9 +329,7 @@ public class PinotTableIdealStateBuilder {
         _exception = e;
         throw e;
       } finally {
-        if (consumerWrapper instanceof SimpleConsumerWrapper) {
-          IOUtils.closeQuietly((SimpleConsumerWrapper) consumerWrapper);
-        }
+        consumerWrapper.close();
       }
     }
   }

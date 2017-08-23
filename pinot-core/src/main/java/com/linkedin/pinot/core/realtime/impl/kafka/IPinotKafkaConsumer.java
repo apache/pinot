@@ -21,7 +21,7 @@ import kafka.message.MessageAndOffset;
 import org.apache.commons.lang3.tuple.Pair;
 
 
-public interface KafkaConsumerWrapperInterface {
+public interface IPinotKafkaConsumer {
   int getPartitionCount(String topic, long timeoutMillis);
 
   Pair<Iterable<MessageAndOffset>, Long> fetchMessagesAndHighWatermark(long startOffset,

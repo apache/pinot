@@ -45,8 +45,8 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.core.realtime.impl.kafka.IPinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerWrapperInterface;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactoryImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
@@ -75,7 +75,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.AccessOption;
@@ -1203,8 +1202,9 @@ public class PinotLLCRealtimeSegmentManager {
     @Override
     public Boolean call() throws Exception {
 
-      KafkaConsumerWrapperInterface consumerWrapper = _kafkaConsumerFactory.buildConsumerWrapper(_bootstrapHosts, "dummyClientId", _topicName, _partitionId,
-          KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+      IPinotKafkaConsumer
+          consumerWrapper = _kafkaConsumerFactory.buildConsumerWrapper(_bootstrapHosts, "dummyClientId", _topicName,
+          _partitionId, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
       try {
         _offset = consumerWrapper.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {
@@ -1219,9 +1219,7 @@ public class PinotLLCRealtimeSegmentManager {
         _exception = e;
         throw e;
       } finally {
-        if (consumerWrapper instanceof SimpleConsumerWrapper) {
-          IOUtils.closeQuietly((SimpleConsumerWrapper) consumerWrapper);
-        }
+        consumerWrapper.close();
       }
     }
   }

@@ -53,7 +53,7 @@ import kafka.message.MessageAndOffset;
 /**
  * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
-public class SimpleConsumerWrapper implements Closeable, KafkaConsumerWrapperInterface {
+public class SimpleConsumerWrapper implements Closeable, IPinotKafkaConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleConsumerWrapper.class);
   private static final int SOCKET_TIMEOUT_MILLIS = 10000;
   private static final int SOCKET_BUFFER_SIZE = 512000;
@@ -115,7 +115,8 @@ public class SimpleConsumerWrapper implements Closeable, KafkaConsumerWrapperInt
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
-  public SimpleConsumerWrapper(String bootstrapNodes, String clientId, String topic, int partition, long connectTimeoutMillis) {
+  public SimpleConsumerWrapper(String bootstrapNodes, String clientId, String topic, int partition,
+      long connectTimeoutMillis) {
     _clientId = clientId;
     _topic = topic;
     _partition = partition;
