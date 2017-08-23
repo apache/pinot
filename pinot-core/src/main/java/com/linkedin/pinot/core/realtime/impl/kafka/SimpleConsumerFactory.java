@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-public class SimpleConsumerFactory implements KafkaConsumerFactory {
+public class SimpleConsumerFactory implements PinotKafkaConsumerFactory {
   public PinotKafkaConsumer buildConsumer(String bootstrapNodes, String clientId, String topic, int partition,
       long connectTimeoutMillis) {
     return new SimpleConsumerWrapper(bootstrapNodes, clientId, topic, partition, connectTimeoutMillis);

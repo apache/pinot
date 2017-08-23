@@ -45,9 +45,9 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
+import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -75,6 +75,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.AccessOption;
@@ -1181,7 +1182,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     private Exception _exception = null;
     private long _offset = -1;
-    private KafkaConsumerFactory _kafkaConsumerFactory = new SimpleConsumerFactory();
+    private PinotKafkaConsumerFactory _pinotKafkaConsumerFactory = new SimpleConsumerFactory();
 
 
     private KafkaOffsetFetcher(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
@@ -1203,7 +1204,7 @@ public class PinotLLCRealtimeSegmentManager {
     public Boolean call() throws Exception {
 
       PinotKafkaConsumer
-          consumerWrapper = _kafkaConsumerFactory.buildConsumer(_bootstrapHosts, "dummyClientId", _topicName,
+          consumerWrapper = _pinotKafkaConsumerFactory.buildConsumer(_bootstrapHosts, "dummyClientId", _topicName,
           _partitionId, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
       try {
         _offset = consumerWrapper.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
@@ -1219,7 +1220,7 @@ public class PinotLLCRealtimeSegmentManager {
         _exception = e;
         throw e;
       } finally {
-        consumerWrapper.close();
+        IOUtils.closeQuietly(consumerWrapper);
       }
     }
   }

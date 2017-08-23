@@ -16,12 +16,16 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import java.io.Closeable;
 import java.io.IOException;
 import kafka.message.MessageAndOffset;
 import org.apache.commons.lang3.tuple.Pair;
 
 
-public interface PinotKafkaConsumer {
+/**
+ * Interface that allows us to plugin different Kafka consumers. The default implementation is SimpleConsumerWrapper.
+ */
+public interface PinotKafkaConsumer extends Closeable {
   int getPartitionCount(String topic, long timeoutMillis);
 
   Pair<Iterable<MessageAndOffset>, Long> fetchMessagesAndHighWatermark(long startOffset,
