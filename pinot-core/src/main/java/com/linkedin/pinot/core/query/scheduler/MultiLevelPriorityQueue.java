@@ -150,7 +150,9 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     long deadlineEpochMillis = currentTimeMillis() - queryDeadlineMillis;
     for (Map.Entry<String, SchedulerGroup> groupInfoEntry : schedulerGroups.entrySet()) {
       SchedulerGroup group = groupInfoEntry.getValue();
-      sb.append(group.toString());
+      if (LOGGER.isDebugEnabled()) {
+        sb.append(group.toString());
+      }
       group.trimExpired(deadlineEpochMillis);
       if (group.isEmpty() || !resourceManager.canSchedule(group)) {
         continue;
@@ -190,14 +192,16 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     SchedulerQueryContext query = null;
     if (currentWinnerGroup != null) {
       ServerQueryRequest queryRequest = currentWinnerGroup.peekFirst().getQueryRequest();
-      sb.append(String.format(" Winner: %s: [%d,%d,%d,%d]", currentWinnerGroup.name(),
-          queryRequest.getTimerContext().getQueryArrivalTimeMs(),
-          queryRequest.getInstanceRequest().getRequestId(),
-          queryRequest.getInstanceRequest().getSearchSegments().size(),
-          startTime));
+      if (LOGGER.isDebugEnabled()) {
+        sb.append(String.format(" Winner: %s: [%d,%d,%d,%d]", currentWinnerGroup.name(), queryRequest.getTimerContext().getQueryArrivalTimeMs(),
+            queryRequest.getInstanceRequest().getRequestId(), queryRequest.getInstanceRequest().getSearchSegments().size(),
+            startTime));
+      }
       query = currentWinnerGroup.removeFirst();
     }
-    LOGGER.debug(sb.toString());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug(sb.toString());
+    }
     return query;
   }
 
