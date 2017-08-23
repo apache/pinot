@@ -81,7 +81,7 @@ const setWeight = (event) => {
  * Helper function assigning start and end times to events relative
  * to the anomaly period's start time
  */
-const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, baselineEnd) => {
+const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, baselineEnd, analysisStart, analysisEnd) => {
   const duration = event.end - event.start;
   const baselineOffset = baselineStart - anomalyStart;
 
@@ -89,7 +89,7 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
 
   var relEnd = Infinity;
   var relDuration = Infinity;
-  if (moment().isAfter(moment(event.end).add(1, 'minute'))) {
+  if (event.end > 0 && moment().isAfter(moment(event.end).add(1, 'minute'))) {
     relEnd = event.end - anomalyStart;
     relDuration = event.end - event.start;
   }
@@ -97,7 +97,7 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
   var isBaseline = false;
   var displayStart = event.start;
   var displayEnd = event.end;
-  if (displayStart < baselineEnd) {
+  if (baselineStart <= displayStart && displayStart < baselineEnd) {
     isBaseline = true;
     displayStart -= baselineOffset;
     displayEnd -= baselineOffset;
@@ -111,7 +111,7 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
  */
 const adjustHolidayTimestamp = (event) => {
   const startUtc = moment(event.start).utc();
-  const endUtc = moment(event.start).utc();
+  const endUtc = moment(event.end).utc();
 
   if (event.eventType == 'holiday') {
     if (startUtc.isSame(startUtc.startOf('day'))) {
@@ -213,11 +213,10 @@ function fetchEvents(start, end, mode) {
       .then(res => res.json())
       .then((res) => {
         return _.uniqBy(res, 'urn')
-          .filter(event => event.eventType !== 'informed')
           .map(adjustHolidayTimestamp)
+          .map(event => assignEventTimeInfo(event, anomalyStart, anomalyEnd, baselineStart, baselineEnd, analysisStart, analysisEnd))
           .map(assignEventColor)
           .map(setWeight)
-          .map(event => assignEventTimeInfo(event, anomalyStart, anomalyEnd, baselineStart, baselineEnd))
           .map(assignHumanTimeInfo)
           .sort((a, b) => (b.score - a.score));
       })
