@@ -24,7 +24,9 @@ import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManage
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.BeforeMethod;
@@ -46,11 +48,6 @@ public class MultiLevelPriorityQueueTest {
   @BeforeMethod
   public void beforeMethod() {
     groupFactory.reset();
-  }
-
-  @Test (expectedExceptions = NullPointerException.class)
-  public void testPutNull() throws OutOfCapacityError {
-    createQueue().put(null);
   }
 
   @Test
@@ -100,7 +97,7 @@ public class MultiLevelPriorityQueueTest {
     final MultiLevelPriorityQueue queue = createQueue();
     QueueReader reader = new QueueReader(queue);
     // we know thread has started. Sleep for the wakeup duration and check again
-    reader.startAndWait();
+    reader.startAndWaitForQueueWakeup();
     assertTrue(reader.reader.isAlive());
     assertEquals(reader.readQueries.size(), 0);
     sleepForQueueWakeup(queue);
@@ -129,14 +126,14 @@ public class MultiLevelPriorityQueueTest {
 
     testGroupOne.addReservedThreads(rm.getTableThreadsSoftLimit() + 1);
     QueueReader reader = new QueueReader(queue);
-    reader.startAndWait();
+    reader.startAndWaitForRead();
     assertEquals(reader.readQueries.size(), 1);
     assertEquals(reader.readQueries.poll().getSchedulerGroup().name(), groupTwo);
 
     // add one more group two
     queue.put(createQueryRequest(groupTwo, metrics));
     reader = new QueueReader(queue);
-    reader.startAndWait();
+    reader.startAndWaitForRead();
     assertEquals(reader.readQueries.size(), 1);
     assertEquals(reader.readQueries.poll().getSchedulerGroup().name(), groupTwo);
 
@@ -144,14 +141,14 @@ public class MultiLevelPriorityQueueTest {
     queue.put(createQueryRequest(groupTwo, metrics));
     testGroupTwo.addReservedThreads(testGroupOne.totalReservedThreads() + 1);
     reader = new QueueReader(queue);
-    reader.startAndWait();
+    reader.startAndWaitForRead();
     assertEquals(reader.readQueries.size(), 1);
     assertEquals(reader.readQueries.poll().getSchedulerGroup().name(), groupOne);
 
     // set groupOne above hard limit
     testGroupOne.addReservedThreads(rm.getTableThreadsHardLimit());
     reader = new QueueReader(queue);
-    reader.startAndWait();
+    reader.startAndWaitForRead();
     assertEquals(reader.readQueries.size(), 1);
     assertEquals(reader.readQueries.poll().getSchedulerGroup().name(), groupTwo);
 
@@ -161,7 +158,7 @@ public class MultiLevelPriorityQueueTest {
     queue.put(createQueryRequest(groupOne, metrics));
     testGroupTwo.addReservedThreads(rm.getTableThreadsHardLimit());
     reader = new QueueReader(queue);
-    reader.startAndWait();
+    reader.startAndWaitForQueueWakeup();
     assertEquals(reader.readQueries.size(), 0);
     // try again
     sleepForQueueWakeup(queue);
@@ -190,13 +187,12 @@ public class MultiLevelPriorityQueueTest {
     testGroupOne.peekFirst().getQueryRequest().getTimerContext().setQueryArrivalTimeNs(1000);
     testGroupTwo.peekFirst().getQueryRequest().getTimerContext().setQueryArrivalTimeNs(1000);
     QueueReader reader = new QueueReader(queue);
-    reader.startAndWait();
+    reader.startAndWaitForQueueWakeup();
     assertTrue(reader.readQueries.isEmpty());
     assertTrue(testGroupOne.isEmpty());
     assertTrue(testGroupTwo.isEmpty());
     queue.put(createQueryRequest(groupOne, metrics));
     sleepForQueueWakeup(queue);
-
   }
 
   private MultiLevelPriorityQueue createQueue() {
@@ -213,6 +209,7 @@ public class MultiLevelPriorityQueueTest {
   class QueueReader {
     private final MultiLevelPriorityQueue queue;
     CyclicBarrier startBarrier = new CyclicBarrier(2);
+    CountDownLatch readDoneSignal = new CountDownLatch(1);
     ConcurrentLinkedQueue<SchedulerQueryContext> readQueries = new ConcurrentLinkedQueue<>();
     Thread reader;
 
@@ -228,16 +225,31 @@ public class MultiLevelPriorityQueueTest {
             throw new RuntimeException(e);
           }
           readQueries.add(queue.take());
+          try {
+            readDoneSignal.countDown();
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
         }
       });
     }
 
     // this is for main thread that creates reader. Pattern is odd
     // it keeps calling code concise
-    void startAndWait() throws BrokenBarrierException, InterruptedException {
+    // Use this when test expects to read something from queue. This blocks
+    // till an entry is read from the queue
+    void startAndWaitForRead() throws BrokenBarrierException, InterruptedException {
       reader.start();
       startBarrier.await();
-      sleepForQueueWakeup(queue);
+      readDoneSignal.await();
+    }
+
+    // Use this if the reader is not expected to complete read after queue wakeup duration
+    void startAndWaitForQueueWakeup() throws InterruptedException, BrokenBarrierException {
+      reader.start();
+      startBarrier.await();
+      readDoneSignal.await(queue.getWakeupTimeMicros() +
+          TimeUnit.MICROSECONDS.convert(10, TimeUnit.MILLISECONDS), TimeUnit.MICROSECONDS);
     }
   }
 }
