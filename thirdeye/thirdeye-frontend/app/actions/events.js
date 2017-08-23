@@ -102,6 +102,9 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
     displayStart -= baselineOffset;
     displayEnd -= baselineOffset;
   }
+  if (displayEnd <= 0) {
+    displayEnd = analysisEnd;
+  }
 
   return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd });
 };
