@@ -471,7 +471,7 @@ public class AnomalyResource {
       @QueryParam("properties") String properties,
       @QueryParam("isActive") Boolean isActive,
       @QueryParam("frequency") String frequency,
-      @QueryParam("bucket") String bucketTimeGranularity) throws Exception {
+      @QueryParam("bucket") String userInputDataGranularity) throws Exception {
 
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
@@ -543,16 +543,16 @@ public class AnomalyResource {
       anomalyFunctionSpec.setCron(cron);
     }
 
-    if (bucketTimeGranularity != null) {
+    if (userInputDataGranularity != null) {
       // Update bucket size and unit
-      TimeGranularity timeGranularity = TimeGranularity.fromString(bucketTimeGranularity);
+      TimeGranularity timeGranularity = TimeGranularity.fromString(userInputDataGranularity);
       if (timeGranularity != null) {
         anomalyFunctionSpec.setBucketSize(timeGranularity.getSize());
         anomalyFunctionSpec.setBucketUnit(timeGranularity.getUnit());
       } else {
-        LOG.warn("Non-feasible time granularity expression: {}", bucketTimeGranularity);
+        LOG.warn("Non-feasible time granularity expression: {}", userInputDataGranularity);
         return Response.status(Response.Status.BAD_REQUEST)
-            .entity("Non-feasible time granularity expression: " + bucketTimeGranularity).build();
+            .entity("Non-feasible time granularity expression: " + userInputDataGranularity).build();
       }
     }
 
