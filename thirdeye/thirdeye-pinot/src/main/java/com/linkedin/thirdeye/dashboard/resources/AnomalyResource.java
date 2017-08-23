@@ -470,7 +470,9 @@ public class AnomalyResource {
       @QueryParam("filters") String filters,
       @QueryParam("properties") String properties,
       @QueryParam("isActive") Boolean isActive,
-      @QueryParam("frequency") String frequency) throws Exception {
+      @QueryParam("frequency") String frequency,
+      @QueryParam("bucketSize") Integer bucketSize,
+      @QueryParam("bucketUnit") String bucketUnit) throws Exception {
 
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
@@ -540,6 +542,19 @@ public class AnomalyResource {
         throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
       }
       anomalyFunctionSpec.setCron(cron);
+    }
+
+    if (bucketSize != null && bucketSize >= 0) {
+      // Update bucket size
+      anomalyFunctionSpec.setBucketSize(bucketSize);
+    }
+
+    if (bucketUnit != null) {
+      // Update bucket time unit
+      TimeUnit bucketTimeUnit = TimeUnit.valueOf(bucketUnit.toUpperCase());
+      if (bucketTimeUnit != null) {
+        anomalyFunctionSpec.setBucketUnit(bucketTimeUnit);
+      }
     }
 
     if (StringUtils.isNotEmpty(frequency)) {
