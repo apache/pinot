@@ -50,11 +50,6 @@ public class MultiLevelPriorityQueueTest {
     groupFactory.reset();
   }
 
-  @Test (expectedExceptions = IllegalArgumentException.class)
-  public void testPutNull() throws OutOfCapacityError {
-    createQueue().put(null);
-  }
-
   @Test
   public void testSimplePutTake() throws OutOfCapacityError {
     MultiLevelPriorityQueue queue = createQueue();
