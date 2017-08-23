@@ -96,6 +96,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       final ServerMetrics serverMetrics)
       throws Exception {
     super();
+    initStatsHistory(realtimeTableDataManager);
     _realtimeTableDataManager = realtimeTableDataManager;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     this.schema = schema;
@@ -103,6 +104,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     this.serverMetrics =serverMetrics;
     this.segmentName = segmentMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
+    initMemoryManager(realtimeTableDataManager, indexLoadingConfig.isRealtimeOffheapAllocation(), segmentName);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {

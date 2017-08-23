@@ -64,7 +64,7 @@ public class MutableDictionaryTest {
       }
       {
         MutableDictionary dictionary =
-            new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "stringColumn");
+            new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "stringColumn", 32);
         testSingleReaderSingleWriter(dictionary, FieldSpec.DataType.STRING);
         dictionary.close();
       }
@@ -98,7 +98,7 @@ public class MutableDictionaryTest {
       }
       {
         MutableDictionary dictionary =
-            new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "stringColumn");
+            new StringOffHeapMutableDictionary(EST_CARDINALITY, 2000, _memoryManager, "stringColumn", 32);
         testMultiReadersSingleWriter(dictionary, FieldSpec.DataType.STRING);
         dictionary.close();
       }
@@ -125,7 +125,7 @@ public class MutableDictionaryTest {
   public void testOnHeapMutableDictionary() {
     try {
       for (FieldSpec.DataType dataType : DATA_TYPES) {
-        MutableDictionary dictionary = MutableDictionaryFactory.getMutableDictionary(dataType);
+        MutableDictionary dictionary = MutableDictionaryFactory.getMutableDictionary(dataType, false, null, 0, 0, null);
         testMutableDictionary(dictionary, dataType);
         dictionary.close();
       }
@@ -179,7 +179,7 @@ public class MutableDictionaryTest {
       case DOUBLE:
         return new DoubleOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "doubleColumn");
       case STRING:
-        return new StringOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "stringColumn");
+        return new StringOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "stringColumn", 32);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }

@@ -31,10 +31,10 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   private String _min = null;
   private String _max = null;
 
-  public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize, RealtimeIndexOffHeapMemoryManager memoryManager,
-      String columnName) {
+  public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
+      RealtimeIndexOffHeapMemoryManager memoryManager, String columnName, int avgStringLen) {
     super(estimatedCardinality, maxOverflowHashSize, memoryManager, columnName);
-    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, columnName);
+    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, columnName, estimatedCardinality, avgStringLen);
   }
 
   @Override
@@ -157,7 +157,8 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
     return super.getTotalOffHeapMemUsed() + _byteStore.getTotalOffHeapMemUsed();
   }
 
-  public int getAvgStringSize() {
+  @Override
+  public int getAvgValueSize() {
     return (int)_byteStore.getAvgValueSize();
   }
 }

@@ -20,7 +20,9 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
@@ -46,6 +48,11 @@ public class RealtimeSegmentImplTest {
     when(segmentDataManager.getNoDictionaryColumns()).thenReturn(new ArrayList<String>());
     when(segmentDataManager.getSegmentName()).thenReturn(segmentName);
     when(segmentDataManager.getInvertedIndexColumns()).thenReturn(new ArrayList<String>());
+    RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
+    when(statsHistory.getEstimatedCardinality(any(String.class))).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(any(String.class))).thenReturn(32);
+    when(segmentDataManager.getStatsHistory()).thenReturn(statsHistory);
+    when(segmentDataManager.getMemoryManager()).thenReturn(new DirectMemoryManager(segmentName));
 
     IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
     when(indexLoadingConfig.getRealtimeAvgMultiValueCount()).thenReturn(2);

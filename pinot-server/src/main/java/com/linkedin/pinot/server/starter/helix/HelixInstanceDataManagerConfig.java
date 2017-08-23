@@ -59,6 +59,9 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
 
+  // Whether memory for realtime consuming segments should be allocated off-heap.
+  private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
+
   private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
   private Configuration _instanceDataManagerConfiguration = null;
 
@@ -129,6 +132,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean isEnableSplitCommit() {
     return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT, false);
+  }
+
+  @Override
+  public boolean isRealtimeOffHeapAllocation() {
+    return _instanceDataManagerConfiguration.getBoolean(REALTIME_OFFHEAP_ALLOCATION, false);
   }
 
   @Override

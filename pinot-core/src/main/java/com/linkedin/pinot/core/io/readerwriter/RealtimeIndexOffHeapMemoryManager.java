@@ -35,6 +35,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
   private final List<PinotDataBuffer> _buffers = new LinkedList<>();
   private final String _segmentName;
+  private long _totalMemBytes = 0;
 
   protected RealtimeIndexOffHeapMemoryManager(String segmentName) {
     _segmentName = segmentName;
@@ -60,6 +61,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
    */
   public PinotDataBuffer allocate(long size, String columnName) {
     PinotDataBuffer buffer = allocateInternal(size, columnName);
+    _totalMemBytes += size;
     _buffers.add(buffer);
     return buffer;
   }
@@ -85,5 +87,9 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
     }
     doClose();
     _buffers.clear();
+  }
+
+  public long getTotalMemBytes() {
+    return _totalMemBytes;
   }
 }

@@ -56,6 +56,8 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
+  // Whether memory for realtime consuming segments should be allocated off-heap.
+  private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
 
   private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_TABLE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -152,6 +154,11 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
   @Override
   public boolean isEnableSplitCommit() {
     return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT, false);
+  }
+
+  @Override
+  public boolean isRealtimeOffHeapAllocation() {
+    return _instanceDataManagerConfiguration.getBoolean(REALTIME_OFFHEAP_ALLOCATION, false);
   }
 
   @Override

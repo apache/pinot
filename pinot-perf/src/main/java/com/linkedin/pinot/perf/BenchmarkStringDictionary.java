@@ -82,7 +82,8 @@ public class BenchmarkStringDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public StringOffHeapMutableDictionary benchmarkOffHeapStringDictionary() {
-    StringOffHeapMutableDictionary dictionary = new StringOffHeapMutableDictionary(10, 10, _memoryManager, "stringColumn");
+    StringOffHeapMutableDictionary dictionary = new StringOffHeapMutableDictionary(5000, 10, _memoryManager, "stringColumn",
+        32);
 
     for (int i = 0; i < stringValues.length; i++) {
       dictionary.index(stringValues[i]);

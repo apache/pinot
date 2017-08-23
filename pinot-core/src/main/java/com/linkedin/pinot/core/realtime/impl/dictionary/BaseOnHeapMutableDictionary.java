@@ -52,6 +52,11 @@ public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
     return _entriesIndexed;
   }
 
+  @Override
+  public int getAvgValueSize() {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
   public boolean isEmpty() {
     return _entriesIndexed == 0;
   }
