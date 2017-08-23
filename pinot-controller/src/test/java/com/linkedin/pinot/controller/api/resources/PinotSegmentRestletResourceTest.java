@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.pinot.controller.api.restlet.resources;
+package com.linkedin.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
