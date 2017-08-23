@@ -80,11 +80,11 @@ public class TableViewsTest extends ControllerTest {
     while (System.currentTimeMillis() < endTime) {
       Thread.sleep(100L);
       TableViews.TableView
-          tableView = getTableView(OFFLINE_TABLE_NAME, com.linkedin.pinot.controller.api.restlet.resources.TableViews.EXTERNALVIEW, null);
+          tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
       if ((tableView.offline == null) || (tableView.offline.size() != 1)) {
         continue;
       }
-      tableView = getTableView(HYBRID_TABLE_NAME, com.linkedin.pinot.controller.api.restlet.resources.TableViews.EXTERNALVIEW, null);
+      tableView = getTableView(HYBRID_TABLE_NAME, TableViews.EXTERNALVIEW, null);
       if (tableView.offline == null) {
         continue;
       }

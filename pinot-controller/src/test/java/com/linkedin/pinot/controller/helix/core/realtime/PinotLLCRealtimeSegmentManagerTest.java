@@ -29,10 +29,10 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.restlet.resources.LLCSegmentCommitUpload;
-import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
+import com.linkedin.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -63,7 +63,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private static final String clusterName = "testCluster";
   private static final String DUMMY_HOST = "dummyHost:1234";
   private static final String KAFKA_OFFSET = "testDummy";
-  private static final String SCHEME = LLCSegmentCommitUpload.SCHEME;
+  private static final String SCHEME = LLCSegmentCompletionHandlers.getScheme();
   private String[] serverNames;
   private static File baseDir;
 

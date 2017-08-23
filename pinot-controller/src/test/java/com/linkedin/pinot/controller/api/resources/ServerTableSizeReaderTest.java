@@ -20,7 +20,6 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
-import com.linkedin.pinot.controller.api.restlet.resources.ServerTableSizeReader;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -44,8 +43,7 @@ import org.testng.annotations.Test;
 
 
 public class ServerTableSizeReaderTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      com.linkedin.pinot.controller.api.restlet.resources.ServerTableSizeReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
 
   private final ExecutorService executor = Executors.newFixedThreadPool(3);
   private final HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
@@ -146,8 +144,7 @@ public class ServerTableSizeReaderTest {
 
   @Test
   public void testServerSizeReader() {
-    com.linkedin.pinot.controller.api.restlet.resources.ServerTableSizeReader
-        reader = new com.linkedin.pinot.controller.api.restlet.resources.ServerTableSizeReader(executor, httpConnectionManager);
+    ServerTableSizeReader reader = new ServerTableSizeReader(executor, httpConnectionManager);
     BiMap<String, String> endpoints = HashBiMap.create();
     for (int i = 0; i < 2; i++) {
       endpoints.put(serverList.get(i), endpointList.get(i));
@@ -166,8 +163,7 @@ public class ServerTableSizeReaderTest {
 
   @Test
   public void testServerSizesErrors() {
-    com.linkedin.pinot.controller.api.restlet.resources.ServerTableSizeReader
-        reader = new ServerTableSizeReader(executor, httpConnectionManager);
+    ServerTableSizeReader reader = new ServerTableSizeReader(executor, httpConnectionManager);
     BiMap<String, String> endpoints = HashBiMap.create();
     for (int i = 0; i < serverCount; i++) {
       endpoints.put(serverList.get(i), endpointList.get(i));
