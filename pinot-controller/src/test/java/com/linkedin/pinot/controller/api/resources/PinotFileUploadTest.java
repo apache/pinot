@@ -20,12 +20,11 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import org.restlet.Client;
-import org.restlet.Request;
-import org.restlet.Response;
-import org.restlet.data.MediaType;
-import org.restlet.data.Method;
-import org.restlet.data.Protocol;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -40,15 +39,15 @@ public class PinotFileUploadTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
 
   @Test
-  public void testUploadBogusData() {
-    Client client = new Client(Protocol.HTTP);
-    Request request = new Request(Method.POST, _controllerRequestURLBuilder.forDataFileUpload());
-    request.setEntity("blah", MediaType.MULTIPART_ALL);
-    Response response = client.handle(request);
-    int statusCode = response.getStatus().getCode();
+  public void testUploadBogusData() throws Exception {
+    org.apache.http.client.HttpClient httpClient = new DefaultHttpClient();
+    HttpPost httpPost = new HttpPost(_controllerRequestURLBuilder.forDataFileUpload());
+    HttpEntity entity = new StringEntity("blah");
+    httpPost.setEntity(entity);
+    HttpResponse response = httpClient.execute(httpPost);
+    int statusCode = response.getStatusLine().getStatusCode();
 
-    // TODO: After jersey api migration, change to check for 4xx response code instead of 5xx.
-    Assert.assertTrue(statusCode >= 400, "Status code = " + response.getStatus().toString());
+    Assert.assertTrue(statusCode >= 400 && statusCode < 500, "Status code = " + statusCode);
   }
 
   @BeforeClass
