@@ -313,7 +313,7 @@ public class PinotTableIdealStateBuilder {
       // TODO: Factory should be loaded from config
       PinotKafkaConsumerFactory _pinotKafkaConsumerFactory = new SimpleConsumerFactory();
       PinotKafkaConsumer consumerWrapper = _pinotKafkaConsumerFactory.buildConsumer(bootstrapHosts,
-          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, null, 0,
+          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, null, Integer.MIN_VALUE,
           KAFKA_CONNECTION_TIMEOUT_MILLIS);
 
       try {

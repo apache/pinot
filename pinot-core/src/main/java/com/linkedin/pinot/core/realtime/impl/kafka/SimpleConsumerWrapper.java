@@ -101,27 +101,18 @@ public class SimpleConsumerWrapper implements PinotKafkaConsumer {
     }
   }
 
-  public SimpleConsumerWrapper(String bootstrapNodes, String clientId, long connectTimeoutMillis) {
-    _clientId = clientId;
-    _connectTimeoutMillis = connectTimeoutMillis;
-    _metadataOnlyConsumer = true;
-    _simpleConsumer = null;
-
-    // Topic and partition are ignored for metadata-only consumers
-    _topic = null;
-    _partition = Integer.MIN_VALUE;
-
-    initializeBootstrapNodeList(bootstrapNodes);
-    setCurrentState(new ConnectingToBootstrapNode());
-  }
-
   public SimpleConsumerWrapper(String bootstrapNodes, String clientId, String topic, int partition,
       long connectTimeoutMillis) {
     _clientId = clientId;
     _topic = topic;
     _partition = partition;
+    if (_topic == null && _partition == Integer.MIN_VALUE) {
+      // Topic and partition are ignored for metadata-only consumers
+      _metadataOnlyConsumer = true;
+    } else {
+      _metadataOnlyConsumer = false;
+    }
     _connectTimeoutMillis = connectTimeoutMillis;
-    _metadataOnlyConsumer = false;
     _simpleConsumer = null;
 
     initializeBootstrapNodeList(bootstrapNodes);
@@ -322,7 +313,7 @@ public class SimpleConsumerWrapper implements PinotKafkaConsumer {
 
       // Connect to the partition leader
       try {
-        _simpleConsumer = new SimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS, SOCKET_BUFFER_SIZE, _clientId);
+        _simpleConsumer = new SimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS, SOCKET_BUFFER_SIZE, _clientId);
 
         setCurrentState(new ConnectedToPartitionLeader());
       } catch (Exception e) {
