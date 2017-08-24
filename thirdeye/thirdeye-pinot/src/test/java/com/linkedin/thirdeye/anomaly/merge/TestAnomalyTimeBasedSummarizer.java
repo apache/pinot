@@ -42,6 +42,7 @@ public class TestAnomalyTimeBasedSummarizer {
     rawAnomalyResults.add(rawAnomalyResult1);
     rawAnomalyResults.add(rawAnomalyResult2);
 
+    // Test when raw anomalies come in bulk
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
         .mergeAnomalies(mergedAnomaly, rawAnomalyResults, anomalyMergeConfig);
 
@@ -52,7 +53,31 @@ public class TestAnomalyTimeBasedSummarizer {
     assert(firstMergedAnomaly.getStartTime() == mergedAnomaly.getStartTime());
     assert(firstMergedAnomaly.getEndTime() == rawAnomalyResult1.getEndTime());
 
+    // Check if the second anomaly is not merged with the merged anomaly
     MergedAnomalyResultDTO secondMergedAnomaly = mergedResults.get(1);
+    assert(secondMergedAnomaly.getStartTime() == rawAnomalyResult2.getStartTime());
+    assert(secondMergedAnomaly.getEndTime() == rawAnomalyResult2.getEndTime());
+
+    rawAnomalyResults.clear();
+
+    // Test when raw anomalies come one-by-one
+    rawAnomalyResults.add(rawAnomalyResult1);
+    mergedResults = AnomalyTimeBasedSummarizer
+        .mergeAnomalies(mergedAnomaly, rawAnomalyResults, anomalyMergeConfig);
+    assert(mergedResults.size() == 1);
+    rawAnomalyResults.clear();
+    rawAnomalyResults.add(rawAnomalyResult2);
+    mergedResults = AnomalyTimeBasedSummarizer
+        .mergeAnomalies(mergedAnomaly, rawAnomalyResults, anomalyMergeConfig);
+    assert(mergedResults.size() == 2);
+
+    // Check if the first raw anomaly is merged with the merged anomaly
+    firstMergedAnomaly = mergedResults.get(0);
+    assert(firstMergedAnomaly.getStartTime() == mergedAnomaly.getStartTime());
+    assert(firstMergedAnomaly.getEndTime() == rawAnomalyResult1.getEndTime());
+
+    // Check if the second anomaly is not merged with the merged anomaly
+    secondMergedAnomaly = mergedResults.get(1);
     assert(secondMergedAnomaly.getStartTime() == rawAnomalyResult2.getStartTime());
     assert(secondMergedAnomaly.getEndTime() == rawAnomalyResult2.getEndTime());
   }
