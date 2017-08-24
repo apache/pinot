@@ -825,11 +825,26 @@ public class AnomaliesResource {
     // the first data range interval is always the monitoring data range
     Pair<Long, Long> monitoringDataInterval = dataRangeIntervals.get(0);
 
+    // Dataset time granularity
     String aggGranularity = datasetConfig.bucketTimeGranularity().toAggregationGranularityString();
     TimeGranularity timeGranularity =
         Utils.getAggregationTimeGranularity(aggGranularity, anomalyFunctionSpec.getCollection());
-    long bucketMillis = timeGranularity.toMillis();
 
+    // Anomaly function time granularity
+    TimeGranularity functionTimeGranularity =
+        new TimeGranularity(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
+
+    long bucketMillis = functionTimeGranularity.toMillis();
+    /*
+     If the function-specified time granularity is smaller than the dataset time granularity, use the dataset's.
+
+     Ex: If the time granularity of the dataset is 1-Day and function assigns 1-Hours, than use 1-Day
+      */
+    if (functionTimeGranularity.toMillis() < timeGranularity.toMillis()) {
+      LOG.warn("The time granularity of the function {}, {}, is smaller than the dataset's, {}. Use dataset's setting.",
+          functionTimeGranularity.toString(), anomalyFunctionSpec.getId(), aggGranularity.toString());
+      bucketMillis = timeGranularity.toMillis();
+    }
     AnomalyTimelinesView anomalyTimelinesView = null;
     AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
         new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
