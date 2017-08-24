@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 
@@ -577,7 +578,7 @@ public class DetectionJobResource {
       @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso,
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
-      @QueryParam("FilterPattern") @DefaultValue("TWO_SIDED") String userDefinedPattern,
+      @QueryParam("FilterPattern") @DefaultValue("UP,DOWN") String userDefinedPattern,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
@@ -671,7 +672,7 @@ public class DetectionJobResource {
       @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso,
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
-      @QueryParam("userDefinedPattern") @DefaultValue("TWO_SIDED") String userDefinedPattern,
+      @QueryParam("userDefinedPattern") @DefaultValue("UP,DOWN") String userDefinedPattern,
       @QueryParam("Sensitivity") @DefaultValue("MEDIUM") String sensitivity,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
@@ -683,7 +684,10 @@ public class DetectionJobResource {
     List<MergedAnomalyResultDTO> anomalies = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
 
     //initiate AutoTuneConfigDTO
-    AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(FilterPattern.valueOf(userDefinedPattern), sensitivity);
+    Properties tuningProperties = new Properties();
+    tuningProperties.put("pattern", userDefinedPattern);
+    tuningProperties.put("sensitivity", sensitivity);
+    AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(tuningProperties);
 
     // create alert filter auto tune
     BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
