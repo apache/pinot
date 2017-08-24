@@ -79,6 +79,7 @@ public abstract class AnomalyTimeBasedSummarizer {
         MergedAnomalyResultDTO currAnomaly = new MergedAnomalyResultDTO();
         populateMergedResult(currAnomaly, currentResult);
         // if the merging is applying sequential gap and current anomaly has gap time larger than sequentialAllowedGap
+        // or the duration of the anomaly to be merged is longer than the maxMergedDurationMillis
         // or current anomaly is not equal on mergeable keys with mergedAnomaly
         // should not merge the two and split from here
         if ((applySequentialGapBasedSplit

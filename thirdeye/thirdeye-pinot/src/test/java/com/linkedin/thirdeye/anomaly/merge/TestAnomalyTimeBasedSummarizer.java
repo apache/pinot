@@ -45,6 +45,7 @@ public class TestAnomalyTimeBasedSummarizer {
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
         .mergeAnomalies(mergedAnomaly, rawAnomalyResults, anomalyMergeConfig);
 
+    // There should be two merged anomaly: 1) mergedAnomaly + rawAnomalyResult1 and 2) rawAnomalyResult2
     assert(mergedResults.size() == 2);
     // Check if the first raw anomaly is merged with the merged anomaly
     MergedAnomalyResultDTO firstMergedAnomaly = mergedResults.get(0);
