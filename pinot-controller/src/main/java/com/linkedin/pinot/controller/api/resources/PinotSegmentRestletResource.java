@@ -43,7 +43,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.ZNRecord;
@@ -317,7 +316,7 @@ public class PinotSegmentRestletResource {
       PinotResourceManagerResponse responseOffline =
           toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state, helixResourceManager);
       if (!responseOffline.isSuccessful() || !responseRealtime.isSuccessful()) {
-        throw new WebApplicationException("OFFLINE response : " + responseOffline.getMessage() + ", REALTIME response"
+        throw new ControllerApplicationException(LOGGER, "OFFLINE response : " + responseOffline.getMessage() + ", REALTIME response"
             + responseRealtime.getMessage(), INTERNAL_ERROR);
       }
       List<PinotResourceManagerResponse> responses = new ArrayList<>();
@@ -334,7 +333,7 @@ public class PinotSegmentRestletResource {
           segmentsToToggle.addAll(realtimeSegments);
         }
       } else {
-        throw new WebApplicationException("There is no realtime table for " + tableName, BAD_REQUEST);
+        throw new ControllerApplicationException(LOGGER, "There is no realtime table for " + tableName, BAD_REQUEST);
       }
     } else {
       if (helixResourceManager.hasOfflineTable(tableName)) {
@@ -345,7 +344,7 @@ public class PinotSegmentRestletResource {
           segmentsToToggle.addAll(offlineSegments);
         }
       } else {
-        throw new WebApplicationException("There is no offline table for: " + tableName, BAD_REQUEST);
+        throw new ControllerApplicationException(LOGGER, "There is no offline table for: " + tableName, BAD_REQUEST);
       }
     }
     PinotResourceManagerResponse resourceManagerResponse =
@@ -403,7 +402,7 @@ public class PinotSegmentRestletResource {
       case DROP:
         return helixResourceManager.deleteSegments(tableName, segmentsToToggle);
       default:
-        throw new WebApplicationException("Invalid state", BAD_REQUEST);
+        throw new ControllerApplicationException(LOGGER, "Invalid state", BAD_REQUEST);
     }
   }
 
@@ -443,7 +442,7 @@ public class PinotSegmentRestletResource {
     if (foundOfflineTable || foundRealtimeTable) {
       return ret;
     } else {
-      throw new WebApplicationException("Table " + tableName + " not found.", Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, "Table " + tableName + " not found.", Response.Status.NOT_FOUND);
     }
   }
 
@@ -494,13 +493,13 @@ public class PinotSegmentRestletResource {
     // seems to be wrong comparing the table name to have the table type, but we copy it here anyway.
     // Realtime table is not supported.
     if (TableNameBuilder.getTableTypeFromTableName(tableName) == CommonConstants.Helix.TableType.REALTIME) {
-      throw new WebApplicationException("Realtime table is not supported", Response.Status.FORBIDDEN);
+      throw new ControllerApplicationException(LOGGER, "Realtime table is not supported", Response.Status.FORBIDDEN);
     }
 
     // Check that the offline table exists.
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     if (!_pinotHelixResourceManager.getAllTables().contains(offlineTableName)) {
-      throw new WebApplicationException("Offline table " + tableName + " does not exist.", BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Offline table " + tableName + " does not exist.", BAD_REQUEST);
     }
 
     Map<String, String> segmentCrcForTable = _pinotHelixResourceManager.getSegmentsCrcForTable(offlineTableName);

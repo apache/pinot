@@ -136,20 +136,21 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey.getStringKey(), "");
+    Assert.assertEquals(firstGroupKey._stringKey, "");
     Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).cardinality(), 21L);
     Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).cardinality(), 691L);
 
     // Test inter segments base query
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(BASE_QUERY);
-    QueriesTestUtils.verifyAggregationResult(brokerResponse, 4L, 0L, 8L, 120000L, new String[]{"21", "1762"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4L, 0L, 8L, 120000L, new String[]{"21", "1762"});
     // Test inter segments query with filter
     brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
-    QueriesTestUtils.verifyAggregationResult(brokerResponse, 24516L, 340992L, 49032L, 120000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 340992L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
     brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
-    QueriesTestUtils.verifyAggregationResult(brokerResponse, 18452L, 0L, 55356L, 120000L, new String[]{"21", "1762"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 18452L, 0L, 55356L, 120000L,
+        new String[]{"21", "1762"});
 
     deleteSegment();
   }
@@ -191,20 +192,22 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey.getStringKey(), "");
+    Assert.assertEquals(firstGroupKey._stringKey, "");
     Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).cardinality(), 21L);
     Assert.assertEquals(((HyperLogLog) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).cardinality(), 691L);
 
     // Test inter segments base query
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(BASE_QUERY);
-    QueriesTestUtils.verifyAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, new String[]{"21", "1762"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
+        new String[]{"21", "1762"});
     // Test inter segments query with filter
     brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
-    QueriesTestUtils.verifyAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
     brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
-    QueriesTestUtils.verifyAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, new String[]{"21", "1762"});
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
+        new String[]{"21", "1762"});
 
     deleteSegment();
   }

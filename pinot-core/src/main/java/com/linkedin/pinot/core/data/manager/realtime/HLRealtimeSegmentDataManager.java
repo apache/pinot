@@ -15,17 +15,6 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimerTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
@@ -39,7 +28,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -50,9 +38,20 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public class HLRealtimeSegmentDataManager extends SegmentDataManager {
+public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HLRealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
@@ -97,6 +96,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
       final ServerMetrics serverMetrics)
       throws Exception {
     super();
+    initStatsHistory(realtimeTableDataManager);
     _realtimeTableDataManager = realtimeTableDataManager;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     this.schema = schema;
@@ -104,6 +104,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     this.serverMetrics =serverMetrics;
     this.segmentName = segmentMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
+    initMemoryManager(realtimeTableDataManager, indexLoadingConfig.isRealtimeOffheapAllocation(), segmentName);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
@@ -167,9 +168,8 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     // lets create a new realtime segment
     segmentLogger.info("Started kafka stream provider");
     realtimeSegment =
-        new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(), tableName,
-            segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName(), serverMetrics,
-            this.invertedIndexColumns, indexLoadingConfig.getRealtimeAvgMultiValueCount(), noDictionaryColumns);
+        new RealtimeSegmentImpl(serverMetrics, this, indexLoadingConfig, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(),
+            kafkaStreamProviderConfig.getStreamName());
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
     notifier = realtimeTableDataManager;
 
@@ -431,5 +431,30 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     keepIndexing = false;
     segmentStatusTask.cancel();
     realtimeSegment.destroy();
+  }
+
+  @Override
+  public String getTableName() {
+    return tableName;
+  }
+
+  @Override
+  public Schema getSchema() {
+    return schema;
+  }
+
+  @Override
+  public List<String> getNoDictionaryColumns() {
+    return noDictionaryColumns;
+  }
+
+  @Override
+  public List<String> getInvertedIndexColumns() {
+    return invertedIndexColumns;
+  }
+
+  @Override
+  public File getTableDataDir() {
+    return resourceDir;
   }
 }

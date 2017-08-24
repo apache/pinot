@@ -40,6 +40,8 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
  * PQL 2 compiler.
  */
 public class Pql2Compiler implements AbstractCompiler {
+  private boolean _splitInClause = false;
+
   private static class ErrorListener extends BaseErrorListener {
     @Override
     public void syntaxError(@NotNull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,
@@ -52,6 +54,20 @@ public class Pql2Compiler implements AbstractCompiler {
 
   @Override
   public BrokerRequest compileToBrokerRequest(String expression) throws Pql2CompilationException {
+    return compileToBrokerRequest(expression, false);
+  }
+
+  /**
+   * Compile the given expression into {@link BrokerRequest}.
+   *
+   * @param expression Expression to compile
+   * @param splitInClause Value of in clause sent as list if true, joined with delimiter otherwise. This is a temporary
+   *                      argument to keep the broker and server compatible, and will be removed.
+   * @return BrokerRequest
+   * @throws Pql2CompilationException
+   */
+  public BrokerRequest compileToBrokerRequest(String expression, boolean splitInClause) throws Pql2CompilationException {
+    _splitInClause = splitInClause;
     try {
       //
       CharStream charStream = new ANTLRInputStream(expression);
@@ -69,7 +85,7 @@ public class Pql2Compiler implements AbstractCompiler {
       ParseTree parseTree = parser.root();
 
       ParseTreeWalker walker = new ParseTreeWalker();
-      Pql2AstListener listener = new Pql2AstListener(expression);
+      Pql2AstListener listener = new Pql2AstListener(expression, _splitInClause);
       walker.walk(listener, parseTree);
 
       AstNode rootNode = listener.getRootNode();
@@ -96,7 +112,7 @@ public class Pql2Compiler implements AbstractCompiler {
     ParseTree parseTree = parser.expression();
 
     ParseTreeWalker walker = new ParseTreeWalker();
-    Pql2AstListener listener = new Pql2AstListener(expression);
+    Pql2AstListener listener = new Pql2AstListener(expression, _splitInClause);
     walker.walk(listener, parseTree);
 
     final AstNode rootNode = listener.getRootNode();

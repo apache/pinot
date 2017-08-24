@@ -89,6 +89,33 @@ public class EmailResource {
   }
 
   /**
+   * Generate an instance of SmtpConfiguration
+   * This smtp configuration will take the default setting from thirdeye configuration first. If there is user defined
+   * smtp setting, then use the user's definition.
+   * @param smtpHost
+   *    the host of the smtp server; no change if null
+   * @param smtpPort
+   *    the port of the smtp server; no change if null
+   * @return
+   *    an instance of smtp configuration with user defined host and port
+   */
+  public SmtpConfiguration getSmtpConfiguration(String smtpHost, Integer smtpPort) {
+    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
+    if (thirdeyeConfiguration.getSmtpConfiguration() != null) {
+      smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
+    }
+
+    if (!Strings.isNullOrEmpty(smtpHost)) {
+      smtpConfiguration.setSmtpHost(smtpHost);
+    }
+    if (smtpPort != null) {
+      smtpConfiguration.setSmtpPort(smtpPort);
+    }
+
+    return smtpConfiguration;
+  }
+
+  /**
    * End point to send anomalies by datasets
    * @param startTime start time to generate anomalies
    * @param endTime end time of generate anomalies
@@ -124,12 +151,9 @@ public class EmailResource {
       throw new WebApplicationException("Empty : list of recipients" + toAddr);
     }
 
-    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
-    if (!Strings.isNullOrEmpty(smtpHost)) {
-      smtpConfiguration.setSmtpHost(smtpHost);
-    }
-    if (smtpPort != null) {
-      smtpConfiguration.setSmtpPort(smtpPort);
+    SmtpConfiguration smtpConfiguration = getSmtpConfiguration(smtpHost, smtpPort);
+    if (smtpConfiguration == null) {
+      throw new WebApplicationException("Smtp configuration is empty or null");
     }
 
     if(Strings.isNullOrEmpty(teHost)) {
@@ -193,12 +217,10 @@ public class EmailResource {
     if (Strings.isNullOrEmpty(toAddr)) {
       throw new WebApplicationException("Empty : list of recipients" + toAddr);
     }
-    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
-    if (!Strings.isNullOrEmpty(smtpHost)) {
-      smtpConfiguration.setSmtpHost(smtpHost);
-    }
-    if (smtpPort != null) {
-      smtpConfiguration.setSmtpPort(smtpPort);
+
+    SmtpConfiguration smtpConfiguration = getSmtpConfiguration(smtpHost, smtpPort);
+    if (smtpConfiguration == null) {
+      throw new WebApplicationException("Smtp configuration is empty or null");
     }
 
     if(Strings.isNullOrEmpty(teHost)) {
@@ -247,13 +269,9 @@ public class EmailResource {
       throw new WebApplicationException("Empty : list of recipients" + toAddr);
     }
 
-    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
-
-    if (!Strings.isNullOrEmpty(smtpHost)) {
-      smtpConfiguration.setSmtpHost(smtpHost);
-    }
-    if (smtpPort != null) {
-      smtpConfiguration.setSmtpPort(smtpPort);
+    SmtpConfiguration smtpConfiguration = getSmtpConfiguration(smtpHost, smtpPort);
+    if (smtpConfiguration == null) {
+      throw new WebApplicationException("Smtp configuration is empty or null");
     }
 
     if(Strings.isNullOrEmpty(teHost)) {
@@ -301,13 +319,9 @@ public class EmailResource {
       smtpHost = thirdeyeConfiguration.getSmtpHost();
     }
 
-    SmtpConfiguration smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
-    if (smtpPort != null) {
-      smtpConfiguration.setSmtpPort(smtpPort);
-    }
-
-    if (smtpHost != null) {
-      smtpConfiguration.setSmtpHost(smtpHost);
+    SmtpConfiguration smtpConfiguration = getSmtpConfiguration(smtpHost, smtpPort);
+    if (smtpConfiguration == null) {
+      throw new WebApplicationException("Smtp configuration is empty or null");
     }
 
     if (Strings.isNullOrEmpty(fromAddr)) {

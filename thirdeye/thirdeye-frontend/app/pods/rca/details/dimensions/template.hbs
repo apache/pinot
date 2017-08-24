@@ -19,7 +19,7 @@
       </div>
     </div>
 
-    {{#if (or dimensions.loading )}}
+    {{#if dimensions.loading}}
       <div class="spinner-wrapper">
         {{ember-spinner}}
       </div>
@@ -37,6 +37,8 @@
           selectedDimensions=summary.selectedDimensions
           analysisStart=dimensions.regionStart
           analysisEnd=dimensions.regionEnd
+          minDate=displayStart
+          maxDate=displayEnd
           onSubchartChange=(action "setDateParams")
           onSelection=(action actions.onSelection)
           showDimensions=true}}
@@ -69,7 +71,7 @@
                       theme='ios'
                       showLabels=true
                       name="splitViewToggle"
-                      onToggle=(action (mut showDetails))
+                      onToggle=(action "onToggle")
                       as |toggle|}}
                         {{#toggle.label splitView=(not showDetails)}}
                           <span class="te-label">{{if showDetails 'Hide Details' 'Show Details'}}</span>
@@ -86,7 +88,7 @@
                   end=dimensionsEnd
                   dimensions=dimensions.subdimensions
                   showDetails=showDetails
-                  loading=(mut tableIsLoading)
+                  stopLoading=(action "onRendering")
                 }} 
               {{/if}}
             </div>

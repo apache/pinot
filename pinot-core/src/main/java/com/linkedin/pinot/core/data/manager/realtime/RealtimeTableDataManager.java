@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -35,11 +36,14 @@ import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nonnull;
@@ -49,13 +53,16 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.LoggerFactory;
 
-// TODO Use the refcnt object inside SegmentDataManager
 public class RealtimeTableDataManager extends AbstractTableDataManager {
 
   private final ExecutorService _segmentAsyncExecutorService = Executors
       .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
   private SegmentBuildTimeLeaseExtender _leaseExtender;
+  private RealtimeSegmentStatsHistory _statsHistory;
+
+  private static final String CONSUMERS_DIR = "consumers";
+  private static final String STATS_FILE_NAME = "stats.ser";
 
   public RealtimeTableDataManager() {
     super();
@@ -76,6 +83,35 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.create(getServerInstance());
     LOGGER = LoggerFactory.getLogger(_tableName + "-RealtimeTableDataManager");
+    File consumersDir = new File(_tableDataDir, CONSUMERS_DIR);
+    consumersDir.mkdirs();
+    File statsFile = new File(consumersDir, STATS_FILE_NAME);
+    try {
+      _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+    } catch (IOException |ClassNotFoundException e) {
+      LOGGER.error("Error reading history object for table {} from {}", _tableName, statsFile.getAbsolutePath(), e);
+      File savedFile = new File(consumersDir, STATS_FILE_NAME + "." + UUID.randomUUID());
+      try {
+        FileUtils.moveFile(statsFile, savedFile);
+      } catch (IOException e1) {
+        LOGGER.error("Could not move {} to {}", statsFile.getAbsolutePath(), savedFile.getAbsolutePath(), e1);
+        throw new RuntimeException(e);
+      }
+      LOGGER.warn("Saved unreadable {} into {}. Creating a fresh instance", statsFile.getAbsolutePath(), savedFile.getAbsolutePath());
+      try {
+        _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+      } catch (Exception e2) {
+        Utils.rethrowException(e2);
+      }
+    }
+  }
+
+  public RealtimeSegmentStatsHistory getStatsHistory() {
+    return _statsHistory;
+  }
+
+  public String getConsumerDir() {
+    return _tableDataDir + File.separator + CONSUMERS_DIR;
   }
 
   public void notifySegmentCommitted(RealtimeSegmentZKMetadata metadata, IndexSegment segment) {

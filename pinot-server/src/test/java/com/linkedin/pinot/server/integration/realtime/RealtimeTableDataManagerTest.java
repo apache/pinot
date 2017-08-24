@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.HLRealtimeSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.realtime.TimerService;
@@ -55,6 +56,8 @@ import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
+
+import static org.mockito.Mockito.*;
 
 
 public class RealtimeTableDataManagerTest {
@@ -115,10 +118,22 @@ public class RealtimeTableDataManagerTest {
     return tableDataManagerConfig;
   }
 
+  private InstanceDataManagerConfig makeInstanceDataManagerConfig() {
+    InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(dataManagerConfig.getReadMode()).thenReturn(null);
+    when(dataManagerConfig.getAvgMultiValueCount()).thenReturn(null);
+    when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
+    when(dataManagerConfig.isEnableDefaultColumns()).thenReturn(false);
+    when(dataManagerConfig.isEnableSplitCommit()).thenReturn(false);
+    when(dataManagerConfig.isRealtimeOffHeapAllocation()).thenReturn(false);
+    return dataManagerConfig;
+  }
+
   public void testSetup() throws Exception {
+    InstanceDataManagerConfig dataManagerConfig = makeInstanceDataManagerConfig();
     final HLRealtimeSegmentDataManager manager =
         new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, null,
-            tableDataManagerConfig.getDataDir(), new IndexLoadingConfig(null, tableConfig), getTestSchema(),
+            tableDataManagerConfig.getDataDir(), new IndexLoadingConfig(dataManagerConfig, tableConfig), getTestSchema(),
             new ServerMetrics(new MetricsRegistry()));
 
     final long start = System.currentTimeMillis();

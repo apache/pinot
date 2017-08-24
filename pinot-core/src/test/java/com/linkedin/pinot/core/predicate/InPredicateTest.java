@@ -1,0 +1,74 @@
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.linkedin.pinot.core.predicate;
+
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.predicate.InPredicate;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import java.util.Arrays;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
+
+/**
+ * Unit test for {@link InPredicate}
+ */
+public class InPredicateTest {
+
+  /**
+   * This test ensures the FilterQueryTree & InPredicate are constructed correctly for both cases of:
+   * <ul>
+   *   <li> Splitting the in clause values. </li>
+   *   <li> Joining the in clause values with delimiter. </li>
+   * </ul>
+   */
+  @Test
+  public void testSplitInClause() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    String query = "select * from foo where values in ('abc', 'xyz', '123')";
+
+    String[] expectedValues = new String[]{"abc", "xyz", "123"};
+    Arrays.sort(expectedValues); /* InPredicateAstNode sorts the predicate values. */
+
+    /* Test split case */
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query, true /*splitInClause*/);
+    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+    InPredicate predicate = (InPredicate) Predicate.newPredicate(filterQueryTree);
+    String[] actualValues = predicate.getInRange();
+    Arrays.sort(actualValues);
+
+    Assert.assertEquals(actualValues, expectedValues);
+    Assert.assertTrue(EqualityUtils.isEqualIgnoreOrder(filterQueryTree.getValue(), Arrays.asList(expectedValues)));
+
+    /* Test join case */
+    brokerRequest = compiler.compileToBrokerRequest(query, false /*splitInClause*/);
+    filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+    predicate = (InPredicate) Predicate.newPredicate(filterQueryTree);
+    actualValues = predicate.getInRange();
+    Arrays.sort(actualValues);
+
+    Assert.assertEquals(actualValues, expectedValues);
+    actualValues = filterQueryTree.getValue().get(0).split(InPredicate.DELIMITER);
+    Arrays.sort(actualValues);
+    Assert.assertEquals(actualValues, expectedValues);
+  }
+}
+

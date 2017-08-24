@@ -86,8 +86,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizerTest {
   public void testEqualityAndInMerge() {
     // a = 1 OR a IN (2,3,4) -> a IN (1,2,3,4)
     checkForIdenticalFilterQueryTrees(
-        "select * from a where a = 1 OR a IN (2,3,4)",
-        "select * from a where a IN (1,2,3,4)"
+        "select * from a where a = 1 OR a IN (2,3,4,31)",
+        "select * from a where a IN (1,2,31,3,4)"
     );
   }
 

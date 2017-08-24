@@ -470,7 +470,8 @@ public class AnomalyResource {
       @QueryParam("filters") String filters,
       @QueryParam("properties") String properties,
       @QueryParam("isActive") Boolean isActive,
-      @QueryParam("frequency") String frequency) throws Exception {
+      @QueryParam("frequency") String frequency,
+      @QueryParam("bucket") String userInputDataGranularity) throws Exception {
 
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
@@ -540,6 +541,19 @@ public class AnomalyResource {
         throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
       }
       anomalyFunctionSpec.setCron(cron);
+    }
+
+    if (userInputDataGranularity != null) {
+      // Update bucket size and unit
+      TimeGranularity timeGranularity = TimeGranularity.fromString(userInputDataGranularity);
+      if (timeGranularity != null) {
+        anomalyFunctionSpec.setBucketSize(timeGranularity.getSize());
+        anomalyFunctionSpec.setBucketUnit(timeGranularity.getUnit());
+      } else {
+        LOG.warn("Non-feasible time granularity expression: {}", userInputDataGranularity);
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("Non-feasible time granularity expression: " + userInputDataGranularity).build();
+      }
     }
 
     if (StringUtils.isNotEmpty(frequency)) {

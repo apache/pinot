@@ -45,7 +45,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.json.JSONArray;
@@ -101,7 +100,7 @@ public class PinotTableRestletResource {
       tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       tableName = tableConfig.getTableName();
     } catch (IOException | JSONException | IllegalArgumentException e) {
-      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
     try {
       ensureMinReplicas(tableConfig);
@@ -110,10 +109,10 @@ public class PinotTableRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
-        LOGGER.info("Invalid table config for table: {}, {}", tableName, e.getMessage());
-        throw new WebApplicationException("Invalid table config:" + e.getStackTrace(), Response.Status.BAD_REQUEST);
+        String errStr = "Invalid table config for table: " + tableName;
+        throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
       } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
-        throw new WebApplicationException(e, Response.Status.CONFLICT);
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
       } else {
         throw e;
       }
@@ -134,7 +133,7 @@ public class PinotTableRestletResource {
       resultObject.put("tables", tableArray);
       return resultObject.toString();
     } catch (Exception e) {
-      throw new WebApplicationException(e);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -156,7 +155,7 @@ public class PinotTableRestletResource {
       }
       return ret.toString();
     } catch (Exception e) {
-      throw new WebApplicationException(e);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -208,10 +207,10 @@ public class PinotTableRestletResource {
       if (tableExists) {
         return ret.toString();
       } else {
-        throw new WebApplicationException("Table '" + tableName + "' does not exist", Response.Status.BAD_REQUEST);
+        throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist", Response.Status.BAD_REQUEST);
       }
     } catch (Exception e) {
-      throw new WebApplicationException(e);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
 
   }
@@ -236,7 +235,7 @@ public class PinotTableRestletResource {
       }
       return new SuccessResponse("Table deleted " + tablesDeleted);
     } catch (Exception e) {
-      throw new WebApplicationException(e);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -253,7 +252,7 @@ public class PinotTableRestletResource {
       JSONObject tableConfigJson = new JSONObject(tableConfigStr);
       tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
     } catch (Exception e) {
-      throw new WebApplicationException(e);
+      throw new ControllerApplicationException(LOGGER, "Invalid JSON", Response.Status.BAD_REQUEST);
     }
 
     try {
@@ -261,27 +260,27 @@ public class PinotTableRestletResource {
       String configTableName = tableConfig.getTableName();
       String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
       if (!configTableName.equals(tableNameWithType)) {
-        throw new WebApplicationException(
+        throw new ControllerApplicationException(LOGGER,
             "Request table " + tableNameWithType + " does not match table name in the body " + configTableName,
             Response.Status.BAD_REQUEST);
       }
 
       if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
         if (!_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          throw new WebApplicationException("Table " + tableName + " does not exist", Response.Status.BAD_REQUEST);
+          throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist", Response.Status.BAD_REQUEST);
         }
       } else {
         if (!_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          throw new WebApplicationException("Table " + tableName + " does not exist", Response.Status.NOT_FOUND);
+          throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist", Response.Status.NOT_FOUND);
         }
       }
 
       ensureMinReplicas(tableConfig);
       _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
-      LOGGER.info("Failed to update configuration for table {}, message: {}", tableName, e.getMessage());
+      String errStr = "Failed to update configuration for table " + tableName;
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
-      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw e;

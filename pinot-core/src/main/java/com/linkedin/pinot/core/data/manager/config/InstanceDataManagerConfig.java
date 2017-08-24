@@ -41,4 +41,6 @@ public interface InstanceDataManagerConfig {
   boolean isEnableDefaultColumns();
 
   boolean isEnableSplitCommit();
+
+  boolean isRealtimeOffHeapAllocation();
 }

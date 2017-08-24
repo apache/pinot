@@ -27,6 +27,7 @@ import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.ZkUtils;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;

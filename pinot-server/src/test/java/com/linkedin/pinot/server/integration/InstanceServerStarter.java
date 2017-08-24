@@ -15,20 +15,9 @@
  */
 package com.linkedin.pinot.server.integration;
 
+import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.ServerQueryRequest;
-import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -36,8 +25,16 @@ import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.server.starter.ServerBuilder;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class InstanceServerStarter {
@@ -60,7 +57,6 @@ public class InstanceServerStarter {
     LOGGER.info("Trying to build QueryExecutor");
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
     QueryScheduler queryScheduler = serverBuilder.buildQueryScheduler(queryExecutor);
-    RequestHandlerFactory simpleRequestHandlerFactory = serverBuilder.buildRequestHandlerFactory(queryScheduler);
     LOGGER.info("Trying to build NettyServer");
 
     System.out.println(getMaxQuery());
@@ -84,7 +80,7 @@ public class InstanceServerStarter {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
       ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, metrics);
-      DataTable instanceResponse = queryExecutor.processQuery(queryRequest, queryScheduler.getWorkerExecutorService());
+      DataTable instanceResponse = queryExecutor.processQuery(queryRequest, queryScheduler.getQueryWorkers());
       System.out.println(instanceResponse.toString());
       System.out.println("Query Time Used : " + instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
     } catch (Exception e) {

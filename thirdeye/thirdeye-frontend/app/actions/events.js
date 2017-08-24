@@ -39,6 +39,9 @@ function loadEvents(response) {
   };
 }
 
+/**
+ * Set Events Status to loaded
+ */
 function loaded() {
   return {
     type: ActionTypes.LOADED
@@ -78,7 +81,7 @@ const setWeight = (event) => {
  * Helper function assigning start and end times to events relative
  * to the anomaly period's start time
  */
-const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, baselineEnd) => {
+const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, baselineEnd, analysisStart, analysisEnd) => {
   const duration = event.end - event.start;
   const baselineOffset = baselineStart - anomalyStart;
 
@@ -86,7 +89,7 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
 
   var relEnd = Infinity;
   var relDuration = Infinity;
-  if (moment().isAfter(moment(event.end).add(1, 'minute'))) {
+  if (event.end > 0 && moment().isAfter(moment(event.end).add(1, 'minute'))) {
     relEnd = event.end - anomalyStart;
     relDuration = event.end - event.start;
   }
@@ -94,10 +97,13 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
   var isBaseline = false;
   var displayStart = event.start;
   var displayEnd = event.end;
-  if (displayStart < baselineEnd) {
+  if (baselineStart <= displayStart && displayStart < baselineEnd) {
     isBaseline = true;
     displayStart -= baselineOffset;
     displayEnd -= baselineOffset;
+  }
+  if (displayEnd <= 0) {
+    displayEnd = analysisEnd;
   }
 
   return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd });
@@ -108,7 +114,7 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
  */
 const adjustHolidayTimestamp = (event) => {
   const startUtc = moment(event.start).utc();
-  const endUtc = moment(event.start).utc();
+  const endUtc = moment(event.end).utc();
 
   if (event.eventType == 'holiday') {
     if (startUtc.isSame(startUtc.startOf('day'))) {
@@ -177,7 +183,10 @@ const assignHumanTimeInfo = (event) => {
  */
 function fetchEvents(start, end, mode) {
   return (dispatch, getState) => {
-    const { primaryMetric } = getState();
+    const {
+      primaryMetric,
+      events: eventsState
+    } = getState();
 
     const {
       primaryMetricId: metricId,
@@ -185,8 +194,9 @@ function fetchEvents(start, end, mode) {
       currentStart = moment(currentEnd).subtract(1, 'week').valueOf(),
       compareMode
     } = primaryMetric;
+    const { events } = eventsState;
 
-    if (!metricId) {return;}
+    if (!metricId || events.length) { return; }
 
     const analysisStart = currentStart;
     const analysisEnd = currentEnd;
@@ -205,14 +215,11 @@ function fetchEvents(start, end, mode) {
     return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=thirdeye:metric:${metricId}`)
       .then(res => res.json())
       .then((res) => {
-        // hidding informed events
-
         return _.uniqBy(res, 'urn')
-          .filter(event => event.eventType !== 'informed')
           .map(adjustHolidayTimestamp)
+          .map(event => assignEventTimeInfo(event, anomalyStart, anomalyEnd, baselineStart, baselineEnd, analysisStart, analysisEnd))
           .map(assignEventColor)
           .map(setWeight)
-          .map(event => assignEventTimeInfo(event, anomalyStart, anomalyEnd, baselineStart, baselineEnd))
           .map(assignHumanTimeInfo)
           .sort((a, b) => (b.score - a.score));
       })
@@ -231,8 +238,8 @@ function updateDates(start, end, compareMode) {
   return (dispatch, getState) => {
     const { primaryMetric } = getState();
     compareMode = compareMode || primaryMetric.compareMode;
-
-    return dispatch(fetchEvents(start, end, compareMode));
+    return dispatch(reset())
+      .then(() => dispatch(fetchEvents(start, end, compareMode)));
   };
 }
 

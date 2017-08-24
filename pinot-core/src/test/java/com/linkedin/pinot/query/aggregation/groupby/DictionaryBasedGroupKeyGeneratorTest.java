@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.query.aggregation.groupby.DefaultGroupKeyGenerator;
+import com.linkedin.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -50,7 +50,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class DefaultGroupKeyGeneratorTest {
+public class DictionaryBasedGroupKeyGeneratorTest {
   private static final String SEGMENT_NAME = "DefaultGroupKeyGeneratorTestSegment";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
   private static final int NUM_ROWS = 1000;
@@ -151,15 +151,16 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
-    Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
+    DictionaryBasedGroupKeyGenerator
+        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 100, _errorMessage);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 100, _errorMessage);
     compareSingleValueBuffer();
-    testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
   }
 
   @Test
@@ -169,15 +170,16 @@ public class DefaultGroupKeyGeneratorTest {
 
     // Test initial status.
     long expected = (long) Math.pow(UNIQUE_ROWS, groupByColumns.length);
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
-    Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), expected, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+    DictionaryBasedGroupKeyGenerator
+        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), expected, _errorMessage);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
-    testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
   }
 
   @Test
@@ -186,15 +188,16 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
-    Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+    DictionaryBasedGroupKeyGenerator
+        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE, _errorMessage);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
-    testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
   }
 
   /**
@@ -217,16 +220,17 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
-    int groupKeyUpperBound = defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound();
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
+    DictionaryBasedGroupKeyGenerator
+        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    int groupKeyUpperBound = dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound();
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
     compareMultiValueBuffer();
-    testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
   }
 
   @Test
@@ -235,15 +239,16 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1", "m2", "s1", "s2"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+    DictionaryBasedGroupKeyGenerator
+        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
-    testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
   }
 
   @Test
@@ -252,15 +257,16 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1", "m2", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+    DictionaryBasedGroupKeyGenerator
+        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
-    testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
   }
 
   /**
@@ -300,8 +306,8 @@ public class DefaultGroupKeyGeneratorTest {
     while (groupKeyIterator.hasNext()) {
       count++;
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      idSet.add(groupKey.getFirst());
-      groupKeySet.add(groupKey.getStringKey());
+      idSet.add(groupKey._groupId);
+      groupKeySet.add(groupKey._stringKey);
     }
 
     Assert.assertEquals(count, numUniqueKeys, _errorMessage);

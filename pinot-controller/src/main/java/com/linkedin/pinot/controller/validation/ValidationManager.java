@@ -141,6 +141,7 @@ public class ValidationManager {
 
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
       TableConfig tableConfig = null;
+
       _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName);
       // For each table, fetch the metadata for all its segments
       if (tableType.equals(TableType.OFFLINE)) {
@@ -152,6 +153,9 @@ public class ValidationManager {
         KafkaStreamMetadata streamMetadata = null;
         try {
           tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+          if (tableConfig == null) {
+            continue;
+          }
           streamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
           if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
             countHLCSegments = false;

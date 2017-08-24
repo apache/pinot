@@ -10,6 +10,7 @@ import { COMPARE_MODE_MAPPING, colors } from './constants';
  */
 export const ActionTypes = {
   LOADING: type('[Metric] Loading'),
+  LOADED: type('[Metric] Loaded'),
   REQUEST_FAIL: type('[Metric] Request Fail'),
   LOAD_IDS: type('[Metric] Load related Metric Ids'),
   LOAD_DATA: type('[Metric] Load related Metric Data'),
@@ -38,6 +39,15 @@ const filterMetric = (metric) => {
 function loading() {
   return {
     type: ActionTypes.LOADING
+  };
+}
+
+/**
+ * Set Metrics Status to loaded
+ */
+function loaded() {
+  return {
+    type: ActionTypes.LOADED
   };
 }
 
@@ -271,6 +281,7 @@ function reset() {
 
 export const Actions = {
   loading,
+  loaded,
   requestFail,
   fetchRelatedMetricData,
   fetchRelatedMetricIds,

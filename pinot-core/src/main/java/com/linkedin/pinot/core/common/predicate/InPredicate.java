@@ -30,12 +30,17 @@ public class InPredicate extends Predicate {
 
   @Override
   public String toString() {
+    List<String> rhs = getRhs();
     return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : "
-        + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
+        + Arrays.toString(rhs.toArray(new String[rhs.size()])) + "\n";
   }
 
   public String[] getInRange() {
-    return getRhs().get(0).split(DELIMITER);
+    /* To maintain backward compatibility, we always split if number of values is one. We do not support
+       case where DELIMITER is a sub-string of value.
+     */
+    List<String> values = getRhs();
+    return (values.size() == 1) ? values.get(0).split(DELIMITER) : values.toArray(new String[values.size()]);
   }
 
 }

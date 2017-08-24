@@ -26,7 +26,6 @@ import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.QuerySchedulerFactory;
 import com.linkedin.pinot.server.conf.NettyServerConfig;
 import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.request.ScheduledRequestHandler;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
@@ -43,8 +42,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Initialize a ServerBuilder with serverConf file.
- *
- *
  */
 public class ServerBuilder {
 
@@ -151,15 +148,6 @@ public class ServerBuilder {
     return QuerySchedulerFactory.create(schedulerConfig, queryExecutor, _serverMetrics);
   }
 
-  public RequestHandlerFactory buildRequestHandlerFactory(final QueryScheduler queryScheduler) {
-    RequestHandlerFactory requestHandlerFactory = new RequestHandlerFactory() {
-      @Override
-      public NettyServer.RequestHandler createNewRequestHandler() {
-        return new ScheduledRequestHandler(queryScheduler, _serverMetrics);
-      }
-    };
-    return requestHandlerFactory;
-  }
 
   /**
    * This method initializes the transform factory containing built-in functions

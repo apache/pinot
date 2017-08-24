@@ -49,6 +49,14 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
         failed: false
       });
 
+    case ActionTypes.LOADED: {
+      return Object.assign({}, state, {
+        loaded: true,
+        loading: false,
+        failed: false
+      });
+    }
+
     case ActionTypes.LOAD_PRIMARY_METRIC: {
       let {
         primaryMetricId,

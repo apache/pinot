@@ -42,8 +42,8 @@ public class MutableOffHeapByteArrayStoreTest {
 
   @Test
   public void maxValueTest() throws Exception {
-    MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn");
-    final int arrSize = MutableOffHeapByteArrayStore.getStartSize();
+    MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 1024, 32);
+    final int arrSize = store.getStartSize();
     byte[] dataIn = new byte[arrSize-4];
     for (int i = 0; i < dataIn.length; i++) {
       dataIn[i] = (byte)(i % Byte.MAX_VALUE);
@@ -56,8 +56,8 @@ public class MutableOffHeapByteArrayStoreTest {
 
   @Test
   public void overflowTest() throws Exception {
-    MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn");
-    final int maxSize = MutableOffHeapByteArrayStore.getStartSize() - 4;
+    MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 1024, 32);
+    final int maxSize = store.getStartSize() - 4;
 
     byte[] b1 = new byte[3];
     for (int i = 0; i < b1.length; i++) {

@@ -248,42 +248,33 @@ public class SegmentFetcherAndLoader {
     }
   }
 
-  private String downloadSegmentToLocal(String uri, String tableName, String segmentId)
+  @Nonnull
+  private String downloadSegmentToLocal(@Nonnull String uri, @Nonnull String tableName, @Nonnull String segmentName)
       throws Exception {
-    File tempSegmentFile = null;
-    File tempFile = null;
+    File tempDir = new File(new File(_dataManager.getSegmentFileDirectory(), tableName),
+        "tmp_" + segmentName + "_" + System.nanoTime());
+    FileUtils.forceMkdir(tempDir);
+    File tempTarFile = new File(tempDir, segmentName + ".tar.gz");
+    File tempSegmentDir = new File(tempDir, segmentName);
     try {
-      tempSegmentFile = new File(_dataManager.getSegmentFileDirectory() + "/"
-          + tableName + "/temp_" + segmentId + "_" + System.currentTimeMillis());
-      tempFile = new File(_dataManager.getSegmentFileDirectory(), segmentId + ".tar.gz");
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
-      LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}; segmentName: {}; table: {}", uri, tempFile,
-          tempFile.length(), segmentId, tableName);
-      LOGGER.info("Trying to decompress segment tar file from {} to {} for table {}", tempFile, tempSegmentFile, tableName);
+      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempTarFile);
+      LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
+          tableName, uri, tempTarFile, tempTarFile.length());
+      TarGzCompressionUtils.unTar(tempTarFile, tempSegmentDir);
+      File[] files = tempSegmentDir.listFiles();
+      Preconditions.checkState(files != null && files.length == 1);
+      File tempIndexDir = files[0];
 
-      TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
-      FileUtils.deleteQuietly(tempFile);
-      final File segmentDir = new File(new File(_dataManager.getSegmentDataDirectory(), tableName), segmentId);
-      Thread.sleep(1000);
-      if (segmentDir.exists()) {
-        LOGGER.info("Deleting the directory {} and recreating it again table {} ", segmentDir.getAbsolutePath(), tableName);
-        FileUtils.deleteDirectory(segmentDir);
+      File indexDir = new File(new File(_dataManager.getSegmentDataDirectory(), tableName), segmentName);
+      if (indexDir.exists()) {
+        LOGGER.info("Deleting existing index directory for segment: {} for table: {}", segmentName, tableName);
+        FileUtils.deleteDirectory(indexDir);
       }
-      LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to "
-          + segmentDir.getAbsolutePath() + " for " + segmentId + " of table " + tableName);
-      FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
-      FileUtils.deleteDirectory(tempSegmentFile);
-      Thread.sleep(1000);
-      LOGGER.info("Was able to succesfully rename the dir to match the segment {} for table {}", segmentId, tableName);
-
-      new File(segmentDir, "finishedLoading").createNewFile();
-      return segmentDir.getAbsolutePath();
-    } catch (Exception e) {
-      FileUtils.deleteQuietly(tempSegmentFile);
-      FileUtils.deleteQuietly(tempFile);
-      LOGGER.error("Caught exception downloading segment {} for table {}", segmentId, tableName, e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
+      FileUtils.moveDirectory(tempIndexDir, indexDir);
+      LOGGER.info("Successfully downloaded segment: {} for table: {} to: {}", segmentName, tableName, indexDir);
+      return indexDir.getAbsolutePath();
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
     }
   }
 

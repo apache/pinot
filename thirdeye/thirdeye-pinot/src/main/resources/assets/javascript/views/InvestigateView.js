@@ -65,7 +65,9 @@ InvestigateView.prototype = {
     const diff = anomalyRegionEnd.valueOf() - anomalyRegionStart.valueOf();
     const currentViewStart = anomalyRegionStart.valueOf() - diff;
     const currentViewEnd = anomalyRegionEnd.valueOf() + diff;
-
+    const displayStart = currentViewStart + Math.round(diff/2);
+    const displayEnd = currentViewEnd - Math.round(diff/2);
+    
     const parsedDimensions = JSON.parse(anomalyFunctionDimension);
     const dimensionKeys = Object.keys(parsedDimensions);
     const dimension = dimensionKeys.length ? dimensionKeys[0] : 'All';
@@ -88,6 +90,7 @@ InvestigateView.prototype = {
 
 
         wow.newUrl = `app#/rca/${metricId}/dimensions?analysisStart=${anomalyRegionStart.valueOf()}&analysisEnd=${anomalyRegionEnd.valueOf()}&` +
+          `displayStart=${displayStart}&displayEnd=${displayEnd}&` +
           `startDate=${currentViewStart}&endDate=${currentViewEnd}&` +
           `compareMode=${wow.compareMode}&filters=${anomalyFunctionDimension}&granularity=${granularity}`;
         return wow;

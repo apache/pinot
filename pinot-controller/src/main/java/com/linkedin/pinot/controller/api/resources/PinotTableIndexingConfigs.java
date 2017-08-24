@@ -15,28 +15,25 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import java.io.IOException;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.io.IOException;
 import javax.inject.Inject;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
@@ -67,13 +64,11 @@ public class PinotTableIndexingConfigs {
           tableConfig.getIndexingConfig());
       return new SuccessResponse("Updated indexing config for table " + tableName);
     } catch (JSONException | IOException e) {
-      LOGGER.info("Error converting request to table config for table: {}", tableName, e);
-      throw new WebApplicationException("Error converting request body to table configuration",
-          Response.Status.BAD_REQUEST);
+      String errStr = "Error converting request to table config for table: " + tableName;
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
-      LOGGER.info("Failed to update indexing config for table: {}", tableName, e);
-      throw new WebApplicationException("Error converting request body to table configuration",
-          Response.Status.INTERNAL_SERVER_ERROR);
+      String errStr = "Failed to update indexing config for table: " + tableName;
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 }

@@ -9,6 +9,7 @@ import moment from 'moment';
 export const ActionTypes = {
   LOAD: type('[Dimensions] Load'),
   LOADING: type('[Dimensions] Loading'),
+  LOADED: type('[Dimensions] Loaded'),
   LOAD_TIMESERIES: type('[Dimensions] Load TimeSeries'),
   LOAD_HEATMAP: type('[Dimensions] Load HeatMap'),
   SET: type('[Dimension] Set Dimension'),
@@ -20,6 +21,15 @@ export const ActionTypes = {
 function resetData() {
   return {
     type: ActionTypes.RESET
+  };
+}
+
+/**
+ * Set Dimension Status to loaded
+ */
+function loaded() {
+  return {
+    type: ActionTypes.LOADED
   };
 }
 
@@ -157,7 +167,7 @@ function fetchHeatMapData(start, end) {
  * @param {Number} end The end time in unix ms
  */
 function updateDates(start, end) {
-  return (dispatch, getState) => {
+  return (dispatch) => {
     // const { primaryMetric } = getState();
     //check if dates are stame
 
@@ -176,6 +186,7 @@ function reset() {
 export const Actions = {
   loading,
   load,
+  loaded,
   requestFail,
   fetchDimensions,
   updateDimension,

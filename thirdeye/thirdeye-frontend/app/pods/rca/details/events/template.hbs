@@ -21,13 +21,16 @@
             primaryMetric=summary.primaryMetric
             events=events.data
             showGraphLegend=false
-            showLegend=true
+            showLegend=false
+            height=400
             showEvents=true
             showSubchart=true
             analysisStart=events.eventStart
             analysisEnd=events.eventEnd
             onSubchartChange=(action "setDateParams")
             onSelection=(action actions.onEventSelection)
+            minDate=displayStart
+            maxDate=displayEnd
           }}
 
           {{events-table

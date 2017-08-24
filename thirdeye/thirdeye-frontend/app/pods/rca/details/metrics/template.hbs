@@ -49,6 +49,8 @@
                 showMetrics=true
                 showTitle=true
                 enableZoom=true
+                minDate=displayStart
+                maxDate=displayEnd
                 analysisStart=metricList.regionStart
                 analysisEnd=metricList.regionEnd
                 onSubchartChange=(action "onDateChange")
@@ -62,6 +64,8 @@
                   enableZoom=true
                   showMetrics=true
                   showTitle=true
+                  minDate=displayStart
+                  maxDate=displayEnd
                   analysisStart=metricList.regionStart
                   analysisEnd=metricList.regionEnd
                   onSelection=(action actions.onMetricSelection)
@@ -81,6 +85,8 @@
                 showSubchart=true
                 analysisStart=metricList.regionStart
                 analysisEnd=metricList.regionEnd
+                minDate=displayStart
+                maxDate=displayEnd
                 onSelection=(action actions.onMetricSelection)
                 onSubchartChange=(action "onDateChange")
               }}
@@ -116,7 +122,7 @@
                     end=analysisEnd
                     relatedMetrics=metricList.relatedMetrics
                     showDetails=(eq selectedTab "number")
-                    loading=(mut loading)
+                    stopLoading=(action "onRendering")
                   }}
                 {{/if}}
               </div>

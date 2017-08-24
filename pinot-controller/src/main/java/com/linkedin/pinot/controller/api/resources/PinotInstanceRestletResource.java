@@ -15,13 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import java.util.List;
-import org.apache.helix.model.InstanceConfig;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -31,6 +24,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -39,9 +33,14 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.model.InstanceConfig;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Api(tags = Constants.INSTANCE_TAG)
@@ -94,7 +93,7 @@ public class PinotInstanceRestletResource {
   {
 
     if (!pinotHelixResourceManager.instanceExists(instanceName)) {
-      throw new WebApplicationException("Instance " + instanceName + " does not exist",
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " does not exist",
           javax.ws.rs.core.Response.Status.NOT_FOUND);
     }
     InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
@@ -106,7 +105,7 @@ public class PinotInstanceRestletResource {
       response.put("port", instanceConfig.getPort());
       response.put("tags", new JSONArray(instanceConfig.getTags()));
     } catch (JSONException e) {
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     return response.toString();
   }
@@ -125,7 +124,7 @@ public class PinotInstanceRestletResource {
     LOGGER.info("Instance creation request received for instance " + instance.toInstanceId());
     final PinotResourceManagerResponse resp = pinotHelixResourceManager.addInstance(instance);
     if (resp.status == PinotResourceManagerResponse.ResponseStatus.failure) {
-      throw new WebApplicationException("Instance exists already",
+      throw new ControllerApplicationException(LOGGER, "Instance already exists",
           javax.ws.rs.core.Response.Status.CONFLICT);
     }
     return new SuccessResponse("Instance successfully created");
@@ -149,7 +148,7 @@ public class PinotInstanceRestletResource {
   ) {
     // TODO: state should be moved to path or form parameter
     if (! pinotHelixResourceManager.instanceExists(instanceName)) {
-      throw new WebApplicationException("Instance " + instanceName + " does not exist",
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " does not exist",
           Response.Status.NOT_FOUND);
     }
     PinotResourceManagerResponse response;
@@ -160,13 +159,13 @@ public class PinotInstanceRestletResource {
     } else if (StateType.DROP.name().equalsIgnoreCase(state)) {
       response = pinotHelixResourceManager.dropInstance(instanceName);
     } else {
-     throw new WebApplicationException("Unknown state " + state + " for instance request",
+     throw new ControllerApplicationException(LOGGER, "Unknown state " + state + " for instance request",
          Response.Status.BAD_REQUEST);
     }
     if (response.isSuccessful()) {
       return new SuccessResponse("Request to " + state + " instance " + instanceName  + " is successful");
     }
-    throw new WebApplicationException("Failed to " + state + " instance " + instanceName,
+    throw new ControllerApplicationException(LOGGER, "Failed to " + state + " instance " + instanceName,
         Response.Status.INTERNAL_SERVER_ERROR);
   }
 
@@ -188,17 +187,17 @@ public class PinotInstanceRestletResource {
       @PathParam("instanceName") String instanceName
   ) {
     if (! pinotHelixResourceManager.instanceExists(instanceName)) {
-      throw new WebApplicationException("Instance " + instanceName + " does not exist",
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " does not exist",
           Response.Status.NOT_FOUND);
     }
     if (!pinotHelixResourceManager.isInstanceDroppable(instanceName)) {
-      throw new WebApplicationException("Instance " + instanceName + " is live or it still appears in the idealstate",
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " is live or it still appears in the idealstate",
           Response.Status.CONFLICT);
     }
     PinotResourceManagerResponse response = pinotHelixResourceManager.dropInstance(instanceName);
     if (!response.isSuccessful()) {
       LOGGER.error("Failed to delete instance: {}, response: {}", instanceName, response.message);
-      throw new WebApplicationException("Failed to delete instance", Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER, "Failed to delete instance", Response.Status.INTERNAL_SERVER_ERROR);
     }
     return new SuccessResponse("Successfully deleted instance");
   }

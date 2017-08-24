@@ -67,12 +67,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private boolean _isStarted = false;
   private SegmentMetadataLoader _segmentMetadataLoader;
 
-  public synchronized void init(HelixInstanceDataManagerConfig instanceDataManagerConfig)
-      throws ConfigurationException, InstantiationException, IllegalAccessException, ClassNotFoundException {
-    _instanceDataManagerConfig = instanceDataManagerConfig;
-    _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-  }
-
   @Override
   public synchronized void init(Configuration dataManagerConfig) {
     try {

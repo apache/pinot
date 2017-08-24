@@ -39,7 +39,6 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.codehaus.jackson.JsonParseException;
@@ -88,7 +87,7 @@ public class PinotSchemaRestletResource {
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
-      throw new WebApplicationException("Schema not found", Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, "Schema not found", Response.Status.NOT_FOUND);
     }
     // We need to return schema.getJSONSchema(). Returning schema ends up with many extra fields, "jsonSchema" being one of them,
     // Others like fieldSpecMap, etc., serialzing the entire Schema object.
@@ -141,7 +140,7 @@ public class PinotSchemaRestletResource {
     Schema schema = getSchemaFromMultiPart(multiPart);
     if (!schema.validate(LOGGER)) {
       LOGGER.info("Invalid schema during create/update of {}", schemaNameForLogging);
-      throw new WebApplicationException("Invalid schema", Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Invalid schema", Response.Status.BAD_REQUEST);
     }
 
     if (schemaName != null && !schema.getSchemaName().equals(schemaName)) {

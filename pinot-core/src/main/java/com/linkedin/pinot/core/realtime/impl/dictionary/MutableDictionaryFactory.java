@@ -16,26 +16,50 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 
 
 public class MutableDictionaryFactory {
   private MutableDictionaryFactory() {
   }
 
-  public static MutableDictionary getMutableDictionary(FieldSpec.DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return new IntOnHeapMutableDictionary();
-      case LONG:
-        return new LongOnHeapMutableDictionary();
-      case FLOAT:
-        return new FloatOnHeapMutableDictionary();
-      case DOUBLE:
-        return new DoubleOnHeapMutableDictionary();
-      case STRING:
-        return new StringOnHeapMutableDictionary();
-      default:
-        throw new UnsupportedOperationException();
+  public static MutableDictionary getMutableDictionary(FieldSpec.DataType dataType, boolean isOffHeapAllocation,
+      RealtimeIndexOffHeapMemoryManager memoryManager, int avgStringLen, int cardinality, String columnName) {
+    if (isOffHeapAllocation) {
+      // OnHeap allocation
+      int maxOverflowSize = cardinality/10;
+      switch (dataType) {
+        case INT:
+          return new IntOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName);
+        case LONG:
+          return new LongOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName);
+        case FLOAT:
+          return new FloatOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName);
+        case DOUBLE:
+          return new DoubleOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName);
+        case STRING:
+          return new StringOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName,
+              avgStringLen);
+        default:
+          throw new UnsupportedOperationException();
+      }
+    } else {
+      // OnHeap allocation
+      switch (dataType) {
+        case INT:
+          return new IntOnHeapMutableDictionary();
+        case LONG:
+          return new LongOnHeapMutableDictionary();
+        case FLOAT:
+          return new FloatOnHeapMutableDictionary();
+        case DOUBLE:
+          return new DoubleOnHeapMutableDictionary();
+        case STRING:
+          return new StringOnHeapMutableDictionary();
+        default:
+          throw new UnsupportedOperationException();
+      }
+
     }
   }
 }

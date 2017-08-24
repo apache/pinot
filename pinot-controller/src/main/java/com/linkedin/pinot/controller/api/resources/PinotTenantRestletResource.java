@@ -43,7 +43,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.json.JSONException;
@@ -111,7 +110,7 @@ public class PinotTenantRestletResource {
       return new SuccessResponse("Successfully created tenant");
     }
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_CREATE_ERROR, 1L);
-    throw new WebApplicationException("Failed to create tenant", Response.Status.INTERNAL_SERVER_ERROR);
+    throw new ControllerApplicationException(LOGGER, "Failed to create tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 
   /*
@@ -143,7 +142,7 @@ public class PinotTenantRestletResource {
       return new SuccessResponse("Updated tenant");
     }
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_UPDATE_ERROR, 1L);
-    throw new WebApplicationException("Failed to update tenant", Response.Status.INTERNAL_SERVER_ERROR);
+    throw new ControllerApplicationException(LOGGER, "Failed to update tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 
   public static class TenantMetadata {
@@ -215,7 +214,7 @@ public class PinotTenantRestletResource {
 
     if (StateType.DROP.name().equalsIgnoreCase(stateStr)) {
       if (!allInstances.isEmpty()) {
-        throw  new WebApplicationException("Error: Tenant " + tenantName + " has live instances, cannot be dropped.",
+        throw  new ControllerApplicationException(LOGGER, "Error: Tenant " + tenantName + " has live instances, cannot be dropped.",
             Response.Status.BAD_REQUEST);
       }
       pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
@@ -332,7 +331,7 @@ public class PinotTenantRestletResource {
     // TODO: do not support drop. It's same as DELETE
     if (StateType.DROP.name().equalsIgnoreCase(state)) {
       if (!allInstances.isEmpty()) {
-        throw new WebApplicationException("Tenant " + tenantName + " has live instance", Response.Status.BAD_REQUEST);
+        throw new ControllerApplicationException(LOGGER, "Tenant " + tenantName + " has live instance", Response.Status.BAD_REQUEST);
       }
       pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
       pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
@@ -382,7 +381,7 @@ public class PinotTenantRestletResource {
       @QueryParam("type") @DefaultValue("") String type) {
 
     if (type == null || type.isEmpty()) {
-      throw new WebApplicationException("Tenant type (BROKER | SERVER) is required as query parameter",
+      throw new ControllerApplicationException(LOGGER, "Tenant type (BROKER | SERVER) is required as query parameter",
           Response.Status.INTERNAL_SERVER_ERROR);
     }
     TenantRole tenantRole = TenantRole.valueOf(type.toUpperCase());
@@ -392,7 +391,7 @@ public class PinotTenantRestletResource {
         if (pinotHelixResourceManager.isBrokerTenantDeletable(tenantName)) {
           res = pinotHelixResourceManager.deleteBrokerTenantFor(tenantName);
         } else {
-          throw new WebApplicationException("Broker tenant is not null, can not delete it",
+          throw new ControllerApplicationException(LOGGER, "Broker tenant is not null, can not delete it",
               Response.Status.BAD_REQUEST);
         }
         break;
@@ -403,7 +402,7 @@ public class PinotTenantRestletResource {
               res = pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
             }
           } else {
-            throw new WebApplicationException("Server tenant is not null, can not delete it",
+            throw new ControllerApplicationException(LOGGER, "Server tenant is not null, can not delete it",
                 Response.Status.BAD_REQUEST);
           }
         break;
@@ -414,6 +413,6 @@ public class PinotTenantRestletResource {
       return new SuccessResponse("Successfully deleted tenant " + tenantName);
     }
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
-    throw new WebApplicationException("Error deleting tenant", Response.Status.INTERNAL_SERVER_ERROR);
+    throw new ControllerApplicationException(LOGGER, "Error deleting tenant", Response.Status.INTERNAL_SERVER_ERROR);
   }
 }
