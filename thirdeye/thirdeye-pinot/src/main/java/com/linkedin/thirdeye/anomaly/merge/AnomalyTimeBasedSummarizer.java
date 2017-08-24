@@ -83,6 +83,8 @@ public abstract class AnomalyTimeBasedSummarizer {
         // should not merge the two and split from here
         if ((applySequentialGapBasedSplit
             && (currentResult.getStartTime() - mergedAnomaly.getEndTime()) > sequentialAllowedGap)
+            || ( applyMaxDurationBasedSplit
+            && (currentResult.getEndTime() - mergedAnomaly.getStartTime()) > maxMergedDurationMillis)
             || (!isEqualOnMergeableKeys(mergedAnomaly, currAnomaly, mergeablePropertyKeys))) {
 
           // Split here
@@ -103,21 +105,6 @@ public abstract class AnomalyTimeBasedSummarizer {
             mergedAnomaly.getAnomalyResults().add(currentResult);
             currentResult.setMerged(true);
           }
-        }
-      }
-
-      // till this point merged result contains current raw result
-      if (applyMaxDurationBasedSplit
-          // check if Max Duration for merged has passed, if so, create new one
-          && mergedAnomaly.getEndTime() - mergedAnomaly.getStartTime() >= maxMergedDurationMillis) {
-        // check if next anomaly has same start time as current one, that should be merged with current one too
-        if (i < (anomalies.size() - 1) && anomalies.get(i + 1).getStartTime()
-            .equals(currentResult.getStartTime())) {
-          // no need to split as we want to include the next raw anomaly into the current one
-        } else {
-          // Split here
-          mergedAnomalies.add(mergedAnomaly);
-          mergedAnomaly = null;
         }
       }
 
