@@ -7,18 +7,21 @@ import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 import java.util.Map;
+import java.util.Set;
 import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -33,19 +36,24 @@ import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Path("thirdeye/email")
 @Produces(MediaType.APPLICATION_JSON)
 public class EmailResource {
+  private static final Logger LOG = LoggerFactory.getLogger(EmailResource.class);
 
   private final AlertConfigManager alertDAO;
+  private final ApplicationManager appDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private ThirdEyeConfiguration thirdeyeConfiguration = null;
   private AlertFilterFactory alertFilterFactory;
 
   public EmailResource(ThirdEyeConfiguration thirdEyeConfiguration) {
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.appDAO = DAO_REGISTRY.getApplicationDAO();
     this.thirdeyeConfiguration = thirdEyeConfiguration;
     this.alertFilterFactory = new AlertFilterFactory(this.thirdeyeConfiguration.getAlertFilterConfigPath());
   }
@@ -99,7 +107,7 @@ public class EmailResource {
    * @return
    *    an instance of smtp configuration with user defined host and port
    */
-  public SmtpConfiguration getSmtpConfiguration(String smtpHost, Integer smtpPort) {
+  private SmtpConfiguration getSmtpConfiguration(String smtpHost, Integer smtpPort) {
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     if (thirdeyeConfiguration.getSmtpConfiguration() != null) {
       smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
@@ -113,6 +121,29 @@ public class EmailResource {
     }
 
     return smtpConfiguration;
+  }
+
+  private Response generateAnomalyReportForAnomalies(AnomalyReportGenerator anomalyReportGenerator,
+      List<MergedAnomalyResultDTO> anomalies, boolean applyFilter, long startTime, long endTime, Long groupId, String groupName,
+      String subject, boolean includeSentAnomaliesOnly, String toAddr, String fromAddr, String alertName,
+      boolean includeSummary, String teHost, String smtpHost, int smtpPort) {
+    if (Strings.isNullOrEmpty(toAddr)) {
+      throw new WebApplicationException("Empty : list of recipients" + toAddr);
+    }
+    if(applyFilter){
+      anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
+    }
+
+    ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
+    configuration.setSmtpConfiguration(getSmtpConfiguration(smtpHost, smtpPort));
+    configuration.setDashboardHost(teHost);
+    configuration.setPhantomJsPath(thirdeyeConfiguration.getPhantomJsPath());
+
+    String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
+    anomalyReportGenerator
+        .buildReport(startTime, endTime, groupId, groupName, anomalies, emailSub, configuration,
+            includeSentAnomaliesOnly, toAddr, fromAddr, alertName, includeSummary);
+    return Response.ok("Request to generate report-email accepted ").build();
   }
 
   /**
@@ -162,20 +193,10 @@ public class EmailResource {
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
-    if (isApplyFilter) {
-      anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
-    }
-    ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
-    configuration.setSmtpConfiguration(smtpConfiguration);
-    configuration.setDashboardHost(teHost);
-    configuration.setPhantomJsPath(thirdeyeConfiguration.getPhantomJsPath());
-    configuration.setRootDir(thirdeyeConfiguration.getRootDir());
-    String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
 
-    anomalyReportGenerator
-        .buildReport(startTime, endTime, null, null, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
-    return Response.ok().build();
+    return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
+        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        teHost, smtpHost, smtpPort);
   }
 
 
@@ -214,33 +235,14 @@ public class EmailResource {
     if (metricsArr.length == 0) {
       throw new WebApplicationException("metrics empty : " + metricsArr);
     }
-    if (Strings.isNullOrEmpty(toAddr)) {
-      throw new WebApplicationException("Empty : list of recipients" + toAddr);
-    }
 
-    SmtpConfiguration smtpConfiguration = getSmtpConfiguration(smtpHost, smtpPort);
-    if (smtpConfiguration == null) {
-      throw new WebApplicationException("Smtp configuration is empty or null");
-    }
-
-    if(Strings.isNullOrEmpty(teHost)) {
-      teHost = thirdeyeConfiguration.getDashboardHost();
-    }
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForMetrics(Arrays.asList(metricsArr), startTime, endTime);
-    if(isApplyFilter){
-      anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
-    }
-    ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
-    configuration.setSmtpConfiguration(smtpConfiguration);
-    configuration.setDashboardHost(teHost);
-    configuration.setPhantomJsPath(phantomJsPath);
-    String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
-    anomalyReportGenerator
-        .buildReport(startTime, endTime, null, null, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
-    return Response.ok().build();
+
+    return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
+        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        teHost, smtpHost, smtpPort);
   }
 
 
@@ -265,9 +267,6 @@ public class EmailResource {
     if (functionList.size() == 0) {
       throw new WebApplicationException("metrics empty : " + functionList);
     }
-    if (Strings.isNullOrEmpty(toAddr)) {
-      throw new WebApplicationException("Empty : list of recipients" + toAddr);
-    }
 
     SmtpConfiguration smtpConfiguration = getSmtpConfiguration(smtpHost, smtpPort);
     if (smtpConfiguration == null) {
@@ -285,23 +284,64 @@ public class EmailResource {
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForFunctions(functionList, startTime, endTime);
-    if(isApplyFilter){
-      anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
-    }
-    ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
-    configuration.setSmtpConfiguration(smtpConfiguration);
-    configuration.setDashboardHost(teHost);
-    configuration.setPhantomJsPath(phantomJsPath);
-    String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
-    anomalyReportGenerator
-        .buildReport(startTime, endTime, null, null, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
-    return Response.ok().build();
+
+    return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
+        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        teHost, smtpHost, smtpPort);
   }
 
 
   @GET
-  @Path("notification/")
+  @Path("generate/app/{app}/{startTime}/{endTime}")
+  public Response sendEmailForApp(@PathParam("app") String application, @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime, @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
+      @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
+      @QueryParam("isApplyFilter") boolean isApplyFilter,
+      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") int smtpPort) {
+
+    if(Strings.isNullOrEmpty(application)) {
+      throw new WebApplicationException("Application empty : " + application);
+    }
+    List<ApplicationDTO> apps = appDAO.findByName(application);
+    if (apps.size() == 0) {
+      throw new WebApplicationException("Application not found: " + application);
+    }
+    LOG.info("Generating report for application [{}]", application);
+    Set<Long> anomalyFunctions = new HashSet<>();
+
+    for (ApplicationDTO applicationDTO : apps) {
+      List<AlertConfigDTO> alertConfigDTOS = alertDAO.findWhereApplicationLike(applicationDTO.getApplication());
+      if (alertConfigDTOS.size() > 0) {
+        for (AlertConfigDTO alertConfigDTO : alertConfigDTOS) {
+          if (alertConfigDTO.getEmailConfig() != null && alertConfigDTO.getEmailConfig().getFunctionIds() != null) {
+            anomalyFunctions.addAll(alertConfigDTO.getEmailConfig().getFunctionIds());
+          }
+        }
+      }
+    }
+
+    LOG.info("Generating report for application: {}, functions {}", application, anomalyFunctions);
+
+
+    List<Long> functionList = new ArrayList<>();
+    functionList.addAll(anomalyFunctions);
+    if (functionList.size() == 0) {
+      throw new WebApplicationException("metrics empty : " + functionList);
+    }
+
+    AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
+    List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
+        .getAnomaliesForFunctions(functionList, startTime, endTime);
+
+    return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
+        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, application, true,
+        teHost, smtpHost, smtpPort);
+  }
+
+  @GET
+  @Path("notification")
   public Response sendEmailWithText(
       @QueryParam("from") String fromAddr,
       @QueryParam("to") String toAddr,
@@ -343,5 +383,4 @@ public class EmailResource {
     }
     return Response.ok().build();
   }
-
 }
