@@ -162,7 +162,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     Iterator<GroupKeyGenerator.GroupKey> uniqueGroupKeys = groupKeyGenerator.getUniqueGroupKeys();
     while (uniqueGroupKeys.hasNext()) {
       GroupKeyGenerator.GroupKey groupKey = uniqueGroupKeys.next();
-      String actual = groupKey.getStringKey();
+      String actual = groupKey._stringKey;
       Assert.assertTrue(expectedGroupKeys.contains(actual), "Unexpected group key: " + actual);
     }
   }

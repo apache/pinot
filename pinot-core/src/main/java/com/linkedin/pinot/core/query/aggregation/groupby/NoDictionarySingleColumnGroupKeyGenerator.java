@@ -239,7 +239,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     @SuppressWarnings("unchecked")
     public GroupKeyIterator(Map map) {
       _iterator = (Iterator<Map.Entry<Object, Integer>>) map.entrySet().iterator();
-      _groupKey = new GroupKey(INVALID_ID, null);
+      _groupKey = new GroupKey();
     }
 
     @Override
@@ -250,8 +250,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     @Override
     public GroupKey next() {
       Map.Entry<Object, Integer> entry = _iterator.next();
-      _groupKey.setFirst(entry.getValue());
-      _groupKey.setSecond(entry.getKey().toString());
+      _groupKey._groupId = entry.getValue();
+      _groupKey._stringKey = entry.getKey().toString();
       return _groupKey;
     }
 

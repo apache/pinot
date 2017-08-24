@@ -195,7 +195,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
     public GroupKeyIterator(Map<FixedIntArray, Integer> map) {
       _iterator = map.entrySet().iterator();
-      _groupKey = new GroupKey(INVALID_ID, null);
+      _groupKey = new GroupKey();
     }
 
     @Override
@@ -206,8 +206,8 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     @Override
     public GroupKey next() {
       Map.Entry<FixedIntArray, Integer> entry = _iterator.next();
-      _groupKey.setFirst(entry.getValue());
-      _groupKey.setSecond(buildStringKeyFromIds(entry.getKey()));
+      _groupKey._groupId = entry.getValue();
+      _groupKey._stringKey = buildStringKeyFromIds(entry.getKey());
       return _groupKey;
     }
 
