@@ -234,19 +234,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       }
     }
 
-    String configSegmentName = segmentGeneratorConfig.getSegmentName();
-    if (_segmentName == null) {
-      if (configSegmentName == null) {
-        throw new RuntimeException("Must specify segmentName.");
-      }
-      _segmentName = configSegmentName;
-    } else {
-      if (configSegmentName != null && !configSegmentName.equals(_segmentName)) {
-        LOGGER.warn("Find segmentName conflict in command line and config file, use config in command line: {}",
-            _segmentName);
-      }
-    }
-
     // Filter out all input files.
     File dir = new File(_dataDir);
     if (!dir.exists() || !dir.isDirectory()) {
@@ -281,7 +268,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     segmentGeneratorConfig.setOutDir(_outDir);
     segmentGeneratorConfig.setOverwrite(_overwrite);
     segmentGeneratorConfig.setTableName(_tableName);
-    segmentGeneratorConfig.setSegmentName(_segmentName);
     if (_schemaFile != null) {
       if (segmentGeneratorConfig.getSchemaFile() != null && !segmentGeneratorConfig.getSchemaFile()
           .equals(_schemaFile)) {
@@ -290,6 +276,29 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       }
       segmentGeneratorConfig.setSchemaFile(_schemaFile);
     }
+
+    String configSegmentName = segmentGeneratorConfig.getSegmentName();
+    if (_segmentName == null) {
+      if (configSegmentName == null) {
+        if (_schemaFile != null) {
+          LOGGER.warn("Segment name not specified. Deriving segment name from schema name");
+          // Derive segment name from schema name
+          File file = new File(_schemaFile);
+          _segmentName = file.getName().replaceAll("\\..*", "");
+        } else {
+          throw new RuntimeException("Segment Name not specified");
+        }
+      } else {
+        _segmentName = configSegmentName;
+      }
+    } else {
+      if (configSegmentName != null && !configSegmentName.equals(_segmentName)) {
+        LOGGER.warn("Find segmentName conflict in command line and config file, use config in command line: {}",
+            _segmentName);
+      }
+    }
+    segmentGeneratorConfig.setSegmentName(_segmentName);
+
     if (_readerConfigFile != null) {
       if (segmentGeneratorConfig.getReaderConfigFile() != null && !segmentGeneratorConfig.getReaderConfigFile()
           .equals(_readerConfigFile)) {
