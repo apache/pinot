@@ -16,6 +16,7 @@
 package com.linkedin.pinot.segments.v1.creator;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
@@ -102,12 +103,25 @@ public class BitmapInvertedIndexTest {
 
           int dictId = dictionary.indexOf(entry);
           int size = dictionary.length();
-          for (int i = 0; i < size; i++) {
-            ImmutableRoaringBitmap immutableRoaringBitmap = invertedIndex.getImmutable(i);
-            if (i == dictId) {
-              Assert.assertTrue(immutableRoaringBitmap.contains(docId));
-            } else {
-              Assert.assertFalse(immutableRoaringBitmap.contains(docId));
+          if (dataSource.getDataSourceMetadata().isSorted()) {
+            for (int i = 0; i < size; i++) {
+              Pairs.IntPair minMaxRange = (Pairs.IntPair) invertedIndex.getDocIds(i);
+              int min = minMaxRange.getLeft();
+              int max = minMaxRange.getRight();
+              if (i == dictId) {
+                Assert.assertTrue(docId >= min && docId < max);
+              } else {
+                Assert.assertTrue(docId < min || docId >= max);
+              }
+            }
+          } else {
+            for (int i = 0; i < size; i++) {
+              ImmutableRoaringBitmap immutableRoaringBitmap = (ImmutableRoaringBitmap) invertedIndex.getDocIds(i);
+              if (i == dictId) {
+                Assert.assertTrue(immutableRoaringBitmap.contains(docId));
+              } else {
+                Assert.assertFalse(immutableRoaringBitmap.contains(docId));
+              }
             }
           }
         }

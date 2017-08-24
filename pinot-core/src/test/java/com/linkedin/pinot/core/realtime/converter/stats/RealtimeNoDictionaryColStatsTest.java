@@ -16,17 +16,17 @@
 
 package com.linkedin.pinot.core.realtime.converter.stats;
 
-import java.util.Random;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
+import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import java.util.Random;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class RealtimeNoDictionaryColStatsTest {
@@ -35,10 +35,10 @@ public class RealtimeNoDictionaryColStatsTest {
   private static final String FLOAT_COL_NAME = "floatcol";
   private static final String DOUBLE_COL_NAME = "doublecol";
   private static final int NUM_ROWS = 1000;
-  private RealtimeColumnDataSource _intDataSource;
-  private RealtimeColumnDataSource _longDataSource;
-  private RealtimeColumnDataSource _floatDataSource;
-  private RealtimeColumnDataSource _doubleDataSource;
+  private ColumnDataSource _intDataSource;
+  private ColumnDataSource _longDataSource;
+  private ColumnDataSource _floatDataSource;
+  private ColumnDataSource _doubleDataSource;
   private int _intMinVal;
   private int _intMaxVal;
   private long _longMinVal;
@@ -121,10 +121,10 @@ public class RealtimeNoDictionaryColStatsTest {
       }
     }
 
-    _intDataSource = new RealtimeColumnDataSource(intSpec, intRawIndex, null, NUM_ROWS-1, -1, null, null);
-    _longDataSource = new RealtimeColumnDataSource(longSpec, longRawIndex, null, NUM_ROWS-1, -1, null, null);
-    _floatDataSource = new RealtimeColumnDataSource(floatSpec, floatRawIndex, null, NUM_ROWS-1, -1, null, null);
-    _doubleDataSource = new RealtimeColumnDataSource(doubleSpec, doubleRawIndex, null, NUM_ROWS-1, -1, null, null);
+    _intDataSource = new ColumnDataSource(intSpec, NUM_ROWS, 0, intRawIndex, null, null);
+    _longDataSource = new ColumnDataSource(longSpec, NUM_ROWS, 0, longRawIndex, null, null);
+    _floatDataSource = new ColumnDataSource(floatSpec, NUM_ROWS, 0, floatRawIndex, null, null);
+    _doubleDataSource = new ColumnDataSource(doubleSpec, NUM_ROWS, 0, doubleRawIndex, null, null);
   }
 
   @Test

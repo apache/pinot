@@ -16,21 +16,22 @@
 
 package com.linkedin.pinot.core.operator.docvaliterators;
 
-import java.util.Random;
-import org.testng.Assert;
-import org.testng.annotations.AfterSuite;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import java.io.IOException;
+import java.util.Random;
+import org.testng.Assert;
+import org.testng.annotations.AfterTest;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class RealtimeSingleValueIteratorTest {
   private static final int NUM_ROWS = 1000;
+  private static final long RANDOM_SEED = System.currentTimeMillis();
+  private static final Random RANDOM = new Random(RANDOM_SEED);
   private int[] _intVals = new int[NUM_ROWS];
   private long[] _longVals = new long[NUM_ROWS];
   private float[] _floatVals = new float[NUM_ROWS];
@@ -39,131 +40,122 @@ public class RealtimeSingleValueIteratorTest {
   FixedByteSingleColumnSingleValueReaderWriter _longReader;
   FixedByteSingleColumnSingleValueReaderWriter _floatReader;
   FixedByteSingleColumnSingleValueReaderWriter _doubleReader;
-  private Random _random;
-  private long _seed;
   private RealtimeIndexOffHeapMemoryManager _memoryManager;
 
-  @AfterSuite
-  public void tearDown() throws Exception {
-    _memoryManager.close();
-  }
-
   @BeforeClass
-  public void initData() {
+  public void setUp() {
     _memoryManager = new DirectMemoryManager(RealtimeSingleValueIteratorTest.class.getName());
-    final long _seed = new Random().nextLong();
-    _random = new Random(_seed);
-    _intReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.INTEGER_SIZE,
-        _memoryManager, "intReader");
-    _longReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.LONG_SIZE,
-        _memoryManager, "longReader");
-    _floatReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.FLOAT_SIZE,
-        _memoryManager, "floatReader");
-    _doubleReader = new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS)+1, V1Constants.Numbers.DOUBLE_SIZE,
-        _memoryManager, "doubleReader");
+    _intReader =
+        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.INTEGER_SIZE,
+            _memoryManager, "intReader");
+    _longReader =
+        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.LONG_SIZE,
+            _memoryManager, "longReader");
+    _floatReader =
+        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.FLOAT_SIZE,
+            _memoryManager, "floatReader");
+    _doubleReader =
+        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.DOUBLE_SIZE,
+            _memoryManager, "doubleReader");
 
     for (int i = 0; i < NUM_ROWS; i++) {
-      _intVals[i] = _random.nextInt();
+      _intVals[i] = RANDOM.nextInt();
       _intReader.setInt(i, _intVals[i]);
-      _longVals[i]  = _random.nextLong();
+      _longVals[i] = RANDOM.nextLong();
       _longReader.setLong(i, _longVals[i]);
-      _floatVals[i] = _random.nextFloat();
+      _floatVals[i] = RANDOM.nextFloat();
       _floatReader.setFloat(i, _floatVals[i]);
-      _doubleVals[i] = _random.nextDouble();
+      _doubleVals[i] = RANDOM.nextDouble();
       _doubleReader.setDouble(i, _doubleVals[i]);
     }
   }
 
-
   @Test
   public void testIntReader() throws Exception {
     try {
-      RealtimeSingleValueIterator iterator = new RealtimeSingleValueIterator(_intReader, NUM_ROWS, FieldSpec.DataType.INT);
+      SingleValueIterator iterator = new SingleValueIterator(_intReader, NUM_ROWS);
       // Test all values
       iterator.reset();
       for (int i = 0; i < NUM_ROWS; i++) {
         Assert.assertEquals(iterator.nextIntVal(), _intVals[i], " at row " + i);
       }
-      Assert.assertEquals(iterator.nextIntVal(), Constants.EOF);
 
-      final int startDocId = _random.nextInt(NUM_ROWS);
+      final int startDocId = RANDOM.nextInt(NUM_ROWS);
       iterator.skipTo(startDocId);
       for (int i = startDocId; i < NUM_ROWS; i++) {
         Assert.assertEquals(iterator.nextIntVal(), _intVals[i], " at row " + i);
       }
-      Assert.assertEquals(iterator.nextIntVal(), Constants.EOF);
     } catch (Throwable t) {
       t.printStackTrace();
-      Assert.fail("Failed with seed " + _seed);
+      Assert.fail("Failed with seed " + RANDOM_SEED);
     }
   }
 
   @Test
   public void testLongReader() throws Exception {
     try {
-      RealtimeSingleValueIterator iterator = new RealtimeSingleValueIterator(_longReader, NUM_ROWS, FieldSpec.DataType.LONG);
+      SingleValueIterator iterator = new SingleValueIterator(_longReader, NUM_ROWS);
       // Test all values
       iterator.reset();
       for (int i = 0; i < NUM_ROWS; i++) {
         Assert.assertEquals(iterator.nextLongVal(), _longVals[i], " at row " + i);
       }
-      Assert.assertEquals(iterator.nextLongVal(), (long)Constants.EOF);
 
-      final int startDocId = _random.nextInt(NUM_ROWS);
+      final int startDocId = RANDOM.nextInt(NUM_ROWS);
       iterator.skipTo(startDocId);
       for (int i = startDocId; i < NUM_ROWS; i++) {
         Assert.assertEquals(iterator.nextLongVal(), _longVals[i], " at row " + i);
       }
-      Assert.assertEquals(iterator.nextLongVal(), (long)Constants.EOF);
     } catch (Throwable t) {
       t.printStackTrace();
-      Assert.fail("Failed with seed " + _seed);
+      Assert.fail("Failed with seed " + RANDOM_SEED);
     }
   }
 
   @Test
   public void testFloatReader() throws Exception {
     try {
-      RealtimeSingleValueIterator iterator = new RealtimeSingleValueIterator(_floatReader, NUM_ROWS, FieldSpec.DataType.FLOAT);
+      SingleValueIterator iterator = new SingleValueIterator(_floatReader, NUM_ROWS);
       // Test all values
       iterator.reset();
       for (int i = 0; i < NUM_ROWS; i++) {
         Assert.assertEquals(iterator.nextFloatVal(), _floatVals[i], " at row " + i);
       }
-      Assert.assertEquals(iterator.nextFloatVal(), (float) Constants.EOF);
 
-      final int startDocId = _random.nextInt(NUM_ROWS);
+      final int startDocId = RANDOM.nextInt(NUM_ROWS);
       iterator.skipTo(startDocId);
       for (int i = startDocId; i < NUM_ROWS; i++) {
         Assert.assertEquals(iterator.nextFloatVal(), _floatVals[i], " at row " + i);
       }
-      Assert.assertEquals(iterator.nextFloatVal(), (float) Constants.EOF);
     } catch (Throwable t) {
       t.printStackTrace();
-      Assert.fail("Failed with seed " + _seed);
+      Assert.fail("Failed with seed " + RANDOM_SEED);
     }
   }
 
-    @Test
-    public void testDoubleReader() throws Exception {
-      try {
-        RealtimeSingleValueIterator iterator = new RealtimeSingleValueIterator(_doubleReader, NUM_ROWS, FieldSpec.DataType.DOUBLE);
-        // Test all values
-        iterator.reset();
-        for (int i = 0; i < NUM_ROWS; i++) {
-          Assert.assertEquals(iterator.nextDoubleVal(), _doubleVals[i], " at row " + i);
-        }
-        Assert.assertEquals(iterator.nextDoubleVal(), (double)Constants.EOF);
-
-        final int startDocId = _random.nextInt(NUM_ROWS);
-        iterator.skipTo(startDocId);
-        for (int i = startDocId; i < NUM_ROWS; i++) {
-          Assert.assertEquals(iterator.nextDoubleVal(), _doubleVals[i], " at row " + i);
-        }
-        Assert.assertEquals(iterator.nextDoubleVal(), (double)Constants.EOF);
-      } catch (Throwable t) {
-        t.printStackTrace();
-        Assert.fail("Failed with seed " + _seed);
+  @Test
+  public void testDoubleReader() throws Exception {
+    try {
+      SingleValueIterator iterator = new SingleValueIterator(_doubleReader, NUM_ROWS);
+      // Test all values
+      iterator.reset();
+      for (int i = 0; i < NUM_ROWS; i++) {
+        Assert.assertEquals(iterator.nextDoubleVal(), _doubleVals[i], " at row " + i);
       }
+
+      final int startDocId = RANDOM.nextInt(NUM_ROWS);
+      iterator.skipTo(startDocId);
+      for (int i = startDocId; i < NUM_ROWS; i++) {
+        Assert.assertEquals(iterator.nextDoubleVal(), _doubleVals[i], " at row " + i);
+      }
+    } catch (Throwable t) {
+      t.printStackTrace();
+      Assert.fail("Failed with seed " + RANDOM_SEED);
+    }
+  }
+
+  @AfterTest
+  public void tearDown() throws IOException {
+    _memoryManager.close();
   }
 }

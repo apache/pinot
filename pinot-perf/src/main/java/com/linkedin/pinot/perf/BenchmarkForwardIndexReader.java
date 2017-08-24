@@ -21,11 +21,9 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
-import com.linkedin.pinot.core.io.reader.impl.SortedValueReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -74,7 +72,7 @@ public class BenchmarkForwardIndexReader {
 
   private int _numDocs;
   private FixedBitSingleValueReader _fixedBitSingleValueReader;
-  private SortedForwardIndexReader _sortedForwardIndexReader;
+  private SortedIndexReader _sortedForwardIndexReader;
   private FixedBitMultiValueReader _fixedBitMultiValueReader;
   private int[] _buffer;
 
@@ -115,8 +113,7 @@ public class BenchmarkForwardIndexReader {
         FileChannel.MapMode.READ_ONLY, MV_COLUMN_NAME);
     _fixedBitSingleValueReader =
         new FixedBitSingleValueReader(svUnsortedDataBuffer, _numDocs, svUnsortedNumBitsPerValue);
-    _sortedForwardIndexReader = new SortedForwardIndexReader(
-        new FixedByteSingleValueMultiColReader(svSortedDataBuffer, svSortedCardinality, new int[]{4, 4}), _numDocs);
+    _sortedForwardIndexReader = new SortedIndexReader(svSortedDataBuffer, svSortedCardinality);
     _fixedBitMultiValueReader = new FixedBitMultiValueReader(mvDataBuffer, _numDocs, mvNumValues, mvNumBitsPerValue);
     _buffer = new int[mvMaxNumMultiValues];
   }
@@ -137,7 +134,7 @@ public class BenchmarkForwardIndexReader {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int sortedForwardIndexReaderSequential() {
-    SortedValueReaderContext context = _sortedForwardIndexReader.createContext();
+    SortedIndexReader.Context context = _sortedForwardIndexReader.createContext();
     int ret = 0;
     for (int i = 0; i < _numDocs; i++) {
       ret += _sortedForwardIndexReader.getInt(i, context);
@@ -149,7 +146,7 @@ public class BenchmarkForwardIndexReader {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int sortedForwardIndexReaderRandom() {
-    SortedValueReaderContext context = _sortedForwardIndexReader.createContext();
+    SortedIndexReader.Context context = _sortedForwardIndexReader.createContext();
     int ret = 0;
     for (int i = 0; i < _numDocs; i++) {
       ret += _sortedForwardIndexReader.getInt(RANDOM.nextInt(_numDocs), context);

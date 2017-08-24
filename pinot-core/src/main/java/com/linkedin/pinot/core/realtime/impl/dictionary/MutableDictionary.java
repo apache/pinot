@@ -16,13 +16,11 @@
 
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import java.io.Closeable;
-import java.io.IOException;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import javax.annotation.Nonnull;
 
 
-public abstract class MutableDictionary implements Dictionary, Closeable {
+public abstract class MutableDictionary implements Dictionary {
 
  @Override
   public String getStringValue(int dictId) {
@@ -86,6 +84,4 @@ public abstract class MutableDictionary implements Dictionary, Closeable {
   public abstract int getAvgValueSize();
 
   public abstract boolean isEmpty();
-
-  public abstract void close() throws IOException;
 }

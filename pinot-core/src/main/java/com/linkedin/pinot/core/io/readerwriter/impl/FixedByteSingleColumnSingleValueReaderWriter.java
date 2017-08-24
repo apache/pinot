@@ -15,16 +15,16 @@
  */
 package com.linkedin.pinot.core.io.readerwriter.impl;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.List;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.Closeable;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
 
 // TODO Check if MMAP allows us to pack more partitions on a single machine.
@@ -225,7 +225,6 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
      */
     if (readers.size() == 1) {
       readers.get(0).getReader().readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
-      return;
     } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos;
           rowIter < rowStartPos + rowSize;
@@ -233,50 +232,6 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
         int row = rows[rowIter];
         int bufferId = getBufferId(row);
         values[valueIter] = readers.get(bufferId).getInt(row);
-      }
-    }
-  }
-
-  public void readValues(int[] rows, int rowStartPos, int rowSize, long[] values, int valuesStartPos) {
-    if (readers.size() == 1) {
-      readers.get(0).getReader().readLongValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
-      return;
-    } else {
-      for (int rowIter = rowStartPos, valueIter = valuesStartPos;
-          rowIter < rowStartPos + rowSize;
-          rowIter++, valueIter++) {
-        int row = rows[rowIter];
-        int bufferId = getBufferId(row);
-        values[valueIter] = readers.get(bufferId).getLong(row);
-      }
-    }
-  }
-
-  public void readValues(int[] rows, int rowStartPos, int rowSize, float[] values, int valuesStartPos) {
-    if (readers.size() == 1) {
-      readers.get(0).getReader().readFloatValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
-      return;
-    } else {
-      for (int rowIter = rowStartPos, valueIter = valuesStartPos;
-          rowIter < rowStartPos + rowSize;
-          rowIter++, valueIter++) {
-        int row = rows[rowIter];
-        int bufferId = getBufferId(row);
-        values[valueIter] = readers.get(bufferId).getFloat(row);
-      }
-    }
-  }
-
-  public void readValues(int[] rows, int rowStartPos, int rowSize, double[] values, int valuesStartPos) {
-    if (readers.size() == 1) {
-      readers.get(0).getReader().readDoubleValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
-      return;
-    } else {
-      for (int rowIter = rowStartPos, valueIter = valuesStartPos; rowIter < rowStartPos + rowSize;
-          rowIter++, valueIter++) {
-        int row = rows[rowIter];
-        int bufferId = getBufferId(row);
-        values[valueIter] = readers.get(bufferId).getDouble(row);
       }
     }
   }

@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-public interface Dictionary {
+import java.io.Closeable;
+
+
+public interface Dictionary extends Closeable {
 
   int DEFAULT_NULL_INT_VALUE = 0;
   long DEFAULT_NULL_LONG_VALUE = 0L;

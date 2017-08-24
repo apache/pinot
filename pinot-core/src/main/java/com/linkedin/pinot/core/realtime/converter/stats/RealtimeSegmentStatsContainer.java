@@ -16,14 +16,14 @@
 
 package com.linkedin.pinot.core.realtime.converter.stats;
 
-import java.util.HashMap;
-import java.util.Map;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
+import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import java.util.HashMap;
+import java.util.Map;
 
 
 /**
@@ -34,7 +34,8 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
   private final RealtimeSegmentRecordReader _realtimeSegmentRecordReader;
   private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
 
-  public RealtimeSegmentStatsContainer(RealtimeSegmentImpl realtimeSegment, RealtimeSegmentRecordReader realtimeSegmentRecordReader) {
+  public RealtimeSegmentStatsContainer(RealtimeSegmentImpl realtimeSegment,
+      RealtimeSegmentRecordReader realtimeSegmentRecordReader) {
     _realtimeSegment = realtimeSegment;
     _realtimeSegmentRecordReader = realtimeSegmentRecordReader;
 
@@ -42,7 +43,7 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
 
     // Create all column statistics
     for (String columnName : realtimeSegment.getColumnNames()) {
-      RealtimeColumnDataSource dataSource = realtimeSegment.getDataSource(columnName);
+      ColumnDataSource dataSource = realtimeSegment.getDataSource(columnName);
       if (dataSource.getDataSourceMetadata().hasDictionary()) {
         _columnStatisticsMap.put(columnName, new RealtimeColumnStatistics(realtimeSegment.getDataSource(columnName),
             _realtimeSegmentRecordReader.getSortedDocIdIterationOrder(),

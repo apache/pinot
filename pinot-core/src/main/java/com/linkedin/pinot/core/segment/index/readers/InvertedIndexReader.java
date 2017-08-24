@@ -15,20 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import java.io.Closeable;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public interface InvertedIndexReader extends Closeable {
-
-  /**
-   * Get the immutable bitmap for the given dictionary id.
-   */
-  ImmutableRoaringBitmap getImmutable(int dictId);
+public interface InvertedIndexReader<T> extends Closeable {
 
   /**
-   * Get min/max range pair for the given dictionary id. (Sorted index only)
+   * Get the document ids for the given dictionary id.
    */
-  IntPair getMinMaxRangeFor(int dictId);
+  T getDocIds(int dictId);
 }

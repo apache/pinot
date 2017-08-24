@@ -15,14 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -30,11 +22,17 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import com.linkedin.pinot.core.segment.index.readers.SortedInvertedIndexReader;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
@@ -73,8 +71,8 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
-    final SortedInvertedIndexReader invertedIndex = (SortedInvertedIndexReader) dataSource.getInvertedIndex();
-    List<IntPair> pairs = new ArrayList<IntPair>();
+    SortedIndexReader invertedIndex = (SortedIndexReader) dataSource.getInvertedIndex();
+    List<IntPair> pairs = new ArrayList<>();
 
     // At this point, we need to create a list of matching docId ranges. There are two kinds of operators:
     //
@@ -115,11 +113,11 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
       // dictionaryIds are adjacent
       Arrays.sort(dictionaryIds);
 
-      IntPair lastPair = invertedIndex.getMinMaxRangeFor(dictionaryIds[0]);
+      IntPair lastPair = invertedIndex.getDocIds(dictionaryIds[0]);
       IntRanges.clip(lastPair, startDocId, endDocId);
 
       for (int i = 1; i < dictionaryIds.length; i++) {
-        IntPair currentPair = invertedIndex.getMinMaxRangeFor(dictionaryIds[i]);
+        IntPair currentPair = invertedIndex.getDocIds(dictionaryIds[i]);
         IntRanges.clip(currentPair, startDocId, endDocId);
 
         // If the previous range is degenerate, just keep the current one

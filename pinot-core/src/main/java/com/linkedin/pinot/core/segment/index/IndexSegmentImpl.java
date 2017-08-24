@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
-import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
+import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
@@ -88,8 +88,8 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public DataSource getDataSource(String columnName) {
-    return new ColumnDataSourceImpl(indexContainerMap.get(columnName));
+  public ColumnDataSource getDataSource(String columnName) {
+    return new ColumnDataSource(indexContainerMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
   }
 
   public DataSource getDataSource(String columnName, Predicate p) {
@@ -108,8 +108,8 @@ public class IndexSegmentImpl implements IndexSegment {
       ColumnIndexContainer columnIndexContainer = indexContainerMap.get(column);
 
       try {
-        if (columnIndexContainer.hasDictionary()) {
-          ImmutableDictionaryReader dictionary = columnIndexContainer.getDictionary();
+        ImmutableDictionaryReader dictionary = columnIndexContainer.getDictionary();
+        if (dictionary != null) {
           dictionary.close();
         }
       } catch (Exception e) {
@@ -121,8 +121,9 @@ public class IndexSegmentImpl implements IndexSegment {
         LOGGER.error("Error when close forward index for column : " + column, e);
       }
       try {
-        if (columnIndexContainer.getInvertedIndex() != null) {
-          columnIndexContainer.getInvertedIndex().close();
+        InvertedIndexReader invertedIndex = columnIndexContainer.getInvertedIndex();
+        if (invertedIndex != null) {
+          invertedIndex.close();
         }
       } catch (Exception e) {
         LOGGER.error("Error when close inverted index for column : " + column, e);

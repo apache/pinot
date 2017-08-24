@@ -29,11 +29,10 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
   private final int rows;
 
   protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int rows, int columnSize) {
-    dataFileReader = new FixedByteSingleValueMultiColReader(dataBuffer, rows, new int[] { columnSize });
+    dataFileReader = new FixedByteSingleValueMultiColReader(dataBuffer, rows, new int[]{columnSize});
     this.rows = rows;
     fileSearcher = new ByteBufferBinarySearchUtil(dataFileReader);
   }
-
 
   protected int intIndexOf(int actualValue) {
     return fileSearcher.binarySearch(0, actualValue);
@@ -67,10 +66,6 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
   @Override
   public abstract double getDoubleValue(int dictionaryId);
 
-  public void close() throws IOException {
-    dataFileReader.close();
-  }
-
   @Override
   public int length() {
     return rows;
@@ -101,18 +96,17 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
     readValues(dictionaryIds, startPos, limit, outValues, outStartPos, FieldSpec.DataType.STRING);
   }
 
-  protected void readValues(int[] dictionaryIds, int startPos, int limit, Object values, int outStartPos, FieldSpec.DataType type) {
+  protected void readValues(int[] dictionaryIds, int startPos, int limit, Object values, int outStartPos,
+      FieldSpec.DataType type) {
     int endPos = startPos + limit;
 
     switch (type) {
-
       case INT: {
         int[] outValues = (int[]) values;
         for (int iter = startPos; iter < endPos; ++iter) {
           int dictId = dictionaryIds[iter];
           outValues[outStartPos++] = getIntValue(dictId);
         }
-
       }
       break;
       case LONG: {
@@ -148,7 +142,10 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
       }
       break;
     }
-
   }
 
+  @Override
+  public void close() throws IOException {
+    dataFileReader.close();
+  }
 }

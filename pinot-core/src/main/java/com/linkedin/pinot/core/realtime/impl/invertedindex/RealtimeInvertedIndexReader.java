@@ -15,17 +15,14 @@
  */
 package com.linkedin.pinot.core.realtime.impl.invertedindex;
 
-import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class RealtimeInvertedIndexReader implements InvertedIndexReader {
+public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableRoaringBitmap> {
   private final List<ThreadSafeMutableRoaringBitmap> _bitmaps = new ArrayList<>();
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
@@ -56,7 +53,7 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public ImmutableRoaringBitmap getImmutable(int dictId) {
+  public MutableRoaringBitmap getDocIds(int dictId) {
     ThreadSafeMutableRoaringBitmap bitmap;
     try {
       _readLock.lock();
@@ -68,12 +65,7 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public Pairs.IntPair getMinMaxRangeFor(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void close() throws IOException {
+  public void close() {
   }
 
   /**

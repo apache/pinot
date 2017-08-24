@@ -75,8 +75,8 @@ public class TransformBlock implements Block {
 
   public BlockMetadata getBlockMetadata(String column) {
     BlockValSet transformBlockValSet = (_transformBlockValSetMap != null) ? _transformBlockValSetMap.get(column) : null;
-    return (transformBlockValSet != null) ? new TransformBlockMetadata(transformBlockValSet.getNumDocs(),
-        transformBlockValSet.getValueType()) : _projectionBlock.getMetadata(column);
+    return (transformBlockValSet != null) ? new BlockMetadataImpl(transformBlockValSet.getNumDocs(), true, 0,
+        transformBlockValSet.getValueType(), null) : _projectionBlock.getMetadata(column);
   }
 
   public DocIdSetBlock getDocIdSetBlock() {

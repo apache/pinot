@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
@@ -25,7 +24,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BitmapInvertedIndexReader implements InvertedIndexReader {
+public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
   final private int numberOfBitmaps;
@@ -51,10 +50,9 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
 
   /**
    * {@inheritDoc}
-   * @see InvertedIndexReader#getImmutable(int)
    */
   @Override
-  public ImmutableRoaringBitmap getImmutable(int dictId) {
+  public ImmutableRoaringBitmap getDocIds(int dictId) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
     // Return the bitmap if it's still on heap
     if (bitmaps != null) {
@@ -117,12 +115,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     buffer.close();
-  }
-
-  @Override
-  public IntPair getMinMaxRangeFor(int dictId) {
-    throw new UnsupportedOperationException("not supported in inverted index type bitmap");
   }
 }

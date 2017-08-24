@@ -16,6 +16,13 @@
 
 package com.linkedin.pinot.core.common;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
+import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -23,13 +30,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 
 
 public class RealtimeNoDictionaryTest {
@@ -84,19 +84,10 @@ public class RealtimeNoDictionaryTest {
     }
 
     Map<String, BaseOperator> dataSourceBlock = new HashMap<>();
-    RealtimeColumnDataSource dataSource;
-
-    dataSource = new RealtimeColumnDataSource(intSpec, intRawIndex, null, NUM_ROWS-1, -1, null, null);
-    dataSourceBlock.put(INT_COL_NAME, dataSource);
-
-    dataSource = new RealtimeColumnDataSource(longSpec, longRawIndex, null, NUM_ROWS-1, -1, null, null);
-    dataSourceBlock.put(LONG_COL_NAME, dataSource);
-
-    dataSource = new RealtimeColumnDataSource(floatSpec, floatRawIndex, null, NUM_ROWS-1, -1, null, null);
-    dataSourceBlock.put(FLOAT_COL_NAME, dataSource);
-
-    dataSource = new RealtimeColumnDataSource(doubleSpec, doubleRawIndex, null, NUM_ROWS-1, -1, null, null);
-    dataSourceBlock.put(DOUBLE_COL_NAME, dataSource);
+    dataSourceBlock.put(INT_COL_NAME, new ColumnDataSource(intSpec, NUM_ROWS, 0, intRawIndex, null, null));
+    dataSourceBlock.put(LONG_COL_NAME, new ColumnDataSource(longSpec, NUM_ROWS, 0, longRawIndex, null, null));
+    dataSourceBlock.put(FLOAT_COL_NAME, new ColumnDataSource(floatSpec, NUM_ROWS, 0, floatRawIndex, null, null));
+    dataSourceBlock.put(DOUBLE_COL_NAME, new ColumnDataSource(doubleSpec, NUM_ROWS, 0, doubleRawIndex, null, null));
 
     return new DataFetcher(dataSourceBlock);
   }
