@@ -44,7 +44,7 @@ export default Ember.Component.extend({
           displayStart,
           displayEnd } = event;
 
-        return (displayStart <= end) && (displayEnd => start);
+        return (displayStart <= end) && (displayEnd >= start);
       });
     }
   ),
