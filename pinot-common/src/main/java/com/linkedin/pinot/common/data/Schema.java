@@ -144,12 +144,10 @@ public final class Schema {
   }
 
   @Nullable
-  @Deprecated
   public TimeFieldSpec getTimeFieldSpec() {
     return _timeFieldSpec;
   }
 
-  @Deprecated
   public void setTimeFieldSpec(@Nullable TimeFieldSpec timeFieldSpec) {
     if (timeFieldSpec != null) {
       addField(timeFieldSpec);
