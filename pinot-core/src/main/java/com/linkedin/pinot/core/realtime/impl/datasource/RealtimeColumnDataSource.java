@@ -32,7 +32,7 @@ import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleV
 import com.linkedin.pinot.core.operator.blocks.RealtimeMultiValueBlock;
 import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
+import com.linkedin.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
@@ -49,12 +49,12 @@ public class RealtimeColumnDataSource extends DataSource {
 
   private final FieldSpec fieldSpec;
   private final DataFileReader indexReader;
-  private final RealtimeInvertedIndex invertedIndex;
+  private final RealtimeInvertedIndexReader invertedIndex;
   private final int offset;
   private final int maxNumberOfMultiValues;
   private final MutableDictionary dictionary;
 
-  public RealtimeColumnDataSource(FieldSpec spec, DataFileReader indexReader, RealtimeInvertedIndex invertedIndex,
+  public RealtimeColumnDataSource(FieldSpec spec, DataFileReader indexReader, RealtimeInvertedIndexReader invertedIndex,
       int searchOffset, int maxNumberOfMultivalues, Schema schema, MutableDictionary dictionary) {
     this.fieldSpec = spec;
     this.indexReader = indexReader;

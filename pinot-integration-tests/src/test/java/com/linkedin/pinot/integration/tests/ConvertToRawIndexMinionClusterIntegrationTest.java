@@ -48,7 +48,7 @@ import org.testng.annotations.Test;
  */
 public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridClusterIntegrationTest {
   private static final int NUM_MINIONS = 3;
-  private static final String COLUMNS_TO_CONVERT = "ActualElapsedTime,ArrDelay,DepDelay";
+  private static final String COLUMNS_TO_CONVERT = "ActualElapsedTime,ArrDelay,DepDelay,CRSDepTime";
 
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;

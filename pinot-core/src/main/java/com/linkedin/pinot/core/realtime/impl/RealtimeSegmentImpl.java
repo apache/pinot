@@ -19,14 +19,11 @@ import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.time.TimeConverter;
-import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -41,11 +38,7 @@ import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
-import com.linkedin.pinot.core.realtime.impl.invertedIndex.DimensionInvertertedIndex;
-import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
-import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
-import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.startree.StarTree;
@@ -73,16 +66,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private String segmentName;
 
-  private final Map<String, MutableDictionary> dictionaryMap;
-  private final Map<String, RealtimeInvertedIndex> invertedIndexMap;
+  private final Map<String, DataFileReader> columnIndexReaderWriterMap = new HashMap<>();
+  private final Map<String, Integer> maxNumberOfMultivaluesMap = new HashMap<>();
+  private final Map<String, RealtimeInvertedIndexReader> invertedIndexMap = new HashMap<>();
+  private final Map<String, MutableDictionary> dictionaryMap = new HashMap<>();
 
-  private final TimeConverter timeConverter;
   private AtomicInteger docIdGenerator;
   private String outgoingTimeColumnName;
-  private TimeGranularitySpec incomingGranularitySpec;
   private TimeGranularitySpec outgoingGranularitySpec;
-
-  private Map<String, Integer> maxNumberOfMultivaluesMap;
 
   private int docIdSearchableOffset = -1;
   private int numDocsIndexed = 0;
@@ -94,11 +85,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private final int capacity;
 
-  private final Map<String, DataFileReader> columnIndexReaderWriterMap;
-
   private final ServerMetrics serverMetrics;
   private final String tableAndStreamName;
-  private StarTreeIndexSpec starTreeIndexSpec = null;
   private SegmentPartitionConfig segmentPartitionConfig = null;
   private final List<String> consumingNoDictionaryColumns = new ArrayList<>();
   private final RealtimeIndexOffHeapMemoryManager memoryManager;
@@ -113,15 +101,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
 
   public RealtimeSegmentImpl(ServerMetrics serverMetrics, RealtimeSegmentDataManager segmentDataManager,
-      IndexLoadingConfig indexLoadingConfig, int capacity, String streamName)
-  {
+      IndexLoadingConfig indexLoadingConfig, int capacity, String streamName) {
     // initial variable setup
     this.segmentName = segmentDataManager.getSegmentName();
     this.serverMetrics = serverMetrics;
     LOGGER = LoggerFactory.getLogger(RealtimeSegmentImpl.class.getName() + "_" + segmentName + "_" + streamName);
     dataSchema = segmentDataManager.getSchema();
-    dictionaryMap = new HashMap<String, MutableDictionary>();
-    maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
     outgoingTimeColumnName = dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName();
     final List<String> noDictionaryColumns = segmentDataManager.getNoDictionaryColumns();
     final List<String> invertedIndexColumns = segmentDataManager.getInvertedIndexColumns();
@@ -130,163 +115,52 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     statsHistory = segmentDataManager.getStatsHistory();
     isOffHeapAllocation = indexLoadingConfig.isRealtimeOffheapAllocation();
     memoryManager = segmentDataManager.getMemoryManager();
-
-    for (final String column : noDictionaryColumns) {
-      // Not all no-dictionary columns can be so while the segment is being consumed.
-      // However, after consumption completes and the segment is built, these columns
-      // can be no-dictionary columns in the built (immutable) segment. We check below
-      // to make sure that the columns that are configured as no-dictionary can still
-      // be so during consumption, and populate consumingNoDictionaryColummns accordingly.
-      // This is so that we can do faster lookups during indexing of rows.
-      if (canBeNoDictionaryColumnInConsumingSegment(column, invertedIndexColumns)) {
-        consumingNoDictionaryColumns.add(column);
-      }
-    }
     this.capacity = capacity;
-
-    for (FieldSpec col : dataSchema.getAllFieldSpecs()) {
-      maxNumberOfMultivaluesMap.put(col.getName(), 0);
-    }
-    // dictionary assignment for dimensions and time column
-    for (String column : dataSchema.getDimensionNames()) {
-      if (!consumingNoDictionaryColumns.contains(column)) {
-        FieldSpec.DataType dataType = dataSchema.getFieldSpecFor(column).getDataType();
-        MutableDictionary dictionary = MutableDictionaryFactory.getMutableDictionary(dataType, isOffHeapAllocation, memoryManager,
-            getColSize(statsHistory, dataType, column),
-            statsHistory.getEstimatedCardinality(column), column);
-        dictionaryMap.put(column, dictionary);
-      }
-    }
-
-    FieldSpec.DataType timeColDataType = dataSchema.getFieldSpecFor(outgoingTimeColumnName).getDataType();
-
-    dictionaryMap.put(outgoingTimeColumnName, MutableDictionaryFactory.getMutableDictionary(
-        timeColDataType, isOffHeapAllocation,
-        memoryManager, getColSize(statsHistory, timeColDataType, outgoingTimeColumnName),
-        statsHistory.getEstimatedCardinality(outgoingTimeColumnName),
-        outgoingTimeColumnName));
-
-    for (String metric : dataSchema.getMetricNames()) {
-      if (!consumingNoDictionaryColumns.contains(metric)) {
-        FieldSpec.DataType dataType = dataSchema.getFieldSpecFor(metric).getDataType();
-        MutableDictionary dictionary = MutableDictionaryFactory.getMutableDictionary(dataType, isOffHeapAllocation,
-            memoryManager,
-            getColSize(statsHistory, dataType, metric),
-            statsHistory.getEstimatedCardinality(metric), metric);
-        dictionaryMap.put(metric, dictionary);
-      }
-    }
-
-    // docId generator and time granularity converter
-    docIdGenerator = new AtomicInteger(-1);
-    incomingGranularitySpec = dataSchema.getTimeFieldSpec().getIncomingGranularitySpec();
-    outgoingGranularitySpec = dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec();
-    timeConverter = TimeConverterProvider.getTimeConverter(incomingGranularitySpec, outgoingGranularitySpec);
-
-    // forward index and inverted index setup
-    columnIndexReaderWriterMap = new HashMap<String, DataFileReader>();
-    invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
-
-    for (String dimension : dataSchema.getDimensionNames()) {
-      if (invertedIndexColumns.contains(dimension)) {
-        invertedIndexMap.put(dimension, new DimensionInvertertedIndex(dimension));
-      }
-      if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
-        int colSize = V1Constants.Numbers.INTEGER_SIZE;
-        if (consumingNoDictionaryColumns.contains(dimension)) {
-          colSize = getColWidth(dataSchema.getFieldSpecFor(dimension).getDataType());
-        }
-        columnIndexReaderWriterMap.put(dimension,
-              new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize, memoryManager, dimension));
-      } else {
-        // TODO Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
-        columnIndexReaderWriterMap.put(dimension,
-            new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgMultiValueCount,
-                capacity, V1Constants.Numbers.INTEGER_SIZE, memoryManager, dimension));
-      }
-    }
-
-    for (String metric : dataSchema.getMetricNames()) {
-      if (invertedIndexColumns.contains(metric)) {
-        invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
-      }
-      int colSize = V1Constants.Numbers.INTEGER_SIZE;
-      if (consumingNoDictionaryColumns.contains(metric)) {
-        colSize = getColWidth(dataSchema.getFieldSpecFor(metric).getDataType());
-      }
-      columnIndexReaderWriterMap.put(metric,
-          new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize, memoryManager, metric));
-    }
-
-    if (invertedIndexColumns.contains(outgoingTimeColumnName)) {
-      invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
-    }
-    columnIndexReaderWriterMap.put(outgoingTimeColumnName,
-        new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Numbers.INTEGER_SIZE, memoryManager,
-            outgoingTimeColumnName));
-
     tableAndStreamName = tableName + "-" + streamName;
-  }
+    docIdGenerator = new AtomicInteger(-1);
+    outgoingGranularitySpec = dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec();
 
-  private int getColSize(RealtimeSegmentStatsHistory statsHistory, FieldSpec.DataType dataType, String columnName) {
-    switch(dataType) {
-      case INT:
-        return V1Constants.Numbers.INTEGER_SIZE;
-      case LONG:
-        return V1Constants.Numbers.LONG_SIZE;
-      case FLOAT:
-        return V1Constants.Numbers.FLOAT_SIZE;
-      case DOUBLE:
-        return V1Constants.Numbers.DOUBLE_SIZE;
-      case STRING:
-        return statsHistory.getEstimatedAvgColSize(columnName);
-      default:
-        throw new RuntimeException("Unknown data type " + dataType.toString() + " for column " + columnName);
-    }
-  }
+    for (FieldSpec fieldSpec : dataSchema.getAllFieldSpecs()) {
+      String columnName = fieldSpec.getName();
+      maxNumberOfMultivaluesMap.put(columnName, 0);
 
-  /**
-   * Check whether a given column can be a no-dictionary column in consuming segment.
-   *
-   * No-dictionary column and inverted index are not supported in combination.
-   *
-   * @param column is the column name to check
-   * @param invertedIndexColumns has a list of columns that have inverted indexes
-   * @return true if column can be a no-dictionary column for consuming segments
-   */
-  private boolean canBeNoDictionaryColumnInConsumingSegment(final String column,
-      final List<String> invertedIndexColumns) {
-    if (invertedIndexColumns.contains(column)) {
-      return false;
-    }
-    FieldSpec fieldSpec = dataSchema.getFieldSpecFor(column);
-    if (!fieldSpec.isSingleValueField()) {
-      return false;
-    }
-    FieldSpec.DataType dataType = fieldSpec.getDataType();
-    switch (dataType) {
-      case INT:
-      case LONG:
-      case DOUBLE:
-      case FLOAT:
-        return true;
-      default:
-        return false;
-    }
-  }
+      // Check whether to generate raw index for the column while consuming
+      // Only support generating raw index on single-value non-string columns that do not have inverted index while
+      // consuming. After consumption completes and the segment is built, all single-value columns can have raw index
+      FieldSpec.DataType dataType = fieldSpec.getDataType();
+      int indexColumnSize = FieldSpec.DataType.INT.size();
+      if (noDictionaryColumns.contains(columnName) && fieldSpec.isSingleValueField()
+          && dataType != FieldSpec.DataType.STRING && !invertedIndexColumns.contains(columnName)) {
+        consumingNoDictionaryColumns.add(columnName);
+        indexColumnSize = dataType.size();
+      } else {
+        int dictionaryColumnSize;
+        if (dataType == FieldSpec.DataType.STRING) {
+          dictionaryColumnSize = statsHistory.getEstimatedAvgColSize(columnName);
+        } else {
+          dictionaryColumnSize = dataType.size();
+        }
+        MutableDictionary dictionary =
+            MutableDictionaryFactory.getMutableDictionary(dataType, isOffHeapAllocation, memoryManager,
+                dictionaryColumnSize, statsHistory.getEstimatedCardinality(columnName), columnName);
+        dictionaryMap.put(columnName, dictionary);
+      }
 
-  private int getColWidth(FieldSpec.DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return V1Constants.Numbers.INTEGER_SIZE;
-      case LONG:
-        return V1Constants.Numbers.LONG_SIZE;
-      case FLOAT:
-        return V1Constants.Numbers.FLOAT_SIZE;
-      case DOUBLE:
-        return V1Constants.Numbers.DOUBLE_SIZE;
-      default:
-        throw new UnsupportedOperationException("Unknown width for datatype " + dataType.toString());
+      DataFileReader dataFileReader;
+      if (fieldSpec.isSingleValueField()) {
+        dataFileReader =
+            new FixedByteSingleColumnSingleValueReaderWriter(capacity, indexColumnSize, memoryManager, columnName);
+      } else {
+        // TODO: Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
+        dataFileReader =
+            new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgMultiValueCount, capacity,
+                indexColumnSize, memoryManager, columnName);
+      }
+      columnIndexReaderWriterMap.put(columnName, dataFileReader);
+
+      if (invertedIndexColumns.contains(columnName)) {
+        invertedIndexMap.put(columnName, new RealtimeInvertedIndexReader());
+      }
     }
   }
 
@@ -428,7 +302,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     // metrics
     for (String metric : dataSchema.getMetricNames()) {
       if (invertedIndexMap.containsKey(metric)) {
-        invertedIndexMap.get(metric).add(rawRowToDicIdMap.get(metric), docId);
+        invertedIndexMap.get(metric).add((Integer) rawRowToDicIdMap.get(metric), docId);
       }
     }
 
@@ -436,7 +310,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     for (String dimension : dataSchema.getDimensionNames()) {
       if (invertedIndexMap.containsKey(dimension)) {
         if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
-          invertedIndexMap.get(dimension).add(rawRowToDicIdMap.get(dimension), docId);
+          invertedIndexMap.get(dimension).add((Integer) rawRowToDicIdMap.get(dimension), docId);
         } else {
           int[] dicIds = (int[]) rawRowToDicIdMap.get(dimension);
           for (int dicId : dicIds) {
@@ -447,7 +321,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
     // time
     if (invertedIndexMap.containsKey(outgoingTimeColumnName)) {
-      invertedIndexMap.get(outgoingTimeColumnName).add(rawRowToDicIdMap.get(outgoingTimeColumnName), docId);
+      invertedIndexMap.get(outgoingTimeColumnName).add((Integer) rawRowToDicIdMap.get(outgoingTimeColumnName), docId);
     }
     docIdSearchableOffset = docId;
     numDocsIndexed += 1;
@@ -584,7 +458,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     // clear map now that index is closed to prevent accidental usage
     columnIndexReaderWriterMap.clear();
 
-    for (RealtimeInvertedIndex index : invertedIndexMap.values()) {
+    for (RealtimeInvertedIndexReader index : invertedIndexMap.values()) {
       try {
         index.close();
       } catch (IOException e) {
@@ -609,7 +483,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForStringColumn(final String columnToSortOn) {
-    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final RealtimeInvertedIndexReader index = invertedIndexMap.get(columnToSortOn);
     final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
@@ -625,13 +499,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValues.get(i))).getIntIterator();
     }
     return intIterators;
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForIntegerColumn(final String columnToSortOn) {
-    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final RealtimeInvertedIndexReader index = invertedIndexMap.get(columnToSortOn);
     final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
@@ -649,13 +523,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValuesArr.length; i++) {
-      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValuesArr[i])).getIntIterator();
+      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValuesArr[i])).getIntIterator();
     }
     return intIterators;
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForLongColumn(final String columnToSortOn) {
-    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final RealtimeInvertedIndexReader index = invertedIndexMap.get(columnToSortOn);
     final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
@@ -671,13 +545,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValues.get(i))).getIntIterator();
     }
     return intIterators;
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForFloatColumn(final String columnToSortOn) {
-    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final RealtimeInvertedIndexReader index = invertedIndexMap.get(columnToSortOn);
     final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
@@ -693,13 +567,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValues.get(i))).getIntIterator();
     }
     return intIterators;
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForDoubleColumn(final String columnToSortOn) {
-    final RealtimeInvertedIndex index = invertedIndexMap.get(columnToSortOn);
+    final RealtimeInvertedIndexReader index = invertedIndexMap.get(columnToSortOn);
     final MutableDictionary dictionary = dictionaryMap.get(columnToSortOn);
     final IntIterator[] intIterators = new IntIterator[dictionary.length()];
 
@@ -715,7 +589,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getDocIdSetFor(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValues.get(i))).getIntIterator();
     }
     return intIterators;
   }

@@ -46,13 +46,13 @@ public class SortedInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public ImmutableRoaringBitmap getImmutable(int idx) {
-    if (idx >= cardinality) {
+  public ImmutableRoaringBitmap getImmutable(int dictId) {
+    if (dictId >= cardinality) {
       return new MutableRoaringBitmap();
     }
     MutableRoaringBitmap rr = new MutableRoaringBitmap();
-    int min = indexReader.getInt(idx, 0);
-    int max = indexReader.getInt(idx, 1);
+    int min = indexReader.getInt(dictId, 0);
+    int max = indexReader.getInt(dictId, 1);
     rr.add(min, max + 1);
     return rr;
   }
