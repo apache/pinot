@@ -16,9 +16,12 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,8 +33,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+
+import org.apache.commons.collections.CollectionUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -41,11 +47,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The <code>Schema</code> class is defined for each table to describe the details of the table's fields (columns).
- * <p>Three field types are supported: DIMENSION, METRIC, TIME.
+ * <p>Four field types are supported: DIMENSION, METRIC, TIME, DATE_TIME.
  * ({@link com.linkedin.pinot.common.data.DimensionFieldSpec}, {@link com.linkedin.pinot.common.data.MetricFieldSpec},
- * {@link com.linkedin.pinot.common.data.TimeFieldSpec})
+ * {@link com.linkedin.pinot.common.data.TimeFieldSpec}, {@link com.linkedin.pinot.common.data.DateTimeFieldSpec})
  * <p>For each field, a {@link com.linkedin.pinot.common.data.FieldSpec} is defined to provide the details of the field.
- * <p>There could be multiple DIMENSION or METRIC fields, but at most 1 TIME field.
+ * <p>There could be multiple DIMENSION or METRIC or DATE_TIME fields, but at most 1 TIME field.
  * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
  * <code>DataType</code>s will be converted to one of them.
  */
@@ -58,13 +64,16 @@ public final class Schema {
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
+  private List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
 
   // Json ignored fields
   private final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
   private final Set<String> _dimensionSet = new HashSet<>();
   private final Set<String> _metricSet = new HashSet<>();
+  private final Set<String> _dateTimeSet = new HashSet<>();
   private final List<String> _dimensionList = new ArrayList<>();
   private final List<String> _metricList = new ArrayList<>();
+  private final List<String> _dateTimeList = new ArrayList<>();
 
   @Nonnull
   public static Schema fromFile(@Nonnull File schemaFile)
@@ -121,11 +130,26 @@ public final class Schema {
     }
   }
 
+  @Nonnull
+  public List<DateTimeFieldSpec> getDateTimeFieldSpecs() {
+    return _dateTimeFieldSpecs;
+  }
+
+  public void setDateTimeFieldSpecs(@Nonnull List<DateTimeFieldSpec> dateTimeFieldSpecs) {
+    Preconditions.checkState(_dateTimeFieldSpecs.isEmpty());
+
+    for (DateTimeFieldSpec dateTimeFieldSpec : dateTimeFieldSpecs) {
+      addField(dateTimeFieldSpec);
+    }
+  }
+
   @Nullable
+  @Deprecated
   public TimeFieldSpec getTimeFieldSpec() {
     return _timeFieldSpec;
   }
 
+  @Deprecated
   public void setTimeFieldSpec(@Nullable TimeFieldSpec timeFieldSpec) {
     if (timeFieldSpec != null) {
       addField(timeFieldSpec);
@@ -158,6 +182,13 @@ public final class Schema {
       case TIME:
         Preconditions.checkState(_timeFieldSpec == null, "Already defined the time column: " + _timeFieldSpec);
         _timeFieldSpec = (TimeFieldSpec) fieldSpec;
+        break;
+      case DATE_TIME:
+        if (!_dateTimeSet.contains(columnName)) {
+          _dateTimeSet.add(columnName);
+          _dateTimeList.add(columnName);
+        }
+        _dateTimeFieldSpecs.add((DateTimeFieldSpec) fieldSpec);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
@@ -224,6 +255,17 @@ public final class Schema {
     return null;
   }
 
+
+  @JsonIgnore
+  @Nullable
+  public DateTimeFieldSpec getDateTimeSpec(@Nonnull String dateTimeName) {
+    FieldSpec fieldSpec = _fieldSpecMap.get(dateTimeName);
+    if (fieldSpec != null && fieldSpec.getFieldType() == FieldType.DATE_TIME) {
+      return (DateTimeFieldSpec) fieldSpec;
+    }
+    return null;
+  }
+
   @JsonIgnore
   @Nonnull
   public List<String> getDimensionNames() {
@@ -237,19 +279,28 @@ public final class Schema {
   }
 
   @JsonIgnore
+  @Nonnull
+  public List<String> getDateTimeNames() {
+    return CollectionUtils.isEmpty(_dateTimeList) ? null : _dateTimeList;
+  }
+
+  @JsonIgnore
   @Nullable
+  @Deprecated
   public String getTimeColumnName() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getName() : null;
   }
 
   @JsonIgnore
   @Nullable
+  @Deprecated
   public TimeUnit getIncomingTimeUnit() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
   }
 
   @JsonIgnore
   @Nullable
+  @Deprecated
   public TimeUnit getOutgoingTimeUnit() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getOutgoingGranularitySpec().getTimeType() : null;
   }
@@ -288,6 +339,7 @@ public final class Schema {
         switch (fieldType) {
           case DIMENSION:
           case TIME:
+          case DATE_TIME:
             switch (dataType) {
               case INT:
               case LONG:
@@ -390,18 +442,21 @@ public final class Schema {
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
         @Nonnull DataType incomingDataType) {
       _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit));
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
         @Nonnull DataType incomingDataType, @Nonnull Object defaultNullValue) {
       _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, defaultNullValue));
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
         @Nonnull DataType incomingDataType, @Nonnull String outgoingName, @Nonnull TimeUnit outgoingTimeUnit,
         @Nonnull DataType outgoingDataType) {
@@ -411,6 +466,7 @@ public final class Schema {
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
         @Nonnull DataType incomingDataType, @Nonnull String outgoingName, @Nonnull TimeUnit outgoingTimeUnit,
         @Nonnull DataType outgoingDataType, @Nonnull Object defaultNullValue) {
@@ -420,12 +476,14 @@ public final class Schema {
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType) {
       _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit));
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull Object defaultNullValue) {
       _schema.addField(
@@ -433,6 +491,7 @@ public final class Schema {
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull String outgoingName,
         int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull DataType outgoingDataType) {
@@ -442,6 +501,7 @@ public final class Schema {
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull String outgoingName,
         int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull DataType outgoingDataType,
@@ -452,26 +512,55 @@ public final class Schema {
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec));
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull Object defaultNullValue) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
       return this;
     }
 
+    @Deprecated
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec, @Nonnull Object defaultNullValue) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addDateTime(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
+        @Nonnull String granularity, @Nonnull Object defaultNullValue) {
+      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addDateTime(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
+        @Nonnull String granularity, DateTimeType dateTimeType, @Nonnull Object defaultNullValue) {
+      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity, dateTimeType, defaultNullValue));
+      return this;
+    }
+
+
+    public SchemaBuilder addDateTime(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
+        @Nonnull String granularity) {
+      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity));
+      return this;
+    }
+
+    public SchemaBuilder addDateTime(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
+        @Nonnull String granularity, DateTimeType dateTimeType) {
+      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity, dateTimeType));
       return this;
     }
 
@@ -504,4 +593,5 @@ public final class Schema {
   public int hashCode() {
     return EqualityUtils.hashCodeOf(_schemaName.hashCode(), _fieldSpecMap);
   }
+
 }

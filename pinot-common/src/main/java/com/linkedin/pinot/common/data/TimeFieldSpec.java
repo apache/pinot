@@ -23,6 +23,7 @@ import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
+@Deprecated
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class TimeFieldSpec extends FieldSpec {
   private TimeGranularitySpec _incomingGranularitySpec;

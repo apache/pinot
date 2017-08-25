@@ -15,12 +15,15 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+
 import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -192,6 +195,69 @@ public class FieldSpecTest {
   }
 
   /**
+   * Test {@link TimeFieldSpec} constructors.
+   */
+  @Test
+  public void testDateTimeFieldSpecConstructor() {
+    String name = "Date";
+    DataType dataType = DataType.LONG;
+    String format = "1:HOURS:EPOCH";
+    String granularity = "1:HOURS";
+    int defaultNullValue = 17050;
+
+    DateTimeFieldSpec dateTimeFieldSpec1 = new DateTimeFieldSpec(name, dataType, format, granularity);
+    DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue);
+
+    Assert.assertFalse(dateTimeFieldSpec1.equals(dateTimeFieldSpec2));
+    dateTimeFieldSpec1.setDefaultNullValue(defaultNullValue);
+    Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec2);
+
+    DateTimeFieldSpec dateTimeFieldSpec3 = new DateTimeFieldSpec(name, dataType, format, granularity, DateTimeType.PRIMARY);
+    DateTimeFieldSpec dateTimeFieldSpec4 = new DateTimeFieldSpec(name, dataType, format, granularity, DateTimeType.PRIMARY, defaultNullValue);
+
+    Assert.assertFalse(dateTimeFieldSpec3.equals(dateTimeFieldSpec4));
+    dateTimeFieldSpec3.setDefaultNullValue(defaultNullValue);
+    Assert.assertEquals(dateTimeFieldSpec3, dateTimeFieldSpec4);
+
+  }
+
+  @Test(expectedExceptions = {IllegalArgumentException.class})
+  public void testDateTimeFormat() {
+    String name = "Date";
+    DataType dataType = DataType.LONG;
+    String format = null;
+    String granularity = "1:HOURS";
+
+    DateTimeFieldSpec dateTimeFieldSpec = null;
+    format = "1";
+    dateTimeFieldSpec= new DateTimeFieldSpec(name, dataType, format, granularity);
+    Assert.assertNull(dateTimeFieldSpec);
+    format = "1:hours";
+    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
+    Assert.assertNull(dateTimeFieldSpec);
+    format = "one_hours";
+    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
+    Assert.assertNull(dateTimeFieldSpec);
+    format = "1:HOURS:SIMPLE_DATE_FORMAT";
+    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
+    Assert.assertNull(dateTimeFieldSpec);
+    format = "1:hour:EPOCH";
+    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
+    Assert.assertNull(dateTimeFieldSpec);
+    format = "1:HOUR:EPOCH:yyyyMMdd";
+    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
+    Assert.assertNull(dateTimeFieldSpec);
+    format = "1:HOURS:EPOCH";
+    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
+    Assert.assertNotNull(dateTimeFieldSpec);
+    dateTimeFieldSpec = null;
+    format = "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd";
+    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
+    Assert.assertNotNull(dateTimeFieldSpec);
+  }
+
+
+  /**
    * Test different order of fields in serialized JSON string to deserialize {@link FieldSpec}.
    */
   @Test
@@ -231,6 +297,13 @@ public class FieldSpecTest {
             TimeUnit.SECONDS, -1);
     Assert.assertEquals(timeFieldSpec1, timeFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(timeFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
+
+    // Date time field with default null value.
+    String[] dateTimeFields = {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"defaultNullValue\":-1"};
+    DateTimeFieldSpec dateTimeFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
+    DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec("Date", DataType.LONG, "1:MILLISECONDS:EPOCH", "5:MINUTES", -1);
+    Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec2, ERROR_MESSAGE);
+    Assert.assertEquals((long)dateTimeFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
   }
 
   /**
@@ -268,6 +341,12 @@ public class FieldSpecTest {
         "\"defaultNullValue\":-1"};
     first = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     second = MAPPER.readValue(MAPPER.writeValueAsString(first), TimeFieldSpec.class);
+    Assert.assertEquals(first, second, ERROR_MESSAGE);
+
+    // DateTime field
+    String[] dateTimeFields = {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"defaultNullValue\":-1"};
+    first = MAPPER.readValue(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
+    second = MAPPER.readValue(MAPPER.writeValueAsString(first), DateTimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
   }
 
