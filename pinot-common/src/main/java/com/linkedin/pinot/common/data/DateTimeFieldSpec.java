@@ -71,6 +71,15 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
 
+  /**
+   *
+   * @param name
+   * @param dataType
+   * @param format - size:timeunit:timeformat eg: 1:MILLISECONDS:EPOCH, 5:MINUTES:EPOCH, 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
+   * @param granularity - size:timeunit eg: 5:MINUTES
+   * @param dateTimeType
+   * @param defaultNullValue
+   */
   public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
       @Nonnull String granularity, DateTimeType dateTimeType, Object defaultNullValue) {
     this(name, dataType, format, granularity, defaultNullValue);
@@ -78,6 +87,12 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
 
+  /**
+   * @param name
+   * @param dataType
+   * @param format - size:timeunit:timeformat eg: 1:MILLISECONDS:EPOCH, 5:MINUTES:EPOCH, 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
+   * @param granularity - size:timeunit eg: 5:MINUTES
+   */
   public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
       @Nonnull String granularity) {
     super(name, dataType, true);
@@ -88,6 +103,13 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
 
+  /**
+   * @param name
+   * @param dataType
+   * @param format - size:timeunit:timeformat eg: 1:MILLISECONDS:EPOCH, 5:MINUTES:EPOCH, 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
+   * @param granularity - size:timeunit eg: 5:MINUTES
+   * @param dateTimeType
+   */
   public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
       @Nonnull String granularity, DateTimeType dateTimeType) {
     this(name, dataType, format, granularity);

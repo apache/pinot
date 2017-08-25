@@ -17,7 +17,6 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
@@ -41,7 +40,6 @@ import org.joda.time.DateTime;
  * <p>If the time column is in Simple Date Format:
  * <p><code>new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.HOURS, TimeFormat.SIMPLE_DATE_FORMAT.toString() +":yyyyMMdd", "hour");</code>
  */
-@Deprecated
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TimeGranularitySpec {
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;

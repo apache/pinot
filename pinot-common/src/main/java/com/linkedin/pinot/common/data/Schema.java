@@ -286,21 +286,18 @@ public final class Schema {
 
   @JsonIgnore
   @Nullable
-  @Deprecated
   public String getTimeColumnName() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getName() : null;
   }
 
   @JsonIgnore
   @Nullable
-  @Deprecated
   public TimeUnit getIncomingTimeUnit() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
   }
 
   @JsonIgnore
   @Nullable
-  @Deprecated
   public TimeUnit getOutgoingTimeUnit() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getOutgoingGranularitySpec().getTimeType() : null;
   }
@@ -442,21 +439,18 @@ public final class Schema {
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
         @Nonnull DataType incomingDataType) {
       _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit));
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
         @Nonnull DataType incomingDataType, @Nonnull Object defaultNullValue) {
       _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnit, defaultNullValue));
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
         @Nonnull DataType incomingDataType, @Nonnull String outgoingName, @Nonnull TimeUnit outgoingTimeUnit,
         @Nonnull DataType outgoingDataType) {
@@ -466,7 +460,6 @@ public final class Schema {
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, @Nonnull TimeUnit incomingTimeUnit,
         @Nonnull DataType incomingDataType, @Nonnull String outgoingName, @Nonnull TimeUnit outgoingTimeUnit,
         @Nonnull DataType outgoingDataType, @Nonnull Object defaultNullValue) {
@@ -476,14 +469,12 @@ public final class Schema {
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType) {
       _schema.addField(new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit));
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull Object defaultNullValue) {
       _schema.addField(
@@ -491,7 +482,6 @@ public final class Schema {
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull String outgoingName,
         int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull DataType outgoingDataType) {
@@ -501,7 +491,6 @@ public final class Schema {
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
         @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull String outgoingName,
         int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull DataType outgoingDataType,
@@ -512,27 +501,23 @@ public final class Schema {
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec));
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull Object defaultNullValue) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, defaultNullValue));
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec));
       return this;
     }
 
-    @Deprecated
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec, @Nonnull Object defaultNullValue) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
