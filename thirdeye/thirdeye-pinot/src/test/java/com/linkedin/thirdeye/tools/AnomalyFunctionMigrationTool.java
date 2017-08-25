@@ -292,7 +292,6 @@ public class AnomalyFunctionMigrationTool extends BaseThirdEyeTool {
   }
 
   public static void main(String[] args) throws Exception{
-    /*
     if (args.length != 3) {
       LOG.warn("Invalid number of parameters.\nShould be in format of <config_path> <source_function_type>"
           + " <destination_function_type>");
@@ -303,6 +302,5 @@ public class AnomalyFunctionMigrationTool extends BaseThirdEyeTool {
     String destFunctionType = args[2];
 
     AnomalyFunctionMigrationTool tool = new AnomalyFunctionMigrationTool(configPath);
-    */
   }
 }
