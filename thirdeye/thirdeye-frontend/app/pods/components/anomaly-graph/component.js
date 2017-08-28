@@ -10,13 +10,13 @@ const COLOR_MAPPING = {
   red: '#FF6C70',
   green: '#6BAF49',
   pink: '#FF61b6',
-  light_blue: '#73EAFF',
-  light_orange: '#FFBE77',
-  light_teal: '#57EFF8',
-  light_purple: '#D8D6FF',
-  light_red: '#FFACB0',
-  light_green: '#ABEF89',
-  light_pink: '#FFA1FF'
+  light_blue: '#65C3E8',
+  light_orange: '#F6A16C',
+  light_teal: '#68C5CD',
+  light_purple: '#B2B0FA',
+  light_red: '#FF999A',
+  light_green: '#91C475',
+  light_pink: '#FF91CF'
 };
 
 export default Ember.Component.extend({
@@ -240,8 +240,8 @@ export default Ember.Component.extend({
     });
 
     events.forEach((event) => {
-      const { color = 'blue'} = event;
-      colors[event.displayLabel] = COLOR_MAPPING[color];
+      const { displayColor = 'blue'} = event;
+      colors[event.displayLabel] = COLOR_MAPPING[displayColor];
     });
 
     this.set('colors', colors);

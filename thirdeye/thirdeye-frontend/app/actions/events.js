@@ -63,11 +63,12 @@ function setDate(dates) {
 const assignEventColor = (event) => {
   const { eventType } = event;
   let color = eventColorMapping[eventType] || 'blue';
+  let displayColor = color;
   if (event.isBaseline && (['holiday', 'gcn'].includes(event.eventType))) {
-    color = baselineEventColorMapping[eventType];
+    displayColor = baselineEventColorMapping[eventType];
   }
 
-  return Object.assign(event, { color });
+  return Object.assign(event, { color, displayColor });
 };
 
 /**
@@ -99,9 +100,11 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
   }
 
   let isBaseline = false;
-  let displayStart = event.start;
-  let displayEnd = event.end;
-  let displayLabel = event.label;
+  let {
+    start: displayStart,
+    end: displayEnd,
+    label: displayLabel
+  } = event;
   if ((baselineStart < displayEnd && displayStart < baselineEnd)) {
     isBaseline = true;
     displayStart -= baselineOffset;
