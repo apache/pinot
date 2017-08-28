@@ -127,7 +127,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
           if(!scores.containsKey(d))
             scores.put(d, 0.0d);
-          scores.put(d, scores.get(d) + score * me.getScore());
+          scores.put(d, Math.max(scores.get(d), score * me.getScore()));
 
           related.put(d, me);
         }

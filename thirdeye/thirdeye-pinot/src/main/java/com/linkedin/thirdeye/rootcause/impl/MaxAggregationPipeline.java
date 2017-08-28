@@ -59,37 +59,6 @@ public class MaxAggregationPipeline extends Pipeline {
 
   @Override
   public PipelineResult run(PipelineContext context) {
-    Multimap<String, Entity> entities = ArrayListMultimap.create();
-    for(Map.Entry<String, Set<Entity>> input : context.getInputs().entrySet()) {
-      for(Entity e : input.getValue()) {
-        entities.put(e.getUrn(), e);
-      }
-    }
-
-    Set<Entity> output = new HashSet<>();
-    for(String urn : entities.keySet()) {
-      double maxScore = Double.MIN_VALUE;
-      Entity maxEntity = null;
-
-      Collection<Entity> values = entities.get(urn);
-      List<Entity> related = new ArrayList<>();
-
-      for(Entity e : values) {
-        if(maxScore < e.getScore()) {
-          maxScore = e.getScore();
-          maxEntity = e;
-        }
-        related.addAll(e.getRelated());
-      }
-
-      if(maxEntity == null) {
-        LOG.warn("Could not determine max for urn '{}'. Skipping.", urn);
-        continue;
-      }
-
-      output.add(maxEntity.withScore(maxScore).withRelated(related));
-    }
-
-    return new PipelineResult(context, EntityUtils.topk(output, this.k));
+    return new PipelineResult(context, EntityUtils.topk(new MaxScoreSet<>(context.filter(Entity.class)), this.k));
   }
 }

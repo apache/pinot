@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 
 /**
@@ -62,5 +63,24 @@ public class Entity {
   @Override
   public String toString() {
     return String.format("%s(urn=%s, score=%.3f)", getClass().getSimpleName(), this.urn, this.score);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof Entity)) {
+      return false;
+    }
+    Entity entity = (Entity) o;
+    return Double.compare(entity.score, score) == 0
+        && Objects.equals(urn, entity.urn)
+        && Objects.equals(related, entity.related);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(urn, score, related);
   }
 }

@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.rootcause.Entity;
 import java.util.ArrayList;
 import java.util.Collection;
