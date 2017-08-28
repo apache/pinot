@@ -250,22 +250,22 @@
       <dependency>
         <groupId>org.restlet.jse</groupId>
         <artifactId>org.restlet</artifactId>
-        <version>2.2.1</version>
+        <version>2.3.9</version>
       </dependency>
       <dependency>
         <groupId>org.restlet.jee</groupId>
         <artifactId>org.restlet.ext.jackson</artifactId>
-        <version>2.2.1</version>
+        <version>2.3.9</version>
       </dependency>
       <dependency>
         <groupId>org.restlet.jee</groupId>
         <artifactId>org.restlet.ext.fileupload</artifactId>
-        <version>2.2.1</version>
+        <version>2.3.9</version>
       </dependency>
       <dependency>
         <groupId>org.restlet.jse</groupId>
         <artifactId>org.restlet.ext.jetty</artifactId>
-        <version>2.2.1</version>
+        <version>2.3.9</version>
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>
@@ -380,7 +380,7 @@
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-server</artifactId>
-        <version>8.1.8.v20121106</version>
+        <version>9.3.18.v20170406</version>
       </dependency>
       <dependency>
         <groupId>javax.servlet</groupId>
@@ -391,12 +391,12 @@
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-servlet</artifactId>
-        <version>8.1.8.v20121106</version>
+        <version>9.3.18.v20170406</version>
       </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-webapp</artifactId>
-        <version>8.1.8.v20121106</version>
+        <version>9.3.18.v20170406</version>
       </dependency>
       <dependency>
         <groupId>org.json</groupId>
