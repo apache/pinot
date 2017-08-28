@@ -12,8 +12,6 @@ import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
  * RootCauseEntity container instances that contain human-readable data for display on the GUI.
  */
 public abstract class RootCauseEventEntityFormatter extends RootCauseEntityFormatter {
-  public static final String SUFFIX_BASELINE = " (baseline)";
-
   @Override
   public final boolean applies(Entity entity) {
     if(!(entity instanceof EventEntity))
@@ -31,10 +29,6 @@ public abstract class RootCauseEventEntityFormatter extends RootCauseEntityForma
   public abstract RootCauseEventEntity format(EventEntity entity);
 
   public static RootCauseEventEntity makeRootCauseEventEntity(EventEntity entity, String label, String link, long start, long end, String details) {
-    // baseline notification
-    if (isRelatedToBaseline(entity))
-      label += SUFFIX_BASELINE;
-
     RootCauseEventEntity out = new RootCauseEventEntity();
     out.setUrn(entity.getUrn());
     out.setScore(Math.round(entity.getScore() * 1000) / 1000.0);
