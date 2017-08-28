@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -221,39 +223,62 @@ public class FieldSpecTest {
 
   }
 
-  @Test(expectedExceptions = {IllegalArgumentException.class})
-  public void testDateTimeFormat() {
+
+  @Test(dataProvider = "testFormatDataProvider")
+  public void testDateTimeFormat(String name, DataType dataType, String format, String granularity,
+      boolean exceptionExpected, DateTimeFieldSpec dateTimeFieldExpected) {
+
+    DateTimeFieldSpec dateTimeFieldActual = null;
+    boolean exceptionActual = false;
+    try {
+      dateTimeFieldActual = new DateTimeFieldSpec(name, dataType, format, granularity);
+    } catch (IllegalArgumentException e) {
+      exceptionActual = true;
+    }
+    Assert.assertEquals(exceptionActual, exceptionExpected);
+    Assert.assertEquals(dateTimeFieldActual, dateTimeFieldExpected);
+  }
+
+  @DataProvider(name = "testFormatDataProvider")
+  public Object[][] provideTestFormatData() {
+
     String name = "Date";
     DataType dataType = DataType.LONG;
-    String format = null;
     String granularity = "1:HOURS";
 
-    DateTimeFieldSpec dateTimeFieldSpec = null;
-    format = "1";
-    dateTimeFieldSpec= new DateTimeFieldSpec(name, dataType, format, granularity);
-    Assert.assertNull(dateTimeFieldSpec);
-    format = "1:hours";
-    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
-    Assert.assertNull(dateTimeFieldSpec);
-    format = "one_hours";
-    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
-    Assert.assertNull(dateTimeFieldSpec);
-    format = "1:HOURS:SIMPLE_DATE_FORMAT";
-    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
-    Assert.assertNull(dateTimeFieldSpec);
-    format = "1:hour:EPOCH";
-    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
-    Assert.assertNull(dateTimeFieldSpec);
-    format = "1:HOUR:EPOCH:yyyyMMdd";
-    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
-    Assert.assertNull(dateTimeFieldSpec);
-    format = "1:HOURS:EPOCH";
-    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
-    Assert.assertNotNull(dateTimeFieldSpec);
-    dateTimeFieldSpec = null;
-    format = "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd";
-    dateTimeFieldSpec = new DateTimeFieldSpec(name, dataType, format, granularity);
-    Assert.assertNotNull(dateTimeFieldSpec);
+    List<Object[]> entries = new ArrayList<>();
+    entries.add(new Object[] {
+        name, dataType, "1:hours", granularity, true, null
+    });
+    entries.add(new Object[] {
+        name, dataType, "one_hours", granularity, true, null
+    });
+    entries.add(new Object[] {
+        name, dataType, "1:HOURS:SIMPLE_DATE_FORMAT", granularity, true, null
+    });
+    entries.add(new Object[] {
+        name, dataType, "1:hour:EPOCH", granularity, true, null
+    });
+    entries.add(new Object[] {
+        name, dataType, "1:HOUR:EPOCH:yyyyMMdd", granularity, true, null
+    });
+    entries.add(new Object[] {
+        name, dataType, "0:HOURS:EPOCH", granularity, true, null
+    });
+    entries.add(new Object[] {
+        name, dataType, "-1:HOURS:EPOCH", granularity, true, null
+    });
+    entries.add(new Object[] {
+        name, dataType, "0.1:HOURS:EPOCH", granularity, true, null
+    });
+    entries.add(new Object[] {
+        name, dataType, "1:HOURS:EPOCH", granularity, false, new DateTimeFieldSpec(name, dataType, "1:HOURS:EPOCH", granularity)
+    });
+    entries.add(new Object[] {
+        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false, new DateTimeFieldSpec(name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)
+    });
+
+    return entries.toArray(new Object[entries.size()][]);
   }
 
 
