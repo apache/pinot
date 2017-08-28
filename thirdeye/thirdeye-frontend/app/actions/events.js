@@ -87,26 +87,28 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
 
   const relStart = event.start - anomalyStart;
 
-  var relEnd = Infinity;
-  var relDuration = Infinity;
+  let relEnd = Infinity;
+  let relDuration = Infinity;
   if (event.end > 0 && moment().isAfter(moment(event.end).add(1, 'minute'))) {
     relEnd = event.end - anomalyStart;
     relDuration = event.end - event.start;
   }
 
-  var isBaseline = false;
-  var displayStart = event.start;
-  var displayEnd = event.end;
-  if (baselineStart <= displayStart && displayStart < baselineEnd) {
+  let isBaseline = false;
+  let displayStart = event.start;
+  let displayEnd = event.end;
+  let displayLabel = event.label;
+  if ((baselineStart < displayEnd && displayStart < baselineEnd)) {
     isBaseline = true;
     displayStart -= baselineOffset;
     displayEnd -= baselineOffset;
+    displayLabel += " (baseline)";
   }
   if (displayEnd <= 0) {
     displayEnd = analysisEnd;
   }
 
-  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd });
+  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd, displayLabel });
 };
 
 /**

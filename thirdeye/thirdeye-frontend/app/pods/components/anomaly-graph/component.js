@@ -234,7 +234,7 @@ export default Ember.Component.extend({
 
     events.forEach((event) => {
       const { color = 'blue'} = event;
-      colors[event.label] = COLOR_MAPPING[color];
+      colors[event.displayLabel] = COLOR_MAPPING[color];
     });
 
     this.set('colors', colors);
@@ -318,13 +318,13 @@ export default Ember.Component.extend({
           // start,
           // end,
           displayScore,
-          label
+          displayLabel
         } = event;
 
         // const scores = (!end || start === end)
         //   ? [score, score]
         //   : [score];
-        return [label, displayScore];
+        return [displayLabel, displayScore];
       });
     }
   ),
@@ -342,7 +342,7 @@ export default Ember.Component.extend({
 
         const date = !end ? [end] : [start];
 
-        return [`${holiday.label}-date`, date];
+        return [`${holiday.displayLabel}-date`, date];
       });
     }
   ),

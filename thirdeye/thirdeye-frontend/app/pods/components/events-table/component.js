@@ -67,7 +67,7 @@ export default Ember.Component.extend({
       className: 'events-table__column--checkbox'
     },
     {
-      propertyName: 'label',
+      propertyName: 'displayLabel',
       template: 'custom/eventLabel',
       title: 'Event Name',
       className: 'events-table__column'

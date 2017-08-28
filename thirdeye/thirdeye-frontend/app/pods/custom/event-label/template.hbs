@@ -1,7 +1,7 @@
-{{#if record.link}} 
-  <a class="thirdeye-link" href={{record.link}} title={{record.link}} target="_blank">{{record.label}}</a>
+{{#if record.link}}
+  <a class="thirdeye-link" href={{record.link}} title={{record.link}} target="_blank">{{record.displayLabel}}</a>
 {{else}}
-  {{record.label}}
+  {{record.displayLabel}}
 {{/if}}
 {{#if record.details}}
   <span>
