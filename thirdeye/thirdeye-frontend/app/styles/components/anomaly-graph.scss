@@ -92,7 +92,7 @@
   background-color: #F3F6F8;
   font-size: 14px;
   font-weight: 600;
-  position: sticky; 
+  position: sticky;
   top: 0;
 }
 
@@ -127,12 +127,19 @@
 
 $colors:
   "blue" $te-blue,
+  "light_blue" $te-orange,
   "orange" $te-orange,
+  "light_orange" $te-orange,
   "teal" $te-teal,
+  "light_teal" $te-teal,
   "purple" $te-purple,
+  "light_purple" $te-purple,
   "red" $te-red,
+  "light_red" $te-red,
   "green" $te-green,
+  "light_green" $te-green,
   "pink" $te-pink,
+  "light_pink" $te-pink,
   "dark-orange" #B74700;
 
 // creates .c3-region-"color" classes

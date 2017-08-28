@@ -9,7 +9,14 @@ const COLOR_MAPPING = {
   purple: '#9896F2',
   red: '#FF6C70',
   green: '#6BAF49',
-  pink: '#FF61b6'
+  pink: '#FF61b6',
+  light_blue: '#73EAFF',
+  light_orange: '#FFBE77',
+  light_teal: '#57EFF8',
+  light_purple: '#D8D6FF',
+  light_red: '#FFACB0',
+  light_green: '#ABEF89',
+  light_pink: '#FFA1FF'
 };
 
 export default Ember.Component.extend({

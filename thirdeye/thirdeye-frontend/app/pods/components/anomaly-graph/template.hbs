@@ -19,20 +19,20 @@
 
           {{#each holidayEvents as |event|}}
             <li class="anomaly-graph__filter-item">
-              {{input 
-                type="checkbox" 
+              {{input
+                type="checkbox"
                 change=(action "onSelection" event.urn)
-                id=(concat relatedMetricId event.urn) 
+                id=(concat relatedMetricId event.urn)
                 checked=event.isSelected}}
               <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{event.color}}" for="{{concat relatedMetricId event.urn}}" title={{event.label}}> {{event.label}} </label>
             </li>
           {{else}}
-            No Related Events. 
+            No Related Events.
             {{#if (eq componentId "main-graph")}}
-              {{#link-to 'rca.details.events' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add an event) </a>{{/link-to}}
+              {{#link-to 'rca.details.events' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Find an event) </a>{{/link-to}}
             {{/if}}
           {{/each}}
-          
+
         </ul>
       {{/if}}
 
@@ -55,7 +55,7 @@
           {{else}}
             No Dimensions.
             {{#if (eq componentId "main-graph")}}
-              {{#link-to 'rca.details.dimensions' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add a dimension) </a>{{/link-to}}
+              {{#link-to 'rca.details.dimensions' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Find a dimension) </a>{{/link-to}}
             {{/if}}
           {{/each}}
         </ul>
@@ -70,10 +70,10 @@
         <ul class="anomaly-graph__filter-group {{if isMetricsHidden "anomaly-graph__filter-group--hidden"}}">
         {{#each relatedMetrics as |metric index|}}
           <li class="anomaly-graph__filter-item">
-            {{input 
-              type="checkbox" 
+            {{input
+              type="checkbox"
               change=(action "onSelection" metric checked)
-              id=(concat relatedMetricId index) 
+              id=(concat relatedMetricId index)
               checked=metric.isSelected
               }}
             <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{metric.color}}" for="{{concat relatedMetricId index}}" title={{metric.metricName}}> {{metric.metricName}} </label>
@@ -81,13 +81,13 @@
         {{else}}
           No Related Metrics.
           {{#if (eq componentId "main-graph")}}
-            {{#link-to 'rca.details.metrics' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Add a metric) </a>{{/link-to}}
+            {{#link-to 'rca.details.metrics' class="thirdeye-link"}} <a {{action "scrollToSection" bubbles=true}}> (Find a metric) </a>{{/link-to}}
           {{/if}}
         {{/each}}
         </ul>
       {{/if}}
 
-      
+
     </div>
   </section>
 {{/if}}
@@ -99,9 +99,9 @@
   {{#if isLoading}}
     {{ember-spinner}}
   {{/if}}
-  {{thirdeye-chart 
-    data=data 
-    axis=axis 
+  {{thirdeye-chart
+    data=data
+    axis=axis
     legend=legend
     regions=regions
     size=size

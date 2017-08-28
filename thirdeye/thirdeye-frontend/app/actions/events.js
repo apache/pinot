@@ -5,6 +5,7 @@ import _ from 'lodash';
 import {
   COMPARE_MODE_MAPPING,
   eventColorMapping,
+  baselineEventColorMapping,
   eventWeightMapping
 } from './constants';
 
@@ -61,7 +62,10 @@ function setDate(dates) {
  */
 const assignEventColor = (event) => {
   const { eventType } = event;
-  const color = eventColorMapping[eventType] || 'blue';
+  let color = eventColorMapping[eventType] || 'blue';
+  if (event.isBaseline && (['holiday', 'gcn'].includes(event.eventType))) {
+    color = baselineEventColorMapping[eventType];
+  }
 
   return Object.assign(event, { color });
 };
