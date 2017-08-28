@@ -9,7 +9,14 @@ const COLOR_MAPPING = {
   purple: '#9896F2',
   red: '#FF6C70',
   green: '#6BAF49',
-  pink: '#FF61b6'
+  pink: '#FF61b6',
+  light_blue: '#65C3E8',
+  light_orange: '#F6A16C',
+  light_teal: '#68C5CD',
+  light_purple: '#B2B0FA',
+  light_red: '#FF999A',
+  light_green: '#91C475',
+  light_pink: '#FF91CF'
 };
 
 export default Ember.Component.extend({
@@ -233,8 +240,8 @@ export default Ember.Component.extend({
     });
 
     events.forEach((event) => {
-      const { color = 'blue'} = event;
-      colors[event.label] = COLOR_MAPPING[color];
+      const { displayColor = 'blue'} = event;
+      colors[event.displayLabel] = COLOR_MAPPING[displayColor];
     });
 
     this.set('colors', colors);
@@ -318,13 +325,13 @@ export default Ember.Component.extend({
           // start,
           // end,
           displayScore,
-          label
+          displayLabel
         } = event;
 
         // const scores = (!end || start === end)
         //   ? [score, score]
         //   : [score];
-        return [label, displayScore];
+        return [displayLabel, displayScore];
       });
     }
   ),
@@ -342,7 +349,7 @@ export default Ember.Component.extend({
 
         const date = !end ? [end] : [start];
 
-        return [`${holiday.label}-date`, date];
+        return [`${holiday.displayLabel}-date`, date];
       });
     }
   ),

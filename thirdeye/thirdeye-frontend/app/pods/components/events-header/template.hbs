@@ -19,8 +19,8 @@
     <span class="events-summary__number">{{lixCount}}</span>
     <span>Lix</span>
   </div>
-  <div class="events-summary__item events-summary__item--no-border {{if (eq activeTab 'informed') 'events-summary__item--active'}}" {{action "onTabClick" "informed"}}>
+  <div class="events-summary__item events-summary__item--red {{if (eq activeTab 'informed') 'events-summary__item--active'}}" {{action "onTabClick" "informed"}}>
     <span class="events-summary__number">{{informedCount}}</span>
-    <span>Informed</span>
+    <span>Deployment</span>
   </div>
 </div>

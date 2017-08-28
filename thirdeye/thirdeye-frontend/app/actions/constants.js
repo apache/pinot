@@ -26,11 +26,20 @@ const eventColorMapping = {
   anomaly: 'teal'
 };
 
+// colors for events
+const baselineEventColorMapping = {
+  holiday: 'light_green',
+  informed: 'light_red',
+  lix: 'light_purple',
+  gcn: 'light_orange',
+  anomaly: 'light_teal'
+};
+
 const eventWeightMapping = {
   informed: 0.025,
   lix: 0.075,
-  anomaly: 0.125,
-  gcn: 0.175,
+  anomaly: 0.225,
+  gcn: 0.125,
   holiday: 0.175
 };
 
@@ -38,5 +47,6 @@ export {
   COMPARE_MODE_MAPPING,
   colors,
   eventColorMapping,
-  eventWeightMapping
+  eventWeightMapping,
+  baselineEventColorMapping
 };

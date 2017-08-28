@@ -5,6 +5,7 @@ import _ from 'lodash';
 import {
   COMPARE_MODE_MAPPING,
   eventColorMapping,
+  baselineEventColorMapping,
   eventWeightMapping
 } from './constants';
 
@@ -61,9 +62,13 @@ function setDate(dates) {
  */
 const assignEventColor = (event) => {
   const { eventType } = event;
-  const color = eventColorMapping[eventType] || 'blue';
+  let color = eventColorMapping[eventType] || 'blue';
+  let displayColor = color;
+  if (event.isBaseline && (['holiday', 'gcn'].includes(event.eventType))) {
+    displayColor = baselineEventColorMapping[eventType];
+  }
 
-  return Object.assign(event, { color });
+  return Object.assign(event, { color, displayColor });
 };
 
 /**
@@ -87,26 +92,30 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
 
   const relStart = event.start - anomalyStart;
 
-  var relEnd = Infinity;
-  var relDuration = Infinity;
+  let relEnd = Infinity;
+  let relDuration = Infinity;
   if (event.end > 0 && moment().isAfter(moment(event.end).add(1, 'minute'))) {
     relEnd = event.end - anomalyStart;
     relDuration = event.end - event.start;
   }
 
-  var isBaseline = false;
-  var displayStart = event.start;
-  var displayEnd = event.end;
-  if (baselineStart <= displayStart && displayStart < baselineEnd) {
+  let isBaseline = false;
+  let {
+    start: displayStart,
+    end: displayEnd,
+    label: displayLabel
+  } = event;
+  if ((baselineStart < displayEnd && displayStart < baselineEnd)) {
     isBaseline = true;
     displayStart -= baselineOffset;
     displayEnd -= baselineOffset;
+    displayLabel += " (baseline)";
   }
   if (displayEnd <= 0) {
     displayEnd = analysisEnd;
   }
 
-  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd });
+  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd, displayLabel });
 };
 
 /**
