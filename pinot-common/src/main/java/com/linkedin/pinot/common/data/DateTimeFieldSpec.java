@@ -32,7 +32,7 @@ import com.linkedin.pinot.common.utils.EqualityUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DateTimeFieldSpec extends FieldSpec {
 
-  private static final String NUMBER_REGEX = "[0-9]+";
+  private static final String NUMBER_REGEX = "[1-9][0-9]*";
   private static final String COLON_SEPARATOR = ":";
 
   private String _format;
@@ -40,8 +40,13 @@ public final class DateTimeFieldSpec extends FieldSpec {
   private DateTimeType _dateTimeType;
 
   public enum DateTimeType {
+    /** The primary date time column. This will be the date time column which keeps the milliseconds value
+     * This will be used as the default time column, in references by pinot code (e.g. retention manager) */
     PRIMARY,
+    /** The date time columns which are not the primary columns with milliseconds value.
+     * These can be date time columns in other granularity, put in by applications for their specific use cases */
     SECONDARY,
+    /** The date time columns which are derived, say using other columns, generated via rollups, etc*/
     DERIVED
   }
 
@@ -57,9 +62,31 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   /**
    * @param name
+   *
    * @param dataType
-   * @param format - size:timeunit:timeformat eg: 1:MILLISECONDS:EPOCH, 5:MINUTES:EPOCH, 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
-   * @param granularity - size:timeunit eg: 5:MINUTES
+   *
+   * @param format - defines how to interpret the numeric value in the date time column.
+   * Format has to follow the pattern - size:timeunit:timeformat, where
+   * size and timeUnit together define the granularity of the time column value.
+   * Size is the integer value of the granularity size.
+   * TimeFormat tells us whether the time column value is expressed in epoch or is a simple date format pattern
+   * Consider 2 date time values for example 2017/07/01 00:00:00 and 2017/08/29 05:20:00:
+   * e.g. 1) If the time column value is defined in millisSinceEpoch (1498892400000, 1504009200000)
+   *          this configuration will be 1:MILLISECONDS:EPOCH
+   *      2) If the time column value is defined in 5 minutes since epoch (4996308, 5013364)
+   *         this configuration will be 5:MINUTES:EPOCH
+   *      3) If the time column value is defined in a simple date format of a day (e.g. 20170701, 20170829),
+   *         this configuration will be 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd (the pattern can be configured as desired)
+   *
+   * @param granularity - defines in what granularity the data is bucketed.
+   * Granularity has to follow pattern- size:timeunit, where
+   * size and timeUnit together define the bucket granularity of the data.
+   * This is independent of the format, which is purely defining how to interpret the numeric value in the date time column.
+   * E.g.
+   *       1) if a time column is defined in millisSinceEpoch (format=1:MILLISECONDS:EPOCH), but the data buckets are 5 minutes,
+   *          the granularity will be 5:MINUTES.
+   *       2) if a time column is defined in hoursSinceEpoch (format=1:HOURS:EPOCH), and the data buckets are 1 hours,
+   *          the granularity will be 1:HOURS
    */
   public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
       @Nonnull String granularity, Object defaultNullValue) {
