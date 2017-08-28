@@ -32,6 +32,12 @@ import com.linkedin.pinot.common.utils.EqualityUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DateTimeFieldSpec extends FieldSpec {
 
+  private static final String FORMAT_TOKENS_ERROR_STR = "format must be of pattern size:timeunit:timeformat(:pattern)";
+  private static final String FORMAT_PATTERN_ERROR_STR = "format must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)";
+  private static final String TIME_FORMAT_ERROR_STR =
+      "format must be of format [0-9]+:<TimeUnit>:EPOCH or [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:<format>";
+  private static final String GRANULARITY_TOKENS_ERROR_STR = "granularity must be of format size:timeunit";
+  private static final String GRANULARITY_PATTERN_ERROR_STR = "granularity must be of format [0-9]+:<TimeUnit>";
   private static final String NUMBER_REGEX = "[1-9][0-9]*";
   private static final String COLON_SEPARATOR = ":";
 
@@ -150,22 +156,22 @@ public final class DateTimeFieldSpec extends FieldSpec {
     Preconditions.checkNotNull(format);
     String[] formatTokens = format.split(COLON_SEPARATOR);
     Preconditions.checkArgument(formatTokens.length == 3 || formatTokens.length == 4,
-        "format must be of format size:timeunit:timeformat(:pattern)");
+        FORMAT_TOKENS_ERROR_STR);
     Preconditions.checkArgument(formatTokens[0].matches(NUMBER_REGEX)
-        && EnumUtils.isValidEnum(TimeUnit.class, formatTokens[1]), "format must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)");
+        && EnumUtils.isValidEnum(TimeUnit.class, formatTokens[1]), FORMAT_PATTERN_ERROR_STR);
     if (formatTokens.length == 3) {
       Preconditions.checkArgument(formatTokens[2].equals(TimeFormat.EPOCH.toString()),
-          "format must be of format [0-9]+:<TimeUnit>:EPOCH or [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:<format>");
+          TIME_FORMAT_ERROR_STR);
     } else {
       Preconditions.checkArgument(formatTokens[2].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-          "format must be of format [0-9]+:<TimeUnit>:EPOCH or [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:<format>");
+          TIME_FORMAT_ERROR_STR);
     }
 
     Preconditions.checkNotNull(granularity);
     String[] granularityTokens = granularity.split(COLON_SEPARATOR);
-    Preconditions.checkArgument(granularityTokens.length == 2, "granularity must be of format size:timeunit");
+    Preconditions.checkArgument(granularityTokens.length == 2, GRANULARITY_TOKENS_ERROR_STR);
     Preconditions.checkArgument(granularityTokens[0].matches(NUMBER_REGEX)
-        && EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[1]), "granularity must be of format [0-9]+:<TimeUnit>");
+        && EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[1]), GRANULARITY_PATTERN_ERROR_STR);
 
   }
 
