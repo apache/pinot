@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.restlet.resource.ResourceException;
 import com.linkedin.pinot.common.utils.MmapUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -53,8 +52,7 @@ public class MmapDebugResource {
       notes = "Lists all off-heap allocations and their associated sizes")
   @ApiResponses(value = {@ApiResponse(code=200, message = "Success")})
   @Produces(MediaType.APPLICATION_JSON)
-  public Map<String, List<AllocationInfo>> getOffHeapSizes()
-      throws ResourceException {
+  public Map<String, List<AllocationInfo>> getOffHeapSizes() {
     List<AllocationInfo> allocations = new ArrayList<>();
 
     List<Pair<MmapUtils.AllocationContext, Integer>> allocationsMap = MmapUtils.getAllocationsAndSizes();

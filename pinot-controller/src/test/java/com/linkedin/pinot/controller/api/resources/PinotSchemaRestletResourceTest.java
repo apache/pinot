@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.restlet.resources;
+package com.linkedin.pinot.controller.api.resources;
 
 import java.io.IOException;
 import org.apache.commons.httpclient.methods.PostMethod;

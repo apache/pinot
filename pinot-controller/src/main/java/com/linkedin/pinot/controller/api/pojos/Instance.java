@@ -17,7 +17,6 @@ package com.linkedin.pinot.controller.api.pojos;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.pinot.common.restlet.swagger.Example;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONException;
@@ -27,7 +26,7 @@ import org.json.JSONObject;
 /**
  * Instance POJO, used as part of the API to create instances.
  */
-@Example("{\n" + "\t\"host\": \"hostname.example.com\",\n" + "\t\"port\": \"1234\",\n" + "\t\"type\": \"server\"\n" + "}")
+//@Example("{\n" + "\t\"host\": \"hostname.example.com\",\n" + "\t\"port\": \"1234\",\n" + "\t\"type\": \"server\"\n" + "}")
 public class Instance {
   private final String _host;
   private final String _port;

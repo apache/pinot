@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -55,6 +56,11 @@ public class LLCSegmentCompletionHandlers {
 
   @Inject
   ControllerConf _controllerConf;
+
+  @VisibleForTesting
+  public static String getScheme() {
+    return SCHEME;
+  }
 
   // We don't want to document these in swagger since they are internal APIs
   @GET

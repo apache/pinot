@@ -31,7 +31,7 @@ import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.api.restlet.resources.ServerTableSizeReader;
+import com.linkedin.pinot.controller.api.resources.ServerTableSizeReader;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
