@@ -260,7 +260,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
           if (!scores.containsKey(candidateMetric)) {
             scores.put(candidateMetric, 0.0);
           }
-          scores.put(candidateMetric, scores.get(candidateMetric) + score);
+          scores.put(candidateMetric, Math.max(scores.get(candidateMetric), score));
 
           related.put(candidateMetric, targetMetric);
 

@@ -75,7 +75,7 @@ public class AnomalyEventsPipeline extends Pipeline {
     ScoreUtils.TimeRangeStrategy strategyAnomaly = ScoreUtils.build(this.strategy, analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
     ScoreUtils.TimeRangeStrategy strategyBaseline = ScoreUtils.build(this.strategy, baseline.getStart(), baseline.getStart(), baseline.getEnd());
 
-    Set<AnomalyEventEntity> entities = new HashSet<>();
+    Set<AnomalyEventEntity> entities = new MaxScoreSet<>();
     for(MetricEntity me : metrics) {
       entities.addAll(EntityUtils.addRelated(score(strategyAnomaly, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), analysis.getStart(), anomaly.getEnd()), anomaly.getScore()), Arrays.asList(anomaly, me)));
       entities.addAll(EntityUtils.addRelated(score(strategyBaseline, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), baseline.getStart(), baseline.getEnd()), baseline.getScore()), Arrays.asList(baseline, me)));
