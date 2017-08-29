@@ -133,6 +133,9 @@ public class HolidayEventsPipeline extends Pipeline {
     double score(EventDTO dto, Map<String, DimensionEntity> urn2entity);
   }
 
+  /**
+   * Wrapper for ScoreUtils time-based strategies
+   */
   private static class ScoreWrapper implements ScoringStrategy {
     private final ScoreUtils.TimeRangeStrategy delegate;
 
@@ -146,6 +149,9 @@ public class HolidayEventsPipeline extends Pipeline {
     }
   }
 
+  /**
+   * Uses the highest score of dimension entities as they relate to an event
+   */
   private static class DimensionStrategy implements ScoringStrategy {
     @Override
     public double score(EventDTO dto, Map<String, DimensionEntity> urn2entity) {
@@ -153,14 +159,14 @@ public class HolidayEventsPipeline extends Pipeline {
     }
 
     private static double makeDimensionScore(Map<String, DimensionEntity> urn2entity, Map<String, List<String>> dimensionFilterMap) {
-      double sum = 0.0;
+      double max = 0.0;
       Set<String> urns = filter2urns(dimensionFilterMap);
       for(String urn : urns) {
         if(urn2entity.containsKey(urn)) {
-          sum += urn2entity.get(urn).getScore();
+          max = Math.max(urn2entity.get(urn).getScore(), max);
         }
       }
-      return sum;
+      return max;
     }
 
     private static Set<String> filter2urns(Map<String, List<String>> dimensionFilterMap) {
@@ -174,6 +180,9 @@ public class HolidayEventsPipeline extends Pipeline {
     }
   }
 
+  /**
+   * Compound strategy that considers both event time as well as the presence of related dimension entities
+   */
   private static class CompoundStrategy implements ScoringStrategy {
     private final ScoreUtils.TimeRangeStrategy delegateTime;
     private final ScoringStrategy delegateDimension = new DimensionStrategy();
