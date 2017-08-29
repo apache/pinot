@@ -15,6 +15,7 @@
 package com.linkedin.pinot.common.utils;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.exception.PermanentDownloadException;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -271,9 +272,14 @@ public class FileUploadUtils {
           responseBodyAsStream.read(buffer);
           LOGGER.error("Error response from url:{} \n {}", url, new String(buffer));
         }
-        throw new RuntimeException(
-            "Received error response from server while downloading file. url:" + url
-                + " response code:" + responseCode);
+        String errMsg = "Received error response from server while downloading file. url:" + url
+            + " response code:" + responseCode;
+        if (responseCode >= 500) {
+          // Caller may retry.
+          throw new RuntimeException(errMsg);
+        } else {
+          throw new PermanentDownloadException(errMsg);
+        }
       } else {
         long ret = httpget.getResponseContentLength();
         BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(file));

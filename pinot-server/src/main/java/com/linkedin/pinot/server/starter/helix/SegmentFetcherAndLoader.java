@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.exception.PermanentDownloadException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -168,13 +169,17 @@ public class SegmentFetcherAndLoader {
             TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
             final String uri = newSegmentZKMetadata.getDownloadUrl();
             final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
-            final SegmentMetadata segmentMetadata =
-                _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
+            final SegmentMetadata segmentMetadata = _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
             _dataManager.addSegment(segmentMetadata, tableConfig, schema);
-            LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName, segmentMetadata.getCrc());
+            LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName,
+                segmentMetadata.getCrc());
 
             // Successfully loaded the segment, break out of the retry loop
             break;
+          } catch (PermanentDownloadException e) {
+            LOGGER.error("Caught exception while loading segment {} (table {}), attempt {} of {}. Aborting", segmentId,
+                tableName, (retryCount + 1), maxRetryCount, e);
+            Utils.rethrowException(e);
           } catch (Exception e) {
             long attemptDurationMillis = System.currentTimeMillis() - attemptStartTime;
             LOGGER.warn("Caught exception while loading segment " + segmentId + "(table " + tableName + "), attempt "
