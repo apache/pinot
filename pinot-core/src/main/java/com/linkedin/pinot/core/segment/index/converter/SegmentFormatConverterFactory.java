@@ -17,20 +17,17 @@ package com.linkedin.pinot.core.segment.index.converter;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
+
 public class SegmentFormatConverterFactory {
+  private SegmentFormatConverterFactory() {
+  }
 
   public static SegmentFormatConverter getConverter(SegmentVersion from, SegmentVersion to) {
 
-    if (from.equals(SegmentVersion.v1) && to.equals(SegmentVersion.v2) ) {
-      return new SegmentFormatConverterV1ToV2();
-    }
-
-    if ((from.equals(SegmentVersion.v1) || from.equals(SegmentVersion.v2)) &&
-        to.equals(SegmentVersion.v3)) {
+    if ((from.equals(SegmentVersion.v1) || from.equals(SegmentVersion.v2)) && to.equals(SegmentVersion.v3)) {
       return new SegmentV1V2ToV3FormatConverter();
     }
 
-    throw new UnsupportedOperationException(
-        "Unable to find a converter to convert segment from:" + from + " to:" + to);
+    throw new UnsupportedOperationException("Unable to find a converter to convert segment from:" + from + " to:" + to);
   }
 }

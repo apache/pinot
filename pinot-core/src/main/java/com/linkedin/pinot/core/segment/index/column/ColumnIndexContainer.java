@@ -82,7 +82,7 @@ public abstract class ColumnIndexContainer {
 
     SingleColumnMultiValueReader<? extends ReaderContext> fwdIndexReader =
         new FixedBitMultiValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
-            metadata.getBitsPerElement(), false);
+            metadata.getBitsPerElement());
 
     BitmapInvertedIndexReader invertedIndex = null;
 
@@ -102,8 +102,7 @@ public abstract class ColumnIndexContainer {
     SingleColumnSingleValueReader fwdIndexReader;
     if (dictionary != null) {
       fwdIndexReader =
-          new FixedBitSingleValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement(),
-              metadata.hasNulls());
+          new FixedBitSingleValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
     } else {
       // TODO: Replace hard-coded compressor with getting information from meta-data.
       fwdIndexReader = getRawIndexReader(fwdIndexBuffer, metadata.getDataType());

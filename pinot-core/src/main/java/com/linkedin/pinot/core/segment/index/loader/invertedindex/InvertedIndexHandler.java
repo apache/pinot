@@ -181,12 +181,12 @@ public class InvertedIndexHandler {
   private DataFileReader getForwardIndexReader(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter)
       throws IOException {
     PinotDataBuffer buffer = segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
+    int numRows = columnMetadata.getTotalDocs();
+    int numBitsPerValue = columnMetadata.getBitsPerElement();
     if (columnMetadata.isSingleValue()) {
-      return new FixedBitSingleValueReader(buffer, columnMetadata.getTotalDocs(), columnMetadata.getBitsPerElement(),
-          columnMetadata.hasNulls());
+      return new FixedBitSingleValueReader(buffer, numRows, numBitsPerValue);
     } else {
-      return new FixedBitMultiValueReader(buffer, columnMetadata.getTotalDocs(),
-          columnMetadata.getTotalNumberOfEntries(), columnMetadata.getBitsPerElement(), false);
+      return new FixedBitMultiValueReader(buffer, numRows, columnMetadata.getTotalNumberOfEntries(), numBitsPerValue);
     }
   }
 }

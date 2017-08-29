@@ -13,15 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.io.reader.impl.v2;
+package com.linkedin.pinot.core.io.reader.impl;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.Closeable;
 
-public class FixedByteMultiValueReader extends com.linkedin.pinot.core.io.reader.impl.v1.FixedByteMultiValueReader{
 
-  public FixedByteMultiValueReader(PinotDataBuffer dataBuffer, int numDocs, int totalNumValues,
-      int columnSizeInBytes)  {
-    super(dataBuffer, numDocs, totalNumValues, columnSizeInBytes);
+public final class FixedByteIntReader implements Closeable {
+  private static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
+
+  private final PinotDataBuffer _dataBuffer;
+
+  public FixedByteIntReader(PinotDataBuffer dataBuffer, int numValues) {
+    Preconditions.checkState(dataBuffer.size() == numValues * INT_SIZE_IN_BYTES);
+    _dataBuffer = dataBuffer;
   }
 
+  public int getInt(int index) {
+    return _dataBuffer.getInt(index * INT_SIZE_IN_BYTES);
+  }
+
+  @Override
+  public void close() {
+    _dataBuffer.close();
+  }
 }
