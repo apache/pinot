@@ -112,13 +112,6 @@ public class MetricTransfer {
     }
   }
 
-  public static void main(String[] args) {
-    double emptyValue = Double.MIN_VALUE;
-    double value = 0.3;
-    System.out.println(Double.toString(emptyValue * value));
-    System.out.println(Double.toString(emptyValue));
-  }
-
   /**
    * This class is used to store debugging information, which is used to show the status of the
    * transformed time series.
