@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.exception.PermanentDownloadException;
 import java.io.File;
 import java.util.Map;
 
@@ -50,6 +52,9 @@ public class HttpSegmentFetcher implements SegmentFetcher {
             "Downloaded file from {} to {}; Length of httpGetResponseContent: {}; Length of downloaded file: {}", uri,
             tempFile, httpGetResponseContentLength, tempFile.length());
         return;
+      } catch (PermanentDownloadException e) {
+        LOGGER.error("Failed to download file from {}", uri, e);
+        Utils.rethrowException(e);
       } catch (Exception e) {
         LOGGER.error("Failed to download file from {}, retry: {}", uri, retry, e);
         if (retry == maxRetryCount) {
