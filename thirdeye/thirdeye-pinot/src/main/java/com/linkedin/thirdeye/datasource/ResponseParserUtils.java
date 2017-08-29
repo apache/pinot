@@ -23,8 +23,7 @@ public class ResponseParserUtils {
 
   public static Map<String, ThirdEyeResponseRow> createResponseMapByTimeAndDimension(
       ThirdEyeResponse thirdEyeResponse) {
-    Map<String, ThirdEyeResponseRow> responseMap;
-    responseMap = new HashMap<>();
+    Map<String, ThirdEyeResponseRow> responseMap = new HashMap<>();
     int numRows = thirdEyeResponse.getNumRows();
     for (int i = 0; i < numRows; i++) {
       ThirdEyeResponseRow thirdEyeResponseRow = thirdEyeResponse.getRow(i);

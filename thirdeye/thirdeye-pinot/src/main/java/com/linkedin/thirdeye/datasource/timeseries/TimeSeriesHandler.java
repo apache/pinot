@@ -16,7 +16,6 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Range;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -24,7 +23,6 @@ import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.TimeRangeUtils;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
@@ -32,44 +30,55 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class TimeSeriesHandler {
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
+  private static final TimeSeriesResponseParser DEFAULT_TIMESERIES_RESPONSE_PARSER = new UITimeSeriesResponseParser();
+
   private final QueryCache queryCache;
-  private final boolean doRollUp; // roll up small metrics to OTHER dimension
   private ExecutorService executorService;
 
 
   public TimeSeriesHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
-    this.doRollUp = true;
   }
 
-  public TimeSeriesHandler(QueryCache queryCache, boolean doRollUp) {
-    this.queryCache = queryCache;
-    this.doRollUp = doRollUp;
-  }
-
+  /**
+   * Handles the given time series request using the default time series parser (i.e., {@link
+   * UITimeSeriesResponseParser}.)
+   *
+   * @param timeSeriesRequest the request to retrieve time series.
+   *
+   * @return the time series for the given request.
+   *
+   * @throws Exception Any exception that is thrown during the retrieval.
+   */
   public TimeSeriesResponse handle(TimeSeriesRequest timeSeriesRequest) throws Exception {
-    List<Range<DateTime>> timeranges = new ArrayList<>();
-    TimeGranularity aggregationTimeGranularity = timeSeriesRequest.getAggregationTimeGranularity();
-    // time ranges
+    return handle(timeSeriesRequest, DEFAULT_TIMESERIES_RESPONSE_PARSER);
+  }
+
+  /**
+   * Handles the given time series request using the given time series parser.
+   *
+   * @param timeSeriesRequest the request to retrieve time series.
+   *
+   * @return the time series for the given request.
+   *
+   * @throws Exception Any exception that is thrown during the retrieval.
+   */
+  public TimeSeriesResponse handle(TimeSeriesRequest timeSeriesRequest,
+      TimeSeriesResponseParser timeSeriesResponseParser) throws Exception {
+    // Time ranges for creating ThirdEye request
     DateTime start = timeSeriesRequest.getStart();
     DateTime end = timeSeriesRequest.getEnd();
     if (timeSeriesRequest.isEndDateInclusive()) {
       // ThirdEyeRequest is exclusive endpoint, so increment by one bucket
+      TimeGranularity aggregationTimeGranularity = timeSeriesRequest.getAggregationTimeGranularity();
       end = end.plus(aggregationTimeGranularity.toMillis());
     }
-    timeranges = TimeRangeUtils.computeTimeRanges(aggregationTimeGranularity, start, end);
-    // create request
+    // Create request
     ThirdEyeRequest request = createThirdEyeRequest("timeseries", timeSeriesRequest, start, end);
-
     Future<ThirdEyeResponse> responseFuture = queryCache.getQueryResultAsync(request);
     // 5 minutes timeout
     ThirdEyeResponse response = responseFuture.get(5, TimeUnit.MINUTES);
-
-    TimeSeriesResponseParser timeSeriesResponseParser =
-        new TimeSeriesResponseParser(response, timeranges,
-            timeSeriesRequest.getAggregationTimeGranularity(),
-            timeSeriesRequest.getGroupByDimensions(), doRollUp);
-    List<TimeSeriesRow> rows = timeSeriesResponseParser.parseResponse();
+    List<TimeSeriesRow> rows = timeSeriesResponseParser.parseResponse(response);
     // compute the derived metrics
     computeDerivedMetrics(timeSeriesRequest, rows);
     return new TimeSeriesResponse(rows);
@@ -122,10 +131,13 @@ public class TimeSeriesHandler {
    * shutdownAsyncHandler() to shutdown the executor service if it is no longer needed.
    *
    * @param timeSeriesRequest the request to retrieve time series.
+   * @param timeSeriesResponseParser the parser to be used to parse the result from data source
+   *
    * @return a future object of time series response for the give request. Returns null if it fails to handle the
    * request.
    */
-  public Future<TimeSeriesResponse> asyncHandle(final TimeSeriesRequest timeSeriesRequest) {
+  public Future<TimeSeriesResponse> asyncHandle(final TimeSeriesRequest timeSeriesRequest,
+      final TimeSeriesResponseParser timeSeriesResponseParser) {
     // For optimizing concurrency performance by reducing the access to the synchronized method
     if (executorService == null) {
       startAsyncHandler();
@@ -134,7 +146,7 @@ public class TimeSeriesHandler {
     Future<TimeSeriesResponse> responseFuture = executorService.submit(new Callable<TimeSeriesResponse>() {
       public TimeSeriesResponse call () {
         try {
-          return TimeSeriesHandler.this.handle(timeSeriesRequest);
+          return TimeSeriesHandler.this.handle(timeSeriesRequest, timeSeriesResponseParser);
         } catch (Exception e) {
           LOG.warn("Failed to retrieve time series of the request: {}", timeSeriesRequest);
         }
