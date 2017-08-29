@@ -281,7 +281,7 @@ public class MetricTimeSeries {
     return result;
   }
 
-  private Integer[] getHasValueSums() {
+  public Integer[] getHasValueSums() {
     Integer[] result = new Integer[schema.getNumMetrics()];
 
     for (int i = 0; i < schema.getNumMetrics(); i++) {
@@ -291,10 +291,8 @@ public class MetricTimeSeries {
     for (Long time : hasValue.keySet()) {
       boolean[] booleans = hasValue.get(time);
       for (int i = 0; i < schema.getNumMetrics(); i++) {
-        for (boolean aBoolean : booleans) {
-          if (aBoolean) {
-            result[i] = result[i] + 1;
-          }
+        if (booleans[i]) {
+          result[i] = result[i] + 1;
         }
       }
     }

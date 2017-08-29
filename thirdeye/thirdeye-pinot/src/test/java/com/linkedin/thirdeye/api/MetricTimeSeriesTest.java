@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.api;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -183,6 +185,25 @@ public class MetricTimeSeriesTest {
   }
 
   @Test(dataProvider = "emptyMetricTimeSeries")
+  public void testGetTimeWindowSet(List<String> metricNames, MetricTimeSeries metricTimeSeries) {
+    long[] timestamps = new long[] { 1, 2, 3, 4, 5 };
+    double[] doubleValues = new double[] {1.0, 2.0, 3.0, NULL_DOUBLE, 5.0};
+    int[] intValues = new int[] {NULL_INT, NULL_INT, NULL_INT, NULL_INT, NULL_INT};
+    long[] longValues = new long[] { 1, NULL_LONG, 3, NULL_LONG, 5};
+
+    initializeMetricTimeSeries(metricNames, metricTimeSeries, timestamps, doubleValues, intValues, longValues);
+
+    Set<Long> expectedTimestamps = new HashSet<Long>() {{
+      add(1L);
+      add(2L);
+      add(3L);
+      add(5L);
+    }};
+
+    Assert.assertEquals(metricTimeSeries.getTimeWindowSet(), expectedTimestamps);
+  }
+
+  @Test(dataProvider = "emptyMetricTimeSeries")
   public void testToString(List<String> metricNames, MetricTimeSeries metricTimeSeries) {
     long[] timestamps = new long[] { 1, 2, 3, 4, 5 };
     double[] doubleValues = new double[] {1.0, 2.0, 3.0, NULL_DOUBLE, 5.0};
@@ -191,6 +212,32 @@ public class MetricTimeSeriesTest {
 
     initializeMetricTimeSeries(metricNames, metricTimeSeries, timestamps, doubleValues, intValues, longValues);
     LOG.info(metricTimeSeries.toString());
+  }
+
+  @Test(dataProvider = "emptyMetricTimeSeries")
+  public void testGetMetricSums(List<String> metricNames, MetricTimeSeries metricTimeSeries) {
+    long[] timestamps = new long[] { 1, 2, 3, 4, 5 };
+    double[] doubleValues = new double[] {1.0, 2.0, 3.0, NULL_DOUBLE, 5.0};
+    int[] intValues = new int[] {NULL_INT, NULL_INT, NULL_INT, NULL_INT, NULL_INT};
+    long[] longValues = new long[] { 1, NULL_LONG, 3, NULL_LONG, 5 };
+
+    initializeMetricTimeSeries(metricNames, metricTimeSeries, timestamps, doubleValues, intValues, longValues);
+    Number[] actualSums = metricTimeSeries.getMetricSums();
+    Number[] expectedSums = new Number[] {11.0, 0, 9L};
+    Assert.assertEquals(actualSums, expectedSums);
+  }
+
+  @Test(dataProvider = "emptyMetricTimeSeries")
+  public void testGetHasValueSums(List<String> metricNames, MetricTimeSeries metricTimeSeries) {
+    long[] timestamps = new long[] { 1, 2, 3, 4, 5 };
+    double[] doubleValues = new double[] {1.0, 2.0, 3.0, NULL_DOUBLE, 5.0};
+    int[] intValues = new int[] {NULL_INT, NULL_INT, NULL_INT, NULL_INT, NULL_INT};
+    long[] longValues = new long[] { 1, NULL_LONG, 3, NULL_LONG, 5 };
+
+    initializeMetricTimeSeries(metricNames, metricTimeSeries, timestamps, doubleValues, intValues, longValues);
+    Integer[] actualSums = metricTimeSeries.getHasValueSums();
+    Integer[] expectedSums = new Integer[] {4, 0, 3};
+    Assert.assertEquals(actualSums, expectedSums);
   }
 
   private void initializeMetricTimeSeries(List<String> metricNames, MetricTimeSeries metricTimeSeries,
