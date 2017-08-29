@@ -17,8 +17,8 @@ package com.linkedin.pinot.core.operator.docvaliterators;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.MultiValueReaderContext;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 public final class MultiValueIterator extends BlockMultiValIterator {
@@ -26,13 +26,13 @@ public final class MultiValueIterator extends BlockMultiValIterator {
   private int counter = 0;
   private ColumnMetadata columnMetadata;
   private SingleColumnMultiValueReader mVReader;
-  MultiValueReaderContext context;
+  private ReaderContext context;
 
   public MultiValueIterator(SingleColumnMultiValueReader mVReader, ColumnMetadata columnMetadata) {
     super();
     this.mVReader = mVReader;
     this.columnMetadata = columnMetadata;
-    this.context = (MultiValueReaderContext) mVReader.createContext();
+    this.context = mVReader.createContext();
   }
 
   @Override

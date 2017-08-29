@@ -15,18 +15,6 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.configuration.ConfigurationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -56,6 +44,16 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory.Reader;
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.ConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Record reader to read pinot segment and generate GenericRows
@@ -112,24 +110,19 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
       if (columnMetadataFor.isSingleValue() && !columnMetadataFor.isSorted()) {
         PinotDataBuffer fwdIndexBuffer = reader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
         SingleColumnSingleValueReader fwdIndexReader =
-            new FixedBitSingleValueReader(fwdIndexBuffer, columnMetadataFor.getTotalDocs(),
-                columnMetadataFor.getBitsPerElement(), columnMetadataFor.hasNulls());
+            new FixedBitSingleValueReader(fwdIndexBuffer, totalDocs, columnMetadataFor.getBitsPerElement());
         singleValueReaderMap.put(column, fwdIndexReader);
-
       } else if (columnMetadataFor.isSingleValue() && columnMetadataFor.isSorted()) {
         PinotDataBuffer dataBuffer = reader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
-        FixedByteSingleValueMultiColReader indexReader = new FixedByteSingleValueMultiColReader(
-            dataBuffer, columnMetadataFor.getCardinality(), new int[] {
-            4, 4
-        });
+        FixedByteSingleValueMultiColReader indexReader =
+            new FixedByteSingleValueMultiColReader(dataBuffer, columnMetadataFor.getCardinality(), new int[]{4, 4});
         SortedForwardIndexReader fwdIndexReader = new SortedForwardIndexReader(indexReader, totalDocs);
         singleValueSortedReaderMap.put(column, fwdIndexReader);
-
       } else {
         PinotDataBuffer fwdIndexBuffer = reader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
         SingleColumnMultiValueReader fwdIndexReader =
-            new FixedBitMultiValueReader(fwdIndexBuffer, segmentMetadata.getTotalDocs(),
-                columnMetadataFor.getTotalNumberOfEntries(), columnMetadataFor.getBitsPerElement(), false);
+            new FixedBitMultiValueReader(fwdIndexBuffer, totalDocs, columnMetadataFor.getTotalNumberOfEntries(),
+                columnMetadataFor.getBitsPerElement());
         multiValueReaderMap.put(column, fwdIndexReader);
       }
       DataType dataType = columnMetadataFor.getDataType();

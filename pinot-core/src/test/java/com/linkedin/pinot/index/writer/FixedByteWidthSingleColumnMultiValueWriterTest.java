@@ -15,18 +15,13 @@
  */
 package com.linkedin.pinot.index.writer;
 
+import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteMultiValueWriter;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.nio.ByteBuffer;
 import java.util.Random;
-
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteMultiValueWriter;
-import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteSkipListMultiValueWriter;
-import com.linkedin.pinot.core.util.CustomBitSet;
 
 
 public class FixedByteWidthSingleColumnMultiValueWriterTest {
@@ -69,6 +64,6 @@ public class FixedByteWidthSingleColumnMultiValueWriterTest {
     dis.close();
     file.delete();
   }
-  
+
 
 }
