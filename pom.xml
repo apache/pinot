@@ -152,16 +152,6 @@
 
   <repositories>
     <repository>
-      <id>restlet.org</id>
-      <url>http://maven.restlet.org</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-    <repository>
       <id>jboss.org</id>
       <url>http://repository.jboss.org</url>
       <releases>

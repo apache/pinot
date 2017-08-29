@@ -80,7 +80,7 @@ public class ControllerStarter {
     realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
     executorService = Executors.newCachedThreadPool(
-        new ThreadFactoryBuilder().setNameFormat("restlet-multiget-thread-%d").build());
+        new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -151,7 +151,6 @@ public class ControllerStarter {
 
       LOGGER.info("Controller download url base: {}", config.generateVipUrl());
       LOGGER.info("Injecting configuration and resource managers to the API context");
-      // TODO: Remove attributes map when removing restlet
       final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
       connectionManager.getParams().setConnectionTimeout(config.getServerAdminRequestTimeoutSeconds());
       // register all the controller objects for injection to jersey resources
