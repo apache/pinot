@@ -33,8 +33,8 @@ InvestigateView.prototype = {
     const anomaly = this.investigateModel.getAnomaly();
     const wowData = this.investigateModel.getWowData();
     const currentValue = wowData.currentVal;
-    const wowResults = this.formatWowResults(wowData.compareResults, anomaly);
-    const externalUrls = anomaly.externalUrl ? JSON.parse(anomaly.externalUrl) : null;
+    const externalUrls = anomaly.externalUrl ? JSON.parse(anomaly.externalUrl) : {};
+    const wowResults = this.formatWowResults(wowData.compareResults, anomaly, externalUrls.INGRAPH);
 
     this.investigateData = {
       anomaly,
@@ -44,7 +44,7 @@ InvestigateView.prototype = {
     };
   },
 
-  formatWowResults( wowResults, args = {}){
+  formatWowResults(wowResults, args = {}, hasIngraph = false){
     const {
       anomalyStart,
       anomalyEnd,
@@ -52,7 +52,7 @@ InvestigateView.prototype = {
       timeUnit,
       currentStart,
       currentEnd,
-      anomalyFunctionDimension
+      anomalyFunctionDimension,
       } = args;
 
     const granularity = (timeUnit === 'MINUTES') ? '5_MINUTES' : timeUnit;
@@ -80,6 +80,7 @@ InvestigateView.prototype = {
         const baselineEnd = end.clone().subtract(offset, 'days');
         const heatMapBaselineStart = anomalyRegionStart.clone().subtract(offset, 'days');
         const heatMapBaselineEnd = anomalyRegionEnd.clone().subtract(offset, 'days');
+        const tab = hasIngraph ? 'events' : 'dimensions';
         wow.change *= 100;
         wow.url = `thirdeye#analysis?metricId=${metricId}&dimension=${dimension}&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
             `baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&` +
@@ -88,8 +89,9 @@ InvestigateView.prototype = {
             `heatMapCurrentEnd=${anomalyRegionEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
             `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}&filters=${anomalyFunctionDimension}&heatMapFilters=${anomalyFunctionDimension}`;
 
-
-        wow.newUrl = `app#/rca/${metricId}/dimensions?analysisStart=${anomalyRegionStart.valueOf()}&analysisEnd=${anomalyRegionEnd.valueOf()}&` +
+        // valueOf is needed since we want all date time query params to be display in unix ms
+        // Omitting it, doesn't consistently yield the expected result
+        wow.newUrl = `app#/rca/${metricId}/${tab}?analysisStart=${anomalyRegionStart.valueOf()}&analysisEnd=${anomalyRegionEnd.valueOf()}&` +
           `displayStart=${displayStart}&displayEnd=${displayEnd}&` +
           `startDate=${currentViewStart}&endDate=${currentViewEnd}&` +
           `compareMode=${wow.compareMode}&filters=${anomalyFunctionDimension}&granularity=${granularity}`;
