@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.builder.EqualsBuilder;
+import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
 import org.joda.time.Interval;
@@ -21,12 +24,11 @@ public class TimeSeries implements MetricTimeSeries {
   private NavigableMap<Long, Double> timeSeries = new TreeMap<>();
 
   /**
-   * The max and min timestamp of this time series; both are inclusive.
+   * The max (exclusive) and min (inclusive) timestamp of this time series.
    */
   private Interval timeSeriesInterval = new Interval(0L, 0L);
 
   public TimeSeries() {
-    timeSeries = new TreeMap<>();
   }
 
   /**
@@ -34,14 +36,19 @@ public class TimeSeries implements MetricTimeSeries {
    */
   public TimeSeries(List<Long> timeStamps, List<Double> values)
       throws Exception {
+    if (CollectionUtils.isNotEmpty(timeStamps) && CollectionUtils.isNotEmpty(values)) {
+      if (timeStamps.size() != values.size()) {
+        throw new IOException("time stamps list and value list need to match in size!!");
+      }
 
-    timeSeries = new TreeMap<>();
-    if (timeStamps.size() != values.size()) {
-      throw new IOException("time stamps list and value list need to match in size!!");
-    }
+      for (int i = 0; i < timeStamps.size(); i++) {
+        timeSeries.put(timeStamps.get(i), values.get(i));
+      }
 
-    for (int i = 0; i < timeStamps.size(); i++) {
-      timeSeries.put(timeStamps.get(i), values.get(i));
+      long minTimestamp = timeSeries.firstEntry().getKey();
+      long maxTimestamp = timeSeries.lastEntry().getKey() + 1; // end time exclusive
+
+      timeSeriesInterval = new Interval(minTimestamp, maxTimestamp);
     }
   }
 
@@ -120,5 +127,26 @@ public class TimeSeries implements MetricTimeSeries {
   @Override
   public String toString() {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    TimeSeries that = (TimeSeries) o;
+
+    return new EqualsBuilder().append(timeSeries, that.timeSeries)
+        .append(getTimeSeriesInterval(), that.getTimeSeriesInterval()).isEquals();
+  }
+
+  @Override
+  public int hashCode() {
+    return new HashCodeBuilder(17, 37).append(timeSeries).append(getTimeSeriesInterval()).toHashCode();
   }
 }
