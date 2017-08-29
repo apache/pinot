@@ -95,57 +95,12 @@ public final class DateTimeFieldSpec extends FieldSpec {
    *          the granularity will be 1:HOURS
    */
   public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-      @Nonnull String granularity, Object defaultNullValue) {
-    super(name, dataType, true, defaultNullValue);
-    check(name, dataType, format, granularity);
-
-    _format = format;
-    _granularity = granularity;
-  }
-
-
-  /**
-   *
-   * @param name
-   * @param dataType
-   * @param format - size:timeunit:timeformat eg: 1:MILLISECONDS:EPOCH, 5:MINUTES:EPOCH, 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
-   * @param granularity - size:timeunit eg: 5:MINUTES
-   * @param dateTimeType
-   * @param defaultNullValue
-   */
-  public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-      @Nonnull String granularity, DateTimeType dateTimeType, Object defaultNullValue) {
-    this(name, dataType, format, granularity, defaultNullValue);
-    _dateTimeType = dateTimeType;
-  }
-
-
-  /**
-   * @param name
-   * @param dataType
-   * @param format - size:timeunit:timeformat eg: 1:MILLISECONDS:EPOCH, 5:MINUTES:EPOCH, 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
-   * @param granularity - size:timeunit eg: 5:MINUTES
-   */
-  public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-      @Nonnull String granularity) {
+      @Nonnull String granularity, DateTimeType dateTimeType) {
     super(name, dataType, true);
     check(name, dataType, format, granularity);
 
     _format = format;
     _granularity = granularity;
-  }
-
-
-  /**
-   * @param name
-   * @param dataType
-   * @param format - size:timeunit:timeformat eg: 1:MILLISECONDS:EPOCH, 5:MINUTES:EPOCH, 1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd
-   * @param granularity - size:timeunit eg: 5:MINUTES
-   * @param dateTimeType
-   */
-  public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-      @Nonnull String granularity, DateTimeType dateTimeType) {
-    this(name, dataType, format, granularity);
     _dateTimeType = dateTimeType;
   }
 
@@ -188,6 +143,10 @@ public final class DateTimeFieldSpec extends FieldSpec {
     return _format;
   }
 
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * @param format
+   */
   public void setFormat(String format) {
     _format = format;
   }
@@ -197,6 +156,10 @@ public final class DateTimeFieldSpec extends FieldSpec {
     return _granularity;
   }
 
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * @param granularity
+   */
   public void setGranularity(String granularity) {
     _granularity = granularity;
   }
@@ -206,6 +169,10 @@ public final class DateTimeFieldSpec extends FieldSpec {
     return _dateTimeType;
   }
 
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * @param dateTimeType
+   */
   public void setDateTimeType(DateTimeType dateTimeType) {
     _dateTimeType = dateTimeType;
   }

@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -109,6 +108,12 @@ public final class Schema {
     return _dimensionFieldSpecs;
   }
 
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * Adding @Deprecated to prevent usage
+   * @param dimensionFieldSpecs
+   */
+  @Deprecated
   public void setDimensionFieldSpecs(@Nonnull List<DimensionFieldSpec> dimensionFieldSpecs) {
     Preconditions.checkState(_dimensionFieldSpecs.isEmpty());
 
@@ -122,6 +127,12 @@ public final class Schema {
     return _metricFieldSpecs;
   }
 
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * Adding @Deprecated to prevent usage
+   * @param metricFieldSpecs
+   */
+  @Deprecated
   public void setMetricFieldSpecs(@Nonnull List<MetricFieldSpec> metricFieldSpecs) {
     Preconditions.checkState(_metricFieldSpecs.isEmpty());
 
@@ -130,11 +141,18 @@ public final class Schema {
     }
   }
 
+
   @Nonnull
   public List<DateTimeFieldSpec> getDateTimeFieldSpecs() {
     return _dateTimeFieldSpecs;
   }
 
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * Adding @Deprecated to prevent usage
+   * @param dateTimeFieldSpecs
+   */
+  @Deprecated
   public void setDateTimeFieldSpecs(@Nonnull List<DateTimeFieldSpec> dateTimeFieldSpecs) {
     Preconditions.checkState(_dateTimeFieldSpecs.isEmpty());
 
@@ -148,6 +166,12 @@ public final class Schema {
     return _timeFieldSpec;
   }
 
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * Adding @Deprecated to prevent usage
+   * @param timeFieldSpec
+   */
+  @Deprecated
   public void setTimeFieldSpec(@Nullable TimeFieldSpec timeFieldSpec) {
     if (timeFieldSpec != null) {
       addField(timeFieldSpec);
@@ -519,25 +543,6 @@ public final class Schema {
     public SchemaBuilder addTime(@Nonnull TimeGranularitySpec incomingTimeGranularitySpec,
         @Nonnull TimeGranularitySpec outgoingTimeGranularitySpec, @Nonnull Object defaultNullValue) {
       _schema.addField(new TimeFieldSpec(incomingTimeGranularitySpec, outgoingTimeGranularitySpec, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addDateTime(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-        @Nonnull String granularity, @Nonnull Object defaultNullValue) {
-      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity, defaultNullValue));
-      return this;
-    }
-
-    public SchemaBuilder addDateTime(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-        @Nonnull String granularity, DateTimeType dateTimeType, @Nonnull Object defaultNullValue) {
-      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity, dateTimeType, defaultNullValue));
-      return this;
-    }
-
-
-    public SchemaBuilder addDateTime(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-        @Nonnull String granularity) {
-      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity));
       return this;
     }
 
