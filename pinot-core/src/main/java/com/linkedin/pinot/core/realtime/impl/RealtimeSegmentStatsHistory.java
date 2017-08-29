@@ -44,7 +44,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   // Fields to be serialzied.
   private int _cursor = 0;
   private SegmentStats[] _entries;
-  private boolean _isFull;
+  private boolean _isFull = false;
   private String _historyFilePath;
 
   // We return these values when we don't have any prior statistics.
@@ -177,8 +177,6 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   private void normalize() {
     if (_entries.length == MAX_NUM_ENTRIES) {
       _arraySize = MAX_NUM_ENTRIES;
-      _cursor = 0;
-      _isFull = false;
       return;
     }
     int toCopy;
@@ -322,5 +320,15 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       return getArraySize();
     }
     return getCursor();
+  }
+
+  public static void main(String[] args) throws Exception {
+    RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(new File("/tmp/stats.ser"));
+    System.out.println(history.toString());
+    for (int i = 0; i <history.getNumntriesToScan(); i++) {
+      SegmentStats segmentStats = history.getSegmentStatsAt(i);
+      System.out.println(segmentStats.toString());
+
+    }
   }
 }
