@@ -130,10 +130,10 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
         continue;
       }
       double value = metricTimeSeries.getOrDefault(timestamp, metricName, NULL_DOUBLE).doubleValue();
+      ++totalCount;
       if (Double.compare(NULL_DOUBLE, value) == 0) {
         continue;
       }
-      ++totalCount;
       if (isLiveBucket(value, minLiveZone, maxLiveZone)) {
         sum += value;
         ++count;
@@ -141,10 +141,10 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
     }
 
     if (count > 0) {
-      double liveBucketPercentage = count / totalCount;
-      if (liveBucketPercentage > liveBucketPercentageThreshold) {
+      double liveBucketPercentage = (double) count / (double) totalCount;
+      if (Double.compare(liveBucketPercentage, liveBucketPercentageThreshold) >= 0) {
         double average = sum / count;
-        return average > threshold;
+        return Double.compare(average, threshold) >= 0;
       }
     }
 
