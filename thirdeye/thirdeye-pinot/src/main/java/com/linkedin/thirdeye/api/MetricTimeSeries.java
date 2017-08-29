@@ -45,16 +45,19 @@ public class MetricTimeSeries {
   }
 
   /**
-   * @param timeWindow
-   * @param value
+   * Sets the value of the metric with the given timestamp.
+   *
+   * @param timeWindow the timestamp for the value.
+   * @param name metric name.
+   * @param value a non-null value.
    */
   public void set(long timeWindow, String name, Number value) {
     initBufferForTimeWindow(timeWindow);
-    setTimeseries(timeWindow, name, value);
+    setMetricValue(timeWindow, name, value);
     setHasValue(timeWindow, name);
   }
 
-  private void setTimeseries(long timeWindow, String name, Number value) {
+  private void setMetricValue(long timeWindow, String name, Number value) {
     ByteBuffer buffer = metricsValue.get(timeWindow);
     buffer.position(schema.getOffset(name));
     MetricType metricType = schema.getMetricType(name);
@@ -75,54 +78,59 @@ public class MetricTimeSeries {
     }
   }
 
+  /**
+   * Gets the metric value with the timestamp if the value exists; otherwise, 0 is returned.
+   *
+   * @param timeWindow the timestamp.
+   * @param name the metric name.
+   *
+   * @return the metric value if exists; otherwise, 0 is returned.
+   */
   public Number get(long timeWindow, String name) {
     return getOrDefault(timeWindow, name, 0);
   }
 
+  /**
+   * Gets the metric value with the timestamp if the value exists; otherwise, the default number is returned.
+   *
+   * @param timeWindow the timestamp.
+   * @param name the metric name.
+   * @param defaultNumber the default number for the returned value if the target value does not exist.
+   *
+   * @return the metric value with the timestamp if the value exists; otherwise, the default number is returned.
+   */
   public Number getOrDefault(long timeWindow, String name, Number defaultNumber) {
-    Number ret = null;
+    Number ret = defaultNumber;
 
     boolean[] hasValueBuffer = hasValue.get(timeWindow);
     if (hasValueBuffer != null && hasValueBuffer[schema.getMetricIndex(name)]) {
       ByteBuffer buffer = metricsValue.get(timeWindow);
       if (buffer != null) {
         buffer = buffer.duplicate();
-        MetricType metricType = schema.getMetricType(name);
         buffer.position(schema.getOffset(name));
+        MetricType metricType = schema.getMetricType(name);
         ret = NumberUtils.readFromBuffer(buffer, metricType);
       }
     }
 
-    if (ret != null) {
-      return ret;
-    } else {
-      return defaultNumber;
-    }
+    return ret;
   }
 
+  /**
+   * Increments the metric value of the timestamp with delta.
+   *
+   * @param timeWindow the timestamp.
+   * @param name the metric name.
+   * @param delta the non-null value to be added to the metric value.
+   */
   public void increment(long timeWindow, String name, Number delta) {
     Number newValue = delta;
     Number oldValue = getOrDefault(timeWindow, name, null);
 
     if (oldValue != null) {
       MetricType metricType = schema.getMetricType(name);
-      switch (metricType) {
-      case SHORT:
-        newValue = oldValue.shortValue() + delta.shortValue();
-        break;
-      case INT:
-        newValue = oldValue.intValue() + delta.intValue();
-        break;
-      case LONG:
-        newValue = oldValue.longValue() + delta.longValue();
-        break;
-      case FLOAT:
-        newValue = oldValue.floatValue() + delta.floatValue();
-        break;
-      case DOUBLE:
-        newValue = oldValue.doubleValue() + delta.doubleValue();
-        break;
-      default:
+      newValue = NumberUtils.sum(newValue, oldValue, metricType);
+      if (newValue == null) {
         throw new UnsupportedOperationException(
             "unknown metricType:" + metricType + " for column:" + name);
       }
