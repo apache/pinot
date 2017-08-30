@@ -99,8 +99,8 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
           new TimeBucket(currentBucketMillis, currentBucketMillis + bucketMillis, baselineBucketMillis,
               baselineBucketMillis + bucketMillis);
       anomalyTimelinesView.addTimeBuckets(timebucket);
-      anomalyTimelinesView.addCurrentValues(timeSeries.get(currentBucketMillis, metric).doubleValue());
-      anomalyTimelinesView.addBaselineValues(timeSeries.get(baselineBucketMillis, metric).doubleValue());
+      anomalyTimelinesView.addCurrentValues(timeSeries.getOrDefault(currentBucketMillis, metric, 0).doubleValue());
+      anomalyTimelinesView.addBaselineValues(timeSeries.getOrDefault(baselineBucketMillis, metric, 0).doubleValue());
     }
 
     return anomalyTimelinesView;

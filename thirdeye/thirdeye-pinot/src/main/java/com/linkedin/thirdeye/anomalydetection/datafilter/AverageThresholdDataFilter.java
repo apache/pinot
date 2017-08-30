@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
  */
 public class AverageThresholdDataFilter extends BaseDataFilter {
   private static final Logger LOG = LoggerFactory.getLogger(AverageThresholdDataFilter.class);
+  private static final Double NULL_DOUBLE = Double.NaN;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String METRIC_NAME_KEY = "metricName";
@@ -128,12 +129,11 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
       if (timestamp < windowStart || timestamp >= windowEnd) {
         continue;
       }
-      double value = metricTimeSeries.get(timestamp, metricName).doubleValue();
-      // TODO: Distinguish 0 and empty value
-      if (Double.compare(0d, value) == 0) {
+      double value = metricTimeSeries.getOrDefault(timestamp, metricName, NULL_DOUBLE).doubleValue();
+      ++totalCount;
+      if (Double.compare(NULL_DOUBLE, value) == 0) {
         continue;
       }
-      ++totalCount;
       if (isLiveBucket(value, minLiveZone, maxLiveZone)) {
         sum += value;
         ++count;
@@ -141,10 +141,10 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
     }
 
     if (count > 0) {
-      double liveBucketPercentage = count / totalCount;
-      if (liveBucketPercentage > liveBucketPercentageThreshold) {
+      double liveBucketPercentage = (double) count / (double) totalCount;
+      if (Double.compare(liveBucketPercentage, liveBucketPercentageThreshold) >= 0) {
         double average = sum / count;
-        return average > threshold;
+        return Double.compare(average, threshold) >= 0;
       }
     }
 

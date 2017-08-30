@@ -84,7 +84,7 @@ public class RatioOutlierFunction extends BaseAnomalyFunction {
       // Compute the weight of this time series (average across whole)
       double averageValue = 0;
       for (Long time : timeSeries.getTimeWindowSet()) {
-        averageValue += timeSeries.get(time, m).doubleValue();
+        averageValue += timeSeries.getOrDefault(time, m, 0).doubleValue();
       }
 
       // avg value of this time series
@@ -97,8 +97,8 @@ public class RatioOutlierFunction extends BaseAnomalyFunction {
     String m_b = getSpec().getMetrics().get(1);
 
     for (Long timeBucket : timeSeries.getTimeWindowSet()) {
-      double value_a = timeSeries.get(timeBucket, m_a).doubleValue();
-      double value_b = timeSeries.get(timeBucket, m_b).doubleValue();
+      double value_a = timeSeries.getOrDefault(timeBucket, m_a, 0).doubleValue();
+      double value_b = timeSeries.getOrDefault(timeBucket, m_b, 0).doubleValue();
 
       if (value_b == 0.0d) continue;
 
@@ -156,8 +156,8 @@ public class RatioOutlierFunction extends BaseAnomalyFunction {
               baselineBucketMillis + bucketMillis);
       view.addTimeBuckets(timebucket);
 
-      double value_a = timeSeries.get(currentBucketMillis, m_a).doubleValue();
-      double value_b = timeSeries.get(currentBucketMillis, m_b).doubleValue();
+      double value_a = timeSeries.getOrDefault(currentBucketMillis, m_a, 0).doubleValue();
+      double value_b = timeSeries.getOrDefault(currentBucketMillis, m_b, 0).doubleValue();
 
       if (value_b != 0.0d) {
         double ratio = value_a / value_b;

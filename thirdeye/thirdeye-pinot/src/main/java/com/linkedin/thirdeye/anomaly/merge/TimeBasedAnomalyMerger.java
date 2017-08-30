@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 public class TimeBasedAnomalyMerger {
   private final static Logger LOG = LoggerFactory.getLogger(TimeBasedAnomalyMerger.class);
+  private final static Double NULL_DOUBLE = Double.NaN;
   private final static double NORMALIZATION_FACTOR = 1000; // to prevent from double overflow
 
   private final MergedAnomalyResultManager mergedResultDAO;
@@ -293,7 +294,7 @@ public class TimeBasedAnomalyMerger {
    */
   public static double computeImpactToGlobalMetric(MetricTimeSeries globalMetricTimeSerise, MetricTimeSeries subMetricTimeSeries,
       MergedAnomalyResultDTO mergedAnomaly) {
-    double impactToTotal = Double.NaN;
+    double impactToTotal = NULL_DOUBLE;
     if (globalMetricTimeSerise == null || globalMetricTimeSerise.getTimeWindowSet().isEmpty()) {
       return impactToTotal;
     }
@@ -311,13 +312,13 @@ public class TimeBasedAnomalyMerger {
     // Calculate the average traffic
     for (long timestamp : globalMetricTimeSerise.getTimeWindowSet()) {
       if (timestamp < mergedAnomaly.getStartTime()) {
-        double globalMetricValue = globalMetricTimeSerise.get(timestamp, globalMetric).doubleValue();
-        double subMetricValue = subMetricTimeSeries.get(timestamp, anomalyMetric).doubleValue();
-        if (globalMetricValue != Double.NaN) {
+        double globalMetricValue = globalMetricTimeSerise.getOrDefault(timestamp, globalMetric, NULL_DOUBLE).doubleValue();
+        double subMetricValue = subMetricTimeSeries.getOrDefault(timestamp, anomalyMetric, NULL_DOUBLE).doubleValue();
+        if (Double.compare(globalMetricValue, NULL_DOUBLE) != 0) {
           avgGlobal += globalMetricValue;
           countGlobal++;
         }
-        if (subMetricValue != Double.NaN) {
+        if (Double.compare(subMetricValue, NULL_DOUBLE) != 0) {
           avgSub += subMetricValue;
           countSub++;
         }
