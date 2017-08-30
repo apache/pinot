@@ -47,6 +47,8 @@ export default Ember.Controller.extend({
   filters: {},
   graphConfig: {},
   selectedFilters: JSON.stringify({}),
+  selectedSensitivity: null,
+  selectedWeeklyEffect: true,
 
   /**
    * Object to cover basic ield 'presence' validation
@@ -86,6 +88,22 @@ export default Ember.Controller.extend({
    */
   patternsOfInterest: ['Up and Down', 'Up only', 'Down only'],
 
+
+  /**
+   * Options for sensitivity field
+   */
+  sensitivityOptions: ['Robust', 'Medium', 'Sensitive'],
+
+  /**
+   * To be sent to replay endpoint
+   */
+  sensitivityMapping: {
+    robuts: 'LOW',
+    medium: 'MEDIUM',
+    sensitivity: 'HIGH'
+  },
+
+  weeklyEffectOptions: [true, false],
   /**
    * Application name field options loaded from our model.
    */
@@ -345,7 +363,7 @@ export default Ember.Controller.extend({
    */
   callReplayStart(functionId, startTime, endTime) {
     const granularity = this.get('graphConfig.granularity').toLowerCase();
-    const speedUp = granularity.includes('hour') || granularity.includes('day');
+    const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
     const recipients = this.get('selectedConfigGroup.recipients');
 
     const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}&end=${endTime}&speedup=${speedUp}&removeAnomaliesInWindow=true&to=${recipients}`;

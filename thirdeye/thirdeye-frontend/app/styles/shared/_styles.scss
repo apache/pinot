@@ -59,8 +59,48 @@ body {
   }
 }
 
+
 .te-hide {
   @include app-hide;
+}
+
+.te-label {
+  font-weight: normal;
+  color:  app-shade(black, 8);
+  margin-bottom: 12px;
+
+  &--flush {
+    margin-bottom: 0;
+  }
+}
+
+.te-input {
+  min-height: 2.4em !important;
+  border: 1px solid app-shade(black, 0.25);
+  color: app-shade(black, 0.85);
+  border-radius: 2px;
+  box-shadow: none;
+
+  &::placeholder {
+    color: app-shade(black, 0.55);
+  }
+
+  &:disabled {
+    border-color: app-shade(black, 0.1);
+    background-color: app-shade(black, 0);
+    cursor: default;
+    color: app-shade(black, 0.25);
+
+    &::placeholder {
+      color: app-shade(black, 0.25);
+      font-weight: normal;
+    }
+  }
+
+
+  &:hover:not(:disabled){
+    border-color: app-shade(black, 0.55);
+  }
 }
 
 .te-page-right {
