@@ -60,9 +60,9 @@ public class MetricTimeSeriesTest {
 
   @Test(dataProvider = "defaultMetricTimeSeries")
   public void testGet(List<String> metricNames, MetricTimeSeries metricTimeSeries, long[] timestamps) {
-    double[] expectedDValues = new double[] {1.0, 2.0, 3.0, 0.0, 5.0};
-    int[] expectedIValues = new int[] {0, 0, 0, 0, 0};
-    long[] expectedLValues = new long[] { 1, 0, 3, 0, 5 };
+    double[] expectedDValues = new double[] {1.0, 2.0, 3.0, 5.0};
+    int[] expectedIValues = new int[] {};
+    long[] expectedLValues = new long[] { 1, 3, 5 };
 
     checkActualWithPresetNullValues(metricNames, metricTimeSeries, timestamps, expectedDValues, expectedIValues,
         expectedLValues);
@@ -238,13 +238,37 @@ public class MetricTimeSeriesTest {
   private static void checkActualWithPresetNullValues(List<String> metricNames, MetricTimeSeries metricTimeSeries,
       long[] timestamps, double[] expectedDValues, int[] expectedIValues, long[] expectedLValues) {
 
-    double[] actualDValues = new double[5];
-    int[] actualIValues = new int[5];
-    long[] actualLValues = new long[5];
-    for (int i = 0; i < timestamps.length; i++) {
-      actualDValues[i] = metricTimeSeries.get(timestamps[i], metricNames.get(0)).doubleValue();
-      actualIValues[i] = metricTimeSeries.get(timestamps[i], metricNames.get(1)).intValue();
-      actualLValues[i] = metricTimeSeries.get(timestamps[i], metricNames.get(2)).longValue();
+    List<Double> doubleList = new ArrayList<>();
+    List<Integer> intList = new ArrayList<>();
+    List<Long> longList = new ArrayList<>();
+
+    for (long timestamp : timestamps) {
+      Number doubleNumber = metricTimeSeries.get(timestamp, metricNames.get(0));
+      if (doubleNumber != null) {
+        doubleList.add(doubleNumber.doubleValue());
+      }
+      Number intNumber = metricTimeSeries.get(timestamp, metricNames.get(1));
+      if (intNumber != null) {
+        intList.add(intNumber.intValue());
+      }
+      Number longNumber = metricTimeSeries.get(timestamp, metricNames.get(2));
+      if (longNumber != null) {
+        longList.add(longNumber.longValue());
+      }
+    }
+
+    double[] actualDValues = new double[doubleList.size()];
+    int[] actualIValues = new int[intList.size()];
+    long[] actualLValues = new long[longList.size()];
+
+    for (int i = 0; i < doubleList.size(); i++) {
+      actualDValues[i] = doubleList.get(i);
+    }
+    for (int i = 0; i < intList.size(); i++) {
+      actualIValues[i] = intList.get(i);
+    }
+    for (int i = 0; i < longList.size(); i++) {
+      actualLValues[i] = longList.get(i);
     }
 
     Assert.assertEquals(actualDValues, expectedDValues);

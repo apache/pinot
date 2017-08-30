@@ -81,16 +81,15 @@ public class MetricTimeSeries {
   }
 
   /**
-   * Gets the metric value with the timestamp if the value exists; otherwise, 0 is returned.
+   * Gets the metric value with the timestamp if the value exists; otherwise, null is returned.
    *
    * @param timeWindow the timestamp.
    * @param name the metric name.
    *
-   * @return the metric value if exists; otherwise, 0 is returned.
+   * @return the metric value if exists; otherwise, null is returned.
    */
-  @Deprecated
   public Number get(long timeWindow, String name) {
-    return getOrDefault(timeWindow, name, 0);
+    return getOrDefault(timeWindow, name, null);
   }
 
   /**
