@@ -26,17 +26,18 @@ public final class FixedBitIntWriter implements Closeable {
   private final int _numBitsPerValue;
 
   public FixedBitIntWriter(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
-    Preconditions.checkState(dataBuffer.size() == (numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
+    Preconditions.checkState(
+        dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
     _dataBitSet = new PinotDataBitSet(dataBuffer);
     _numBitsPerValue = numBitsPerValue;
   }
 
   public void writeInt(int index, int value) {
-    _dataBitSet.writeInt(index * _numBitsPerValue, _numBitsPerValue, value);
+    _dataBitSet.writeInt(index, _numBitsPerValue, value);
   }
 
   public void writeInt(int startIndex, int length, int[] values) {
-    _dataBitSet.writeInt(startIndex * _numBitsPerValue, _numBitsPerValue, length, values);
+    _dataBitSet.writeInt(startIndex, _numBitsPerValue, length, values);
   }
 
   @Override

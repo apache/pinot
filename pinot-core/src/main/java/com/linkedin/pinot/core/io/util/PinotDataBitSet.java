@@ -15,10 +15,8 @@
  */
 package com.linkedin.pinot.core.io.util;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
-import java.util.Arrays;
 
 
 public final class PinotDataBitSet implements Closeable {
@@ -28,7 +26,6 @@ public final class PinotDataBitSet implements Closeable {
   private static final int BYTE_MASK = 0xFF;
 
   static {
-    Arrays.fill(FIRST_BIT_SET, -1);
     for (int i = 0; i < (1 << Byte.SIZE); i++) {
       int numBitsSet = 0;
       for (int j = 0; j < Byte.SIZE; j++) {
@@ -44,13 +41,13 @@ public final class PinotDataBitSet implements Closeable {
   private final PinotDataBuffer _dataBuffer;
 
   public PinotDataBitSet(PinotDataBuffer dataBuffer) {
-    Preconditions.checkState(dataBuffer.size() * Byte.SIZE <= Integer.MAX_VALUE);
     _dataBuffer = dataBuffer;
   }
 
-  public int readInt(int bitOffset, int numBitsPerValue) {
-    int byteOffset = bitOffset / Byte.SIZE;
-    int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
+  public int readInt(int index, int numBitsPerValue) {
+    long bitOffset = (long) index * numBitsPerValue;
+    int byteOffset = (int) (bitOffset / Byte.SIZE);
+    int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
 
     // Initiated with the value in first byte
     int currentValue = _dataBuffer.getByte(byteOffset) & (BYTE_MASK >>> bitOffsetInFirstByte);
@@ -70,9 +67,10 @@ public final class PinotDataBitSet implements Closeable {
     }
   }
 
-  public void readInt(int startBitOffset, int numBitsPerValue, int length, int[] buffer) {
-    int byteOffset = startBitOffset / Byte.SIZE;
-    int bitOffsetInFirstByte = startBitOffset % Byte.SIZE;
+  public void readInt(int startIndex, int numBitsPerValue, int length, int[] buffer) {
+    long startBitOffset = (long) startIndex * numBitsPerValue;
+    int byteOffset = (int) (startBitOffset / Byte.SIZE);
+    int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);
 
     // Initiated with the value in first byte
     int currentValue = _dataBuffer.getByte(byteOffset) & (BYTE_MASK >>> bitOffsetInFirstByte);
@@ -102,9 +100,10 @@ public final class PinotDataBitSet implements Closeable {
     }
   }
 
-  public void writeInt(int bitOffset, int numBitsPerValue, int value) {
-    int byteOffset = bitOffset / Byte.SIZE;
-    int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
+  public void writeInt(int index, int numBitsPerValue, int value) {
+    long bitOffset = (long) index * numBitsPerValue;
+    int byteOffset = (int) (bitOffset / Byte.SIZE);
+    int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
 
     int firstByte = _dataBuffer.getByte(byteOffset);
 
@@ -128,9 +127,10 @@ public final class PinotDataBitSet implements Closeable {
     }
   }
 
-  public void writeInt(int startBitOffset, int numBitsPerValue, int length, int[] values) {
-    int byteOffset = startBitOffset / Byte.SIZE;
-    int bitOffsetInFirstByte = startBitOffset % Byte.SIZE;
+  public void writeInt(int startIndex, int numBitsPerValue, int length, int[] values) {
+    long startBitOffset = (long) startIndex * numBitsPerValue;
+    int byteOffset = (int) (startBitOffset / Byte.SIZE);
+    int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);
 
     int firstByte = _dataBuffer.getByte(byteOffset);
 
