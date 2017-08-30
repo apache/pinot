@@ -19,6 +19,17 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
 
+import com.linkedin.pinot.pql.parsers.pql2.ast.BaseAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.ComparisonPredicateAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.HavingAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.InPredicateAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.OutputColumnAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.OutputColumnListAstNode;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Stack;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -89,6 +100,10 @@ public class Pql2Compiler implements AbstractCompiler {
       walker.walk(listener, parseTree);
 
       AstNode rootNode = listener.getRootNode();
+
+      //Validate the HAVING clause if any
+      validateHavingClause(rootNode);
+
       BrokerRequest brokerRequest = new BrokerRequest();
       rootNode.updateBrokerRequest(brokerRequest);
       return brokerRequest;
@@ -118,4 +133,93 @@ public class Pql2Compiler implements AbstractCompiler {
     final AstNode rootNode = listener.getRootNode();
     return TransformExpressionTree.buildTree(rootNode);
   }
+
+  private void validateHavingClause(AstNode rootNode) {
+
+
+    List<? extends AstNode> childs = rootNode.getChildren();
+
+    BaseAstNode outList = (BaseAstNode) childs.get(0);
+    HavingAstNode havingList = null;
+    boolean isThereHaving = false;
+    for (int i = 1; i < childs.size(); i++) {
+      if (childs.get(i) instanceof HavingAstNode) {
+        havingList = (HavingAstNode) childs.get(i);
+        isThereHaving = true;
+        break;
+      }
+    }
+    if (isThereHaving) {
+         /*
+          Check if the HAVING predicate function call is in the select list;
+          if not: add the missing function call to select list and set isInSelectList to false
+          */
+
+      List<FunctionCallAstNode> functionCalls = havingTreeDFSTraversalToFindFunctionCalls(havingList);
+      if (functionCalls.isEmpty()) {
+        throw new Pql2CompilationException("HAVING clause needs to have minimum one function call comparison");
+      }
+
+      List<? extends AstNode> outListChildren = outList.getChildren();
+      boolean havingPredicateIsNotInSelectList = true;
+      for(FunctionCallAstNode havingFunction:functionCalls){
+        boolean functionCallIsInSelectList=false;
+        for (AstNode anOutListChildren : outListChildren) {
+          OutputColumnAstNode selectItem = (OutputColumnAstNode) anOutListChildren;
+          if (selectItem.getChildren().get(0) instanceof FunctionCallAstNode) {
+            FunctionCallAstNode function = (FunctionCallAstNode) selectItem.getChildren().get(0);
+            if (function.getExpression().equals(havingFunction.getExpression()) && function.getName()
+                .equals(havingFunction.getName())) {
+              functionCallIsInSelectList = true;
+              break;
+            }
+
+          }
+        }
+        if(functionCallIsInSelectList==false){
+          OutputColumnAstNode havingFunctionAstNode= new OutputColumnAstNode();
+          havingFunction.setIsInSelectList(false);
+          havingFunctionAstNode.addChild(havingFunction);
+          havingFunction.setParent(havingFunctionAstNode);
+          outList.addChild(havingFunctionAstNode);
+          havingFunctionAstNode.setParent(outList);
+        }
+      }
+
+    }
+  }
+
+  private List<FunctionCallAstNode> havingTreeDFSTraversalToFindFunctionCalls(HavingAstNode havingList) {
+    List<FunctionCallAstNode> functionCalls = new ArrayList<FunctionCallAstNode>();
+    Stack<AstNode> astNodeStack = new Stack<AstNode>();
+    astNodeStack.add(havingList);
+    while (!astNodeStack.isEmpty()) {
+      AstNode visitingNode = astNodeStack.pop();
+      if (visitingNode instanceof ComparisonPredicateAstNode) {
+        if (!((ComparisonPredicateAstNode) visitingNode).isItFunctionCallComparison()) {
+          throw new Pql2CompilationException("Having predicate only compares function calls");
+        }
+        functionCalls.add(((ComparisonPredicateAstNode) visitingNode).getFunction());
+      } else if (visitingNode instanceof BetweenPredicateAstNode) {
+        if (!((ComparisonPredicateAstNode) visitingNode).isItFunctionCallComparison()) {
+          throw new Pql2CompilationException("Having predicate only compares function calls");
+        }
+        functionCalls.add(((BetweenPredicateAstNode) visitingNode).getFunction());
+      } else if (visitingNode instanceof InPredicateAstNode) {
+        if (!((ComparisonPredicateAstNode) visitingNode).isItFunctionCallComparison()) {
+          throw new Pql2CompilationException("Having predicate only compares function calls");
+        }
+        functionCalls.add(((InPredicateAstNode) visitingNode).getFunction());
+      } else {
+        if (visitingNode.hasChildren()) {
+          for (AstNode children : visitingNode.getChildren()) {
+            astNodeStack.add(children);
+          }
+        }
+      }
+    }
+
+    return functionCalls;
+  }
+
 }

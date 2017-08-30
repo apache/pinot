@@ -13,25 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.pql.parsers.pql2.ast;
+package com.linkedin.pinot.common.utils.request;
 
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.HavingQueryTree;
-import com.linkedin.pinot.common.utils.request.QueryTree;
+import com.linkedin.pinot.common.request.FilterOperator;
+import java.util.List;
 
+public abstract class QueryTree {
+  protected int _id;
+  protected List<String> _value;
+  protected FilterOperator _operator;
 
-/**
- * AST node for a predicate surrounded by parentheses.
- */
-public class PredicateParenthesisGroupAstNode extends PredicateAstNode {
-
-  @Override
-  public FilterQueryTree buildFilterQueryTree() {
-    return ((PredicateAstNode) getChildren().get(0)).buildFilterQueryTree();
+  public int getId() {
+    return _id;
   }
 
-  @Override
-  public HavingQueryTree buildHavingQueryTree() {
-    return ((PredicateAstNode) getChildren().get(0)).buildHavingQueryTree();
+  public List<String> getValue() {
+    return _value;
   }
+
+  public FilterOperator getOperator() {
+    return _operator;
+  }
+
+  public abstract String toString();
+
+  protected abstract void recursiveToStringIntoBuffer(int indent, StringBuffer stringBuffer);
 }

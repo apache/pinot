@@ -482,6 +482,11 @@ public class ClusterIntegrationTestUtils {
     JSONObject pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pqlQuery);
 
+    //Skip comparison for HAVING queries with null response; mainly because of CLOSE policy
+    if(pqlQuery.contains("HAVING") && pinotResponse==null){
+      return;
+    }
+
     // Skip comparison if SQL queries are not specified
     if (sqlQueries == null) {
       return;
@@ -583,7 +588,7 @@ public class ClusterIntegrationTestUtils {
               failure(pqlQuery, sqlQueries, failureMessage);
             }
 
-            if (pinotNumRecordsSelected != 0) {
+            if (!pqlQuery.contains("HAVING") && pinotNumRecordsSelected != 0) {
               String failureMessage = "No group returned in Pinot but " + pinotNumRecordsSelected + " records selected";
               failure(pqlQuery, sqlQueries, failureMessage);
             }

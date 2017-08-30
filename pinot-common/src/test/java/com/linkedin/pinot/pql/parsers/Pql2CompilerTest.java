@@ -132,6 +132,22 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.NOT);
   }
 
+ @Test
+  public void testCompilationWithHaving() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    BrokerRequest brokerRequest= compiler.compileToBrokerRequest("select count(*) as count from potato having count(*) = 10");
+    // TODO
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.EQUALITY);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0), "10");
+
+    brokerRequest= compiler.compileToBrokerRequest("select count(*) as count from potato having count(*) > 0 AND count(*) < 45");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size() , 3);
+
+    brokerRequest= compiler.compileToBrokerRequest("select count(*) as count, avg(price) as avgprice from potato having count(*) > 0 OR (avg(price) < 45 AND count(*) > 22)");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size() , 5);
+
+   }
+
   @Test
   public void testQueryOptions() {
     Pql2Compiler compiler = new Pql2Compiler();

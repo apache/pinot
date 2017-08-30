@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.request.Selection;
 import java.util.ArrayList;
 import java.util.List;
 
-
 /**
  * AST node for the star column list (as in SELECT * FROM foo).
  */

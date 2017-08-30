@@ -22,6 +22,8 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.HavingFilterQuery;
+import com.linkedin.pinot.common.request.HavingFilterQueryMap;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import java.util.ArrayList;
@@ -34,10 +36,11 @@ import org.apache.commons.lang.mutable.MutableInt;
 
 
 public class RequestUtils {
+  public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
+  private static final String USE_STAR_TREE_KEY = "useStarTree";
+
   private RequestUtils() {
   }
-
-  private static final String USE_STAR_TREE_KEY = "useStarTree";
 
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
@@ -53,6 +56,16 @@ public class RequestUtils {
     FilterQueryMap mp = new FilterQueryMap();
     mp.setFilterQueryMap(filterQueryMap);
     request.setFilterSubQueryMap(mp);
+  }
+
+  public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
+    Map<Integer, HavingFilterQuery> filterQueryMap = new HashMap<Integer, HavingFilterQuery>();
+    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap);
+    filterQueryMap.put(root.getId(), root);
+    request.setHavingFilterQuery(root);
+    HavingFilterQueryMap mp = new HavingFilterQueryMap();
+    mp.setFilterQueryMap(filterQueryMap);
+    request.setHavingFilterSubQueryMap(mp);
   }
 
   private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree,
@@ -75,6 +88,25 @@ public class RequestUtils {
     FilterQuery query = new FilterQuery();
     query.setColumn(tree.getColumn());
     query.setId(currentNodeId);
+    query.setNestedFilterQueryIds(f);
+    query.setOperator(tree.getOperator());
+    query.setValue(tree.getValue());
+    return query;
+  }
+
+  private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree tree,
+      Map<Integer, HavingFilterQuery> filterQueryMap) {
+    final List<Integer> f = new ArrayList<Integer>();
+    if (null != tree.getChildren()) {
+      for (final HavingQueryTree c : tree.getChildren()) {
+        f.add(c.getId());
+        final HavingFilterQuery q = traverseHavingFilterQueryAndPopulateMap(c, filterQueryMap);
+        filterQueryMap.put(c.getId(), q);
+      }
+    }
+    HavingFilterQuery query = new HavingFilterQuery();
+    query.setAggregationInfo(((HavingQueryTree) tree).getAggregationInfo());
+    query.setId(tree.getId());
     query.setNestedFilterQueryIds(f);
     query.setOperator(tree.getOperator());
     query.setValue(tree.getValue());
@@ -115,8 +147,6 @@ public class RequestUtils {
     FilterQueryTree q2 = new FilterQueryTree(q.getColumn(), q.getValue(), q.getOperator(), c);
     return q2;
   }
-
-  public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
 
   /**
    * Returns true for the following, false otherwise:
@@ -197,7 +227,7 @@ public class RequestUtils {
           return false;
         }
         //only one predicate per column is supported
-        String column = child.getColumn();
+        String column = (child).getColumn();
         if (predicateColumns.contains(column)) {
           return false;
         }

@@ -16,11 +16,27 @@
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-
+import com.linkedin.pinot.common.utils.request.HavingQueryTree;
+import com.linkedin.pinot.common.utils.request.QueryTree;
 
 /**
  * Common interface for predicate AST nodes.
  */
 public abstract class PredicateAstNode extends BaseAstNode {
+
+  /**
+   * Create the query tree for the where clause
+   *
+   * @return
+   *
+   */
   public abstract FilterQueryTree buildFilterQueryTree();
+
+  /**
+   * Create the query tree for the having clause
+   * It is different than FilterQuery because here we deal with function call comparison with literals
+   * @return
+   */
+  public abstract HavingQueryTree buildHavingQueryTree();
+
 }

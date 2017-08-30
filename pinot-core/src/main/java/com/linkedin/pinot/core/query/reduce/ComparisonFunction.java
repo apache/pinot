@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.pql.parsers.pql2.ast;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
+package com.linkedin.pinot.core.query.reduce;
+
+import java.math.BigDecimal;
 
 
-/**
- * AST node for HAVING clauses.
- */
-public class HavingAstNode extends BaseAstNode {
-  @Override
-  public void updateBrokerRequest(BrokerRequest brokerRequest) {
-    PredicateAstNode predicateAstNode = (PredicateAstNode) getChildren().get(0);
-    RequestUtils.generateFilterFromTree(predicateAstNode.buildHavingQueryTree(), brokerRequest);
+//This class will be inherited by different classes that compare (e.g. for equality) the input value by the base value
+public abstract class ComparisonFunction {
+  protected String _functionExpression;
+
+  public abstract boolean isComparisonValid(String aggResult);
+
+  public String getFunctionExpression() {
+    return _functionExpression;
   }
-
 }

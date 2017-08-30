@@ -97,7 +97,7 @@ booleanOperator: OR | AND;
 groupByClause: GROUP BY groupByList;
 groupByList: expression (',' expression)*;
 
-havingClause: HAVING predicate;
+havingClause: HAVING predicateList;
 
 orderByClause: ORDER BY orderByList;
 orderByList: orderByExpression (',' orderByExpression)*;

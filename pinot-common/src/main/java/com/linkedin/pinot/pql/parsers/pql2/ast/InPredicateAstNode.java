@@ -18,11 +18,13 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.HavingQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 
 /**
@@ -33,24 +35,45 @@ public class InPredicateAstNode extends PredicateAstNode {
   private final boolean _isNotInClause;
   private String _identifier;
   private final boolean _splitInClause;
+  private FunctionCallAstNode _function;
 
   public InPredicateAstNode(boolean isNotInClause, boolean splitInClause) {
     _isNotInClause = isNotInClause;
     _splitInClause = splitInClause;
   }
 
+  public boolean isItFunctionCallComparison() {
+    if (_function == null) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
-      if (_identifier == null) {
+      if (_identifier == null && _function == null) {
         IdentifierAstNode node = (IdentifierAstNode) childNode;
         _identifier = node.getName();
-      } else {
+      } else if (_identifier != null) {
         throw new Pql2CompilationException("IN predicate has more than one identifier.");
+      } else {
+        throw new Pql2CompilationException("IN predicate has both identifier and function.");
+      }
+    } else if (childNode instanceof FunctionCallAstNode) {
+      if (_function == null && _identifier == null) {
+        _function = (FunctionCallAstNode) childNode;
+      } else if (_function != null) {
+        throw new Pql2CompilationException("IN predicate has more than one function.");
+      } else {
+        throw new Pql2CompilationException("IN predicate has both identifier and function.");
       }
     } else {
       super.addChild(childNode);
     }
+
   }
 
   public String getIdentifier() {
@@ -59,7 +82,13 @@ public class InPredicateAstNode extends PredicateAstNode {
 
   @Override
   public String toString() {
-    return "InPredicateAstNode{" + "_identifier='" + _identifier + '\'' + '}';
+    if (_identifier != null) {
+      return "InPredicateAstNode{" + "_identifier='" + _identifier + '\'' + '}';
+    } else if (_function != null) {
+      return "InPredicateAstNode{" + "_function='" + _function.toString() + '\'' + '}';
+    } else {
+      return "InPredicateAstNode{_identifier/_function= null";
+    }
   }
 
   @Override
@@ -92,4 +121,36 @@ public class InPredicateAstNode extends PredicateAstNode {
           filterOperator, null);
     }
   }
+
+  @Override
+  public HavingQueryTree buildHavingQueryTree() {
+    //return (HavingQueryTree)buildQueryTree (true);
+    if (_function == null) {
+      throw new Pql2CompilationException("IN predicate has no function");
+    }
+
+    TreeSet<String> values = new TreeSet<>();
+
+    for (AstNode astNode : getChildren()) {
+      if (astNode instanceof LiteralAstNode) {
+        LiteralAstNode node = (LiteralAstNode) astNode;
+        values.add(node.getValueAsString());
+      }
+    }
+
+    String[] valueArray = values.toArray(new String[values.size()]);
+    FilterOperator filterOperator;
+    if (_isNotInClause) {
+      filterOperator = FilterOperator.NOT_IN;
+    } else {
+      filterOperator = FilterOperator.IN;
+    }
+    return new HavingQueryTree(_function.buildAggregationInfo(),
+        Collections.singletonList(StringUtil.join("\t\t", valueArray)), filterOperator, null);
+  }
+
+  public FunctionCallAstNode getFunction() {
+    return _function;
+  }
+
 }
