@@ -257,7 +257,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
     }
 
     public DimensionEntity toEntity(double score, Collection<Entity> related) {
-      return DimensionEntity.fromDimension(score, related, this.name, this.value);
+      return DimensionEntity.fromDimension(score, related, this.name, this.value, DimensionEntity.TYPE_GENERATED);
     }
 
     @Override

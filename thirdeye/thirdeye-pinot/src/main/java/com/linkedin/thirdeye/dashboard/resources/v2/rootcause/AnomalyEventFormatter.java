@@ -52,7 +52,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, dto.getStartTime(), dto.getEndTime(), null);
 
     for(Map.Entry<String, String> entry : dto.getDimensions().entrySet()) {
-      DimensionEntity de = DimensionEntity.fromDimension(entity.getScore(), entry.getKey(), entry.getValue());
+      DimensionEntity de = DimensionEntity.fromDimension(entity.getScore(), entry.getKey(), entry.getValue(), DimensionEntity.TYPE_GENERATED);
       out.addRelatedEntity(DIMENSION_FORMATTER.format(de));
     }
 

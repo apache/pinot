@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.rootcause;
 
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import com.linkedin.thirdeye.rootcause.impl.DimensionEntity;
 import com.linkedin.thirdeye.rootcause.impl.EntityMappingPipeline;
 import java.util.ArrayList;
@@ -21,7 +20,6 @@ import org.testng.annotations.Test;
 
 public class EntityMappingPipelineTest {
   private static final String DIMENSION_TO_DIMENSION = "DIMENSION_TO_DIMENSION";
-  private static final String METRIC_TO_SERVICE = "METRIC_TO_SERVICE";
 
   private static final PipelineContext CONTEXT_DEFAULT = makeContext(makeEntities(1.0, "country:us", "country:at", "other:value"));
 
@@ -43,11 +41,11 @@ public class EntityMappingPipelineTest {
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
     Assert.assertEquals(entities.size(), 3);
-    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:country:at");
+    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:country:at:provided");
     Assert.assertEquals(entities.get(0).getScore(), 1.0);
-    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:country:us");
+    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:country:us:provided");
     Assert.assertEquals(entities.get(1).getScore(), 1.0);
-    Assert.assertEquals(entities.get(2).getUrn(), "thirdeye:dimension:other:value");
+    Assert.assertEquals(entities.get(2).getUrn(), "thirdeye:dimension:other:value:provided");
     Assert.assertEquals(entities.get(2).getScore(), 1.0);
   }
 
@@ -55,7 +53,7 @@ public class EntityMappingPipelineTest {
   public void testMappingDefault() {
     Collection<EntityToEntityMappingDTO> mappings = new ArrayList<>();
     mappings.add(makeMapping("thirdeye:dimension:country:", "thirdeye:dimension:countryCode:", 0.5, DIMENSION_TO_DIMENSION));
-    mappings.add(makeMapping("thirdeye:dimension:country:us", "thirdeye:dimension:countryCode:us", 0.8, DIMENSION_TO_DIMENSION));
+    mappings.add(makeMapping("thirdeye:dimension:country:us:provided", "thirdeye:dimension:countryCode:us:provided", 0.8, DIMENSION_TO_DIMENSION));
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(mappings);
 
     EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, false, false, 1);
@@ -63,7 +61,7 @@ public class EntityMappingPipelineTest {
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
     Assert.assertEquals(entities.size(), 1);
-    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:countryCode:us");
+    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:countryCode:us:provided");
     Assert.assertEquals(entities.get(0).getScore(), 0.8);
   }
 
@@ -78,16 +76,16 @@ public class EntityMappingPipelineTest {
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
     Assert.assertEquals(entities.size(), 2);
-    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:countryCode:at");
+    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:countryCode:at:provided");
     Assert.assertEquals(entities.get(0).getScore(), 0.5);
-    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:countryCode:us");
+    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:countryCode:us:provided");
     Assert.assertEquals(entities.get(1).getScore(), 0.5);
   }
 
   @Test
   public void testMappingRewriter() {
     Collection<EntityToEntityMappingDTO> mappings = new ArrayList<>();
-    mappings.add(makeMapping("thirdeye:dimension:country:us", "thirdeye:dimension:countryCode:us", 0.8, DIMENSION_TO_DIMENSION));
+    mappings.add(makeMapping("thirdeye:dimension:country:us:provided", "thirdeye:dimension:countryCode:us:provided", 0.8, DIMENSION_TO_DIMENSION));
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(mappings);
 
     EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, true, false, false, 1);
@@ -95,11 +93,11 @@ public class EntityMappingPipelineTest {
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
     Assert.assertEquals(entities.size(), 3);
-    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:country:at");
+    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:country:at:provided");
     Assert.assertEquals(entities.get(0).getScore(), 1.0);
-    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:other:value");
+    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:other:value:provided");
     Assert.assertEquals(entities.get(1).getScore(), 1.0);
-    Assert.assertEquals(entities.get(2).getUrn(), "thirdeye:dimension:countryCode:us");
+    Assert.assertEquals(entities.get(2).getUrn(), "thirdeye:dimension:countryCode:us:provided");
     Assert.assertEquals(entities.get(2).getScore(), 0.8);
   }
 
@@ -114,20 +112,20 @@ public class EntityMappingPipelineTest {
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
     Assert.assertEquals(entities.size(), 3);
-    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:other:value");
+    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:other:value:provided");
     Assert.assertEquals(entities.get(0).getScore(), 1.0);
-    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:countryCode:at");
+    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:countryCode:at:provided");
     Assert.assertEquals(entities.get(1).getScore(), 0.5);
-    Assert.assertEquals(entities.get(2).getUrn(), "thirdeye:dimension:countryCode:us");
+    Assert.assertEquals(entities.get(2).getUrn(), "thirdeye:dimension:countryCode:us:provided");
     Assert.assertEquals(entities.get(2).getScore(), 0.5);
   }
 
   @Test
   public void testMappingIterations() {
     Collection<EntityToEntityMappingDTO> mappings = new ArrayList<>();
-    mappings.add(makeMapping("thirdeye:dimension:country:us", "thirdeye:dimension:country:cn", 0.5, DIMENSION_TO_DIMENSION));
-    mappings.add(makeMapping("thirdeye:dimension:country:cn", "thirdeye:dimension:country:at", 0.5, DIMENSION_TO_DIMENSION));
-    mappings.add(makeMapping("thirdeye:dimension:country:at", "thirdeye:dimension:country:us", 0.5, DIMENSION_TO_DIMENSION));
+    mappings.add(makeMapping("thirdeye:dimension:country:us:provided", "thirdeye:dimension:country:cn:provided", 0.5, DIMENSION_TO_DIMENSION));
+    mappings.add(makeMapping("thirdeye:dimension:country:cn:provided", "thirdeye:dimension:country:at:provided", 0.5, DIMENSION_TO_DIMENSION));
+    mappings.add(makeMapping("thirdeye:dimension:country:at:provided", "thirdeye:dimension:country:us:provided", 0.5, DIMENSION_TO_DIMENSION));
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(mappings);
 
     EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, false, true, 3);
@@ -135,11 +133,11 @@ public class EntityMappingPipelineTest {
     List<Entity> entities = runPipeline(p, makeContext(makeEntities(1.0, "country:us")));
 
     Assert.assertEquals(entities.size(), 3);
-    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:country:cn");
+    Assert.assertEquals(entities.get(0).getUrn(), "thirdeye:dimension:country:cn:provided");
     Assert.assertEquals(entities.get(0).getScore(), 0.5);
-    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:country:at");
+    Assert.assertEquals(entities.get(1).getUrn(), "thirdeye:dimension:country:at:provided");
     Assert.assertEquals(entities.get(1).getScore(), 0.25);
-    Assert.assertEquals(entities.get(2).getUrn(), "thirdeye:dimension:country:us");
+    Assert.assertEquals(entities.get(2).getUrn(), "thirdeye:dimension:country:us:provided");
     Assert.assertEquals(entities.get(2).getScore(), 0.125);
   }
 
@@ -160,14 +158,14 @@ public class EntityMappingPipelineTest {
     int i=0;
     for(String dim : dimensions) {
       String[] parts = dim.split(":");
-      entities[i++] = DimensionEntity.fromDimension(score, parts[0], parts[1]);
+      entities[i++] = DimensionEntity.fromDimension(score, parts[0], parts[1], DimensionEntity.TYPE_PROVIDED);
     }
     return entities;
   }
 
   private static PipelineContext makeContext(Entity... entities) {
     Map<String, Set<Entity>> inputs = new HashMap<>();
-    inputs.put("default", new HashSet<Entity>(Arrays.asList(entities)));
+    inputs.put("default", new HashSet<>(Arrays.asList(entities)));
     return new PipelineContext(inputs);
   }
 
