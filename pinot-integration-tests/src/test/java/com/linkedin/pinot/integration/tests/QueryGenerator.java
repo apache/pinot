@@ -774,15 +774,15 @@ public class QueryGenerator {
       ArrayList<String> arrayOfAggregationColumnsAndFunctions = new ArrayList<>(aggregationColumnsAndFunctions);
 
       //Generate a HAVING clause for group by query
-      String havingClause = createHavingClause(aggregationColumns, arrayOfAggregationColumnsAndFunctions);
+      String havingClause = createHavingClause(arrayOfAggregationColumnsAndFunctions);
 
       // Generate a result limit of at most MAX_RESULT_LIMIT.
       TopQueryFragment top = new TopQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
 
       return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, top, havingClause);
     }
-    private String createHavingClause(List<String> aggregationColumns,
-        ArrayList<String> arrayOfAggregationColumnsAndFunctions) {
+
+    private String createHavingClause( ArrayList<String> arrayOfAggregationColumnsAndFunctions) {
       String havingClause = new String();
       int numOfFunctionsInSelectList = arrayOfAggregationColumnsAndFunctions.size();
       int aggregationFunctionCount = RANDOM.nextInt(numOfFunctionsInSelectList);
@@ -797,7 +797,7 @@ public class QueryGenerator {
         if (havingPredicate.startsWith("COUNT") || havingPredicate.startsWith("DISTINCTCOUNT")) {
           functionValue = Integer.toString(RANDOM.nextInt(MAX_COUNT_FUNCTION_RESULT) + 1);
         } else {
-          functionValue = pickRandom(_columnToValueList.get(aggregationColumns.get(aggregationFunctionIndex)));
+          functionValue = Float.toString(RANDOM.nextFloat());
         }
         havingPredicate = joinWithSpaces(havingPredicate, functionValue);
         aggregationPredicates.add(havingPredicate);
@@ -813,12 +813,11 @@ public class QueryGenerator {
         for (int i = 1; i < aggregationFunctionCount; i++) {
           String operator = pickRandom(BOOLEAN_OPERATORS);
           havingClause = joinWithSpaces(havingClause, operator);
-          havingClause = joinWithSpaces(havingClause,aggregationPredicates.get(i));
+          havingClause = joinWithSpaces(havingClause, aggregationPredicates.get(i));
         }
       }
       return havingClause;
     }
-
   }
 
   /**

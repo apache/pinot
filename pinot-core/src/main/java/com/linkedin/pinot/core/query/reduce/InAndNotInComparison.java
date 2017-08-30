@@ -42,28 +42,32 @@ public class InAndNotInComparison extends ComparisonFunction {
 
   @Override
   public boolean isComparisonValid(String aggResult) {
-    BigDecimal baseValue = new BigDecimal(aggResult);
-    int size = _values.length;
+    try {
+      BigDecimal baseValue = new BigDecimal(aggResult);
+      int size = _values.length;
 
-    int i;
-    for (i = 0; i < size; i++) {
-      if (baseValue.compareTo(_values[i]) == 0) {
-        break;
+      int i;
+      for (i = 0; i < size; i++) {
+        if (baseValue.compareTo(_values[i]) == 0) {
+          break;
+        }
       }
-    }
 
-    if (!_isItNotIn) {
-      if (i < size) {
-        return true;
+      if (!_isItNotIn) {
+        if (i < size) {
+          return true;
+        } else {
+          return false;
+        }
       } else {
-        return false;
+        if (i < size) {
+          return false;
+        } else {
+          return true;
+        }
       }
-    } else {
-      if (i < size) {
-        return false;
-      } else {
-        return true;
-      }
+    } catch (Exception e) {
+      return false;
     }
   }
 }

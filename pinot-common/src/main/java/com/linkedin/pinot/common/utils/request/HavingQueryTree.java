@@ -21,31 +21,35 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import java.util.List;
 
 
-public class HavingQueryTree extends  QueryTree{
-  private final AggregationInfo _aggregationInfo;
+public class HavingQueryTree extends QueryTree {
   final List<HavingQueryTree> _children;
+  private final AggregationInfo _aggregationInfo;
 
-
-  public HavingQueryTree(AggregationInfo aggregationInfo, List<String> value,FilterOperator operator, List<HavingQueryTree> children) {
+  public HavingQueryTree(AggregationInfo aggregationInfo, List<String> value, FilterOperator operator,
+      List<HavingQueryTree> children) {
     this._id = System.identityHashCode(this);
-    this._value=value;
-    this._aggregationInfo=aggregationInfo;
+    this._value = value;
+    this._aggregationInfo = aggregationInfo;
     this._operator = operator;
     this._children = children;
   }
 
-  public HavingQueryTree(int id, AggregationInfo aggregationInfo, List<String> value,FilterOperator operator,
+  public HavingQueryTree(int id, AggregationInfo aggregationInfo, List<String> value, FilterOperator operator,
       List<HavingQueryTree> children) {
     this._id = id;
-    this._value=value;
-    this._aggregationInfo=aggregationInfo;
+    this._value = value;
+    this._aggregationInfo = aggregationInfo;
     this._operator = operator;
     this._children = children;
   }
 
-  public List<HavingQueryTree> getChildren() {  return _children;  }
+  public List<HavingQueryTree> getChildren() {
+    return _children;
+  }
 
-  public AggregationInfo getAggregationInfo() { return _aggregationInfo;  }
+  public AggregationInfo getAggregationInfo() {
+    return _aggregationInfo;
+  }
 
   @Override
   public String toString() {
@@ -62,7 +66,17 @@ public class HavingQueryTree extends  QueryTree{
     if (_operator == FilterOperator.OR || _operator == FilterOperator.AND) {
       stringBuffer.append(_operator).append(" (").append(_id).append(")");
     } else {
-      stringBuffer.append(_aggregationInfo.getAggregationType()).append("(").append(_aggregationInfo.getAggregationParams().toString()).append(")").append(" ").append(_operator).append(" ").append(_value).append(" (").append(_id).append(")");
+      stringBuffer.append(_aggregationInfo.getAggregationType())
+          .append("(")
+          .append(_aggregationInfo.getAggregationParams().toString())
+          .append(")")
+          .append(" ")
+          .append(_operator)
+          .append(" ")
+          .append(_value)
+          .append(" (")
+          .append(_id)
+          .append(")");
     }
     if (_children != null) {
       for (QueryTree child : _children) {

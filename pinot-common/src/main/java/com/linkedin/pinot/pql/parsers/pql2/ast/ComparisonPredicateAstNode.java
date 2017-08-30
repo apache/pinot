@@ -41,6 +41,9 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
     return _operand;
   }
 
+  public String getValue() {
+    return _literal.getValueAsString();
+  }
   public FunctionCallAstNode getFunction() {
     return _function;
   }

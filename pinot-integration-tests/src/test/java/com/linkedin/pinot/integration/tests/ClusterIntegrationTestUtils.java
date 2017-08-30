@@ -482,11 +482,6 @@ public class ClusterIntegrationTestUtils {
     JSONObject pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pqlQuery);
 
-    //Skip comparison for HAVING queries with null response; mainly because of CLOSE policy
-    if(pqlQuery.contains("HAVING") && pinotResponse==null){
-      return;
-    }
-
     // Skip comparison if SQL queries are not specified
     if (sqlQueries == null) {
       return;

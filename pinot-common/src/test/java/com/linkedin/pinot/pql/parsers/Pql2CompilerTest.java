@@ -135,17 +135,16 @@ public class Pql2CompilerTest {
  @Test
   public void testCompilationWithHaving() {
     Pql2Compiler compiler = new Pql2Compiler();
-    BrokerRequest brokerRequest= compiler.compileToBrokerRequest("select count(*) as count from potato having count(*) = 10");
-    // TODO
+    BrokerRequest brokerRequest= compiler.compileToBrokerRequest("select avg(age) as avg_age from person group by address_city having avg(age)=20");
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.EQUALITY);
-    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0), "10");
-
-    brokerRequest= compiler.compileToBrokerRequest("select count(*) as count from potato having count(*) > 0 AND count(*) < 45");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationType(), "avg");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"), "age");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0), "20");
+    brokerRequest= compiler.compileToBrokerRequest("select count(*) as count from sell group by price having count(*) > 100 AND count(*)<200");
     Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size() , 3);
-
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(),FilterOperator.AND);
     brokerRequest= compiler.compileToBrokerRequest("select count(*) as count, avg(price) as avgprice from potato having count(*) > 0 OR (avg(price) < 45 AND count(*) > 22)");
     Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size() , 5);
-
    }
 
   @Test

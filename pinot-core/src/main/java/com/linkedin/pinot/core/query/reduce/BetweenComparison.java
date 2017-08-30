@@ -37,10 +37,14 @@ public class BetweenComparison extends ComparisonFunction {
 
   @Override
   public boolean isComparisonValid(String aggResult) {
-    BigDecimal middleValue = new BigDecimal(aggResult);
-    if ((middleValue.compareTo(_leftValue) >= 0) && (middleValue.compareTo(_rightValue) <= 0)) {
-      return true;
-    } else {
+    try {
+      BigDecimal middleValue = new BigDecimal(aggResult);
+      if ((middleValue.compareTo(_leftValue) >= 0) && (middleValue.compareTo(_rightValue) <= 0)) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (Exception e) {
       return false;
     }
   }

@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 public class GreaterThanComparison extends ComparisonFunction {
   private BigDecimal _rightValue;
 
-  public GreaterThanComparison(String rightValue,AggregationInfo aggregationInfo) {
+  public GreaterThanComparison(String rightValue, AggregationInfo aggregationInfo) {
     this._rightValue = new BigDecimal(rightValue);
 
     if (!aggregationInfo.getAggregationParams().get("column").equals("*")) {
@@ -35,10 +35,14 @@ public class GreaterThanComparison extends ComparisonFunction {
 
   @Override
   public boolean isComparisonValid(String aggResult) {
-    BigDecimal leftValue = new BigDecimal(aggResult);
-    if (leftValue.compareTo(_rightValue) > 0) {
-      return true;
-    } else {
+    try {
+      BigDecimal leftValue = new BigDecimal(aggResult);
+      if (leftValue.compareTo(_rightValue) > 0) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (Exception e) {
       return false;
     }
   }

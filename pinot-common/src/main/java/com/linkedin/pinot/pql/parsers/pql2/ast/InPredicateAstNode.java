@@ -33,8 +33,8 @@ import java.util.TreeSet;
 public class InPredicateAstNode extends PredicateAstNode {
   private static final String DELIMITER = "\t\t";
   private final boolean _isNotInClause;
-  private String _identifier;
   private final boolean _splitInClause;
+  private String _identifier;
   private FunctionCallAstNode _function;
 
   public InPredicateAstNode(boolean isNotInClause, boolean splitInClause) {
@@ -50,6 +50,16 @@ public class InPredicateAstNode extends PredicateAstNode {
     }
   }
 
+  public ArrayList<String> getValues() {
+    ArrayList<String> values = new ArrayList<String>();
+    for (AstNode astNode : getChildren()) {
+      if (astNode instanceof LiteralAstNode) {
+        LiteralAstNode node = (LiteralAstNode) astNode;
+        values.add(node.getValueAsString());
+      }
+    }
+    return values;
+  }
 
   @Override
   public void addChild(AstNode childNode) {
@@ -73,7 +83,6 @@ public class InPredicateAstNode extends PredicateAstNode {
     } else {
       super.addChild(childNode);
     }
-
   }
 
   public String getIdentifier() {
@@ -96,23 +105,19 @@ public class InPredicateAstNode extends PredicateAstNode {
     if (_identifier == null) {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
-
     Set<String> values = new HashSet<>();
-
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
         values.add(node.getValueAsString());
       }
     }
-
     FilterOperator filterOperator;
     if (_isNotInClause) {
       filterOperator = FilterOperator.NOT_IN;
     } else {
       filterOperator = FilterOperator.IN;
     }
-
     if (_splitInClause) {
       return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
     } else {
@@ -124,20 +129,16 @@ public class InPredicateAstNode extends PredicateAstNode {
 
   @Override
   public HavingQueryTree buildHavingQueryTree() {
-    //return (HavingQueryTree)buildQueryTree (true);
     if (_function == null) {
       throw new Pql2CompilationException("IN predicate has no function");
     }
-
     TreeSet<String> values = new TreeSet<>();
-
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
         values.add(node.getValueAsString());
       }
     }
-
     String[] valueArray = values.toArray(new String[values.size()]);
     FilterOperator filterOperator;
     if (_isNotInClause) {
@@ -152,5 +153,4 @@ public class InPredicateAstNode extends PredicateAstNode {
   public FunctionCallAstNode getFunction() {
     return _function;
   }
-
 }

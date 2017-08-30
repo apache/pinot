@@ -58,6 +58,14 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
     return _identifier;
   }
 
+  public String getLeftValue() {
+    return ((LiteralAstNode) getChildren().get(0)).getValueAsString();
+  }
+
+  public String getRightValue() {
+    return ((LiteralAstNode) getChildren().get(1)).getValueAsString();
+  }
+
   @Override
   public String toString() {
     if (_identifier != null) {
@@ -71,12 +79,9 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
 
   @Override
   public FilterQueryTree buildFilterQueryTree() {
-
-    //return (FilterQueryTree)buildQueryTree (false);
     if (_identifier == null) {
       throw new Pql2CompilationException("Between predicate has no identifier");
     }
-
     if (getChildren().size() == 2) {
       try {
         LiteralAstNode left = (LiteralAstNode) getChildren().get(0);

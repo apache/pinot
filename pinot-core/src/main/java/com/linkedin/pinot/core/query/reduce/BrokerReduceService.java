@@ -457,7 +457,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           new AggregationGroupByTrimmingService(finalAggregationFunctions, (int) groupBy.getTopN());
       List<GroupByResult>[] groupByResultLists = aggregationGroupByTrimmingService.trimFinalResults(finalOutResultMaps);
       List<AggregationResult> aggregationResults = new ArrayList<>(count);
-      for (int i = 0; i < count; i++) {
+      for (int i = 0; i < aggregationNumsInFinalResult; i++) {
         List<GroupByResult> groupByResultList = groupByResultLists[i];
         List<String> groupByColumns = groupBy.getExpressions();
         if (groupByColumns == null) {

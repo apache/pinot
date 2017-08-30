@@ -35,10 +35,14 @@ public class GreaterEqualComparison extends ComparisonFunction {
 
   @Override
   public boolean isComparisonValid(String aggResult) {
-    BigDecimal leftValue = new BigDecimal(aggResult);
-    if (leftValue.compareTo(_rightValue) >= 0) {
-      return true;
-    } else {
+    try {
+      BigDecimal leftValue = new BigDecimal(aggResult);
+      if (leftValue.compareTo(_rightValue) >= 0) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (Exception e) {
       return false;
     }
   }

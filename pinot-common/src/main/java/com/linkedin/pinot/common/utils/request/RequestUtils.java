@@ -39,9 +39,6 @@ public class RequestUtils {
   public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
   private static final String USE_STAR_TREE_KEY = "useStarTree";
 
-  private RequestUtils() {
-  }
-
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
    * @param filterQueryTree
@@ -96,18 +93,18 @@ public class RequestUtils {
 
   private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree tree,
       Map<Integer, HavingFilterQuery> filterQueryMap) {
-    final List<Integer> f = new ArrayList<Integer>();
+    final List<Integer> filterIds = new ArrayList<Integer>();
     if (null != tree.getChildren()) {
-      for (final HavingQueryTree c : tree.getChildren()) {
-        f.add(c.getId());
-        final HavingFilterQuery q = traverseHavingFilterQueryAndPopulateMap(c, filterQueryMap);
-        filterQueryMap.put(c.getId(), q);
+      for (final HavingQueryTree child : tree.getChildren()) {
+        filterIds.add(child.getId());
+        final HavingFilterQuery filterQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap);
+        filterQueryMap.put(child.getId(), filterQuery);
       }
     }
     HavingFilterQuery query = new HavingFilterQuery();
-    query.setAggregationInfo(((HavingQueryTree) tree).getAggregationInfo());
+    query.setAggregationInfo(tree.getAggregationInfo());
     query.setId(tree.getId());
-    query.setNestedFilterQueryIds(f);
+    query.setNestedFilterQueryIds(filterIds);
     query.setOperator(tree.getOperator());
     query.setValue(tree.getValue());
     return query;
@@ -227,7 +224,7 @@ public class RequestUtils {
           return false;
         }
         //only one predicate per column is supported
-        String column = (child).getColumn();
+        String column = child.getColumn();
         if (predicateColumns.contains(column)) {
           return false;
         }
