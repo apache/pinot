@@ -150,10 +150,21 @@ public class RealtimeSegmentStatsHistoryTest {
       history.getEstimatedCardinality("0");
     }
     // Now add a new column
+    boolean savedIsFull;
+    int savedCursor;
     {
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
       Assert.assertEquals(history.getEstimatedAvgColSize("new"), RealtimeSegmentStatsHistory.getDefaultEstAvgColSize());
       Assert.assertEquals(history.getEstimatedCardinality("new"), RealtimeSegmentStatsHistory.getDefaultEstCardinality());
+      savedIsFull = history.isFull();
+      savedCursor = history.getCursor();
+      history.save();
+    }
+    {
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      Assert.assertEquals(history.isFull(), savedIsFull);
+      Assert.assertEquals(history.getCursor(), savedCursor);
+
     }
   }
 
