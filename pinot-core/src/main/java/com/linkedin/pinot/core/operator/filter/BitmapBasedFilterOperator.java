@@ -92,7 +92,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     int length = dictionaryIds.length;
     List<ImmutableRoaringBitmap> bitmaps = new ArrayList<>(length);
     for (int dictionaryId : dictionaryIds) {
-      ImmutableRoaringBitmap bitmap = invertedIndex.getImmutable(dictionaryId);
+      ImmutableRoaringBitmap bitmap = (ImmutableRoaringBitmap) invertedIndex.getDocIds(dictionaryId);
       if (bitmap != null) {
         bitmaps.add(bitmap);
       }

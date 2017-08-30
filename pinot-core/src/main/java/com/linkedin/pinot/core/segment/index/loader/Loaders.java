@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
@@ -103,9 +104,9 @@ public class Loaders {
       SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, readMode);
       SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
       Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
-      for (String column : segmentMetadata.getColumnMetadataMap().keySet()) {
-        indexContainerMap.put(column,
-            ColumnIndexContainer.init(segmentReader, segmentMetadata.getColumnMetadataFor(column), indexLoadingConfig));
+      for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+        indexContainerMap.put(entry.getKey(),
+            new ColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
       }
 
       // Load star tree index if it exists

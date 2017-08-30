@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.core.realtime.converter.stats;
 
-import java.util.Arrays;
-import java.util.List;
-import org.apache.commons.lang.math.IntRange;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Block;
@@ -27,10 +22,15 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
+import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
+import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.commons.lang.math.IntRange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,7 +39,7 @@ import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 public class RealtimeColumnStatistics implements ColumnStatistics {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeColumnStatistics.class);
 
-  private final RealtimeColumnDataSource _dataSource;
+  private final ColumnDataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
   private final MutableDictionary _dictionaryReader;
   private final Block _block;
@@ -48,11 +48,11 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   private int partitionRangeStart = Integer.MAX_VALUE;
   private int partitionRangeEnd = Integer.MIN_VALUE;
 
-  public RealtimeColumnStatistics(RealtimeColumnDataSource dataSource, int[] sortedDocIdIterationOrder,
+  public RealtimeColumnStatistics(ColumnDataSource dataSource, int[] sortedDocIdIterationOrder,
       ColumnPartitionConfig columnPartitionConfig) {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
-    _dictionaryReader = dataSource.getDictionary();
+    _dictionaryReader = (MutableDictionary) dataSource.getDictionary();
     _block = dataSource.getNextBlock();
     if (columnPartitionConfig != null) {
       String functionName = columnPartitionConfig.getFunctionName();
@@ -115,7 +115,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
     }
 
     // Iterate over all data to figure out whether or not it's in sorted order
-    SingleColumnSingleValueReader singleValueReader = ((RealtimeSingleValueBlock) _block).getReader();
+    SingleColumnSingleValueReader singleValueReader = ((SingleValueBlock) _block).getReader();
 
     int docIdIndex = _sortedDocIdIterationOrder != null ? _sortedDocIdIterationOrder[0] : 0;
     int dictionaryId = singleValueReader.getInt(docIdIndex);

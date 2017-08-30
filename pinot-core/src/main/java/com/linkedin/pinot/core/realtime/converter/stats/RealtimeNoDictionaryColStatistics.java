@@ -16,15 +16,15 @@
 
 package com.linkedin.pinot.core.realtime.converter.stats;
 
-import java.util.List;
-import org.apache.commons.lang.math.IntRange;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import java.util.List;
+import org.apache.commons.lang.math.IntRange;
 
 
 public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
@@ -34,7 +34,7 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   Object _minValue;
   Object _maxValue;
 
-  public RealtimeNoDictionaryColStatistics(RealtimeColumnDataSource dataSource) {
+  public RealtimeNoDictionaryColStatistics(ColumnDataSource dataSource) {
     Block block = dataSource.getNextBlock();
     _numDocIds = block.getMetadata().getEndDocId() + 1;
     _blockValSet = block.getBlockValueSet();

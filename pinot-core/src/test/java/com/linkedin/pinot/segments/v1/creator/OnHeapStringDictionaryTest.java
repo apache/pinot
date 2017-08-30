@@ -28,6 +28,10 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapStringDictionary;
+import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -77,11 +81,9 @@ public class OnHeapStringDictionaryTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(COLUMN_NAME);
     SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, ReadMode.mmap);
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
-
-    ImmutableDictionaryReader offHeapDictionary =
-        ColumnIndexContainer.loadDictionary(columnMetadata, segmentReader, false);
-    ImmutableDictionaryReader onHeapDictionary =
-        ColumnIndexContainer.loadDictionary(columnMetadata, segmentReader, true);
+    PinotDataBuffer dictionaryBuffer = segmentReader.getIndexFor(COLUMN_NAME, ColumnIndexType.DICTIONARY);
+    ImmutableDictionaryReader offHeapDictionary = new StringDictionary(dictionaryBuffer, columnMetadata);
+    ImmutableDictionaryReader onHeapDictionary = new OnHeapStringDictionary(dictionaryBuffer, columnMetadata);
 
     int numElements = offHeapDictionary.length();
     Assert.assertEquals(onHeapDictionary.length(), numElements, "Dictionary length mis-match");

@@ -15,10 +15,33 @@
  */
 package com.linkedin.pinot.core.realtime;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.predicate.EqPredicate;
+import com.linkedin.pinot.core.common.predicate.NEqPredicate;
+import com.linkedin.pinot.core.common.predicate.RangePredicate;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
+import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
+import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import com.linkedin.pinot.core.realtime.impl.kafka.RealtimeSegmentImplTest;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,31 +51,6 @@ import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.common.predicate.NEqPredicate;
-import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
-import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
-import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.RealtimeSegmentImplTest;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
-import com.yammer.metrics.core.MetricsRegistry;
 
 import static org.mockito.Mockito.*;
 
@@ -119,30 +117,6 @@ public class RealtimeSegmentTest {
       row = provider.next(row);
     }
     provider.shutdown();
-  }
-
-  @Test
-  public void test1() throws Exception {
-    DataSource ds = segmentWithInvIdx.getDataSource("column1");
-    Block b = ds.nextBlock();
-    BlockValSet set = b.getBlockValueSet();
-    BlockSingleValIterator it = (BlockSingleValIterator) set.iterator();
-    BlockMetadata metadata = b.getMetadata();
-    while (it.next()) {
-      int dicId = it.nextIntVal();
-    }
-  }
-
-  @Test
-  public void test2() throws Exception {
-    DataSource ds = segmentWithoutInvIdx.getDataSource("column1");
-    Block b = ds.nextBlock();
-    BlockValSet set = b.getBlockValueSet();
-    BlockSingleValIterator it = (BlockSingleValIterator) set.iterator();
-    BlockMetadata metadata = b.getMetadata();
-    while (it.next()) {
-      int dicId = it.nextIntVal();
-    }
   }
 
   @Test

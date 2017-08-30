@@ -17,15 +17,12 @@ package com.linkedin.pinot.core.realtime.impl;
 
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import com.linkedin.pinot.core.data.readers.RecordReader;
@@ -35,11 +32,11 @@ import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.realtime.RealtimeSegment;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import com.linkedin.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.startree.StarTree;
 import java.io.IOException;
@@ -376,23 +373,11 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public RealtimeColumnDataSource getDataSource(String columnName) {
-    FieldSpec fieldSpec = dataSchema.getFieldSpecFor(columnName);
-
-    if (fieldSpec.getFieldType() == FieldType.METRIC) {
-      return new RealtimeColumnDataSource(fieldSpec, columnIndexReaderWriterMap.get(columnName),
-          invertedIndexMap.get(columnName), docIdSearchableOffset, -1, dataSchema, dictionaryMap.get(columnName));
-    }
-
-    return new RealtimeColumnDataSource(fieldSpec, columnIndexReaderWriterMap.get(columnName),
-        invertedIndexMap.get(columnName), docIdSearchableOffset, maxNumberOfMultivaluesMap.get(columnName), dataSchema,
-        dictionaryMap.get(columnName));
-  }
-
-  public DataSource getDataSource(String columnName, Predicate p) {
-    DataSource ds = getDataSource(columnName);
-    ds.setPredicate(p);
-    return ds;
+  public ColumnDataSource getDataSource(String columnName) {
+    // Because document id searchable offset is inclusive, number of documents is 1 larger than it
+    return new ColumnDataSource(dataSchema.getFieldSpecFor(columnName), docIdSearchableOffset + 1,
+        maxNumberOfMultivaluesMap.get(columnName), columnIndexReaderWriterMap.get(columnName),
+        invertedIndexMap.get(columnName), dictionaryMap.get(columnName));
   }
 
   @Override
@@ -459,11 +444,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     columnIndexReaderWriterMap.clear();
 
     for (RealtimeInvertedIndexReader index : invertedIndexMap.values()) {
-      try {
-        index.close();
-      } catch (IOException e) {
-        LOGGER.error("Failed to close inverted index. Service will continue with memory leaks, error: ", e);
-      }
+      index.close();
     }
 
     for (Map.Entry<String, MutableDictionary> entry : dictionaryMap.entrySet()) {
@@ -499,7 +480,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+      intIterators[i] = index.getDocIds(dictionary.indexOf(rawValues.get(i))).getIntIterator();
     }
     return intIterators;
   }
@@ -523,7 +504,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValuesArr.length; i++) {
-      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValuesArr[i])).getIntIterator();
+      intIterators[i] = index.getDocIds(dictionary.indexOf(rawValuesArr[i])).getIntIterator();
     }
     return intIterators;
   }
@@ -545,7 +526,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+      intIterators[i] = index.getDocIds(dictionary.indexOf(rawValues.get(i))).getIntIterator();
     }
     return intIterators;
   }
@@ -567,7 +548,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+      intIterators[i] = index.getDocIds(dictionary.indexOf(rawValues.get(i))).getIntIterator();
     }
     return intIterators;
   }
@@ -589,7 +570,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         (System.currentTimeMillis() - start));
 
     for (int i = 0; i < rawValues.size(); i++) {
-      intIterators[i] = index.getImmutable(dictionary.indexOf(rawValues.get(i))).getIntIterator();
+      intIterators[i] = index.getDocIds(dictionary.indexOf(rawValues.get(i))).getIntIterator();
     }
     return intIterators;
   }

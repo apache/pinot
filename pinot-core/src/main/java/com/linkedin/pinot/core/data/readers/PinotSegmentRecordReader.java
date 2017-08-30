@@ -16,27 +16,22 @@
 package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
@@ -49,176 +44,115 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 /**
- * Record reader to read pinot segment and generate GenericRows
+ * Record reader for Pinot segment.
  */
 public class PinotSegmentRecordReader extends BaseRecordReader {
+  private final SegmentMetadataImpl _segmentMetadata;
+  private final int _numRows;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRecordReader.class);
+  private final Map<String, Dictionary> _dictionaryMap = new HashMap<>();
+  private final Map<String, SingleColumnSingleValueReader> _singleValueReaderMap = new HashMap<>();
+  private final Map<String, SingleColumnMultiValueReader> _multiValueReaderMap = new HashMap<>();
+  private final int[] _multiValueBuffer;
 
-  private SegmentMetadataImpl segmentMetadata;
-  private int totalDocs;
-  private Set<String> columns;
+  private int _nextRow;
 
-  private Map<String, SingleColumnSingleValueReader> singleValueReaderMap;
-  private Map<String, SingleColumnMultiValueReader> multiValueReaderMap;
-  private Map<String, SortedForwardIndexReader> singleValueSortedReaderMap;
+  public PinotSegmentRecordReader(File indexDir) throws IOException, ConfigurationException {
+    _segmentMetadata = new SegmentMetadataImpl(indexDir);
+    _numRows = _segmentMetadata.getTotalDocs();
 
-  private Map<String, Dictionary> pinotDictionaryBufferMap;
-
-  private Map<String, DataType> columnDataTypeMap;
-  private Map<String, int[]> multiValueArrayMap;
-
-  private Map<String, Boolean> isSingleValueMap;
-  private Map<String, Boolean> isSortedMap;
-
-  private int docNumber;
-
-  public PinotSegmentRecordReader(File segmentIndexDir)  throws IOException, ConfigurationException {
-
-    segmentMetadata = new SegmentMetadataImpl(segmentIndexDir);
-    SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentIndexDir, segmentMetadata, ReadMode.heap);
-
-    totalDocs = segmentMetadata.getTotalDocs();
-    columns = segmentMetadata.getAllColumns();
-
+    SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, _segmentMetadata, ReadMode.mmap);
     Reader reader = segmentDirectory.createReader();
-    singleValueReaderMap = new HashMap<>();
-    multiValueReaderMap = new HashMap<>();
-    singleValueSortedReaderMap = new HashMap<>();
 
-    pinotDictionaryBufferMap = new HashMap<>();
-    columnDataTypeMap = new HashMap<>();
-    multiValueArrayMap = new HashMap<>();
+    int maxNumMultiValues = 0;
+    for (Entry<String, ColumnMetadata> entry : _segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String columnName = entry.getKey();
+      ColumnMetadata columnMetadata = entry.getValue();
 
-    isSingleValueMap = new HashMap<>();
-    isSortedMap = new HashMap<>();
-
-    for (String column : columns) {
-
-      ColumnMetadata columnMetadataFor = segmentMetadata.getColumnMetadataFor(column);
-
-      isSingleValueMap.put(column, columnMetadataFor.isSingleValue());
-      isSortedMap.put(column, columnMetadataFor.isSorted());
-
-      if (columnMetadataFor.isSingleValue() && !columnMetadataFor.isSorted()) {
-        PinotDataBuffer fwdIndexBuffer = reader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
-        SingleColumnSingleValueReader fwdIndexReader =
-            new FixedBitSingleValueReader(fwdIndexBuffer, totalDocs, columnMetadataFor.getBitsPerElement());
-        singleValueReaderMap.put(column, fwdIndexReader);
-      } else if (columnMetadataFor.isSingleValue() && columnMetadataFor.isSorted()) {
-        PinotDataBuffer dataBuffer = reader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
-        FixedByteSingleValueMultiColReader indexReader =
-            new FixedByteSingleValueMultiColReader(dataBuffer, columnMetadataFor.getCardinality(), new int[]{4, 4});
-        SortedForwardIndexReader fwdIndexReader = new SortedForwardIndexReader(indexReader, totalDocs);
-        singleValueSortedReaderMap.put(column, fwdIndexReader);
-      } else {
-        PinotDataBuffer fwdIndexBuffer = reader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
-        SingleColumnMultiValueReader fwdIndexReader =
-            new FixedBitMultiValueReader(fwdIndexBuffer, totalDocs, columnMetadataFor.getTotalNumberOfEntries(),
-                columnMetadataFor.getBitsPerElement());
-        multiValueReaderMap.put(column, fwdIndexReader);
-      }
-      DataType dataType = columnMetadataFor.getDataType();
-      PinotDataBuffer dictionaryBuffer = reader.getIndexFor(column, ColumnIndexType.DICTIONARY);
-
-      switch (dataType) {
-        case BOOLEAN:
-          pinotDictionaryBufferMap.put(column, new StringDictionary(dictionaryBuffer, columnMetadataFor));
-          break;
-        case DOUBLE:
-          pinotDictionaryBufferMap.put(column, new DoubleDictionary(dictionaryBuffer, columnMetadataFor));
-          break;
-        case FLOAT:
-          pinotDictionaryBufferMap.put(column, new FloatDictionary(dictionaryBuffer, columnMetadataFor));
-          break;
+      PinotDataBuffer dictionaryBuffer = reader.getIndexFor(columnName, ColumnIndexType.DICTIONARY);
+      switch (columnMetadata.getDataType()) {
         case INT:
-          pinotDictionaryBufferMap.put(column, new IntDictionary(dictionaryBuffer, columnMetadataFor));
+          _dictionaryMap.put(columnName, new IntDictionary(dictionaryBuffer, columnMetadata));
           break;
         case LONG:
-          pinotDictionaryBufferMap.put(column, new LongDictionary(dictionaryBuffer, columnMetadataFor));
+          _dictionaryMap.put(columnName, new LongDictionary(dictionaryBuffer, columnMetadata));
+          break;
+        case FLOAT:
+          _dictionaryMap.put(columnName, new FloatDictionary(dictionaryBuffer, columnMetadata));
+          break;
+        case DOUBLE:
+          _dictionaryMap.put(columnName, new DoubleDictionary(dictionaryBuffer, columnMetadata));
           break;
         case STRING:
-          pinotDictionaryBufferMap.put(column, new StringDictionary(dictionaryBuffer, columnMetadataFor));
+          _dictionaryMap.put(columnName, new StringDictionary(dictionaryBuffer, columnMetadata));
           break;
-        case INT_ARRAY:
-        case BYTE:
-        case BYTE_ARRAY:
-        case CHAR:
-        case CHAR_ARRAY:
-        case DOUBLE_ARRAY:
-        case FLOAT_ARRAY:
-        case LONG_ARRAY:
-        case OBJECT:
-        case SHORT:
-        case SHORT_ARRAY:
-        case STRING_ARRAY:
         default:
-          LOGGER.error("Unsupported data type {}", dataType);
-          break;
+          throw new IllegalStateException();
       }
-      if (!isSingleValueMap.get(column)) {
-        int[] intArray = new int[columnMetadataFor.getMaxNumberOfMultiValues()];
-        multiValueArrayMap.put(column, intArray);
+
+      PinotDataBuffer forwardIndexBuffer = reader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+      if (columnMetadata.isSingleValue()) {
+        if (columnMetadata.isSorted()) {
+          _singleValueReaderMap.put(columnName,
+              new SortedIndexReader(forwardIndexBuffer, columnMetadata.getCardinality()));
+        } else {
+          _singleValueReaderMap.put(columnName,
+              new FixedBitSingleValueReader(forwardIndexBuffer, _numRows, columnMetadata.getBitsPerElement()));
+        }
+      } else {
+        _multiValueReaderMap.put(columnName,
+            new FixedBitMultiValueReader(forwardIndexBuffer, _numRows, columnMetadata.getTotalNumberOfEntries(),
+                columnMetadata.getBitsPerElement()));
+        maxNumMultiValues = Math.max(maxNumMultiValues, columnMetadata.getMaxNumberOfMultiValues());
       }
-      columnDataTypeMap.put(column, dataType);
     }
-  }
-
-
-  @Override
-  public void init() throws Exception {
-    docNumber = 0;
+    _multiValueBuffer = new int[maxNumMultiValues];
   }
 
   @Override
-  public void rewind() throws Exception {
-    init();
+  public void init() {
+    _nextRow = 0;
   }
 
+  @Override
+  public void rewind() {
+    _nextRow = 0;
+  }
 
   @Override
   public boolean hasNext() {
-    return docNumber < totalDocs;
+    return _nextRow < _numRows;
   }
 
   @Override
   public Schema getSchema() {
-
     Schema schema = new Schema();
-    schema.setSchemaName(segmentMetadata.getName());
+    schema.setSchemaName(_segmentMetadata.getTableName());
 
-    for (String column : columns) {
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      String columnName = columnMetadata.getColumnName();
+    for (Entry<String, ColumnMetadata> entry : _segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String columnName = entry.getKey();
+      ColumnMetadata columnMetadata = entry.getValue();
       DataType dataType = columnMetadata.getDataType();
-      FieldType fieldType = columnMetadata.getFieldType();
-      FieldSpec fieldSpec = null;
 
-      switch (fieldType) {
+      switch (columnMetadata.getFieldType()) {
         case DIMENSION:
-          boolean isSingleValue = columnMetadata.isSingleValue();
-          fieldSpec = new DimensionFieldSpec(columnName, dataType, isSingleValue);
+          schema.addField(new DimensionFieldSpec(columnName, dataType, columnMetadata.isSingleValue()));
           break;
         case METRIC:
-          fieldSpec = new MetricFieldSpec(columnName, dataType);
+          schema.addField(new MetricFieldSpec(columnName, dataType));
           break;
         case TIME:
-          TimeUnit timeType = columnMetadata.getTimeUnit();
-          TimeGranularitySpec incomingGranularitySpec = new TimeGranularitySpec(dataType, timeType, columnName);
-          fieldSpec = new TimeFieldSpec(incomingGranularitySpec);
+          schema.addField(new TimeFieldSpec(columnName, dataType, columnMetadata.getTimeUnit()));
           break;
         default:
-          break;
+          throw new IllegalStateException();
       }
-      schema.addField(fieldSpec);
     }
+
     return schema;
   }
 
@@ -229,61 +163,35 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
 
   @Override
   public GenericRow next(GenericRow row) {
-    for (String column : columns) {
-      Dictionary dictionary = pinotDictionaryBufferMap.get(column);
-
-      if (isSingleValueMap.get(column)) {
-        // Single-value column.
-        if (!isSortedMap.get(column)) {
-          row.putField(column, dictionary.get(singleValueReaderMap.get(column).getInt(docNumber)));
-        } else {
-          row.putField(column, dictionary.get(singleValueSortedReaderMap.get(column).getInt(docNumber)));
-        }
+    for (Entry<String, Dictionary> entry : _dictionaryMap.entrySet()) {
+      String columnName = entry.getKey();
+      Dictionary dictionary = entry.getValue();
+      if (_singleValueReaderMap.containsKey(columnName)) {
+        row.putField(columnName, dictionary.get(_singleValueReaderMap.get(columnName).getInt(_nextRow)));
       } else {
-        // Multi-value column.
-        int[] dictionaryIdArray = multiValueArrayMap.get(column);
-        int numValues = multiValueReaderMap.get(column).getIntArray(docNumber, dictionaryIdArray);
-
+        int numValues = _multiValueReaderMap.get(columnName).getIntArray(_nextRow, _multiValueBuffer);
         Object[] objectArray = new Object[numValues];
         for (int i = 0; i < numValues; i++) {
-          objectArray[i] = dictionary.get(dictionaryIdArray[i]);
+          objectArray[i] = dictionary.get(_multiValueBuffer[i]);
         }
-        row.putField(column, objectArray);
+        row.putField(columnName, objectArray);
       }
     }
-
-    docNumber++;
-
+    _nextRow++;
     return row;
   }
 
   @Override
   public void close() throws Exception {
-    for (Entry<String, Dictionary> entry : pinotDictionaryBufferMap.entrySet()) {
-      ImmutableDictionaryReader dictionary = (ImmutableDictionaryReader) entry.getValue();
-      if (dictionary != null) {
-        dictionary.close();
-      }
+    for (Dictionary dictionary : _dictionaryMap.values()) {
+      dictionary.close();
     }
-    for (Entry<String, SingleColumnSingleValueReader> entry : singleValueReaderMap.entrySet()) {
-      SingleColumnSingleValueReader reader = entry.getValue();
-      if (reader != null) {
-        reader.close();
-      }
+    for (SingleColumnSingleValueReader reader : _singleValueReaderMap.values()) {
+      reader.close();
     }
-    for (Entry<String, SortedForwardIndexReader> entry : singleValueSortedReaderMap.entrySet()) {
-      SortedForwardIndexReader reader = entry.getValue();
-      if (reader != null) {
-        reader.close();
-      }
+    for (SingleColumnMultiValueReader reader : _multiValueReaderMap.values()) {
+      reader.close();
     }
-    for (Entry<String, SingleColumnMultiValueReader> entry : multiValueReaderMap.entrySet()) {
-      SingleColumnMultiValueReader reader = entry.getValue();
-      if (reader != null) {
-        reader.close();
-      }
-    }
-    segmentMetadata.close();
+    _segmentMetadata.close();
   }
-
 }

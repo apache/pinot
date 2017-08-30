@@ -16,12 +16,10 @@
 package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 
 public abstract class DataSource extends BaseOperator {
-
-  public abstract boolean setPredicate(Predicate predicate);
 
   public abstract DataSourceMetadata getDataSourceMetadata();
 

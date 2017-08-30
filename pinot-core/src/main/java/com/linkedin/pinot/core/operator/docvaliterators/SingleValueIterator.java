@@ -15,18 +15,18 @@
  */
 package com.linkedin.pinot.core.operator.docvaliterators;
 
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 
 
-public final class MultiValueIterator extends BlockMultiValIterator {
-  private final SingleColumnMultiValueReader<? super ReaderContext> _reader;
+public final class SingleValueIterator extends BlockSingleValIterator {
+  private SingleColumnSingleValueReader<? super ReaderContext> _reader;
   private final int _numDocs;
   private final ReaderContext _context;
   private int _nextDocId;
 
-  public MultiValueIterator(SingleColumnMultiValueReader<? super ReaderContext> reader, int numDocs) {
+  public SingleValueIterator(SingleColumnSingleValueReader<? super ReaderContext> reader, int numDocs) {
     _reader = reader;
     _numDocs = numDocs;
     _context = _reader.createContext();
@@ -34,8 +34,28 @@ public final class MultiValueIterator extends BlockMultiValIterator {
   }
 
   @Override
-  public int nextIntVal(int[] intArray) {
-    return _reader.getIntArray(_nextDocId++, intArray, _context);
+  public int nextIntVal() {
+    return _reader.getInt(_nextDocId++, _context);
+  }
+
+  @Override
+  public long nextLongVal() {
+    return _reader.getLong(_nextDocId++, _context);
+  }
+
+  @Override
+  public float nextFloatVal() {
+    return _reader.getFloat(_nextDocId++, _context);
+  }
+
+  @Override
+  public double nextDoubleVal() {
+    return _reader.getDouble(_nextDocId++, _context);
+  }
+
+  @Override
+  public String nextStringVal() {
+    return _reader.getString(_nextDocId++, _context);
   }
 
   @Override

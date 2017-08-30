@@ -115,7 +115,7 @@ public class BitmapInvertedIndexCreatorTest {
         FileChannel.MapMode.READ_ONLY, "testing");
     BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(dataBuffer, cardinality);
     for (int i = 0; i < cardinality; i++) {
-      ImmutableRoaringBitmap bitmap = reader.getImmutable(i);
+      ImmutableRoaringBitmap bitmap = reader.getDocIds(i);
       Set<Integer> expected = postingListMap.get(i);
       Assert.assertEquals(bitmap.getCardinality(), expected.size());
       int[] actual = bitmap.toArray();

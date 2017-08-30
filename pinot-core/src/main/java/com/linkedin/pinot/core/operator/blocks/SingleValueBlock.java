@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -22,55 +23,55 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
-import com.linkedin.pinot.core.operator.docvalsets.SortedSingleValueSet;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
+import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.operator.docvalsets.SingleValueSet;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
-/**
- * Nov 15, 2014
- */
 
-public class SortedSingleValueBlock implements Block {
+public final class SingleValueBlock implements Block {
+  private final SingleColumnSingleValueReader<? super ReaderContext> _reader;
+  private final BlockValSet _blockValSet;
+  private final BlockMetadata _blockMetadata;
 
-  final SortedForwardIndexReader sVReader;
-  private final BlockId id;
-  private final BlockMetadata blockMetadata;
+  public SingleValueBlock(SingleColumnSingleValueReader<? super ReaderContext> reader, int numDocs,
+      FieldSpec.DataType dataType, Dictionary dictionary) {
+    _reader = reader;
+    _blockValSet = new SingleValueSet(reader, numDocs, dataType);
+    _blockMetadata = new BlockMetadataImpl(numDocs, true, 0, dataType, dictionary);
+  }
 
-  public SortedSingleValueBlock(BlockId id, SortedForwardIndexReader singleValueReader,
-      ImmutableDictionaryReader dictionaryReader, ColumnMetadata columnMetadata) {
-    sVReader = singleValueReader;
-    this.id = id;
-    this.blockMetadata = new BlockMetadataImpl(columnMetadata, dictionaryReader);
+  public SingleColumnSingleValueReader<? extends ReaderContext> getReader() {
+    return _reader;
   }
 
   @Override
   public BlockId getId() {
-    return id;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException("cannnot set predicate on blocks");
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException("cannnot getBlockDocIdSet on data source blocks");
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
-    return new SortedSingleValueSet(sVReader);
+    return _blockValSet;
   }
 
   @Override
   public BlockDocIdValueSet getBlockDocIdValueSet() {
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockMetadata getMetadata() {
-    return blockMetadata;
+    return _blockMetadata;
   }
 }
