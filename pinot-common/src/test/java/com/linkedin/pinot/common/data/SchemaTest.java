@@ -15,12 +15,15 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.SchemaUtils;
+
 import java.io.File;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -60,7 +63,10 @@ public class SchemaTest {
         + "  \"timeFieldSpec\":{"
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
         + "    \"defaultNullValue\":12345"
-        + "  }"
+        + "  },"
+        + "  \"dateTimeFieldSpecs\":["
+        + "    {\"name\":\"Date\", \"dataType\":\"LONG\", \"format\":\"1:MILLISECONDS:EPOCH\", \"granularity\":\"5:MINUTES\", \"dateTimeType\":\"PRIMARY\"}"
+        + "  ]"
         + "}";
   }
 
@@ -78,6 +84,7 @@ public class SchemaTest {
         .addMetric("derivedMetricWithDefault", DataType.FLOAT, 10, MetricFieldSpec.DerivedMetricType.HLL,
             defaultFloat.toString())
         .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
+        .addDateTime("dateTime", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", DateTimeType.PRIMARY)
         .build();
 
     FieldSpec fieldSpec;
@@ -134,6 +141,11 @@ public class SchemaTest {
     Assert.assertEquals(fieldSpec.isSingleValueField(), true);
     Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.LONG);
     Assert.assertEquals(fieldSpec.getDefaultNullValue(), Long.MIN_VALUE);
+
+    fieldSpec = schema.getDateTimeSpec("dateTime");
+    Assert.assertNotNull(fieldSpec);
+    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.LONG);
   }
 
   @Test

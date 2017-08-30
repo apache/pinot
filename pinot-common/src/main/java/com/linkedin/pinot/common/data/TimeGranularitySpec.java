@@ -17,7 +17,6 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
@@ -31,7 +30,7 @@ import org.joda.time.DateTime;
  * <p>- <code>DataType</code>: data type of the time column (e.g. INT, LONG).
  * <p>- <code>TimeType</code>: time unit of the time column (e.g. MINUTES, HOURS).
  * <p>- <code>TimeUnitSize</code>: size of the time buckets (e.g. 10 MINUTES, 2 HOURS). By default this is set to 1.
- * <p>- <code>TimeFormat</code>: Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
+ * <p>- <code>TimeFormat</code>: Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd
  * <p>- <code>Name</code>: name of the time column.
  * <p>E.g.
  * <p>If the time column is in millisecondsSinceEpoch, constructor can be invoked as:
@@ -44,25 +43,25 @@ import org.joda.time.DateTime;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TimeGranularitySpec {
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;
-  
+
   private DataType _dataType;
   private TimeUnit _timeType;
   private int _timeUnitSize = DEFAULT_TIME_UNIT_SIZE;
   private String _timeFormat = TimeFormat.EPOCH.toString();
   private String _name;
   /*
-   * Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
+   * Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd
    */
   public enum TimeFormat {
     EPOCH, //default
-    SIMPLE_DATE_FORMAT 
+    SIMPLE_DATE_FORMAT
   }
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public TimeGranularitySpec() {
   }
 
   /**
-   * 
+   *
    * @param dataType
    * @param timeType
    * @param name
@@ -76,10 +75,10 @@ public class TimeGranularitySpec {
     _name = name;
   }
   /**
-   * 
+   *
    * @param dataType
    * @param timeType
-   * @param timeFormat Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
+   * @param timeFormat Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd
    * @param name
    */
   public TimeGranularitySpec(@Nonnull DataType dataType, @Nonnull TimeUnit timeType, @Nonnull String timeFormat,
@@ -95,7 +94,7 @@ public class TimeGranularitySpec {
     _timeFormat = timeFormat;
   }
   /**
-   * 
+   *
    * @param dataType
    * @param timeUnitSize
    * @param timeType
@@ -113,11 +112,11 @@ public class TimeGranularitySpec {
   }
 
   /**
-   * 
+   *
    * @param dataType
    * @param timeUnitSize
    * @param timeType
-   * @param timeFormat Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd 
+   * @param timeFormat Can be either EPOCH (default) or SIMPLE_DATE_FORMAT:pattern e.g SIMPLE_DATE_FORMAT:yyyyMMdd
    * @param name
    */
   public TimeGranularitySpec(@Nonnull DataType dataType, int timeUnitSize, @Nonnull TimeUnit timeType,
@@ -133,7 +132,7 @@ public class TimeGranularitySpec {
     _name = name;
     _timeFormat = timeFormat;
   }
-  
+
   public DataType getDataType() {
     return _dataType;
   }
@@ -183,11 +182,11 @@ public class TimeGranularitySpec {
   public void setTimeFormat(String timeFormat) {
     this._timeFormat = timeFormat;
   }
-  
+
   public String getTimeFormat() {
     return _timeFormat;
   }
-  
+
   /**
    * Convert the units of time since epoch to {@link DateTime} format using current <code>TimeGranularitySpec</code>.
    */

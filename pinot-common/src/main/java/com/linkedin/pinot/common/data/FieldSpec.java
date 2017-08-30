@@ -150,6 +150,7 @@ public abstract class FieldSpec {
             break;
           case DIMENSION:
           case TIME:
+          case DATE_TIME:
             switch (_dataType) {
               case INT:
                 _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_INT;
@@ -189,12 +190,14 @@ public abstract class FieldSpec {
    * <p><code>DIMENSION</code>: columns used to filter records.
    * <p><code>METRIC</code>: columns used to apply aggregation on. <code>METRIC</code> field only contains numeric data.
    * <p><code>TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
+   * <p><code>DATE_TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
     DIMENSION,
     METRIC,
-    TIME
+    TIME,
+    DATE_TIME
   }
 
   /**
