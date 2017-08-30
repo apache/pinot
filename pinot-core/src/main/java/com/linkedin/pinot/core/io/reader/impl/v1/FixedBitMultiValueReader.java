@@ -43,6 +43,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  * </ul>
  */
 public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueReader<FixedBitMultiValueReader.Context> {
+  private static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
   private final PinotDataBuffer _dataBuffer;
@@ -59,12 +60,12 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
     _numValues = numValues;
     _numRowsPerChunk = (int) (Math.ceil((float) PREFERRED_NUM_VALUES_PER_CHUNK / (numValues / numRows)));
     int numChunks = (numRows + _numRowsPerChunk - 1) / _numRowsPerChunk;
-    int checkHeaderSize = numChunks * (Integer.SIZE / Byte.SIZE);
-    _chunkOffsetReader = new FixedByteIntReader(dataBuffer.view(0L, checkHeaderSize), numChunks);
-    int bitmapSize = (numValues + 7) / Byte.SIZE;
-    int endOffset = checkHeaderSize + bitmapSize;
-    _bitmapReader = new PinotDataBitSet(dataBuffer.view(checkHeaderSize, endOffset));
-    int rawDataSize = (numValues * numBitsPerValue + 7) / Byte.SIZE;
+    long endOffset = numChunks * INT_SIZE_IN_BYTES;
+    _chunkOffsetReader = new FixedByteIntReader(dataBuffer.view(0L, endOffset), numChunks);
+    int bitmapSize = (numValues + Byte.SIZE - 1) / Byte.SIZE;
+    _bitmapReader = new PinotDataBitSet(dataBuffer.view(endOffset, endOffset + bitmapSize));
+    endOffset += bitmapSize;
+    int rawDataSize = (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
     _rawDataReader =
         new FixedBitIntReader(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
   }

@@ -26,17 +26,18 @@ public final class FixedBitIntReader implements Closeable {
   private final int _numBitsPerValue;
 
   public FixedBitIntReader(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
-    Preconditions.checkState(dataBuffer.size() == (numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
+    Preconditions.checkState(
+        dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
     _dataBitSet = new PinotDataBitSet(dataBuffer);
     _numBitsPerValue = numBitsPerValue;
   }
 
   public int readInt(int index) {
-    return _dataBitSet.readInt(index * _numBitsPerValue, _numBitsPerValue);
+    return _dataBitSet.readInt(index, _numBitsPerValue);
   }
 
   public void readInt(int startIndex, int length, int[] buffer) {
-    _dataBitSet.readInt(startIndex * _numBitsPerValue, _numBitsPerValue, length, buffer);
+    _dataBitSet.readInt(startIndex, _numBitsPerValue, length, buffer);
   }
 
   @Override
