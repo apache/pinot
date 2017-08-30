@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -23,6 +24,7 @@ import com.linkedin.thirdeye.util.NumberUtils;
  */
 public class MetricTimeSeries {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetricTimeSeries.class);
+  private static final String NULL_NUMBER_TOSTRING_STRING = "null";
 
   // Mapping from timestamp to the value of metrics. (One value per metric and multiple metrics per timestamp.)
   private Map<Long, ByteBuffer> metricsValue;
@@ -86,6 +88,7 @@ public class MetricTimeSeries {
    *
    * @return the metric value if exists; otherwise, 0 is returned.
    */
+  @Deprecated
   public Number get(long timeWindow, String name) {
     return getOrDefault(timeWindow, name, 0);
   }
@@ -230,7 +233,7 @@ public class MetricTimeSeries {
           sb.append(number);
         } else {
           // TODO: read user specified null value from schema
-          sb.append("null");
+          sb.append(NULL_NUMBER_TOSTRING_STRING);
         }
       }
       sb.append("]");
@@ -254,7 +257,7 @@ public class MetricTimeSeries {
       for (int i = 0; i < schema.getNumMetrics(); i++) {
         String metricName = schema.getMetricName(i);
         MetricType metricType = schema.getMetricType(i);
-        Number metricValue = get(time, metricName);
+        Number metricValue = getOrDefault(time, metricName, 0);
 
         switch (metricType) {
         case INT:
@@ -302,12 +305,15 @@ public class MetricTimeSeries {
 
   @Override
   public int hashCode() {
-    return metricsValue.keySet().hashCode() + 13 * schema.hashCode();
+    return Objects.hash(metricsValue.keySet(), getSchema());
   }
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof MetricTimeSeries)) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
 

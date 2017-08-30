@@ -44,7 +44,7 @@ public class testMetricTransfer {
     double [] m1_expected = {0.8, 0.8, Double.NaN, 1.0, 1.0, 1.0};
     double [] m_actual = new double[6];
     for (int i=0; i<=5; i++) {
-      m_actual[i]= metrics.get(i, mName).doubleValue();
+      m_actual[i]= metrics.getOrDefault(i, mName, 0).doubleValue();
     }
     Assert.assertEquals(m_actual, m1_expected);
 
@@ -54,7 +54,7 @@ public class testMetricTransfer {
     sfList0.add(sf1);
     MetricTransfer.rescaleMetric(metrics, 3, sfList0, mName, properties);
     for (int i=0; i<=5; i++) {
-      m_actual[i]= metrics.get(i, mName).doubleValue();
+      m_actual[i]= metrics.getOrDefault(i, mName, 0).doubleValue();
     }
     Assert.assertEquals(m_actual, m1_expected);
 

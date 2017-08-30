@@ -3,11 +3,10 @@ package com.linkedin.thirdeye.anomalydetection.context;
 import java.io.IOException;
 import java.util.List;
 import java.util.NavigableMap;
+import java.util.Objects;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.builder.EqualsBuilder;
-import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
 import org.joda.time.Interval;
@@ -134,19 +133,16 @@ public class TimeSeries implements MetricTimeSeries {
     if (this == o) {
       return true;
     }
-
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-
     TimeSeries that = (TimeSeries) o;
-
-    return new EqualsBuilder().append(timeSeries, that.timeSeries)
-        .append(getTimeSeriesInterval(), that.getTimeSeriesInterval()).isEquals();
+    return Objects.equals(timeSeries, that.timeSeries) && Objects
+        .equals(getTimeSeriesInterval(), that.getTimeSeriesInterval());
   }
 
   @Override
   public int hashCode() {
-    return new HashCodeBuilder(17, 37).append(timeSeries).append(getTimeSeriesInterval()).toHashCode();
+    return Objects.hash(timeSeries, getTimeSeriesInterval());
   }
 }
