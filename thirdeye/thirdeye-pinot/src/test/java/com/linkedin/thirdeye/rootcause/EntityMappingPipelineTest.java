@@ -23,10 +23,12 @@ public class EntityMappingPipelineTest {
 
   private static final PipelineContext CONTEXT_DEFAULT = makeContext(makeEntities(1.0, "country:us", "country:at", "other:value"));
 
+  // TODO direction tests
+
   @Test
   public void testNoMappingDefault() {
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(Collections.<EntityToEntityMappingDTO>emptyList());
-    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, false, false, 1);
+    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, false, false, EntityMappingPipeline.PROP_DIRECTION_REGULAR, 1);
 
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
@@ -36,7 +38,7 @@ public class EntityMappingPipelineTest {
   @Test
   public void testNoMappingRewriter() {
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(Collections.<EntityToEntityMappingDTO>emptyList());
-    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, true, false, false, 1);
+    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, true, false, false, EntityMappingPipeline.PROP_DIRECTION_REGULAR, 1);
 
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
@@ -56,7 +58,7 @@ public class EntityMappingPipelineTest {
     mappings.add(makeMapping("thirdeye:dimension:country:us:provided", "thirdeye:dimension:countryCode:us:provided", 0.8, DIMENSION_TO_DIMENSION));
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(mappings);
 
-    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, false, false, 1);
+    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, false, false, EntityMappingPipeline.PROP_DIRECTION_REGULAR, 1);
 
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
@@ -71,7 +73,7 @@ public class EntityMappingPipelineTest {
     mappings.add(makeMapping("thirdeye:dimension:country:", "thirdeye:dimension:countryCode:", 0.5, DIMENSION_TO_DIMENSION));
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(mappings);
 
-    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, true, false, 1);
+    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, true, false, EntityMappingPipeline.PROP_DIRECTION_REGULAR, 1);
 
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
@@ -88,7 +90,7 @@ public class EntityMappingPipelineTest {
     mappings.add(makeMapping("thirdeye:dimension:country:us:provided", "thirdeye:dimension:countryCode:us:provided", 0.8, DIMENSION_TO_DIMENSION));
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(mappings);
 
-    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, true, false, false, 1);
+    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, true, false, false, EntityMappingPipeline.PROP_DIRECTION_REGULAR, 1);
 
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
@@ -107,7 +109,7 @@ public class EntityMappingPipelineTest {
     mappings.add(makeMapping("thirdeye:dimension:country:", "thirdeye:dimension:countryCode:", 0.5, DIMENSION_TO_DIMENSION));
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(mappings);
 
-    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, true, true, false, 1);
+    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, true, true, false, EntityMappingPipeline.PROP_DIRECTION_REGULAR, 1);
 
     List<Entity> entities = runPipeline(p, CONTEXT_DEFAULT);
 
@@ -128,7 +130,7 @@ public class EntityMappingPipelineTest {
     mappings.add(makeMapping("thirdeye:dimension:country:at:provided", "thirdeye:dimension:country:us:provided", 0.5, DIMENSION_TO_DIMENSION));
     EntityToEntityMappingManager entityDAO = new MockEntityToEntityMappingManager(mappings);
 
-    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, false, true, 3);
+    EntityMappingPipeline p = new EntityMappingPipeline("output", Collections.<String>emptySet(), entityDAO, DIMENSION_TO_DIMENSION, false, false, true, EntityMappingPipeline.PROP_DIRECTION_REGULAR, 3);
 
     List<Entity> entities = runPipeline(p, makeContext(makeEntities(1.0, "country:us")));
 
