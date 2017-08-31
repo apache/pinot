@@ -129,7 +129,8 @@ function fetchRelatedMetricIds() {
     } = metrics;
 
     const {
-      compareMode
+      compareMode,
+      filters: filterJson,
     } = primaryMetric;
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
@@ -140,7 +141,11 @@ function fetchRelatedMetricIds() {
       return Promise.reject(new Error("Must provide a metricId"));
     }
 
-    return fetch(`/rootcause/query?framework=relatedMetrics&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=thirdeye:metric:${metricId}`)
+    const filters = JSON.parse(filterJson);
+    const filterUrns = Object.keys(filters).map(k => 'thirdeye:dimension:' + k + ':' + filters[k] + ':provided');
+    const urns = [`thirdeye:metric:${metricId}`].concat(filterUrns).join(",");
+
+    return fetch(`/rootcause/query?framework=relatedMetrics&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=${urns}`)
       .then(res => res.json())
       .then(res => dispatch(loadRelatedMetricIds(res)));
   };

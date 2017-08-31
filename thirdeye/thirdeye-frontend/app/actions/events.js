@@ -201,7 +201,8 @@ function fetchEvents(start, end, mode) {
       primaryMetricId: metricId,
       currentEnd = moment().subtract(1, 'day').endOf('day').valueOf(),
       currentStart = moment(currentEnd).subtract(1, 'week').valueOf(),
-      compareMode
+      compareMode,
+      filters: filterJson
     } = primaryMetric;
     const { events } = eventsState;
 
@@ -219,9 +220,13 @@ function fetchEvents(start, end, mode) {
     const baselineStart = moment(anomalyStart).clone().subtract(offset, 'week').valueOf();
     const baselineEnd = moment(anomalyEnd).clone().subtract(offset, 'week').valueOf();
 
+    const filters = JSON.parse(filterJson);
+    const filterUrns = Object.keys(filters).map(k => 'thirdeye:dimension:' + k + ':' + filters[k] + ':provided');
+    const urns = [`thirdeye:metric:${metricId}`].concat(filterUrns).join(",");
+
     dispatch(setDate([anomalyStart, anomalyEnd]));
     dispatch(loading());
-    return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=thirdeye:metric:${metricId}`)
+    return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=${urns}`)
       .then(res => res.json())
       .then((res) => {
         return _.uniqBy(res, 'urn')
