@@ -55,7 +55,7 @@ public class AlertFilterAutotuneFactory {
     }
   }
 
-  public BaseAlertFilterAutoTune fromSpec(String AutoTuneType) {
+  public BaseAlertFilterAutoTune fromSpec(String AutoTuneType, AutotuneConfigDTO autotuneConfigDTO, List<MergedAnomalyResultDTO> anomalies) {
     BaseAlertFilterAutoTune alertFilterAutoTune = new DummyAlertFilterAutoTune();
     if (!props.containsKey(AutoTuneType)) {
       LOGGER.warn("AutoTune from Spec: Unsupported type " + AutoTuneType);
@@ -63,6 +63,7 @@ public class AlertFilterAutotuneFactory {
       try {
         String className = props.getProperty(AutoTuneType);
         alertFilterAutoTune = (BaseAlertFilterAutoTune) Class.forName(className).newInstance();
+        alertFilterAutoTune.init(anomalies, autotuneConfigDTO);
       } catch (Exception e) {
         LOGGER.warn("Failed to init AutoTune from Spec: {}", e.getMessage());
       }

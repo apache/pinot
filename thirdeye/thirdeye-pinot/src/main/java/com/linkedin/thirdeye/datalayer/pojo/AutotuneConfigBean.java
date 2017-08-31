@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.joda.time.DateTime;
@@ -26,7 +27,7 @@ public class AutotuneConfigBean extends AbstractBean {
   // The goal of the autotune
   private double goal;
   // The tuned properties configuration
-  private Map<String, String> configuration;
+  private Map<String, String> configuration = new HashMap<>();
   // The average running time for each thread while doing autotune
   private long avgRunningTime;
   // The overall running time  while doing autotune

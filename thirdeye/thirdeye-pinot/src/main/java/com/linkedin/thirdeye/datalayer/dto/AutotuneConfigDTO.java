@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 public class AutotuneConfigDTO extends AutotuneConfigBean {
   private static final Logger LOGGER = LoggerFactory.getLogger(AutotuneConfigDTO.class);
   private AlertFilter alertFilter = new DummyAlertFilter();
-  private Properties properties;
+  private Properties tuningProps = new Properties();
 
   public AutotuneConfigDTO() {
 
@@ -26,11 +26,11 @@ public class AutotuneConfigDTO extends AutotuneConfigBean {
   // populate alert filter to autotune configuration as tuning properties
   public AutotuneConfigDTO(BaseAlertFilter alertFilter){
     setAlertFilter(alertFilter);
-    this.properties = alertFilter.toProperties();
+    this.tuningProps = alertFilter.toProperties();
   }
 
   public AutotuneConfigDTO(Properties properties) {
-    setProperties(properties);
+    setTuningProps(properties);
   }
 
 
@@ -42,12 +42,12 @@ public class AutotuneConfigDTO extends AutotuneConfigBean {
     return this.alertFilter;
   }
 
-  public void setProperties(Properties properties) {
-    this.properties = properties;
+  public void setTuningProps(Properties tuningProps) {
+    this.tuningProps = tuningProps;
   }
 
-  public Properties getProperties() {
-    return this.properties;
+  public Properties getTuningProps() {
+    return this.tuningProps;
   }
 
 }

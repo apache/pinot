@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import java.util.List;
+import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +27,19 @@ public abstract class BaseAlertFilterAutoTune implements AlertFilterAutoTune {
 
   public AutotuneConfigDTO getAutotuneConfig() {
     return this.autotuneConfig;
+  }
+
+
+  public Properties getTuningProperties() {
+    return this.autotuneConfig.getTuningProps();
+  }
+
+  public void setAutotuneConfig(AutotuneConfigDTO autotuneConfig) {
+    this.autotuneConfig = autotuneConfig;
+  }
+
+  public void setTuningProperties(Properties tuningProps) {
+    this.autotuneConfig.setTuningProps(tuningProps);
   }
 
   public List<MergedAnomalyResultDTO> getTrainingAnomalies() {
