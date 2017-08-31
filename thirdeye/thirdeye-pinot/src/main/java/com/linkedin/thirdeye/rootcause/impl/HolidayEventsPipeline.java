@@ -82,7 +82,7 @@ public class HolidayEventsPipeline extends Pipeline {
     ScoringStrategy strategyAnomaly = makeStrategy(analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
     ScoringStrategy strategyBaseline = makeStrategy(baseline.getStart(), baseline.getStart(), baseline.getEnd());
 
-    Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
+    Set<DimensionEntity> dimensionEntities = DimensionEntity.getContextDimensionsGenerated(context);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
     Set<HolidayEventEntity> entities = new MaxScoreSet<>();

@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -8,7 +11,6 @@ import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,13 +74,15 @@ public class AnomalyEventsPipeline extends Pipeline {
     TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
     TimeRangeEntity analysis = TimeRangeEntity.getTimeRangeAnalysis(context);
 
+    Set<DimensionEntity> filters = DimensionEntity.getContextDimensionsProvided(context);
+
     ScoreUtils.TimeRangeStrategy strategyAnomaly = ScoreUtils.build(this.strategy, analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
     ScoreUtils.TimeRangeStrategy strategyBaseline = ScoreUtils.build(this.strategy, baseline.getStart(), baseline.getStart(), baseline.getEnd());
 
     Set<AnomalyEventEntity> entities = new MaxScoreSet<>();
     for(MetricEntity me : metrics) {
-      entities.addAll(EntityUtils.addRelated(score(strategyAnomaly, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), analysis.getStart(), anomaly.getEnd()), anomaly.getScore()), Arrays.asList(anomaly, me)));
-      entities.addAll(EntityUtils.addRelated(score(strategyBaseline, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), baseline.getStart(), baseline.getEnd()), baseline.getScore()), Arrays.asList(baseline, me)));
+      entities.addAll(EntityUtils.addRelated(score(strategyAnomaly, filter(filters, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), analysis.getStart(), anomaly.getEnd())), anomaly.getScore()), Arrays.asList(anomaly, me)));
+      entities.addAll(EntityUtils.addRelated(score(strategyBaseline, filter(filters, this.anomalyDAO.findAnomaliesByMetricIdAndTimeRange(me.getId(), baseline.getStart(), baseline.getEnd())), baseline.getScore()), Arrays.asList(baseline, me)));
     }
 
     return new PipelineResult(context, EntityUtils.topk(entities, this.k));
@@ -91,5 +95,30 @@ public class AnomalyEventsPipeline extends Pipeline {
       entities.add(AnomalyEventEntity.fromDTO(score, dto));
     }
     return entities;
+  }
+
+  private List<MergedAnomalyResultDTO> filter(Set<DimensionEntity> dimensions, Iterable<MergedAnomalyResultDTO> anomalies) {
+    List<MergedAnomalyResultDTO> output = new ArrayList<>();
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    for (DimensionEntity e : dimensions) {
+      filters.put(e.getName(), e.getValue());
+    }
+
+    for (MergedAnomalyResultDTO dto : anomalies) {
+      if (passesExistingFilters(filters, dto.getDimensions())) {
+        output.add(dto);
+      }
+    }
+
+    return output;
+  }
+
+  private static boolean passesExistingFilters(Multimap<String, String> filters, Map<String, String> values) {
+    Set<String> names = Sets.intersection(values.keySet(), filters.keySet());
+    for (String name : names) {
+      if (!filters.get(name).contains(values.get(name)))
+        return false;
+    }
+    return true;
   }
 }
