@@ -5,7 +5,7 @@
     <div class="col-xs-12">
       <legend class="te-form__section-title">Metric Details</legend>
     </div>
-    <div class="form-group col-xs-12 col-md-8">
+    <div class="form-group col-xs-12 col-sm-8">
       <div class="te-page-right te-page-right--inside">
         {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
           Import a Metric From InGraphs
@@ -34,7 +34,7 @@
       {{/bs-alert}}
     {{/if}}
 
-    <div class="form-group col-xs-4">
+    <div class="form-group col-xs-6 col-sm-4">
       <label for="select-granularity" class="control-label te-label">Desired Granularity</label>
       {{#power-select
         options=metricGranularityOptions
@@ -116,12 +116,12 @@
     
   </fieldset>
 
-  <fieldset class="te-form__section row">
+  <fieldset class="te-form__se  ction row">
     <div class="col-xs-12">
       <legend class="te-form__section-title">Detection Configuration</legend>
     </div>
     {{!-- Field: Pattern --}}
-    <div class="form-group col-xs-5">
+    <div class="form-group col-xs-6 col-sm-5">
       <label for="select-pattern" class="control-label te-label required">Pattern of Interest *</label>
       {{#power-select
         loadingMessage="Waiting for the server...."
@@ -142,7 +142,7 @@
     </div>
 
     {{!-- Field: Sensitivity --}}
-    <div class="form-group col-xs-5">
+    <div class="form-group col-xs-6 col-sm-5">
       <label for="select-sensitivity" class="control-label te-label required">Sensitivity *</label>
       {{#power-select
         loadingMessage="Waiting for the server...."
@@ -163,7 +163,7 @@
     </div>
 
     {{!-- Field: Weekly Effect --}}
-    <div class="form-group col-xs-2">
+    <div class="form-group col-xs-5 col-sm-2">
       <label for="select-effect" class="control-label te-label required">Weekly Effect *</label>
       {{#x-toggle 
         value=selectedWeeklyEffect 
@@ -232,7 +232,7 @@
 
 
     {{!-- Field: Select Existing Subscription Group --}}
-    <div class="form-group col-xs-6">
+    <div class="form-group col-sm-6">
       <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
       {{#power-select
         options=filteredConfigGroups
@@ -250,7 +250,7 @@
       {{/power-select}}
     </div>
     {{!--  Fields for new alert group creation --}}
-    <div class="form-group col-xs-6">
+    <div class="form-group col-sm-6">
       <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
       {{input
         type="text"

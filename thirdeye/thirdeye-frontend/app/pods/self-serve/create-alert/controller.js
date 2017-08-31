@@ -18,9 +18,6 @@ export default Ember.Controller.extend({
   isMetricSelected: false,
   isFormDisabled: false,
   isMetricDataInvalid: false,
-  isFilterSelectDisabled: false,
-  isGranularitySelectDisabled: false,
-  isSubmitDisabled: true,
   isCreateAlertSuccess: false,
   isCreateGroupSuccess: false,
   isCreateAlertError: false,
@@ -56,6 +53,8 @@ export default Ember.Controller.extend({
   requiredFields: [
     'selectedMetricOption',
     'selectedPattern',
+    'selectedSensitivity',
+    'selectedWeeklyEffect',
     'alertFunctionName',
     'selectedAppName'
   ],
@@ -98,9 +97,9 @@ export default Ember.Controller.extend({
    * To be sent to replay endpoint
    */
   sensitivityMapping: {
-    robuts: 'LOW',
+    robust: 'LOW',
     medium: 'MEDIUM',
-    sensitivity: 'HIGH'
+    sensitive: 'HIGH'
   },
 
   weeklyEffectOptions: [true, false],
@@ -365,19 +364,28 @@ export default Ember.Controller.extend({
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
     const recipients = this.get('selectedConfigGroup.recipients');
+    const {
+      selectedWeeklyEffect,
+      selectedSensitivity
+    } = this.getProperties('selectedWeeklyEffect', 'selectedSensitivity');
+    const sensitivy = this.sensitivityMapping[selectedSensitivity];
 
-    const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}&end=${endTime}&speedup=${speedUp}&removeAnomaliesInWindow=true&to=${recipients}`;
-    return fetch(url, { method: 'post' })
-      .then((res) => checkStatus(res, 'post'))
-      .catch((error) => {
-        this.setProperties({
-          isReplayStatusError: true,
-          isReplayStatusPending: false,
-          bsAlertBannerType: 'danger',
-          replayStatusClass: 'te-form__banner--failure',
-          failureMessage: `The replay sequence has been interrupted. (${error})`
-        });
-      });
+    const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
+      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${sensitivy}&` +
+      `&removeAnomaliesInWindow=true&removeAnomaliesInWindow=true&to=${recipients}`;
+
+    console.log(url);
+    // return fetch(url, { method: 'post' })
+    //   .then((res) => checkStatus(res, 'post'))
+    //   .catch((error) => {
+    //     this.setProperties({
+    //       isReplayStatusError: true,
+    //       isReplayStatusPending: false,
+    //       bsAlertBannerType: 'danger',
+    //       replayStatusClass: 'te-form__banner--failure',
+    //       failureMessage: `The replay sequence has been interrupted. (${error})`
+    //     });
+    //   });
   },
 
   /**
@@ -499,6 +507,8 @@ export default Ember.Controller.extend({
   isSubmitDisabled: Ember.computed(
     'selectedMetricOption',
     'selectedPattern',
+    'selectedSensitivity',
+    'selectedWeeklyEffect',
     'alertFunctionName',
     'selectedAppName',
     'selectedConfigGroup',
@@ -675,6 +685,8 @@ export default Ember.Controller.extend({
       selectedMetricOption: null,
       selectedPattern: null,
       selectedGranularity: null,
+      selectedSensitivity: null,
+      selectedWeeklyEffect: true,
       selectedDimension: null,
       alertFunctionName: null,
       selectedAppName: null,
