@@ -17,10 +17,10 @@ package com.linkedin.pinot.core.io.writer.impl.v1;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
+import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
-import com.linkedin.pinot.core.io.writer.impl.FixedBitIntWriter;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteIntWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.nio.channels.FileChannel;
@@ -57,9 +57,9 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
   private PinotDataBuffer bitsetBuffer;
   private PinotDataBuffer rawDataBuffer;
 
-  private FixedByteIntWriter chunkOffsetsWriter;
+  private FixedByteValueReaderWriter chunkOffsetsWriter;
   private PinotDataBitSet customBitSet;
-  private FixedBitIntWriter rawDataWriter;
+  private FixedBitIntReaderWriter rawDataWriter;
   private int numChunks;
   int prevRowStartIndex = 0;
   int prevRowLength = 0;
@@ -88,9 +88,9 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
     bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
     rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos + rawDataSize);
 
-    chunkOffsetsWriter = new FixedByteIntWriter(chunkOffsetsBuffer, numChunks);
+    chunkOffsetsWriter = new FixedByteValueReaderWriter(chunkOffsetsBuffer);
     customBitSet = new PinotDataBitSet(bitsetBuffer);
-    rawDataWriter = new FixedBitIntWriter(rawDataBuffer, totalNumValues, columnSizeInBits);
+    rawDataWriter = new FixedBitIntReaderWriter(rawDataBuffer, totalNumValues, columnSizeInBits);
   }
 
   public int getChunkOffsetHeaderSize() {

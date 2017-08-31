@@ -88,31 +88,38 @@ public class ColumnMinMaxValueGenerator {
 
     PinotDataBuffer dictionaryBuffer = _segmentWriter.getIndexFor(columnName, ColumnIndexType.DICTIONARY);
     FieldSpec.DataType dataType = columnMetadata.getDataType();
+    int length = columnMetadata.getCardinality();
     switch (dataType) {
       case INT:
-        IntDictionary intDictionary = new IntDictionary(dictionaryBuffer, columnMetadata);
-        SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-            intDictionary.getStringValue(0), intDictionary.getStringValue(intDictionary.length() - 1));
+        try (IntDictionary intDictionary = new IntDictionary(dictionaryBuffer, length)) {
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+              intDictionary.getStringValue(0), intDictionary.getStringValue(length - 1));
+        }
         break;
       case LONG:
-        LongDictionary longDictionary = new LongDictionary(dictionaryBuffer, columnMetadata);
-        SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-            longDictionary.getStringValue(0), longDictionary.getStringValue(longDictionary.length() - 1));
+        try (LongDictionary longDictionary = new LongDictionary(dictionaryBuffer, length)) {
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+              longDictionary.getStringValue(0), longDictionary.getStringValue(length - 1));
+        }
         break;
       case FLOAT:
-        FloatDictionary floatDictionary = new FloatDictionary(dictionaryBuffer, columnMetadata);
-        SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-            floatDictionary.getStringValue(0), floatDictionary.getStringValue(floatDictionary.length() - 1));
+        try (FloatDictionary floatDictionary = new FloatDictionary(dictionaryBuffer, length)) {
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+              floatDictionary.getStringValue(0), floatDictionary.getStringValue(length - 1));
+        }
         break;
       case DOUBLE:
-        DoubleDictionary doubleDictionary = new DoubleDictionary(dictionaryBuffer, columnMetadata);
-        SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-            doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(doubleDictionary.length() - 1));
+        try (DoubleDictionary doubleDictionary = new DoubleDictionary(dictionaryBuffer, length)) {
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+              doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(length - 1));
+        }
         break;
       case STRING:
-        StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, columnMetadata);
-        SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, stringDictionary.get(0),
-            stringDictionary.get(stringDictionary.length() - 1));
+        try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
+            columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter())) {
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, stringDictionary.get(0),
+              stringDictionary.get(length - 1));
+        }
         break;
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);

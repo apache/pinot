@@ -23,9 +23,7 @@ import java.io.Reader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -98,10 +96,10 @@ public class CSVRecordReader extends BaseRecordReader {
         incrementNullCountFor(fieldSpec.getName());
       }
       if (fieldSpec.isSingleValueField()) {
-        value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
+        value = RecordReaderUtils.convertToDataType(token, fieldSpec);
       } else {
         String[] tokens = (token != null) ? StringUtils.split(token, _delimiterString) : null;
-        value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec.getDataType());
+        value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec);
       }
 
       row.putField(column, value);

@@ -15,22 +15,26 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.FixedByteIntReader;
+import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public final class SortedIndexReader
     extends BaseSingleColumnSingleValueReader<SortedIndexReader.Context> implements InvertedIndexReader<Pairs.IntPair> {
-  private final FixedByteIntReader _reader;
+  private static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
+
+  private final FixedByteValueReaderWriter _reader;
   private final int _cardinality;
 
   public SortedIndexReader(PinotDataBuffer dataBuffer, int cardinality) {
     // 2 values per dictionary id
-    _reader = new FixedByteIntReader(dataBuffer, 2 * cardinality);
+    Preconditions.checkState(dataBuffer.size() == 2 * cardinality * INT_SIZE_IN_BYTES);
+    _reader = new FixedByteValueReaderWriter(dataBuffer);
     _cardinality = cardinality;
   }
 

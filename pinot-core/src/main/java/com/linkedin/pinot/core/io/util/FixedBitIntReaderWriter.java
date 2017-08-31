@@ -13,23 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.io.writer.impl;
+package com.linkedin.pinot.core.io.util;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 
 
-public final class FixedBitIntWriter implements Closeable {
+public final class FixedBitIntReaderWriter implements Closeable {
   private final PinotDataBitSet _dataBitSet;
   private final int _numBitsPerValue;
 
-  public FixedBitIntWriter(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
+  public FixedBitIntReaderWriter(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
     Preconditions.checkState(
         dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
     _dataBitSet = new PinotDataBitSet(dataBuffer);
     _numBitsPerValue = numBitsPerValue;
+  }
+
+  public int readInt(int index) {
+    return _dataBitSet.readInt(index, _numBitsPerValue);
+  }
+
+  public void readInt(int startIndex, int length, int[] buffer) {
+    _dataBitSet.readInt(startIndex, _numBitsPerValue, length, buffer);
   }
 
   public void writeInt(int index, int value) {

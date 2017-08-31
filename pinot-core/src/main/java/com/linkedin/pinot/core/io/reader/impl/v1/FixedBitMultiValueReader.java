@@ -17,8 +17,8 @@ package com.linkedin.pinot.core.io.reader.impl.v1;
 
 import com.linkedin.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.FixedBitIntReader;
-import com.linkedin.pinot.core.io.reader.impl.FixedByteIntReader;
+import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
+import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -47,9 +47,9 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
   private final PinotDataBuffer _dataBuffer;
-  private final FixedByteIntReader _chunkOffsetReader;
+  private final FixedByteValueReaderWriter _chunkOffsetReader;
   private final PinotDataBitSet _bitmapReader;
-  private final FixedBitIntReader _rawDataReader;
+  private final FixedBitIntReaderWriter _rawDataReader;
   private final int _numRows;
   private final int _numValues;
   private final int _numRowsPerChunk;
@@ -61,13 +61,13 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
     _numRowsPerChunk = (int) (Math.ceil((float) PREFERRED_NUM_VALUES_PER_CHUNK / (numValues / numRows)));
     int numChunks = (numRows + _numRowsPerChunk - 1) / _numRowsPerChunk;
     long endOffset = numChunks * INT_SIZE_IN_BYTES;
-    _chunkOffsetReader = new FixedByteIntReader(dataBuffer.view(0L, endOffset), numChunks);
+    _chunkOffsetReader = new FixedByteValueReaderWriter(dataBuffer.view(0L, endOffset));
     int bitmapSize = (numValues + Byte.SIZE - 1) / Byte.SIZE;
     _bitmapReader = new PinotDataBitSet(dataBuffer.view(endOffset, endOffset + bitmapSize));
     endOffset += bitmapSize;
     int rawDataSize = (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
     _rawDataReader =
-        new FixedBitIntReader(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
+        new FixedBitIntReaderWriter(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
   }
 
   @Override

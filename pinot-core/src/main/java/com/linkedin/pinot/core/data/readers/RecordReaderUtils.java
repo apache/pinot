@@ -15,70 +15,71 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.ArrayList;
+
 
 public class RecordReaderUtils {
-  public static Object convertToDataType(String token, DataType dataType) {
-    if ((token == null) || (token.isEmpty())) {
-      return getDefaultNullValue(dataType);
+  private RecordReaderUtils() {
+  }
+
+  public static Object convertToDataType(String token, FieldSpec fieldSpec) {
+    if ((token == null) || token.isEmpty()) {
+      return fieldSpec.getDefaultNullValue();
     }
 
+    DataType dataType = fieldSpec.getDataType();
     switch (dataType) {
       case INT:
-        return (int) Double.parseDouble(token);
-
+        return Integer.parseInt(token);
       case LONG:
         return Long.parseLong(token);
-
       case FLOAT:
         return Float.parseFloat(token);
-
       case DOUBLE:
         return Double.parseDouble(token);
-
       case STRING:
-      case BOOLEAN:
         return token;
-
       default:
-        throw new RuntimeException("Unsupported data type");
+        throw new IllegalStateException("Illegal data type: " + dataType);
     }
   }
 
-  public static Object convertToDataTypeArray(String [] tokens, DataType dataType) {
-    Object [] value;
+  public static Object convertToDataTypeArray(String[] tokens, FieldSpec fieldSpec) {
+    Object[] value;
 
     if ((tokens == null) || (tokens.length == 0)) {
-      value = new Object[1];
-      value[0] = getDefaultNullValue(dataType);
-
+      value = new Object[]{fieldSpec.getDefaultNullValue()};
     } else {
-      value = new Object[tokens.length];
-      for (int i = 0; i < tokens.length; ++ i) {
-        value[i] = convertToDataType(tokens[i], dataType);
+      int length = tokens.length;
+      value = new Object[length];
+      for (int i = 0; i < length; i++) {
+        value[i] = convertToDataType(tokens[i], fieldSpec);
       }
     }
 
     return value;
   }
 
-  public static Object getDefaultNullValue(DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return Dictionary.DEFAULT_NULL_INT_VALUE;
-      case FLOAT:
-        return Dictionary.DEFAULT_NULL_FLOAT_VALUE;
-      case DOUBLE:
-        return Dictionary.DEFAULT_NULL_DOUBLE_VALUE;
-      case LONG:
-        return Dictionary.DEFAULT_NULL_LONG_VALUE;
-      case STRING:
-      case BOOLEAN:
-        return Dictionary.DEFAULT_NULL_STRING_VALUE;
-      default:
-        break;
+  public static Object convertToDataTypeArray(ArrayList tokens, FieldSpec fieldSpec) {
+    Object[] value;
+
+    if ((tokens == null) || tokens.isEmpty()) {
+      value = new Object[]{fieldSpec.getDefaultNullValue()};
+    } else {
+      int length = tokens.size();
+      value = new Object[length];
+      for (int i = 0; i < length; i++) {
+        Object token = tokens.get(i);
+        if (token == null) {
+          value[i] = fieldSpec.getDefaultNullValue();
+        } else {
+          value[i] = convertToDataType(token.toString(), fieldSpec);
+        }
+      }
     }
-    return null;
+
+    return value;
   }
 }

@@ -19,47 +19,33 @@ import java.io.Closeable;
 
 
 public interface Dictionary extends Closeable {
-
-  int DEFAULT_NULL_INT_VALUE = 0;
-  long DEFAULT_NULL_LONG_VALUE = 0L;
-  float DEFAULT_NULL_FLOAT_VALUE = 0F;
-  double DEFAULT_NULL_DOUBLE_VALUE = 0D;
-  String DEFAULT_NULL_STRING_VALUE = "null";
-
   int NULL_VALUE_INDEX = -1;
 
   int indexOf(Object rawValue);
 
-  Object get(int dictionaryId);
+  Object get(int dictId);
 
-  long getLongValue(int dictionaryId);
+  int getIntValue(int dictId);
 
-  double getDoubleValue(int dictionaryId);
+  long getLongValue(int dictId);
 
-  String getStringValue(int dictionaryId);
+  float getFloatValue(int dictId);
 
-  float getFloatValue(int dictionaryId);
+  double getDoubleValue(int dictId);
 
-  int getIntValue(int dictionaryId);
+  String getStringValue(int dictId);
 
   int length();
 
-  /**
-   * Batch API to read values corresponding to the input set of dictionary Ids.
-   * Caller should ensure that outValues array size is atleast outStartPos + limit
-   * @param dictionaryIds input dictionary ids for which to read values
-   * @param startPos starting index in dictionaryIds
-   * @param limit number of dictionary Ids to read from startPos
-   * @param outValues array containing values corresponding to dictionaryIds
-   *                  OutValues should be an array of appropriate type.
-   *                  Example: String[] for StringDictionary implementation
-   *                  double[] for DoubleDictionary. Use POD types where possible
-   * @param outStartPos starting position in outValues. Values are copied starting
-   *                    at this position.
-   */
-  void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos);
-  void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos);
-  void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos);
-  void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos);
-  void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos);
+  // Batch read APIs
+
+  void readIntValues(int[] dictIds, int inStartPos, int length, int[] outValues, int outStartPos);
+
+  void readLongValues(int[] dictIds, int inStartPos, int length, long[] outValues, int outStartPos);
+
+  void readFloatValues(int[] dictIds, int inStartPos, int length, float[] outValues, int outStartPos);
+
+  void readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos);
+
+  void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos);
 }

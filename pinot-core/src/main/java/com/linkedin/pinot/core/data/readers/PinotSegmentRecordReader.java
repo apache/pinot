@@ -74,21 +74,24 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
       ColumnMetadata columnMetadata = entry.getValue();
 
       PinotDataBuffer dictionaryBuffer = reader.getIndexFor(columnName, ColumnIndexType.DICTIONARY);
+      int length = columnMetadata.getCardinality();
       switch (columnMetadata.getDataType()) {
         case INT:
-          _dictionaryMap.put(columnName, new IntDictionary(dictionaryBuffer, columnMetadata));
+          _dictionaryMap.put(columnName, new IntDictionary(dictionaryBuffer, length));
           break;
         case LONG:
-          _dictionaryMap.put(columnName, new LongDictionary(dictionaryBuffer, columnMetadata));
+          _dictionaryMap.put(columnName, new LongDictionary(dictionaryBuffer, length));
           break;
         case FLOAT:
-          _dictionaryMap.put(columnName, new FloatDictionary(dictionaryBuffer, columnMetadata));
+          _dictionaryMap.put(columnName, new FloatDictionary(dictionaryBuffer, length));
           break;
         case DOUBLE:
-          _dictionaryMap.put(columnName, new DoubleDictionary(dictionaryBuffer, columnMetadata));
+          _dictionaryMap.put(columnName, new DoubleDictionary(dictionaryBuffer, length));
           break;
         case STRING:
-          _dictionaryMap.put(columnName, new StringDictionary(dictionaryBuffer, columnMetadata));
+          _dictionaryMap.put(columnName,
+              new StringDictionary(dictionaryBuffer, length, columnMetadata.getStringColumnMaxLength(),
+                  (byte) columnMetadata.getPaddingCharacter()));
           break;
         default:
           throw new IllegalStateException();
