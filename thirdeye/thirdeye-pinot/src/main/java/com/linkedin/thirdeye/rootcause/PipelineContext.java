@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.rootcause;
 
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -29,14 +28,15 @@ public class PipelineContext {
 
   /**
    * Flattens the inputs from different pipelines and filters them by (super) class {@code clazz}.
-   * Returns a set of typed Entities or an empty set if no matching instances are found.
+   * Returns a set of typed Entities or an empty set if no matching instances are found.  URN
+   * conflicts are resolved by preserving the entity with the highest score.
    *
    * @param clazz (super) class to filter by
    * @param <T> (super) class of output collection
    * @return set of Entities in input context with given super class
    */
   public <T extends Entity> Set<T> filter(Class<? extends T> clazz) {
-    Set<T> filtered = new HashSet<>();
+    Set<T> filtered = new MaxScoreSet<>();
     for(Set<Entity> entities : this.inputs.values()) {
       for (Entity e : entities) {
         if (clazz.isInstance(e))

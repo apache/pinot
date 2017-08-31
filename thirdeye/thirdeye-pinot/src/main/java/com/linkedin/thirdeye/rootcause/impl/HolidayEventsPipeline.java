@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
@@ -38,7 +39,7 @@ public class HolidayEventsPipeline extends Pipeline {
   private static final int PROP_K_DEFAULT = -1;
 
   private static final String PROP_STRATEGY = "strategy";
-  private static final String PROP_STRATEGY_DEFAULT = StrategyType.TRIANGULAR.toString();
+  private static final String PROP_STRATEGY_DEFAULT = StrategyType.COMPOUND.toString();
 
   private final StrategyType strategy;
   private final EventDataProviderManager eventDataProvider;
@@ -82,12 +83,15 @@ public class HolidayEventsPipeline extends Pipeline {
     ScoringStrategy strategyAnomaly = makeStrategy(analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
     ScoringStrategy strategyBaseline = makeStrategy(baseline.getStart(), baseline.getStart(), baseline.getEnd());
 
-    Set<DimensionEntity> dimensionEntities = DimensionEntity.getContextDimensionsGenerated(context);
+    // use both provided and generated
+    Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
     Set<HolidayEventEntity> entities = new MaxScoreSet<>();
-    entities.addAll(EntityUtils.addRelated(score(strategyAnomaly, this.getHolidayEvents(analysis.getStart(), anomaly.getEnd()), urn2entity, anomaly.getScore()), anomaly));
-    entities.addAll(EntityUtils.addRelated(score(strategyBaseline, this.getHolidayEvents(baseline.getStart(), baseline.getEnd()), urn2entity, baseline.getScore()), baseline));
+    entities.addAll(EntityUtils.addRelated(score(strategyAnomaly,
+        this.getHolidayEvents(analysis.getStart(), anomaly.getEnd()), urn2entity, anomaly.getScore()), anomaly));
+    entities.addAll(EntityUtils.addRelated(score(strategyBaseline,
+        this.getHolidayEvents(baseline.getStart(), baseline.getEnd()), urn2entity, baseline.getScore()), baseline));
 
     return new PipelineResult(context, EntityUtils.topk(entities, this.k));
   }

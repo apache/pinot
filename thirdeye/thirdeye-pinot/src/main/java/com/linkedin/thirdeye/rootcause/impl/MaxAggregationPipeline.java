@@ -1,18 +1,10 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
