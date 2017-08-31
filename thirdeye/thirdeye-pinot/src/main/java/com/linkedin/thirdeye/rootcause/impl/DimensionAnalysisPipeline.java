@@ -3,9 +3,11 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.StringSeries;
+import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
+import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.dataframe.util.RequestContainer;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -19,8 +21,8 @@ import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -109,14 +111,17 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     final TimeRangeEntity anomaly = TimeRangeEntity.getTimeRangeAnomaly(context);
     final TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
+    final Multimap<String, String> filters = DimensionEntity.makeFilterSet(context);
 
     Map<Dimension, Double> scores = new HashMap<>();
     Multimap<Dimension, Entity> related = ArrayListMultimap.create();
 
     for(MetricEntity me : metricsEntities) {
       try {
-        final long windowSize = anomaly.getEnd() - anomaly.getStart();
-        DataFrame dfScores = getDimensionScores(me.getId(), anomaly.getStart(), baseline.getStart(), windowSize);
+        final MetricSlice sliceCurrent = MetricSlice.from(me.getId(), anomaly.getStart(), anomaly.getEnd(), filters);
+        final MetricSlice sliceBaseline = MetricSlice.from(me.getId(), baseline.getStart(), baseline.getEnd(), filters);
+
+        DataFrame dfScores = getDimensionScores(sliceCurrent, sliceBaseline);
 
         for(int i=0; i<dfScores.size(); i++) {
           double score = dfScores.getDouble(COL_SCORE, i);
@@ -144,9 +149,10 @@ public class DimensionAnalysisPipeline extends Pipeline {
     return new PipelineResult(context, EntityUtils.topkNormalized(entities, this.k));
   }
 
-  private DataFrame getContribution(long metricId, long start, long end, String dimension) throws Exception {
-    String ref = String.format("%d-%s", metricId, dimension);
-    DataFrameUtils.RequestContainer rc = DataFrameUtils.makeAggregateRequest(metricId, start, end, Arrays.asList(dimension), ref, this.metricDAO, this.datasetDAO);
+  private DataFrame getContribution(MetricSlice slice, String dimension) throws Exception {
+    String ref = String.format("%d-%s", slice.getMetricId(), dimension);
+    RequestContainer
+        rc = DataFrameUtils.makeAggregateRequest(slice, Collections.singletonList(dimension), ref, this.metricDAO, this.datasetDAO);
     ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
 
     DataFrame raw = DataFrameUtils.evaluateResponse(res, rc);
@@ -159,9 +165,9 @@ public class DimensionAnalysisPipeline extends Pipeline {
     return out;
   }
 
-  private DataFrame getContributionDelta(long metricId, long current, long baseline, long windowSize, String dimension) throws Exception {
-    DataFrame curr = getContribution(metricId, current, current + windowSize, dimension);
-    DataFrame base = getContribution(metricId, baseline, baseline + windowSize, dimension);
+  private DataFrame getContributionDelta(MetricSlice current, MetricSlice baseline, String dimension) throws Exception {
+    DataFrame curr = getContribution(current, dimension);
+    DataFrame base = getContribution(baseline, dimension);
 
     DataFrame joined = curr.joinOuter(base)
         .fillNull(COL_CONTRIB + DataFrame.COLUMN_JOIN_LEFT)
@@ -188,19 +194,23 @@ public class DimensionAnalysisPipeline extends Pipeline {
     return df;
   }
 
-  private Future<DataFrame> getContributionDeltaPackedAsync(final long metricId, final long current, final long baseline, final long windowSize, final String dimension) throws Exception {
+  private Future<DataFrame> getContributionDeltaPackedAsync(final MetricSlice current, final MetricSlice baseline, final String dimension) throws Exception {
     return this.executor.submit(new Callable<DataFrame>() {
       @Override
       public DataFrame call() throws Exception {
-        return packDimension(getContributionDelta(metricId, current, baseline, windowSize, dimension), dimension);
+        return packDimension(getContributionDelta(current, baseline, dimension), dimension);
       }
     });
   }
 
-  private DataFrame getDimensionScores(long metricId, long current, long baseline, long windowSize) throws Exception {
-    MetricConfigDTO metric = this.metricDAO.findById(metricId);
+  private DataFrame getDimensionScores(MetricSlice current, MetricSlice baseline) throws Exception {
+    if (current.getMetricId() != baseline.getMetricId()) {
+      throw new IllegalArgumentException("current and baseline must reference the same metric id");
+    }
+
+    MetricConfigDTO metric = this.metricDAO.findById(current.getMetricId());
     if(metric == null) {
-      throw new IllegalArgumentException(String.format("Could not resolve metric id '%d'", metricId));
+      throw new IllegalArgumentException(String.format("Could not resolve metric id '%d'", current.getMetricId()));
     }
 
     DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
@@ -217,7 +227,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     Collection<Future<DataFrame>> futures = new ArrayList<>();
     for(String dimension : dataset.getDimensions()) {
-      futures.add(getContributionDeltaPackedAsync(metricId, current, baseline, windowSize, dimension));
+      futures.add(getContributionDeltaPackedAsync(current, baseline, dimension));
     }
 
     final long timeout = System.currentTimeMillis() + TIMEOUT;
