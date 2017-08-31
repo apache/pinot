@@ -221,8 +221,8 @@ function fetchEvents(start, end, mode) {
     const baselineEnd = moment(anomalyEnd).clone().subtract(offset, 'week').valueOf();
 
     const filters = JSON.parse(filterJson);
-    const filterUrns = Object.keys(filters).map(k => 'thirdeye:dimension:' + k + ':' + filters[k] + ':provided');
-    const urns = [`thirdeye:metric:${metricId}`].concat(filterUrns).join(",");
+    const filterUrns = Object.keys(filters).map(key => 'thirdeye:dimension:' + key + ':' + filters[key] + ':provided');
+    const urns = [`thirdeye:metric:${metricId}`].concat(filterUrns).join(',');
 
     dispatch(setDate([anomalyStart, anomalyEnd]));
     dispatch(loading());
