@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,15 +31,21 @@ import org.slf4j.LoggerFactory;
 public class EntityMappingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(EntityMappingPipeline.class);
 
+  public static final String PROP_DIRECTION_REGULAR = "REGULAR";
+  public static final String PROP_DIRECTION_REVERSE = "REVERSE";
+  public static final String PROP_DIRECTION_BOTH = "BOTH";
+
   public static final String PROP_MAPPING_TYPE = "mappingType";
   public static final String PROP_IS_REWRITER = "isRewriter";
   public static final String PROP_MATCH_PREFIX = "matchPrefix";
   public static final String PROP_IS_COLLECTOR = "isCollector";
+  public static final String PROP_DIRECTION = "direction";
   public static final String PROP_ITERATIONS = "iterations";
 
   public static final boolean PROP_IS_REWRITER_DEFAULT = false;
   public static final boolean PROP_MATCH_PREFIX_DEFAULT = false;
   public static final boolean PROP_IS_COLLECTOR_DEFAULT = false;
+  public static final String PROP_DIRECTION_DEFAULT = PROP_DIRECTION_REGULAR;
   public static final int PROP_ITERATIONS_DEFAULT = 1;
 
   private final EntityToEntityMappingManager entityDAO;
@@ -46,6 +53,7 @@ public class EntityMappingPipeline extends Pipeline {
   private final boolean isRewriter;
   private final boolean matchPrefix;
   private final boolean isCollector;
+  private final String direction;
   private final int iterations;
 
   /**
@@ -58,15 +66,17 @@ public class EntityMappingPipeline extends Pipeline {
    * @param isRewriter enable rewriter mode (pass-through for entities without mapping)
    * @param matchPrefix match on URN prefix rather than entire URN
    * @param isCollector emit iterated entities in output (does not include input entities)
+   * @param direction apply mappings given direction
    * @param iterations number of iterations of transitive hull expansion
    */
-  public EntityMappingPipeline(String outputName, Set<String> inputNames, EntityToEntityMappingManager entityDAO, String mappingType, boolean isRewriter, boolean matchPrefix, boolean isCollector, int iterations) {
+  public EntityMappingPipeline(String outputName, Set<String> inputNames, EntityToEntityMappingManager entityDAO, String mappingType, boolean isRewriter, boolean matchPrefix, boolean isCollector, String direction, int iterations) {
     super(outputName, inputNames);
     this.entityDAO = entityDAO;
     this.mappingType = mappingType;
     this.isRewriter = isRewriter;
     this.matchPrefix = matchPrefix;
     this.isCollector = isCollector;
+    this.direction = direction;
     this.iterations = iterations;
   }
 
@@ -75,7 +85,7 @@ public class EntityMappingPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param properties configuration properties ({@code PROP_MAPPING_TYPE}, {@code PROP_IS_REWRITER=false}, {@code PROP_MATCH_PREFIX=false}, {@code PROP_IS_COLLECTOR=false}, {@code PROP_ITERATIONS=1})
+   * @param properties configuration properties ({@code PROP_MAPPING_TYPE}, {@code PROP_IS_REWRITER=false}, {@code PROP_MATCH_PREFIX=false}, {@code PROP_IS_COLLECTOR=false}, {@code PROP_DIRECTION=REGULAR}, {@code PROP_ITERATIONS=1})
    */
   public EntityMappingPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) throws IOException {
     super(outputName, inputNames);
@@ -89,14 +99,19 @@ public class EntityMappingPipeline extends Pipeline {
     this.isRewriter = MapUtils.getBoolean(properties, PROP_IS_REWRITER, PROP_IS_REWRITER_DEFAULT);
     this.matchPrefix = MapUtils.getBoolean(properties, PROP_MATCH_PREFIX, PROP_MATCH_PREFIX_DEFAULT);
     this.isCollector = MapUtils.getBoolean(properties, PROP_IS_COLLECTOR, PROP_IS_COLLECTOR_DEFAULT);
+    this.direction = MapUtils.getString(properties, PROP_DIRECTION, PROP_DIRECTION_DEFAULT);
     this.iterations = MapUtils.getInteger(properties, PROP_ITERATIONS, PROP_ITERATIONS_DEFAULT);
+
+    if (!Arrays.asList(PROP_DIRECTION_REGULAR, PROP_DIRECTION_REVERSE, PROP_DIRECTION_BOTH).contains(this.direction)) {
+      throw new IllegalArgumentException(String.format("Unknown direction '%s'", this.direction));
+    }
   }
 
   @Override
   public PipelineResult run(PipelineContext context) {
     Set<Entity> entities = context.filter(Entity.class);
 
-    Map<String, Set<EntityToEntityMappingDTO>> mappings = toMap(this.entityDAO.findByMappingType(this.mappingType));
+    Map<String, Set<EntityToEntityMappingDTO>> mappings = toMap(this.getMappings());
 
     // perform entity urn mapping
     final int inputSize = entities.size();
@@ -195,6 +210,22 @@ public class EntityMappingPipeline extends Pipeline {
     return matches;
   }
 
+  private List<EntityToEntityMappingDTO> getMappings() {
+    List<EntityToEntityMappingDTO> mappings = this.entityDAO.findByMappingType(this.mappingType);
+
+    switch (this.direction) {
+      case PROP_DIRECTION_REGULAR:
+        return mappings;
+      case PROP_DIRECTION_REVERSE:
+        return reverseDirection(mappings);
+      case PROP_DIRECTION_BOTH:
+        mappings.addAll(reverseDirection(mappings));
+        return mappings;
+      default:
+        throw new IllegalArgumentException(String.format("Unknown direction '%s'", this.direction));
+    }
+  }
+
   private static Map<String, Set<EntityToEntityMappingDTO>> toMap(Iterable<EntityToEntityMappingDTO> mappings) {
     Map<String, Set<EntityToEntityMappingDTO>> map = new HashMap<>();
     for(EntityToEntityMappingDTO dto : mappings) {
@@ -204,5 +235,17 @@ public class EntityMappingPipeline extends Pipeline {
       map.get(key).add(dto);
     }
     return map;
+  }
+
+  private static List<EntityToEntityMappingDTO> reverseDirection(Iterable<EntityToEntityMappingDTO> mappings) {
+    List<EntityToEntityMappingDTO> output = new ArrayList<>();
+    for (EntityToEntityMappingDTO m : mappings) {
+      EntityToEntityMappingDTO n = new EntityToEntityMappingDTO();
+      n.setFromURN(m.getToURN());
+      n.setToURN(m.getFromURN());
+      n.setScore(m.getScore());
+      output.add(n);
+    }
+    return output;
   }
 }

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.rootcause.impl;
+package com.linkedin.thirdeye.rootcause;
 
 import com.linkedin.thirdeye.rootcause.Entity;
 import java.util.Collection;

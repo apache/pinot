@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
@@ -38,7 +39,7 @@ public class HolidayEventsPipeline extends Pipeline {
   private static final int PROP_K_DEFAULT = -1;
 
   private static final String PROP_STRATEGY = "strategy";
-  private static final String PROP_STRATEGY_DEFAULT = StrategyType.TRIANGULAR.toString();
+  private static final String PROP_STRATEGY_DEFAULT = StrategyType.COMPOUND.toString();
 
   private final StrategyType strategy;
   private final EventDataProviderManager eventDataProvider;
@@ -82,12 +83,15 @@ public class HolidayEventsPipeline extends Pipeline {
     ScoringStrategy strategyAnomaly = makeStrategy(analysis.getStart(), anomaly.getStart(), anomaly.getEnd());
     ScoringStrategy strategyBaseline = makeStrategy(baseline.getStart(), baseline.getStart(), baseline.getEnd());
 
+    // use both provided and generated
     Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
     Set<HolidayEventEntity> entities = new MaxScoreSet<>();
-    entities.addAll(EntityUtils.addRelated(score(strategyAnomaly, this.getHolidayEvents(analysis.getStart(), anomaly.getEnd()), urn2entity, anomaly.getScore()), anomaly));
-    entities.addAll(EntityUtils.addRelated(score(strategyBaseline, this.getHolidayEvents(baseline.getStart(), baseline.getEnd()), urn2entity, baseline.getScore()), baseline));
+    entities.addAll(EntityUtils.addRelated(score(strategyAnomaly,
+        this.getHolidayEvents(analysis.getStart(), anomaly.getEnd()), urn2entity, anomaly.getScore()), anomaly));
+    entities.addAll(EntityUtils.addRelated(score(strategyBaseline,
+        this.getHolidayEvents(baseline.getStart(), baseline.getEnd()), urn2entity, baseline.getScore()), baseline));
 
     return new PipelineResult(context, EntityUtils.topk(entities, this.k));
   }
@@ -160,23 +164,23 @@ public class HolidayEventsPipeline extends Pipeline {
 
     private static double makeDimensionScore(Map<String, DimensionEntity> urn2entity, Map<String, List<String>> dimensionFilterMap) {
       double max = 0.0;
-      Set<String> urns = filter2urns(dimensionFilterMap);
-      for(String urn : urns) {
-        if(urn2entity.containsKey(urn)) {
-          max = Math.max(urn2entity.get(urn).getScore(), max);
+      for(DimensionEntity e : filter2entities(dimensionFilterMap)) {
+        if(urn2entity.containsKey(e.getUrn())) {
+          max = Math.max(urn2entity.get(e.getUrn()).getScore(), max);
         }
       }
       return max;
     }
 
-    private static Set<String> filter2urns(Map<String, List<String>> dimensionFilterMap) {
-      Set<String> urns = new HashSet<>();
+    private static Set<DimensionEntity> filter2entities(Map<String, List<String>> dimensionFilterMap) {
+      Set<DimensionEntity> entities = new HashSet<>();
       for(Map.Entry<String, List<String>> e : dimensionFilterMap.entrySet()) {
+        String name = e.getKey();
         for(String val : e.getValue()) {
-          urns.add(DimensionEntity.TYPE.formatURN(e.getKey(), val.toLowerCase()));
+          entities.add(DimensionEntity.fromDimension(1.0, name, val.toLowerCase(), DimensionEntity.TYPE_GENERATED));
         }
       }
-      return urns;
+      return entities;
     }
   }
 

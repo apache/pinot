@@ -1,7 +1,13 @@
-package com.linkedin.thirdeye.dataframe;
+package com.linkedin.thirdeye.dataframe.util;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.LongSeries;
+import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -144,8 +150,8 @@ public class DataFrameUtils {
    * {@code COL_TIME} by default, and creates columns for each groupBy attribute and for each
    * MetricFunction specified in the request. It further evaluates expressions for derived
    * metrics.
-   * @see DataFrameUtils#makeAggregateRequest(long, long, long, List, String, MetricConfigManager, DatasetConfigManager)
-   * @see DataFrameUtils#makeTimeSeriesRequest(long, long, long, String, MetricConfigManager, DatasetConfigManager)
+   * @see DataFrameUtils#makeAggregateRequest(MetricSlice, List, String, MetricConfigManager, DatasetConfigManager)
+   * @see DataFrameUtils#makeTimeSeriesRequest(MetricSlice, String, MetricConfigManager, DatasetConfigManager)
    *
    * @param response thirdeye client response
    * @param rc RequestContainer
@@ -160,7 +166,7 @@ public class DataFrameUtils {
    * {@code COL_TIME} by default, and creates columns for each groupBy attribute and for each
    * MetricFunction specified in the request. It evaluates expressions for derived
    * metrics and offsets timestamp based on the original timeseries request.
-   * @see DataFrameUtils#makeTimeSeriesRequest(long, long, long, String, MetricConfigManager, DatasetConfigManager)
+   * @see DataFrameUtils#makeTimeSeriesRequest(MetricSlice, String, MetricConfigManager, DatasetConfigManager)
    *
    * @param response thirdeye client response
    * @param rc TimeSeriesRequestContainer
@@ -190,37 +196,33 @@ public class DataFrameUtils {
    * Returns a DataFrame wrapping the requested time series at the associated dataset's native
    * time granularity.
    * <br/><b>NOTE:</b> this method injects dependencies from the DAO and Cache registries.
-   * @see DataFrameUtils#fetchTimeSeries(long, long, long, MetricConfigManager, DatasetConfigManager, QueryCache)
+   * @see DataFrameUtils#fetchTimeSeries(MetricSlice, MetricConfigManager, DatasetConfigManager, QueryCache)
    *
-   * @param metricId metric id
-   * @param start start time in millis (inclusive)
-   * @param end end time in millis (exclusive)
+   * @param slice metric data slice
    * @return DataFrame with time series
    * @throws Exception
    */
-  public static DataFrame fetchTimeSeries(long metricId, long start, long end) throws Exception {
+  public static DataFrame fetchTimeSeries(MetricSlice slice) throws Exception {
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
-    return fetchTimeSeries(metricId, start, end, metricDAO, datasetDAO, cache);
+    return fetchTimeSeries(slice, metricDAO, datasetDAO, cache);
   }
 
   /**
    * Returns a DataFrame wrapping the requested time series at the associated dataset's native
    * time granularity.
    *
-   * @param metricId metric id
-   * @param start start time in millis (inclusive)
-   * @param end end time in millis (exclusive)
+   * @param slice metric data slice
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
    * @param cache query cache
    * @return DataFrame with time series
    * @throws Exception
    */
-  public static DataFrame fetchTimeSeries(long metricId, long start, long end, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache cache) throws Exception {
-    String ref = String.format("%s-%d-%d", Thread.currentThread().getName(), metricId, System.nanoTime());
-    RequestContainer req = makeTimeSeriesRequest(metricId, start, end, ref, metricDAO, datasetDAO);
+  public static DataFrame fetchTimeSeries(MetricSlice slice, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache cache) throws Exception {
+    String ref = String.format("%s-%d-%d", Thread.currentThread().getName(), slice.metricId, System.nanoTime());
+    RequestContainer req = makeTimeSeriesRequest(slice, ref, metricDAO, datasetDAO);
     ThirdEyeResponse resp = cache.getQueryResult(req.request);
     return evaluateExpressions(parseResponse(resp), req.expressions);
   }
@@ -229,38 +231,34 @@ public class DataFrameUtils {
    * Constructs and wraps a request for a metric with derived expressions. Resolves all
    * required dependencies from the Thirdeye database.
    * <br/><b>NOTE:</b> this method injects dependencies from the DAO registry.
-   * @see DataFrameUtils#makeTimeSeriesRequest(long, long, long, String, MetricConfigManager, DatasetConfigManager)
+   * @see DataFrameUtils#makeTimeSeriesRequest(MetricSlice slice, String, MetricConfigManager, DatasetConfigManager)
    *
-   * @param metricId metric id
-   * @param start start time in millis (inclusive)
-   * @param end end time in millis (exclusive)
+   * @param slice metric data slice
    * @param reference unique identifier for request
    * @return RequestContainer
    * @throws Exception
    */
-  public static TimeSeriesRequestContainer makeTimeSeriesRequest(long metricId, long start, long end, String reference) throws Exception {
+  public static TimeSeriesRequestContainer makeTimeSeriesRequest(MetricSlice slice, String reference) throws Exception {
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
-    return makeTimeSeriesRequest(metricId, start, end, reference, metricDAO, datasetDAO);
+    return makeTimeSeriesRequest(slice, reference, metricDAO, datasetDAO);
   }
 
   /**
    * Constructs and wraps a request for a metric with derived expressions. Resolves all
    * required dependencies from the Thirdeye database.
    *
-   * @param metricId metric id
-   * @param start start time in millis (inclusive)
-   * @param end end time in millis (exclusive)
+   * @param slice metric data slice
    * @param reference unique identifier for request
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
    * @return TimeSeriesRequestContainer
    * @throws Exception
    */
-  public static TimeSeriesRequestContainer makeTimeSeriesRequest(long metricId, long start, long end, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
-    MetricConfigDTO metric = metricDAO.findById(metricId);
+  public static TimeSeriesRequestContainer makeTimeSeriesRequest(MetricSlice slice, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
+    MetricConfigDTO metric = metricDAO.findById(slice.metricId);
     if(metric == null)
-      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", metricId));
+      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.metricId));
 
     DatasetConfigDTO dataset = datasetDAO.findByDataset(metric.getDataset());
     if(dataset == null)
@@ -273,9 +271,17 @@ public class DataFrameUtils {
       functions.addAll(exp.computeMetricFunctions());
     }
 
+    Multimap<String, String> effectiveFilters = ArrayListMultimap.create();
+    for (String dimName : slice.filters.keySet()) {
+      if (dataset.getDimensions().contains(dimName)) {
+        effectiveFilters.putAll(dimName, slice.filters.get(dimName));
+      }
+    }
+
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
-        .setStartTimeInclusive(start)
-        .setEndTimeExclusive(end)
+        .setStartTimeInclusive(slice.start)
+        .setEndTimeExclusive(slice.end)
+        .setFilterSet(effectiveFilters)
         .setMetricFunctions(functions)
         .setGroupByTimeGranularity(dataset.bucketTimeGranularity())
         .setDataSource(dataset.getDataSource())
@@ -283,26 +289,25 @@ public class DataFrameUtils {
 
     final long timeGranularity = dataset.bucketTimeGranularity().toMillis();
 
-    return new TimeSeriesRequestContainer(request, expressions, start, end, timeGranularity);
+    return new TimeSeriesRequestContainer(request, expressions, slice.start, slice.end, timeGranularity);
   }
 
   /**
    * Constructs and wraps a request for a metric with derived expressions. Resolves all
    * required dependencies from the Thirdeye database.
    *
-   * @param metricId metric id
-   * @param start start time in millis (inclusive)
-   * @param end end time in millis (exclusive)
+   * @param slice metric data slice
+   * @param dimensions dimensions to group by
    * @param reference unique identifier for request
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
    * @return RequestContainer
    * @throws Exception
    */
-  public static RequestContainer makeAggregateRequest(long metricId, long start, long end, List<String> dimensions, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
-    MetricConfigDTO metric = metricDAO.findById(metricId);
+  public static RequestContainer makeAggregateRequest(MetricSlice slice, List<String> dimensions, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
+    MetricConfigDTO metric = metricDAO.findById(slice.metricId);
     if(metric == null)
-      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", metricId));
+      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.metricId));
 
     DatasetConfigDTO dataset = datasetDAO.findByDataset(metric.getDataset());
     if(dataset == null)
@@ -315,60 +320,22 @@ public class DataFrameUtils {
       functions.addAll(exp.computeMetricFunctions());
     }
 
+    Multimap<String, String> effectiveFilters = ArrayListMultimap.create();
+    for (String dimName : slice.filters.keySet()) {
+      if (dataset.getDimensions().contains(dimName)) {
+        effectiveFilters.putAll(dimName, slice.filters.get(dimName));
+      }
+    }
+
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
-        .setStartTimeInclusive(start)
-        .setEndTimeExclusive(end)
+        .setStartTimeInclusive(slice.start)
+        .setEndTimeExclusive(slice.end)
+        .setFilterSet(effectiveFilters)
         .setMetricFunctions(functions)
         .setDataSource(dataset.getDataSource())
         .setGroupBy(dimensions)
         .build(reference);
 
     return new RequestContainer(request, expressions);
-  }
-
-  /**
-   * Wrapper for ThirdEye request with derived metric expressions
-   */
-  public static class RequestContainer {
-    final ThirdEyeRequest request;
-    final List<MetricExpression> expressions;
-
-    RequestContainer(ThirdEyeRequest request, List<MetricExpression> expressions) {
-      this.request = request;
-      this.expressions = expressions;
-    }
-
-    public ThirdEyeRequest getRequest() {
-      return request;
-    }
-
-    public List<MetricExpression> getExpressions() {
-      return expressions;
-    }
-  }
-
-  public static class TimeSeriesRequestContainer extends RequestContainer {
-    final long start;
-    final long end;
-    final long interval;
-
-    public TimeSeriesRequestContainer(ThirdEyeRequest request, List<MetricExpression> expressions, long start, long end, long interval) {
-      super(request, expressions);
-      this.start = start;
-      this.end = end;
-      this.interval = interval;
-    }
-
-    public long getStart() {
-      return start;
-    }
-
-    public long getEnd() {
-      return end;
-    }
-
-    public long getInterval() {
-      return interval;
-    }
   }
 }

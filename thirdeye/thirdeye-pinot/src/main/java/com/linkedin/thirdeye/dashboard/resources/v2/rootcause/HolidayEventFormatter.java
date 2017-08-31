@@ -33,7 +33,7 @@ public class HolidayEventFormatter extends RootCauseEventEntityFormatter {
       dimensions.append(" (" + dimName + ":");
       dimensions.append(Joiner.on(",").join(entry.getValue()) + ")");
       for(String dimValue : entry.getValue()) {
-        DimensionEntity de = DimensionEntity.fromDimension(entity.getScore(), dimName, dimValue);
+        DimensionEntity de = DimensionEntity.fromDimension(entity.getScore(), dimName, dimValue, DimensionEntity.TYPE_GENERATED);
         relatedDimensionEntities.add(de);
       }
     }

@@ -1,12 +1,13 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import ch.qos.logback.classic.Level;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DataFrameUtils;
+import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.dataframe.util.TimeSeriesRequestContainer;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -118,6 +119,8 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     TimeRangeEntity anomalyRange = TimeRangeEntity.getTimeRangeAnomaly(context);
     TimeRangeEntity baselineRange = TimeRangeEntity.getTimeRangeBaseline(context);
 
+    Multimap<String, String> filters = DimensionEntity.makeFilterSet(context);
+
     Set<MetricEntity> targetMetrics = new HashSet<>();
     for(Entity entity : context.getInputs().get(this.targetInput)) {
       if(entity instanceof MetricEntity) {
@@ -132,23 +135,23 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     allMetrics.addAll(targetMetrics);
 
     // generate requests
-    List<DataFrameUtils.TimeSeriesRequestContainer> requestList = new ArrayList<>();
-    requestList.addAll(makeRequests(targetMetrics, anomalyRange, PRE_CURRENT));
-    requestList.addAll(makeRequests(candidateMetrics, anomalyRange, PRE_CURRENT));
-    requestList.addAll(makeRequests(targetMetrics, baselineRange, PRE_BASELINE));
-    requestList.addAll(makeRequests(candidateMetrics, baselineRange, PRE_BASELINE));
+    List<TimeSeriesRequestContainer> requestList = new ArrayList<>();
+    requestList.addAll(makeRequests(targetMetrics, anomalyRange, filters, PRE_CURRENT));
+    requestList.addAll(makeRequests(candidateMetrics, anomalyRange, filters, PRE_CURRENT));
+    requestList.addAll(makeRequests(targetMetrics, baselineRange, filters, PRE_BASELINE));
+    requestList.addAll(makeRequests(candidateMetrics, baselineRange, filters, PRE_BASELINE));
 
     LOG.info("Requesting {} time series", requestList.size());
 
-    Map<String, DataFrameUtils.TimeSeriesRequestContainer> requests = new HashMap<>();
-    for(DataFrameUtils.TimeSeriesRequestContainer rc : requestList) {
+    Map<String, TimeSeriesRequestContainer> requests = new HashMap<>();
+    for(TimeSeriesRequestContainer rc : requestList) {
       requests.put(rc.getRequest().getRequestReference(), rc);
     }
 
     // fetch responses and calculate derived metrics
     Map<String, DataFrame> responses = new HashMap<>();
     List<ThirdEyeRequest> thirdeyeRequests = new ArrayList<>();
-    for(DataFrameUtils.TimeSeriesRequestContainer rc : requestList) {
+    for(TimeSeriesRequestContainer rc : requestList) {
       thirdeyeRequests.add(rc.getRequest());
     }
 
@@ -289,12 +292,13 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     }
   }
 
-  private List<DataFrameUtils.TimeSeriesRequestContainer> makeRequests(Collection<MetricEntity> metrics, TimeRangeEntity timerange, String prefix) {
-    List<DataFrameUtils.TimeSeriesRequestContainer> requests = new ArrayList<>();
+  private List<TimeSeriesRequestContainer> makeRequests(Collection<MetricEntity> metrics, TimeRangeEntity range, Multimap<String, String> filters, String prefix) {
+    List<TimeSeriesRequestContainer> requests = new ArrayList<>();
     for(MetricEntity e : metrics) {
       String id = makeIdentifier(e.getUrn(), prefix);
+      MetricSlice slice = MetricSlice.from(e.getId(), range.getStart(), range.getEnd(), filters);
       try {
-        requests.add(DataFrameUtils.makeTimeSeriesRequest(e.getId(), timerange.getStart(), timerange.getEnd(), id, this.metricDAO, this.datasetDAO));
+        requests.add(DataFrameUtils.makeTimeSeriesRequest(slice, id, this.metricDAO, this.datasetDAO));
       } catch (Exception ex) {
         LOG.warn(String.format("Could not make request for '%s'. Skipping.", id), ex);
       }

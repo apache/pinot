@@ -1,6 +1,7 @@
-package com.linkedin.thirdeye.rootcause.impl;
+package com.linkedin.thirdeye.rootcause;
 
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import java.util.Collections;
 import org.testng.Assert;
 import org.testng.annotations.Test;
