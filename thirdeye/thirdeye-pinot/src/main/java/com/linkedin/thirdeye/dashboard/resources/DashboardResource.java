@@ -417,8 +417,7 @@ public class DashboardResource {
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone,
       @QueryParam("currentStart") Long start, @QueryParam("currentEnd") Long end,
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
-      @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions,
-      @QueryParam("rollup") @DefaultValue("true") Boolean doRollup)
+      @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions)
       throws Exception {
 
 
@@ -451,7 +450,7 @@ public class DashboardResource {
       request.setEndDateInclusive(true);
     }
 
-    TimeSeriesHandler handler = new TimeSeriesHandler(queryCache, doRollup);
+    TimeSeriesHandler handler = new TimeSeriesHandler(queryCache);
     String jsonResponse = "";
     try {
       TimeSeriesResponse response = handler.handle(request);
