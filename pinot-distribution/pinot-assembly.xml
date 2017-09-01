@@ -75,19 +75,9 @@
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-tools/target/pinot-tools-pkg/repo</directory>
-      <outputDirectory>repo</outputDirectory>
-    </fileSet>
-    <fileSet>
-      <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/pinot-tools/target/pinot-tools-pkg/bin</directory>
       <outputDirectory>bin</outputDirectory>
       <fileMode>0755</fileMode>
-    </fileSet>
-    <fileSet>
-      <useDefaultExcludes>false</useDefaultExcludes>
-      <directory>${pinot.root}/pinot-controller/src/main/resources</directory>
-      <outputDirectory>repo</outputDirectory>
     </fileSet>
   </fileSets>
 </assembly>

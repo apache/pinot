@@ -98,6 +98,8 @@
               <name>perf-tester</name>
             </program>
           </programs>
+          <repositoryLayout>flat</repositoryLayout>
+          <repositoryName>lib</repositoryName>
         </configuration>
       </plugin>
     </plugins>

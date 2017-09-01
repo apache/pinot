@@ -194,8 +194,9 @@
               <mainClass>com.linkedin.pinot.server.starter.InteractiveBroker</mainClass>
               <name>interactive-broker</name>
             </program>
-
           </programs>
+          <repositoryLayout>flat</repositoryLayout>
+          <repositoryName>lib</repositoryName>
         </configuration>
       </plugin>
       <plugin>

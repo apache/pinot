@@ -107,6 +107,8 @@
               <name>pinot-perfBenchmarkRunner</name>
             </program>
           </programs>
+          <repositoryLayout>flat</repositoryLayout>
+          <repositoryName>lib</repositoryName>
           <binFileExtensions>
             <unix>.sh</unix>
           </binFileExtensions>

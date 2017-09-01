@@ -79,6 +79,8 @@
           <platforms>
             <platform>unix</platform>
           </platforms>
+          <repositoryLayout>flat</repositoryLayout>
+          <repositoryName>lib</repositoryName>
         </configuration>
         <executions>
           <execution>
