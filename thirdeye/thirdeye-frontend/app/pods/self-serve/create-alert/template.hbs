@@ -121,7 +121,7 @@
       <legend class="te-form__section-title">Detection Configuration</legend>
     </div>
     {{!-- Field: Pattern --}}
-    <div class="form-group col-xs-6 col-sm-5">
+    <div class="form-group col-xs-6">
       <label for="select-pattern" class="control-label te-label required">Pattern of Interest *</label>
       {{#power-select
         loadingMessage="Waiting for the server...."
@@ -142,7 +142,7 @@
     </div>
 
     {{!-- Field: Sensitivity --}}
-    <div class="form-group col-xs-6 col-sm-5">
+    <div class="form-group col-xs-6">
       <label for="select-sensitivity" class="control-label te-label required">Sensitivity *</label>
       {{#power-select
         loadingMessage="Waiting for the server...."
@@ -163,23 +163,33 @@
     </div>
 
     {{!-- Field: Weekly Effect --}}
-    <div class="form-group col-xs-5 col-sm-2">
-      <label for="select-effect" class="control-label te-label required">Weekly Effect *</label>
-      {{#x-toggle 
-        value=selectedWeeklyEffect 
-        classNames="te-toggle te-toggle--form te-toggle--left"
-        theme='ios'
-        showLabels=true
-        name="splitViewToggle"
-        disabled=(not isMetricSelected)
-        onToggle=(action (mut selectedWeeklyEffect))
-        as |toggle|}}
-          {{#toggle.label value=selectedWeeklyEffect}}
-            <span class="te-label te-label--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
-          {{/toggle.label}}
-          {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-      {{/x-toggle}} 
-    </div>
+    {{#if (eq selectedGranularity 'DAYS')}}
+      <div class="form-group col-xs-6">
+        <label for="select-effect" class="control-label te-label required">
+          Weekly Seasonality *
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element}}
+              Does your metric behave differently depending on the day of the week?
+            {{/tooltip-on-element}}
+          </span>
+        </label>
+        {{#x-toggle 
+          value=selectedWeeklyEffect 
+          classNames="te-toggle te-toggle--form te-toggle--left"
+          theme='ios'
+          showLabels=true
+          name="splitViewToggle"
+          disabled=(not isMetricSelected)
+          onToggle=(action (mut selectedWeeklyEffect))
+          as |toggle|}}
+            {{#toggle.label value=selectedWeeklyEffect}}
+              <span class="te-label te-label--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
+            {{/toggle.label}}
+            {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+        {{/x-toggle}} 
+      </div>
+    {{/if}}
 
   </fieldset>
 

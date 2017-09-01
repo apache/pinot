@@ -54,7 +54,6 @@ export default Ember.Controller.extend({
     'selectedMetricOption',
     'selectedPattern',
     'selectedSensitivity',
-    'selectedWeeklyEffect',
     'alertFunctionName',
     'selectedAppName'
   ],
@@ -364,28 +363,24 @@ export default Ember.Controller.extend({
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
     const recipients = this.get('selectedConfigGroup.recipients');
-    const {
-      selectedWeeklyEffect,
-      selectedSensitivity
-    } = this.getProperties('selectedWeeklyEffect', 'selectedSensitivity');
+    const selectedSensitivity = this.getProperties('selectedWeeklyEffect');
     const sensitivy = this.sensitivityMapping[selectedSensitivity];
 
     const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
       `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${sensitivy}&` +
       `&removeAnomaliesInWindow=true&removeAnomaliesInWindow=true&to=${recipients}`;
 
-    console.log(url);
-    // return fetch(url, { method: 'post' })
-    //   .then((res) => checkStatus(res, 'post'))
-    //   .catch((error) => {
-    //     this.setProperties({
-    //       isReplayStatusError: true,
-    //       isReplayStatusPending: false,
-    //       bsAlertBannerType: 'danger',
-    //       replayStatusClass: 'te-form__banner--failure',
-    //       failureMessage: `The replay sequence has been interrupted. (${error})`
-    //     });
-    //   });
+    return fetch(url, { method: 'post' })
+      .then((res) => checkStatus(res, 'post'))
+      .catch((error) => {
+        this.setProperties({
+          isReplayStatusError: true,
+          isReplayStatusPending: false,
+          bsAlertBannerType: 'danger',
+          replayStatusClass: 'te-form__banner--failure',
+          failureMessage: `The replay sequence has been interrupted. (${error})`
+        });
+      });
   },
 
   /**
@@ -554,6 +549,7 @@ export default Ember.Controller.extend({
       const granularity = this.get('graphConfig.granularity').toLowerCase();
       const selectedFilter = this.get('selectedFilters');
       const selectedDimension = this.get('selectedDimension');
+      const weeklyEffect = this.get('selectedWeeklyEffect');
       const settingsByGranularity = {
         common: {
           functionName: this.get('alertFunctionName') || this.get('alertFunctionName').trim(),
@@ -585,7 +581,7 @@ export default Ember.Controller.extend({
           windowDelay: 0,
           windowDelayUnit: 'DAYS',
           cron: '0%200%2014%201%2F1%20*%20%3F%20*',
-          properties: 'pValueThreshold=0.05;logTransform=true;weeklyEffectRemovedInPrediction=false'
+          properties: `pValueThreshold=0.05;logTransform=true;weeklyEffectRemovedInPrediction=false;weeklyEffectModeled=${weeklyEffect}`
         }
       };
 
