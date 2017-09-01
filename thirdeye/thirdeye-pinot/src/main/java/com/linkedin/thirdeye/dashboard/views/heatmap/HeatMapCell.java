@@ -111,7 +111,10 @@ public class HeatMapCell {
     };
   }
 
+  // NOTE: hack for display of small numbers
   public static String format(Double number) {
+    if (Math.abs(number) <= 0.1)
+      return String.format("%.3e", number);
     return decimalFormat.format(number);
   }
 
