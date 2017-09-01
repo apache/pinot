@@ -180,6 +180,8 @@ public class SimpleConsumerWrapper implements Closeable {
       LOGGER.warn("Caught Kafka consumer exception while in state {}, disconnecting and trying again",
           _currentState.getStateValue(), e);
 
+      Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+
       setCurrentState(new ConnectingToBootstrapNode());
     }
 
@@ -209,6 +211,7 @@ public class SimpleConsumerWrapper implements Closeable {
       _currentPort = _bootstrapPorts[randomHostIndex];
 
       try {
+        LOGGER.info("Connecting to bootstrap host {}:{}", _currentHost, _currentPort);
         _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
             SOCKET_BUFFER_SIZE, _clientId);
         setCurrentState(new ConnectedToBootstrapNode());
