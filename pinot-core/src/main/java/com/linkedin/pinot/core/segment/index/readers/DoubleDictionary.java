@@ -15,54 +15,54 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
-public class DoubleDictionary extends ImmutableDictionaryReader  {
 
-  public DoubleDictionary(PinotDataBuffer dataBuffer, ColumnMetadata columnMetadata) {
-    super(dataBuffer, columnMetadata.getCardinality(), Double.SIZE/8);
+public class DoubleDictionary extends ImmutableDictionaryReader {
+  private static final int DOUBLE_SIZE_IN_BYTES = Double.SIZE / Byte.SIZE;
+
+  public DoubleDictionary(PinotDataBuffer dataBuffer, int length) {
+    super(dataBuffer, length, DOUBLE_SIZE_IN_BYTES, (byte) 0);
   }
 
   @Override
   public int indexOf(Object rawValue) {
-    Double lookup;
-
+    double value;
     if (rawValue instanceof String) {
-      lookup = Double.parseDouble((String) rawValue);
+      value = Double.parseDouble((String) rawValue);
     } else {
-      lookup = (Double)rawValue;
+      value = (Double) rawValue;
     }
-    return doubleIndexOf(lookup);
+    return binarySearch(value);
   }
 
   @Override
-  public Double get(int dictionaryId) {
-    return getDoubleValue(dictionaryId);
+  public Double get(int dictId) {
+    return getDouble(dictId);
   }
 
   @Override
-  public long getLongValue(int dictionaryId) {
-    return (long) getDoubleValue(dictionaryId);
+  public int getIntValue(int dictId) {
+    return (int) getDouble(dictId);
   }
 
   @Override
-  public double getDoubleValue(int dictionaryId) {
-    return dataFileReader.getDouble(dictionaryId, 0);
+  public long getLongValue(int dictId) {
+    return (long) getDouble(dictId);
   }
 
   @Override
-  public String getStringValue(int dictionaryId) {
-    return Double.toString(getDoubleValue(dictionaryId));
+  public float getFloatValue(int dictId) {
+    return (float) getDouble(dictId);
   }
 
   @Override
-  public float getFloatValue(int dictionaryId) {
-    return (float) getDoubleValue(dictionaryId);
+  public double getDoubleValue(int dictId) {
+    return getDouble(dictId);
   }
 
   @Override
-  public int getIntValue(int dictionaryId) {
-    return (int) getDoubleValue(dictionaryId);
+  public String getStringValue(int dictId) {
+    return Double.toString(getDouble(dictId));
   }
 }

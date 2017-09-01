@@ -119,18 +119,21 @@ public final class ColumnIndexContainer {
           metadata.getColumnName());
     }
 
+    int length = metadata.getCardinality();
     switch (dataType) {
       case INT:
-        return new IntDictionary(dictionaryBuffer, metadata);
+        return new IntDictionary(dictionaryBuffer, length);
       case LONG:
-        return new LongDictionary(dictionaryBuffer, metadata);
+        return new LongDictionary(dictionaryBuffer, length);
       case FLOAT:
-        return new FloatDictionary(dictionaryBuffer, metadata);
+        return new FloatDictionary(dictionaryBuffer, length);
       case DOUBLE:
-        return new DoubleDictionary(dictionaryBuffer, metadata);
+        return new DoubleDictionary(dictionaryBuffer, length);
       case STRING:
-        return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, metadata)
-            : new StringDictionary(dictionaryBuffer, metadata);
+        int numBytesPerValue = metadata.getStringColumnMaxLength();
+        byte paddingByte = (byte) metadata.getPaddingCharacter();
+        return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
+            : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
       default:
         throw new IllegalStateException("Illegal data type for dictionary: " + dataType);
     }

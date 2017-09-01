@@ -130,16 +130,16 @@ public class LoadersTest {
     TarGzCompressionUtils.unTar(
         new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_OLD))), INDEX_DIR);
     File segmentDirectory = new File(INDEX_DIR, "paddingOld");
-    SegmentMetadataImpl originalMetadata = new SegmentMetadataImpl(segmentDirectory);
-    Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
-        V1Constants.Str.LEGACY_STRING_PAD_CHAR);
-    SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, originalMetadata, ReadMode.heap);
-    ColumnMetadata columnMetadataFor = originalMetadata.getColumnMetadataFor("name");
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("name");
+    Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
+    SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
     SegmentDirectory.Reader reader = segmentDir.createReader();
     PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    StringDictionary dict = new StringDictionary(dictionaryBuffer, columnMetadataFor);
+    StringDictionary dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
+        columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
-    Assert.assertEquals(dict.getStringValue(1), "lynda%%%%");
+    Assert.assertEquals(dict.getStringValue(1), "lynda");
     Assert.assertEquals(dict.get(0), "lynda 2.0");
     Assert.assertEquals(dict.get(1), "lynda");
     Assert.assertEquals(dict.indexOf("lynda%"), 1);
@@ -150,16 +150,16 @@ public class LoadersTest {
         new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_PERCENT))),
         INDEX_DIR);
     segmentDirectory = new File(INDEX_DIR, "paddingPercent");
-    originalMetadata = new SegmentMetadataImpl(segmentDirectory);
-    Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
-        V1Constants.Str.LEGACY_STRING_PAD_CHAR);
-    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, originalMetadata, ReadMode.heap);
-    columnMetadataFor = originalMetadata.getColumnMetadataFor("name");
+    segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
+    columnMetadata = segmentMetadata.getColumnMetadataFor("name");
+    Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
+    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    dict = new StringDictionary(dictionaryBuffer, columnMetadataFor);
+    dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
+        columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
-    Assert.assertEquals(dict.getStringValue(1), "lynda%%%%");
+    Assert.assertEquals(dict.getStringValue(1), "lynda");
     Assert.assertEquals(dict.get(0), "lynda 2.0");
     Assert.assertEquals(dict.get(1), "lynda");
     Assert.assertEquals(dict.indexOf("lynda%"), 1);
@@ -170,20 +170,20 @@ public class LoadersTest {
         new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_NULL))),
         INDEX_DIR);
     segmentDirectory = new File(INDEX_DIR, "paddingNull");
-    originalMetadata = new SegmentMetadataImpl(segmentDirectory);
-    Assert.assertEquals(originalMetadata.getColumnMetadataFor("name").getPaddingCharacter(),
-        V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
-    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, originalMetadata, ReadMode.heap);
-    columnMetadataFor = originalMetadata.getColumnMetadataFor("name");
+    segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
+    columnMetadata = segmentMetadata.getColumnMetadataFor("name");
+    Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
+    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    dict = new StringDictionary(dictionaryBuffer, columnMetadataFor);
-    Assert.assertEquals(dict.getStringValue(0), "lynda\0\0\0\0");
+    dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
+        columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
+    Assert.assertEquals(dict.getStringValue(0), "lynda");
     Assert.assertEquals(dict.getStringValue(1), "lynda 2.0");
     Assert.assertEquals(dict.get(0), "lynda");
     Assert.assertEquals(dict.get(1), "lynda 2.0");
-    Assert.assertEquals(dict.indexOf("lynda\0"), 0);
-    Assert.assertEquals(dict.indexOf("lynda\0\0"), 0);
+    Assert.assertEquals(dict.indexOf("lynda\0"), -2);
+    Assert.assertEquals(dict.indexOf("lynda\0\0"), -2);
   }
 
   @AfterClass

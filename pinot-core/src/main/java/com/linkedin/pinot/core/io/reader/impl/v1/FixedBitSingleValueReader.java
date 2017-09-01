@@ -17,15 +17,15 @@ package com.linkedin.pinot.core.io.reader.impl.v1;
 
 import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.FixedBitIntReader;
+import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {
-  private final FixedBitIntReader _reader;
+  private final FixedBitIntReaderWriter _reader;
 
   public FixedBitSingleValueReader(PinotDataBuffer dataBuffer, int numRows, int numBitsPerValue) {
-    _reader = new FixedBitIntReader(dataBuffer, numRows, numBitsPerValue);
+    _reader = new FixedBitIntReaderWriter(dataBuffer, numRows, numBitsPerValue);
   }
 
   @Override

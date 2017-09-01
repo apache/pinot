@@ -15,124 +15,56 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import java.nio.charset.Charset;
-import java.util.Arrays;
 
 
 public class StringDictionary extends ImmutableDictionaryReader {
-  private static final String EMPTY_STRING = "";
-  private final int lengthofMaxEntry;
-  private static Charset UTF_8 = Charset.forName("UTF-8");
-  private final char paddingChar;
 
-  public StringDictionary(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    super(dataBuffer, metadata.getCardinality(), metadata.getStringColumnMaxLength());
-    lengthofMaxEntry = metadata.getStringColumnMaxLength();
-    paddingChar = metadata.getPaddingCharacter();
+  public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
+    super(dataBuffer, length, numBytesPerValue, paddingByte);
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   public int indexOf(Object rawValue) {
-    final String lookup = (String) rawValue; // This will always be a string
+    return binarySearch((String) rawValue);
+  }
 
-    byte[] lookupBytes = lookup.getBytes(UTF_8);
-    if (lookupBytes.length >= lengthofMaxEntry) {
-      // No need to pad the string
-      return stringIndexOf(lookup);
+  @Override
+  public String get(int dictId) {
+    return getUnpaddedString(dictId, getBuffer());
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return getUnpaddedString(dictId, getBuffer());
+  }
+
+  @Override
+  public void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
+    byte[] buffer = getBuffer();
+    int inEndPos = inStartPos + length;
+    for (int i = inStartPos; i < inEndPos; i++) {
+      outValues[outStartPos++] = getUnpaddedString(dictIds[i], buffer);
     }
-
-    // Need to pad the string before looking up
-    byte[] dest = new byte[lengthofMaxEntry];
-    System.arraycopy(lookupBytes, 0, dest, 0, lookupBytes.length);
-    Arrays.fill(dest, lookupBytes.length, dest.length, (byte) paddingChar);
-    return stringIndexOf(new String(dest, UTF_8));
-  }
-
-  @Override
-  public String get(int dictionaryId) {
-    if ((dictionaryId == -1) || (dictionaryId >= length())) {
-      return "null";
-    }
-    byte[] bytes = dataFileReader.getBytes(dictionaryId, 0);
-    return getUnpaddedString(bytes);
-  }
-
-  @Override
-  public long getLongValue(int dictionaryId) {
-    throw new RuntimeException("cannot converted string to long");
-  }
-
-  @Override
-  public double getDoubleValue(int dictionaryId) {
-    throw new RuntimeException("cannot converted string to double");
-  }
-
-  @Override
-  public int getIntValue(int dictionaryId) {
-    throw new RuntimeException("cannot converted string to int");
-  }
-
-  @Override
-  public float getFloatValue(int dictionaryId) {
-    throw new RuntimeException("cannot converted string to float");
-  }
-
-  @Override
-  public String getStringValue(int dictionaryId) {
-    return getString(dictionaryId);
-  }
-
-  @Override
-  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
-    throw new RuntimeException("Can not convert string to int");
-  }
-
-  @Override
-  public void readLongValues(int[] dictionaryIds, int startPos, int limit, long[] outValues, int outStartPos) {
-    throw new RuntimeException("Can not convert string to long");
-  }
-
-  @Override
-  public void readFloatValues(int[] dictionaryIds, int startPos, int limit, float[] outValues, int outStartPos) {
-    throw new RuntimeException("Can not convert string to float");
-  }
-
-  @Override
-  public void readDoubleValues(int[] dictionaryIds, int startPos, int limit, double[] outValues, int outStartPos) {
-    throw new RuntimeException("Can not convert string to double");
-  }
-
-  @Override
-  public void readStringValues(int[] dictionaryIds, int startPos, int limit, String[] outValues, int outStartPos) {
-    dataFileReader.readStringValues(dictionaryIds, 0/*column*/, startPos, limit, outValues, outStartPos);
-    int outEndPos = outStartPos + limit;
-    for (int i = outStartPos; i < outEndPos; i++) {
-      String val = outValues[i];
-      outValues[i] = getUnpaddedString(val.getBytes(UTF_8));
-    }
-  }
-
-  private String getString(int dictionaryId) {
-    return dataFileReader.getString(dictionaryId, 0);
-  }
-
-  /**
-   * Helper method to build and return String from given byte[] after stripping out the padding character.
-   * It strips out all padding characters at the end of the string. This means that non-terminating padding character(s)
-   * may exist in the returned String.
-   *
-   * @param bytes Byte array
-   * @return Unpadded string of byte[]
-   */
-  private String getUnpaddedString(byte[] bytes) {
-    for (int i = lengthofMaxEntry - 1; i >= 0; i--) {
-      if (bytes[i] != paddingChar) {
-        return new String(bytes, 0, i + 1, UTF_8);
-      }
-    }
-    return EMPTY_STRING;
   }
 }

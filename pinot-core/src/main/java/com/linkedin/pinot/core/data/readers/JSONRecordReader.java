@@ -16,18 +16,17 @@
 package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.io.FileReader;
 import java.io.Reader;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.map.ObjectMapper;
+
 
 public class JSONRecordReader extends BaseRecordReader {
   private final String _dataFile;
@@ -48,7 +47,6 @@ public class JSONRecordReader extends BaseRecordReader {
     final Reader reader = new FileReader(_dataFile);
     _parser = new JsonFactory().createJsonParser(reader);
     _iterator = new ObjectMapper().readValues(_parser, Map.class);
-
   }
 
   @Override
@@ -80,15 +78,15 @@ public class JSONRecordReader extends BaseRecordReader {
       String column = fieldSpec.getName();
       Object data = record.get(column);
 
-      Object value=null;
+      Object value;
       if (fieldSpec.isSingleValueField()) {
         String token = (data != null) ? data.toString() : null;
         if (token == null || token.isEmpty()) {
           incrementNullCountFor(fieldSpec.getName());
         }
-        value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
+        value = RecordReaderUtils.convertToDataType(token, fieldSpec);
       } else {
-        value = convertToDataTypeArray(data, fieldSpec.getDataType());
+        value = RecordReaderUtils.convertToDataTypeArray((ArrayList) data, fieldSpec);
       }
 
       row.putField(column, value);
@@ -100,25 +98,5 @@ public class JSONRecordReader extends BaseRecordReader {
   @Override
   public void close() throws Exception {
     _parser.close();
-  }
-
-  private Object [] convertToDataTypeArray(Object data, DataType dataType) {
-    Object [] value;
-
-    if ((data == null)) {
-      value = new Object[1];
-      value[0] = RecordReaderUtils.getDefaultNullValue(dataType);
-
-    } else {
-      ArrayList objs = (ArrayList) data;
-      value = new Object[objs.size()];
-
-      for (int i = 0; i < objs.size(); ++i) {
-        String token = (objs.get(i) != null) ? objs.get(i).toString() : null;
-        value[i] = RecordReaderUtils.convertToDataType(token, dataType);
-      }
-    }
-
-    return value;
   }
 }

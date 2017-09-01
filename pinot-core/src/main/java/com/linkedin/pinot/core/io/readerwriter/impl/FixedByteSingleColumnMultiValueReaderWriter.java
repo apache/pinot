@@ -134,10 +134,10 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
 
   private void addHeaderBuffers() {
     headerBuffer = memoryManager.allocate(headerSize, columnName);
-    // We know that these bufffers will not be copied directly into a file (or mapped from a file).
+    // We know that these buffers will not be copied directly into a file (or mapped from a file).
     // So, we can use native byte order here.
     headerBuffer.order(ByteOrder.nativeOrder());
-    //dataBufferId, startIndex, length
+    // dataBufferId, startIndex, length
     curHeaderWriter =
         new FixedByteSingleValueMultiColWriter(headerBuffer, rowCountPerChunk, 3,
             new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
