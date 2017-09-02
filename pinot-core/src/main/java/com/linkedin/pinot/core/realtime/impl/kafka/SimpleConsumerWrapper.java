@@ -423,7 +423,7 @@ public class SimpleConsumerWrapper implements PinotKafkaConsumer {
    * @return An iterable containing messages fetched from Kafka and their offsets, as well as the high watermark for
    * this partition.
    */
-  public synchronized Pair<Iterable<MessageAndOffset>, Long> fetchMessagesAndHighWatermark(long startOffset,
+  public synchronized Pair<PinotKafkaMessagesIterable, Long> fetchMessagesAndHighWatermark(long startOffset,
       long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
     Preconditions.checkState(!_metadataOnlyConsumer, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
     // Ensure that we're connected to the leader
@@ -448,7 +448,7 @@ public class SimpleConsumerWrapper implements PinotKafkaConsumer {
     if (!fetchResponse.hasError()) {
       final Iterable<MessageAndOffset> messageAndOffsetIterable =
           buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
-      return Pair.of(messageAndOffsetIterable, fetchResponse.highWatermark(_topic, _partition));
+      return Pair.of((PinotKafkaMessagesIterable) new PinotKafkaMessagesImpl(messageAndOffsetIterable), fetchResponse.highWatermark(_topic, _partition));
     } else {
       throw exceptionForKafkaErrorCode(fetchResponse.errorCode(_topic, _partition));
     }
@@ -506,7 +506,7 @@ public class SimpleConsumerWrapper implements PinotKafkaConsumer {
    * milliseconds
    * @return An iterable containing messages fetched from Kafka and their offsets.
    */
-  public synchronized Iterable<MessageAndOffset> fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+  public synchronized PinotKafkaMessagesIterable fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
     return fetchMessagesAndHighWatermark(startOffset, endOffset, timeoutMillis).getLeft();
   }

@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import java.io.Closeable;
 import java.io.IOException;
-import kafka.message.MessageAndOffset;
 import org.apache.commons.lang3.tuple.Pair;
 
 
@@ -28,10 +27,10 @@ import org.apache.commons.lang3.tuple.Pair;
 public interface PinotKafkaConsumer extends Closeable {
   int getPartitionCount(String topic, long timeoutMillis);
 
-  Pair<Iterable<MessageAndOffset>, Long> fetchMessagesAndHighWatermark(long startOffset,
+  Pair<PinotKafkaMessagesIterable, Long> fetchMessagesAndHighWatermark(long startOffset,
         long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException;
 
-  Iterable<MessageAndOffset> fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+  PinotKafkaMessagesIterable fetchMessages(long startOffset, long endOffset, int timeoutMillis)
         throws java.util.concurrent.TimeoutException;
 
   long fetchPartitionOffset(String requestedOffset, int timeoutMillis)

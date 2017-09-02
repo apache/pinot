@@ -208,10 +208,11 @@ public class SimpleConsumerWrapperTest {
   @Test(enabled = false)
   public void testFetchOffsets()
       throws Exception {
-//    PinotKafkaConsumerFactory kafkaConsumerFactory = new MockPinotKafkaSimpleConsumerFactory();
-//    PinotKafkaConsumer consumerWrapper = kafkaConsumerFactory.buildConsumer("node1:1234,node2:2345", "clientId", "topic", 1, 123456L);
-//
-//    consumerWrapper.fetchPartitionOffset("smallest", 10000);
+    PinotKafkaConsumerFactory pinotKafkaConsumerFactory = new MockPinotKafkaSimpleConsumerFactory();
+    SimpleConsumerWrapper consumerWrapper = (MockSimpleConsumerWrapper) pinotKafkaConsumerFactory.buildConsumer(
+        "node1:1234,node2:2345", "clientId", "topic", 1, 123456L);
+
+    consumerWrapper.fetchPartitionOffset("smallest", 10000);
   }
 }
 
