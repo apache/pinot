@@ -32,6 +32,7 @@ export default Ember.Controller.extend({
   bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
+  isGroupNameDuplicate: false,
 
   legendText: {
     dotted: 'WoW',
@@ -694,6 +695,7 @@ export default Ember.Controller.extend({
       isReplayStatusSuccess: false,
       isReplayStarted: false,
       isReplayStatusError: false,
+      isGroupNameDuplicate: false,
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({}),
@@ -846,13 +848,24 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     validateNewGroupName(name) {
-      if (name && name.trim().length) {
-        this.setProperties({
-          newConfigGroupName: name,
-          selectedConfigGroup: null,
-          selectedGroupRecipients: null
-        });
+      this.set('isGroupNameDuplicate', false);
+      // return early if name is empty
+      if (!name || !name.trim().length) { return; }
+      const nameExists = this.get('allAlertsConfigGroups')
+        .map(group => group.name)
+        .includes(name);
+
+      // set error message and return early if group name exists
+      if (nameExists) {
+        this.set('isGroupNameDuplicate', true);
+        return;
       }
+
+      this.setProperties({
+        newConfigGroupName: name,
+        selectedConfigGroup: null,
+        selectedGroupRecipients: null
+      });
     },
 
     /**

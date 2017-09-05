@@ -271,6 +271,9 @@
     {{!--  Fields for new alert group creation --}}
     <div class="form-group col-sm-6">
       <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
+      {{#if isGroupNameDuplicate}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
+      {{/if}}
       {{input
         type="text"
         id="config-group-new-name"
@@ -278,6 +281,7 @@
         placeholder="New Group Name"
         value=newConfigGroupName
         key-up="validateNewGroupName"
+        focus-out="validateNewGroupName"
         disabled=(not isMetricSelected)
       }}
     </div>
