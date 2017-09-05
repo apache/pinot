@@ -151,8 +151,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
 
         StringBuilder queryResp = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
-          String line;
-          while ((line = reader.readLine()) != null) {
+          for (String line = reader.readLine(); line != null; line = reader.readLine()) {
             queryResp.append(line);
           }
         }
