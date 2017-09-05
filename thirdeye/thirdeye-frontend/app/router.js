@@ -11,7 +11,7 @@ Router.map(function() {
 
   this.route('manage', function() {
     this.route('alerts', function() {
-      this.route('edit', {path: '/:alertId'});
+      this.route('edit', { path: '/:alertId' });
     });
   });
 

@@ -143,7 +143,15 @@
 
     {{!-- Field: Sensitivity --}}
     <div class="form-group col-xs-6">
-      <label for="select-sensitivity" class="control-label te-label required">Sensitivity *</label>
+      <label for="select-sensitivity" class="control-label te-label required">
+        Sensitivity (optional)
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element}}
+            How sensitive do you want your alert to be?
+          {{/tooltip-on-element}}
+        </span>
+      </label>
       {{#power-select
         loadingMessage="Waiting for the server...."
         triggerId="select-sensitivity"
@@ -158,6 +166,7 @@
         required=true
         as |sensitivity|
       }}
+  
         {{sensitivity}}
       {{/power-select}}
     </div>

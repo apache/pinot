@@ -114,12 +114,14 @@ body {
 
 .te-search-results {
   border-bottom: 1px app-shade(black, 1) solid;
+  padding: 24px 0;
 
   &__list {
     list-style: none;
+    // margin-bottom: 24px;
 
     &--details-block {
-      padding: 0 15px 15px 15px;
+      padding: 0;
     }
   }
 
@@ -127,7 +129,8 @@ body {
     line-height: 22px;
 
     &--tag {
-      margin-top: 4px;
+      // margin-top: 4px;
+
     }
 
     &--title {
@@ -143,8 +146,9 @@ body {
     background-color: app-shade(black, 3);
     border-radius: 5px;
     padding: 4px 8px;
+    margin-right: $te-spacing-lg;
     color: app-shade(white, 8);
-
+    width: 150px;
     &--active {
       background-color: app-shade(black, 7);
     }
@@ -157,13 +161,12 @@ body {
 
 .te-search-header {
   padding-bottom: $te-spacing--sm;
-  margin-bottom: $te-spacing--sm;
   border-bottom: 1px app-shade(black, 1) solid;
 }
 
 .te-search-title {
-  font-size: 16px;
-  color: lighten(black, 25%);
+  font-size: 21px;
+  color: app-shade(black, 0.85);
 }
 
 .te-link--show {

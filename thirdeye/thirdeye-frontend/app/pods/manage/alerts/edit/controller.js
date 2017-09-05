@@ -53,6 +53,7 @@ export default Ember.Controller.extend({
   requiredFields: [
     'selectedMetricOption',
     'selectedPattern',
+    'selectedSensitivity',
     'alertFunctionName',
     'selectedAppName'
   ],
@@ -501,6 +502,7 @@ export default Ember.Controller.extend({
   isSubmitDisabled: Ember.computed(
     'selectedMetricOption',
     'selectedPattern',
+    'selectedSensitivity',
     'selectedWeeklyEffect',
     'alertFunctionName',
     'selectedAppName',

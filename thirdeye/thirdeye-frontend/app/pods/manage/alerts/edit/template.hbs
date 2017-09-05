@@ -1,1 +1,384 @@
-Editing: yoyoyo
+<h1 class="te-title">Create An Alert</h1>
+<main class="alert-create paper-container paper-container--padded te-form">
+
+  <fieldset class="te-form__section te-form__section--first row">
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">Metric Details</legend>
+    </div>
+    <div class="form-group col-xs-12 col-sm-8">
+      <div class="te-page-right te-page-right--inside">
+        {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
+          Import a Metric From InGraphs
+        {{/link-to}}
+      </div>
+      <label for="select-metric" class="control-label te-label required">Search for a Metric</label>
+      {{#power-select
+        search=(perform searchMetricsList)
+        selected=selectedMetricOption
+        onchange=(action "onSelectMetric")
+        loadingMessage="Waiting for the server...."
+        placeholder="Search by Metric Name"
+        searchPlaceholder="Type to filter..."
+        triggerId="select-metric"
+        triggerClass="te-form__select"
+        disabled=false
+        as |metric|
+      }}
+        {{metric.alias}}
+      {{/power-select}}
+    </div>
+
+    {{#if isSelectMetricError}}
+      {{#bs-alert type="danger"}}
+        <strong>{{selectMetricErrMsg}}</strong> Unable to fetch data for this metric.
+      {{/bs-alert}}
+    {{/if}}
+
+    <div class="form-group col-xs-6 col-sm-4">
+      <label for="select-granularity" class="control-label te-label">Desired Granularity</label>
+      {{#power-select
+        options=metricGranularityOptions
+        selected=selectedGranularity
+        onchange=(action "onSelectGranularity")
+        placeholder="Select a Granularity"
+        searchPlaceholder="Type to filter..."
+        triggerId="select-granularity"
+        triggerClass="te-form__select"
+        disabled=isGranularitySelectDisabled
+        as |granularity|
+      }}
+        {{granularity}}
+      {{/power-select}}
+    </div>
+
+    <div class="form-group col-xs-6">
+      <label for="select-filters" class="control-label te-label required">Filters (optional)</label>
+      {{filter-select
+        options=filters
+        selected=selectedFilters
+        triggerId="select-filters"
+        onChange=(action "onSelectFilter")
+        disabled=isFilterSelectDisabled
+      }}
+    </div>
+
+    <div class="form-group col-xs-6">
+      <label for="select-dimension" class="control-label te-label">Dimension (optional)</label>
+      {{#power-select
+        classNames="te-input"
+        options=dimensions
+        selected=selectedDimension
+        onchange=(action (mut selectedDimension))
+        loadingMessage="Waiting for the server...."
+        placeholder="Break Dimensions By..."
+        searchPlaceholder="Type to filter..."
+        triggerId="select-dimension"
+        triggerClass="te-form__select"
+        disabled=(not isMetricSelected)
+        as |dimension|
+      }}
+        {{dimension}}
+      {{/power-select}}
+    </div>
+
+    <div class="col-xs-12">
+      <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
+        {{#if isMetricDataLoading}}
+          <section>
+            <div class="spinner-wrapper--self-serve">
+              {{ember-spinner}}
+            </div>
+          </section>
+        {{/if}}
+        {{#if isMetricSelected}}
+          {{anomaly-graph
+            primaryMetric=selectedMetric
+            isLoading=loading
+            showSubchart=true
+            showLegend=false
+            legendText=legendText
+            enableZoom=true
+            componentId='create-alert'
+            showGraphLegend=false
+            height=400
+          }}
+          <div class="te-form__note">
+            NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
+          </div>
+        {{else}}
+          <div class="te-graph-alert__content">
+            <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
+            <p class="te-graph-alert__pre-text">{{graphMessageText}}</p>
+          </div>
+        {{/if}}
+      </div>
+    </div>
+    
+  </fieldset>
+
+  <fieldset class="te-form__se  ction row">
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">Detection Configuration</legend>
+    </div>
+    {{!-- Field: Pattern --}}
+    <div class="form-group col-xs-6">
+      <label for="select-pattern" class="control-label te-label required">Pattern of Interest *</label>
+      {{#power-select
+        loadingMessage="Waiting for the server...."
+        triggerId="select-pattern"
+        triggerClass="te-form__select"
+        placeholder="Select a Pattern"
+        loadingMessage="Please select a metric first"
+        options=patternsOfInterest
+        searchEnabled=false
+        selected=selectedPattern
+        onchange=(action (mut selectedPattern))
+        disabled=(not isMetricSelected)
+        required=true
+        as |name|
+      }}
+        {{name}}
+      {{/power-select}}
+    </div>
+
+    {{!-- Field: Sensitivity --}}
+    <div class="form-group col-xs-6">
+      <label for="select-sensitivity" class="control-label te-label required">Sensitivity *</label>
+      {{#power-select
+        loadingMessage="Waiting for the server...."
+        triggerId="select-sensitivity"
+        triggerClass="te-form__select"
+        placeholder="Select a sensitivity"
+        loadingMessage="Please select a metric first"
+        options=sensitivityOptions
+        searchEnabled=false
+        selected=selectedSensitivity
+        onchange=(action (mut selectedSensitivity))
+        disabled=(not isMetricSelected)
+        required=true
+        as |sensitivity|
+      }}
+        {{sensitivity}}
+      {{/power-select}}
+    </div>
+
+    {{!-- Field: Weekly Effect --}}
+    {{#if (eq selectedGranularity 'DAYS')}}
+      <div class="form-group col-xs-6">
+        <label for="select-effect" class="control-label te-label required">
+          Weekly Seasonality *
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element}}
+              Does your metric behave differently depending on the day of the week?
+            {{/tooltip-on-element}}
+          </span>
+        </label>
+        {{#x-toggle 
+          value=selectedWeeklyEffect 
+          classNames="te-toggle te-toggle--form te-toggle--left"
+          theme='ios'
+          showLabels=true
+          name="splitViewToggle"
+          disabled=(not isMetricSelected)
+          onToggle=(action (mut selectedWeeklyEffect))
+          as |toggle|}}
+            {{#toggle.label value=selectedWeeklyEffect}}
+              <span class="te-label te-label--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
+            {{/toggle.label}}
+            {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+        {{/x-toggle}} 
+      </div>
+    {{/if}}
+
+  </fieldset>
+
+  <fieldset class="te-form__section row">
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">Alert Details</legend>
+    </div>
+
+    {{!-- Field: Alert Name --}}
+    <div class="form-group col-xs-12">
+      <label for="anomaly-form-function-name" class="control-label te-label required">
+        Alert Name *
+        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">productName_metricName_dimensionName_other</span></div>
+      </label>
+      {{#if isAlertNameDuplicate}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
+      {{/if}}
+      {{input
+        type="text"
+        id="anomaly-form-function-name"
+        class="form-control te-input"
+        placeholder="Add a descriptive alert name"
+        value=alertFunctionName
+        focus-out="validateAlertName"
+        key-up="validateAlertName"
+        disabled=(not isMetricSelected)
+      }}
+    </div>
+
+
+    {{!-- Field: App Name --}}
+    <div class="form-group col-xs-12">
+      <label for="anomaly-form-app-name" class="control-label te-label required">Related Product or Team *</label>
+       {{#power-select
+          options=allApplicationNames
+          selected=selectedAppName
+          onchange=(action "onSelectAppName")
+          loadingMessage="Waiting for the server...."
+          placeholder="Select an existing product/team name"
+          searchPlaceholder="Type to filter..."
+          triggerId="anomaly-form-app-name"
+          triggerClass="te-form__select"
+          disabled=(not isMetricSelected)
+          as |app|
+        }}
+          {{app.application}}
+        {{/power-select}}
+    </div>
+
+
+
+    {{!-- Field: Select Existing Subscription Group --}}
+    <div class="form-group col-sm-6">
+      <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
+      {{#power-select
+        options=filteredConfigGroups
+        selected=selectedConfigGroup
+        onchange=(action "onSelectConfigGroup")
+        disabled=(not isMetricSelected)
+        loadingMessage="Waiting for the server...."
+        placeholder="Select an existing alert subscription group"
+        searchPlaceholder="Type to filter..."
+        triggerId="config-group"
+        triggerClass="te-form__select"
+        as |group|
+      }}
+        {{group.name}}
+      {{/power-select}}
+    </div>
+    {{!--  Fields for new alert group creation --}}
+    <div class="form-group col-sm-6">
+      <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
+      {{input
+        type="text"
+        id="config-group-new-name"
+        class="form-control te-input"
+        placeholder="New Group Name"
+        value=newConfigGroupName
+        key-up="validateNewGroupName"
+        disabled=(not isMetricSelected)
+      }}
+    </div>
+    {{!-- Alert Group Metadata --}}
+    {{#if selectedConfigGroup}}
+      <div class="form-group col-xs-12">
+        {{#if selectedGroupFunctions.length}}
+          {{#bs-accordion as |acc|}}
+            {{#acc.item class="te-form__custom-label" title=selectedConfigGroupSubtitle}}
+              {{models-table
+                data=selectedGroupFunctions
+                columns=alertsTableColumns
+                showGlobalFilter=false
+                showColumnsDropdown=false
+                filteringIgnoreCase=true
+              }}
+            {{/acc.item}}
+          {{/bs-accordion}}
+        {{else}}
+          <span class="alert-group-functions__item--id">NONE</span>
+        {{/if}}
+      </div>
+    {{/if}}
+    {{!-- Field: new alert group recipient emails --}}
+    <div class="form-group col-xs-12">
+      <label for="config-group" class="control-label te-label">
+        Add Alert Notification Recipients *
+        <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "None"}}</span></div>
+      </label>
+      {{#if isDuplicateEmail}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>
+      {{/if}}
+      {{input
+        type="email"
+        id="config-group-add-recipients"
+        class="form-control te-input"
+        focus-out="validateAlertEmail"
+        key-up="validateAlertEmail"
+        placeholder="Add additional recipients (comma-separated email addresses)"
+        autocomplete=false
+        value=alertGroupNewRecipient
+        disabled=(not isMetricSelected)
+        required=true
+      }}
+    </div>
+  </fieldset>
+
+  {{#if isCreateAlertSuccess}}
+    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+      <strong>Create Alert Success!</strong> You have created anomaly alert Id <strong>{{finalFunctionId}}</strong>
+      {{#if selectedConfigGroup}}
+        ... and assigned it to existing notification group <strong>{{selectedConfigGroup.name}}</strong>.
+      {{/if}}
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if isCreateAlertError}}
+    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+      <strong>Create Alert Error!</strong> Alert creation has failed. Please try again.
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if isCreateGroupSuccess}}
+    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+      <strong>New Group Success!</strong> You have created anomaly notification group <strong>{{newConfigGroupName}}</strong>.
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if isReplayStarted}}
+    {{#bs-alert type=bsAlertBannerType class="te-form__banner" classNameBindings="replayStatusClass"}}
+      {{#if isReplayStatusPending}}
+        ...triggering replay. Please wait.
+      {{/if}}
+      {{#if isReplayStatusSuccess}}
+        <strong>Replay Success!</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has started processing.
+      {{/if}}
+      {{#if isReplayStatusError}}
+        <strong>Replay Warning:</strong> {{failureMessage}}
+      {{/if}}
+    {{/bs-alert}}
+  {{/if}}
+
+  <fieldset class="te-form__section-submit">
+    {{bs-button
+      defaultText="Clear All"
+      type="outline-primary"
+      buttonType="cancel"
+      onClick=(action "onResetForm")
+      class="te-submit-button"
+    }}
+    {{#if isFormDisabled}}
+      {{bs-button
+        defaultText="Create Another Alert"
+        type="primary"
+        onClick=(action "onResetForm")
+        buttonType="submit"
+        class="te-submit-button"
+      }}
+    {{else}}
+      {{bs-button
+        defaultText="Create & Activate Alert"
+        type="primary"
+        onClick=(action "onSubmit")
+        buttonType="submit"
+        disabled=isSubmitDisabled
+        class="te-submit-button"
+      }}
+    {{/if}}
+
+  </fieldset>
+
+  {{outlet}}
+</main>

@@ -67,11 +67,55 @@ body {
 }
 
 .te-search-results {
+  color: app-shade(black, 0.7);
+  &__header {
+    display: flex;    
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $te-spacing;
+  }
+
+  &__row {
+    display: flex;
+  }
+  &__option {
+    display: inline-block;
+    width: 120px;
+    min-width: 120px;
+    font-weight: 600;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  &__edit-button {
+    margin-left: $te-spacing;
+  }
+
+  &__title-group {
+    color: app-shade(black,0.85);	
+    font-size: 21px;
+    display: flex; 
+    align-items: center;
+    flex-shrink: 1;
+    overflow: hidden;
+  }
+  
+  &__title {
+    min-width: 120px;
+  }
+
   &__list {
+    font-weight: normal;
     margin-bottom: 0;
 
     &--summary-block {
-      padding: 5px 10px 10px 0;
+      padding: 0;
     }
   }
 
@@ -89,15 +133,17 @@ body {
   }
 
   &__tag {
-    font-weight: 400;
-    letter-spacing: 1px;
+    font-size: 15px;
+    border-radius: 2px;
 
     &--active {
-      background-color: $te-blue;
+      color: #398B18;
+      background-color: #DCF0CB;    
     }
 
-    &--active {
-      background-color: $te-blue;
+    &--inactive {
+      background-color: $te-red;
+      background-color: lighten($te-red, 30%);
     }
   }
 }
