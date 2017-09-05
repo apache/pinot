@@ -28,6 +28,8 @@ import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -150,6 +152,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   // Whether to start with 0 off-heap storage. Items are added to the overflow map first, until it reaches
   // a threshold, and then the off-heap structures are allocated.
   private static final boolean HEAP_FIRST = true;
+
+  public static Logger LOGGER = LoggerFactory.getLogger(BaseOffHeapMutableDictionary.class);
 
   private final int _maxItemsInOverflowHash;
 
@@ -296,6 +300,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     for (IntBuffer iBuf : oldList) {
       newList.add(iBuf);
     }
+    LOGGER.info("Allocating {} bytes for column {}", bbSize, _columnName);
     PinotDataBuffer buffer = _memoryManager.allocate(bbSize, _columnName);
     _pinotDataBuffers.add(buffer);
     buffer.order(ByteOrder.nativeOrder());

@@ -425,10 +425,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
       segmentStats.setNumRowsConsumed(numDocsIndexed);
       segmentStats.setMemUsedBytes(memoryManager.getTotalMemBytes());
-      LOGGER.info("Segment used {} bytes of memory", memoryManager.getTotalMemBytes());
       final long now = System.currentTimeMillis();
-      segmentStats.setNumSeconds((int)((now - startTimeMillis)/1000));
+      final int numSeconds  = (int)((now - startTimeMillis)/1000);
+      segmentStats.setNumSeconds(numSeconds);
       statsHistory.addSegmentStats(segmentStats);
+      LOGGER.info("Segment used {} bytes of memory for {} rows consumed in {} seconds",
+          memoryManager.getTotalMemBytes(), numDocsIndexed, numSeconds);
       statsHistory.save();
     }
 

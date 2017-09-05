@@ -25,6 +25,8 @@ import java.util.List;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -84,6 +86,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 public class OffHeapStringStore implements Closeable {
   private static final int START_SIZE = 32 * 1024;
   private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
+  public static Logger LOGGER = LoggerFactory.getLogger(OffHeapStringStore.class);
 
   public static int getStartSize() {
     return START_SIZE;
@@ -104,6 +107,7 @@ public class OffHeapStringStore implements Closeable {
       if (size >= Integer.MAX_VALUE) {
         size = Integer.MAX_VALUE - 1;
       }
+      LOGGER.info("Allocationg string buffer of size {} for column {}", size, columnName);
       _pinotDataBuffer = memoryManager.allocate(size, columnName);
       _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
