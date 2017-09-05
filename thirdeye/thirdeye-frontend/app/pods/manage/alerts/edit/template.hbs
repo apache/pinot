@@ -49,6 +49,22 @@
         disabled=true
       }}
     </div>
+
+    <div class="col-xs-12">
+      <div class="te-graph-alert">
+        {{anomaly-graph
+          primaryMetric=metricData
+          showSubchart=true
+          showLegend=false
+          legendText=legendText
+          enableZoom=true
+          componentId='create-alert'
+          showGraphLegend=false
+          height=400
+        }}
+      </div>
+    </div>
+    
   </fieldset>
 
   <fieldset class="te-form__section row">

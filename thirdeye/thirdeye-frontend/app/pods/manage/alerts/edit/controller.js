@@ -65,6 +65,8 @@ export default Ember.Controller.extend({
 
   selectedAppName: Ember.computed.reads('model.application'),
 
+  metricData: Ember.computed.reads('model.metricData'),
+
 
   // /**
   //  * Initialized alert creation page settings
@@ -88,10 +90,10 @@ export default Ember.Controller.extend({
   // graphEmailLinkProps: '',
   // replayStatusClass: 'te-form__banner--pending',
 
-  // legendText: {
-  //   dotted: 'WoW',
-  //   solid: 'Observed'
-  // },
+  legendText: {
+    dotted: 'WoW',
+    solid: 'Observed'
+  },
 
   // /**
   //  * Component property initial settings
