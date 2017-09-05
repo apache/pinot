@@ -33,6 +33,7 @@ export default Ember.Controller.extend({
   graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
   isGroupNameDuplicate: false,
+  isAlertNameDuplicate: false,
 
   legendText: {
     dotted: 'WoW',
@@ -508,6 +509,8 @@ export default Ember.Controller.extend({
     'selectedConfigGroup',
     'newConfigGroupName',
     'alertGroupNewRecipient',
+    'isAlertNameDuplicate',
+    'isGroupNameDuplicate',
     function() {
       let isDisabled = false;
       const requiredFields = this.get('requiredFields');
@@ -520,6 +523,12 @@ export default Ember.Controller.extend({
       }
       // Enable submit if either of these field values are present
       if (Ember.isBlank(this.get('selectedConfigGroup')) && Ember.isBlank(this.get('newConfigGroupName'))) {
+        isDisabled = true;
+      }
+
+      // Duplicate alert Name or group name
+
+      if (this.get('isAlertNameDuplicate') || this.get('isGroupNameDuplicate')) {
         isDisabled = true;
       }
       // For alert group email recipients, require presence only if group recipients is empty
@@ -696,6 +705,7 @@ export default Ember.Controller.extend({
       isReplayStarted: false,
       isReplayStatusError: false,
       isGroupNameDuplicate: false,
+      isAlertNameDuplicate: false,
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({}),
