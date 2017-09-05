@@ -15,10 +15,14 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.core.data.GenericRow;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,9 +37,6 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.core.data.GenericRow;
 
 
 @NotThreadSafe
@@ -134,6 +135,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
   private static class SchemaFetcher implements Callable<Boolean> {
     private org.apache.avro.Schema _schema;
     private URL url;
+    private boolean _isSuccessful = false;
 
     SchemaFetcher(URL url) {
       this.url = url;
@@ -142,15 +144,22 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     @Override
     public Boolean call() throws Exception {
       try {
-        BufferedReader reader = null;
+        URLConnection conn = url.openConnection();
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
+        LOGGER.info("Fetching schema using url {}", url.toString());
 
-        reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"));
         StringBuilder queryResp = new StringBuilder();
-        for (String respLine; (respLine = reader.readLine()) != null; ) {
-          queryResp.append(respLine);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+          String line;
+          while ((line = reader.readLine()) != null) {
+            queryResp.append(line);
+          }
         }
+
         _schema = org.apache.avro.Schema.parse(queryResp.toString());
 
+        LOGGER.info("Schema fetch succeeded on url {}", url.toString());
         return Boolean.TRUE;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while fetching schema", e);
