@@ -1,5 +1,6 @@
 import Ember from 'ember';
 import fetch from 'fetch';
+import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Route.extend({
   model(params) {
@@ -7,6 +8,10 @@ export default Ember.Route.extend({
     if (!id) { return; }
 
     const url = `onboard/function/${id}`;
-    return fetch(url).then(res => res.json());
+    return fetch(url).then(checkStatus);
   }
+
+  // afterModel() {
+
+  // },
 });

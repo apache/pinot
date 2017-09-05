@@ -366,7 +366,7 @@
       type="outline-primary"
       buttonType="cancel"
       onClick=(action "onResetForm")
-      class="te-submit-button"
+      class="te-button te-button--cancel"
     }}
     {{#if isFormDisabled}}
       {{bs-button
@@ -374,7 +374,7 @@
         type="primary"
         onClick=(action "onResetForm")
         buttonType="submit"
-        class="te-submit-button"
+        class="te-button te-button--submit"
       }}
     {{else}}
       {{bs-button
@@ -383,7 +383,7 @@
         onClick=(action "onSubmit")
         buttonType="submit"
         disabled=isSubmitDisabled
-        class="te-submit-button"
+        class="te-button te-button--submit"
       }}
     {{/if}}
 

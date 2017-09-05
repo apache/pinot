@@ -96,11 +96,15 @@ body {
       font-weight: normal;
     }
   }
-
+  
+  &--read-only:disabled {
+    color: app-shade(black, 0.55);    
+  }
 
   &:hover:not(:disabled){
     border-color: app-shade(black, 0.55);
   }
+
 }
 
 .te-page-right {
@@ -176,4 +180,35 @@ body {
 
 .te-link--hide {
   display: none;
+}
+
+.te-button {
+  border-radius: 2px; 
+  border: 1px solid #339BC7;
+  margin: 0 1px;
+  font-size: 17px;
+
+  &--cancel {
+    background-color: white;
+    color: #339BC7;
+    a {
+      color: #339BC7;
+    }
+    &:hover,
+    a:hover {
+      color: #339BC7;      
+      text-decoration: none;
+    }
+  }
+
+  &--submit {
+    background-color: #1A84BC;
+    color: white;
+    &:hover,
+    a:hover {
+      color: white;
+      text-decoration: none;
+    }
+  }
+
 }

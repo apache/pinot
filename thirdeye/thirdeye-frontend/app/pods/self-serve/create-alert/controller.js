@@ -362,7 +362,7 @@ export default Ember.Controller.extend({
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
     const recipients = this.get('selectedConfigGroup.recipients');
-    const selectedSensitivity = this.getProperties('selectedWeeklyEffect');
+    const selectedSensitivity = this.getProperties('selectedSensitivity');
     const sensitivy = this.sensitivityMapping[selectedSensitivity];
 
     const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
