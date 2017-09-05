@@ -5,23 +5,11 @@ env:
   - RUN_INTEGRATION_TESTS=false
 
 jdk:
-  - oraclejdk7
-  - openjdk7
   - oraclejdk8
-
-matrix:
-  exclude:
-    - jdk: openjdk7
-      env: RUN_INTEGRATION_TESTS=false
-    - jdk: oraclejdk8
-      env: RUN_INTEGRATION_TESTS=false
 
 cache:
   directories:
     - $HOME/.m2
-
-dist: precise
-sudo: false
 
 install:
   - ./.travis_install.sh

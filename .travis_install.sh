@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-# Ignore changes not related to pinot code
+# Fail the install if commit range is invalid
 echo 'Changed files:'
 git diff --name-only $TRAVIS_COMMIT_RANGE
 if [ $? -ne 0 ]; then
