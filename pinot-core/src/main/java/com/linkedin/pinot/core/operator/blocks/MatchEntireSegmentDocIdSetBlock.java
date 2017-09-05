@@ -21,7 +21,6 @@ import com.linkedin.pinot.core.operator.docidsets.SizeBasedDocIdSet;
 
 
 public class MatchEntireSegmentDocIdSetBlock extends BaseFilterBlock {
-
   private final int _totalDocs;
 
   public MatchEntireSegmentDocIdSetBlock(int totalDocs) {
@@ -30,7 +29,8 @@ public class MatchEntireSegmentDocIdSetBlock extends BaseFilterBlock {
 
   @Override
   public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-    return new SizeBasedDocIdSet(_totalDocs);
+    int maxDocId = _totalDocs - 1;
+    return new SizeBasedDocIdSet(maxDocId);
   }
 
   @Override

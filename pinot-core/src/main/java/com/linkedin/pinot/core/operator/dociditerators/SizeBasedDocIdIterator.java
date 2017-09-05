@@ -18,38 +18,36 @@ package com.linkedin.pinot.core.operator.dociditerators;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
+
 public final class SizeBasedDocIdIterator implements BlockDocIdIterator {
-  int counter = 0;
-  private int maxDocId;
+  private final int _maxDocId;
+  private int _currentDocId = -1;
 
   public SizeBasedDocIdIterator(int maxDocId) {
-    this(0, maxDocId);
-  }
-
-  public SizeBasedDocIdIterator(int minDocId, int maxDocId) {
-    this.maxDocId = maxDocId;
-  }
-
-  @Override
-  public int advance(int targetDocId) {
-    if (targetDocId < maxDocId) {
-      counter = targetDocId;
-      return counter;
-    } else {
-      return Constants.EOF;
-    }
+    _maxDocId = maxDocId;
   }
 
   @Override
   public int next() {
-    if (counter >= maxDocId) {
+    if (_currentDocId >= _maxDocId) {
       return Constants.EOF;
+    } else {
+      return ++_currentDocId;
     }
-    return counter++;
+  }
+
+  @Override
+  public int advance(int targetDocId) {
+    _currentDocId = targetDocId;
+    if (_currentDocId >= _maxDocId) {
+      return Constants.EOF;
+    } else {
+      return _currentDocId;
+    }
   }
 
   @Override
   public int currentDocId() {
-    return counter;
+    return _currentDocId;
   }
 }
