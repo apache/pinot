@@ -66,6 +66,20 @@
         disabled=true
       }}
     </div>
+
+    {{!-- Field: Sensitivity --}}
+    <div class="form-group col-xs-6">
+      <label for="select-sensitivity" class="control-label te-label required">Sensitivity *</label>
+      {{input
+        type="text"
+        id="select-sensitivity"
+        class="form-control te-input te-input--read-only"
+        value=sensitivity
+        disabled=true
+      }}
+    </div>
+
+    {{!-- Field: Weekly Effect --}}
     {{#if (eq granularity 'DAYS')}}
       <div class="form-group col-xs-6">
         <label for="select-effect" class="control-label te-label required">
@@ -209,7 +223,7 @@
         {{/if}}
       </div>
     {{/if}}
-    
+
     {{!-- Field: new alert group recipient emails --}}
     <div class="form-group col-xs-12">
       <label for="config-group" class="control-label te-label">

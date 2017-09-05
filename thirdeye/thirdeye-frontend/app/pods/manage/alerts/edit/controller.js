@@ -47,6 +47,18 @@ export default Ember.Controller.extend({
     return props.weeklyEffectModeled;
   }),
 
+  sensitivity: Ember.computed('properties', function() {
+    const props = this.get('properties');
+    const sensitivity = props.userDefinedPattern;
+    const sensitivityMapping = {
+      LOW: 'robust',
+      MEDIUM: 'medium',
+      HIGHT: 'high'
+    };
+
+    return sensitivityMapping[sensitivity];
+  }),
+
   alertFunctionName: Ember.computed.reads('model.functionName'),
 
   isActive: Ember.computed.reads('model.isActive'),

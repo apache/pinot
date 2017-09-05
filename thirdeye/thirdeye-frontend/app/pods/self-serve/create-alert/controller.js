@@ -970,6 +970,10 @@ export default Ember.Controller.extend({
             isMetricSelected: false,
             isMetricDataInvalid: false
           });
+          return newFunctionId;
+        })
+        .then((id) => {
+          this.transitionToRoute('manage.alerts.edit', id);
         })
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         .catch((error) => {
