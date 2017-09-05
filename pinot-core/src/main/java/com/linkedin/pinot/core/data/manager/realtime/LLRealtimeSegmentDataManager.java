@@ -47,7 +47,6 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaMessageAndOffset;
-import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaMessagesImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaMessagesIterable;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
@@ -388,7 +387,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         throw new RuntimeException("Realtime segment full");
       }
       // Index each message
-      PinotKafkaMessageAndOffset pinotKafkaMessageAndOffset = ((PinotKafkaMessagesImpl) messagesAndOffsets).decodeMessageAndOffset(decodedRow, msgIterator.next(), _messageDecoder);
+      PinotKafkaMessageAndOffset pinotKafkaMessageAndOffset = (messagesAndOffsets).decodeMessageAndOffset(decodedRow, msgIterator.next(), _messageDecoder);
       decodedRow = pinotKafkaMessageAndOffset.getDecodedRow();
 
       // Update lag metric on the first message of each batch

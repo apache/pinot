@@ -33,13 +33,15 @@ public class PinotKafkaMessagesImpl implements PinotKafkaMessagesIterable {
    return this;
   }
 
-  public PinotKafkaMessageAndOffset decodeMessageAndOffset(GenericRow decodedRow, Object message, KafkaMessageDecoder decoder) {
+  public PinotKafkaMessageAndOffset decodeMessageAndOffset(GenericRow decodedRow, Object message, Object decoder) {
     MessageAndOffset messageAndOffset = (MessageAndOffset) message;
     byte[] array = messageAndOffset.message().payload().array();
     int offset = messageAndOffset.message().payload().arrayOffset();
     int length = messageAndOffset.message().payloadSize();
     decodedRow = GenericRow.createOrReuseRow(decodedRow);
-    return new PinotKafkaMessageAndOffset(decoder.decode(array, offset, length, decodedRow), messageAndOffset.offset(), messageAndOffset.nextOffset());
+
+    KafkaMessageDecoder messageDecoder = (KafkaMessageDecoder) decoder;
+    return new PinotKafkaMessageAndOffset(messageDecoder.decode(array, offset, length, decodedRow), messageAndOffset.offset(), messageAndOffset.nextOffset());
   }
 
   public Iterator iterator() {

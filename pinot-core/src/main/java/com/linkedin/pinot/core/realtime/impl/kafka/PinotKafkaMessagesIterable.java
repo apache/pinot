@@ -23,7 +23,7 @@ import java.util.Iterator;
 public interface PinotKafkaMessagesIterable extends Iterable {
   PinotKafkaMessagesIterable getMessages();
 
-  PinotKafkaMessageAndOffset decodeMessageAndOffset(GenericRow decodedRow, Object message, KafkaMessageDecoder decoder);
+  PinotKafkaMessageAndOffset decodeMessageAndOffset(GenericRow decodedRow, Object message, Object decoder);
 
   Iterator<PinotKafkaMessagesIterable> iterator();
 }
