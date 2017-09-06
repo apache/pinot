@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.FilterPattern;
 import java.lang.reflect.Field;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,7 +11,6 @@ import org.slf4j.LoggerFactory;
 
 public abstract class BaseAlertFilter implements AlertFilter {
   private final static Logger LOG = LoggerFactory.getLogger(BaseAlertFilter.class);
-
 
 
   /**
@@ -76,5 +77,10 @@ public abstract class BaseAlertFilter implements AlertFilter {
         LOG.warn("Failed to set the field {} for class {} exception: {}", fieldName, c.getSimpleName(), e.toString());
       }
     }
+  }
+
+
+  public Properties toProperties(){
+    return new Properties();
   }
 }
