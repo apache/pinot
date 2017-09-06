@@ -72,7 +72,7 @@ public class HavingClauseComparisonTree {
           new NotEqualComparison(havingFilterQuery.getValue().get(0), havingFilterQuery.getAggregationInfo());
     } else if (operator == FilterOperator.RANGE) {
       String value = havingFilterQuery.getValue().get(0);
-      comparisonFunction = havingRangStringToComparisonFunction(value, havingFilterQuery.getAggregationInfo());
+      comparisonFunction = havingRangeStringToComparisonFunction(value, havingFilterQuery.getAggregationInfo());
     } else if (operator == FilterOperator.NOT_IN) {
       comparisonFunction =
           new InAndNotInComparison(havingFilterQuery.getValue().get(0), true, havingFilterQuery.getAggregationInfo());
@@ -85,7 +85,7 @@ public class HavingClauseComparisonTree {
     return comparisonFunction;
   }
 
-  private static ComparisonFunction havingRangStringToComparisonFunction(String rangeString,
+  private static ComparisonFunction havingRangeStringToComparisonFunction(String rangeString,
       AggregationInfo aggregationInfo) {
     ComparisonFunction comparisonFunction = null;
     if (rangeString.matches("\\(\\*\\t\\t[-]?[0-9].*\\)")) {
@@ -105,6 +105,18 @@ public class HavingClauseComparisonTree {
       comparisonFunction = new BetweenComparison(tokens[1], tokens[2], aggregationInfo);
     }
     return comparisonFunction;
+  }
+
+  public FilterOperator getFilterOperator() {
+    return _filterOperator;
+  }
+
+  public ComparisonFunction getComparisonFunction() {
+    return _comparisonFunction;
+  }
+
+  public List<HavingClauseComparisonTree> getSubComparisonTree() {
+    return _subComparisonTree;
   }
 
   //This function evaluates if a group with its aggregation function results pass the Comparison Tree or Not

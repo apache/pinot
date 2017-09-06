@@ -27,16 +27,6 @@ public class HavingQueryTree extends QueryTree {
 
   public HavingQueryTree(AggregationInfo aggregationInfo, List<String> value, FilterOperator operator,
       List<HavingQueryTree> children) {
-    this._id = System.identityHashCode(this);
-    this._value = value;
-    this._aggregationInfo = aggregationInfo;
-    this._operator = operator;
-    this._children = children;
-  }
-
-  public HavingQueryTree(int id, AggregationInfo aggregationInfo, List<String> value, FilterOperator operator,
-      List<HavingQueryTree> children) {
-    this._id = id;
     this._value = value;
     this._aggregationInfo = aggregationInfo;
     this._operator = operator;
@@ -64,7 +54,7 @@ public class HavingQueryTree extends QueryTree {
       stringBuffer.append(' ');
     }
     if (_operator == FilterOperator.OR || _operator == FilterOperator.AND) {
-      stringBuffer.append(_operator).append(" (").append(_id).append(")");
+      stringBuffer.append(_operator);
     } else {
       stringBuffer.append(_aggregationInfo.getAggregationType())
           .append("(")
@@ -73,10 +63,7 @@ public class HavingQueryTree extends QueryTree {
           .append(" ")
           .append(_operator)
           .append(" ")
-          .append(_value)
-          .append(" (")
-          .append(_id)
-          .append(")");
+          .append(_value);
     }
     if (_children != null) {
       for (QueryTree child : _children) {

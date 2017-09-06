@@ -16,17 +16,21 @@
 package com.linkedin.pinot.core.query.reduce;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
-import java.math.BigDecimal;
+import org.slf4j.LoggerFactory;
 
 
 public class BetweenComparison extends ComparisonFunction {
-  private BigDecimal _rightValue;
-  private BigDecimal _leftValue;
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(BetweenComparison.class);
+  private double _rightValue;
+  private double _leftValue;
 
   public BetweenComparison(String leftValue, String rightValue, AggregationInfo aggregationInfo) {
-    this._leftValue = new BigDecimal(leftValue);
-    this._rightValue = new BigDecimal(rightValue);
-
+    try {
+      this._leftValue = Double.parseDouble(leftValue);
+      this._rightValue = Double.parseDouble(rightValue);
+    } catch (Exception e) {
+      LOGGER.info("Exception in creating HAVING clause BETWEEN predicate", e);
+    }
     if (!aggregationInfo.getAggregationParams().get("column").equals("*")) {
       this._functionExpression =
           aggregationInfo.getAggregationType() + "_" + aggregationInfo.getAggregationParams().get("column");
@@ -38,14 +42,23 @@ public class BetweenComparison extends ComparisonFunction {
   @Override
   public boolean isComparisonValid(String aggResult) {
     try {
-      BigDecimal middleValue = new BigDecimal(aggResult);
-      if ((middleValue.compareTo(_leftValue) >= 0) && (middleValue.compareTo(_rightValue) <= 0)) {
+      double middleValue = Double.parseDouble(aggResult);
+      if (middleValue >= _leftValue && middleValue <= _rightValue) {
         return true;
       } else {
         return false;
       }
     } catch (Exception e) {
+      LOGGER.info("Exception in applying HAVING clause BETWEEN predicate", e);
       return false;
     }
+  }
+
+  public double getRightValue() {
+    return _rightValue;
+  }
+
+  public double getLeftValue() {
+    return _leftValue;
   }
 }

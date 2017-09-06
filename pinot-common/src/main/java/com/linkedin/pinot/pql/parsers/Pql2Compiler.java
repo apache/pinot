@@ -121,9 +121,7 @@ public class Pql2Compiler implements AbstractCompiler {
   }
 
   private void validateHavingClause(AstNode rootNode) {
-
     List<? extends AstNode> children = rootNode.getChildren();
-
     BaseAstNode outList = (BaseAstNode) children.get(0);
     HavingAstNode havingList = null;
     boolean isThereHaving = false;
@@ -139,7 +137,6 @@ public class Pql2Compiler implements AbstractCompiler {
           Check if the HAVING predicate function call is in the select list;
           if not: add the missing function call to select list and set isInSelectList to false
           */
-
       List<FunctionCallAstNode> functionCalls = havingTreeDFSTraversalToFindFunctionCalls(havingList);
       if (functionCalls.isEmpty()) {
         throw new Pql2CompilationException("HAVING clause needs to have minimum one function call comparison");
@@ -152,8 +149,8 @@ public class Pql2Compiler implements AbstractCompiler {
           OutputColumnAstNode selectItem = (OutputColumnAstNode) anOutListChildren;
           if (selectItem.getChildren().get(0) instanceof FunctionCallAstNode) {
             FunctionCallAstNode function = (FunctionCallAstNode) selectItem.getChildren().get(0);
-            if (function.getExpression().equals(havingFunction.getExpression()) && function.getName()
-                .equals(havingFunction.getName())) {
+            if (function.getExpression().equalsIgnoreCase(havingFunction.getExpression()) && function.getName()
+                .equalsIgnoreCase(havingFunction.getName())) {
               functionCallIsInSelectList = true;
               break;
             }
@@ -186,7 +183,7 @@ public class Pql2Compiler implements AbstractCompiler {
         }
         functionCalls.add(((ComparisonPredicateAstNode) visitingNode).getFunction());
       } else if (visitingNode instanceof BetweenPredicateAstNode) {
-        if (!((ComparisonPredicateAstNode) visitingNode).isItFunctionCallComparison()) {
+        if (!((BetweenPredicateAstNode) visitingNode).isItFunctionCallComparison()) {
           throw new Pql2CompilationException("Having predicate only compares function calls");
         }
         if (!NumberUtils.isNumber(((BetweenPredicateAstNode) visitingNode).getLeftValue())) {
@@ -197,7 +194,7 @@ public class Pql2Compiler implements AbstractCompiler {
         }
         functionCalls.add(((BetweenPredicateAstNode) visitingNode).getFunction());
       } else if (visitingNode instanceof InPredicateAstNode) {
-        if (!((ComparisonPredicateAstNode) visitingNode).isItFunctionCallComparison()) {
+        if (!((InPredicateAstNode) visitingNode).isItFunctionCallComparison()) {
           throw new Pql2CompilationException("Having predicate only compares function calls");
         }
         for (String value : ((InPredicateAstNode) visitingNode).getValues()) {
@@ -216,7 +213,6 @@ public class Pql2Compiler implements AbstractCompiler {
         }
       }
     }
-
     return functionCalls;
   }
 

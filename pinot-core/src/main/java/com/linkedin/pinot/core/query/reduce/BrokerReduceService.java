@@ -48,6 +48,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.Vector;
 import javax.annotation.Nonnull;
@@ -384,64 +385,45 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     if (havingFilterQuery != null) {
       HavingClauseComparisonTree havingClauseComparisonTree =
           HavingClauseComparisonTree.buildHavingClauseComparisonTree(havingFilterQuery, havingFilterQueryMap);
-
       //Applying close policy
       //We just keep those groups (from different aggregation functions) that are exist in the result set of all aggregation functions.
       //In other words, we just keep intersection of groups of different aggregation functions.
+      //Here we calculate the intersection of group key sets of different aggregation functions
+      Set<String> intersectionOfKeySets = finalResultMaps[0].keySet();
+      for (int i = 1; i < numAggregationFunctions; i++) {
+        intersectionOfKeySets.retainAll(finalResultMaps[i].keySet());
+      }
+      //Now it is time to remove those groups that do not validate HAVING clause predicate
+      //We use TreeMap which supports CASE_INSENSITIVE_ORDER
+      Map<String, Comparable> singleGroupAggResults = new TreeMap<String, Comparable>(String.CASE_INSENSITIVE_ORDER);
+      Map<String, Comparable>[] finalFilteredResultMaps = new Map[numAggregationFunctions];
       for (int i = 0; i < numAggregationFunctions; i++) {
-        Iterator<Map.Entry<String, Comparable>> finalMapIterator = finalResultMaps[i].entrySet().iterator();
-        while (finalMapIterator.hasNext()) {
-          Map.Entry<String, Comparable> aggResult = finalMapIterator.next();
-          for (int j = 0; j < numAggregationFunctions; j++) {
-            if (j != i) {
-              if (finalResultMaps[j].get(aggResult.getKey()) == null) {
-                finalMapIterator.remove();
-                break;
-              }
-            }
+        finalFilteredResultMaps[i] = new HashMap<>();
+      }
+      for (String groupKey : intersectionOfKeySets) {
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          singleGroupAggResults.put(columnNames[i], finalResultMaps[i].get(groupKey));
+        }
+        //if this group validate HAVING predicate keep it in the new map
+        if (havingClauseComparisonTree.isThisGroupPassPredicates(singleGroupAggResults)) {
+          for (int i = 0; i < numAggregationFunctions; i++) {
+            finalFilteredResultMaps[i].put(groupKey, singleGroupAggResults.get(columnNames[i]));
           }
         }
       }
-
-      //Now it is time to remove those groups that do not validate HAVING clause predicate
-      //We first find which group keys need to be deleted and then remove them in the next step
-      Vector<String> removedGroupIDs = new Vector<String>();
-      Iterator<Map.Entry<String, Comparable>> finalMapIterator = finalResultMaps[0].entrySet().iterator();
-      Map<String, Comparable> singleGroupAggResults = new TreeMap<String, Comparable>(String.CASE_INSENSITIVE_ORDER);
-
-      while (finalMapIterator.hasNext()) {
-        int i;
-        Map.Entry<String, Comparable> aggResult = finalMapIterator.next();
-        singleGroupAggResults.put(columnNames[0], aggResult.getValue());
-        for (i = 1; i < numAggregationFunctions; i++) {
-          singleGroupAggResults.put(columnNames[i], finalResultMaps[i].get(aggResult.getKey()));
-        }
-        if (!havingClauseComparisonTree.isThisGroupPassPredicates(singleGroupAggResults)) {
-          removedGroupIDs.add(aggResult.getKey());
-        }
-        singleGroupAggResults.clear();
-      }
-
-      for (int i = 0; i < removedGroupIDs.size(); i++) {
-        for (int j = 0; j < numAggregationFunctions; j++) {
-          finalResultMaps[j].remove(removedGroupIDs.get(i));
-        }
-      }
+      //update the final results
+      finalResultMaps = finalFilteredResultMaps;
     }
-
     int aggregationNumsInFinalResult = 0;
-
     for (int i = 0; i < numAggregationFunctions; i++) {
       if (aggregationFunctionsSelectStatus[i]) {
         aggregationNumsInFinalResult++;
       }
     }
-
     if (aggregationNumsInFinalResult > 0) {
       String[] finalColumnNames = new String[aggregationNumsInFinalResult];
       Map<String, Comparable>[] finalOutResultMaps = new Map[aggregationNumsInFinalResult];
       AggregationFunction[] finalAggregationFunctions = new AggregationFunction[aggregationNumsInFinalResult];
-
       int count = 0;
       for (int i = 0; i < numAggregationFunctions; i++) {
         if (aggregationFunctionsSelectStatus[i]) {
@@ -451,7 +433,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           count++;
         }
       }
-
       // Trim the final result maps to topN and set them into the broker response.
       AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
           new AggregationGroupByTrimmingService(finalAggregationFunctions, (int) groupBy.getTopN());

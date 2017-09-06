@@ -69,7 +69,8 @@ public class QueryGenerator {
   private static final int MAX_NUM_IN_CLAUSE_VALUES = 5;
   private static final int MAX_RESULT_LIMIT = 30;
   private static final int MAX_COUNT_FUNCTION_RESULT = 1000;
-
+  private static final float MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE = 10000;
+  private static final int MAX_INT_FOR_HAVING_CLAUSE_PREDICATE = 10000;
   private static final List<String> BOOLEAN_OPERATORS = Arrays.asList("OR", "AND");
   private static final List<String> COMPARISON_OPERATORS = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
 
@@ -480,7 +481,9 @@ public class QueryGenerator {
     private PredicateQueryFragment _predicate;
     private Set<String> _groupColumns;
     private TopQueryFragment _top;
-    private String _havingClause;
+    private List<String> _havingClauseAggregationFunctions;
+    private List<String> _havingClauseOperatorsAndValues;
+    private List<String> _havingClauseBooleanOperators;
 
     /**
      * Constructor for <code>AggregationQuery</code>.
@@ -491,12 +494,15 @@ public class QueryGenerator {
      * @param top top fragment.
      */
     public AggregationQuery(List<String> aggregateColumnsAndFunctions, PredicateQueryFragment predicate,
-        Set<String> groupColumns, TopQueryFragment top, String havingClause) {
+        Set<String> groupColumns, TopQueryFragment top, List<String> havingClauseAggregationFunctions,
+        List<String> havingClauseOperatorsAndValues, List<String> havingClauseBooleanOperators) {
       _aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
       _predicate = predicate;
       _groupColumns = groupColumns;
       _top = top;
-      _havingClause = havingClause;
+      _havingClauseAggregationFunctions = havingClauseAggregationFunctions;
+      _havingClauseOperatorsAndValues = havingClauseOperatorsAndValues;
+      _havingClauseBooleanOperators = havingClauseBooleanOperators;
     }
 
     @Override
@@ -506,16 +512,27 @@ public class QueryGenerator {
             _predicate.generatePql(), _top.generatePql());
       } else {
         String groupByColumns = StringUtils.join(_groupColumns, ", ");
+        String pqlHavingClause = "";
+        int aggregationFunctionCount = _havingClauseAggregationFunctions.size();
+        if (aggregationFunctionCount > 0) {
+          pqlHavingClause += "HAVING";
+          pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseAggregationFunctions.get(0));
+          pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseOperatorsAndValues.get(0));
+          for (int i = 1; i < aggregationFunctionCount; i++) {
+            pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseBooleanOperators.get(i - 1));
+            pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseAggregationFunctions.get(i));
+            pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseOperatorsAndValues.get(i));
+          }
+        }
         return joinWithSpaces("SELECT", groupByColumns + ",", StringUtils.join(_aggregateColumnsAndFunctions, ", "),
             "FROM", _pinotTableName, _predicate.generatePql(), "GROUP BY", StringUtils.join(_groupColumns, ", "),
-            _havingClause, _top.generatePql());
+            pqlHavingClause, _top.generatePql());
       }
     }
 
     @Override
     public List<String> generateH2Sql() {
       List<String> queries = new ArrayList<>();
-
       // For each aggregation function, generate one separate H2 SQL query.
       for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
         // Make 'AVG' and 'DISTINCTCOUNT' compatible with H2 SQL query.
@@ -525,7 +542,6 @@ public class QueryGenerator {
         } else if (aggregateColumnAndFunction.startsWith("DISTINCTCOUNT(")) {
           aggregateColumnAndFunction = aggregateColumnAndFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
         }
-
         if (_groupColumns.isEmpty()) {
           // Aggregation query.
           queries.add(
@@ -536,8 +552,32 @@ public class QueryGenerator {
 
           // Unlike PQL, SQL expects the group columns in select statements.
           String groupByColumns = StringUtils.join(_groupColumns, ", ");
+          String sqlHavingClause = "";
+          int aggregationFunctionCount = _havingClauseAggregationFunctions.size();
+          if (aggregationFunctionCount > 0) {
+            sqlHavingClause += "HAVING";
+            String aggregationFunction = _havingClauseAggregationFunctions.get(0);
+            if (aggregationFunction.startsWith("AVG(")) {
+              aggregationFunction = aggregationFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
+            } else if (aggregationFunction.startsWith("DISTINCTCOUNT(")) {
+              aggregationFunction = aggregationFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+            }
+            sqlHavingClause = joinWithSpaces(sqlHavingClause, aggregationFunction);
+            sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseOperatorsAndValues.get(0));
+            for (int i = 1; i < aggregationFunctionCount; i++) {
+              aggregationFunction = _havingClauseAggregationFunctions.get(i);
+              if (aggregationFunction.startsWith("AVG(")) {
+                aggregationFunction = aggregationFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
+              } else if (aggregationFunction.startsWith("DISTINCTCOUNT(")) {
+                aggregationFunction = aggregationFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+              }
+              sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseBooleanOperators.get(i - 1));
+              sqlHavingClause = joinWithSpaces(sqlHavingClause, aggregationFunction);
+              sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseOperatorsAndValues.get(i));
+            }
+          }
           queries.add(joinWithSpaces("SELECT", groupByColumns + ",", aggregateColumnAndFunction, "FROM", _h2TableName,
-              _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _havingClause, _top.generateH2Sql()));
+              _predicate.generateH2Sql(), "GROUP BY", groupByColumns, sqlHavingClause, _top.generateH2Sql()));
         }
       }
 
@@ -734,89 +774,114 @@ public class QueryGenerator {
       // Generate at most MAX_NUM_AGGREGATION_COLUMNS columns on which to aggregate, map 0 to 'COUNT(*)'.
       int aggregationColumnCount = RANDOM.nextInt(MAX_NUM_AGGREGATION_COLUMNS + 1);
       Set<String> aggregationColumnsAndFunctions = new HashSet<>();
-      List<String> aggregationFunctions = new ArrayList<>();
-      List<String> aggregationColumns = new ArrayList<>();
-      boolean isAggregationFunctionCountStar = false;
       if (aggregationColumnCount == 0) {
         aggregationColumnsAndFunctions.add("COUNT(*)");
-        isAggregationFunctionCountStar = true;
       } else {
         while (aggregationColumnsAndFunctions.size() < aggregationColumnCount) {
-          String aggregationFunction = pickRandom(AGGREGATION_FUNCTIONS);
-          String aggregationColumn;
-          switch (aggregationFunction) {
-            // "COUNT" and "DISTINCTCOUNT" support all single-value columns.
-            case "COUNT":
-            case "DISTINCTCOUNT":
-              aggregationColumn = pickRandom(_singleValueColumnNames);
-              isAggregationFunctionCountStar = true;
-              break;
-            // Other functions only support single-value numeric columns.
-            default:
-              aggregationColumn = pickRandom(_singleValueNumericalColumnNames);
-          }
-          aggregationColumnsAndFunctions.add(aggregationFunction + "(" + aggregationColumn + ")");
-          aggregationFunctions.add(aggregationColumn);
-          aggregationColumns.add(aggregationColumn);
+          aggregationColumnsAndFunctions.add(createRandomAggregationFunction());
         }
       }
-
       // Generate a predicate.
       PredicateQueryFragment predicate = generatePredicate();
-
       // Generate at most MAX_NUM_GROUP_BY_COLUMNS columns on which to group.
       int groupColumnCount = Math.min(RANDOM.nextInt(MAX_NUM_GROUP_BY_COLUMNS + 1), _singleValueColumnNames.size());
       Set<String> groupColumns = new HashSet<>();
       while (groupColumns.size() < groupColumnCount) {
         groupColumns.add(pickRandom(_singleValueColumnNames));
       }
-
       ArrayList<String> arrayOfAggregationColumnsAndFunctions = new ArrayList<>(aggregationColumnsAndFunctions);
-
       //Generate a HAVING clause for group by query
-      String havingClause = createHavingClause(arrayOfAggregationColumnsAndFunctions);
-
+      List<String> havingClauseAggregationFunctions = new ArrayList<String>();
+      List<String> havingClauseOperatorsAndValues = new ArrayList<String>();
+      List<String> havingClauseBooleanOperators = new ArrayList<String>();
+      createHavingClause(arrayOfAggregationColumnsAndFunctions, havingClauseAggregationFunctions,
+          havingClauseOperatorsAndValues, havingClauseBooleanOperators);
       // Generate a result limit of at most MAX_RESULT_LIMIT.
       TopQueryFragment top = new TopQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
-
-      return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, top, havingClause);
+      return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, top,
+          havingClauseAggregationFunctions, havingClauseOperatorsAndValues, havingClauseBooleanOperators);
     }
 
-    private String createHavingClause( ArrayList<String> arrayOfAggregationColumnsAndFunctions) {
-      String havingClause = new String();
+    private void createHavingClause(ArrayList<String> arrayOfAggregationColumnsAndFunctions,
+        List<String> havingClauseAggregationFunctions, List<String> havingClauseOperatorsAndValues,
+        List<String> havingClauseBooleanOperators) {
       int numOfFunctionsInSelectList = arrayOfAggregationColumnsAndFunctions.size();
-      int aggregationFunctionCount = RANDOM.nextInt(numOfFunctionsInSelectList);
+      int aggregationFunctionCount = RANDOM.nextInt(numOfFunctionsInSelectList + 1);
       ArrayList<String> aggregationPredicates = new ArrayList<>();
-
       for (int i = 0; i < aggregationFunctionCount; i++) {
         int aggregationFunctionIndex = RANDOM.nextInt(numOfFunctionsInSelectList);
-        String havingPredicate = arrayOfAggregationColumnsAndFunctions.get(aggregationFunctionIndex);
-        String comparisonOperator = pickRandom(COMPARISON_OPERATORS);
-        havingPredicate = joinWithSpaces(havingPredicate, comparisonOperator);
+        String aggregationFunction = arrayOfAggregationColumnsAndFunctions.get(aggregationFunctionIndex);
+        havingClauseAggregationFunctions.add(aggregationFunction);
+        havingClauseOperatorsAndValues.add(createOperatorAndValueForAggregationFunction(aggregationFunction));
+      }
+      int aggregationFunctionNotInSelectListCount = RANDOM.nextInt(MAX_NUM_AGGREGATION_COLUMNS + 1);
+      for (int i = 0; i < aggregationFunctionNotInSelectListCount; i++) {
+        String aggregationFunction = createRandomAggregationFunction();
+        havingClauseAggregationFunctions.add(aggregationFunction);
+        havingClauseOperatorsAndValues.add(createOperatorAndValueForAggregationFunction(aggregationFunction));
+      }
+      aggregationFunctionCount += aggregationFunctionNotInSelectListCount;
+      for (int i = 1; i < aggregationFunctionCount; i++) {
+        havingClauseBooleanOperators.add(pickRandom(BOOLEAN_OPERATORS));
+      }
+    }
+
+    private String createRandomAggregationFunction() {
+      String aggregationFunction = pickRandom(AGGREGATION_FUNCTIONS);
+      String aggregationColumn;
+      switch (aggregationFunction) {
+        // "COUNT" and "DISTINCTCOUNT" support all single-value columns.
+        case "COUNT":
+        case "DISTINCTCOUNT":
+          aggregationColumn = pickRandom(_singleValueColumnNames);
+          break;
+        // Other functions only support single-value numeric columns.
+        default:
+          aggregationColumn = pickRandom(_singleValueNumericalColumnNames);
+      }
+      return aggregationFunction + "(" + aggregationColumn + ")";
+    }
+
+    private String createOperatorAndValueForAggregationFunction(String aggregationFunction) {
+      boolean comparisonOperatorNotBetweenOrIN = RANDOM.nextBoolean();
+      String valueOperator = new String();
+      String comparisonOperator = new String();
+      if (comparisonOperatorNotBetweenOrIN) {
         String functionValue = new String();
-        if (havingPredicate.startsWith("COUNT") || havingPredicate.startsWith("DISTINCTCOUNT")) {
+        comparisonOperator = pickRandom(COMPARISON_OPERATORS);
+        if (aggregationFunction.startsWith("COUNT") || aggregationFunction.startsWith("DISTINCTCOUNT")) {
           functionValue = Integer.toString(RANDOM.nextInt(MAX_COUNT_FUNCTION_RESULT) + 1);
         } else {
-          functionValue = Float.toString(RANDOM.nextFloat());
+          functionValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
         }
-        havingPredicate = joinWithSpaces(havingPredicate, functionValue);
-        aggregationPredicates.add(havingPredicate);
-      }
-      if (aggregationFunctionCount == 0) {
-        return "";
-      } else if (aggregationFunctionCount == 1) {
-        havingClause += "HAVING";
-        havingClause = joinWithSpaces(havingClause, aggregationPredicates.get(0));
-      } else if (aggregationFunctionCount > 1) {
-        havingClause += "HAVING";
-        havingClause = joinWithSpaces(havingClause, aggregationPredicates.get(0));
-        for (int i = 1; i < aggregationFunctionCount; i++) {
-          String operator = pickRandom(BOOLEAN_OPERATORS);
-          havingClause = joinWithSpaces(havingClause, operator);
-          havingClause = joinWithSpaces(havingClause, aggregationPredicates.get(i));
+        valueOperator = joinWithSpaces(valueOperator, comparisonOperator);
+        valueOperator = joinWithSpaces(valueOperator, functionValue);
+      } else {
+        boolean isItBetween = RANDOM.nextBoolean();
+        if (isItBetween) {
+          String leftValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
+          String rightValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
+          comparisonOperator = "BETWEEN " + leftValue + " AND " + rightValue;
+          valueOperator = comparisonOperator;
+        } else {
+          int numValues = RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1;
+          Set<String> values = new HashSet<>();
+          while (values.size() < numValues) {
+            values.add(Integer.toString(RANDOM.nextInt(MAX_INT_FOR_HAVING_CLAUSE_PREDICATE)));
+          }
+          comparisonOperator = StringUtils.join(values, ", ");
+          boolean isItIn = RANDOM.nextBoolean();
+          if (isItIn) {
+            comparisonOperator = "IN (" + comparisonOperator;
+            comparisonOperator += ")";
+          } else {
+            comparisonOperator = "NOT IN (" + comparisonOperator;
+            comparisonOperator += ")";
+          }
+          valueOperator = comparisonOperator;
         }
       }
-      return havingClause;
+      return valueOperator;
     }
   }
 

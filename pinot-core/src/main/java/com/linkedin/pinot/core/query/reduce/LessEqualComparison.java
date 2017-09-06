@@ -16,14 +16,19 @@
 package com.linkedin.pinot.core.query.reduce;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
-import java.math.BigDecimal;
+import org.slf4j.LoggerFactory;
 
 
 public class LessEqualComparison extends ComparisonFunction {
-  private BigDecimal _rightValue;
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LessEqualComparison.class);
+  private double _rightValue;
 
   public LessEqualComparison(String rightValue, AggregationInfo aggregationInfo) {
-    this._rightValue = new BigDecimal(rightValue);
+    try {
+      this._rightValue = Double.parseDouble(rightValue);
+    } catch (Exception e) {
+      LOGGER.info("Exception in creating HAVING clause LESS EQUAL predicate", e);
+    }
     if (!aggregationInfo.getAggregationParams().get("column").equals("*")) {
       this._functionExpression =
           aggregationInfo.getAggregationType() + "_" + aggregationInfo.getAggregationParams().get("column");
@@ -35,14 +40,19 @@ public class LessEqualComparison extends ComparisonFunction {
   @Override
   public boolean isComparisonValid(String aggResult) {
     try {
-      BigDecimal leftValue = new BigDecimal(aggResult);
-      if (leftValue.compareTo(_rightValue) <= 0) {
+      double leftValue = Double.parseDouble(aggResult);
+      if (leftValue <= _rightValue) {
         return true;
       } else {
         return false;
       }
     } catch (Exception e) {
+      LOGGER.info("Exception in applying HAVING clause LESS EQUAL predicate", e);
       return false;
     }
+  }
+
+  public double getRightValue() {
+    return _rightValue;
   }
 }

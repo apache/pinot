@@ -39,7 +39,6 @@ public class PredicateListAstNode extends PredicateAstNode {
       if (i + 1 < childrenCount) {
         nextOperator = (BooleanOperatorAstNode) getChildren().get(i + 1);
       }
-      // 2 cases for isItHaving
       // 3 cases for the next operator:
       // - No next operator: Add the predicate to the AND predicates or to the parent OR predicate
       // - AND: Add the predicate to the AND predicates, creating it if necessary

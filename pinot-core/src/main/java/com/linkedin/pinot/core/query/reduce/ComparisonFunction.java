@@ -16,10 +16,7 @@
 
 package com.linkedin.pinot.core.query.reduce;
 
-import java.math.BigDecimal;
-
-
-//This class will be inherited by different classes that compare (e.g. for equality) the input value by the base value
+//This class will be inherited by different classes that compare (e.g., for equality) the input value by the base value
 public abstract class ComparisonFunction {
   protected String _functionExpression;
 

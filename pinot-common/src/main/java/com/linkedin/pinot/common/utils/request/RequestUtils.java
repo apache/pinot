@@ -39,6 +39,10 @@ public class RequestUtils {
   public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
   private static final String USE_STAR_TREE_KEY = "useStarTree";
 
+  private RequestUtils() {
+
+  }
+
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
    * @param filterQueryTree
@@ -57,7 +61,8 @@ public class RequestUtils {
 
   public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
     Map<Integer, HavingFilterQuery> filterQueryMap = new HashMap<Integer, HavingFilterQuery>();
-    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap);
+    MutableInt currentId = new MutableInt(0);
+    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
     filterQueryMap.put(root.getId(), root);
     request.setHavingFilterQuery(root);
     HavingFilterQueryMap mp = new HavingFilterQueryMap();
@@ -92,22 +97,26 @@ public class RequestUtils {
   }
 
   private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree tree,
-      Map<Integer, HavingFilterQuery> filterQueryMap) {
+      Map<Integer, HavingFilterQuery> filterQueryMap, MutableInt currentId) {
+    int currentNodeId = currentId.intValue();
+    currentId.increment();
     final List<Integer> filterIds = new ArrayList<Integer>();
     if (null != tree.getChildren()) {
       for (final HavingQueryTree child : tree.getChildren()) {
-        filterIds.add(child.getId());
-        final HavingFilterQuery filterQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap);
-        filterQueryMap.put(child.getId(), filterQuery);
+        int childNodeId = currentId.intValue();
+        currentId.increment();
+        filterIds.add(childNodeId);
+        final HavingFilterQuery filterQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap, currentId);
+        filterQueryMap.put(childNodeId, filterQuery);
       }
     }
-    HavingFilterQuery query = new HavingFilterQuery();
-    query.setAggregationInfo(tree.getAggregationInfo());
-    query.setId(tree.getId());
-    query.setNestedFilterQueryIds(filterIds);
-    query.setOperator(tree.getOperator());
-    query.setValue(tree.getValue());
-    return query;
+    HavingFilterQuery havingFilterQuery = new HavingFilterQuery();
+    havingFilterQuery.setAggregationInfo(tree.getAggregationInfo());
+    havingFilterQuery.setId(currentNodeId);
+    havingFilterQuery.setNestedFilterQueryIds(filterIds);
+    havingFilterQuery.setOperator(tree.getOperator());
+    havingFilterQuery.setValue(tree.getValue());
+    return havingFilterQuery;
   }
 
   /**

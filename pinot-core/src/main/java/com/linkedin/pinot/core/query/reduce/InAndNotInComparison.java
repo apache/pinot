@@ -16,20 +16,24 @@
 package com.linkedin.pinot.core.query.reduce;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
-import java.math.BigDecimal;
+import org.slf4j.LoggerFactory;
 
 
 public class InAndNotInComparison extends ComparisonFunction {
-  private BigDecimal[] _values;
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(InAndNotInComparison.class);
+  private double[] _values;
   private boolean _isItNotIn;
 
   public InAndNotInComparison(String values, boolean isItNotIn, AggregationInfo aggregationInfo) {
-
     String[] splitedValues = values.split("\\t\\t");
     int size = splitedValues.length;
-    this._values = new BigDecimal[size];
+    this._values = new double[size];
     for (int i = 0; i < size; i++) {
-      this._values[i] = new BigDecimal(splitedValues[i]);
+      try {
+        this._values[i] = Double.parseDouble(splitedValues[i]);
+      } catch (Exception e) {
+        LOGGER.info("Exception in creating HAVING clause IN/NOT-IN predicate", e);
+      }
     }
     this._isItNotIn = isItNotIn;
     if (!aggregationInfo.getAggregationParams().get("column").equals("*")) {
@@ -43,16 +47,14 @@ public class InAndNotInComparison extends ComparisonFunction {
   @Override
   public boolean isComparisonValid(String aggResult) {
     try {
-      BigDecimal baseValue = new BigDecimal(aggResult);
+      double baseValue = Double.parseDouble(aggResult);
       int size = _values.length;
-
       int i;
       for (i = 0; i < size; i++) {
-        if (baseValue.compareTo(_values[i]) == 0) {
+        if (baseValue == _values[i]) {
           break;
         }
       }
-
       if (!_isItNotIn) {
         if (i < size) {
           return true;
@@ -67,7 +69,12 @@ public class InAndNotInComparison extends ComparisonFunction {
         }
       }
     } catch (Exception e) {
+      LOGGER.info("Exception in applying HAVING clause IN/NOT-IN predicate", e);
       return false;
     }
+  }
+
+  public double[] getValues() {
+    return _values;
   }
 }
