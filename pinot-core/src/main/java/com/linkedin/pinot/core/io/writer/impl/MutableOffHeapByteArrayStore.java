@@ -17,15 +17,17 @@
 package com.linkedin.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -82,6 +84,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  */
 public class MutableOffHeapByteArrayStore implements Closeable {
   private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
+  public static Logger LOGGER = LoggerFactory.getLogger(MutableOffHeapByteArrayStore.class);
 
   private static class Buffer implements Closeable {
 
@@ -97,6 +100,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       if (size >= Integer.MAX_VALUE) {
         size = Integer.MAX_VALUE - 1;
       }
+      LOGGER.info("Allocating byte array store buffer of size {} for column {}", size, columnName);
       _pinotDataBuffer = memoryManager.allocate(size, columnName);
       _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);

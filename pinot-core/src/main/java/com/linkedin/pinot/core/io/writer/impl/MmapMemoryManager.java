@@ -57,6 +57,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   private long _availableOffset = DEFAULT_FILE_LENGTH; // Available offset in this file.
   private long _curFileLen = -1;
   private final List<String> _paths = new LinkedList<>();
+  private final List<PinotDataBuffer> _memMappedBuffers = new LinkedList<>();
   PinotDataBuffer _currentBuffer;
 
   @VisibleForTesting
@@ -98,6 +99,8 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
       raf.setLength(fileLen);
       raf.close();
       _currentBuffer = PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, thisContext);
+      LOGGER.info("Mapped file {} for segment {} into buffer {}", file.getAbsolutePath(), getSegmentName(), _currentBuffer);
+      _memMappedBuffers.add(_currentBuffer);
     }  catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -123,12 +126,17 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
 
   @Override
   protected void doClose() {
+    for (PinotDataBuffer buffer : _memMappedBuffers) {
+      LOGGER.info("Closing buffer {}", buffer);
+      buffer.close();
+    }
     for (String path: _paths) {
       try {
         File file = new File(path);
         file.delete();
+        LOGGER.info("Deleted file {}", path);
       } catch (Exception e) {
-        LOGGER.warn("Exception closing entry {}", path, e);
+        LOGGER.warn("Exception trying to delete file {}", path, e);
       }
     }
   }

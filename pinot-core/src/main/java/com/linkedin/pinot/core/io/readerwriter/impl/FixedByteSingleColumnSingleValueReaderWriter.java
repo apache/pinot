@@ -25,11 +25,14 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 // TODO Check if MMAP allows us to pack more partitions on a single machine.
 public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColumnSingleValueReaderWriter {
 
+  public static Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleColumnSingleValueReaderWriter.class);
   WriterWithOffset currentWriter;
   private List<WriterWithOffset> writers = new ArrayList<>();
   private List<ReaderWithOffset> readers = new ArrayList<>();
@@ -124,6 +127,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   private void addBuffer() {
+    LOGGER.info("Allocating {} bytes for column {}", chunkSizeInBytes, columnName);
     PinotDataBuffer buffer = memoryManager.allocate(chunkSizeInBytes, columnName);
     buffer.order(ByteOrder.nativeOrder());
     buffers.add(buffer);
