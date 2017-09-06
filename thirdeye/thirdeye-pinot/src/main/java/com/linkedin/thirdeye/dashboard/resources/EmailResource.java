@@ -61,6 +61,9 @@ public class EmailResource {
   @POST
   @Path("alert")
   public Response createAlertConfig(AlertConfigDTO alertConfigDTO) {
+    if (Strings.isNullOrEmpty(alertConfigDTO.getFromAddress())) {
+      alertConfigDTO.setFromAddress(thirdeyeConfiguration.getFailureToAddress());
+    }
     Long id = alertDAO.save(alertConfigDTO);
     return Response.ok(id).build();
   }
@@ -94,6 +97,12 @@ public class EmailResource {
       }
     }
     return mapping;
+  }
+
+  @GET
+  @Path("function/{id}")
+  public List<AlertConfigDTO> getSubscriberList(@PathParam("id") Long alertFunctionId) {
+    return getAlertToSubscriberMapping().get(alertFunctionId);
   }
 
   /**
@@ -215,8 +224,6 @@ public class EmailResource {
    * @param smtpPort
    * @return
    */
-
-
   @GET
   @Path("generate/metrics/{startTime}/{endTime}")
   public Response generateAndSendAlertForMetrics(

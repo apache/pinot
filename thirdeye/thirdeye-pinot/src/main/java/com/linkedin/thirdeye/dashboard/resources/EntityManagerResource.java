@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
@@ -57,13 +58,14 @@ public class EntityManagerResource {
   private final ClassificationConfigManager classificationConfigManager;
   private final ApplicationManager applicationManager;
   private final EntityToEntityMappingManager entityToEntityMappingManager;
+  private final ThirdEyeConfiguration config;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final Logger LOG = LoggerFactory.getLogger(EntityManagerResource.class);
 
-  public EntityManagerResource() {
+  public EntityManagerResource(ThirdEyeConfiguration configuration) {
     this.anomalyFunctionManager = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.dashboardConfigManager = DAO_REGISTRY.getDashboardConfigDAO();
     this.metricConfigManager = DAO_REGISTRY.getMetricConfigDAO();
@@ -73,6 +75,7 @@ public class EntityManagerResource {
     this.classificationConfigManager = DAO_REGISTRY.getClassificationConfigDAO();
     this.applicationManager = DAO_REGISTRY.getApplicationDAO();
     this.entityToEntityMappingManager = DAO_REGISTRY.getEntityToEntityMappingDAO();
+    this.config = configuration;
   }
 
   private enum EntityType {
@@ -182,6 +185,9 @@ public class EntityManagerResource {
         break;
       case ALERT_CONFIG:
         AlertConfigDTO alertConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, AlertConfigDTO.class);
+        if (Strings.isNullOrEmpty(alertConfigDTO.getFromAddress())) {
+          alertConfigDTO.setFromAddress(config.getFailureToAddress());
+        }
         if (alertConfigDTO.getId() == null) {
           alertConfigManager.save(alertConfigDTO);
         } else {
