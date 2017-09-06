@@ -16,40 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.math.IntRange;
-import org.apache.helix.AccessOption;
-import org.apache.helix.ControllerChangeListener;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.NotificationContext;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MinMaxPriorityQueue;
@@ -84,9 +50,44 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImp
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import static com.linkedin.pinot.controller.util.SegmentCompletionUtils.getSegmentNamePrefix;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.math.IntRange;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ControllerChangeListener;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static com.linkedin.pinot.controller.util.SegmentCompletionUtils.getSegmentNamePrefix;
 
 
 public class PinotLLCRealtimeSegmentManager {
@@ -856,7 +857,7 @@ public class PinotLLCRealtimeSegmentManager {
 
   private long getPartitionOffset(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
     KafkaOffsetFetcher kafkaOffsetFetcher = new KafkaOffsetFetcher(topicName, bootstrapHosts, offsetCriteria, partitionId);
-    RetryPolicy policy = RetryPolicies.fixedDelayRetryPolicy(3, 1000);
+    RetryPolicy policy = RetryPolicies.exponentialBackoffRetryPolicy(3, 1000L, 2.0f);
     boolean success = policy.attempt(kafkaOffsetFetcher);
     if (success) {
       return kafkaOffsetFetcher.getOffset();

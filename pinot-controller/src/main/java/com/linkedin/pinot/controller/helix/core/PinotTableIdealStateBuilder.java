@@ -221,7 +221,7 @@ public class PinotTableIdealStateBuilder {
 
   public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {
     KafkaPartitionsCountFetcher fetcher = new KafkaPartitionsCountFetcher(kafkaMetadata);
-    RetryPolicy policy = RetryPolicies.noDelayRetryPolicy(3);
+    RetryPolicy policy = RetryPolicies.exponentialBackoffRetryPolicy(3, 1000L, 2.0f);
     boolean successful = policy.attempt(fetcher);
     if (successful) {
       return fetcher.getPartitionCount();
