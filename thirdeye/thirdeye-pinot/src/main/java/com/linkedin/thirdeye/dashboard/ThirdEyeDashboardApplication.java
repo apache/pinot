@@ -124,7 +124,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new CacheResource());
     env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(emailResource);
-    env.jersey().register(new EntityManagerResource());
+    env.jersey().register(new EntityManagerResource(config));
     env.jersey().register(new MetricConfigResource());
     env.jersey().register(new DatasetConfigResource());
     env.jersey().register(new DashboardConfigResource());
