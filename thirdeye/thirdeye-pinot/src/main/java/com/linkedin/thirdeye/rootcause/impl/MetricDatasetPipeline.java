@@ -105,6 +105,7 @@ public class MetricDatasetPipeline extends Pipeline {
       double datasetScore = datasetScores.get(d);
       Collection<MetricConfigDTO> dtos = metricDAO.findByDataset(d);
 
+      dtos = removeInactive(dtos);
       dtos = removeExisting(dtos, metrics);
       dtos = removeMeta(dtos);
 
@@ -130,6 +131,15 @@ public class MetricDatasetPipeline extends Pipeline {
     Collection<MetricConfigDTO> out = new ArrayList<>();
     for(MetricConfigDTO dto : dtos) {
       if(!findExisting(dto, existing))
+        out.add(dto);
+    }
+    return out;
+  }
+
+  static Collection<MetricConfigDTO> removeInactive(Iterable<MetricConfigDTO> dtos) {
+    Collection<MetricConfigDTO> out = new ArrayList<>();
+    for(MetricConfigDTO dto : dtos) {
+      if(dto.isActive())
         out.add(dto);
     }
     return out;
