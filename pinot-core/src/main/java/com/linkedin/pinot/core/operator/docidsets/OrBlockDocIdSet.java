@@ -22,129 +22,102 @@ import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.OrDocIdIterator;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
-  /**
-   *
-   */
-  final public AtomicLong timeMeasure = new AtomicLong(0);
-  private List<FilterBlockDocIdSet> docIdSets;
-  private int maxDocId = Integer.MIN_VALUE;
-  private int minDocId = Integer.MAX_VALUE;
-  private IntIterator intIterator;
-  private BlockDocIdIterator[] docIdIterators;
+  private final List<FilterBlockDocIdSet> _docIdSets;
 
-  public OrBlockDocIdSet(List<FilterBlockDocIdSet> blockDocIdSets) {
-    this.docIdSets = blockDocIdSets;
-    updateMinMaxRange();
-  }
+  private int _minDocId = Integer.MAX_VALUE;
+  private int _maxDocId = Integer.MIN_VALUE;
 
-  private void updateMinMaxRange() {
-    for (FilterBlockDocIdSet blockDocIdSet : docIdSets) {
-      minDocId = Math.min(minDocId, blockDocIdSet.getMinDocId());
-      maxDocId = Math.max(maxDocId, blockDocIdSet.getMaxDocId());
+  public OrBlockDocIdSet(List<FilterBlockDocIdSet> docIdSets) {
+    _docIdSets = docIdSets;
+
+    for (FilterBlockDocIdSet docIdSet : docIdSets) {
+      _minDocId = Math.min(_minDocId, docIdSet.getMinDocId());
+      _maxDocId = Math.max(_maxDocId, docIdSet.getMaxDocId());
     }
-    for (FilterBlockDocIdSet blockDocIdSet : docIdSets) {
-      blockDocIdSet.setStartDocId(minDocId);
-      blockDocIdSet.setEndDocId(maxDocId);
-    }
-  }
-
-  @Override
-  public int getMaxDocId() {
-    return maxDocId;
   }
 
   @Override
   public int getMinDocId() {
-    return minDocId;
+    return _minDocId;
   }
 
   @Override
-  public BlockDocIdIterator iterator() {
-    List<BlockDocIdIterator> rawIterators = new ArrayList<>();
-    boolean useBitmapOr = false;
-    for (BlockDocIdSet docIdSet : docIdSets) {
-      if (docIdSet instanceof BitmapDocIdSet) {
-        useBitmapOr = true;
-      }
-    }
-    if (useBitmapOr) {
-      List<ImmutableRoaringBitmap> allBitmaps = new ArrayList<ImmutableRoaringBitmap>();
-      for (BlockDocIdSet docIdSet : docIdSets) {
-        if (docIdSet instanceof SortedDocIdSet) {
-          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-          SortedDocIdSet sortedDocIdSet = (SortedDocIdSet) docIdSet;
-          List<Pairs.IntPair> pairs = sortedDocIdSet.getRaw();
-          for (Pairs.IntPair pair : pairs) {
-            bitmap.add(pair.getLeft(), pair.getRight() + 1); //add takes [start, end) i.e inclusive start, exclusive end.
-          }
-          allBitmaps.add(bitmap);
-        } else if (docIdSet instanceof BitmapDocIdSet) {
-          BitmapDocIdSet bitmapDocIdSet = (BitmapDocIdSet) docIdSet;
-          ImmutableRoaringBitmap childBitmap = bitmapDocIdSet.getRaw();
-          allBitmaps.add(childBitmap);
-        } else {
-          BlockDocIdIterator iterator = docIdSet.iterator();
-          rawIterators.add(iterator);
-        }
-      }
-      MutableRoaringBitmap answer = allBitmaps.get(0).toMutableRoaringBitmap();
-      for (int i = 1; i < allBitmaps.size(); i++) {
-        answer.or(allBitmaps.get(i));
-      }
-      intIterator = answer.getIntIterator();
-      BitmapDocIdIterator singleBitmapBlockIdIterator = new BitmapDocIdIterator(intIterator);
-      singleBitmapBlockIdIterator.setStartDocId(minDocId);
-      singleBitmapBlockIdIterator.setEndDocId(maxDocId);
-      rawIterators.add(singleBitmapBlockIdIterator);
-      docIdIterators = new BlockDocIdIterator[rawIterators.size()];
-      rawIterators.toArray(docIdIterators);
-    } else {
-      docIdIterators = new BlockDocIdIterator[docIdSets.size()];
-      for (int srcId = 0; srcId < docIdSets.size(); srcId++) {
-        docIdIterators[srcId] = docIdSets.get(srcId).iterator();
-      }
-    }
-//    if (docIdIterators.length == 1) {
-//      return docIdIterators[0];
-//    } else {
-      OrDocIdIterator orDocIdIterator = new OrDocIdIterator(docIdIterators);
-      orDocIdIterator.setStartDocId(minDocId);
-      orDocIdIterator.setEndDocId(maxDocId);
-      return orDocIdIterator;
-//    }
-  }
-
-  @SuppressWarnings("unchecked")
-  @Override
-  public <T> T getRaw() {
-    return (T) this.docIdSets;
+  public int getMaxDocId() {
+    return _maxDocId;
   }
 
   @Override
   public void setStartDocId(int startDocId) {
-    minDocId = Math.min(minDocId, startDocId);
-    updateMinMaxRange();
+    _minDocId = Math.max(_minDocId, startDocId);
   }
 
   @Override
   public void setEndDocId(int endDocId) {
-    maxDocId = Math.max(maxDocId, endDocId);
-    updateMinMaxRange();
+    _maxDocId = Math.min(_maxDocId, endDocId);
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
     long numEntriesScannedInFilter = 0L;
-    for (FilterBlockDocIdSet docIdSet : docIdSets) {
+    for (FilterBlockDocIdSet docIdSet : _docIdSets) {
       numEntriesScannedInFilter += docIdSet.getNumEntriesScannedInFilter();
     }
     return numEntriesScannedInFilter;
+  }
+
+  @Override
+  public BlockDocIdIterator iterator() {
+    boolean useBitmapOr = false;
+    for (BlockDocIdSet docIdSet : _docIdSets) {
+      if (docIdSet instanceof BitmapDocIdSet) {
+        useBitmapOr = true;
+        break;
+      }
+    }
+    if (useBitmapOr) {
+      List<BlockDocIdIterator> iterators = new ArrayList<>();
+      MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+      for (BlockDocIdSet docIdSet : _docIdSets) {
+        if (docIdSet instanceof SortedDocIdSet) {
+          List<Pairs.IntPair> pairs = docIdSet.getRaw();
+          for (Pairs.IntPair pair : pairs) {
+            // Add takes [start, end) i.e inclusive start, exclusive end
+            bitmap.add(pair.getLeft(), pair.getRight() + 1);
+          }
+        } else if (docIdSet instanceof BitmapDocIdSet) {
+          bitmap.or((ImmutableRoaringBitmap) docIdSet.getRaw());
+        } else {
+          iterators.add(docIdSet.iterator());
+        }
+      }
+      IntIterator intIterator = bitmap.getIntIterator();
+      BitmapDocIdIterator bitmapDocIdIterator = new BitmapDocIdIterator(intIterator);
+      bitmapDocIdIterator.setStartDocId(_minDocId);
+      bitmapDocIdIterator.setEndDocId(_maxDocId);
+      if (iterators.isEmpty()) {
+        return bitmapDocIdIterator;
+      } else {
+        iterators.add(bitmapDocIdIterator);
+      }
+      return new OrDocIdIterator(iterators.toArray(new BlockDocIdIterator[iterators.size()]), _minDocId, _maxDocId);
+    } else {
+      int numDocIdSets = _docIdSets.size();
+      BlockDocIdIterator[] iterators = new BlockDocIdIterator[numDocIdSets];
+      for (int i = 0; i < numDocIdSets; i++) {
+        iterators[i] = _docIdSets.get(i).iterator();
+      }
+      return new OrDocIdIterator(iterators, _minDocId, _maxDocId);
+    }
+  }
+
+  @Override
+  public <T> T getRaw() {
+    throw new UnsupportedOperationException();
   }
 }
