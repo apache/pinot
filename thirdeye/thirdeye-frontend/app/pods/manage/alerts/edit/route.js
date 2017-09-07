@@ -3,6 +3,11 @@ import fetch from 'fetch';
 import moment from 'moment';
 import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 
+/**
+ * Parses stringified object from payload
+ * @param {String} filters
+ * @returns {Object}
+ */
 const parseProps = (filters) => {
   filters = filters || '';
 
@@ -65,6 +70,7 @@ export default Ember.Route.extend({
         return fetch(`thirdeye/email/functions`).then(checkStatus);
       })
       .then((groupConfigs) => {
+        // Temporary fix to match alert functions to subscribtion group
         const subscriptionGroups = groupConfigs[id] || [];
 
         // Back end supports 1-many relationships, however, we currently
@@ -74,7 +80,11 @@ export default Ember.Route.extend({
         Object.assign(model, { subscriptionGroup });
       });
   },
+
   actions: {
+    /**
+     * Action called on submission to reload the route's model
+     */
     refreshModel: function() {
       this.refresh();
     }
