@@ -12,30 +12,37 @@ export default Ember.Controller.extend({
   metricName: Ember.computed.reads('model.metric'),
   granularity: Ember.computed.reads('model.bucketUnit'),
   dimensions: Ember.computed.reads('model.exploreDimensions'),
-  properties: Ember.computed.reads('model.properties'),
+  alertFilter: Ember.computed.reads('model.alertFilter'),
   alertFunctionName: Ember.computed.reads('model.functionName'),
   isActive: Ember.computed.reads('model.isActive'),
   selectedAppName: Ember.computed.reads('model.application'),
   metricData: Ember.computed.reads('model.metricData'),
+  subscriptionGroup: Ember.computed.reads('model.subscriptionGroup'),
 
   filters: Ember.computed('model.filters', function() {
     return this.get('model.filters');
   }),
 
-  pattern: Ember.computed('properties.pattern', function() {
-    const pattern = this.getWithDefault('properties.pattern', 'Up and Down');
+  pattern: Ember.computed('alertFilter.pattern', function() {
+    const pattern = this.getWithDefault('alertFilter.pattern', 'UP,DOWN');
 
-    return pattern;
+    const patternMapping = {
+      'UP,DOWN': 'Up and Down',
+      UP: 'Up',
+      DOWN: 'Down'
+    };
+
+    return patternMapping[pattern];
   }),
 
-  weeklyEffect: Ember.computed('properties.weeklyEffectModeled', function() {
-    const weeklyEffect = this.getWithDefault('properties.weeklyEffectModeled', true);
+  weeklyEffect: Ember.computed('alertFilter.weeklyEffectModeled', function() {
+    const weeklyEffect = this.getWithDefault('alertFilter.weeklyEffectModeled', true);
 
     return weeklyEffect;
   }),
 
-  sensitivity: Ember.computed('properties.userDefinedPattern', function() {
-    const sensitivity = this.getWithDefault('properties.userDefinedPattern', 'MEDIUM');
+  sensitivity: Ember.computed('alertFilter.userDefinedPattern', function() {
+    const sensitivity = this.getWithDefault('alertFilter.userDefinedPattern', 'MEDIUM');
     const sensitivityMapping = {
       LOW: 'Robust',
       MEDIUM: 'Medium',
@@ -45,6 +52,7 @@ export default Ember.Controller.extend({
     return sensitivityMapping[sensitivity];
   }),
 
+  selectedApplication: Ember.computed.reads('model.subscriptionGroup.application'),
 
   legendText: {
     dotted: 'WoW',
@@ -78,15 +86,17 @@ export default Ember.Controller.extend({
   filteredConfigGroups: Ember.computed(
     'selectedApplication',
     function() {
-      const appName = this.get('selectedApplication');
-      const activeGroups = this.getWithDefault('allAlertsConfigGroups', []).filterBy('active');
-      const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
 
-      if (Ember.isPresent(appName)) {
-        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName));
-      } else {
-        return activeGroups;
-      }
+      return this.get('model.subscriptionGroup.name');
+      // const appName = this.get('selectedApplication');
+      // const activeGroups = this.getWithDefault('allAlertsConfigGroups', []).filterBy('active');
+      // const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
+
+      // if (Ember.isPresent(appName)) {
+      //   return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName));
+      // } else {
+      //   return activeGroups;
+      // }
     }
   ),
 
@@ -148,8 +158,62 @@ export default Ember.Controller.extend({
       });
     },
 
-    // To do update alert config group and/or activate/deactivate
+
+    /**
+     * Verify that email address does not already exist in alert group. If it does, remove it and alert user.
+     * @method validateAlertEmail
+     * @param {String} emailInput - Comma-separated list of new emails to add to the config group.
+     * @return {undefined}
+     */
+    validateAlertEmail(emailInput) {
+      const newEmailArr = emailInput.replace(/\s+/g, '').split(',');
+      let existingEmailArr = this.get('selectedGroupRecipients');
+      let cleanEmailArr = [];
+      let badEmailArr = [];
+      let isDuplicateEmail = false;
+
+      if (emailInput.trim() && existingEmailArr) {
+        existingEmailArr = existingEmailArr.replace(/\s+/g, '').split(',');
+        for (var email of newEmailArr) {
+          if (existingEmailArr.includes(email)) {
+            isDuplicateEmail = true;
+            badEmailArr.push(email);
+          } else {
+            cleanEmailArr.push(email);
+          }
+        }
+
+        this.setProperties({
+          isDuplicateEmail,
+          duplicateEmails: badEmailArr.join()
+        });
+      }
+    },
+
+    // MVP version:
+    // Can activate / deactivate
+    // can change name of alerts
     onSubmit() {
+      const functionId = this.get('model.id');
+      const functionName = this.get('alertFunctionName');
+      const isActive = this.get('isActive');
+      const url = `/dashboard/anomaly-function/${functionId}`;
+
+      const body = {
+        functionName,
+        isActive
+      };
+
+      debugger;
+
+      const putProps = {
+        method: 'put',
+        body: JSON.stringify(body),
+        headers: { 'content-type': 'Application/Json' }
+      };
+
+      return fetch(url, putProps).then((res) => checkStatus(res, 'post'))
+        .then(this.send('refreshModel'));
     }
   }
 });

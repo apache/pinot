@@ -32,17 +32,18 @@ export default Ember.Route.extend({
     const {
       metric: metricName,
       collection: dataset,
-      filters
+      filters,
+      bucketUnit: granularity,
+      id
      } = model;
 
-    const granularity = model.bucketUnit;
-    let id = '';
+    let metricId = '';
 
     return fetch(`/data/autocomplete/metric?name=${dataset}::${metricName}`).then(checkStatus)
       .then((metrics) => {
         const metric = metrics.pop();
-        id = metric.id;
-        return fetch(`/data/maxDataTime/metricId/${id}`).then(checkStatus);
+        metricId = metric.id;
+        return fetch(`/data/maxDataTime/metricId/${metricId}`).then(checkStatus);
       })
       .then((maxTime) => {
         const currentEnd = moment(maxTime).isValid()
@@ -53,22 +54,29 @@ export default Ember.Route.extend({
         const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
         const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
         const baselineEnd = moment(currentEnd).subtract(1, 'week');
-        const url =  `/timeseries/compare/${id}/${currentStart}/${currentEnd}/` +
+        const url =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
           `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}` +
           `&filters=${encodeURIComponent(formattedFilters)}`;
         return fetch(url).then(checkStatus);
       })
       .then((metricData) => {
-        model.properties = parseProps(model.properties);
-
         Object.assign(model, { metricData });
 
         return fetch(`thirdeye/email/functions`).then(checkStatus);
-      });
-      // .then((groupConfigs) => {
-      //   const groupConfig = groupConfigs[`${id}`];
+      })
+      .then((groupConfigs) => {
+        const subscriptionGroups = groupConfigs[id] || [];
 
-      //   Object.assign(model, { groupConfig });
-      // });
+        // Back end supports 1-many relationships, however, we currently
+        // enforces 1-1 in the front end
+        const subscriptionGroup = subscriptionGroups.pop();
+
+        Object.assign(model, { subscriptionGroup });
+      });
+  },
+  actions: {
+    refreshModel: function() {
+      this.refresh();
+    }
   }
 });
