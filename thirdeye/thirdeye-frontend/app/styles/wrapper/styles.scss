@@ -67,11 +67,55 @@ body {
 }
 
 .te-search-results {
+  color: app-shade(black, 0.7);
+  &__header {
+    display: flex;    
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $te-spacing;
+  }
+
+  &__row {
+    display: flex;
+  }
+  &__option {
+    display: inline-block;
+    width: 120px;
+    min-width: 120px;
+    font-weight: 600;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  &__edit-button {
+    margin-left: $te-spacing;
+  }
+
+  &__title-group {
+    color: app-shade(black,0.85);	
+    font-size: 21px;
+    display: flex; 
+    align-items: center;
+    flex-shrink: 1;
+    overflow: hidden;
+  }
+  
+  &__title {
+    min-width: 120px;
+  }
+
   &__list {
+    font-weight: normal;
     margin-bottom: 0;
 
     &--summary-block {
-      padding: 5px 10px 10px 0;
+      padding: 0;
     }
   }
 
@@ -89,21 +133,33 @@ body {
   }
 
   &__tag {
-    font-weight: 400;
-    letter-spacing: 1px;
+    font-size: 15px;
+    border-radius: 2px;
 
     &--active {
-      background-color: $te-blue;
+      color: #398B18;
+      background-color: #DCF0CB;    
     }
 
-    &--active {
-      background-color: $te-blue;
+    &--inactive {
+      background-color: $te-red;
+      background-color: lighten($te-red, 30%);
     }
   }
 }
 
 .te-form {
   &__section {
+    margin-top: 24px;
+    margin-bottom: 24px;
+
+    &-title {
+      border-bottom: none;
+      font-weight: 600;
+      font-size: 17px;
+      color: app-shade(black, 0.85);
+    }
+
     &--first {
       margin-top: 0;
     }
@@ -113,11 +169,11 @@ body {
     margin: $te-default-element-spacing 0 15px 0;
     padding-top: $te-default-element-spacing;
     text-align: right;
-    border-top: 2px app-shade(black, 2) dotted;
+    border-top: 1px solid #E9E9E9;
   }
 
   &__sub-label {
-    margin: -5px 0 5px 0;
+    color: rgba(0,0,0,0.45);
 
     &--strong {
       font-weight: 600;
@@ -208,18 +264,59 @@ body {
   .ember-power-select-trigger {
     padding-top: 2px;
     min-height: 2.4em !important;
+    border: 1px solid app-shade(black, 0.25);
+    border-radius: 2px;
+    box-shadow: none;
+    color: app-shade(black, 0.85);
+  
+    &:hover {
+      border-color: app-shade(black, 0.55);  
+    }
+  
+    .ember-power-select-status-icon {
+      border-top-color: app-shade(black, 0.7);
+    }
+
+    .ember-power-select-placeholder {
+      color: app-shade(black, 0.55);
+    }
+    
+    &[aria-disabled=true] {
+      border-color: app-shade(black, 0.1);
+      background-color: app-shade(black, 0);
+      cursor: default;
+  
+      .ember-power-select-trigger-multiple-input {
+        background-color: app-shade(black, 0);
+
+        &::placeholder {
+          color: app-shade(black, 0.25);
+        }
+      }
+
+      .ember-power-select-status-icon {
+        border-top-color: app-shade(black, 0.25);
+      }
+      .ember-power-select-placeholder {
+        color: app-shade(black, 0.25);
+      }
+   }
   }
 }
 
+// overriding x-toggle default styling
 .te-toggle {
   margin-right: 14px;
   // necessary to override the ember-toggle component
   .x-toggle:checked + label > .x-toggle-ios.x-toggle-btn {
     background-color: $te-blue-6;
   }
-}
 
-.te-label {
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.70)
+  &--left {
+    justify-content: flex-start;
+  }
+
+  &--form {
+    margin-top: 6px;
+  }
 }

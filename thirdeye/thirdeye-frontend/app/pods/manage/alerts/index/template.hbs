@@ -1,0 +1,187 @@
+<aside class="manage-alert-filters col-md-3">
+  <div class="manage-alert-filters__wrapper">
+    <h1 class="manage-alert-filters__row manage-alert-filters__row--title">Manage Alerts</h1>
+    {{#accordion-list allowManyActiveItems=true as |accordion|}}
+      {{#accordion.item as |accordionItem|}}
+        {{#accordionItem.toggle}}
+          <div class="manage-alert-filters__row te-hide">Alerts </div>
+        {{/accordionItem.toggle}}
+        {{#accordionItem.panel}}
+          <div class="manage-alert-filters__options te-hide">Options go here</div>
+        {{/accordionItem.panel}}
+      {{/accordion.item}}
+    {{/accordion-list}}
+  </div>
+</aside>
+
+<main class="manage-alert-container paper-container paper-container--padded col-md-9">
+  <div class="manage-alert-container__title">Search for an existing alert</div>
+  <div class="manage-alert-search">
+    <div class="manage-alert-search__filter">
+      <div class="manage-alert-search__label">Search By:</div>
+      {{#power-select
+        selected=selectedSearchMode
+        options=searchModes
+        searchEnabled=false
+        onchange=(action "onSearchModeChange")
+        as |name|
+      }}
+        {{name}}
+      {{/power-select}}
+    </div>
+
+    <div class="manage-alert-search__input">
+      <div class="manage-alert-search__label">Search for Alert:</div>
+      {{#if (eq selectedSearchMode 'All Alerts')}}
+        {{#power-select
+          selected=selectedAll
+          onchange=(action "onAlertChange")
+          placeholder="Show All Alerts"
+          disabled=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+      {{else if (eq selectedSearchMode 'Alerts')}}
+        {{#power-select
+          selected=primaryMetric
+          onchange=(action "onAlertChange")
+          search=(perform searchByFunctionName)
+          searchPlaceholder="Search for an Alert"
+          placeholder="Search by Alert Name"
+          allowClear=true
+          as |alert|
+        }}
+          {{alert.functionName}}
+        {{/power-select}}
+
+      {{else if (eq selectedSearchMode 'Applications')}}
+        {{#power-select
+          selected=selectedApplicationName
+          onchange=(perform searchByApplicationName)
+          options=applicationNames
+          searchPlaceholder="Search for an Application Name"
+          placeholder="Search by Application Name"
+          allowClear=true
+          as |applicationName|
+        }}
+          {{applicationName}}
+        {{/power-select}}
+
+      {{else if (eq selectedSearchMode 'Subscriber Groups')}}
+        {{#power-select
+          onchange=(perform searchByDatasetName)
+          selected=selectedsuscriberGroupNames
+          options=suscriberGroupNames
+          searchPlaceholder="Search for a dataset"
+          placeholder="Search by Subscriber Group Name"
+          allowClear=true
+          as |groupName|
+        }}
+          {{groupName}}
+        {{/power-select}}
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="manage-alert-results">
+    {{#if paginatedSelectedAlerts}}
+      <section class="te-search-header"> 
+        <span class="te-search-title">
+          Alerts Found({{selectedAlerts.length}}) 
+        </span>
+        <span class="pull-right">
+          Showing {{paginatedSelectedAlerts.length}} of 
+          {{selectedAlerts.length}} {{if (gt selectedAlerts.length 1) 'alerts' 'alert'}}
+        </span>
+      </section>
+    {{/if}}
+    {{#if isLoading}}
+      <div class="spinner-wrapper">
+        {{ember-spinner}}
+      </div>
+    {{/if}}
+      {{#each paginatedSelectedAlerts as |alert|}}
+        <section class="te-search-results">
+          <div class="te-search-results__header">
+            <div class="te-search-results__title-group">
+              <div class="te-search-results__title">
+                <span class="te-search-results__tag {{if alert.isActive "te-search-results__tag--active"}}">
+                  {{if alert.isActive "Active" "Inactive"}}
+                </span>
+              </div>
+              <span title={{alert.functionName}}>
+                {{alert.functionName}}
+              </span>
+            </div>
+            {{!-- TODO: add edit button once MVP is finalized --}}
+            {{!-- <div class="te-search-results__edit-button">
+              {{#link-to "manage.alerts.edit" alert.id}}<span class="glyphicon glyphicon-pencil"></span>{{/link-to}}
+            </div> --}}
+          </div>
+          <ul class="te-search-results__list te-search-results__list--details-block row">
+            <div class="col-xs-12 col-sm-6">
+              <li class="te-search-results__row">
+                {{!-- Todo: Dry this out --}}
+                <div class="te-search-results__option">Metric</div>
+                <div class="te-search-results__value" title={{alert.metric}}>{{alert.metric}}</div>
+              </li>
+              <li class="te-search-results__row">
+                <div class="te-search-results__option">Dataset</div>
+                <div class="te-search-results__value" title={{alert.collection}}>{{alert.collection}}</div>
+              </li>
+              <li class="te-search-results__row">
+                <div class="te-search-results__option">Application</div>
+                <div class="te-search-results__value" title={{alert.application}}>{{alert.application}}</div>
+              </li>
+            </div> 
+            <div class="col-xs-12 col-sm-6">
+              <li class="te-search-results__row">
+                <div class="te-search-results__option">Type</div>
+                <div class="te-search-results__value" title={{alert.type}}>{{alert.type}}</div>
+              </li>
+              <li class="te-search-results__row">
+                <div class="te-search-results__option">Data Filter</div>
+                <div class="te-search-results__value" title={{alert.filters}}>{{alert.filters}}</div>
+              </li>
+              <li class="te-search-results__row">
+                <div class="te-search-results__option">Dimensions</div>
+                <div class="te-search-results__value" title={{alert.exploreDimensions}}>{{alert.exploreDimensions}}</div>
+              </li>
+            </div>
+          </ul>
+        </section>
+      {{/each}}
+  </div>
+
+{{!--pagination--}}
+  {{#if (gt pagesNum 1)}}
+    <nav class="text-center" aria-label="Page navigation">
+      <ul class="pagination">
+        <li class={{if (eq currentPage 1) 'active disabled'}} >
+          <a href="#" {{action "onPaginationClick" 1}} aria-label="First">
+            <span aria-hidden="true">First</span>
+          </a>
+        </li>
+        <li class={{if (eq currentPage 1) 'active disabled'}}>
+          <a href="#" {{action "onPaginationClick" "previous"}} aria-label="Previous">
+            <span aria-hidden="true">Previous</span>
+          </a>
+        </li>
+        {{#each viewPages as |page|}}
+          <li class={{if (eq page currentPage) 'active'}}><a href="#" {{action "onPaginationClick" page}}>{{page}}</a></li>
+        {{/each}}
+        <li class={{if (eq currentPage pagesNum) 'disabled'}} >
+          <a href="#" {{action "onPaginationClick" "next"}} aria-label="Next">
+            <span aria-hidden="true">Next</span>
+          </a>
+        </li>
+        <li class={{if (eq currentPage pagesNum) 'disabled'}} >
+          <a href="#" {{action "onPaginationClick" pagesNum}} aria-label="Last">
+            <span aria-hidden="true">Last</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  {{/if}}
+</main>

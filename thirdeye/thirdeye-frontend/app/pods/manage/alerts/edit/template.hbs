@@ -1,0 +1,235 @@
+<h1 class="te-title">Edit An Alert</h1>
+<main class="alert-create paper-container paper-container--padded te-form">
+
+  <fieldset class="te-form__section te-form__section--first row">
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">Metric Details</legend>
+    </div>
+    <div class="form-group col-xs-12 col-sm-8">
+      <label for="select-metric" class="control-label te-label required">Metric Name</label>
+      {{input
+        type="text"
+        id="select-metric"
+        class="form-control te-input te-input--read-only"
+        value=metricName
+        disabled=true
+      }}
+    </div>
+
+    <div class="form-group col-xs-6 col-sm-4">
+      <label for="select-granularity" class="control-label te-label">Granularity</label>
+      {{input
+        type="text"
+        id="select-granularity"
+        class="form-control te-input te-input--read-only"
+        value=granularity
+        disabled=true
+      }}
+    </div>
+
+    <div class="form-group col-xs-6">
+      <label for="select-filters" class="control-label te-label required">Filters</label>
+      {{input
+        type="text"
+        id="select-filters"
+        class="form-control te-input te-input--read-only"
+        value=filters
+        disabled=true
+      }}
+    </div>
+
+
+    <div class="form-group col-xs-6">
+      <label for="select-dimension" class="control-label te-label">Dimension</label>
+      {{input
+        type="text"
+        id="select-dimension"
+        class="form-control te-input te-input--read-only"
+        value=dimensions
+        disabled=true
+      }}
+    </div>
+
+    <div class="col-xs-12">
+      <div class="te-graph-alert">
+        {{anomaly-graph
+          primaryMetric=metricData
+          showSubchart=true
+          showLegend=false
+          legendText=legendText
+          enableZoom=true
+          componentId='create-alert'
+          showGraphLegend=false
+          height=400
+        }}
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset class="te-form__section row">
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">Detection Configuration</legend>
+    </div>
+    {{!-- Field: Pattern --}}
+    <div class="form-group col-xs-6">
+      <label for="select-pattern" class="control-label te-label required">Pattern of Interest</label>
+      {{input
+        type="text"
+        id="select-pattern"
+        class="form-control te-input te-input--read-only"
+        value=pattern
+        disabled=true
+      }}
+    </div>
+
+    {{!-- Field: Sensitivity --}}
+    <div class="form-group col-xs-6">
+      <label for="select-sensitivity" class="control-label te-label required">Sensitivity</label>
+      {{input
+        type="text"
+        id="select-sensitivity"
+        class="form-control te-input te-input--read-only"
+        value=sensitivity
+        disabled=true
+      }}
+    </div>
+
+    {{!-- Field: Weekly Effect --}}
+    {{#if (eq granularity 'DAYS')}}
+      <div class="form-group col-xs-6">
+        <label for="select-effect" class="control-label te-label required">
+          Weekly Seasonality
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element}}
+              Does your metric behave differently depending on the day of the week?
+            {{/tooltip-on-element}}
+          </span>
+        </label>
+        {{#x-toggle 
+          value=weeklyEffect 
+          classNames="te-toggle te-toggle--form te-toggle--left"
+          theme='ios'
+          showLabels=true
+          name="weeklyEffectToggle"
+          disabled=true
+          as |toggle|}}
+            {{#toggle.label value=weeklyEffect}}
+              <span class="te-label te-label--flush">{{if weeklyEffect 'True' 'False'}}</span>
+            {{/toggle.label}}
+            {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+        {{/x-toggle}} 
+      </div>
+    {{/if}}
+  </fieldset>
+
+  <fieldset class="te-form__section row">
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">Alert Details</legend>
+    </div>
+
+    {{!-- Field: Alert Name --}}
+    <div class="form-group col-xs-12">
+      <label for="anomaly-form-function-name" class="control-label te-label required">
+        Alert Name *
+        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">productName_metricName_dimensionName_other</span></div>
+      </label>
+      {{#if isAlertNameDuplicate}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
+      {{/if}}
+      {{input
+        type="text"
+        id="anomaly-form-function-name"
+        class="form-control te-input te-input--read-only"
+        placeholder="Add a descriptive alert name"
+        value=alertFunctionName
+        focus-out="validateAlertName"
+        key-up="validateAlertName"
+      }}
+    </div>
+
+    {{!-- Field: App Name --}}
+    <div class="form-group col-xs-10">
+      <label for="anomaly-form-app-name" class="control-label te-label required">Related Product or Team</label>
+      {{input
+        type="text"
+        id="anomaly-form-app-name"
+        class="form-control te-input te-input--read-only"
+        value=(get subscriptionGroup "application")
+        disabled=true
+      }}
+    </div>
+
+    <div class="form-group col-xs-2">
+      <label for="select-status" class="control-label te-label required">
+        Status
+      </label>
+      {{#x-toggle 
+        value=isActive 
+        classNames="te-toggle te-toggle--form te-toggle--left"
+        theme='ios'
+        showLabels=true
+        name="activeToggle"
+        onToggle=(action (mut isActive))
+        as |toggle|}}
+          {{#toggle.label value=isActive}}
+            <span class="te-label te-label--flush">{{if isActive 'Active' 'Inactive'}}</span>
+          {{/toggle.label}}
+          {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+      {{/x-toggle}} 
+    </div>
+
+    {{!-- Field: Select Existing Subscription Group --}}
+    <div class="form-group col-sm-12">
+      <label for="config-group" class="control-label te-label">Subscription Group</label>
+      {{input
+        type="text"
+        id="config-group"
+        class="form-control te-input te-input--read-only"
+        placeholder="Add a descriptive alert name"
+        value=(get subscriptionGroup "name")
+        disabled=true
+      }}
+    </div>
+
+    {{!-- Field: new alert group recipient emails --}}
+    <div class="form-group col-xs-12">
+      <label for="config-group-add-recipients" class="control-label te-label">
+        Notification Recipients
+        {{!-- <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{get subscriptionGroup "recipients"}}</span></div> --}}
+      </label>
+      {{#if isDuplicateEmail}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>
+      {{/if}}
+      {{input
+        type="email"
+        id="config-group-add-recipients"
+        class="form-control te-input te-input--read-only"
+        placeholder="Add additional recipients (comma-separated email addresses)"
+        autocomplete=false
+        value=(get subscriptionGroup "recipients")
+        required=true
+        disabled=true
+      }}
+    </div>
+  </fieldset>
+
+  <fieldset class="te-form__section-submit">
+
+    {{#bs-button
+      type="outline-primary"
+      buttonType="cancel"
+      class="te-button te-button--cancel"
+    }}
+      {{#link-to "manage.alerts"}} Cancel {{/link-to}}
+    {{/bs-button}}
+    {{bs-button
+      defaultText="Save"
+      type="primary"
+      onClick=(action "onSubmit")
+      buttonType="submit"
+      disabled=isSubmitDisabled
+      class="te-button te-button--submit"
+    }}
+  </fieldset>
+</main>

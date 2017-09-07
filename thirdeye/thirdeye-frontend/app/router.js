@@ -10,7 +10,9 @@ Router.map(function() {
   this.route('example', { path: 'example/:id' });
 
   this.route('manage', function() {
-    this.route('alerts');
+    this.route('alerts', function() {
+      this.route('edit', { path: '/:alertId' });
+    });
   });
 
   this.route('rca', { path: '/rca' }, function() {

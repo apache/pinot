@@ -4,9 +4,8 @@
 
 .te-graph-alert {
   width: 100%;
-  clear: both;
+  margin-top: $te-spacing;
   border-radius: 5px;
-  margin: 93px 0 20px 0;
 
   &--pending {
     background-color: $te-light-grey;
