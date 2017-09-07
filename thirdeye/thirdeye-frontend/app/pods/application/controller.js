@@ -26,7 +26,7 @@ export default Ember.Controller.extend({
     },
     {
       className: 'manage',
-      link: 'manage',
+      link: 'manage.alerts',
       title: 'Manage'
     }
   ]
