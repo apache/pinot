@@ -18,9 +18,6 @@ export default Ember.Controller.extend({
   isMetricSelected: false,
   isFormDisabled: false,
   isMetricDataInvalid: false,
-  isFilterSelectDisabled: false,
-  isGranularitySelectDisabled: false,
-  isSubmitDisabled: true,
   isCreateAlertSuccess: false,
   isCreateGroupSuccess: false,
   isCreateAlertError: false,
@@ -35,6 +32,8 @@ export default Ember.Controller.extend({
   bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
+  isGroupNameDuplicate: false,
+  isAlertNameDuplicate: false,
 
   legendText: {
     dotted: 'WoW',
@@ -47,6 +46,8 @@ export default Ember.Controller.extend({
   filters: {},
   graphConfig: {},
   selectedFilters: JSON.stringify({}),
+  selectedSensitivity: null,
+  selectedWeeklyEffect: true,
 
   /**
    * Object to cover basic ield 'presence' validation
@@ -86,6 +87,22 @@ export default Ember.Controller.extend({
    */
   patternsOfInterest: ['Up and Down', 'Up only', 'Down only'],
 
+
+  /**
+   * Options for sensitivity field
+   */
+  sensitivityOptions: ['Robust', 'Medium', 'Sensitive'],
+
+  /**
+   * To be sent to replay endpoint
+   */
+  sensitivityMapping: {
+    robust: 'LOW',
+    medium: 'MEDIUM',
+    sensitive: 'HIGH'
+  },
+
+  weeklyEffectOptions: [true, false],
   /**
    * Application name field options loaded from our model.
    */
@@ -345,8 +362,15 @@ export default Ember.Controller.extend({
    */
   callReplayStart(functionId, startTime, endTime) {
     const granularity = this.get('graphConfig.granularity').toLowerCase();
-    const speedUp = granularity.includes('hour') || granularity.includes('day');
-    const url = `/detection-job/${functionId}/replay?start=${startTime}&end=${endTime}&speedup=${speedUp}`;
+    const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
+    const recipients = this.get('selectedConfigGroup.recipients');
+    const selectedSensitivity = this.getProperties('selectedSensitivity');
+    const sensitivy = this.sensitivityMapping[selectedSensitivity];
+
+    const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
+      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${sensitivy}&` +
+      `&removeAnomaliesInWindow=true&removeAnomaliesInWindow=true&to=${recipients}`;
+
     return fetch(url, { method: 'post' })
       .then((res) => checkStatus(res, 'post'))
       .catch((error) => {
@@ -441,7 +465,8 @@ export default Ember.Controller.extend({
     'newConfigGroupName',
     function() {
       return this.get('selectedConfigGroup') && Ember.isNone(this.get('newConfigGroupName'));
-    }),
+    }
+  ),
 
   /**
    * Determines cases in which the filter field should be disabled
@@ -478,11 +503,14 @@ export default Ember.Controller.extend({
   isSubmitDisabled: Ember.computed(
     'selectedMetricOption',
     'selectedPattern',
+    'selectedWeeklyEffect',
     'alertFunctionName',
     'selectedAppName',
     'selectedConfigGroup',
     'newConfigGroupName',
     'alertGroupNewRecipient',
+    'isAlertNameDuplicate',
+    'isGroupNameDuplicate',
     function() {
       let isDisabled = false;
       const requiredFields = this.get('requiredFields');
@@ -495,6 +523,12 @@ export default Ember.Controller.extend({
       }
       // Enable submit if either of these field values are present
       if (Ember.isBlank(this.get('selectedConfigGroup')) && Ember.isBlank(this.get('newConfigGroupName'))) {
+        isDisabled = true;
+      }
+
+      // Duplicate alert Name or group name
+
+      if (this.get('isAlertNameDuplicate') || this.get('isGroupNameDuplicate')) {
         isDisabled = true;
       }
       // For alert group email recipients, require presence only if group recipients is empty
@@ -523,6 +557,7 @@ export default Ember.Controller.extend({
       const granularity = this.get('graphConfig.granularity').toLowerCase();
       const selectedFilter = this.get('selectedFilters');
       const selectedDimension = this.get('selectedDimension');
+      const weeklyEffect = this.get('selectedWeeklyEffect');
       const settingsByGranularity = {
         common: {
           functionName: this.get('alertFunctionName') || this.get('alertFunctionName').trim(),
@@ -554,7 +589,7 @@ export default Ember.Controller.extend({
           windowDelay: 0,
           windowDelayUnit: 'DAYS',
           cron: '0%200%2014%201%2F1%20*%20%3F%20*',
-          properties: 'pValueThreshold=0.05;logTransform=true;weeklyEffectRemovedInPrediction=false'
+          properties: `pValueThreshold=0.05;logTransform=true;weeklyEffectRemovedInPrediction=false;weeklyEffectModeled=${weeklyEffect}`
         }
       };
 
@@ -654,6 +689,8 @@ export default Ember.Controller.extend({
       selectedMetricOption: null,
       selectedPattern: null,
       selectedGranularity: null,
+      selectedSensitivity: null,
+      selectedWeeklyEffect: true,
       selectedDimension: null,
       alertFunctionName: null,
       selectedAppName: null,
@@ -667,6 +704,8 @@ export default Ember.Controller.extend({
       isReplayStatusSuccess: false,
       isReplayStarted: false,
       isReplayStatusError: false,
+      isGroupNameDuplicate: false,
+      isAlertNameDuplicate: false,
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({}),
@@ -743,7 +782,7 @@ export default Ember.Controller.extend({
       // Do not allow selected dimension to match selected filter
       if (isSelectedDimensionEqualToSelectedFilter) {
         this.set('selectedDimension', 'All');
-      };
+      }
       // Fetch new graph data with selected filters
       this.triggerGraphFromMetric(this.get('selectedMetricOption'));
     },
@@ -819,13 +858,24 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     validateNewGroupName(name) {
-      if (name && name.trim().length) {
-        this.setProperties({
-          newConfigGroupName: name,
-          selectedConfigGroup: null,
-          selectedGroupRecipients: null
-        });
+      this.set('isGroupNameDuplicate', false);
+      // return early if name is empty
+      if (!name || !name.trim().length) { return; }
+      const nameExists = this.get('allAlertsConfigGroups')
+        .map(group => group.name)
+        .includes(name);
+
+      // set error message and return early if group name exists
+      if (nameExists) {
+        this.set('isGroupNameDuplicate', true);
+        return;
       }
+
+      this.setProperties({
+        newConfigGroupName: name,
+        selectedConfigGroup: null,
+        selectedGroupRecipients: null
+      });
     },
 
     /**
@@ -943,6 +993,10 @@ export default Ember.Controller.extend({
             isMetricSelected: false,
             isMetricDataInvalid: false
           });
+          return newFunctionId;
+        })
+        .then((id) => {
+          this.transitionToRoute('manage.alerts.edit', id);
         })
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         .catch((error) => {

@@ -59,8 +59,52 @@ body {
   }
 }
 
+
 .te-hide {
   @include app-hide;
+}
+
+.te-label {
+  font-weight: normal;
+  color:  app-shade(black, 8);
+  margin-bottom: 12px;
+
+  &--flush {
+    margin-bottom: 0;
+  }
+}
+
+.te-input {
+  min-height: 2.4em !important;
+  border: 1px solid app-shade(black, 0.25);
+  color: app-shade(black, 0.85);
+  border-radius: 2px;
+  box-shadow: none;
+
+  &::placeholder {
+    color: app-shade(black, 0.55);
+  }
+
+  &:disabled {
+    border-color: app-shade(black, 0.1);
+    background-color: app-shade(black, 0);
+    cursor: default;
+    color: app-shade(black, 0.25);
+
+    &::placeholder {
+      color: app-shade(black, 0.25);
+      font-weight: normal;
+    }
+  }
+  
+  &--read-only:disabled {
+    color: app-shade(black, 0.55);    
+  }
+
+  &:hover:not(:disabled){
+    border-color: app-shade(black, 0.55);
+  }
+
 }
 
 .te-page-right {
@@ -74,12 +118,14 @@ body {
 
 .te-search-results {
   border-bottom: 1px app-shade(black, 1) solid;
+  padding: 24px 0;
 
   &__list {
     list-style: none;
+    // margin-bottom: 24px;
 
     &--details-block {
-      padding: 0 15px 15px 15px;
+      padding: 0;
     }
   }
 
@@ -87,7 +133,8 @@ body {
     line-height: 22px;
 
     &--tag {
-      margin-top: 4px;
+      // margin-top: 4px;
+
     }
 
     &--title {
@@ -103,8 +150,9 @@ body {
     background-color: app-shade(black, 3);
     border-radius: 5px;
     padding: 4px 8px;
+    margin-right: $te-spacing-lg;
     color: app-shade(white, 8);
-
+    width: 150px;
     &--active {
       background-color: app-shade(black, 7);
     }
@@ -117,13 +165,12 @@ body {
 
 .te-search-header {
   padding-bottom: $te-spacing--sm;
-  margin-bottom: $te-spacing--sm;
   border-bottom: 1px app-shade(black, 1) solid;
 }
 
 .te-search-title {
-  font-size: 16px;
-  color: lighten(black, 25%);
+  font-size: 21px;
+  color: app-shade(black, 0.85);
 }
 
 .te-link--show {
@@ -133,4 +180,35 @@ body {
 
 .te-link--hide {
   display: none;
+}
+
+.te-button {
+  border-radius: 2px; 
+  border: 1px solid #339BC7;
+  margin: 0 1px;
+  font-size: 17px;
+
+  &--cancel {
+    background-color: white;
+    color: #339BC7;
+    a {
+      color: #339BC7;
+    }
+    &:hover,
+    a:hover {
+      color: #339BC7;      
+      text-decoration: none;
+    }
+  }
+
+  &--submit {
+    background-color: #1A84BC;
+    color: white;
+    &:hover,
+    a:hover {
+      color: white;
+      text-decoration: none;
+    }
+  }
+
 }
