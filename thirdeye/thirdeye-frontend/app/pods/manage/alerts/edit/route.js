@@ -29,7 +29,7 @@ export default Ember.Route.extend({
     const { alertId: id } = params;
     if (!id) { return; }
 
-    const url = `onboard/function/${id}`;
+    const url = `/onboard/function/${id}`;
     return fetch(url).then(checkStatus);
   },
 
@@ -67,7 +67,7 @@ export default Ember.Route.extend({
       .then((metricData) => {
         Object.assign(model, { metricData });
 
-        return fetch(`thirdeye/email/functions`).then(checkStatus);
+        return fetch(`/thirdeye/email/functions`).then(checkStatus);
       })
       .then((groupConfigs) => {
         // Temporary fix to match alert functions to subscribtion group
