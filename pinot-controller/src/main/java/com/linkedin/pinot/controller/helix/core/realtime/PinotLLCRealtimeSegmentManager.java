@@ -672,7 +672,7 @@ public class PinotLLCRealtimeSegmentManager {
 
   protected int getRealtimeTableFlushSizeForTable(String tableName) {
     TableConfig tableConfig = getRealtimeTableConfig(tableName);
-    return getRealtimeTableFlushSize(tableConfig);
+    return getLLCRealtimeTableFlushSize(tableConfig);
   }
 
   public long getCommitTimeoutMS(String tableName) {
@@ -696,7 +696,18 @@ public class PinotLLCRealtimeSegmentManager {
     return commitTimeoutMS;
   }
 
-  public static int getRealtimeTableFlushSize(TableConfig tableConfig) {
+  /**
+   * Returns the max number of rows that a host holds across all consuming LLC partitions.
+   * This number should be divided by the number of partitions on the host, so as to get
+   * the flush limit for each segment.
+   *
+   * If flush threshold is configured for LLC, return it, otherwise, if flush threshold is
+   * configured for HLC, then return that value, else return -1.
+   *
+   * @param tableConfig
+   * @return -1 if tableConfig is null, or neither value is configured
+   */
+  public static int getLLCRealtimeTableFlushSize(TableConfig tableConfig) {
     final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
     String flushSizeStr;
     if (streamConfigs == null) {
@@ -707,15 +718,16 @@ public class PinotLLCRealtimeSegmentManager {
       try {
         return Integer.parseInt(flushSizeStr);
       } catch (Exception e1) {
-        LOGGER.warn("Failed to parse LLC flush size of {}", flushSizeStr, e1);
-        if (streamConfigs.containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
-          flushSizeStr = streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE);
-          try {
-            return Integer.parseInt(flushSizeStr);
-          } catch (Exception e2) {
-            LOGGER.warn("Failed to parse flush size of {}", flushSizeStr, e2);
-          }
-        }
+        LOGGER.warn("Failed to parse LLC flush size of {} for table {}", flushSizeStr, tableConfig.getTableName(), e1);
+      }
+    }
+
+    if (streamConfigs.containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
+      flushSizeStr = streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE);
+      try {
+        return Integer.parseInt(flushSizeStr);
+      } catch (Exception e2) {
+        LOGGER.warn("Failed to parse flush size of {} for table {}", flushSizeStr, tableConfig.getTableName(), e2);
       }
     }
     return -1;
