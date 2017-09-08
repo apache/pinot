@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
-public interface KafkaMessageDecoder {
+public interface KafkaMessageDecoder<T> {
 
   /**
    *
@@ -35,7 +35,7 @@ public interface KafkaMessageDecoder {
    * @param payload
    * @return
    */
-  GenericRow decode(byte[] payload, GenericRow destination);
+  GenericRow decode(T payload, GenericRow destination);
 
   /**
    * Decodes a row.
@@ -46,5 +46,5 @@ public interface KafkaMessageDecoder {
    * @param destination The {@link GenericRow} to write the decoded row into
    * @return A new row decoded from the buffer
    */
-  GenericRow decode(byte[] payload, int offset, int length, GenericRow destination);
+  GenericRow decode(T payload, int offset, int length, GenericRow destination);
 }

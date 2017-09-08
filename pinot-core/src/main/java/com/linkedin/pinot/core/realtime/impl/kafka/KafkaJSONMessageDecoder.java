@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 
 
-public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
+public class KafkaJSONMessageDecoder implements KafkaMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
 
   private Schema schema;

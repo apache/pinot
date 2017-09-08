@@ -274,7 +274,7 @@ public abstract class ClusterTest extends ControllerTest {
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
   }
 
-  public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder {
+  public static class AvroFileSchemaKafkaAvroMessageDecoder implements KafkaMessageDecoder<byte[]> {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File avroFile;
     private org.apache.avro.Schema _avroSchema;
