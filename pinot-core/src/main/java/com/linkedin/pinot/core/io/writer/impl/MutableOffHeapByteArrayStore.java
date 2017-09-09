@@ -100,7 +100,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       if (size >= Integer.MAX_VALUE) {
         size = Integer.MAX_VALUE - 1;
       }
-      LOGGER.info("Allocating byte array store buffer of size {} for column {}", size, columnName);
+      LOGGER.info("Allocating byte array store buffer of size {} for column {} segment {}", size, columnName, memoryManager.getSegmentName());
       _pinotDataBuffer = memoryManager.allocate(size, columnName);
       _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);

@@ -300,7 +300,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     for (IntBuffer iBuf : oldList) {
       newList.add(iBuf);
     }
-    LOGGER.info("Allocating {} bytes for column {}", bbSize, _columnName);
+    LOGGER.info("Allocating {} bytes for column {} segment {}", bbSize, _columnName, _memoryManager.getSegmentName());
     PinotDataBuffer buffer = _memoryManager.allocate(bbSize, _columnName);
     _pinotDataBuffers.add(buffer);
     buffer.order(ByteOrder.nativeOrder());

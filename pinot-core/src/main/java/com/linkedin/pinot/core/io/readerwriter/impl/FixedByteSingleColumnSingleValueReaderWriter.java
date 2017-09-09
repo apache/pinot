@@ -127,7 +127,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   private void addBuffer() {
-    LOGGER.info("Allocating {} bytes for column {}", chunkSizeInBytes, columnName);
+    LOGGER.info("Allocating {} bytes for column {} for segment {}", chunkSizeInBytes, columnName, memoryManager.getSegmentName());
     PinotDataBuffer buffer = memoryManager.allocate(chunkSizeInBytes, columnName);
     buffer.order(ByteOrder.nativeOrder());
     buffers.add(buffer);

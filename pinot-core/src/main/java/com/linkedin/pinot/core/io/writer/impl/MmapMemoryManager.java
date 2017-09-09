@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.io.writer.impl;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
@@ -74,13 +75,33 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   public MmapMemoryManager(String dirPathName, String segmentName) {
     super(segmentName);
     _dirPathName = dirPathName;
+    File dirFile = new File(_dirPathName);
+    if (dirFile.exists()) {
+      File[] segmentFiles = dirFile.listFiles(new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+          return name.startsWith(getFilePrefix());
+        }
+      });
+      for (File file : segmentFiles) {
+        if (file.delete()) {
+          LOGGER.info("Deleted old file {}", file.getAbsolutePath());
+        } else {
+          LOGGER.error("Cannot delete file {}", file.getAbsolutePath());
+        }
+      }
+    }
+  }
+
+  private String getFilePrefix() {
+    return getSegmentName() + ".";
   }
 
   private void addFileIfNecessary(long len) {
     if (len + _availableOffset <= _curFileLen) {
       return;
     }
-    String thisContext = getSegmentName() + "." + _numFiles++;
+    String thisContext = getFilePrefix() + _numFiles++;
     String filePath;
     filePath = _dirPathName + "/" + thisContext;
     final File file = new File(filePath);
