@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -32,7 +34,8 @@ public class MultiValueDictionaryTest {
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(MultiValueDictionaryTest.class.getName());
+    _memoryManager = new DirectMemoryManager(MultiValueDictionaryTest.class.getName(),
+        new ServerMetrics(new MetricsRegistry()));
   }
 
   @AfterClass
@@ -54,7 +57,8 @@ public class MultiValueDictionaryTest {
       throws Exception {
     final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
-        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8, new DirectMemoryManager("test"), "indexer");
+        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8, new DirectMemoryManager("test",
+            new ServerMetrics(new MetricsRegistry())), "indexer");
 
     // Insert rows into the indexer and dictionary
     Random random = new Random(seed);

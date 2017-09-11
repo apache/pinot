@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.core.indexsegment.utils;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -32,7 +34,8 @@ public class OffHeapStringStoreTest {
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(OffHeapStringStoreTest.class.getName());
+    _memoryManager = new DirectMemoryManager(OffHeapStringStoreTest.class.getName(),
+        new ServerMetrics(new MetricsRegistry()));
   }
 
   @AfterClass

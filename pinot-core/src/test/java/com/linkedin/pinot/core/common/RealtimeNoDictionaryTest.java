@@ -18,11 +18,13 @@ package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -48,7 +50,8 @@ public class RealtimeNoDictionaryTest {
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(RealtimeNoDictionaryTest.class.getName());
+    _memoryManager = new DirectMemoryManager(RealtimeNoDictionaryTest.class.getName(),
+        new ServerMetrics(new MetricsRegistry()));
   }
 
   @AfterClass

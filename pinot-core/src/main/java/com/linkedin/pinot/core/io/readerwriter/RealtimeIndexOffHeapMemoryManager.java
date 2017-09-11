@@ -16,11 +16,16 @@
 
 package com.linkedin.pinot.core.io.readerwriter;
 
+import com.linkedin.pinot.common.metrics.ServerGauge;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
@@ -35,10 +40,23 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
   private final List<PinotDataBuffer> _buffers = new LinkedList<>();
   private final String _segmentName;
+  private final ServerMetrics _serverMetrics;
   private long _totalMemBytes = 0;
+  private final String _tableName;
 
-  protected RealtimeIndexOffHeapMemoryManager(String segmentName) {
+  protected RealtimeIndexOffHeapMemoryManager(ServerMetrics serverMetrics, String segmentName) {
+    _serverMetrics = serverMetrics;
     _segmentName = segmentName;
+    if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      _tableName = llcSegmentName.getTableName();
+    } else if (SegmentName.isHighLevelConsumerSegmentName(segmentName)){
+      HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
+      _tableName = hlcSegmentName.getTableName();
+    } else {
+      // For testing only
+      _tableName = "NoSuchTable";
+    }
   }
 
   /**
@@ -63,6 +81,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
     PinotDataBuffer buffer = allocateInternal(size, columnName);
     _totalMemBytes += size;
     _buffers.add(buffer);
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, size);
     return buffer;
   }
 
@@ -84,6 +103,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
   public void close() throws IOException {
     for (PinotDataBuffer buffer : _buffers) {
       buffer.close();
+      _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, -buffer.size());
     }
     doClose();
     _buffers.clear();

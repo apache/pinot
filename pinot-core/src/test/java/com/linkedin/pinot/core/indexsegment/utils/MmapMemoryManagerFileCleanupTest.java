@@ -16,8 +16,10 @@
 
 package com.linkedin.pinot.core.indexsegment.utils;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
@@ -50,11 +52,12 @@ public class MmapMemoryManagerFileCleanupTest {
     final String someColumn = "column";
     final long firstAlloc = 20;
     final long allocAfterRestart = 200;
-    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName,
+        new ServerMetrics(new MetricsRegistry()));
     memoryManager.allocate(firstAlloc, someColumn);
     // Now, if the host restarts, we will have a file left behind for the same consuming segment.
     // and we should not see any exception.
-    memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    memoryManager = new MmapMemoryManager(_tmpDir, segmentName, new ServerMetrics(new MetricsRegistry()));
     memoryManager.allocate(allocAfterRestart, someColumn);
     // We should not see the first allocation in the total.
     Assert.assertEquals(memoryManager.getTotalMemBytes(), allocAfterRestart);

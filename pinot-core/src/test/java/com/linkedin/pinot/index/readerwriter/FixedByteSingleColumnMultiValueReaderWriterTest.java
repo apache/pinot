@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
@@ -33,7 +35,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(FixedByteSingleColumnMultiValueReaderWriterTest.class.getName());
+    _memoryManager = new DirectMemoryManager(FixedByteSingleColumnMultiValueReaderWriterTest.class.getName(),
+        new ServerMetrics(new MetricsRegistry()));
   }
 
   @AfterClass

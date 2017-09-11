@@ -17,6 +17,7 @@
 package com.linkedin.pinot.core.data.manager.realtime;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
@@ -49,10 +50,12 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   protected void initMemoryManager(RealtimeTableDataManager realtimeTableDataManager, boolean isOffHeapAllocation, String segmentName) {
+    ServerMetrics serverMetrics = realtimeTableDataManager.getServerMetrics();
     if (isOffHeapAllocation) {
-      _memoryManager = new MmapMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName);
+      _memoryManager = new MmapMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
+          realtimeTableDataManager.getServerMetrics());
     } else {
-      _memoryManager = new DirectMemoryManager(segmentName);
+      _memoryManager = new DirectMemoryManager(segmentName, realtimeTableDataManager.getServerMetrics());
     }
   }
 

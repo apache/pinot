@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.io.writer.impl;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
@@ -70,10 +71,11 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
    * @param dirPathName directory under which all mmap files are created.
    * @param segmentName Name of the segment for which this memory manager allocates memory
    *
+   * @param serverMetrics
    * @see RealtimeIndexOffHeapMemoryManager
    */
-  public MmapMemoryManager(String dirPathName, String segmentName) {
-    super(segmentName);
+  public MmapMemoryManager(String dirPathName, String segmentName, ServerMetrics serverMetrics) {
+    super(serverMetrics, segmentName);
     _dirPathName = dirPathName;
     File dirFile = new File(_dirPathName);
     if (dirFile.exists()) {

@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.perf;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -45,7 +47,8 @@ public class BenchmarkDictionary {
 
   @Setup
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(BenchmarkDictionary.class.getName());
+    _memoryManager = new DirectMemoryManager(BenchmarkDictionary.class.getName(),
+        new ServerMetrics(new MetricsRegistry()));
     // Create a list of values to insert into the hash map
     uniqueColValues = new long[CARDINALITY];
     for (int i = 0; i < uniqueColValues.length; i++) {

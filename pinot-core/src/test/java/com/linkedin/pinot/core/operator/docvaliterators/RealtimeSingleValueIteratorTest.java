@@ -16,10 +16,12 @@
 
 package com.linkedin.pinot.core.operator.docvaliterators;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.util.Random;
 import org.testng.Assert;
@@ -44,7 +46,8 @@ public class RealtimeSingleValueIteratorTest {
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(RealtimeSingleValueIteratorTest.class.getName());
+    _memoryManager = new DirectMemoryManager(RealtimeSingleValueIteratorTest.class.getName(),
+        new ServerMetrics(new MetricsRegistry()));
     _intReader =
         new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.INTEGER_SIZE,
             _memoryManager, "intReader");

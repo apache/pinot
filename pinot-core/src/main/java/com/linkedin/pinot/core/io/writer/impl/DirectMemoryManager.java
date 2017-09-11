@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.io.writer.impl;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -26,8 +27,8 @@ public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   /**
    * @see RealtimeIndexOffHeapMemoryManager
    */
-  public DirectMemoryManager(final String segmentName) {
-    super(segmentName);
+  public DirectMemoryManager(final String segmentName, ServerMetrics serverMetrics) {
+    super(serverMetrics, segmentName);
   }
 
   /**
