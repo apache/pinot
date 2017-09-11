@@ -27,7 +27,7 @@ export default function() {
   /**
    * Mocks anomaly data end points
    */
-  this.get('/anomalies/search/anomalyIds/1492498800000/1492585200000/1', (server) => {
+  this.get('/anomalies/search/anomalyIds/1/1/1', (server) => {
     const anomaly = Object.assign({}, server.anomalies.first().attrs);
     const anomalyDetailsList = [ anomaly ];
     return { anomalyDetailsList };

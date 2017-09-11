@@ -156,8 +156,8 @@ export default Ember.Component.extend({
     const legendText = this.get('legendText');
 
     const {
-      dotted = 'expected',
-      solid = 'current'
+      dotted = { text: 'expected', color: 'blue'},
+      solid = { text: 'current', color: 'blue' }
     }  = legendText;
 
     chart.insert('div', '.chart').attr('class', 'anomaly-graph__legend').selectAll('span')
@@ -166,26 +166,30 @@ export default Ember.Component.extend({
       .attr('class', 'anomaly-graph__legend-item')
       .attr('width', 80)
       .attr('height', 20)
-      .attr('data-id', function (id) { return id; })
-      .each(function (id) {
+      .attr('data-id', function (el) { return el.text; })
+      .each(function (el) {
         const element = d3.select(this);
 
         element.append('text')
           .attr('x', 35)
           .attr('y', 12)
-          .html(id => id);
+          .text(el.text);
 
         element.append('line')
-          .attr('class', 'anomaly-graph__legend-line')
+          .attr('class', function(el) {
+            return `anomaly-graph__legend-line anomaly-graph__legend-line--${el.color}`;
+          })
           .attr('x1', 0)
           .attr('y1', 10)
           .attr('x2', 30)
           .attr('y2', 10)
           .attr('stroke-dasharray', (d) => {
-            const dasharrayNum = (d === dotted) ? '10%' : '0';
+            const dasharrayNum = (d === dotted) ? '10%' : 'none';
             return dasharrayNum;
           });
       });
+    // Necessary so that it is 'thenable'
+    return Promise.resolve();
   },
 
   willDestroyElement() {
@@ -208,9 +212,21 @@ export default Ember.Component.extend({
       this.buildSliderButton();
       // hiding this feature until fully fleshed out
       // this.buildAnomalyRegionSlider();
-      this.buildCustomLegend();
+      this.buildCustomLegend().then(() => {
+        this.notifyPhantomJS();
+      });
     });
+  },
 
+  /**
+   * Checks if the page is being viewed from phantomJS
+   * and notifies it that the page is rendered and ready
+   * for a screenshot
+   */
+  notifyPhantomJS() {
+    if (typeof window.callPhantom === 'function') {
+      window.callPhantom({message: 'ready'});
+    }
   },
 
   /**
@@ -234,9 +250,9 @@ export default Ember.Component.extend({
 
     data.forEach((datum) => {
       const name = datum.metricName || datum.name;
-      const { color = 'blue' } = datum;
-      colors[`${name}-current`] = COLOR_MAPPING[color];
-      colors[`${name}-expected`] = COLOR_MAPPING[color];
+      const { color } = datum;
+      colors[`${name}-current`] = COLOR_MAPPING[color || 'blue'];
+      colors[`${name}-expected`] = COLOR_MAPPING[color || 'orange'];
     });
 
     events.forEach((event) => {
@@ -405,7 +421,7 @@ export default Ember.Component.extend({
    * Graph axis config
    */
   axis: Ember.computed(
-    'primaryMetric.timeBucketsCurrent',
+    'chartDates',
     'primaryMetric',
     'subchartStart',
     'subchartEnd',
@@ -413,7 +429,7 @@ export default Ember.Component.extend({
     'minDate',
     'maxDate',
     function() {
-      const dates = this.get('primaryMetric.timeBucketsCurrent');
+      const [ _, ...dates ] = this.get('chartDates');
       const subchartStart = this.get('_subchartStart')
         || this.get('subchartStart');
       const subchartEnd = this.get('_subchartEnd')
@@ -488,7 +504,7 @@ export default Ember.Component.extend({
   onbrush: function(dates) {
     const [ start, end ] = dates;
     const onSubchartBrush = this.get('onSubchartChange');
-    const graphDates = this.get('primaryMetric.timeBucketsCurrent');
+    const [ _, ...graphDates ] = this.get('chartDates');
     const min = graphDates.get('firstObject');
     const max = graphDates.get('lastObject');
 
@@ -553,6 +569,7 @@ export default Ember.Component.extend({
 
       selectedMetrics.forEach((metric)  => {
         if (!metric) { return; }
+
         const { baselineValues, currentValues } = metric.subDimensionContributionMap['All'];
         columns.push([`${metric.metricName}-current`, ...currentValues]);
         columns.push([`${metric.metricName}-expected`, ...baselineValues]);
@@ -602,11 +619,11 @@ export default Ember.Component.extend({
     'onEventClick',
     function() {
       const {
-        primaryMetricColumn,
-        selectedMetricsColumn,
-        selectedDimensionsColumn,
-        holidayEventsColumn,
-        holidayEventsDatesColumn
+        primaryMetricColumn = [],
+        selectedMetricsColumn = [],
+        selectedDimensionsColumn = [],
+        holidayEventsColumn = [],
+        holidayEventsDatesColumn = []
       } = this.getProperties(
         'primaryMetricColumn',
         'selectedMetricsColumn',
@@ -666,8 +683,11 @@ export default Ember.Component.extend({
    * and assigns color class
    */
   primaryRegions: Ember.computed('primaryMetric', function() {
-    const primaryMetric = this.get('primaryMetric');
-    const { regions } = primaryMetric;
+    const primaryMetric = this.get('primaryMetric') || {};
+    const { 
+      regions, 
+      color = 'orange'
+    } = primaryMetric;
 
     if (!regions) { return []; }
 
@@ -679,7 +699,7 @@ export default Ember.Component.extend({
         tick: {
           format: '%m %d %Y'
         },
-        class: `c3-region--${primaryMetric.color}`
+        class: `c3-region--${color}`
       };
 
     });

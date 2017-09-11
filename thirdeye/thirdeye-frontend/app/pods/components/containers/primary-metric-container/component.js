@@ -19,7 +19,8 @@ function select(store) {
     graphEnd,
     selectedDimensions,
     selectedEvents,
-    selectedMetricIds
+    selectedMetricIds,
+    color
   } = store.primaryMetric;
 
   const {
@@ -60,7 +61,7 @@ function select(store) {
           dimension,
           { isSelected });
       }).filter(dimension => dimension),
-    primaryMetric: uiMainMetric[primaryMetricId],
+    primaryMetric: Object.assign({}, uiMainMetric[primaryMetricId], {color}),
     selectedMetrics: selectedMetricIds
       .map((id) => {
 

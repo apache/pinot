@@ -51,7 +51,10 @@
   &__legend-line {
     stroke: $te-blue !important;
     stroke-width: 3;
-        // stroke: white;
+
+    &--orange {
+      stroke: $te-orange !important;
+    }
   }
 }
 

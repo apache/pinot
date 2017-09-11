@@ -1,4 +1,6 @@
-{{te-navbar navItems=globalNavItems isGlobalNav=true navClass="te-nav--global"}}
+{{#if showNavbar}}
+  {{te-navbar navItems=globalNavItems isGlobalNav=true navClass="te-nav--global"}}
+{{/if}}
 {{outlet}}
 
 {{!-- placed here because the tooltip is absolutely positioned relative to the body  --}}
