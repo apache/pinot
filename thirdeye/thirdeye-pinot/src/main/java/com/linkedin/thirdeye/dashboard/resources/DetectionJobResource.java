@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.FilterPattern;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,7 +41,6 @@ import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
 import com.linkedin.thirdeye.anomaly.detection.lib.FunctionReplayRunnable;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
@@ -680,6 +678,8 @@ public class DetectionJobResource {
       LOG.warn("Exception when tune alert filter, {}", e.getMessage());
     }
     // write to DB
+    autotuneConfig.setFunctionId(id);
+    autotuneConfig.setAutotuneMethod(AutotuneMethodType.INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE);
     autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig).toString();
 
     return Response.ok(autotuneId).build();
