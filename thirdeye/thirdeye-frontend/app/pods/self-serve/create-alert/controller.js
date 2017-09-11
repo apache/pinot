@@ -103,6 +103,29 @@ export default Ember.Controller.extend({
   },
 
   /**
+   * Setting default sensitivity if selectedSensitivity is undefined
+   * @returns {String}
+   */
+  sensitivityWithDefault: Ember.computed(
+    'selectedSensitivity',
+    'selectedGranularity',
+    function() {
+      let {
+       selectedSensitivity,
+       selectedGranularity
+      } =  this.getProperties('selectedSensitivity', 'selectedGranularity');
+
+      if (!selectedSensitivity) {
+        selectedSensitivity = (selectedGranularity === '5_MINUTES')
+          ? 'Medium'
+          : 'Sensitive';
+      }
+
+      return this.sensitivityMapping[selectedSensitivity];
+    }
+  ),
+
+  /**
    * Mapping user readable pattern to be values
    */
   patternMapping: {
@@ -373,14 +396,13 @@ export default Ember.Controller.extend({
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
     const recipients = this.get('selectedConfigGroup.recipients');
-    const selectedSensitivity = this.get('selectedSensitivity');
-    const sensitivy = this.sensitivityMapping[selectedSensitivity];
+    const sensitivity = this.get('sensitivityWithDefault');
     const selectedPattern = this.get('selectedPattern');
     const pattern = this.patternMapping[selectedPattern];
 
 
     const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
-      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${pattern}&sensitivity=${sensitivy}` +
+      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${pattern}&sensitivity=${sensitivity}` +
       `&removeAnomaliesInWindow=true&removeAnomaliesInWindow=true&to=${recipients}`;
 
     return fetch(url, { method: 'post' })
@@ -743,7 +765,9 @@ export default Ember.Controller.extend({
         selectedMetricOption: selectedObj,
         selectedFilters: JSON.stringify({}),
         selectedPattern: null,
-        selectedDimension: null
+        selectedDimension: null,
+        selectedGranularity: null,
+        selectedSensitivity: null
       });
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {
