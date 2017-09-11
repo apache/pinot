@@ -94,12 +94,21 @@ export default Ember.Controller.extend({
   sensitivityOptions: ['Robust', 'Medium', 'Sensitive'],
 
   /**
-   * To be sent to replay endpoint
+   * Mapping user readable sensitivity to be values
    */
   sensitivityMapping: {
-    robust: 'LOW',
-    medium: 'MEDIUM',
-    sensitive: 'HIGH'
+    Robust: 'LOW',
+    Medium: 'MEDIUM',
+    Sensitive: 'HIGH'
+  },
+
+  /**
+   * Mapping user readable pattern to be values
+   */
+  patternMapping: {
+    'Up and Down': 'UP,DOWN',
+    'Up only': 'UP',
+    'Down only': 'DOWN'
   },
 
   weeklyEffectOptions: [true, false],
@@ -364,11 +373,14 @@ export default Ember.Controller.extend({
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
     const recipients = this.get('selectedConfigGroup.recipients');
-    const selectedSensitivity = this.getProperties('selectedSensitivity');
+    const selectedSensitivity = this.get('selectedSensitivity');
     const sensitivy = this.sensitivityMapping[selectedSensitivity];
+    const selectedPattern = this.get('selectedPattern');
+    const pattern = this.patternMapping[selectedPattern];
+
 
     const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
-      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${sensitivy}&` +
+      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${pattern}&sensitivity=${sensitivy}` +
       `&removeAnomaliesInWindow=true&removeAnomaliesInWindow=true&to=${recipients}`;
 
     return fetch(url, { method: 'post' })
