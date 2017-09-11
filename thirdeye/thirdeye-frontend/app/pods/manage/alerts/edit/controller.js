@@ -31,8 +31,8 @@ export default Ember.Controller.extend({
 
     const patternMapping = {
       'UP,DOWN': 'Up and Down',
-      UP: 'Up',
-      DOWN: 'Down'
+      UP: 'Up only',
+      DOWN: 'Down Only'
     };
 
     return patternMapping[pattern];
