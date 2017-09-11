@@ -47,6 +47,8 @@ import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -167,12 +169,15 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // lets create a new realtime segment
     segmentLogger.info("Started kafka stream provider");
+    final int capacity = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
     realtimeSegment =
-        new RealtimeSegmentImpl(serverMetrics, this, indexLoadingConfig, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(),
+        new RealtimeSegmentImpl(serverMetrics, this, indexLoadingConfig, capacity,
             kafkaStreamProviderConfig.getStreamName());
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
     notifier = realtimeTableDataManager;
 
+    LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
+        segmentName, capacity, new DateTime(segmentEndTimeThreshold, DateTimeZone.UTC).toString());
     segmentStatusTask = new TimerTask() {
       @Override
       public void run() {

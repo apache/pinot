@@ -62,6 +62,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import kafka.message.MessageAndOffset;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -970,6 +972,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     long now = now();
     _consumeStartTime = now;
     _consumeEndTime = now + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+    LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
+        _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();
   }
 
