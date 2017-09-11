@@ -16,24 +16,19 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.kafka.common.errors.TimeoutException;
-import org.apache.kafka.common.protocol.Errors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.PartitionOffsetRequestInfo;
@@ -48,12 +43,17 @@ import kafka.javaapi.TopicMetadataResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.kafka.common.protocol.Errors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
-public class SimpleConsumerWrapper implements Closeable {
+public class SimpleConsumerWrapper implements PinotKafkaConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleConsumerWrapper.class);
   private static final int SOCKET_TIMEOUT_MILLIS = 10000;
   private static final int SOCKET_BUFFER_SIZE = 512000;
@@ -73,7 +73,6 @@ public class SimpleConsumerWrapper implements Closeable {
   private final String _topic;
   private final int _partition;
   private final long _connectTimeoutMillis;
-  private final KafkaSimpleConsumerFactory _simpleConsumerFactory;
   private String[] _bootstrapHosts;
   private int[] _bootstrapPorts;
   private SimpleConsumer _simpleConsumer;
@@ -102,30 +101,18 @@ public class SimpleConsumerWrapper implements Closeable {
     }
   }
 
-  private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId, long connectTimeoutMillis) {
-    _simpleConsumerFactory = simpleConsumerFactory;
-    _clientId = clientId;
-    _connectTimeoutMillis = connectTimeoutMillis;
-    _metadataOnlyConsumer = true;
-    _simpleConsumer = null;
-
-    // Topic and partition are ignored for metadata-only consumers
-    _topic = null;
-    _partition = Integer.MIN_VALUE;
-
-    initializeBootstrapNodeList(bootstrapNodes);
-    setCurrentState(new ConnectingToBootstrapNode());
-  }
-
-  private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId, String topic, int partition, long connectTimeoutMillis) {
-    _simpleConsumerFactory = simpleConsumerFactory;
+  public SimpleConsumerWrapper(String bootstrapNodes, String clientId, String topic, int partition,
+      long connectTimeoutMillis) {
     _clientId = clientId;
     _topic = topic;
     _partition = partition;
+    if (_topic == null && _partition == Integer.MIN_VALUE) {
+      // Topic and partition are ignored for metadata-only consumers
+      _metadataOnlyConsumer = true;
+    } else {
+      _metadataOnlyConsumer = false;
+    }
     _connectTimeoutMillis = connectTimeoutMillis;
-    _metadataOnlyConsumer = false;
     _simpleConsumer = null;
 
     initializeBootstrapNodeList(bootstrapNodes);
@@ -161,6 +148,11 @@ public class SimpleConsumerWrapper implements Closeable {
         throw new IllegalArgumentException("Could not parse port number " + splittedHostAndPort[1] + " for host:port combination " +  hostAndPort);
       }
     }
+  }
+
+  @VisibleForTesting
+  public SimpleConsumer makeSimpleConsumer() {
+    return new SimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS, SOCKET_BUFFER_SIZE, _clientId);
   }
 
   private abstract class State {
@@ -212,8 +204,7 @@ public class SimpleConsumerWrapper implements Closeable {
 
       try {
         LOGGER.info("Connecting to bootstrap host {}:{}", _currentHost, _currentPort);
-        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
-            SOCKET_BUFFER_SIZE, _clientId);
+        _simpleConsumer = makeSimpleConsumer();
         setCurrentState(new ConnectedToBootstrapNode());
       } catch (Exception e) {
         handleConsumerException(e);
@@ -322,9 +313,7 @@ public class SimpleConsumerWrapper implements Closeable {
 
       // Connect to the partition leader
       try {
-        _simpleConsumer =
-            _simpleConsumerFactory.buildSimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS,
-                SOCKET_BUFFER_SIZE, _clientId);
+        _simpleConsumer = new SimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS, SOCKET_BUFFER_SIZE, _clientId);
 
         setCurrentState(new ConnectedToPartitionLeader());
       } catch (Exception e) {
@@ -434,7 +423,7 @@ public class SimpleConsumerWrapper implements Closeable {
    * @return An iterable containing messages fetched from Kafka and their offsets, as well as the high watermark for
    * this partition.
    */
-  public synchronized Pair<Iterable<MessageAndOffset>, Long> fetchMessagesAndHighWatermark(long startOffset,
+  public synchronized Pair<PinotKafkaMessagesIterable, Long> fetchMessagesAndHighWatermark(long startOffset,
       long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
     Preconditions.checkState(!_metadataOnlyConsumer, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
     // Ensure that we're connected to the leader
@@ -459,7 +448,7 @@ public class SimpleConsumerWrapper implements Closeable {
     if (!fetchResponse.hasError()) {
       final Iterable<MessageAndOffset> messageAndOffsetIterable =
           buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
-      return Pair.of(messageAndOffsetIterable, fetchResponse.highWatermark(_topic, _partition));
+      return Pair.of((PinotKafkaMessagesIterable) new PinotKafkaMessagesImpl(messageAndOffsetIterable), fetchResponse.highWatermark(_topic, _partition));
     } else {
       throw exceptionForKafkaErrorCode(fetchResponse.errorCode(_topic, _partition));
     }
@@ -517,7 +506,7 @@ public class SimpleConsumerWrapper implements Closeable {
    * milliseconds
    * @return An iterable containing messages fetched from Kafka and their offsets.
    */
-  public synchronized Iterable<MessageAndOffset> fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+  public synchronized PinotKafkaMessagesIterable fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
     return fetchMessagesAndHighWatermark(startOffset, endOffset, timeoutMillis).getLeft();
   }
@@ -601,7 +590,7 @@ public class SimpleConsumerWrapper implements Closeable {
     throw new TimeoutException();
   }
 
-  private Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets, final long startOffset, final long endOffset) {
+  public Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets, final long startOffset, final long endOffset) {
     return Iterables.filter(messageAndOffsets, new Predicate<MessageAndOffset>() {
       @Override
       public boolean apply(@Nullable MessageAndOffset input) {
@@ -620,40 +609,6 @@ public class SimpleConsumerWrapper implements Closeable {
         return true;
       }
     });
-  }
-
-  /**
-   * Creates a simple consumer wrapper that connects to a random Kafka broker, which allows for fetching topic and
-   * partition metadata. It does not allow to consume from a partition, since Kafka requires connecting to the
-   * leader of that partition for consumption.
-   *
-   * @param simpleConsumerFactory The SimpleConsumer factory to use
-   * @param bootstrapNodes A comma separated list of Kafka broker nodes
-   * @param clientId The Kafka client identifier, to be used to uniquely identify the client when tracing calls
-   * @param connectTimeoutMillis The timeout for connecting or re-establishing a connection to the Kafka cluster
-   * @return A consumer wrapper
-   */
-  public static SimpleConsumerWrapper forMetadataConsumption(KafkaSimpleConsumerFactory simpleConsumerFactory,
-      String bootstrapNodes, String clientId, long connectTimeoutMillis) {
-    return new SimpleConsumerWrapper(simpleConsumerFactory, bootstrapNodes, clientId, connectTimeoutMillis);
-  }
-
-  /**
-   * Creates a simple consumer wrapper that automatically connects to the leader broker for the given topic and
-   * partition. This consumer wrapper can also fetch topic and partition metadata.
-   *
-   * @param simpleConsumerFactory The SimpleConsumer factory to use
-   * @param bootstrapNodes A comma separated list of Kafka broker nodes
-   * @param clientId The Kafka client identifier, to be used to uniquely identify the client when tracing calls
-   * @param topic The Kafka topic to consume from
-   * @param partition The partition id to consume from
-   * @param connectTimeoutMillis The timeout for connecting or re-establishing a connection to the Kafka cluster
-   * @return A consumer wrapper
-   */
-  public static SimpleConsumerWrapper forPartitionConsumption(KafkaSimpleConsumerFactory simpleConsumerFactory,
-      String bootstrapNodes, String clientId, String topic, int partition, long connectTimeoutMillis) {
-    return new SimpleConsumerWrapper(simpleConsumerFactory, bootstrapNodes, clientId, topic, partition,
-        connectTimeoutMillis);
   }
 
   @Override

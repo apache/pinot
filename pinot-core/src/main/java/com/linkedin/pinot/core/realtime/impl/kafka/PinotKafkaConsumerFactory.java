@@ -16,15 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import kafka.javaapi.consumer.SimpleConsumer;
-
-
-/**
- * Implementation of the Kafka SimpleConsumer factory.
- */
-public class KafkaSimpleConsumerFactoryImpl implements KafkaSimpleConsumerFactory {
-  @Override
-  public SimpleConsumer buildSimpleConsumer(String host, int port, int soTimeout, int bufferSize, String clientId) {
-    return new SimpleConsumer(host, port, soTimeout, bufferSize, clientId);
-  }
+public interface PinotKafkaConsumerFactory {
+  PinotKafkaConsumer buildConsumer(String bootstrapNodes, String clientId, String topic, int partition,
+      long connectTimeoutMillis);
 }
