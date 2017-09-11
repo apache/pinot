@@ -252,6 +252,10 @@ public abstract class AbstractTableDataManager implements TableDataManager {
     }
   }
 
+  public ServerMetrics getServerMetrics() {
+    return _serverMetrics;
+  }
+
   @Override
   public String getTableName() {
     return _tableName;
