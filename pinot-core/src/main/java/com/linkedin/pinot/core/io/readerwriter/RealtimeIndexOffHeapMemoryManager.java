@@ -102,8 +102,8 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
    */
   public void close() throws IOException {
     for (PinotDataBuffer buffer : _buffers) {
-      buffer.close();
       _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, -buffer.size());
+      buffer.close();
     }
     doClose();
     _buffers.clear();
