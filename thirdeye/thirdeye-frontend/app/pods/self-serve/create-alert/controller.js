@@ -116,9 +116,10 @@ export default Ember.Controller.extend({
       } =  this.getProperties('selectedSensitivity', 'selectedGranularity');
 
       if (!selectedSensitivity) {
-        selectedSensitivity = (selectedGranularity === '5_MINUTES')
-          ? 'Medium'
-          : 'Sensitive';
+        const isDailyOrHourly = ['DAYS', 'HOURS'].includes(selectedGranularity);
+        selectedSensitivity = isDailyOrHourly
+          ? 'Sensitive'
+          : 'Medium';
       }
 
       return this.sensitivityMapping[selectedSensitivity];
