@@ -111,6 +111,9 @@ public class CommonConstants {
          * to server assignment changes, it's possible to end up with more (or less) than this number of rows in memory.
          */
         public static final String REALTIME_SEGMENT_FLUSH_SIZE = "realtime.segment.flush.threshold.size";
+        public static final String LLC_PROPERTY_SUFFIX = ".llc";
+        public static final String LLC_REALTIME_SEGMENT_FLUSH_SIZE = REALTIME_SEGMENT_FLUSH_SIZE + LLC_PROPERTY_SUFFIX;
+        public static final String LLC_REALTIME_SEGMENT_FLUSH_TIME = REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX;
 
         public static enum StreamType {
           kafka

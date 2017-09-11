@@ -20,10 +20,6 @@ import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTa
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import java.util.HashSet;
-import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -43,7 +39,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 public class RoutingTableBuilderFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutingTableBuilderFactory.class);
 
-  private static final Set<Class<? extends RoutingTableBuilder>> _routingTableBuilders = new HashSet<>();
   private Configuration _configuration;
 
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;

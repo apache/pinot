@@ -216,7 +216,7 @@ public class PinotTableIdealStateBuilder {
     segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas,
         kafkaMetadata.getKafkaConsumerProperties().get(Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET),
         kafkaMetadata.getBootstrapHosts(), idealState, create,
-        PinotLLCRealtimeSegmentManager.getRealtimeTableFlushSize(realtimeTableConfig));
+        PinotLLCRealtimeSegmentManager.getLLCRealtimeTableFlushSize(realtimeTableConfig));
   }
 
   public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {
