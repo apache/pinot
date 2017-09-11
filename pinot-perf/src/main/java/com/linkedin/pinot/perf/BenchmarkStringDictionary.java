@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.perf;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -51,8 +49,7 @@ public class BenchmarkStringDictionary {
 
   @Setup
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(BenchmarkStringDictionary.class.getName(),
-        new ServerMetrics(new MetricsRegistry()));
+    _memoryManager = new DirectMemoryManager(BenchmarkStringDictionary.class.getName());
     // Create a list of values to insert into the hash map
     uniqueStrings = new String[CARDINALITY];
     Random r = new Random();

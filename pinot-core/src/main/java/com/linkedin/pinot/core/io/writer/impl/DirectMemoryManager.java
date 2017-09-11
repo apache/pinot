@@ -16,9 +16,11 @@
 
 package com.linkedin.pinot.core.io.writer.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 // Allocates memory using direct allocation
@@ -29,6 +31,11 @@ public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
    */
   public DirectMemoryManager(final String segmentName, ServerMetrics serverMetrics) {
     super(serverMetrics, segmentName);
+  }
+
+  @VisibleForTesting
+  public DirectMemoryManager(final String segmentName) {
+    this(segmentName, new ServerMetrics(new MetricsRegistry()));
   }
 
   /**

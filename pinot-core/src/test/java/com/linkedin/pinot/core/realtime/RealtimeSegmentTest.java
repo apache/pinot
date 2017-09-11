@@ -97,8 +97,7 @@ public class RealtimeSegmentTest {
     when(segmentDataManager.getInvertedIndexColumns()).thenReturn(invertedIdxCols);
     when(segmentDataManager.getNoDictionaryColumns()).thenReturn(new ArrayList<String>());
     when(segmentDataManager.getSchema()).thenReturn(schema);
-    when(segmentDataManager.getMemoryManager()).thenReturn(new DirectMemoryManager("noSegment",
-        new ServerMetrics(new MetricsRegistry())));
+    when(segmentDataManager.getMemoryManager()).thenReturn(new DirectMemoryManager("noSegment"));
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedAvgColSize(any(String.class))).thenReturn(32);
     when(statsHistory.getEstimatedCardinality(any(String.class))).thenReturn(200);

@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.perf;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.TearDown;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
@@ -41,8 +39,7 @@ public class BenchmarkOffHeapDictionaryMemory {
 
   @Setup
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(BenchmarkOffHeapDictionaryMemory.class.getName(),
-        new ServerMetrics(new MetricsRegistry()));
+    _memoryManager = new DirectMemoryManager(BenchmarkOffHeapDictionaryMemory.class.getName());
   }
 
   @TearDown

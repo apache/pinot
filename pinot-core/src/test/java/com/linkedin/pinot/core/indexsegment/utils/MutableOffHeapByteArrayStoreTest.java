@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.core.indexsegment.utils;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Arrays;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -34,8 +32,7 @@ public class MutableOffHeapByteArrayStoreTest {
 
   @BeforeClass
   public void setUp() {
-    _memoryManager = new DirectMemoryManager(MutableOffHeapByteArrayStoreTest.class.getName(),
-        new ServerMetrics(new MetricsRegistry()));
+    _memoryManager = new DirectMemoryManager(MutableOffHeapByteArrayStoreTest.class.getName());
   }
 
   @AfterClass

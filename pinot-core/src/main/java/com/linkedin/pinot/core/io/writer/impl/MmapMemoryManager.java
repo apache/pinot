@@ -17,6 +17,7 @@
 package com.linkedin.pinot.core.io.writer.impl;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
@@ -93,6 +94,11 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
         }
       }
     }
+  }
+
+  @VisibleForTesting
+  public MmapMemoryManager(String dirPathName, String segmentName) {
+    this(dirPathName, segmentName, new ServerMetrics(new MetricsRegistry()));
   }
 
   private String getFilePrefix() {

@@ -52,8 +52,7 @@ public class RealtimeSegmentImplTest {
     when(statsHistory.getEstimatedCardinality(any(String.class))).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(any(String.class))).thenReturn(32);
     when(segmentDataManager.getStatsHistory()).thenReturn(statsHistory);
-    when(segmentDataManager.getMemoryManager()).thenReturn(new DirectMemoryManager(segmentName,
-        new ServerMetrics(new MetricsRegistry())));
+    when(segmentDataManager.getMemoryManager()).thenReturn(new DirectMemoryManager(segmentName));
 
     IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
     when(indexLoadingConfig.getRealtimeAvgMultiValueCount()).thenReturn(2);
