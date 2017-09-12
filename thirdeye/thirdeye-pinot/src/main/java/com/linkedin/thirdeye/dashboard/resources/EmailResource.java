@@ -120,13 +120,15 @@ public class EmailResource {
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     if (thirdeyeConfiguration.getSmtpConfiguration() != null) {
       smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
-    }
-
-    if (!Strings.isNullOrEmpty(smtpHost)) {
-      smtpConfiguration.setSmtpHost(smtpHost);
-    }
-    if (smtpPort != null) {
-      smtpConfiguration.setSmtpPort(smtpPort);
+    } else {
+      if (Strings.isNullOrEmpty(smtpHost)) {
+        return null;
+      } else {
+        smtpConfiguration.setSmtpHost(smtpHost);
+      }
+      if (smtpPort != null) {
+        smtpConfiguration.setSmtpPort(smtpPort);
+      }
     }
 
     return smtpConfiguration;
