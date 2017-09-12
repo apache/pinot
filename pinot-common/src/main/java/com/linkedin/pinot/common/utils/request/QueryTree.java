@@ -18,14 +18,10 @@ package com.linkedin.pinot.common.utils.request;
 import com.linkedin.pinot.common.request.FilterOperator;
 import java.util.List;
 
+
 public abstract class QueryTree {
-  protected int _id;
   protected List<String> _value;
   protected FilterOperator _operator;
-
-  public int getId() {
-    return _id;
-  }
 
   public List<String> getValue() {
     return _value;
