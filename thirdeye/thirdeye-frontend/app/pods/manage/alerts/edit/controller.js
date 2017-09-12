@@ -67,8 +67,12 @@ export default Ember.Controller.extend({
    * Default text value for the anomaly graph legend
    */
   legendText: {
-    dotted: 'WoW',
-    solid: 'Observed'
+    dotted: {
+      text: 'WoW'
+    },
+    solid: {
+      text: 'Observed'
+    }
   },
 
   /**

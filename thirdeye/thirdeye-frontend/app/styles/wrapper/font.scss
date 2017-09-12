@@ -7,3 +7,9 @@ body {
 .c3-chart-component > svg {
   font-family: $source-sans-pro;
 }
+
+// This is necessary to ensure that phantomJS
+// renders the text properly
+.c3 svg {
+  font-family: $source-sans-pro;    
+}

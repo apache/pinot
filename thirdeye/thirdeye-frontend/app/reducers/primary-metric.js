@@ -42,7 +42,12 @@ const INITIAL_STATE = {
   compareMode: 'WoW',
   splitView: false,
   graphStart: null,
-  graphEnd: null
+  graphEnd: null,
+  
+  /**
+   * Default color for primary Metric
+   */
+  color: 'blue'
 };
 
 const modeMap = {

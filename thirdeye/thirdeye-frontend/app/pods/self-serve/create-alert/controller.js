@@ -334,7 +334,7 @@ export default Ember.Controller.extend({
         // Metric has data. now sending new data to graph
         this.setProperties({
           isMetricSelected: true,
-          selectedMetric: metricData
+          selectedMetric: Object.assign(metricData, { color: 'blue' })
         });
       }
     })

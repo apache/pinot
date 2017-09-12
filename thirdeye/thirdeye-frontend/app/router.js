@@ -28,6 +28,7 @@ Router.map(function() {
     this.route('create-alert');
     this.route('import-metric');
   });
+  this.route('screenshot', { path: 'screenshot/:anomalyId' });
 });
 
 export default Router;

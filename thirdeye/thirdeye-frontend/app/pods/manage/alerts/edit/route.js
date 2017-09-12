@@ -65,6 +65,7 @@ export default Ember.Route.extend({
         return fetch(url).then(checkStatus);
       })
       .then((metricData) => {
+        Object.assign(metricData, { color: 'blue' })
         Object.assign(model, { metricData });
 
         return fetch(`/thirdeye/email/functions`).then(checkStatus);
