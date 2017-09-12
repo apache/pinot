@@ -45,7 +45,7 @@ public class EmailScreenshotHelper {
 
   private static String takeScreenshot(String anomalyId, ThirdEyeAnomalyConfiguration configuration) throws Exception {
 
-    String imgRoute = configuration.getDashboardHost() + "/thirdeye#investigate?anomalyId=" + anomalyId;
+    String imgRoute = configuration.getDashboardHost() + "/app/#/screenshot/" + anomalyId;
     LOG.info("imgRoute {}", imgRoute);
     String phantomScript = configuration.getRootDir() + GRAPH_SCREENSHOT_GENERATOR_SCRIPT;
     LOG.info("Phantom JS script {}", phantomScript);
