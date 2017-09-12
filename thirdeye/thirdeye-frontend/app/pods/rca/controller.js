@@ -11,7 +11,21 @@ export default Ember.Controller.extend({
   searchMetrics: task(function* (metric) {
     yield timeout(600);
     let url = `/data/autocomplete/metric?name=${metric}`;
-    return fetch(url)
+
+    /**
+     * Necessary headers for fetch
+     */
+    const headers = {
+      method: "GET",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Cache': 'no-cache'
+      },
+      credentials: 'include'
+    };
+
+    return fetch(url, headers)
       .then(res => res.json());
   }),
 

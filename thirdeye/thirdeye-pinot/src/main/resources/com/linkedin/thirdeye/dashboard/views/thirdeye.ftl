@@ -2,7 +2,8 @@
 
 <head>
 
-
+<!-- Favicon -->
+<link rel="icon" href="assets/img/favicon.ico" type="image/x-icon">
 
 <!-- CSS -->
 
@@ -199,6 +200,7 @@
                   <div id="help-menu" class="te-nav__dropdown-wrapper hidden">
                     <a class="te-nav__dropdown-item" href="mailto:ask_thirdeye@linkedin.com?Subject=TE-Feedback" target="_blank">Submit Feedback</a>
                     <a class="te-nav__dropdown-item" href="https://iwww.corp.linkedin.com/wiki/cf/display/PRT/ThirdEye+Help+Page" target="_blank">Help page</a>
+                    <a class="te-nav__dropdown-item" href="app/#/logout">Logout</a>
                   </div>
                 </div> 
               </div>
@@ -238,8 +240,8 @@
     </div>
 
     <div class="tab-pane" id="investigate">
-      <div id='investigate-spin-area'></div>
-      <div id="investigate-place-holder""></div>
+      <div id="investigate-spin-area"></div>
+      <div id="investigate-place-holder"></div>
     </div>
 
     <div class="tab-pane" id="analysis">

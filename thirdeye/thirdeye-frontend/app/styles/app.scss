@@ -35,6 +35,7 @@ body {
 @import 'components/filter-select';
 @import 'components/dimension-heatmap';
 @import 'components/dimension-summary';
+@import 'components/login-form';
 
 // Pod Pages
 @import 'ember-power-select/themes/bootstrap';
@@ -44,3 +45,4 @@ body {
 @import "pods/self-serve/import-metric";
 @import 'pods/rca';
 @import 'pods/events';
+@import 'pods/login';

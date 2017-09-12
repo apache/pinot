@@ -1,7 +1,6 @@
 import Ember from 'ember';
 import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
-import moment from 'moment';
 
 export default Ember.Route.extend({
   model(params) {

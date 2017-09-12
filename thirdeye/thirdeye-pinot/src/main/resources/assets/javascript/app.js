@@ -12,16 +12,26 @@ function createNavClickHandler() {
         $('#chevron-icon').toggleClass('glyphicon-menu-down glyphicon-menu-up');
     });
 }
+
 $(document).ready(function() {
-    constants = new Constants();
-    HASH_PARAMS = new HashParams();
-    HASH_PARAMS.init();
-    dataService = new DataService();
-    HASH_SERVICE = new HashService();
-    HASH_SERVICE.init();
-    var app = new AppController();
-    app.init();
-    HASH_SERVICE.registerController('app', app);
-    HASH_SERVICE.routeTo('app');
-    createNavClickHandler();
+
+    // checking if user is authenticated
+    // redirects to the login screen if not
+    $.get('/auth')
+        .done(function() {
+            constants = new Constants();
+            HASH_PARAMS = new HashParams();
+            HASH_PARAMS.init();
+            dataService = new DataService();
+            HASH_SERVICE = new HashService();
+            HASH_SERVICE.init();
+            var app = new AppController();
+            app.init();
+            HASH_SERVICE.registerController('app', app);
+            HASH_SERVICE.routeTo('app');
+            createNavClickHandler();
+        })
+        .fail(function() {
+            window.location.replace('/app/#/login');
+        });
 });

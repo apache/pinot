@@ -7,6 +7,7 @@ import Ember from 'ember';
 
 export default Ember.Controller.extend({
   showNavbar: Ember.computed.alias('model'),
+  session: Ember.inject.service(),
 
   /**
    * Global navbar items
