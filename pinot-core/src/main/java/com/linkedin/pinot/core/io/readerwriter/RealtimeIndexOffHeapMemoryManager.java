@@ -81,7 +81,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
     PinotDataBuffer buffer = allocateInternal(size, columnName);
     _totalMemBytes += size;
     _buffers.add(buffer);
-    _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, _totalMemBytes);
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, size);
     return buffer;
   }
 
@@ -104,7 +104,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
     for (PinotDataBuffer buffer : _buffers) {
       buffer.close();
     }
-    _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, 0);
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, -_totalMemBytes);
     doClose();
     _buffers.clear();
   }
