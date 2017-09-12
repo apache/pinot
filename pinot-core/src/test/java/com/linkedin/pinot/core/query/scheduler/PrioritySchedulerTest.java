@@ -109,8 +109,7 @@ public class PrioritySchedulerTest {
     assertTrue(hasServerShuttingDownError > 0);
   }
 
-  // TODO: Fix and enable it
-  @Test (enabled = false)
+  @Test
   public void testOneQuery() throws InterruptedException, ExecutionException, IOException, BrokenBarrierException {
     PropertiesConfiguration conf = new PropertiesConfiguration();
     conf.setProperty(ResourceLimitPolicy.THREADS_PER_QUERY_PCT, 50);
@@ -129,7 +128,10 @@ public class PrioritySchedulerTest {
     TestSchedulerGroup group = TestPriorityScheduler.groupFactory.groupMap.get("1");
     assertEquals(group.numRunning(), 1);
     assertEquals(group.getThreadsInUse(), 1);
-    assertEquals(group.totalReservedThreads(), 2 /* equals numSegments in request*/);
+    // The total number of threads allocated for query execution will be dependent on the underlying
+    // platform (number of cores). Scheduler will assign total threads up to but not exceeding total
+    // number of segments. On servers with less cores, this can assign only 1 thread (less than total segments)
+    assertTrue(group.totalReservedThreads() <= 2 /* 2: numSegments in request*/);
     validationBarrier.await();
     byte[] resultData = result.get();
     DataTable table = DataTableFactory.getDataTable(resultData);
