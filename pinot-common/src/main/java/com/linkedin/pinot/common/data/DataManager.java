@@ -56,4 +56,6 @@ public interface DataManager {
   SegmentMetadata getSegmentMetadata(@Nonnull String tableNameWithType, @Nonnull String segmentName);
 
   boolean isStarted();
+
+  int getMaxParallelRefreshThreads();
 }

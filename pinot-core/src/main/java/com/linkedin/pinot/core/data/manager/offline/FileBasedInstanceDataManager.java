@@ -152,6 +152,11 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     return _isStarted;
   }
 
+  @Override
+  public int getMaxParallelRefreshThreads() {
+    return 1;
+  }
+
   public synchronized void addTableDataManager(String tableName, TableDataManager tableDataManager) {
     _tableDataManagerMap.put(tableName, tableDataManager);
   }

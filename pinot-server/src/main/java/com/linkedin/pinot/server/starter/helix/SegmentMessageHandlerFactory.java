@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.helix.NotificationContext;
@@ -34,11 +36,36 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   // We only allow one segment refresh/reload happens at the same time
   // The reason for that is segment refresh/reload will temporarily use double-sized memory
   private final Lock _lock = new ReentrantLock();
+  private final Semaphore _refreshThreadSemaphore;
 
   private final SegmentFetcherAndLoader _fetcherAndLoader;
 
-  public SegmentMessageHandlerFactory(SegmentFetcherAndLoader fetcherAndLoader) {
+  public SegmentMessageHandlerFactory(SegmentFetcherAndLoader fetcherAndLoader, DataManager dataManager) {
     _fetcherAndLoader = fetcherAndLoader;
+    int maxParallelRefreshThreads = dataManager.getMaxParallelRefreshThreads();
+    if (maxParallelRefreshThreads > 0) {
+      _refreshThreadSemaphore = new Semaphore(maxParallelRefreshThreads, true);
+    } else {
+      _refreshThreadSemaphore = null;
+    }
+  }
+
+  private void acquireSema(String context, Logger logger) throws InterruptedException {
+    if (_refreshThreadSemaphore != null) {
+      long startTime = System.currentTimeMillis();
+      logger.info("Waiting for lock to refresh : {}, queue-length: {}", context, _refreshThreadSemaphore.getQueueLength());
+      _refreshThreadSemaphore.acquire();
+      logger.info("Acquired lock to refresh segment: {} (lock-time={}ms, queue-length={})", context,
+          System.currentTimeMillis() - startTime, _refreshThreadSemaphore.getQueueLength());
+    } else {
+      LOGGER.info("Locking of refresh threads disabled (segment: {})", context);
+    }
+  }
+
+  private void releaseSema() {
+    if (_refreshThreadSemaphore != null) {
+      _refreshThreadSemaphore.release();
+    }
   }
 
   // Called each time a message is received.
@@ -66,6 +93,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     LOGGER.info("Reset called");
   }
 
+
   private class SegmentRefreshMessageHandler extends MessageHandler {
     private final String _segmentName;
     private final String _tableName;
@@ -84,17 +112,13 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {
-        long startTime = System.currentTimeMillis();
-        _logger.info("Waiting for lock to refresh segment: {}", _segmentName);
-        _lock.lock();
-        _logger.info("Acquired lock to refresh segment: {} (lock-time={}ms)", _segmentName,
-            System.currentTimeMillis() - startTime);
+        acquireSema(_segmentName, LOGGER);
         // The addOrReplaceOfflineSegment() call can retry multiple times with back-off for loading the same segment.
         // If it does, future segment loads will be stalled on the one segment that we cannot load.
         _fetcherAndLoader.addOrReplaceOfflineSegment(_tableName, _segmentName, /*retryOnFailure=*/false);
         result.setSuccess(true);
       } finally {
-        _lock.unlock();
+        releaseSema();
       }
       return result;
     }
@@ -125,18 +149,11 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         long startTime = System.currentTimeMillis();
         if (_segmentName.equals("")) {
-          // Reload all segments
-          _logger.info("Waiting for lock to reload table: {}", _tableNameWithType);
-          _lock.lock();
-          _logger.info("Acquired lock to reload table: {} (lock-time={}ms)", _tableNameWithType,
-              System.currentTimeMillis() - startTime);
+          acquireSema("ALL", _logger);
           _fetcherAndLoader.reloadAllSegments(_tableNameWithType);
         } else {
           // Reload one segment
-          _logger.info("Waiting for lock to reload segment: {}", _segmentName);
-          _lock.lock();
-          _logger.info("Acquired lock to reload segment: {} (lock-time={}ms)", _segmentName,
-              System.currentTimeMillis() - startTime);
+          acquireSema(_segmentName, _logger);
           _fetcherAndLoader.reloadSegment(_tableNameWithType, _segmentName);
         }
         helixTaskResult.setSuccess(true);
@@ -144,7 +161,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         throw new RuntimeException(
             "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableNameWithType, e);
       } finally {
-        _lock.unlock();
+        releaseSema();
       }
       return helixTaskResult;
     }
