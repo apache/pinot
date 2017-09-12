@@ -18,21 +18,24 @@ package com.linkedin.pinot.controller.helix.core.sharding;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.List;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
- * Given a segmentMetadata, each strategy has to implement its own method to compute the assigned instances.
- *
- *
+ * Assigns a segment to the instance that has least size of segments.
  */
-public interface SegmentAssignmentStrategy {
+public class BalanceSizeOfSegmentsAssignmentStrategy implements SegmentAssignmentStrategy {
 
-  List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName);
-
+  @Override
+  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
+      int numReplicas, String tenantName) {
+    //We create a SegmentSizeMetric and pass it to BalanceLoadAssignmentStrategy
+    //This means BalanceSizeOfSegmentsAssignmentStrategy
+    ServerLoadMetric serverLoadMetric = new SegmentSizeMetric();
+    BalanceLoadAssignmentStrategy balanceLoadAssignmentStrategy = new BalanceLoadAssignmentStrategy(serverLoadMetric);
+    return balanceLoadAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
+        segmentMetadata, numReplicas, tenantName);
+  }
 }
-
-

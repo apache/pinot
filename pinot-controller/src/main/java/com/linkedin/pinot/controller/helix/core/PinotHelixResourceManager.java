@@ -1711,7 +1711,7 @@ public class PinotHelixResourceManager {
               ControllerTenantNameBuilder.getOfflineTenantNameForTenant(offlineTableConfig.getTenantConfig()
                   .getServer());
           final int replicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
-          return segmentAssignmentStrategy.getAssignedInstances(_helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
+          return segmentAssignmentStrategy.getAssignedInstances(PinotHelixResourceManager.this, _propertyStore, _helixClusterName, segmentMetadata,
               replicas, serverTenant);
         } else {
           return new ArrayList<String>(currentIdealState.getInstanceSet(segmentName));

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.sharding;
 
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -41,7 +42,7 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(RandomAssignmentStrategy.class);
 
   @Override
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
       String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
     String serverTenantName = null;
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
@@ -51,7 +52,7 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
     }
     final Random random = new Random(System.currentTimeMillis());
 
-    List<String> allInstanceList = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
+    List<String> allInstanceList = HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName, serverTenantName);
     List<String> selectedInstanceList = new ArrayList<String>();
     for (int i = 0; i < numReplicas; ++i) {
       final int idx = random.nextInt(allInstanceList.size());
