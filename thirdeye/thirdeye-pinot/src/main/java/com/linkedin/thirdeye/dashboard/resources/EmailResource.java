@@ -362,10 +362,6 @@ public class EmailResource {
       throw new WebApplicationException("Empty : list of recipients" + toAddr);
     }
 
-    if (Strings.isNullOrEmpty(smtpHost)) {
-      smtpHost = thirdeyeConfiguration.getSmtpHost();
-    }
-
     SmtpConfiguration smtpConfiguration = getSmtpConfiguration(smtpHost, smtpPort);
     if (smtpConfiguration == null) {
       throw new WebApplicationException("Smtp configuration is empty or null");

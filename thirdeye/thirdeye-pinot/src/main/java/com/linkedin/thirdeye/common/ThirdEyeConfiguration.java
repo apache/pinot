@@ -14,8 +14,6 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   private List<String> whitelistDatasets = new ArrayList<>();
 
-  private String smtpHost = "";
-  private int smtpPort = 0;
   private String dashboardHost;
   private SmtpConfiguration smtpConfiguration;
 
@@ -76,22 +74,6 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   public String getAnomalyClassifierConfigPath() {
     return getRootDir() + "/detector-config/anomaly-functions/anomalyClassifier.properties";
-  }
-
-  public String getSmtpHost() {
-    return smtpHost;
-  }
-
-  public void setSmtpHost(String smtpHost) {
-    this.smtpHost = smtpHost;
-  }
-
-  public int getSmtpPort() {
-    return smtpPort;
-  }
-
-  public void setSmtpPort(int smtpPort) {
-    this.smtpPort = smtpPort;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
