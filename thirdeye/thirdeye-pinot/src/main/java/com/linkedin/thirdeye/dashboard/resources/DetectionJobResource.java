@@ -604,6 +604,7 @@ public class DetectionJobResource {
     }
 
     // write to DB
+    autotuneConfig.setFunctionId(id);
     autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig).toString();
     return Response.ok(autotuneId).build();
   }
