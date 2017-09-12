@@ -30,6 +30,6 @@ export default Ember.Route.extend({
       // Fetch all alert group configurations
       allConfigGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       allAppNames: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
-    })
+    });
   }
 });

@@ -35,6 +35,10 @@ module.exports = function(environment) {
       }
     },
 
+    'ember-simple-auth':  {
+      baseURL: '/app/#/rca'
+    },
+
     APP: {
       // you can pass flags/options to your application instance
       // when it is created
@@ -43,6 +47,9 @@ module.exports = function(environment) {
 
   if (environment === 'development') {
     ENV.rootURL = '/';
+    ENV['ember-simple-auth'] = {
+      baseURL: '/#/rca'
+    };
     // necessary for local development
     // ENV.APP.LOG_ACTIVE_GENERATION = true;
     // ENV.APP.LOG_TRANSITIONS = true;

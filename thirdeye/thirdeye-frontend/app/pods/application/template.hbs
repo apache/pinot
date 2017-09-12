@@ -1,4 +1,4 @@
-{{#if showNavbar}}
+{{#if (and showNavbar session.isAuthenticated)}}
   {{te-navbar navItems=globalNavItems isGlobalNav=true navClass="te-nav--global"}}
 {{/if}}
 {{outlet}}

@@ -12,6 +12,7 @@ function createNavClickHandler() {
         $('#chevron-icon').toggleClass('glyphicon-menu-down glyphicon-menu-up');
     });
 }
+
 $(document).ready(function() {
     constants = new Constants();
     HASH_PARAMS = new HashParams();

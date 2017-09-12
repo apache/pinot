@@ -14,7 +14,7 @@ export default Ember.Component.extend({
   tagName: 'nav',
 
   /**
-   * Apply property-based class name
+   * Apply property-based class namete
    */
   classNameBindings: ['navClass'],
 

@@ -53,6 +53,7 @@
     "ember-redux-shim": "^2.1.0",
     "ember-redux-thunk-shim": "^1.1.2",
     "ember-resolver": "^2.0.3",
+    "ember-simple-auth": "^1.4.0",
     "ember-source": "~2.12.0",
     "ember-symbol-observable": "^0.1.2",
     "ember-tether": "^1.0.0-beta.0",
