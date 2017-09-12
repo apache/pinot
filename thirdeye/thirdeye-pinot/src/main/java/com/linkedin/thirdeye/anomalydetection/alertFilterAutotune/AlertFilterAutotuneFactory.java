@@ -1,14 +1,18 @@
 package com.linkedin.thirdeye.anomalydetection.alertFilterAutotune;
 
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluate;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.io.IOUtils;
@@ -51,18 +55,22 @@ public class AlertFilterAutotuneFactory {
     }
   }
 
-  public AlertFilterAutoTune fromSpec(String AutoTuneType) {
-    AlertFilterAutoTune alertFilterAutoTune = new DummyAlertFilterAutoTune();
+  public BaseAlertFilterAutoTune fromSpec(String AutoTuneType, AutotuneConfigDTO autotuneConfigDTO, List<MergedAnomalyResultDTO> anomalies) {
+    BaseAlertFilterAutoTune alertFilterAutoTune = new DummyAlertFilterAutoTune();
     if (!props.containsKey(AutoTuneType)) {
       LOGGER.warn("AutoTune from Spec: Unsupported type " + AutoTuneType);
     } else{
       try {
         String className = props.getProperty(AutoTuneType);
-        alertFilterAutoTune = (AlertFilterAutoTune) Class.forName(className).newInstance();
+        alertFilterAutoTune = (BaseAlertFilterAutoTune) Class.forName(className).newInstance();
+        alertFilterAutoTune.init(anomalies, autotuneConfigDTO);
       } catch (Exception e) {
         LOGGER.warn("Failed to init AutoTune from Spec: {}", e.getMessage());
       }
     }
     return alertFilterAutoTune;
   }
+
+
+
 }

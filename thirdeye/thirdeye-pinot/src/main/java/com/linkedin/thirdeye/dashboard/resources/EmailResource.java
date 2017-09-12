@@ -294,7 +294,7 @@ public class EmailResource {
 
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
         null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
-        teHost, smtpHost, smtpPort);
+        teHost, smtpConfiguration.getSmtpHost(), smtpConfiguration.getSmtpPort());
   }
 
 
