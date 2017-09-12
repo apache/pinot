@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The abstract class for Alert Filter AutoTune
+ * BaseAlertFilterAutoTune initiates the AutoTune class by assigning training and tuning configuration
+ * BaseAlertFilterAutoTune is designed to be extended by specific AlertFilterAutoTune class
  */
 public abstract class BaseAlertFilterAutoTune implements AlertFilterAutoTune {
   private final static Logger LOG = LoggerFactory.getLogger(BaseAlertFilterAutoTune.class);

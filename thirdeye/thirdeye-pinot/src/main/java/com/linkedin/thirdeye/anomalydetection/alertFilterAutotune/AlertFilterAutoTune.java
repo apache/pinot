@@ -4,11 +4,13 @@ import java.util.Map;
 
 
 /**
- * Created by ychung on 2/9/17.
+ * The interface of AlertFilterAutoTuning.
+ * Tuning based on user provided labels with machine learning methodology
  */
 public interface AlertFilterAutoTune {
 
-  // Tune alert filter based on training data
+  // Tune alert filter based on training data and model configuration
+  // Returns the tuned alert filter configuration
   Map<String, String> tuneAlertFilter() throws Exception;
 
 }
