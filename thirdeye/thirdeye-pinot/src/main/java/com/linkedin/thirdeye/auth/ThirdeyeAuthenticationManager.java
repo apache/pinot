@@ -17,7 +17,7 @@ import org.apache.commons.codec.binary.Base64;
 public class ThirdeyeAuthenticationManager implements IAuthManager, Authenticator<AuthRequest, PrincipalAuthContext> {
   private static final String LDAP_CONTEXT_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
   private final AuthConfiguration authConfiguration;
-  private final ThreadLocal<PrincipalAuthContext> principalAuthContextThreadLocal;
+  private volatile ThreadLocal<PrincipalAuthContext> principalAuthContextThreadLocal;
   private final Key aesKey;
 
   public ThirdeyeAuthenticationManager(AuthConfiguration authConfiguration) {
