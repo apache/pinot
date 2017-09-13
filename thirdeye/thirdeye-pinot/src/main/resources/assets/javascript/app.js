@@ -17,7 +17,7 @@ $(document).ready(function() {
 
     // checking if user is authenticated
     // redirects to the login screen if not
-    $.get('/auth')
+    $.get('/auth/')
         .done(function() {
             constants = new Constants();
             HASH_PARAMS = new HashParams();
