@@ -60,6 +60,7 @@ public class AuthResource {
   public Response getPrincipalContext() {
     PrincipalAuthContext authContext = authManager.getCurrentPrincipal();
     if (authContext == null) {
+      LOG.error("Could not find a valid the user");
       return Response.status(Response.Status.UNAUTHORIZED).build();
     }
     return Response.ok(authContext).build();
