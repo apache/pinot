@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -39,11 +40,13 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory.Reader;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+
 import org.apache.commons.configuration.ConfigurationException;
 
 
@@ -150,6 +153,10 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
           break;
         case TIME:
           schema.addField(new TimeFieldSpec(columnName, dataType, columnMetadata.getTimeUnit()));
+          break;
+        case DATE_TIME:
+          schema.addField(new DateTimeFieldSpec(columnName, dataType, columnMetadata.getDateTimeFormat(),
+              columnMetadata.getDateTimeGranularity(), columnMetadata.getDateTimeType()));
           break;
         default:
           throw new IllegalStateException();

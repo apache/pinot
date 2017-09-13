@@ -19,6 +19,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -28,7 +29,9 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -47,6 +50,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import com.linkedin.pinot.core.startree.hll.HllUtil;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
@@ -161,6 +165,22 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       dimensionTypes.add(spec.getDataType());
       HashBiMap<Object, Integer> dictionary = HashBiMap.create();
       dictionaryMap.put(dimensionName, dictionary);
+    }
+    // Treat DATE_TIME columns as dimensions, however we will never split on this dimension,
+    // unless explicitly defined in split order
+    List<DateTimeFieldSpec> dateTimeFieldSpecs = schema.getDateTimeFieldSpecs();
+    for (int index = 0; index < dateTimeFieldSpecs.size(); index++) {
+      DateTimeFieldSpec spec = dateTimeFieldSpecs.get(index);
+      String dateTimeName = spec.getName();
+      dimensionNames.add(dateTimeName);
+      int size = dimensionNameToIndexMap.size();
+      dimensionNameToIndexMap.put(dateTimeName, size);
+      Object starValue;
+      starValue = getAllStarValue(spec);
+      dimensionNameToStarValueMap.put(dateTimeName, starValue);
+      dimensionTypes.add(spec.getDataType());
+      HashBiMap<Object, Integer> dictionary = HashBiMap.create();
+      dictionaryMap.put(dateTimeName, dictionary);
     }
     // treat time column as just another dimension, only difference is that we will never split on
     // this dimension unless explicitly specified in split order
@@ -534,7 +554,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
   private List<String> computeDefaultSplitOrder() {
     ArrayList<String> defaultSplitOrder = new ArrayList<>();
-    // include only the dimensions not time column. Also, assumes that
+    // include only the dimensions, not time column and not the date_time columns. Also, assumes that
     // skipMaterializationForDimensions is built.
     for (String dimensionName : dimensionNames) {
       if (skipMaterializationForDimensions != null
@@ -544,6 +564,11 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     }
     if (timeColumnName != null) {
       defaultSplitOrder.remove(timeColumnName);
+    }
+    if (schema.getDateTimeNames() != null) {
+      for (String dateTimeColumn : schema.getDateTimeNames()) {
+        defaultSplitOrder.remove(dateTimeColumn);
+      }
     }
     Collections.sort(defaultSplitOrder, new Comparator<String>() {
       @Override
