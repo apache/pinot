@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -139,10 +140,14 @@ public class SearchFilters {
       boolean passed = true;
       // check feedback filter
       AnomalyFeedback feedback = mergedAnomalyResultDTO.getFeedback();
+      String status = null;
       if (feedback != null) {
-        String status = feedback.getFeedbackType().toString();
-        passed = passed && checkFilter(feedbackFilterMap, status);
+        status = feedback.getFeedbackType().getUserReadableName();
+      } else {
+        // If feedback is null, assign NO_FEEDBACK to the status
+        status = AnomalyFeedbackType.NO_FEEDBACK.getUserReadableName();
       }
+      passed = passed && checkFilter(feedbackFilterMap, status);
       // check status filter
       String functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
       passed = passed && checkFilter(functionFilterMap, functionName);
@@ -194,10 +199,14 @@ public class SearchFilters {
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalies) {
       // update feedback filter
       AnomalyFeedback feedback = mergedAnomalyResultDTO.getFeedback();
+      String status = null;
       if (feedback != null) {
-        String status = feedback.getFeedbackType().toString();
-        update(feedbackFilterMap, status, mergedAnomalyResultDTO.getId());
+        status = feedback.getFeedbackType().getUserReadableName();
+      } else {
+        // If anomaly feedback is null, assign NO_FEEDBACK
+        status = AnomalyFeedbackType.NO_FEEDBACK.getUserReadableName();
       }
+      update(feedbackFilterMap, status, mergedAnomalyResultDTO.getId());
       // update status filter
       String functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
       update(functionFilterMap, functionName, mergedAnomalyResultDTO.getId());
