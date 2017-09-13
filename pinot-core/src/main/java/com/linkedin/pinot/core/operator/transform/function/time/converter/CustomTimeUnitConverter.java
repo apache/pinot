@@ -59,12 +59,6 @@ public class CustomTimeUnitConverter implements TimeUnitConverter {
 
   @Override
   public void convert(long[] inputTime, TimeUnit inputTimeUnit, int length, long[] outputTime) {
-    convert(inputTime, inputTimeUnit, length, 1, DateTimeZone.UTC, outputTime);
-  }
-
-  @Override
-  public void convert(long[] inputTime, TimeUnit inputTimeUnit, int length, int granularity,
-      DateTimeZone outputTimeZone, long[] outputTime) {
     MutableDateTime inputDateTime = new MutableDateTime(0L, DateTimeZone.UTC);
 
     // For loop within switch better than switch within for loop (may be??).
@@ -72,7 +66,6 @@ public class CustomTimeUnitConverter implements TimeUnitConverter {
       case WEEKS:
         for (int i = 0; i < length; i++) {
           long inputTimeMillis = TimeUnit.MILLISECONDS.convert(inputTime[i], inputTimeUnit);
-          inputTimeMillis = (inputTimeMillis + outputTimeZone.getOffset(inputTimeMillis)) / granularity;
           inputDateTime.setDate(inputTimeMillis);
           outputTime[i] = Weeks.weeksBetween(EPOCH_START_DATE, inputDateTime).getWeeks();
         }
@@ -81,7 +74,6 @@ public class CustomTimeUnitConverter implements TimeUnitConverter {
       case MONTHS:
         for (int i = 0; i < length; i++) {
           long inputTimeMillis = TimeUnit.MILLISECONDS.convert(inputTime[i], inputTimeUnit);
-          inputTimeMillis = (inputTimeMillis + outputTimeZone.getOffset(inputTimeMillis)) / granularity;
           inputDateTime.setDate(inputTimeMillis);
           outputTime[i] = Months.monthsBetween(EPOCH_START_DATE, inputDateTime).getMonths();
         }
@@ -90,7 +82,6 @@ public class CustomTimeUnitConverter implements TimeUnitConverter {
       case YEARS:
         for (int i = 0; i < length; i++) {
           long inputTimeMillis = TimeUnit.MILLISECONDS.convert(inputTime[i], inputTimeUnit);
-          inputTimeMillis = (inputTimeMillis + outputTimeZone.getOffset(inputTimeMillis)) / granularity;
           inputDateTime.setDate(inputTimeMillis);
           outputTime[i] = Years.yearsBetween(EPOCH_START_DATE, inputDateTime).getYears();
         }

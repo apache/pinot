@@ -108,42 +108,4 @@ public class TimeConversionTransformTest {
       Assert.assertEquals(output[i], expectedYears[i]);
     }
   }
-
-  @Test
-  public void testBucketing() {
-    long inputs[] = new long[NUM_ROWS];
-    long outputs[] = new long[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      inputs[i] = i;
-    }
-
-    int granularity = 4;
-    TimeUnitConverter converter = TimeConverterFactory.getTimeConverter("DaYs");
-    converter.convert(inputs, TimeUnit.DAYS, NUM_ROWS, granularity, DateTimeZone.UTC, outputs);
-
-    for (int i = 0; i < NUM_ROWS; i++) {
-      Assert.assertEquals(outputs[i], inputs[i] / granularity);
-    }
-  }
-
-  @Test
-  public void testTimeZone() {
-    long inputs[] = new long[NUM_ROWS];
-    long outputs[] = new long[NUM_ROWS];
-
-    Random random = new Random(System.nanoTime());
-    for (int i = 0; i < NUM_ROWS; i++) {
-      inputs[i] = Math.abs(random.nextLong());
-    }
-
-    int granularity = 4;
-    DateTimeZone timeZone = DateTimeZone.forID("America/Los_Angeles");
-    TimeUnitConverter converter = TimeConverterFactory.getTimeConverter("MiLliSEconDs");
-    converter.convert(inputs, TimeUnit.MILLISECONDS, NUM_ROWS, granularity, timeZone, outputs);
-
-    for (int i = 0; i < NUM_ROWS; i++) {
-      long offset = timeZone.getOffset(inputs[i]);
-      Assert.assertEquals(outputs[i], (inputs[i] + offset) / granularity, "i: " + i);
-    }
-  }
 }
