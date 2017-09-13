@@ -18,12 +18,14 @@ package com.linkedin.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.operator.docvalsets.ConstantBlockValSet;
 import com.linkedin.pinot.core.operator.transform.function.time.converter.TimeConverterFactory;
 import com.linkedin.pinot.core.operator.transform.function.time.converter.TimeUnitConverter;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.joda.time.DateTimeZone;
 
 
 /**
@@ -51,11 +53,18 @@ public class TimeConversionTransform implements TransformFunction {
 
   @Override
   public <T> T transform(int length, BlockValSet... input) {
-    Preconditions.checkArgument(input.length == 3, TRANSFORM_NAME + " expects three arguments");
+    int numArgs = input.length;
+    Preconditions.checkArgument(numArgs <= 5, TRANSFORM_NAME + " expects upto five arguments");
 
     long[] inputTime = input[0].getLongValuesSV();
     String[] inputTimeUnits = input[1].getStringValuesSV();
     String[] outputTimeUnits = input[2].getStringValuesSV();
+
+    int granularity = (numArgs >= 4) ? ((ConstantBlockValSet) input[3]).getIntValue() : 1;
+    Preconditions.checkArgument(granularity > 0, "Time granularity must be greater than zero.");
+
+    DateTimeZone outputTimeZone =
+        (numArgs == 5) ? DateTimeZone.forID(((ConstantBlockValSet) input[4]).getStringValue()) : DateTimeZone.UTC;
 
     Preconditions.checkState(inputTime.length >= length && inputTimeUnits.length >= length,
         outputTimeUnits.length >= length);
@@ -66,7 +75,7 @@ public class TimeConversionTransform implements TransformFunction {
     if (_output == null || _output.length < length) {
       _output = new long[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
     }
-    converter.convert(inputTime, inputTimeUnit, length, _output);
+    converter.convert(inputTime, inputTimeUnit, length, granularity, outputTimeZone, _output);
     return (T) _output;
   }
 

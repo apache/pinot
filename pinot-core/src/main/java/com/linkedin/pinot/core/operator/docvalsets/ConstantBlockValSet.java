@@ -127,4 +127,24 @@ public class ConstantBlockValSet extends BaseBlockValSet {
   public int getNumDocs() {
     return _numDocs;
   }
+
+  public int getIntValue() {
+    return Integer.parseInt(_value);
+  }
+
+  public long getLongValue() {
+    return Long.parseLong(_value);
+  }
+
+  public float getFloatValue() {
+    return Float.parseFloat(_value);
+  }
+
+  public double getDoubleValue() {
+    return Double.parseDouble(_value);
+  }
+
+  public String getStringValue() {
+    return _value;
+  }
 }
