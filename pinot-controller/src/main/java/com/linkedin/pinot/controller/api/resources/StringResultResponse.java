@@ -15,14 +15,14 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-public final class SuccessResponse {
-  private final String _status;
+public final class StringResultResponse {
+  private final String _result;
 
-  public SuccessResponse(String status) {
-    _status = status;
+  public StringResultResponse(String result) {
+    _result = result;
   }
 
-  public String getStatus() {
-    return _status;
+  public String getResult() {
+    return _result;
   }
 }

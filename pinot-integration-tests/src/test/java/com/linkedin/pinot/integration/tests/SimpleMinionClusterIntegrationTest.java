@@ -80,7 +80,6 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
     // Register the test task generator into task manager
     _pinotTaskManager.registerTaskGenerator(new TestTaskGenerator(_pinotTaskManager.getClusterInfoProvider()));
-    _pinotTaskManager.ensureTaskQueuesExist();
 
     Map<String, Class<? extends PinotTaskExecutor>> taskExecutorsToRegister = new HashMap<>(1);
     taskExecutorsToRegister.put(TestTaskGenerator.TASK_TYPE, TestTaskExecutor.class);
@@ -97,7 +96,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Override
       public Boolean apply(@Nullable Void aVoid) {
-        return _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).size() == 4;
+        return _pinotHelixTaskResourceManager.getTasks(TestTaskGenerator.TASK_TYPE).size() == 4;
       }
     }, 60_000L, "Failed to get all tasks showing up in the cluster");
 
@@ -142,6 +141,10 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
         return true;
       }
     }, 60_000L, "Failed to get all tasks COMPLETED");
+
+    // Clean up the COMPLETED tasks
+    _pinotHelixTaskResourceManager.cleanUpTaskQueue(TestTaskGenerator.TASK_TYPE);
+    Assert.assertEquals(_pinotHelixTaskResourceManager.getTasks(TestTaskGenerator.TASK_TYPE).size(), 0);
 
     // Delete the task queue
     _pinotHelixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE);

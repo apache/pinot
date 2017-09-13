@@ -81,6 +81,18 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Clean up a task queue for the given task type.
+   *
+   * @param taskType Task type
+   */
+  // TODO: Seems the node under PROPERTYSTORE/TaskRebalancer is not cleaned up properly
+  public synchronized void cleanUpTaskQueue(@Nonnull String taskType) {
+    String helixJobQueueName = getHelixJobQueueName(taskType);
+    LOGGER.info("Cleaning up task queue: {} for task type: {}", helixJobQueueName, taskType);
+    _taskDriver.cleanupJobQueue(helixJobQueueName);
+  }
+
+  /**
    * Stop the task queue for the given task type.
    *
    * @param taskType Task type

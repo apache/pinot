@@ -122,7 +122,6 @@ public class ControllerStarter {
       LOGGER.info("Starting task manager");
       _taskManager =
           new PinotTaskManager(taskDriver, helixResourceManager, _helixTaskResourceManager, config, controllerMetrics);
-      _taskManager.ensureTaskQueuesExist();
       int taskManagerFrequencyInSeconds = config.getTaskManagerFrequencyInSeconds();
       if (taskManagerFrequencyInSeconds > 0) {
         LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableTaskConfig;
@@ -93,19 +94,6 @@ public class PinotTaskManager {
   }
 
   /**
-   * Ensure all registered task queues exist.
-   * <p>Should be called after all task generators get registered.
-   */
-  public void ensureTaskQueuesExist() {
-    Map<String, WorkflowConfig> helixWorkflows = _taskDriver.getWorkflows();
-    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
-      if (!helixWorkflows.containsKey(PinotHelixTaskResourceManager.getHelixJobQueueName(taskType))) {
-        _pinotHelixTaskResourceManager.createTaskQueue(taskType);
-      }
-    }
-  }
-
-  /**
    * Start the task scheduler with the given running frequency.
    *
    * @param runFrequencyInSeconds Scheduler running frequency in seconds
@@ -133,12 +121,21 @@ public class PinotTaskManager {
   }
 
   /**
+   * Stop the task scheduler.
+   */
+  public void stopScheduler() {
+    if (_executorService != null) {
+      _executorService.shutdown();
+    }
+  }
+
+  /**
    * Check the Pinot cluster status and schedule new tasks.
    */
   public void scheduleTasks() {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
-    // TODO: add JobQueue health check here
+    ensureTaskQueuesExist();
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
     Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
@@ -177,11 +174,32 @@ public class PinotTaskManager {
   }
 
   /**
-   * Stop the task scheduler.
+   * Helper method to ensure all registered task queues exist.
+   * <p>Should be called after all task generators get registered.
    */
-  public void stopScheduler() {
-    if (_executorService != null) {
-      _executorService.shutdown();
+  private void ensureTaskQueuesExist() {
+    Set<String> allTaskTypes = _taskGeneratorRegistry.getAllTaskTypes();
+    Map<String, WorkflowConfig> helixWorkflows = _taskDriver.getWorkflows();
+
+    boolean done = true;
+    for (String taskType : allTaskTypes) {
+      if (!helixWorkflows.containsKey(PinotHelixTaskResourceManager.getHelixJobQueueName(taskType))) {
+        _pinotHelixTaskResourceManager.createTaskQueue(taskType);
+        done = false;
+      }
+    }
+
+    // Wait until all task queues show up
+    while (!done) {
+      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+      done = true;
+      helixWorkflows = _taskDriver.getWorkflows();
+      for (String taskType : allTaskTypes) {
+        if (!helixWorkflows.containsKey(PinotHelixTaskResourceManager.getHelixJobQueueName(taskType))) {
+          done = false;
+          break;
+        }
+      }
     }
   }
 }
