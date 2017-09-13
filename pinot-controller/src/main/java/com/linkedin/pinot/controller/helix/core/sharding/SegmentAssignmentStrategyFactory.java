@@ -36,8 +36,8 @@ public class SegmentAssignmentStrategyFactory {
         return new BucketizedSegmentStrategy();
       case ReplicaGroupSegmentAssignmentStrategy:
         return new ReplicaGroupSegmentAssignmentStrategy();
-      case BalanceSizeOfSegmentsAssignmentStrategy:
-        return new BalanceSizeOfSegmentsAssignmentStrategy();
+      case BalanceSegmentsSizeSegmentAssignmentStrategy:
+        return new BalanceSegmentsSizeSegmentAssignmentStrategy();
       default:
         return new BalanceNumSegmentAssignmentStrategy();
     }

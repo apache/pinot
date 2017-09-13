@@ -25,5 +25,5 @@ public enum SegmentAssignmentStrategyEnum {
   BalanceNumSegmentAssignmentStrategy,
   BucketizedSegmentAssignmentStrategy,
   ReplicaGroupSegmentAssignmentStrategy,
-  BalanceSizeOfSegmentsAssignmentStrategy;
+  BalanceSegmentsSizeSegmentAssignmentStrategy;
 }
