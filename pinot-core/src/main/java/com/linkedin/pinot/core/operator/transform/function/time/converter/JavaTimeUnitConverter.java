@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.transform.function.time.converter;
 
 import java.util.concurrent.TimeUnit;
-import org.joda.time.DateTimeZone;
 
 
 /**
@@ -31,17 +30,8 @@ public class JavaTimeUnitConverter implements TimeUnitConverter {
 
   @Override
   public void convert(long[] inputTime, TimeUnit inputTimeUnit, int length, long[] outputTime) {
-    convert(inputTime, inputTimeUnit, length, 1, DateTimeZone.UTC, outputTime);
-  }
-
-  @Override
-  public void convert(long[] inputTime, TimeUnit inputTimeUnit, int length, int granularity,
-      DateTimeZone outputTimeZone, long[] outputTime) {
     for (int i = 0; i < length; i++) {
-      long inputTimeMillis = TimeUnit.MILLISECONDS.convert(inputTime[i], inputTimeUnit);
-      int timeOffset = outputTimeZone.getOffset(inputTimeMillis);
-      long inputTimeInZone = inputTime[i] + inputTimeUnit.convert(timeOffset, TimeUnit.MILLISECONDS);
-      outputTime[i] = _timeUnit.convert(inputTimeInZone, inputTimeUnit) / granularity;
+      outputTime[i] = _timeUnit.convert(inputTime[i], inputTimeUnit);
     }
   }
 }

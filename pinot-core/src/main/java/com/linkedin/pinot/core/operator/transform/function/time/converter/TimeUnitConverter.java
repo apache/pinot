@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.transform.function.time.converter;
 
 import java.util.concurrent.TimeUnit;
-import org.joda.time.DateTimeZone;
 
 
 /**
@@ -35,19 +34,4 @@ public interface TimeUnitConverter {
    * @param outputTime Array where output is to be stored.
    */
   void convert(long[] inputTime, TimeUnit inputTimeUnit, int length, long[] outputTime);
-
-  /**
-   * This method converts an array of input times from the specified {@link TimeUnit} into
-   * implementation's timeUnit. It also allows for rolling up to custom granularity (eg 15 minutes),
-   * and applying time offset before rolling up.
-   *
-   * @param inputTime Input times
-   * @param inputTimeUnit Time unit for the input
-   * @param length Length of input array to process
-   * @param granularity Time granularity (for example 15 minutes)
-   * @param outputTimeZone Output time zone.
-   * @param outputTime Array where output is to be stored.
-   */
-  void convert(long[] inputTime, TimeUnit inputTimeUnit, int length, int granularity, DateTimeZone outputTimeZone,
-      long[] outputTime);
 }
