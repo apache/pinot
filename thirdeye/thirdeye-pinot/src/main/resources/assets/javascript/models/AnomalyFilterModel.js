@@ -7,7 +7,7 @@ function AnomalyFilterModel() {
   this.viewFilters = null;
   this.selectedFilters = null;
   this.pageNumber = 1;
-  this.hiddenFilters = ['statusFilterMap'];
+  this.hiddenFilters = [];
 }
 
 AnomalyFilterModel.prototype = {
