@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.restlet.resources.ServerSegmentsInfo;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
-import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -33,8 +33,7 @@ public class SegmentSizeMetric implements ServerLoadMetric {
     Executor executor = Executors.newFixedThreadPool(1);
     ServerPerfMetricsReader serverPerfMetricsReader =
         new ServerPerfMetricsReader(executor, connectionManager, helixResourceManager);
-    ServerPerfMetricsReader.ServerSegmentsInfo serverSegmentsInfo =
-        serverPerfMetricsReader.getServerPerfMetrics(instance, 300);
+    ServerSegmentsInfo serverSegmentsInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 300);
     return serverSegmentsInfo.getReportedSegmentsSizeInBytes();
   }
 }

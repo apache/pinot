@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.config.TableConfig;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -74,6 +75,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     return NUM_SERVERS;
   }
 
+  protected String getSegmentAssignmentStrategy(){
+    return TableConfig.Builder.getDefaultSegmentAssignmentStrategy();
+  }
+  protected int getNumReplicas(){
+    return 3;
+  }
   @BeforeClass
   public void setUp() throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
@@ -121,7 +128,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Create the table
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
-        getTaskConfig());
+        getTaskConfig(),getSegmentAssignmentStrategy(), getNumReplicas());
 
     // Upload all segments
     uploadSegments(_tarDir);

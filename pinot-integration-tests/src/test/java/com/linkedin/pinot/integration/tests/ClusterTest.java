@@ -244,6 +244,15 @@ public abstract class ClusterTest extends ControllerTest {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
   }
 
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
+      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
+      TableTaskConfig taskConfig, String segmentAssignmentStrategy, int numReplicas) throws Exception {
+    TableConfig tableConfig =
+        getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
+            invertedIndexColumns, taskConfig, segmentAssignmentStrategy,numReplicas);
+    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+  }
+
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
       TableTaskConfig taskConfig) throws Exception {
@@ -266,6 +275,23 @@ public abstract class ClusterTest extends ControllerTest {
         .setSegmentVersion(segmentVersion.toString())
         .setInvertedIndexColumns(invertedIndexColumns)
         .setTaskConfig(taskConfig)
+        .build();
+  }
+
+  private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
+      String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
+      List<String> invertedIndexColumns, TableTaskConfig taskConfig, String segmentAssignmentStrategy, int numReplicas) throws Exception {
+    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
+        .setTimeColumnName(timeColumnName)
+        .setTimeType(timeType)
+        .setNumReplicas(numReplicas)
+        .setBrokerTenant(brokerTenant)
+        .setServerTenant(serverTenant)
+        .setLoadMode(loadMode)
+        .setSegmentVersion(segmentVersion.toString())
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setTaskConfig(taskConfig)
+        .setSegmentAssignmentStrategy(segmentAssignmentStrategy)
         .build();
   }
 

@@ -416,6 +416,10 @@ public class TableConfig {
       return this;
     }
 
+    public static String getDefaultSegmentAssignmentStrategy(){
+      return DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY;
+    }
+
     public Builder setSortedColumn(String sortedColumn) {
       _sortedColumn = sortedColumn;
       return this;
@@ -462,6 +466,9 @@ public class TableConfig {
       return this;
     }
 
+    public static int getDefaultNumReplicas(){
+      return Integer.parseInt(DEFAULT_NUM_REPLICAS);
+    }
     public TableConfig build()
         throws IOException, JSONException {
       // Validation config

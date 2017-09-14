@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.controller.util;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.http.MultiGetRequest;
 import com.linkedin.pinot.common.restlet.resources.ServerPerfMetrics;
+import com.linkedin.pinot.common.restlet.resources.ServerSegmentsInfo;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
@@ -57,30 +57,37 @@ public class ServerPerfMetricsReader {
   }
 
   public @Nullable
-  ServerPerfMetricsReader.ServerSegmentsInfo getServerPerfMetrics(@Nonnull String serverName,
+  ServerSegmentsInfo getServerPerfMetrics(@Nonnull String serverNameOrEndpoint, @Nonnull boolean isThisServerName,
       @Nonnegative int timeoutMsec) {
-    Preconditions.checkNotNull(serverName, "Server name should not be null");
-    Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
 
-    ServerPerfMetricsReader.ServerSegmentsInfo serverSegmentsInfo =
-        new ServerPerfMetricsReader.ServerSegmentsInfo(serverName);
+    Preconditions.checkNotNull(serverNameOrEndpoint, "Server Name Or Endpoint name should not be null");
+    Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
+    if (isThisServerName) {
+      Preconditions.checkNotNull(_helixResourceManager, "_helixResourceManager should not be null");
+    }
+    ServerSegmentsInfo serverSegmentsInfo = new ServerSegmentsInfo(serverNameOrEndpoint);
     Set<String> singleServerList = new HashSet<String>();
-    singleServerList.add(serverName);
-    BiMap<String, String> endpoint = _helixResourceManager.getDataInstanceAdminEndpoints(singleServerList);
-    Preconditions.checkNotNull(endpoint, "Server endpoint should not be null");
-    BiMap<String, String> endpointInverse = endpoint.inverse();
+    singleServerList.add(serverNameOrEndpoint);
+    String serverPerfUrl;
+    if (isThisServerName) {
+      BiMap<String, String> endpoint = _helixResourceManager.getDataInstanceAdminEndpoints(singleServerList);
+      Preconditions.checkNotNull(endpoint, "Server endpoint should not be null");
+      BiMap<String, String> endpointInverse = endpoint.inverse();
+      Iterator<String> iterator = endpointInverse.keySet().iterator();
+      serverPerfUrl = "http://" + iterator.next() + "/ServerPerfMetrics/SegmentsInfo";
+    } else {
+      serverPerfUrl = "http://" + serverNameOrEndpoint + "/ServerPerfMetrics/SegmentsInfo";
+    }
     List<String> serverUrl = new ArrayList<>(1);
-    Iterator<String> iterator = endpointInverse.keySet().iterator();
-    String serverPerfUrl = "http://" + iterator.next() + "/ServerPerfMetrics/SegmentsInfo";
     serverUrl.add(serverPerfUrl);
     MultiGetRequest mget = new MultiGetRequest(_executor, _connectionManager);
-    LOGGER.info("Reading segments size for server: {}, timeoutMsec: {}", serverName, timeoutMsec);
+    LOGGER.info("Reading segments size for server: {}, timeoutMsec: {}", serverNameOrEndpoint, timeoutMsec);
     CompletionService<GetMethod> completionService = mget.execute(serverUrl, timeoutMsec);
     GetMethod getMethod = null;
     try {
       getMethod = completionService.take().get();
       if (getMethod.getStatusCode() >= timeoutMsec) {
-        LOGGER.error("Server: {} returned error: {}", serverName, getMethod.getStatusCode());
+        LOGGER.error("Server: {} returned error: {}", serverNameOrEndpoint, getMethod.getStatusCode());
         return serverSegmentsInfo;
       }
       ServerPerfMetrics serverPerfMetrics =
@@ -88,58 +95,26 @@ public class ServerPerfMetricsReader {
       serverSegmentsInfo.setReportedNumOfSegments(serverPerfMetrics.numOfSegments);
       serverSegmentsInfo.setReportedSegmentsSizeInBytes(serverPerfMetrics.segmentsDiskSizeInBytes);
     } catch (InterruptedException e) {
-      LOGGER.warn("Interrupted exception while reading segments size for server: {}", serverName, e);
+      LOGGER.warn("Interrupted exception while reading segments size for server: {}", serverNameOrEndpoint, e);
     } catch (ExecutionException e) {
       if (Throwables.getRootCause(e) instanceof SocketTimeoutException) {
-        LOGGER.warn("Server request to read segments info was timed out for table: {}", serverName, e);
+        LOGGER.warn("Server request to read segments info was timed out for table: {}", serverNameOrEndpoint, e);
       } else if (Throwables.getRootCause(e) instanceof ConnectTimeoutException) {
-        LOGGER.warn("Server request to read segments info timed out waiting for connection. table: {}", serverName, e);
+        LOGGER.warn("Server request to read segments info timed out waiting for connection. table: {}",
+            serverNameOrEndpoint, e);
       } else if (Throwables.getRootCause(e) instanceof ConnectionPoolTimeoutException) {
         LOGGER.warn("Server request to read segments info timed out on getting a connection from pool, table: {}",
-            serverName, e);
+            serverNameOrEndpoint, e);
       } else {
-        LOGGER.warn("Execution exception while reading segment info for server: {}", serverName, e);
+        LOGGER.warn("Execution exception while reading segment info for server: {}", serverNameOrEndpoint, e);
       }
     } catch (Exception e) {
-      LOGGER.warn("Error while reading segment info for server: {}", serverName);
+      LOGGER.warn("Error while reading segment info for server: {}", serverNameOrEndpoint);
     } finally {
       if (getMethod != null) {
         getMethod.releaseConnection();
       }
     }
     return serverSegmentsInfo;
-  }
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  static public class ServerSegmentsInfo {
-    private String _serverName;
-    private long _reportedNumOfSegments;
-    private long _reportedSegmentsSizeInBytes;
-
-    public ServerSegmentsInfo(String serverName) {
-      this._serverName = serverName;
-      //We set default value to -1 as indication of error in returning reported info from a Pinot server
-      _reportedNumOfSegments = -1;
-      _reportedSegmentsSizeInBytes = -1;
-    }
-
-    public String getServerName(){
-      return _serverName;
-    }
-    public long getReportedNumOfSegments() {
-      return _reportedNumOfSegments;
-    }
-
-    public void setReportedNumOfSegments(long reportedNumOfSegments) {
-      this._reportedNumOfSegments = reportedNumOfSegments;
-    }
-
-    public long getReportedSegmentsSizeInBytes() {
-      return _reportedSegmentsSizeInBytes;
-    }
-
-    public void setReportedSegmentsSizeInBytes(long reportedSegmentsSizeInBytes) {
-      this._reportedSegmentsSizeInBytes = reportedSegmentsSizeInBytes;
-    }
   }
 }
