@@ -33,7 +33,7 @@ public class TimeSeriesResourceTest {
     }
   }
 
-  TimeSeriesResource resource;
+  private TimeSeriesResource resource;
 
   @BeforeMethod
   public void before() {
@@ -97,12 +97,42 @@ public class TimeSeriesResourceTest {
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
-    assertEquals(ts.get("2"), Arrays.asList(null, -1d/3, -0.5d, 1d, 0.5d, null));
+    assertEquals(ts.get("2"), Arrays.asList(null, -0.333, -0.5d, 1d, 0.5d, null));
+  }
+
+  @Test
+  public void testTranformationRelative() throws Exception {
+    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
+        "1", RANGE, null, null, "relative", null);
+    Map<String, List<? extends Number>> ts = out.get(RANGE);
+
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
+    assertEquals(ts.get("1"), Arrays.asList(1d, 0.5d, 0d, 0.5d, 1d, null));
+  }
+
+  @Test
+  public void testTranformationLog() throws Exception {
+    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
+        "0", RANGE, null, null, "log", null);
+    Map<String, List<? extends Number>> ts = out.get(RANGE);
+
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
+    assertEquals(ts.get("0"), Arrays.asList(0d, null, null, null, 0d, null));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testTranformationChangeNoGranularityFail() throws Exception {
     this.resource.getTimeSeries("0", RANGE, null, null, "timestamp", null);
+  }
+
+  @Test
+  public void testMultiTranformation() throws Exception {
+    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
+        "2", RANGE, null, null, "change,forwardfill,cumulative", null);
+    Map<String, List<? extends Number>> ts = out.get(RANGE);
+
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
+    assertEquals(ts.get("2"), Arrays.asList(null, -0.333, -0.833d, 0.166d, 0.666d, 1.166));
   }
 
   @Test
@@ -137,6 +167,46 @@ public class TimeSeriesResourceTest {
   @Test
   public void testNoAggregationMultiRangeDifferentLengthPass() throws Exception {
     this.resource.getTimeSeries("0,1", RANGE + ",20:90", null, null, null, null);
+  }
+
+  @Test
+  public void testMultiAggregationMultiRange() throws Exception {
+    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
+        "0,1", RANGE + ",20:80", null, null, null, "sum,product");
+
+    Map<String, List<? extends Number>> ts = out.get("sum");
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 1L, 2L, 3L, 4L, 5L));
+    assertEquals(ts.get("0"), Arrays.asList(2d, 0d, -2d, 0d, 2d, null));
+    assertEquals(ts.get("1"), Arrays.asList(4d, 2d, 0d, 2d, 4d, null));
+
+    ts = out.get("product");
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 1L, 2L, 3L, 4L, 5L));
+    assertEquals(ts.get("0"), Arrays.asList(1d, 0d, 1d, 0d, 1d, null));
+    assertEquals(ts.get("1"), Arrays.asList(4d, 1d, 0d, 1d, 4d, null));
+
+  }
+
+  @Test
+  public void testMultiTransformationMultiAggregationMultiRange() throws Exception {
+    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
+        "0,1", RANGE + ",20:80", null, null, "forwardfill,cumulative", "sum,product");
+
+    // 0: 1d, 0d, -1d, 0d, 1d, null
+    // 1: 2d, 1d,  0d, 1d, 2d, null
+
+    // 0 ffill,cumulative: 1d, 1d, 0d, 0d, 1d, 2d
+    // 1 ffill,cumulative: 2d, 3d, 3d, 4d, 6d, 8d
+
+    Map<String, List<? extends Number>> ts = out.get("sum");
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 1L, 2L, 3L, 4L, 5L));
+    assertEquals(ts.get("0"), Arrays.asList(2d, 2d, 0d, 0d, 2d, 4d));
+    assertEquals(ts.get("1"), Arrays.asList(4d, 6d, 6d, 8d, 12d, 16d));
+
+    ts = out.get("product");
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 1L, 2L, 3L, 4L, 5L));
+    assertEquals(ts.get("0"), Arrays.asList(1d, 1d, 0d, 0d, 1d, 4d));
+    assertEquals(ts.get("1"), Arrays.asList(4d, 9d, 9d, 16d, 36d, 64d));
+
   }
 
   private static void assertEquals(List<? extends Number> actual, List<Double> expected) {

@@ -67,7 +67,9 @@ public class TimeSeriesResource {
     CUMULATIVE,
     FORWARDFILL,
     TIMESTAMP,
-    CHANGE
+    CHANGE,
+    RELATIVE,
+    LOG,
   }
 
   enum AggregationType {
@@ -376,6 +378,10 @@ public class TimeSeriesResource {
         return transformTimeSeriesTimestamp(data, start, granularity);
       case CHANGE:
         return transformTimeSeriesChange(data);
+      case RELATIVE:
+        return transformTimeSeriesRelative(data);
+      case LOG:
+        return transformTimeSeriesLog(data);
     }
     throw new IllegalArgumentException(String.format("Unknown transformation type '%s'", transformation));
   }
@@ -436,6 +442,52 @@ public class TimeSeriesResource {
         continue;
       DoubleSeries s = data.getDoubles(id);
       data.addSeries(id, s.divide(s.shift(1).replace(0d, DoubleSeries.NULL)).subtract(1));
+    }
+    return data;
+  }
+
+  /**
+   * Returns time series as relative offset to first value.
+   *
+   * @param data query results
+   * @return filled time series
+   */
+  private DataFrame transformTimeSeriesRelative(DataFrame data) {
+    for (String id : data.getSeriesNames()) {
+      if (data.getIndexName().equals(id))
+        continue;
+      DoubleSeries s = data.getDoubles(id);
+      if (s.size() <= 0)
+        continue;
+      final double base = s.first().doubleValue();
+      if (base != 0.0d) {
+        data.addSeries(id, s.divide(base));
+      } else {
+        data.addSeries(id, DoubleSeries.nulls(s.size()));
+      }
+    }
+    return data;
+  }
+
+  /**
+   * Returns time series log-10 transformed.
+   *
+   * @param data query results
+   * @return filled time series
+   */
+  private DataFrame transformTimeSeriesLog(DataFrame data) {
+    for (String id : data.getSeriesNames()) {
+      if (data.getIndexName().equals(id))
+        continue;
+      data.mapInPlace(new Series.DoubleFunction() {
+        @Override
+        public double apply(double... values) {
+          if (values[0] > 0) {
+            return Math.log10(values[0]);
+          }
+          return DoubleSeries.NULL;
+        }
+      }, id);
     }
     return data;
   }
