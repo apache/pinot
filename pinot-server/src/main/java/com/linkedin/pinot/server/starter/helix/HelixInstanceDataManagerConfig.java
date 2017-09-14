@@ -62,6 +62,20 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Whether memory for realtime consuming segments should be allocated off-heap.
   private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
 
+  // Number of simultaneous segments that can be refreshed on one server.
+  // Segment refresh works by loading the old as well as new versions of segments in memory, assigning
+  // new incoming queries to use the new version. The old version is dropped when all the queries that
+  // use the old version have completed. A server-wide semaphore is acquired before refreshing a segment so
+  // that we exceed the memory in some limited fashion. If there are multiple
+  // refresh requests, then they are queued on the semaphore (FIFO).
+  // In some multi-tenant use cases, it may be fine to over-allocate memory.
+  // Setting this config variable to a value greater than 1 will cause as many refresh threads to run simultaneously.
+  //
+  // NOTE: While segment load can be faster, multiple threads will be taken up loading segments, so
+  //       it is possible that the query latencies increase during that period.
+  //
+  private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
+
   private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
   private Configuration _instanceDataManagerConfiguration = null;
 
@@ -142,6 +156,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getAvgMultiValueCount() {
     return _instanceDataManagerConfiguration.getString(AVERAGE_MV_COUNT, null);
+  }
+
+  public int getMaxParallelRefreshThreads() {
+    return _instanceDataManagerConfiguration.getInt(MAX_PARALLEL_REFRESH_THREADS, 1);
   }
 
   @Override

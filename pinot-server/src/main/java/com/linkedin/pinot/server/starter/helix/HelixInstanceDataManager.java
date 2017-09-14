@@ -287,6 +287,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     return _segmentMetadataLoader;
   }
 
+  @Override
+  public int getMaxParallelRefreshThreads() {
+    return _instanceDataManagerConfig.getMaxParallelRefreshThreads();
+  }
+
   @Nonnull
   @Override
   public List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType) {
