@@ -35,6 +35,9 @@ public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthCon
         || uriPath.equals("thirdeye")
         // Let detector capture the screenshot without authentication error
         || uriPath.startsWith("/app/#/screenshot/")
+        || uriPath.startsWith("anomalies/search/anomalyIds")
+
+        // at last any other path specified in the te-config
         || authConfig.getAllowedPaths().contains(uriPath)) {
       return;
     }
