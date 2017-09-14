@@ -120,12 +120,14 @@ public class EmailResource {
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     if (thirdeyeConfiguration.getSmtpConfiguration() != null) {
       smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
-    }
-
-    if (!Strings.isNullOrEmpty(smtpHost)) {
-      smtpConfiguration.setSmtpHost(smtpHost);
-    }
-    if (smtpPort != null) {
+    } else {
+      if (Strings.isNullOrEmpty(smtpHost)) {
+        return null;
+      } else {
+        smtpConfiguration.setSmtpHost(smtpHost);
+      }
+      // if smtpPort is null, set to be default value as 25
+      smtpPort = smtpPort == null? 25 : smtpPort;
       smtpConfiguration.setSmtpPort(smtpPort);
     }
 
@@ -360,10 +362,6 @@ public class EmailResource {
 
     if (Strings.isNullOrEmpty(toAddr)) {
       throw new WebApplicationException("Empty : list of recipients" + toAddr);
-    }
-
-    if (Strings.isNullOrEmpty(smtpHost)) {
-      smtpHost = thirdeyeConfiguration.getSmtpHost();
     }
 
     SmtpConfiguration smtpConfiguration = getSmtpConfiguration(smtpHost, smtpPort);
