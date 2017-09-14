@@ -2,11 +2,14 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.TimeSeriesCompareMetricView;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.ValuesContainer;
+import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
@@ -20,6 +23,7 @@ import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -34,10 +38,13 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -53,6 +60,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +70,29 @@ public class TimeSeriesResource {
   enum TransformationType {
     CUMULATIVE,
     FORWARDFILL,
-    MILLISECONDS
+    MILLISECONDS,
+    CHANGE
+  }
+
+  enum AggregationType {
+    SUM,
+    PRODUCT,
+    MEAN,
+    MEDIAN,
+    STD,
+    MIN,
+    MAX
+  }
+
+  private static final Map<AggregationType, Series.DoubleFunction> aggregation2function = new HashMap<>();
+  static {
+    aggregation2function.put(AggregationType.SUM, DoubleSeries.SUM);
+    aggregation2function.put(AggregationType.PRODUCT, DoubleSeries.PRODUCT);
+    aggregation2function.put(AggregationType.MEAN, DoubleSeries.MEAN);
+    aggregation2function.put(AggregationType.MEDIAN, DoubleSeries.MEDIAN);
+    aggregation2function.put(AggregationType.STD, DoubleSeries.STD);
+    aggregation2function.put(AggregationType.MIN, DoubleSeries.MIN);
+    aggregation2function.put(AggregationType.MAX, DoubleSeries.MAX);
   }
 
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -77,109 +107,179 @@ public class TimeSeriesResource {
   private QueryCache queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
 
   private static final long TIMEOUT = 60000;
-  private static final String COL_TIME = DataFrameUtils.COL_TIME;
-  private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
-  private static final String SERIES_PREFIX = "_";
+
+  public static final String COL_TIME = DataFrameUtils.COL_TIME;
+  public static final String COL_VALUE = DataFrameUtils.COL_VALUE;
 
   private final ExecutorService executor;
+  private final TimeSeriesLoader loader;
 
-  public TimeSeriesResource(ExecutorService executor) {
+  public TimeSeriesResource(ExecutorService executor, TimeSeriesLoader loader) {
     this.executor = executor;
+    this.loader = loader;
   }
 
   @GET
   @Path("/query")
-  public Map<String, List<? extends Number>> getTimeSeries(
-      @QueryParam("metricIds") String metricIds,
-      @QueryParam("start") Long start,
-      @QueryParam("end") Long end,
+  public Map<String, Map<String, List<? extends Number>>> getTimeSeries(
+      @QueryParam("metricIds") String metricIdsString,
+      @QueryParam("ranges") String rangesString,
       @QueryParam("filters") String filterString,
       @QueryParam("granularity") String granularityString,
-      @QueryParam("transformations") String transformationsString) throws Exception {
+      @QueryParam("transformations") String transformationsString,
+      @QueryParam("aggregations") String aggregationsString) throws Exception {
 
     // validate input
-    if (metricIds == null) {
+    if (StringUtils.isBlank(metricIdsString)) {
       throw new IllegalArgumentException("Must provide metricId");
     }
 
-    if (start == null) {
-      throw new IllegalArgumentException("Must provide start timestamp");
+    List<Interval> ranges = new ArrayList<>();
+    for (String range : rangesString.split(",")) {
+      String[] parts = range.split(":", 2);
+      long start = Long.parseLong(parts[0]);
+      long end = Long.parseLong(parts[1]);
+
+      if (end <= start) {
+        throw  new IllegalArgumentException(String.format("Start (%d) must be greater than end (%d)", start, end));
+      }
+
+      ranges.add(new Interval(start, end, DateTimeZone.UTC));
     }
 
-    if (end == null) {
-      throw new IllegalArgumentException("Must provide end timestamp");
-    }
-
-    if (end <= start) {
-      throw  new IllegalArgumentException("Start must be greater than end");
+    if (ranges.isEmpty()) {
+      throw new IllegalArgumentException("Must provide at least one time range");
     }
 
     TimeGranularity granularity = null;
-    if (granularityString != null) {
+    if (!StringUtils.isBlank(granularityString)) {
       granularity = TimeGranularity.fromString(granularityString.toUpperCase());
     }
 
     Multimap<String, String> filters = null;
-    if (filterString != null) {
+    if (!StringUtils.isBlank(filterString)) {
       filters = ThirdEyeUtils.convertToMultiMap(filterString);
     }
 
     Collection<TransformationType> transformations = new ArrayList<>();
-    if (transformationsString != null && !transformationsString.isEmpty()) {
-      String[] parts = transformationsString.split(",");
-      for (String part : parts) {
+    if (!StringUtils.isBlank(transformationsString)) {
+      for (String part : transformationsString.split(",")) {
         transformations.add(TransformationType.valueOf(part.toUpperCase()));
       }
     }
 
-    // make requests
-    Map<String, Future<DataFrame>> requests = new HashMap<>();
-    String[] ids = metricIds.split(",");
-    LOG.info("Requesting {} time series from {} to {} with granularity '{}'", ids.length, start, end, granularity);
+    Collection<AggregationType> aggregations = new ArrayList<>();
+    if (!StringUtils.isBlank(aggregationsString)) {
+      for (String part : aggregationsString.split(",")) {
+        aggregations.add(AggregationType.valueOf(part.toUpperCase()));
+      }
 
-    for (String id : ids) {
-      long metricId = Long.valueOf(id);
-      requests.put(id, fetchMetricTimeSeriesAsync(metricId, start, end, granularity, filters));
+      // require equal-length time ranges
+      Interval baseRange = ranges.get(0);
+      for (Interval r : ranges) {
+        if (r.toDurationMillis() != baseRange.toDurationMillis()) {
+          throw new IllegalArgumentException("Must provide equal-length time ranges when using aggregation");
+        }
+      }
+    }
+
+    List<String> metricIds = Arrays.asList(metricIdsString.split(","));
+
+    LOG.info("Requesting {} metrics from {} time ranges with granularity '{}', transformations '{}', aggregations '{}'",
+        metricIds.size(), ranges.size(), granularity, transformations, aggregations);
+
+    Map<MetricSlice, Future<DataFrame>> requests = new HashMap<>();
+    for (String id : metricIds) {
+      for (Interval range : ranges) {
+        long metricId = Long.valueOf(id);
+        long start = range.getStartMillis();
+        long end = range.getEndMillis();
+        MetricSlice slice = MetricSlice.from(metricId, start, end, filters);
+
+        requests.put(slice, fetchMetricTimeSeriesAsync(slice, granularity));
+      }
     }
 
     // collect results
-    Map<String, DataFrame> results = new HashMap<>();
-    for (String id : requests.keySet()) {
-      results.put(id, requests.get(id).get(TIMEOUT, TimeUnit.MILLISECONDS));
+    Map<MetricSlice, DataFrame> results = new HashMap<>();
+    for (MetricSlice slice : requests.keySet()) {
+      results.put(slice, requests.get(slice).get(TIMEOUT, TimeUnit.MILLISECONDS));
     }
 
     // merge results
-    DataFrame data = mergeResults(results);
+    Map<Interval, DataFrame> data = mergeResults(results);
 
-    // transform output
-    data = transformTimeSeries(data, transformations, start, end, granularity);
+    // transform results
+    for (Interval range : data.keySet()) {
+      long start = range.getStartMillis();
+      long end = range.getEndMillis();
+      data.put(range, transformTimeSeries(data.get(range), transformations, start, end, granularity));
+    }
 
-    return convertDataToMap(data);
+    // aggregate results
+    Map<String, Map<String, List<? extends Number>>> output = new HashMap<>();
+
+    if (aggregations.isEmpty()) {
+      // no aggregation - user time ranges as top-level keys
+      for (Interval range : ranges) {
+        String key = String.format("%d:%d", range.getStartMillis(), range.getEndMillis());
+        output.put(key, convertDataToMap(data.get(range)));
+      }
+
+    } else {
+      // with aggregation - use aggregation strings as top-level keys
+      for (AggregationType aggregation : aggregations) {
+        String key = aggregation.name().toLowerCase();
+        output.put(key, convertDataToMap(aggregateTimeSeries(data, aggregation)));
+      }
+    }
+
+    return output;
+  }
+
+  private static Interval slice2interval(MetricSlice slice) {
+    return new Interval(slice.getStart(), slice.getEnd(), DateTimeZone.UTC);
   }
 
   /**
-   * Returns a DataFrame merging individual query results and aligning them to the same timestamps.
+   * Returns a map of dataframes keyed by time range by merging individual query results and aligning them to the same timestamps.
    *
    * @param results query results
-   * @return merged aligned dataframe
+   * @return map with merged dataframes keyed by time range
    */
-  private static DataFrame mergeResults(Map<String, DataFrame> results) {
-    DataFrame df = new DataFrame();
-    if (results.isEmpty())
-      return df;
-
-    // TODO move timestamp generation here
-    Series timestamp = results.values().iterator().next().get(COL_TIME);
-    df.addSeries(COL_TIME, timestamp);
-    df.setIndex(COL_TIME);
-
-    for (Map.Entry<String, DataFrame> entry : results.entrySet()) {
-      String name = SERIES_PREFIX + entry.getKey();
-      DataFrame res = new DataFrame(entry.getValue()).renameSeries(COL_VALUE, name);
-      df.addSeries(res);
+  private static Map<Interval, DataFrame> mergeResults(Map<MetricSlice, DataFrame> results) {
+    if (results.isEmpty()) {
+      return Collections.emptyMap();
     }
 
-    return df;
+    // NOTE: pass in intervals from outside?
+    Set<Interval> timeRanges = new HashSet<>();
+    for (Map.Entry<MetricSlice, DataFrame> entry : results.entrySet()) {
+      timeRanges.add(slice2interval(entry.getKey()));
+    }
+
+    Map<Interval, DataFrame> output = new HashMap<>();
+    for (Interval range : timeRanges) {
+      for (Map.Entry<MetricSlice, DataFrame> entry : results.entrySet()) {
+        MetricSlice slice = entry.getKey();
+        DataFrame dfSlice = entry.getValue();
+
+        if (!slice2interval(slice).equals(range)) {
+          continue;
+        }
+
+        if (!output.containsKey(range)) {
+          DataFrame df = new DataFrame();
+          df.addSeries(COL_TIME, dfSlice.get(COL_TIME));
+          df.setIndex(COL_TIME);
+          output.put(range, df);
+        }
+
+        output.get(range).addSeries(dfSlice.renameSeries(COL_VALUE, String.valueOf(slice.getMetricId())));
+      }
+    }
+
+    return output;
   }
 
   /**
@@ -191,19 +291,55 @@ public class TimeSeriesResource {
   private static Map<String, List<? extends Number>> convertDataToMap(DataFrame data) {
     Map<String, List<? extends Number>> output = new HashMap<>();
     for (String name : data.getSeriesNames()) {
-      String outName = name;
-      if (outName.startsWith(SERIES_PREFIX)) {
-        outName = outName.substring(SERIES_PREFIX.length());
-      }
-
       if (data.getIndexName().equals(name)) {
-        output.put(outName, data.getLongs(name).toList());
+        output.put(name, data.getLongs(name).toList());
         continue;
       }
-
-      output.put(outName, data.getDoubles(name).toList());
+      output.put(name, data.getDoubles(name).toList());
     }
     return output;
+  }
+
+  /**
+   * Returns a dataframe aggregated across intervals for multiple metrics
+   *
+   * @param data (transformed) query results
+   * @param aggregation aggregation function to apply
+   * @return dataframe with aggregated series per metric
+   */
+  private DataFrame aggregateTimeSeries(Map<Interval, DataFrame> data, AggregationType aggregation) {
+    final Series.DoubleFunction function = aggregation2function.get(aggregation);
+
+    // transpose interval-metrics to metric-intervals
+    Multimap<String, Series> series = ArrayListMultimap.create();
+    for (DataFrame df : data.values()) {
+      for (String name : df.getSeriesNames()) {
+        if (name.equals(COL_TIME)) {
+          continue;
+        }
+        series.put(name, df.get(name));
+      }
+    }
+
+    // aggregate across intervals
+    DataFrame dfOutput = new DataFrame();
+    for (String name : series.keySet()) {
+      DataFrame df = new DataFrame();
+      int count = 0;
+      for (Series s : series.get(name)) {
+        df.addSeries(String.valueOf(count), s);
+        count++;
+      }
+
+      DoubleSeries out = df.map(function, df.getSeriesNames().toArray(new String[count]));
+
+      dfOutput.addSeries(name, out);
+    }
+
+    // add index back in
+    dfOutput.addSeries(COL_TIME, LongSeries.sequence(0, dfOutput.size()));
+
+    return dfOutput;
   }
 
   /**
@@ -236,6 +372,8 @@ public class TimeSeriesResource {
         return transformTimeSeriesForwardFill(data);
       case MILLISECONDS:
         return transformTimeSeriesMilliseconds(data, start, granularity);
+      case CHANGE:
+        return transformTimeSeriesChange(data);
     }
     throw new IllegalArgumentException(String.format("Unknown transformation type '%s'", transformation));
   }
@@ -286,140 +424,32 @@ public class TimeSeriesResource {
   }
 
   /**
-   * Asynchronous call to {@code fetchMetricTimeSeries}
-   * @see TimeSeriesResource#fetchMetricTimeSeries
+   * Returns time series of changes.
+   *
+   * @param data query results
+   * @return change time series
    */
-  private Future<DataFrame> fetchMetricTimeSeriesAsync(final long metricId, final long start,
-      final long end, final TimeGranularity granularity, final Multimap<String, String> filters) throws Exception {
+  private DataFrame transformTimeSeriesChange(DataFrame data) {
+    for (String id : data.getSeriesNames()) {
+      if (data.getIndexName().equals(id))
+        continue;
+      DoubleSeries s = data.getDoubles(id);
+      data.addSeries(id, s.shift(1).divide(s));
+    }
+    return data;
+  }
+
+  /**
+   * Asynchronous call to {@code fetchMetricTimeSeries}
+   * @see TimeSeriesLoader#load
+   */
+  private Future<DataFrame> fetchMetricTimeSeriesAsync(final MetricSlice slice, final TimeGranularity granularity) throws Exception {
     return this.executor.submit(new Callable<DataFrame>() {
       @Override
       public DataFrame call() throws Exception {
-        return fetchMetricTimeSeries(metricId, start, end, granularity, filters);
+        return TimeSeriesResource.this.loader.load(slice, granularity);
       }
     });
-  }
-
-  /**
-   * Returns the metric time series for a given time range and filter set, with a specified
-   * time granularity. If the underlying time series resolution does not correspond to the desired
-   * time granularity, it is up-sampled (via forward fill) or down-sampled (via sum if additive, or
-   * last value otherwise) transparently.
-   *
-   * <br/><b>NOTE:</b> if the start timestamp does not align with the time
-   * resolution, it is aligned with the nearest lower time stamp.
-   *
-   * @param metricId metric id in thirdeye database
-   * @param start start time stamp (inclusive, in millis)
-   * @param end end time stamp (exclusive, in millis)
-   * @param granularity time granularity
-   * @param filters filter set
-   * @return dataframe with aligned timestamps and values
-   */
-  private static DataFrame fetchMetricTimeSeries(long metricId, long start, long end,
-      TimeGranularity granularity, Multimap<String, String> filters) throws Exception {
-
-    // fetch meta data
-    MetricConfigDTO metric = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
-    if (metric == null) {
-      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", metricId));
-    }
-
-    DatasetConfigDTO dataset = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(metric.getDataset());
-    if (dataset == null) {
-      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s'", metric.getDataset()));
-    }
-
-    if (granularity == null) {
-      granularity = dataset.bucketTimeGranularity();
-    }
-
-    List<MetricFunction> functions = new ArrayList<>();
-    List<MetricExpression> expressions = Arrays.asList(ThirdEyeUtils.getMetricExpressionFromMetricConfig(metric));
-    for(MetricExpression exp : expressions) {
-      functions.addAll(exp.computeMetricFunctions());
-    }
-
-    // aligned timestamps
-    // NOTE: the method over-fetches data in front of the time series to fill-forward correctly
-    final long alignedStart = granularity.toMillis(granularity.convertToUnit(start));
-    final long dataAlignedStart = dataset.bucketTimeGranularity().toMillis(
-        dataset.bucketTimeGranularity().convertToUnit(start));
-
-    // build request
-    ThirdEyeRequest.ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder()
-        .setStartTimeInclusive(dataAlignedStart)
-        .setEndTimeExclusive(end)
-        .setMetricFunctions(functions)
-        .setGroupBy(dataset.getTimeColumn())
-        .setGroupByTimeGranularity(granularity)
-        .setDataSource(dataset.getDataSource());
-
-    if (filters != null) {
-      builder.setFilterSet(filters);
-    }
-
-    ThirdEyeRequest request = builder.build("ref");
-
-    // fetch result
-    ThirdEyeResponse response = CACHE_REGISTRY_INSTANCE.getQueryCache().getQueryResult(request);
-
-    DataFrame df = DataFrameUtils.parseResponse(response);
-    DataFrameUtils.evaluateExpressions(df, expressions);
-
-    // generate time stamps
-    DataFrame output = new DataFrame();
-    output.addSeries(COL_TIME, makeTimeRangeIndex(dataAlignedStart, end, granularity));
-    output.setIndex(COL_TIME);
-
-    LOG.info("Metric id {} has {} data points for time range {}-{}, need {} for time range {}-{}", metricId, df.size(), dataAlignedStart, end, output.size(), alignedStart, end);
-
-    // handle down-sampling - group by timestamp
-    output.addSeries(df.groupByValue(COL_TIME).aggregate(COL_VALUE, getGroupingFunction(dataset)));
-
-    // NOTE: up-sampling handled outside
-
-    // project onto (aligned) start timestamp
-    int fromIndex = (int) granularity.convertToUnit(alignedStart - dataAlignedStart);
-    if (fromIndex > 0) {
-      LOG.info("Metric id {} resampling over-generated {} data points (out of {}). Truncating.", metricId, fromIndex, output.size());
-      output = output.sliceFrom(fromIndex);
-
-      LongSeries timestamps = output.getLongs(COL_TIME);
-      output.addSeries(COL_TIME, timestamps.subtract(timestamps.min()));
-    }
-
-    return output;
-  }
-
-  /**
-   * Returns a LongSeries with length {@code N}, where {@code N} corresponds to the number of time
-   * buckets between {@code start} and {@code end} with the given time granularity.
-   *
-   * @param start start timestamp (inclusive, in millis)
-   * @param end end timestamp (exclusive, in millis)
-   * @param granularity time granularity
-   * @return long series
-   */
-  private static LongSeries makeTimeRangeIndex(long start, long end, TimeGranularity granularity) {
-    long roundUp = granularity.toMillis(1) - 1;
-    int maxCount = (int) granularity.convertToUnit(end - start + roundUp);
-    long[] values = new long[maxCount];
-    for(int i=0; i<maxCount; i++) {
-      values[i] = i;
-    }
-    return LongSeries.buildFrom(values);
-  }
-
-  /**
-   * Returns the grouping function based on whether the dataset is additive or not.
-   *
-   * @param dataset dataset config
-   * @return grouping function
-   */
-  private static Series.DoubleFunction getGroupingFunction(DatasetConfigDTO dataset) {
-    if(dataset.isAdditive())
-      return DoubleSeries.SUM;
-    return DoubleSeries.LAST;
   }
 
   @GET
