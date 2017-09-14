@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.minion;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.Collections;
@@ -22,9 +23,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobQueue;
+import org.apache.helix.task.TaskConstants;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
@@ -45,9 +52,11 @@ public class PinotHelixTaskResourceManager {
   private static final String TASK_PREFIX = "Task" + TASK_NAME_SEPARATOR;
 
   private final TaskDriver _taskDriver;
+  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  public PinotHelixTaskResourceManager(@Nonnull TaskDriver taskDriver) {
-    _taskDriver = taskDriver;
+  public PinotHelixTaskResourceManager(@Nonnull HelixManager helixManager) {
+    _taskDriver = new TaskDriver(helixManager);
+    _propertyStore = helixManager.getHelixPropertyStore();
   }
 
   /**
@@ -66,18 +75,28 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Create a task queue for the given task type.
+   * Ensure the task queue for the given task type exists.
    *
    * @param taskType Task type
    */
-  public synchronized void createTaskQueue(@Nonnull String taskType) {
+  public void ensureTaskQueueExists(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
-    LOGGER.info("Creating task queue: {} for task type: {}", helixJobQueueName, taskType);
+    WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
 
-    // Set full parallelism
-    JobQueue jobQueue = new JobQueue.Builder(helixJobQueueName).setWorkflowConfig(
-        new WorkflowConfig.Builder().setParallelJobs(Integer.MAX_VALUE).build()).build();
-    _taskDriver.createQueue(jobQueue);
+    if (workflowConfig == null) {
+      // Task queue does not exist
+      LOGGER.info("Creating task queue: {} for task type: {}", helixJobQueueName, taskType);
+
+      // Set full parallelism
+      JobQueue jobQueue = new JobQueue.Builder(helixJobQueueName).setWorkflowConfig(
+          new WorkflowConfig.Builder().setParallelJobs(Integer.MAX_VALUE).build()).build();
+      _taskDriver.createQueue(jobQueue);
+    }
+
+    // Wait until task queue context shows up
+    while (_taskDriver.getWorkflowContext(helixJobQueueName) == null) {
+      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+    }
   }
 
   /**
@@ -85,11 +104,26 @@ public class PinotHelixTaskResourceManager {
    *
    * @param taskType Task type
    */
-  // TODO: Seems the node under PROPERTYSTORE/TaskRebalancer is not cleaned up properly
   public synchronized void cleanUpTaskQueue(@Nonnull String taskType) {
+    // NOTE: There is a Helix bug that causes task contexts not removed properly. Need to explicitly remove them
+    // TODO: After Helix bug gets fixed, remove the extra logic
+
     String helixJobQueueName = getHelixJobQueueName(taskType);
+    Set<String> helixJobsBeforeCleaningUp = _taskDriver.getWorkflowConfig(helixJobQueueName).getJobDag().getAllNodes();
+    if (helixJobsBeforeCleaningUp.isEmpty()) {
+      return;
+    }
+
     LOGGER.info("Cleaning up task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.cleanupJobQueue(helixJobQueueName);
+
+    // Explicitly remove the task contexts
+    Set<String> helixJobsAfterCleaningUp = _taskDriver.getWorkflowConfig(helixJobQueueName).getJobDag().getAllNodes();
+    for (String helixJobName : helixJobsBeforeCleaningUp) {
+      if (!helixJobsAfterCleaningUp.contains(helixJobName)) {
+        _propertyStore.remove(TaskConstants.REBALANCER_CONTEXT_ROOT + "/" + helixJobName, AccessOption.PERSISTENT);
+      }
+    }
   }
 
   /**
@@ -170,7 +204,14 @@ public class PinotHelixTaskResourceManager {
         pinotTaskConfig, minionInstanceTag);
     JobConfig.Builder jobBuilder = new JobConfig.Builder().setInstanceGroupTag(minionInstanceTag)
         .addTaskConfigs(Collections.singletonList(pinotTaskConfig.toHelixTaskConfig(taskName)));
+
     _taskDriver.enqueueJob(getHelixJobQueueName(taskType), taskName, jobBuilder);
+
+    // Wait until task state is available
+    while (getTaskState(taskName) == null) {
+      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+    }
+
     return taskName;
   }
 

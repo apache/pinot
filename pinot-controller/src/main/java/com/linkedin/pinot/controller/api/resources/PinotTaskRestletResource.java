@@ -22,6 +22,7 @@ import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
@@ -131,10 +132,9 @@ public class PinotTaskRestletResource {
   @PUT
   @Path("/tasks/scheduletasks")
   @ApiOperation("Schedule tasks")
-  public SuccessResponse scheduleTasks() {
+  public Map<String, List<String>> scheduleTasks() {
     try {
-      _pinotTaskManager.scheduleTasks();
-      return new SuccessResponse("Successfully scheduled tasks");
+      return _pinotTaskManager.scheduleTasks();
     } catch (Exception e) {
       throw new WebApplicationException(e);
     }
