@@ -43,17 +43,12 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   }
 
   /**
-   * Returns the metric time series for a given time range and filter set, with a specified
-   * time granularity. If the underlying time series resolution does not correspond to the desired
-   * time granularity, it is up-sampled (via forward fill) or down-sampled (via sum if additive, or
-   * last value otherwise) transparently.
-   *
-   * <br/><b>NOTE:</b> if the start timestamp does not align with the time
-   * resolution, it is aligned with the nearest lower time stamp.
+   * Default implementation using metricDAO, datasetDAO, and QueryCache
    *
    * @param slice metric slice to fetch
    * @param granularity time granularity
-   * @return dataframe with aligned timestamps and values
+   * @return Dataframe with timestamps and metric values
+   * @throws Exception
    */
   @Override
   public DataFrame load(MetricSlice slice, TimeGranularity granularity) throws Exception {
@@ -74,7 +69,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     }
 
     if (granularity == null) {
-      granularity = dataset.bucketTimeGranularity();
+      throw new IllegalArgumentException("Must provide time granularity");
     }
 
     List<MetricFunction> functions = new ArrayList<>();

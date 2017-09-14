@@ -40,6 +40,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
+import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -135,7 +136,8 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new OverrideConfigResource());
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new TimeSeriesResource(Executors.newFixedThreadPool(10)));
+    env.jersey().register(new TimeSeriesResource(Executors.newFixedThreadPool(10),
+        new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache())));
     env.jersey().register(new OnboardResource());
     env.jersey().register(new EventResource(config));
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));

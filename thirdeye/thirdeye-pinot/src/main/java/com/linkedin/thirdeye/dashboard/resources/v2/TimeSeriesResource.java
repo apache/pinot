@@ -5,7 +5,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.TimeSeriesCompareMetricView;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.ValuesContainer;
@@ -18,20 +17,17 @@ import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
@@ -70,7 +66,7 @@ public class TimeSeriesResource {
   enum TransformationType {
     CUMULATIVE,
     FORWARDFILL,
-    MILLISECONDS,
+    TIMESTAMP,
     CHANGE
   }
 
@@ -165,6 +161,11 @@ public class TimeSeriesResource {
     if (!StringUtils.isBlank(transformationsString)) {
       for (String part : transformationsString.split(",")) {
         transformations.add(TransformationType.valueOf(part.toUpperCase()));
+      }
+
+      // require time granularity for timestamp transformation
+      if (transformations.contains(TransformationType.TIMESTAMP) && granularity == null) {
+        throw new IllegalArgumentException("Must provide time granularity for timestamp transformation");
       }
     }
 
@@ -338,6 +339,7 @@ public class TimeSeriesResource {
 
     // add index back in
     dfOutput.addSeries(COL_TIME, LongSeries.sequence(0, dfOutput.size()));
+    dfOutput.setIndex(COL_TIME);
 
     return dfOutput;
   }
@@ -370,8 +372,8 @@ public class TimeSeriesResource {
         return transformTimeSeriesCumulative(data);
       case FORWARDFILL:
         return transformTimeSeriesForwardFill(data);
-      case MILLISECONDS:
-        return transformTimeSeriesMilliseconds(data, start, granularity);
+      case TIMESTAMP:
+        return transformTimeSeriesTimestamp(data, start, granularity);
       case CHANGE:
         return transformTimeSeriesChange(data);
     }
@@ -412,12 +414,11 @@ public class TimeSeriesResource {
    * @param granularity time granularity of rows
    * @return data series with millisecond timestamps
    */
-  private DataFrame transformTimeSeriesMilliseconds(DataFrame data, long start, final TimeGranularity granularity) {
-    final long offset = granularity.toMillis(granularity.convertToUnit(start));
+  private DataFrame transformTimeSeriesTimestamp(DataFrame data, final long start, final TimeGranularity granularity) {
     data.mapInPlace(new Series.LongFunction() {
       @Override
       public long apply(long... values) {
-        return granularity.toMillis(values[0]) + offset;
+        return granularity.toMillis(values[0]) + start;
       }
     }, data.getIndexName());
     return data;
@@ -434,7 +435,7 @@ public class TimeSeriesResource {
       if (data.getIndexName().equals(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
-      data.addSeries(id, s.shift(1).divide(s));
+      data.addSeries(id, s.divide(s.shift(1).replace(0d, DoubleSeries.NULL)).subtract(1));
     }
     return data;
   }
