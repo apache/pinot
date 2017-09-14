@@ -28,8 +28,13 @@ public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthCon
   @Override
   public void filter(ContainerRequestContext containerRequestContext) throws IOException {
     String uriPath = containerRequestContext.getUriInfo().getPath();
-    if (!authConfig.isAuthEnabled() || uriPath.equals("auth/authenticate")|| uriPath.equals("auth/logout")
-        || uriPath.startsWith("anomalies/search/anomalyIds")|| uriPath.equals("thirdeye")
+    if (!authConfig.isAuthEnabled()
+        // authenticate end points should be out of auth filter
+        || uriPath.equals("auth/authenticate")|| uriPath.equals("auth/logout")
+        // Landing page should not throw 401
+        || uriPath.equals("thirdeye")
+        // Let detector capture the screenshot without authentication error
+        || uriPath.startsWith("/app/#/screenshot/")
         || authConfig.getAllowedPaths().contains(uriPath)) {
       return;
     }
