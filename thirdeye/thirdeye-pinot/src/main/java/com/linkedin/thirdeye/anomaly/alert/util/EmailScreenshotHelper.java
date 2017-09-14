@@ -54,15 +54,18 @@ public class EmailScreenshotHelper {
     Process proc = Runtime.getRuntime().exec(new String[]{configuration.getPhantomJsPath(), "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
         phantomScript, imgRoute, imgPath});
 
-    InputStream stderr = proc.getErrorStream();
-    InputStreamReader isr = new InputStreamReader(stderr);
-    BufferedReader br = new BufferedReader(isr);
-    // exhaust the error stream before waiting for the process to exit
-    String line = br.readLine();
-    if (line != null) {
-      do {
-        line = br.readLine();
-      } while (line != null);
+    try (
+      InputStream stderr = proc.getErrorStream();
+      InputStreamReader isr = new InputStreamReader(stderr);
+      BufferedReader br = new BufferedReader(isr);
+    ) {
+      // exhaust the error stream before waiting for the process to exit
+      String line = br.readLine();
+      if (line != null) {
+        do {
+          line = br.readLine();
+        } while (line != null);
+      }
     }
     int exitVal = proc.waitFor();
     if (exitVal != 0) {
