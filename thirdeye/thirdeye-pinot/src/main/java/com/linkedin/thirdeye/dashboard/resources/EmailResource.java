@@ -126,9 +126,9 @@ public class EmailResource {
       } else {
         smtpConfiguration.setSmtpHost(smtpHost);
       }
-      if (smtpPort != null) {
-        smtpConfiguration.setSmtpPort(smtpPort);
-      }
+      // if smtpPort is null, set to be default value as 25
+      smtpPort = smtpPort == null? 25 : smtpPort;
+      smtpConfiguration.setSmtpPort(smtpPort);
     }
 
     return smtpConfiguration;
