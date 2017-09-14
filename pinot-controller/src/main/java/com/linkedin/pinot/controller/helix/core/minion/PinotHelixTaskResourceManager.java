@@ -15,12 +15,15 @@
  */
 package com.linkedin.pinot.controller.helix.core.minion;
 
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +34,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobQueue;
+import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskConstants;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskState;
@@ -179,40 +183,51 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Submit a task to the Minion instances with the default tag.
+   * Submit a list of child tasks with same task type to the Minion instances with the default tag.
    *
-   * @param pinotTaskConfig Task config of the task to be submitted
-   * @return Name of the submitted task
+   * @param pinotTaskConfigs List of child task configs to be submitted
+   * @return Name of the submitted parent task
    */
   @Nonnull
-  public synchronized String submitTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
-    return submitTask(pinotTaskConfig, CommonConstants.Minion.UNTAGGED_INSTANCE);
+  public synchronized String submitTask(@Nonnull List<PinotTaskConfig> pinotTaskConfigs) {
+    return submitTask(pinotTaskConfigs, CommonConstants.Minion.UNTAGGED_INSTANCE);
   }
 
   /**
-   * Submit a task to the Minion instances with the given tag.
+   * Submit a list of child tasks with same task type to the Minion instances with the given tag.
    *
-   * @param pinotTaskConfig Task config of the task to be submitted
+   * @param pinotTaskConfigs List of child task configs to be submitted
    * @param minionInstanceTag Tag of the Minion instances to submit the task to
-   * @return Name of the submitted task
+   * @return Name of the submitted parent task
    */
   @Nonnull
-  public synchronized String submitTask(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull String minionInstanceTag) {
-    String taskType = pinotTaskConfig.getTaskType();
-    String taskName = TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + System.nanoTime();
-    LOGGER.info("Submitting task: {} of type: {} with config: {} to Minion instances with tag: {}", taskName, taskType,
-        pinotTaskConfig, minionInstanceTag);
-    JobConfig.Builder jobBuilder = new JobConfig.Builder().setInstanceGroupTag(minionInstanceTag)
-        .addTaskConfigs(Collections.singletonList(pinotTaskConfig.toHelixTaskConfig(taskName)));
+  public synchronized String submitTask(@Nonnull List<PinotTaskConfig> pinotTaskConfigs,
+      @Nonnull String minionInstanceTag) {
+    int numChildTasks = pinotTaskConfigs.size();
+    Preconditions.checkState(numChildTasks > 0);
 
-    _taskDriver.enqueueJob(getHelixJobQueueName(taskType), taskName, jobBuilder);
+    String taskType = pinotTaskConfigs.get(0).getTaskType();
+    String parentTaskName = TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + System.nanoTime();
+    LOGGER.info(
+        "Submitting parent task: {} of type: {} with {} child task configs: {} to Minion instances with tag: {}",
+        parentTaskName, taskType, numChildTasks, pinotTaskConfigs, minionInstanceTag);
+    List<TaskConfig> helixTaskConfigs = new ArrayList<>(numChildTasks);
+    for (int i = 0; i < numChildTasks; i++) {
+      PinotTaskConfig pinotTaskConfig = pinotTaskConfigs.get(i);
+      Preconditions.checkState(pinotTaskConfig.getTaskType().equals(taskType));
+      helixTaskConfigs.add(pinotTaskConfig.toHelixTaskConfig(parentTaskName + TASK_NAME_SEPARATOR + i));
+    }
+    JobConfig.Builder jobBuilder = new JobConfig.Builder().setInstanceGroupTag(minionInstanceTag)
+        .addTaskConfigs(helixTaskConfigs)
+        .setNumConcurrentTasksPerInstance(Integer.MAX_VALUE);
+    _taskDriver.enqueueJob(getHelixJobQueueName(taskType), parentTaskName, jobBuilder);
 
     // Wait until task state is available
-    while (getTaskState(taskName) == null) {
+    while (getTaskState(parentTaskName) == null) {
       Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
     }
 
-    return taskName;
+    return parentTaskName;
   }
 
   /**
@@ -260,15 +275,20 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Get the task config for the given task name.
+   * Get the child task configs for the given task name.
    *
    * @param taskName Task name
-   * @return Task config
+   * @return List of child task configs
    */
   @Nonnull
-  public synchronized PinotTaskConfig getTaskConfig(@Nonnull String taskName) {
-    return PinotTaskConfig.fromHelixTaskConfig(
-        _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfig(taskName));
+  public synchronized List<PinotTaskConfig> getTaskConfigs(@Nonnull String taskName) {
+    Collection<TaskConfig> helixTaskConfigs =
+        _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfigMap().values();
+    List<PinotTaskConfig> taskConfigs = new ArrayList<>(helixTaskConfigs.size());
+    for (TaskConfig helixTaskConfig : helixTaskConfigs) {
+      taskConfigs.add(PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig));
+    }
+    return taskConfigs;
   }
 
   /**

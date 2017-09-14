@@ -55,7 +55,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private static final String TABLE_NAME_1 = "testTable1";
   private static final String TABLE_NAME_2 = "testTable2";
   private static final String TABLE_NAME_3 = "testTable3";
-  private static final int NUM_MINIONS = 3;
+  private static final int NUM_MINIONS = 1;
 
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
@@ -89,17 +89,19 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
   @Test
   public void testStopAndResumeTaskQueue() throws Exception {
-    // Should create the task queues and generate 2 tasks
-    Assert.assertEquals(_taskManager.scheduleTasks().get(TestTaskGenerator.TASK_TYPE).size(), 2);
+    // Should create the task queues and generate a task
+    Assert.assertEquals(_taskManager.scheduleTasks().size(), 1);
     Assert.assertEquals(_helixTaskResourceManager.getTaskQueues().size(), 2);
-    // Should generate 2 more tasks
-    Assert.assertEquals(_taskManager.scheduleTasks().get(TestTaskGenerator.TASK_TYPE).size(), 2);
+
+    // Should generate one more task
+    Assert.assertEquals(_taskManager.scheduleTasks().size(), 1);
+
     // Should not generate more tasks
-    Assert.assertEquals(_taskManager.scheduleTasks().get(TestTaskGenerator.TASK_TYPE).size(), 0);
+    Assert.assertTrue(_taskManager.scheduleTasks().isEmpty());
 
     // Check if all tasks IN_PROGRESS
     Collection<TaskState> taskStates = _helixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values();
-    Assert.assertEquals(taskStates.size(), 4);
+    Assert.assertEquals(taskStates.size(), 2);
     for (TaskState taskState : taskStates) {
       Assert.assertEquals(taskState, TaskState.IN_PROGRESS);
     }
@@ -113,7 +115,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       public Boolean apply(@Nullable Void aVoid) {
         Collection<TaskState> taskStates =
             _helixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values();
-        Assert.assertEquals(taskStates.size(), 4);
+        Assert.assertEquals(taskStates.size(), 2);
         for (TaskState taskState : taskStates) {
           if (taskState != TaskState.STOPPED) {
             return false;
@@ -132,7 +134,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       public Boolean apply(@Nullable Void aVoid) {
         Collection<TaskState> taskStates =
             _helixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values();
-        Assert.assertEquals(taskStates.size(), 4);
+        Assert.assertEquals(taskStates.size(), 2);
         for (TaskState taskState : taskStates) {
           if (taskState != TaskState.COMPLETED) {
             return false;
@@ -178,8 +180,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     public List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs) {
       Assert.assertEquals(tableConfigs.size(), 2);
 
-      // Generate at most 4 tasks
-      if (_clusterInfoProvider.getTaskStates(TASK_TYPE).size() >= 4) {
+      // Generate at most 2 tasks
+      if (_clusterInfoProvider.getTaskStates(TASK_TYPE).size() >= 2) {
         return Collections.emptyList();
       }
 
