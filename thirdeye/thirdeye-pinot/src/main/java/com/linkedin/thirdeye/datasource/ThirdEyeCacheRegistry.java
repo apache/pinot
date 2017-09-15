@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datasource;
 
 import com.google.common.cache.Weigher;
 
+import com.linkedin.pinot.client.ResultSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -65,6 +66,7 @@ public class ThirdEyeCacheRegistry {
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
   private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
   private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
+  private static final long CACHE_EXPIRATION_HOURS = 1;
 
   private static class Holder {
     static final ThirdEyeCacheRegistry INSTANCE = new ThirdEyeCacheRegistry();
@@ -122,14 +124,14 @@ public class ThirdEyeCacheRegistry {
     long maxBucketNumber = getApproximateMaxBucketNumber(DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE);
     LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache = CacheBuilder.newBuilder()
         .removalListener(listener)
-        .expireAfterAccess(1, TimeUnit.HOURS)
+        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
         .maximumWeight(maxBucketNumber)
         .weigher(new Weigher<PinotQuery, ResultSetGroup>() {
           @Override public int weigh(PinotQuery pinotQuery, ResultSetGroup resultSetGroup) {
             int resultSetCount = resultSetGroup.getResultSetCount();
             int weight = 0;
             for (int idx = 0; idx < resultSetCount; ++idx) {
-              com.linkedin.pinot.client.ResultSet resultSet = resultSetGroup.getResultSet(idx);
+              ResultSet resultSet = resultSetGroup.getResultSet(idx);
               weight += (resultSet.getColumnCount() * resultSet.getRowCount());
             }
             return weight;
@@ -141,17 +143,17 @@ public class ThirdEyeCacheRegistry {
 
     // DatasetConfig cache
     LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CacheBuilder.newBuilder()
-        .build(new DatasetConfigCacheLoader(datasetConfigDAO));
+        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new DatasetConfigCacheLoader(datasetConfigDAO));
     cacheRegistry.registerDatasetConfigCache(datasetConfigCache);
 
     // MetricConfig cache
     LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache = CacheBuilder.newBuilder()
-        .build(new MetricConfigCacheLoader(metricConfigDAO));
+        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new MetricConfigCacheLoader(metricConfigDAO));
     cacheRegistry.registerMetricConfigCache(metricConfigCache);
 
     // DashboardConfigs cache
     LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache = CacheBuilder.newBuilder()
-        .build(new DashboardConfigCacheLoader(dashboardConfigDAO));
+        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new DashboardConfigCacheLoader(dashboardConfigDAO));
     cacheRegistry.registerDashboardConfigsCache(dashboardConfigsCache);
 
     // Query Cache
@@ -166,7 +168,7 @@ public class ThirdEyeCacheRegistry {
 
     // Dimension Filter cache
     LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
-        .build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
+        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
     // Collections cache
