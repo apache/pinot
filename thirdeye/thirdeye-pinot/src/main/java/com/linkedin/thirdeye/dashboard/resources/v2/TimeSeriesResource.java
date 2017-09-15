@@ -65,7 +65,8 @@ import org.slf4j.LoggerFactory;
 public class TimeSeriesResource {
   enum TransformationType {
     CUMULATIVE,
-    FORWARDFILL,
+    FILLFORWARD,
+    FILLZERO,
     TIMESTAMP,
     CHANGE,
     RELATIVE,
@@ -117,6 +118,51 @@ public class TimeSeriesResource {
     this.loader = loader;
   }
 
+  /**
+   * <p>Returns metric time series for a set of given metrics and time ranges. Optionally allows
+   * specification of filters, time granularity, transformations and aggregations.</p>
+   *
+   * <p>The result is structured hierarchically as follows:
+   * <pre>
+   * [time range 0]:
+   *   [metric id 0]:
+   *     value 0, value 1, ..., value n
+   *   [metric id 1]:
+   *     value 0, value 1, ..., value n
+   *   timestamp:
+   *     timestamp 0, timestamp 1, ..., timestamp n
+   * [time range 1]:
+   *   [metric id 0]:
+   *     value 0, value 1, ..., value n
+   *   [metric id 1]:
+   *     value 0, value 1, ..., value n
+   *   timestamp:
+   *     timestamp 0, timestamp 1, ..., timestamp n
+   * }</pre>
+   * Note that the timestamp column is always present.</p>
+   *
+   * <p>Transformations are applied to each time series before aggregation in the order they
+   * are specified. Aggregations replace time ranges if specified, while metric ids remain
+   * nested in a similar way. Note, that if one or more aggregations are specified the
+   * time ranges must be of equal length.</p>
+   *
+   * <p>Sample queries:
+   * <pre>
+   * minimal example:    curl -X GET 'localhost:1426/timeseries/query?metricIds=0&ranges=1504076400000:1504162800000'
+   * multiple metrics:   curl -X GET 'localhost:1426/timeseries/query?metricIds=0,1&ranges=1504076400000:1504162800000&granularity=1_HOURS'
+   * transformations:    curl -X GET 'localhost:1426/timeseries/query?metricIds=0&ranges=1504076400000:1504162800000transformations=fillforward,log'
+   * aggregations:       curl -X GET 'localhost:1426/timeseries/query?metricIds=0&ranges=1503990000000:1504076400000,1504076400000:1504162800000&transformations=fillforward&aggregations=sum,max'
+   * </pre></p>
+   *
+   * @param metricIdsString metric ids separated by ","
+   * @param rangesString time ranges with end exclusive "[start]:[end]" separated by ","
+   * @param filterString (optional) metric filters
+   * @param granularityString (optional) time series granularity "[count]_[unit]"
+   * @param transformationsString (optional) transformations to apply to time series, separated by ","
+   * @param aggregationsString (optional) aggregations to apply to transformed time series, separated by ","
+   * @return Map (keyed by range or aggregation) of maps (keyed by metric id) of list of values
+   * @throws Exception
+   */
   @GET
   @Path("/query")
   public Map<String, Map<String, List<? extends Number>>> getTimeSeries(
@@ -372,8 +418,10 @@ public class TimeSeriesResource {
     switch (transformation) {
       case CUMULATIVE:
         return transformTimeSeriesCumulative(data);
-      case FORWARDFILL:
-        return transformTimeSeriesForwardFill(data);
+      case FILLFORWARD:
+        return transformTimeSeriesFillForward(data);
+      case FILLZERO:
+        return transformTimeSeriesFillZero(data);
       case TIMESTAMP:
         return transformTimeSeriesTimestamp(data, start, granularity);
       case CHANGE:
@@ -408,8 +456,18 @@ public class TimeSeriesResource {
    * @param data query results
    * @return filled time series
    */
-  private DataFrame transformTimeSeriesForwardFill(DataFrame data) {
+  private DataFrame transformTimeSeriesFillForward(DataFrame data) {
     return data.fillNullForward(data.getSeriesNames().toArray(new String[0]));
+  }
+
+  /**
+   * Returns time series with nulls filled with zero.
+   *
+   * @param data query results
+   * @return filled time series
+   */
+  private DataFrame transformTimeSeriesFillZero(DataFrame data) {
+    return data.fillNull(data.getSeriesNames().toArray(new String[0]));
   }
 
   /**

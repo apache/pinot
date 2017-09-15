@@ -69,7 +69,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     }
 
     if (granularity == null) {
-      throw new IllegalArgumentException("Must provide time granularity");
+      granularity = dataset.bucketTimeGranularity();
     }
 
     List<MetricFunction> functions = new ArrayList<>();
