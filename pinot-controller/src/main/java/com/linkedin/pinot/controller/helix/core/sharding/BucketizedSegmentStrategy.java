@@ -63,8 +63,8 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
         }
       }
       LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-          + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(
-          selectedInstanceList.toArray()));
+          + segmentMetadata.getTableName() + ", selected instances: "
+          + Arrays.toString(selectedInstanceList.toArray()));
       return selectedInstanceList;
     } else {
       throw new RuntimeException("Segment missing sharding key!");

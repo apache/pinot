@@ -20,14 +20,14 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.http.MultiGetRequest;
 import com.linkedin.pinot.common.restlet.resources.ServerPerfMetrics;
-import com.linkedin.pinot.common.restlet.resources.ServerSegmentsInfo;
+import com.linkedin.pinot.common.restlet.resources.ServerSegmentInfo;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -57,27 +57,27 @@ public class ServerPerfMetricsReader {
   }
 
   public @Nullable
-  ServerSegmentsInfo getServerPerfMetrics(@Nonnull String serverNameOrEndpoint, @Nonnull boolean isThisServerName,
+  ServerSegmentInfo getServerPerfMetrics(@Nonnull String serverNameOrEndpoint, boolean isThisServerName,
       @Nonnegative int timeoutMsec) {
-
     Preconditions.checkNotNull(serverNameOrEndpoint, "Server Name Or Endpoint name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
     if (isThisServerName) {
       Preconditions.checkNotNull(_helixResourceManager, "_helixResourceManager should not be null");
     }
-    ServerSegmentsInfo serverSegmentsInfo = new ServerSegmentsInfo(serverNameOrEndpoint);
-    Set<String> singleServerList = new HashSet<String>();
-    singleServerList.add(serverNameOrEndpoint);
+
+    ServerSegmentInfo serverSegmentInfo = new ServerSegmentInfo(serverNameOrEndpoint);
+
     String serverPerfUrl;
     if (isThisServerName) {
-      BiMap<String, String> endpoint = _helixResourceManager.getDataInstanceAdminEndpoints(singleServerList);
+      BiMap<String, String> endpoint = _helixResourceManager.getDataInstanceAdminEndpoints(
+          Collections.singleton(serverNameOrEndpoint));
       Preconditions.checkNotNull(endpoint, "Server endpoint should not be null");
-      BiMap<String, String> endpointInverse = endpoint.inverse();
-      Iterator<String> iterator = endpointInverse.keySet().iterator();
-      serverPerfUrl = "http://" + iterator.next() + "/ServerPerfMetrics/SegmentsInfo";
+      Iterator<String> iterator = endpoint.values().iterator();
+      serverPerfUrl = "http://" + iterator.next() + CommonConstants.Helix.ServerPerfMetricUris.SERVER_SEGMENT_INFO_URI;
     } else {
-      serverPerfUrl = "http://" + serverNameOrEndpoint + "/ServerPerfMetrics/SegmentsInfo";
+      serverPerfUrl = "http://" + serverNameOrEndpoint + CommonConstants.Helix.ServerPerfMetricUris.SERVER_SEGMENT_INFO_URI;
     }
+
     List<String> serverUrl = new ArrayList<>(1);
     serverUrl.add(serverPerfUrl);
     MultiGetRequest mget = new MultiGetRequest(_executor, _connectionManager);
@@ -88,12 +88,12 @@ public class ServerPerfMetricsReader {
       getMethod = completionService.take().get();
       if (getMethod.getStatusCode() >= timeoutMsec) {
         LOGGER.error("Server: {} returned error: {}", serverNameOrEndpoint, getMethod.getStatusCode());
-        return serverSegmentsInfo;
+        return serverSegmentInfo;
       }
       ServerPerfMetrics serverPerfMetrics =
           new ObjectMapper().readValue(getMethod.getResponseBodyAsString(), ServerPerfMetrics.class);
-      serverSegmentsInfo.setReportedNumOfSegments(serverPerfMetrics.numOfSegments);
-      serverSegmentsInfo.setReportedSegmentsSizeInBytes(serverPerfMetrics.segmentsDiskSizeInBytes);
+      serverSegmentInfo.setSegmentCount(serverPerfMetrics.segmentCount);
+      serverSegmentInfo.setSegmentSizeInBytes(serverPerfMetrics.segmentDiskSizeInBytes);
     } catch (InterruptedException e) {
       LOGGER.warn("Interrupted exception while reading segments size for server: {}", serverNameOrEndpoint, e);
     } catch (ExecutionException e) {
@@ -115,6 +115,6 @@ public class ServerPerfMetricsReader {
         getMethod.releaseConnection();
       }
     }
-    return serverSegmentsInfo;
+    return serverSegmentInfo;
   }
 }

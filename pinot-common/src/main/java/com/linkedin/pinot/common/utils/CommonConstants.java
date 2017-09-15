@@ -170,6 +170,10 @@ public class CommonConstants {
       public static final String ADMIN_PORT_KEY = "adminPort";
     }
 
+    public static class ServerPerfMetricUris {
+      public static final String SERVER_SEGMENT_INFO_URI = "/ServerPerfMetrics/SegmentInfo";
+    }
+
     public enum TableType {
       OFFLINE,
       REALTIME;

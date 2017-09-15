@@ -25,17 +25,17 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 /**
  * Assigns a segment to the instance that has least size of segments.
  */
-public class BalanceSegmentsSizeSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+public class BalancedSegmentSizeSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
 
   @Override
   public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
       ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
       int numReplicas, String tenantName) {
-    //We create a SegmentSizeMetric and pass it to BalanceLoadAssignmentStrategy
-    //This means BalanceSegmentsSizeSegmentAssignmentStrategy
+    //We create a SegmentSizeMetric and pass it to BalancedLoadAssignmentStrategy
+    //This means BalancedSegmentSizeSegmentAssignmentStrategy
     ServerLoadMetric serverLoadMetric = new SegmentSizeMetric();
-    BalanceLoadAssignmentStrategy balanceLoadAssignmentStrategy = new BalanceLoadAssignmentStrategy(serverLoadMetric);
-    return balanceLoadAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
+    BalancedLoadAssignmentStrategy balancedLoadAssignmentStrategy = new BalancedLoadAssignmentStrategy(serverLoadMetric);
+    return balancedLoadAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
         segmentMetadata, numReplicas, tenantName);
   }
 }

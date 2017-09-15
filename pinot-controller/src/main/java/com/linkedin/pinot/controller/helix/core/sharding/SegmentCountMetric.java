@@ -16,12 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.sharding;
 
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
 import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.model.IdealState;
 
 

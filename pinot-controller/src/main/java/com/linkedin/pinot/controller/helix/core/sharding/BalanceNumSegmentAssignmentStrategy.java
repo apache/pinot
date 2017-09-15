@@ -31,11 +31,11 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
   public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
       ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
       int numReplicas, String tenantName) {
-    //We create a SegmentCountMetric and pass it to BalanceLoadAssignmentStrategy
-    //This means BalanceNumSegmentAssignmentStrategy
+    // We create a SegmentCountMetric and pass it to BalancedLoadAssignmentStrategy
+    // This means BalanceNumSegmentAssignmentStrategy
     ServerLoadMetric serverLoadMetric = new SegmentCountMetric();
-    BalanceLoadAssignmentStrategy balanceLoadAssignmentStrategy = new BalanceLoadAssignmentStrategy(serverLoadMetric);
-    return balanceLoadAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
+    BalancedLoadAssignmentStrategy balancedLoadAssignmentStrategy = new BalancedLoadAssignmentStrategy(serverLoadMetric);
+    return balancedLoadAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
         segmentMetadata, numReplicas, tenantName);
   }
 }

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import com.linkedin.pinot.common.restlet.resources.ServerSegmentsInfo;
+import com.linkedin.pinot.common.restlet.resources.ServerSegmentInfo;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
@@ -38,10 +38,10 @@ import org.testng.annotations.Test;
 
 
 /*
-This class extends offline cluster integration test while it uses BalanceSegmentsSizeSegmentAssignmentStrategy
+This class extends offline cluster integration test while it uses BalancedSegmentSizeSegmentAssignmentStrategy
 for segment assignment strategy. It then verifies that the segments are distributed properly.
  */
-public class BalanceSegmentsSizeSegmentAssignmentStrategyIntegrationTest extends OfflineClusterIntegrationTest {
+public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends OfflineClusterIntegrationTest {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 6;
 
@@ -57,7 +57,7 @@ public class BalanceSegmentsSizeSegmentAssignmentStrategyIntegrationTest extends
 
   @Override
   protected String getSegmentAssignmentStrategy() {
-    return "BalanceSegmentsSizeSegmentAssignmentStrategy";
+    return "BalancedSegmentSizeSegmentAssignmentStrategy";
   }
 
   @Override
@@ -86,7 +86,7 @@ public class BalanceSegmentsSizeSegmentAssignmentStrategyIntegrationTest extends
 
   /*
   We override uploadSegments to make sure that a current segment upload is completed before starting a new segment upload.
-  This is a necessary to verify that BalanceSegmentsSizeSegmentAssignmentStrategy logic is correct.
+  This is a necessary to verify that BalancedSegmentSizeSegmentAssignmentStrategy logic is correct.
    */
   @Override
   protected void uploadSegments(@Nonnull File segmentDir) {
@@ -120,8 +120,8 @@ public class BalanceSegmentsSizeSegmentAssignmentStrategyIntegrationTest extends
     ServerPerfMetricsReader serverPerfMetricsReader = new ServerPerfMetricsReader(executor, connectionManager, null);
     for (int i = 0; i < NUM_SERVERS; i++) {
       String serverEndpoint = "localhost:" + (CommonConstants.Server.DEFAULT_ADMIN_API_PORT - i);
-      ServerSegmentsInfo serverSegmentsInfo = serverPerfMetricsReader.getServerPerfMetrics(serverEndpoint, false, 5000);
-      currentTotalSegmentAssigned = serverSegmentsInfo.getReportedNumOfSegments();
+      ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(serverEndpoint, false, 5000);
+      currentTotalSegmentAssigned = serverSegmentInfo.getSegmentCount();
     }
     return currentTotalSegmentAssigned;
   }
@@ -134,13 +134,13 @@ public class BalanceSegmentsSizeSegmentAssignmentStrategyIntegrationTest extends
     ServerPerfMetricsReader serverPerfMetricsReader = new ServerPerfMetricsReader(executor, connectionManager, null);
     for (int i = 0; i < NUM_SERVERS; i++) {
       String serverEndpoint = "localhost:" + (CommonConstants.Server.DEFAULT_ADMIN_API_PORT - i);
-      ServerSegmentsInfo serverSegmentsInfo = serverPerfMetricsReader.getServerPerfMetrics(serverEndpoint, false, 5000);
+      ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(serverEndpoint, false, 5000);
       //Check that every server gets 2 segments
-      Assert.assertEquals(serverSegmentsInfo.getReportedNumOfSegments(), 2);
+      Assert.assertEquals(serverSegmentInfo.getSegmentCount(), 2);
       /*Ideally the reportedSegmentsSize should be one of possible values, but it seems there is difference between
-      segment size before and after upload. TODO is to find a better approximation.
+      segment size before and after upload. TODO is to find a accurate estimation of segment size after upload.
       */
-      //Assert.assertEquals(possibleAssignmentSegmentsSize.containsValue(serverSegmentsInfo.getReportedSegmentsSizeInBytes()),true);
+      //Assert.assertEquals(possibleAssignmentSegmentsSize.containsValue(serverSegmentInfo.getSegmentSizeInBytes()),true);
     }
   }
 

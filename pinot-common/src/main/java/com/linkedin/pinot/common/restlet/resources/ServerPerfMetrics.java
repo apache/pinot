@@ -17,26 +17,26 @@ package com.linkedin.pinot.common.restlet.resources;
 
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
-/*
+/**
 Server measure defined performance metrics as of object of this class
 This class can be expanded to contain more load metrics
  */
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerPerfMetrics {
-  public long numOfSegments = 0;
-  public long segmentsDiskSizeInBytes = 0;
+  public long segmentCount = 0;
+  public long segmentDiskSizeInBytes = 0;
 
   public ServerPerfMetrics() {
-    numOfSegments = 0;
-    segmentsDiskSizeInBytes = 0;
+    segmentCount = 0;
+    segmentDiskSizeInBytes = 0;
   }
 
-  public long getNumOfSegments() {
-    return numOfSegments;
+  public long getSegmentCount() {
+    return segmentCount;
   }
 
-  public long getSegmentsDiskSizeInBytes() {
-    return segmentsDiskSizeInBytes;
+  public long getSegmentDiskSizeInBytes() {
+    return segmentDiskSizeInBytes;
   }
 }

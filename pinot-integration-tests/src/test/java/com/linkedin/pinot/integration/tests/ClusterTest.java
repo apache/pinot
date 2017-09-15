@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javafx.scene.control.Tab;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
@@ -238,10 +239,8 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
       TableTaskConfig taskConfig) throws Exception {
-    TableConfig tableConfig =
-        getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, taskConfig);
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+    addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
+        invertedIndexColumns, taskConfig, TableConfig.Builder.getDefaultSegmentAssignmentStrategy(), 3 );
   }
 
   protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
@@ -265,17 +264,8 @@ public abstract class ClusterTest extends ControllerTest {
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
       List<String> invertedIndexColumns, TableTaskConfig taskConfig) throws Exception {
-    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
-        .setTimeColumnName(timeColumnName)
-        .setTimeType(timeType)
-        .setNumReplicas(3)
-        .setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant)
-        .setLoadMode(loadMode)
-        .setSegmentVersion(segmentVersion.toString())
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setTaskConfig(taskConfig)
-        .build();
+      return getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode,
+          segmentVersion, invertedIndexColumns, taskConfig,  TableConfig.Builder.getDefaultSegmentAssignmentStrategy(), 3);
   }
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,

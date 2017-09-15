@@ -34,17 +34,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/*
+/**
 This class implements a load-based segment assignment strategy where it needs a ServerLoadMetric object as input.
 It then asks all tagged instances to return the load metric using the ServerLoadMetric object.
 Finally numReplicas of instances that have the least load are selected.
  */
-public class BalanceLoadAssignmentStrategy implements SegmentAssignmentStrategy {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BalanceLoadAssignmentStrategy.class);
+public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BalancedLoadAssignmentStrategy.class);
   private final double MAX_ACCEPTABLE_ERROR_RATE = 0.5;
   ServerLoadMetric _serverLoadMetric;
 
-  public BalanceLoadAssignmentStrategy(ServerLoadMetric serverLoadMetric) {
+  public BalancedLoadAssignmentStrategy(ServerLoadMetric serverLoadMetric) {
     this._serverLoadMetric = serverLoadMetric;
   }
 
@@ -54,6 +54,7 @@ public class BalanceLoadAssignmentStrategy implements SegmentAssignmentStrategy 
       int numReplicas, String tenantName) {
     String serverTenantName;
     String tableName;
+
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
       tableName = TableNameBuilder.REALTIME.tableNameWithType(segmentMetadata.getTableName());
       serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
@@ -61,11 +62,13 @@ public class BalanceLoadAssignmentStrategy implements SegmentAssignmentStrategy 
       tableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
       serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
     }
+
     List<String> selectedInstances = new ArrayList<>();
     Map<String, Long> reportedLoadMetricPerInstanceMap = new HashMap<>();
     List<String> allTaggedInstances =
         HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName,
             serverTenantName);
+
     // Calculate load metric for every eligible instance
     // We also log if more than a threshold percentage of servers return error for SegmentsInfo requests
     long numOfAllEligibleServers = allTaggedInstances.size();
@@ -92,7 +95,7 @@ public class BalanceLoadAssignmentStrategy implements SegmentAssignmentStrategy 
         if (numOfAllEligibleServers != 0) {
           float serverErrorRate = ((float) numOfServersReturnError) / numOfAllEligibleServers;
           if (serverErrorRate >= MAX_ACCEPTABLE_ERROR_RATE) {
-            LOGGER.error(
+            LOGGER.warn(
                 "More than " + MAX_ACCEPTABLE_ERROR_RATE + "% of servers return error for the segmentInfo requests");
           }
         } else {
@@ -100,6 +103,7 @@ public class BalanceLoadAssignmentStrategy implements SegmentAssignmentStrategy 
         }
       }
     }
+
     // Select up to numReplicas instances with the least load assigned
     PriorityQueue<Pairs.Number2ObjectPair<String>> priorityQueue =
         new PriorityQueue<Pairs.Number2ObjectPair<String>>(numReplicas,

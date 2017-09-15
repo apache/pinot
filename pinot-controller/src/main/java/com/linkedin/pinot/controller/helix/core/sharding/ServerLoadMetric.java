@@ -16,16 +16,14 @@
 package com.linkedin.pinot.controller.helix.core.sharding;
 
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import java.util.Map;
 import org.apache.helix.model.IdealState;
 
 
 /*
 This interface can be implemented by all approaches that assigns a numeric load metric to a server.
 Example load metrics are number of segments, storage size of segments, STeP paper cost model.
-STeP paper:
+STeP paper: http://people.csail.mit.edu/rytaft/step.pdf
 */
 public interface ServerLoadMetric {
-  public long computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState,
-      String instance);
+  long computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance);
 }

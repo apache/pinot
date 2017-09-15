@@ -19,35 +19,35 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ServerSegmentsInfo {
+public class ServerSegmentInfo {
   private String _serverName;
-  private long _reportedNumOfSegments;
-  private long _reportedSegmentsSizeInBytes;
+  private long _segmentCount;
+  private long _segmentSizeInBytes;
 
-  public ServerSegmentsInfo(String serverName) {
+  public ServerSegmentInfo(String serverName) {
     this._serverName = serverName;
-    //We set default value to -1 as indication of error in returning reported info from a Pinot server
-    _reportedNumOfSegments = -1;
-    _reportedSegmentsSizeInBytes = -1;
+    //We set default value to -1 as indication of error (e.g., timeout) in returning segment info from a Pinot server
+    _segmentCount = -1;
+    _segmentSizeInBytes = -1;
   }
 
   public String getServerName() {
     return _serverName;
   }
 
-  public long getReportedNumOfSegments() {
-    return _reportedNumOfSegments;
+  public long getSegmentCount() {
+    return _segmentCount;
   }
 
-  public void setReportedNumOfSegments(long reportedNumOfSegments) {
-    this._reportedNumOfSegments = reportedNumOfSegments;
+  public void setSegmentCount(long segmentCount) {
+    this._segmentCount = segmentCount;
   }
 
-  public long getReportedSegmentsSizeInBytes() {
-    return _reportedSegmentsSizeInBytes;
+  public long getSegmentSizeInBytes() {
+    return _segmentSizeInBytes;
   }
 
-  public void setReportedSegmentsSizeInBytes(long reportedSegmentsSizeInBytes) {
-    this._reportedSegmentsSizeInBytes = reportedSegmentsSizeInBytes;
+  public void setSegmentSizeInBytes(long segmentSizeInBytes) {
+    this._segmentSizeInBytes = segmentSizeInBytes;
   }
 }

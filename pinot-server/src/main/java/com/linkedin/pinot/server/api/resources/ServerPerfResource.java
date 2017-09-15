@@ -52,7 +52,7 @@ public class ServerPerfResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/ServerPerfMetrics/SegmentsInfo")
+  @Path("/ServerPerfMetrics/SegmentInfo")
   @ApiOperation(value = "Show all hosted segments count and storage size", notes = "Storage size and count of all segments hosted by a Pinot Server")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
   public ServerPerfMetrics getSegmentsSize() throws WebApplicationException {
@@ -65,10 +65,10 @@ public class ServerPerfResource {
     for (TableDataManager tableDataManager : tableDataManagers) {
       ImmutableList<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
       try {
-        serverPerfMetrics.numOfSegments += segmentDataManagers.size();
+        serverPerfMetrics.segmentCount += segmentDataManagers.size();
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
           IndexSegment segment = segmentDataManager.getSegment();
-          serverPerfMetrics.segmentsDiskSizeInBytes += segment.getDiskSizeBytes();
+          serverPerfMetrics.segmentDiskSizeInBytes += segment.getDiskSizeBytes();
         }
       } finally {
         // we could release segmentDataManagers as we iterate in the loop above

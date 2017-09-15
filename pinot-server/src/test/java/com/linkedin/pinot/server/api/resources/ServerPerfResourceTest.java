@@ -16,6 +16,7 @@
 package com.linkedin.pinot.server.api.resources;
 
 import com.linkedin.pinot.common.restlet.resources.ServerPerfMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Response;
@@ -29,8 +30,6 @@ import org.testng.annotations.Test;
 
 public class ServerPerfResourceTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(ServerPerfResourceTest.class);
-  private static final String Segments_SIZE_PATH = "/ServerPerfMetrics/SegmentsInfo";
-
   ResourceTestHelper testHelper = new ResourceTestHelper();
   WebTarget target;
 
@@ -47,15 +46,16 @@ public class ServerPerfResourceTest {
 
   @Test
   public void testServerPerfMetricNotFound() {
+    //We did mot implement QueryInfo yet, so it should return error
     Response response = target.path("/ServerPerfMetrics/QueryInfo").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
-  public void testTableSizeDetailed() {
-    ServerPerfMetrics serverPerfMetrics = target.path(Segments_SIZE_PATH).request().get(ServerPerfMetrics.class);
+  public void testServerPerfResource() {
+    ServerPerfMetrics serverPerfMetrics = target.path(CommonConstants.Helix.ServerPerfMetricUris.SERVER_SEGMENT_INFO_URI).request().get(ServerPerfMetrics.class);
     IndexSegment indexSegment = testHelper.indexSegment;
     long expectedSegmentSize = indexSegment.getDiskSizeBytes();
-    Assert.assertEquals(serverPerfMetrics.getSegmentsDiskSizeInBytes(), expectedSegmentSize);
+    Assert.assertEquals(serverPerfMetrics.getSegmentDiskSizeInBytes(), expectedSegmentSize);
   }
 }

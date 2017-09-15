@@ -17,7 +17,8 @@ package com.linkedin.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.restlet.resources.ServerPerfMetrics;
-import com.linkedin.pinot.common.restlet.resources.ServerSegmentsInfo;
+import com.linkedin.pinot.common.restlet.resources.ServerSegmentInfo;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -47,7 +48,6 @@ public class ServerPerfMetricsReaderTest {
   private final ExecutorService _executor = Executors.newFixedThreadPool(3);
   private final HttpConnectionManager _httpConnectionManager = new MultiThreadedHttpConnectionManager();
   private final int _serverPortStart = 10000;
-  private final String URI_PATH = "/ServerPerfMetrics/SegmentsInfo";
   private final List<HttpServer> _servers = new ArrayList<>();
   private final List<String> _serverList = new ArrayList<>();
   private final List<String> _endpointList = new ArrayList<>();
@@ -86,10 +86,10 @@ public class ServerPerfMetricsReaderTest {
 
   private ServerPerfMetrics createSegmentsInfo(String serverNameOrEndpoint, List<Integer> segmentIndexes) {
     ServerPerfMetrics serverSegmentsInfo = new ServerPerfMetrics();
-    serverSegmentsInfo.numOfSegments = segmentIndexes.size();
-    serverSegmentsInfo.segmentsDiskSizeInBytes = 0;
+    serverSegmentsInfo.segmentCount = segmentIndexes.size();
+    serverSegmentsInfo.segmentDiskSizeInBytes = 0;
     for (int segmentIndex : segmentIndexes) {
-      serverSegmentsInfo.segmentsDiskSizeInBytes += segmentIndexToSize(segmentIndex);
+      serverSegmentsInfo.segmentDiskSizeInBytes += segmentIndexToSize(segmentIndex);
     }
     return serverSegmentsInfo;
   }
@@ -121,7 +121,7 @@ public class ServerPerfMetricsReaderTest {
 
   private HttpServer startServer(int port, HttpHandler handler) throws IOException {
     final HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-    server.createContext(URI_PATH, handler);
+    server.createContext(CommonConstants.Helix.ServerPerfMetricUris.SERVER_SEGMENT_INFO_URI, handler);
     new Thread(new Runnable() {
       @Override
       public void run() {
@@ -135,31 +135,31 @@ public class ServerPerfMetricsReaderTest {
   public void testServerPerfMetricsReader() {
     ServerPerfMetricsReader serverPerfMetricsReader =
         new ServerPerfMetricsReader(_executor, _httpConnectionManager, null);
-    ServerSegmentsInfo serverSegmentsInfo;
+    ServerSegmentInfo serverSegmentInfo;
     //Check metric for server1
-    serverSegmentsInfo = serverPerfMetricsReader.getServerPerfMetrics(_endpointList.get(0), false, _timeoutMsec);
-    Assert.assertEquals(serverSegmentsInfo.getReportedNumOfSegments(), _server1SegmentsInfo.getNumOfSegments());
-    Assert.assertEquals(serverSegmentsInfo.getReportedSegmentsSizeInBytes(),
-        _server1SegmentsInfo.getSegmentsDiskSizeInBytes());
+    serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(_endpointList.get(0), false, _timeoutMsec);
+    Assert.assertEquals(serverSegmentInfo.getSegmentCount(), _server1SegmentsInfo.getSegmentCount());
+    Assert.assertEquals(serverSegmentInfo.getSegmentSizeInBytes(),
+        _server1SegmentsInfo.getSegmentDiskSizeInBytes());
     //Check metrics for server2
-    serverSegmentsInfo = serverPerfMetricsReader.getServerPerfMetrics(_endpointList.get(1), false, _timeoutMsec);
-    Assert.assertEquals(serverSegmentsInfo.getReportedNumOfSegments(), _server2SegmentsInfo.getNumOfSegments());
-    Assert.assertEquals(serverSegmentsInfo.getReportedSegmentsSizeInBytes(),
-        _server2SegmentsInfo.getSegmentsDiskSizeInBytes());
+    serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(_endpointList.get(1), false, _timeoutMsec);
+    Assert.assertEquals(serverSegmentInfo.getSegmentCount(), _server2SegmentsInfo.getSegmentCount());
+    Assert.assertEquals(serverSegmentInfo.getSegmentSizeInBytes(),
+        _server2SegmentsInfo.getSegmentDiskSizeInBytes());
     //Check metrics for server3
-    serverSegmentsInfo = serverPerfMetricsReader.getServerPerfMetrics(_endpointList.get(2), false, _timeoutMsec);
-    Assert.assertEquals(serverSegmentsInfo.getReportedNumOfSegments(), _server3SegmentsInfo.getNumOfSegments());
-    Assert.assertEquals(serverSegmentsInfo.getReportedSegmentsSizeInBytes(),
-        _server3SegmentsInfo.getSegmentsDiskSizeInBytes());
+    serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(_endpointList.get(2), false, _timeoutMsec);
+    Assert.assertEquals(serverSegmentInfo.getSegmentCount(), _server3SegmentsInfo.getSegmentCount());
+    Assert.assertEquals(serverSegmentInfo.getSegmentSizeInBytes(),
+        _server3SegmentsInfo.getSegmentDiskSizeInBytes());
   }
 
   @Test
   public void testServerSizesErrors() {
     ServerPerfMetricsReader serverPerfMetricsReader =
         new ServerPerfMetricsReader(_executor, _httpConnectionManager, null);
-    ServerSegmentsInfo serverSegmentsInfo;
-    serverSegmentsInfo = serverPerfMetricsReader.getServerPerfMetrics("FakeEndPoint", false, _timeoutMsec);
-    Assert.assertEquals(serverSegmentsInfo.getReportedNumOfSegments(), -1);
-    Assert.assertEquals(serverSegmentsInfo.getReportedSegmentsSizeInBytes(), -1);
+    ServerSegmentInfo serverSegmentInfo;
+    serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics("FakeEndPoint", false, _timeoutMsec);
+    Assert.assertEquals(serverSegmentInfo.getSegmentCount(), -1);
+    Assert.assertEquals(serverSegmentInfo.getSegmentSizeInBytes(), -1);
   }
 }
