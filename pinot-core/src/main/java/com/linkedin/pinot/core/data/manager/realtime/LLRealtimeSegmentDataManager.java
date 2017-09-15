@@ -44,7 +44,10 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.MessageBatch;
+import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
+import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -52,16 +55,13 @@ import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import kafka.message.MessageAndOffset;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -173,6 +173,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
   private SegmentFileAndOffset _segmentFileAndOffset;
+  private final PinotKafkaConsumerFactory _pinotKafkaConsumerFactory;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -189,7 +190,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   final String _clientId;
   private final LLCSegmentName _segmentName;
   private final PlainFieldExtractor _fieldExtractor;
-  private SimpleConsumerWrapper _consumerWrapper = null;
+  private PinotKafkaConsumer _consumerWrapper = null;
   private final File _resourceTmpDir;
   private final String _tableName;
   private final List<String> _invertedIndexColumns;
@@ -301,15 +302,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     while(!_shouldStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
-      Iterable<MessageAndOffset> messagesAndOffsets = null;
-      Long highWatermark = null;
+      MessageBatch messageBatch = null;
       try {
-        Pair<Iterable<MessageAndOffset>, Long> messagesAndWatermark =
-            _consumerWrapper.fetchMessagesAndHighWatermark(_currentOffset, _endOffset,
-                _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
+        messageBatch = _consumerWrapper.fetchMessages(_currentOffset, _endOffset,
+            _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
         consecutiveErrorCount = 0;
-        messagesAndOffsets = messagesAndWatermark.getLeft();
-        highWatermark = messagesAndWatermark.getRight();
       } catch (TimeoutException e) {
         handleTransientKafkaErrors(e);
         continue;
@@ -326,7 +323,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         continue;
       }
 
-      processKafkaEvents(messagesAndOffsets, highWatermark, idlePipeSleepTimeMillis);
+      processKafkaEvents(messageBatch, idlePipeSleepTimeMillis);
 
       if (_currentOffset != lastUpdatedOffset) {
         // We consumed something. Update the highest kafka offset as well as partition-consuming metric.
@@ -355,18 +352,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  private void processKafkaEvents(Iterable<MessageAndOffset> messagesAndOffsets, Long highWatermark, long idlePipeSleepTimeMillis) {
+  private void processKafkaEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
     Meter realtimeRowsConsumedMeter = null;
     Meter realtimeRowsDroppedMeter = null;
-
-    Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
 
     int indexedMessageCount = 0;
     int kafkaMessageCount = 0;
     boolean canTakeMore = true;
     GenericRow decodedRow = null;
     GenericRow transformedRow = null;
-    while (!_shouldStop && !endCriteriaReached() && msgIterator.hasNext()) {
+    for (int index = 0; index < messagesAndOffsets.getMessageCount(); index ++) {
+      if (_shouldStop || endCriteriaReached()) {
+        break;
+      }
       if (!canTakeMore) {
         // The RealtimeSegmentImpl that we are pushing rows into has indicated that it cannot accept any more
         // rows. This can happen in one of two conditions:
@@ -385,38 +383,36 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         segmentLogger.error("Buffer full with {} rows consumed (row limit {})", _numRowsConsumed, _segmentMaxRowCount);
         throw new RuntimeException("Realtime segment full");
       }
-      // Index each message
-      MessageAndOffset messageAndOffset = msgIterator.next();
-      byte[] array = messageAndOffset.message().payload().array();
-      int offset = messageAndOffset.message().payload().arrayOffset();
-      int length = messageAndOffset.message().payloadSize();
-      decodedRow = GenericRow.createOrReuseRow(decodedRow);
-      decodedRow = _messageDecoder.decode(array, offset, length, decodedRow);
 
-      // Update lag metric on the first message of each batch
-      if (kafkaMessageCount == 0) {
-        long messageOffset = messageAndOffset.offset();
-        long offsetDifference = highWatermark - messageOffset;
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.KAFKA_PARTITION_OFFSET_LAG, offsetDifference);
-      }
+      // Index each message
+      decodedRow = GenericRow.createOrReuseRow(decodedRow);
+
+      decodedRow = _messageDecoder
+          .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
+              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow);
 
       if (decodedRow != null) {
         transformedRow = GenericRow.createOrReuseRow(transformedRow);
         transformedRow = _fieldExtractor.transform(decodedRow, transformedRow);
 
         if (transformedRow != null) {
-          realtimeRowsConsumedMeter = _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
+          realtimeRowsConsumedMeter = _serverMetrics
+              .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
           indexedMessageCount++;
         } else {
-          realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1, realtimeRowsDroppedMeter);
+          realtimeRowsDroppedMeter = _serverMetrics
+              .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                  realtimeRowsDroppedMeter);
         }
 
         canTakeMore = _realtimeSegment.index(transformedRow);
       } else {
-        realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1, realtimeRowsDroppedMeter);
+        realtimeRowsDroppedMeter = _serverMetrics
+            .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                realtimeRowsDroppedMeter);
       }
 
-      _currentOffset = messageAndOffset.nextOffset();
+      _currentOffset = messagesAndOffsets.getNextKafkaMessageOffsetAtIndex(index);
       _numRowsConsumed++;
       kafkaMessageCount++;
     }
@@ -873,6 +869,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instanceId);
+    _pinotKafkaConsumerFactory = new SimpleConsumerFactory();
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
@@ -880,7 +877,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     _kafkaBootstrapNodes = indexingConfig.getStreamConfigs()
-        .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "." + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
+        .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "."
+            + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
     _kafkaTopic = kafkaStreamProviderConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
@@ -1015,9 +1013,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     segmentLogger.info("Creating new Kafka consumer wrapper, reason: {}", reason);
-    _consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
-        _kafkaBootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId,
-        _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
+    _consumerWrapper = _pinotKafkaConsumerFactory.buildConsumer(_kafkaBootstrapNodes, _clientId, _kafkaTopic,
+        _kafkaPartitionId, _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
