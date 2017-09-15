@@ -511,6 +511,16 @@ public class DataFrame {
    * @return sliced DataFrame copy
    */
   public DataFrame slice(String... seriesNames) {
+    return this.slice(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a copy of the DataFrame including only the series in {@code seriesNames}.
+   *
+   * @param seriesNames series names
+   * @return sliced DataFrame copy
+   */
+  public DataFrame slice(Iterable<String> seriesNames) {
     DataFrame df = new DataFrame();
     df.series.clear();
     for(String name : seriesNames) {
@@ -671,6 +681,23 @@ public class DataFrame {
    * destination indexes
    */
   public DataFrame addSeries(DataFrame source, String... seriesNames) {
+    return this.addSeries(source, Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Adds new series to the DataFrame in-place. The series are copied from a source DataFrame
+   * and aligned based on the indexes. If the indexes match, the series are copied directly.
+   * Otherwise, the method performs a left join to align series from the source with the
+   * destination's (this) index.
+   *
+   * @param source source DataFrame
+   * @param seriesNames series names
+   * @return reference to modified DataFrame (this)
+   * @throws IllegalArgumentException if one of the series names does not exist, any DataFrame's
+   * index is missing, or the left-join generates a non-unique mapping between source and
+   * destination indexes
+   */
+  public DataFrame addSeries(DataFrame source, Iterable<String> seriesNames) {
     for(String name : seriesNames)
       if(!source.contains(name))
         throw new IllegalArgumentException(String.format("Source does not contain series '%s'", name));
@@ -678,7 +705,7 @@ public class DataFrame {
       throw new IllegalArgumentException("Destination DataFrame does not have an index");
     if(!source.hasIndex())
       throw new IllegalArgumentException("Source DataFrame does not have an index");
-    if(seriesNames.length <= 0)
+    if(!seriesNames.iterator().hasNext())
       return this;
 
     // fast - if indexes match
@@ -796,22 +823,6 @@ public class DataFrame {
    */
   public Series get(String seriesName) {
     return assertSeriesExists(seriesName);
-  }
-
-  /**
-   * Returns the series referenced by {@code seriesNames}.
-   *
-   * @param seriesNames series names
-   * @throws IllegalArgumentException if any one series does not exist
-   * @return series array
-   */
-  public Series[] get(String... seriesNames) {
-    Series[] series = new Series[seriesNames.length];
-    int i = 0;
-    for(String name : seriesNames) {
-      series[i++] = assertSeriesExists(name);
-    }
-    return series;
   }
 
   /**
@@ -1212,10 +1223,23 @@ public class DataFrame {
    * @return sorted DataFrame copy
    */
   public DataFrame sortedBy(String... seriesNames) {
+    return this.sortedBy(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a copy of the DataFrame sorted by series values referenced by {@code seriesNames}.
+   * The resulting sorted order is the equivalent of applying a stable sort to the nth series
+   * first, and then sorting iteratively by series until the 1st series.
+   *
+   * @param seriesNames 1st series, 2nd series, ..., nth series
+   * @throws IllegalArgumentException if the series does not exist
+   * @return sorted DataFrame copy
+   */
+  public DataFrame sortedBy(List<String> seriesNames) {
     DataFrame df = this;
-    for(int i=seriesNames.length-1; i>=0; i--) {
+    for(int i=seriesNames.size()-1; i>=0; i--) {
       // TODO support "-series" order inversion
-      df = df.project(assertSeriesExists(seriesNames[i]).sortedIndex());
+      df = df.project(assertSeriesExists(seriesNames.get(i)).sortedIndex());
     }
     return df;
   }
@@ -1475,10 +1499,21 @@ public class DataFrame {
    * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
    * values with its native default value.
    *
-   * @param seriesNames series name
+   * @param seriesNames series names
    * @return DataFrame copy with filled nulls
    */
   public DataFrame fillNull(String... seriesNames) {
+    return this.fillNull(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
+   * values with its native default value.
+   *
+   * @param seriesNames series names
+   * @return DataFrame copy with filled nulls
+   */
+  public DataFrame fillNull(Iterable<String> seriesNames) {
     DataFrame df = new DataFrame(this);
     for(String name : seriesNames)
       df.addSeries(name, assertSeriesExists(name).fillNull());
@@ -1489,10 +1524,21 @@ public class DataFrame {
    * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
    * values via forward fill.
    *
-   * @param seriesNames series name
+   * @param seriesNames series names
    * @return DataFrame copy with filled nulls
    */
   public DataFrame fillNullForward(String... seriesNames) {
+    return this.fillNullForward(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
+   * values via forward fill.
+   *
+   * @param seriesNames series names
+   * @return DataFrame copy with filled nulls
+   */
+  public DataFrame fillNullForward(Iterable<String> seriesNames) {
     DataFrame df = new DataFrame(this);
     for(String name : seriesNames)
       df.addSeries(name, assertSeriesExists(name).fillNullForward());
@@ -1503,10 +1549,21 @@ public class DataFrame {
    * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
    * values via back fill.
    *
-   * @param seriesNames series name
+   * @param seriesNames series names
    * @return DataFrame copy with filled nulls
    */
   public DataFrame fillNullBackward(String... seriesNames) {
+    return this.fillNullBackward(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
+   * values via back fill.
+   *
+   * @param seriesNames series names
+   * @return DataFrame copy with filled nulls
+   */
+  public DataFrame fillNullBackward(Iterable<String> seriesNames) {
     DataFrame df = new DataFrame(this);
     for(String name : seriesNames)
       df.addSeries(name, assertSeriesExists(name).fillNullBackward());
@@ -1823,19 +1880,27 @@ public class DataFrame {
   }
 
   public String toString(String... seriesNames) {
+    return this.toString(Arrays.asList(seriesNames));
+  }
+
+  public String toString(List<String> seriesNames) {
     return this.toString(DEFAULT_MAX_COLUMN_WIDTH, seriesNames);
   }
 
   public String toString(int maxColumnWidth, String... seriesNames) {
-    if(seriesNames.length <= 0)
+    return this.toString(maxColumnWidth, Arrays.asList(seriesNames));
+  }
+
+  public String toString(int maxColumnWidth, List<String> seriesNames) {
+    if(seriesNames.isEmpty())
       return "";
 
-    String[][] values = new String[this.size()][seriesNames.length];
-    int[] width = new int[seriesNames.length];
-    for(int i=0; i<seriesNames.length; i++) {
-      Series s = assertSeriesExists(seriesNames[i]);
+    String[][] values = new String[this.size()][seriesNames.size()];
+    int[] width = new int[seriesNames.size()];
+    for(int i=0; i<seriesNames.size(); i++) {
+      Series s = assertSeriesExists(seriesNames.get(i));
 
-      width[i] = truncateToString(seriesNames[i], maxColumnWidth).length();
+      width[i] = truncateToString(seriesNames.get(i), maxColumnWidth).length();
       for(int j=0; j<this.size(); j++) {
         String itemValue = truncateToString(s.toString(j), maxColumnWidth);
         values[j][i] = itemValue;
@@ -1845,8 +1910,8 @@ public class DataFrame {
 
     StringBuilder sb = new StringBuilder();
     // header
-    for(int i=0; i<seriesNames.length; i++) {
-      sb.append(String.format("%" + width[i] + "s", truncateToString(seriesNames[i], maxColumnWidth)));
+    for(int i=0; i<seriesNames.size(); i++) {
+      sb.append(String.format("%" + width[i] + "s", truncateToString(seriesNames.get(i), maxColumnWidth)));
       sb.append("  ");
     }
     sb.delete(sb.length() - 2, sb.length());
@@ -1854,8 +1919,8 @@ public class DataFrame {
 
     // values
     for(int j=0; j<this.size(); j++) {
-      for(int i=0; i<seriesNames.length; i++) {
-        Series s = this.get(seriesNames[i]);
+      for(int i=0; i<seriesNames.size(); i++) {
+        Series s = this.get(seriesNames.get(i));
         String item;
         switch(s.type()) {
           case DOUBLE:
