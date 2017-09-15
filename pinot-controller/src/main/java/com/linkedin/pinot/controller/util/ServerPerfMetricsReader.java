@@ -51,9 +51,9 @@ public class ServerPerfMetricsReader {
 
   public ServerPerfMetricsReader(Executor executor, HttpConnectionManager connectionManager,
       PinotHelixResourceManager helixResourceManager) {
-    this._executor = executor;
-    this._connectionManager = connectionManager;
-    this._helixResourceManager = helixResourceManager;
+    _executor = executor;
+    _connectionManager = connectionManager;
+    _helixResourceManager = helixResourceManager;
   }
 
   public @Nullable

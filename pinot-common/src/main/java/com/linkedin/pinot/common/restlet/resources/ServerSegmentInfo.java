@@ -40,7 +40,7 @@ public class ServerSegmentInfo {
   }
 
   public void setSegmentCount(long segmentCount) {
-    this._segmentCount = segmentCount;
+    _segmentCount = segmentCount;
   }
 
   public long getSegmentSizeInBytes() {
@@ -48,6 +48,6 @@ public class ServerSegmentInfo {
   }
 
   public void setSegmentSizeInBytes(long segmentSizeInBytes) {
-    this._segmentSizeInBytes = segmentSizeInBytes;
+    _segmentSizeInBytes = segmentSizeInBytes;
   }
 }

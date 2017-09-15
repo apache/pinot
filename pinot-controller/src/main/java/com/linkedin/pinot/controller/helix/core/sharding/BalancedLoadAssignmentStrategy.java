@@ -45,7 +45,7 @@ public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy
   ServerLoadMetric _serverLoadMetric;
 
   public BalancedLoadAssignmentStrategy(ServerLoadMetric serverLoadMetric) {
-    this._serverLoadMetric = serverLoadMetric;
+    _serverLoadMetric = serverLoadMetric;
   }
 
   @Override
