@@ -23,11 +23,29 @@ import java.util.Set;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.HavingQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 
 public class RegexpLikePredicateAstNode extends PredicateAstNode {
   private static final String SEPERATOR = "\t\t";
   private String _identifier;
+
+  @Override
+  public void addChild(AstNode childNode) {
+    if (childNode instanceof IdentifierAstNode) {
+      if (_identifier == null) {
+        IdentifierAstNode node = (IdentifierAstNode) childNode;
+        _identifier = node.getName();
+      } else {
+        throw new Pql2CompilationException("REGEXP_LIKE predicate has more than one identifier.");
+      }
+    } else if (childNode instanceof FunctionCallAstNode) {
+      throw new Pql2CompilationException("REGEXP_LIKE operator can not be called for a function.");
+    }
+    else {
+      super.addChild(childNode);
+    }
+  }
 
   @Override
   public FilterQueryTree buildFilterQueryTree() {
@@ -55,16 +73,7 @@ public class RegexpLikePredicateAstNode extends PredicateAstNode {
   }
 
   @Override
-  public void addChild(AstNode childNode) {
-    if (childNode instanceof IdentifierAstNode) {
-      if (_identifier == null) {
-        IdentifierAstNode node = (IdentifierAstNode) childNode;
-        _identifier = node.getName();
-      } else {
-        throw new Pql2CompilationException("REGEXP_LIKE predicate has more than one identifier.");
-      }
-    } else {
-      super.addChild(childNode);
-    }
+  public HavingQueryTree buildHavingQueryTree() {
+    throw new Pql2CompilationException("REGEXP_LIKE predicate is not supported in HAVING clause.");
   }
 }

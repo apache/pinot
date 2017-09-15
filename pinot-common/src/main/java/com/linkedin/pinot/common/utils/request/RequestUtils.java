@@ -22,6 +22,8 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.HavingFilterQuery;
+import com.linkedin.pinot.common.request.HavingFilterQueryMap;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import java.util.ArrayList;
@@ -55,6 +57,17 @@ public class RequestUtils {
     request.setFilterSubQueryMap(mp);
   }
 
+  public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
+    Map<Integer, HavingFilterQuery> filterQueryMap = new HashMap<Integer, HavingFilterQuery>();
+    MutableInt currentId = new MutableInt(0);
+    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
+    filterQueryMap.put(root.getId(), root);
+    request.setHavingFilterQuery(root);
+    HavingFilterQueryMap mp = new HavingFilterQueryMap();
+    mp.setFilterQueryMap(filterQueryMap);
+    request.setHavingFilterSubQueryMap(mp);
+  }
+
   private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree,
       Map<Integer, FilterQuery> filterQueryMap, MutableInt currentId) {
     int currentNodeId = currentId.intValue();
@@ -79,6 +92,31 @@ public class RequestUtils {
     query.setOperator(tree.getOperator());
     query.setValue(tree.getValue());
     return query;
+  }
+
+  private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree tree,
+      Map<Integer, HavingFilterQuery> filterQueryMap, MutableInt currentId) {
+    int currentNodeId = currentId.intValue();
+    currentId.increment();
+
+    final List<Integer> filterIds = new ArrayList<Integer>();
+    if (null != tree.getChildren()) {
+      for (final HavingQueryTree child : tree.getChildren()) {
+        int childNodeId = currentId.intValue();
+        currentId.increment();
+        filterIds.add(childNodeId);
+        final HavingFilterQuery filterQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap, currentId);
+        filterQueryMap.put(childNodeId, filterQuery);
+      }
+    }
+
+    HavingFilterQuery havingFilterQuery = new HavingFilterQuery();
+    havingFilterQuery.setAggregationInfo(tree.getAggregationInfo());
+    havingFilterQuery.setId(currentNodeId);
+    havingFilterQuery.setNestedFilterQueryIds(filterIds);
+    havingFilterQuery.setOperator(tree.getOperator());
+    havingFilterQuery.setValue(tree.getValue());
+    return havingFilterQuery;
   }
 
   /**

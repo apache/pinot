@@ -68,7 +68,9 @@ public class QueryGenerator {
   private static final int MAX_NUM_PREDICATES = 3;
   private static final int MAX_NUM_IN_CLAUSE_VALUES = 5;
   private static final int MAX_RESULT_LIMIT = 30;
-
+  private static final int MAX_COUNT_FUNCTION_RESULT = 1000;
+  private static final float MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE = 10000;
+  private static final int MAX_INT_FOR_HAVING_CLAUSE_PREDICATE = 10000;
   private static final List<String> BOOLEAN_OPERATORS = Arrays.asList("OR", "AND");
   private static final List<String> COMPARISON_OPERATORS = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
 
@@ -171,6 +173,60 @@ public class QueryGenerator {
   }
 
   /**
+   * Helper method to store an Avro value into the valid SQL String value set.
+   *
+   * @param valueSet value set.
+   * @param avroValue Avro value.
+   */
+  private static void storeAvroValueIntoValueSet(Set<String> valueSet, Object avroValue) {
+    if (avroValue instanceof Number) {
+      // For Number object, store raw value.
+      valueSet.add(avroValue.toString());
+    } else {
+      // For non-Number object, escape single quote.
+      valueSet.add("'" + avroValue.toString().replace("'", "''") + "'");
+    }
+  }
+
+  /**
+   * Helper method to join several {@link String} elements with ' '.
+   *
+   * @param elements elements to be joined.
+   * @return joined result.
+   */
+  private static String joinWithSpaces(String... elements) {
+    StringBuilder stringBuilder = new StringBuilder();
+    for (String element : elements) {
+      if (!element.isEmpty()) {
+        stringBuilder.append(element).append(' ');
+      }
+    }
+    return stringBuilder.substring(0, stringBuilder.length() - 1);
+  }
+
+  /**
+   * Sample main class for the query generator.
+   *
+   * @param args arguments.
+   */
+  public static void main(String[] args) throws Exception {
+    File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
+    QueryGenerator queryGenerator = new QueryGenerator(Collections.singletonList(avroFile), "mytable", "mytable");
+    File outputFile = new File(
+        "pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K");
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
+      for (int i = 0; i < 10000; i++) {
+        Query query = queryGenerator.generateQuery();
+        JSONObject queryJson = new JSONObject();
+        queryJson.put("pql", query.generatePql());
+        queryJson.put("hsqls", new JSONArray(query.generateH2Sql()));
+        writer.write(queryJson.toString());
+        writer.newLine();
+      }
+    }
+  }
+
+  /**
    * Helper method to read in an Avro file and add data to the storage.
    *
    * @param avroFile Avro file.
@@ -206,22 +262,6 @@ public class QueryGenerator {
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
-    }
-  }
-
-  /**
-   * Helper method to store an Avro value into the valid SQL String value set.
-   *
-   * @param valueSet value set.
-   * @param avroValue Avro value.
-   */
-  private static void storeAvroValueIntoValueSet(Set<String> valueSet, Object avroValue) {
-    if (avroValue instanceof Number) {
-      // For Number object, store raw value.
-      valueSet.add(avroValue.toString());
-    } else {
-      // For non-Number object, escape single quote.
-      valueSet.add("'" + avroValue.toString().replace("'", "''") + "'");
     }
   }
 
@@ -271,20 +311,50 @@ public class QueryGenerator {
   }
 
   /**
-   * Helper method to join several {@link String} elements with ' '.
+   * Generate one selection or aggregation query.
    *
-   * @param elements elements to be joined.
-   * @return joined result.
+   * @return generated query.
    */
-  private static String joinWithSpaces(String... elements) {
-    StringBuilder stringBuilder = new StringBuilder();
-    for (String element : elements) {
-      if (!element.isEmpty()) {
-        stringBuilder.append(element).append(' ');
+  public Query generateQuery() {
+    return pickRandom(_queryGenerationStrategies).generateQuery();
+  }
+
+  /**
+   * Helper method to generate a predicate query fragment.
+   *
+   * @return generated predicate query fragment.
+   */
+  private PredicateQueryFragment generatePredicate() {
+    // Generate at most MAX_NUM_PREDICATES predicates.
+    int predicateCount = RANDOM.nextInt(MAX_NUM_PREDICATES + 1);
+
+    List<QueryFragment> predicates = new ArrayList<>(predicateCount);
+    while (predicates.size() < predicateCount) {
+      String columnName = pickRandom(_columnNames);
+      if (!_columnToValueList.get(columnName).isEmpty()) {
+        if (!_multiValueColumnMaxNumElements.containsKey(columnName)) {
+          // Single-value column.
+          predicates.add(pickRandom(_singleValuePredicateGenerators).generatePredicate(columnName));
+        } else if (!_skipMultiValuePredicates) {
+          // Multi-value column.
+          predicates.add(pickRandom(_multiValuePredicateGenerators).generatePredicate(columnName));
+        }
       }
     }
-    return stringBuilder.substring(0, stringBuilder.length() - 1);
+
+    if (predicateCount < 2) {
+      // No need to join.
+      return new PredicateQueryFragment(predicates, Collections.<QueryFragment>emptyList());
+    } else {
+      // Join predicates with ANDs and ORs.
+      List<QueryFragment> operators = new ArrayList<>(predicateCount - 1);
+      for (int i = 1; i < predicateCount; i++) {
+        operators.add(new StringQueryFragment(pickRandom(BOOLEAN_OPERATORS)));
+      }
+      return new PredicateQueryFragment(predicates, operators);
+    }
   }
+
 
   /**
    * Query interface with capability of generating PQL and H2 SQL query.
@@ -304,6 +374,53 @@ public class QueryGenerator {
      * @return generated H2 SQL queries.
      */
     List<String> generateH2Sql();
+  }
+
+  /**
+   * Query fragment interface with capability of generating PQL and H2 SQL query fragment.
+   */
+  private interface QueryFragment {
+
+    /**
+     * Generate PQL query fragment.
+     *
+     * @return generated PQL query fragment.
+     */
+    String generatePql();
+
+    /**
+     * Generate H2 SQL query fragment equivalent to the PQL query fragment.
+     *
+     * @return generated H2 SQL query fragment.
+     */
+    String generateH2Sql();
+  }
+
+  /**
+   * Query generation strategy interface with capability of generating query using specific strategy.
+   */
+  private interface QueryGenerationStrategy {
+
+    /**
+     * Generate a query using specific strategy.
+     *
+     * @return generated query.
+     */
+    Query generateQuery();
+  }
+
+  /**
+   * Predicate generator interface with capability of generating a predicate query fragment on a column.
+   */
+  private interface PredicateGenerator {
+
+    /**
+     * Generate a predicate query fragment on a column.
+     *
+     * @param columnName column name.
+     * @return generated predicate query fragment.
+     */
+    QueryFragment generatePredicate(String columnName);
   }
 
   /**
@@ -363,6 +480,7 @@ public class QueryGenerator {
   private class AggregationQuery implements Query {
     private List<String> _aggregateColumnsAndFunctions;
     private PredicateQueryFragment _predicate;
+    private HavingQueryFragment _havingPredicate;
     private Set<String> _groupColumns;
     private TopQueryFragment _top;
 
@@ -375,11 +493,12 @@ public class QueryGenerator {
      * @param top top fragment.
      */
     public AggregationQuery(List<String> aggregateColumnsAndFunctions, PredicateQueryFragment predicate,
-        Set<String> groupColumns, TopQueryFragment top) {
+        Set<String> groupColumns, TopQueryFragment top, HavingQueryFragment havingPredicate) {
       _aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
       _predicate = predicate;
       _groupColumns = groupColumns;
       _top = top;
+      _havingPredicate = havingPredicate;
     }
 
     @Override
@@ -388,8 +507,10 @@ public class QueryGenerator {
         return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
             _predicate.generatePql(), _top.generatePql());
       } else {
+        String groupByColumns = StringUtils.join(_groupColumns, ", ");
         return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
-            _predicate.generatePql(), "GROUP BY", StringUtils.join(_groupColumns, ", "), _top.generatePql());
+            _predicate.generatePql(), "GROUP BY", StringUtils.join(_groupColumns, ", "), _havingPredicate.generatePql(),
+            _top.generatePql());
       }
     }
 
@@ -418,41 +539,12 @@ public class QueryGenerator {
           // Unlike PQL, SQL expects the group columns in select statements.
           String groupByColumns = StringUtils.join(_groupColumns, ", ");
           queries.add(joinWithSpaces("SELECT", groupByColumns + ",", aggregateColumnAndFunction, "FROM", _h2TableName,
-              _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _top.generateH2Sql()));
+              _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _havingPredicate.generateH2Sql(), _top.generateH2Sql()));
         }
       }
 
       return queries;
     }
-  }
-
-  /**
-   * Generate one selection or aggregation query.
-   *
-   * @return generated query.
-   */
-  public Query generateQuery() {
-    return pickRandom(_queryGenerationStrategies).generateQuery();
-  }
-
-  /**
-   * Query fragment interface with capability of generating PQL and H2 SQL query fragment.
-   */
-  private interface QueryFragment {
-
-    /**
-     * Generate PQL query fragment.
-     *
-     * @return generated PQL query fragment.
-     */
-    String generatePql();
-
-    /**
-     * Generate H2 SQL query fragment equivalent to the PQL query fragment.
-     *
-     * @return generated H2 SQL query fragment.
-     */
-    String generateH2Sql();
   }
 
   /**
@@ -596,52 +688,74 @@ public class QueryGenerator {
   }
 
   /**
-   * Helper method to generate a predicate query fragment.
-   *
-   * @return generated predicate query fragment.
+   * Predicate query fragment.
+   * <ul>
+   *   <li>SELECT ... FROM ... 'WHERE ... GROUP BY ... HAVING ...'</li>
+   * </ul>
    */
-  private PredicateQueryFragment generatePredicate() {
-    // Generate at most MAX_NUM_PREDICATES predicates.
-    int predicateCount = RANDOM.nextInt(MAX_NUM_PREDICATES + 1);
-
-    List<QueryFragment> predicates = new ArrayList<>(predicateCount);
-    while (predicates.size() < predicateCount) {
-      String columnName = pickRandom(_columnNames);
-      if (!_columnToValueList.get(columnName).isEmpty()) {
-        if (!_multiValueColumnMaxNumElements.containsKey(columnName)) {
-          // Single-value column.
-          predicates.add(pickRandom(_singleValuePredicateGenerators).generatePredicate(columnName));
-        } else if (!_skipMultiValuePredicates) {
-          // Multi-value column.
-          predicates.add(pickRandom(_multiValuePredicateGenerators).generatePredicate(columnName));
-        }
-      }
-    }
-
-    if (predicateCount < 2) {
-      // No need to join.
-      return new PredicateQueryFragment(predicates, Collections.<QueryFragment>emptyList());
-    } else {
-      // Join predicates with ANDs and ORs.
-      List<QueryFragment> operators = new ArrayList<>(predicateCount - 1);
-      for (int i = 1; i < predicateCount; i++) {
-        operators.add(new StringQueryFragment(pickRandom(BOOLEAN_OPERATORS)));
-      }
-      return new PredicateQueryFragment(predicates, operators);
-    }
-  }
-
-  /**
-   * Query generation strategy interface with capability of generating query using specific strategy.
-   */
-  private interface QueryGenerationStrategy {
+  private class HavingQueryFragment implements QueryFragment {
+    private List<String> _havingClauseAggregationFunctions;
+    private List<String> _havingClauseOperatorsAndValues;
+    private List<String> _havingClauseBooleanOperators;
 
     /**
-     * Generate a query using specific strategy.
+     * Constructor for <code>PredicateQueryFragment</code>.
      *
-     * @return generated query.
+     * @param
+     * @param
      */
-    Query generateQuery();
+    HavingQueryFragment(List<String> havingClauseAggregationFunctions, List<String> havingClauseOperatorsAndValues,
+        List<String> havingClauseBooleanOperators) {
+      _havingClauseAggregationFunctions = havingClauseAggregationFunctions;
+      _havingClauseOperatorsAndValues = havingClauseOperatorsAndValues;
+      _havingClauseBooleanOperators = havingClauseBooleanOperators;
+    }
+
+    @Override
+    public String generatePql() {
+      String pqlHavingClause = "";
+      int aggregationFunctionCount = _havingClauseAggregationFunctions.size();
+      if (aggregationFunctionCount > 0) {
+        pqlHavingClause += "HAVING";
+        pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseAggregationFunctions.get(0));
+        pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseOperatorsAndValues.get(0));
+        for (int i = 1; i < aggregationFunctionCount; i++) {
+          pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseBooleanOperators.get(i - 1));
+          pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseAggregationFunctions.get(i));
+          pqlHavingClause = joinWithSpaces(pqlHavingClause, _havingClauseOperatorsAndValues.get(i));
+        }
+      }
+      return pqlHavingClause;
+    }
+
+    @Override
+    public String generateH2Sql() {
+      String sqlHavingClause = "";
+      int aggregationFunctionCount = _havingClauseAggregationFunctions.size();
+      if (aggregationFunctionCount > 0) {
+        sqlHavingClause += "HAVING";
+        String aggregationFunction = _havingClauseAggregationFunctions.get(0);
+        if (aggregationFunction.startsWith("AVG(")) {
+          aggregationFunction = aggregationFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
+        } else if (aggregationFunction.startsWith("DISTINCTCOUNT(")) {
+          aggregationFunction = aggregationFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+        }
+        sqlHavingClause = joinWithSpaces(sqlHavingClause, aggregationFunction);
+        sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseOperatorsAndValues.get(0));
+        for (int i = 1; i < aggregationFunctionCount; i++) {
+          aggregationFunction = _havingClauseAggregationFunctions.get(i);
+          if (aggregationFunction.startsWith("AVG(")) {
+            aggregationFunction = aggregationFunction.replace("AVG(", "AVG(CAST(").replace(")", " AS DOUBLE))");
+          } else if (aggregationFunction.startsWith("DISTINCTCOUNT(")) {
+            aggregationFunction = aggregationFunction.replace("DISTINCTCOUNT(", "COUNT(DISTINCT ");
+          }
+          sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseBooleanOperators.get(i - 1));
+          sqlHavingClause = joinWithSpaces(sqlHavingClause, aggregationFunction);
+          sqlHavingClause = joinWithSpaces(sqlHavingClause, _havingClauseOperatorsAndValues.get(i));
+        }
+      }
+      return sqlHavingClause;
+    }
   }
 
   /**
@@ -697,51 +811,123 @@ public class QueryGenerator {
         aggregationColumnsAndFunctions.add("COUNT(*)");
       } else {
         while (aggregationColumnsAndFunctions.size() < aggregationColumnCount) {
-          String aggregationFunction = pickRandom(AGGREGATION_FUNCTIONS);
-          String aggregationColumn;
-          switch (aggregationFunction) {
-            // "COUNT" and "DISTINCTCOUNT" support all single-value columns.
-            case "COUNT":
-            case "DISTINCTCOUNT":
-              aggregationColumn = pickRandom(_singleValueColumnNames);
-              break;
-            // Other functions only support single-value numeric columns.
-            default:
-              aggregationColumn = pickRandom(_singleValueNumericalColumnNames);
-          }
-          aggregationColumnsAndFunctions.add(aggregationFunction + "(" + aggregationColumn + ")");
+          aggregationColumnsAndFunctions.add(createRandomAggregationFunction());
         }
       }
-
       // Generate a predicate.
       PredicateQueryFragment predicate = generatePredicate();
-
       // Generate at most MAX_NUM_GROUP_BY_COLUMNS columns on which to group.
       int groupColumnCount = Math.min(RANDOM.nextInt(MAX_NUM_GROUP_BY_COLUMNS + 1), _singleValueColumnNames.size());
       Set<String> groupColumns = new HashSet<>();
       while (groupColumns.size() < groupColumnCount) {
         groupColumns.add(pickRandom(_singleValueColumnNames));
       }
-
+      //Generate a HAVING predicate
+      ArrayList<String> arrayOfAggregationColumnsAndFunctions = new ArrayList<>(aggregationColumnsAndFunctions);
+      HavingQueryFragment havingPredicate= generateHavingPredicate(arrayOfAggregationColumnsAndFunctions);
       // Generate a result limit of at most MAX_RESULT_LIMIT.
       TopQueryFragment top = new TopQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
-
-      return new AggregationQuery(new ArrayList<>(aggregationColumnsAndFunctions), predicate, groupColumns, top);
+      return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, top, havingPredicate);
     }
-  }
 
-  /**
-   * Predicate generator interface with capability of generating a predicate query fragment on a column.
-   */
-  private interface PredicateGenerator {
 
     /**
-     * Generate a predicate query fragment on a column.
+     * Helper method to generate a having predicate query fragment.
      *
-     * @param columnName column name.
      * @return generated predicate query fragment.
      */
-    QueryFragment generatePredicate(String columnName);
+    private HavingQueryFragment generateHavingPredicate(ArrayList<String> arrayOfAggregationColumnsAndFunctions) {
+      //Generate a HAVING clause for group by query
+      List<String> havingClauseAggregationFunctions = new ArrayList<String>();
+      List<String> havingClauseOperatorsAndValues = new ArrayList<String>();
+      List<String> havingClauseBooleanOperators = new ArrayList<String>();
+      createHavingClause(arrayOfAggregationColumnsAndFunctions, havingClauseAggregationFunctions,
+          havingClauseOperatorsAndValues, havingClauseBooleanOperators);
+      return new HavingQueryFragment(havingClauseAggregationFunctions,havingClauseOperatorsAndValues,havingClauseBooleanOperators);
+    }
+
+
+    private void createHavingClause(ArrayList<String> arrayOfAggregationColumnsAndFunctions,
+        List<String> havingClauseAggregationFunctions, List<String> havingClauseOperatorsAndValues,
+        List<String> havingClauseBooleanOperators) {
+      int numOfFunctionsInSelectList = arrayOfAggregationColumnsAndFunctions.size();
+      int aggregationFunctionCount = RANDOM.nextInt(numOfFunctionsInSelectList + 1);
+      ArrayList<String> aggregationPredicates = new ArrayList<>();
+      for (int i = 0; i < aggregationFunctionCount; i++) {
+        int aggregationFunctionIndex = RANDOM.nextInt(numOfFunctionsInSelectList);
+        String aggregationFunction = arrayOfAggregationColumnsAndFunctions.get(aggregationFunctionIndex);
+        havingClauseAggregationFunctions.add(aggregationFunction);
+        havingClauseOperatorsAndValues.add(createOperatorAndValueForAggregationFunction(aggregationFunction));
+      }
+      int aggregationFunctionNotInSelectListCount = RANDOM.nextInt(MAX_NUM_AGGREGATION_COLUMNS + 1);
+      for (int i = 0; i < aggregationFunctionNotInSelectListCount; i++) {
+        String aggregationFunction = createRandomAggregationFunction();
+        havingClauseAggregationFunctions.add(aggregationFunction);
+        havingClauseOperatorsAndValues.add(createOperatorAndValueForAggregationFunction(aggregationFunction));
+      }
+      aggregationFunctionCount += aggregationFunctionNotInSelectListCount;
+      for (int i = 1; i < aggregationFunctionCount; i++) {
+        havingClauseBooleanOperators.add(pickRandom(BOOLEAN_OPERATORS));
+      }
+    }
+
+    private String createRandomAggregationFunction() {
+      String aggregationFunction = pickRandom(AGGREGATION_FUNCTIONS);
+      String aggregationColumn;
+      switch (aggregationFunction) {
+        // "COUNT" and "DISTINCTCOUNT" support all single-value columns.
+        case "COUNT":
+        case "DISTINCTCOUNT":
+          aggregationColumn = pickRandom(_singleValueColumnNames);
+          break;
+        // Other functions only support single-value numeric columns.
+        default:
+          aggregationColumn = pickRandom(_singleValueNumericalColumnNames);
+      }
+      return aggregationFunction + "(" + aggregationColumn + ")";
+    }
+
+    private String createOperatorAndValueForAggregationFunction(String aggregationFunction) {
+      boolean comparisonOperatorNotBetweenOrIN = RANDOM.nextBoolean();
+      String valueOperator = new String();
+      String comparisonOperator = new String();
+      if (comparisonOperatorNotBetweenOrIN) {
+        String functionValue = new String();
+        comparisonOperator = pickRandom(COMPARISON_OPERATORS);
+        if (aggregationFunction.startsWith("COUNT") || aggregationFunction.startsWith("DISTINCTCOUNT")) {
+          functionValue = Integer.toString(RANDOM.nextInt(MAX_COUNT_FUNCTION_RESULT) + 1);
+        } else {
+          functionValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
+        }
+        valueOperator = joinWithSpaces(valueOperator, comparisonOperator);
+        valueOperator = joinWithSpaces(valueOperator, functionValue);
+      } else {
+        boolean isItBetween = RANDOM.nextBoolean();
+        if (isItBetween) {
+          String leftValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
+          String rightValue = Float.toString(RANDOM.nextFloat() * MAX_FLOAT_FOR_HAVING_CLAUSE_PREDICATE);
+          comparisonOperator = "BETWEEN " + leftValue + " AND " + rightValue;
+          valueOperator = comparisonOperator;
+        } else {
+          int numValues = RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1;
+          Set<String> values = new HashSet<>();
+          while (values.size() < numValues) {
+            values.add(Integer.toString(RANDOM.nextInt(MAX_INT_FOR_HAVING_CLAUSE_PREDICATE)));
+          }
+          comparisonOperator = StringUtils.join(values, ", ");
+          boolean isItIn = RANDOM.nextBoolean();
+          if (isItIn) {
+            comparisonOperator = "IN (" + comparisonOperator;
+            comparisonOperator += ")";
+          } else {
+            comparisonOperator = "NOT IN (" + comparisonOperator;
+            comparisonOperator += ")";
+          }
+          valueOperator = comparisonOperator;
+        }
+      }
+      return valueOperator;
+    }
   }
 
   /**
@@ -907,29 +1093,6 @@ public class QueryGenerator {
 
       return new StringQueryFragment(columnName + " BETWEEN " + leftValue + " AND " + rightValue,
           "(" + StringUtils.join(h2ComparisonClauses, " OR ") + ")");
-    }
-  }
-
-  /**
-   * Sample main class for the query generator.
-   *
-   * @param args arguments.
-   */
-  public static void main(String[] args)
-      throws Exception {
-    File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
-    QueryGenerator queryGenerator = new QueryGenerator(Collections.singletonList(avroFile), "mytable", "mytable");
-    File outputFile = new File(
-        "pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K");
-    try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
-      for (int i = 0; i < 10000; i++) {
-        Query query = queryGenerator.generateQuery();
-        JSONObject queryJson = new JSONObject();
-        queryJson.put("pql", query.generatePql());
-        queryJson.put("hsqls", new JSONArray(query.generateH2Sql()));
-        writer.write(queryJson.toString());
-        writer.newLine();
-      }
     }
   }
 }

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 
 
@@ -25,10 +26,40 @@ import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 public class FunctionCallAstNode extends BaseAstNode {
   private final String _name;
   private String _expression;
+  private boolean _isInSelectList;
 
   public FunctionCallAstNode(String name, String expression) {
     _name = name;
     _expression = expression;
+    _isInSelectList = true;
+  }
+
+  public boolean equals(Object obj) {
+    if (EqualityUtils.isNullOrNotSameClass(this, obj)) {
+      return false;
+    }
+
+    if (EqualityUtils.isSameReference(this, obj)) {
+      return true;
+    }
+
+    FunctionCallAstNode functionCallAstNode = (FunctionCallAstNode) obj;
+    if (_name.equals(functionCallAstNode.getName()) && _expression.equals(functionCallAstNode.getExpression())) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  public int hashCode() {
+    int hashCode = EqualityUtils.hashCodeOf(_name);
+    hashCode = EqualityUtils.hashCodeOf(hashCode, _expression);
+    hashCode = EqualityUtils.hashCodeOf(hashCode, _isInSelectList);
+    return hashCode;
+  }
+
+  public void setIsInSelectList(boolean value) {
+    _isInSelectList = value;
   }
 
   public String getName() {
@@ -71,6 +102,7 @@ public class FunctionCallAstNode extends BaseAstNode {
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(function);
     aggregationInfo.putToAggregationParams("column", identifier);
+    aggregationInfo.setIsInSelectList(_isInSelectList);
 
     return aggregationInfo;
   }

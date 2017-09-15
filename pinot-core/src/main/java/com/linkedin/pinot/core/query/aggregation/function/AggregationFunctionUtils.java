@@ -64,6 +64,16 @@ public class AggregationFunctionUtils {
   }
 
   @Nonnull
+  public static boolean[] getAggregationFunctionsSelectStatus(@Nonnull List<AggregationInfo> aggregationInfos) {
+    int numAggregationFunctions = aggregationInfos.size();
+    boolean[] aggregationFunctionsStatus = new boolean[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      aggregationFunctionsStatus[i] = aggregationInfos.get(i).isIsInSelectList();
+    }
+    return aggregationFunctionsStatus;
+  }
+
+  @Nonnull
   public static String formatValue(@Nonnull Object value) {
     if (value instanceof Double) {
       Double doubleValue = (Double) value;

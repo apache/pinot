@@ -109,7 +109,7 @@ public class Pql2CompilerTest {
 
   @Test
   public void testParseExceptionHasCharacterPosition() {
-    Pql2Compiler compiler  = new Pql2Compiler();
+    Pql2Compiler compiler = new Pql2Compiler();
     final String query = "select foo from bar where baz ? 2";
 
     try {
@@ -130,6 +130,38 @@ public class Pql2CompilerTest {
     BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
         "select * from vegetables where name != 'Brussels sprouts'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.NOT);
+  }
+
+  @Test
+  public void testCompilationWithHaving() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+        "select avg(age) as avg_age from person group by address_city having avg(age)=20");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.EQUALITY);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationType(), "avg");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"),
+        "age");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0), "20");
+    brokerRequest = compiler.compileToBrokerRequest(
+        "select count(*) as count from sell group by price having count(*) > 100 AND count(*)<200");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 3);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.AND);
+    brokerRequest = compiler.compileToBrokerRequest(
+        "select count(*) as count, avg(price) as avgprice from sell having count(*) > 0 OR (avg(price) < 45 AND count(*) > 22)");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 5);
+
+    brokerRequest = compiler.compileToBrokerRequest(
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch >= 16312 group by Carrier having count(*) in (375,5005,1099)");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 1);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.IN);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().size(), 1);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("375"), true);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("5005"), true);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("1099"), true);
+    brokerRequest = compiler.compileToBrokerRequest(
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch >= 16312 group by Carrier having count(*) not in (375,5005,1099)");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 1);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.NOT_IN);
   }
 
   @Test

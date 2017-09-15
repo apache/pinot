@@ -13,20 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.pql.parsers.pql2.ast;
+package com.linkedin.pinot.common.utils.request;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.common.request.FilterOperator;
+import java.util.List;
 
 
-/**
- * AST node for HAVING clauses.
- */
-public class HavingAstNode extends BaseAstNode {
-  @Override
-  public void updateBrokerRequest(BrokerRequest brokerRequest) {
-    PredicateAstNode predicateAstNode = (PredicateAstNode) getChildren().get(0);
-    RequestUtils.generateFilterFromTree(predicateAstNode.buildHavingQueryTree(), brokerRequest);
+public abstract class QueryTree {
+  protected List<String> _value;
+  protected FilterOperator _operator;
+
+  public List<String> getValue() {
+    return _value;
   }
 
+  public FilterOperator getOperator() {
+    return _operator;
+  }
+
+  public abstract String toString();
+
+  protected abstract void recursiveToStringIntoBuffer(int indent, StringBuffer stringBuffer);
 }
