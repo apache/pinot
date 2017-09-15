@@ -69,9 +69,9 @@ public class TimeSeriesResourceTest {
   }
 
   @Test
-  public void testTranformationForwardFill() throws Exception {
+  public void testTranformationFillForward() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0", RANGE, null, null, "forwardfill", null);
+        "0", RANGE, null, null, "fillforward", null);
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -128,7 +128,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testMultiTranformation() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "2", RANGE, null, null, "change,forwardfill,cumulative", null);
+        "2", RANGE, null, null, "change,fillforward,cumulative", null);
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -189,7 +189,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testMultiTransformationMultiAggregationMultiRange() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0,1", RANGE + ",20:80", null, null, "forwardfill,cumulative", "sum,product");
+        "0,1", RANGE + ",20:80", null, null, "fillforward,cumulative", "sum,product");
 
     // 0: 1d, 0d, -1d, 0d, 1d, null
     // 1: 2d, 1d,  0d, 1d, 2d, null
