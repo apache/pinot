@@ -102,29 +102,13 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
       }
     }
 
-    // Should generate 5 ConvertToRawIndexTask tasks
-    _taskManager.scheduleTasks();
-    // Wait at most 60 seconds for all 5 tasks showing up in the cluster
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        return _helixTaskResourceManager.getTasks(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size() == 5;
-      }
-    }, 60_000L, "Failed to get all tasks showing up in the cluster");
-
+    // Should create the task queues and generate 5 ConvertToRawIndexTask tasks
+    Assert.assertEquals(_taskManager.scheduleTasks().get(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 5);
+    Assert.assertEquals(_helixTaskResourceManager.getTaskQueues().size(), 1);
     // Should generate 3 more ConvertToRawIndexTask tasks
-    _taskManager.scheduleTasks();
-    // Wait at most 60 seconds for all 8 tasks showing up in the cluster
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        return _helixTaskResourceManager.getTasks(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size() == 8;
-      }
-    }, 60_000L, "Failed to get all tasks showing up in the cluster");
-
+    Assert.assertEquals(_taskManager.scheduleTasks().get(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 3);
     // Should not generate more tasks
-    _taskManager.scheduleTasks();
-    Assert.assertEquals(_helixTaskResourceManager.getTasks(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 8);
+    Assert.assertEquals(_taskManager.scheduleTasks().get(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 0);
 
     // Wait at most 600 seconds for all tasks COMPLETED and new segments refreshed
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
@@ -181,10 +165,6 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
         }
       }
     }, 600_000L, "Failed to get all tasks COMPLETED and new segments refreshed");
-
-    // Clean up the COMPLETED tasks
-    _helixTaskResourceManager.cleanUpTaskQueue(MinionConstants.ConvertToRawIndexTask.TASK_TYPE);
-    Assert.assertEquals(_helixTaskResourceManager.getTasks(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 0);
   }
 
   @Test

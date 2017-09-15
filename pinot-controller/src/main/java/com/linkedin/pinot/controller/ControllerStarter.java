@@ -44,7 +44,6 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.PreConnectCallback;
-import org.apache.helix.task.TaskDriver;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,13 +114,10 @@ public class ControllerStarter {
       helixResourceManager.start();
 
       LOGGER.info("Starting task resource manager");
-      // Helix resource manager must be started in order to get TaskDriver
-      TaskDriver taskDriver = new TaskDriver(helixResourceManager.getHelixZkManager());
-      _helixTaskResourceManager = new PinotHelixTaskResourceManager(taskDriver);
+      _helixTaskResourceManager = new PinotHelixTaskResourceManager(helixResourceManager.getHelixZkManager());
 
       LOGGER.info("Starting task manager");
-      _taskManager =
-          new PinotTaskManager(taskDriver, helixResourceManager, _helixTaskResourceManager, config, controllerMetrics);
+      _taskManager = new PinotTaskManager(_helixTaskResourceManager, helixResourceManager, config, controllerMetrics);
       int taskManagerFrequencyInSeconds = config.getTaskManagerFrequencyInSeconds();
       if (taskManagerFrequencyInSeconds > 0) {
         LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);
