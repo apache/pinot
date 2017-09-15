@@ -17,14 +17,12 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.HavingQueryTree;
-import com.linkedin.pinot.common.utils.request.QueryTree;
 
 
 /**
  * AST node for a predicate surrounded by parentheses.
  */
 public class PredicateParenthesisGroupAstNode extends PredicateAstNode {
-
   @Override
   public FilterQueryTree buildFilterQueryTree() {
     return ((PredicateAstNode) getChildren().get(0)).buildFilterQueryTree();

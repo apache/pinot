@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.HavingFilterQuery;
 import com.linkedin.pinot.common.request.HavingFilterQueryMap;
@@ -35,13 +34,11 @@ import com.linkedin.pinot.common.response.broker.QueryProcessingException;
 import com.linkedin.pinot.common.response.broker.SelectionResults;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,7 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.Vector;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -343,8 +339,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       @Nonnull AggregationFunction[] aggregationFunctions, boolean[] aggregationFunctionsSelectStatus,
       @Nonnull GroupBy groupBy, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
       HavingFilterQuery havingFilterQuery, HavingFilterQueryMap havingFilterQueryMap) {
-
     int numAggregationFunctions = aggregationFunctions.length;
+
     // Merge results from all data tables.
     String[] columnNames = new String[numAggregationFunctions];
     Map<String, Object>[] intermediateResultMaps = new Map[numAggregationFunctions];
@@ -370,6 +366,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         }
       }
     }
+
     // Extract final result maps from the merged intermediate result maps.
     Map<String, Comparable>[] finalResultMaps = new Map[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
@@ -393,6 +390,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       for (int i = 1; i < numAggregationFunctions; i++) {
         intersectionOfKeySets.retainAll(finalResultMaps[i].keySet());
       }
+
       //Now it is time to remove those groups that do not validate HAVING clause predicate
       //We use TreeMap which supports CASE_INSENSITIVE_ORDER
       Map<String, Comparable> singleGroupAggResults = new TreeMap<String, Comparable>(String.CASE_INSENSITIVE_ORDER);
@@ -400,6 +398,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       for (int i = 0; i < numAggregationFunctions; i++) {
         finalFilteredResultMaps[i] = new HashMap<>();
       }
+
       for (String groupKey : intersectionOfKeySets) {
         for (int i = 0; i < numAggregationFunctions; i++) {
           singleGroupAggResults.put(columnNames[i], finalResultMaps[i].get(groupKey));
@@ -414,12 +413,14 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       //update the final results
       finalResultMaps = finalFilteredResultMaps;
     }
+
     int aggregationNumsInFinalResult = 0;
     for (int i = 0; i < numAggregationFunctions; i++) {
       if (aggregationFunctionsSelectStatus[i]) {
         aggregationNumsInFinalResult++;
       }
     }
+
     if (aggregationNumsInFinalResult > 0) {
       String[] finalColumnNames = new String[aggregationNumsInFinalResult];
       Map<String, Comparable>[] finalOutResultMaps = new Map[aggregationNumsInFinalResult];

@@ -34,20 +34,10 @@ public class InPredicateAstNode extends PredicateAstNode {
   private static final String DELIMITER = "\t\t";
   private final boolean _isNotInClause;
   private final boolean _splitInClause;
-  private String _identifier;
-  private FunctionCallAstNode _function;
 
   public InPredicateAstNode(boolean isNotInClause, boolean splitInClause) {
     _isNotInClause = isNotInClause;
     _splitInClause = splitInClause;
-  }
-
-  public boolean isItFunctionCallComparison() {
-    if (_function == null) {
-      return false;
-    } else {
-      return true;
-    }
   }
 
   public ArrayList<String> getValues() {
@@ -85,10 +75,6 @@ public class InPredicateAstNode extends PredicateAstNode {
     }
   }
 
-  public String getIdentifier() {
-    return _identifier;
-  }
-
   @Override
   public String toString() {
     if (_identifier != null) {
@@ -105,19 +91,23 @@ public class InPredicateAstNode extends PredicateAstNode {
     if (_identifier == null) {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
+
     Set<String> values = new HashSet<>();
+
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
         values.add(node.getValueAsString());
       }
     }
+
     FilterOperator filterOperator;
     if (_isNotInClause) {
       filterOperator = FilterOperator.NOT_IN;
     } else {
       filterOperator = FilterOperator.IN;
     }
+
     if (_splitInClause) {
       return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
     } else {
@@ -132,13 +122,16 @@ public class InPredicateAstNode extends PredicateAstNode {
     if (_function == null) {
       throw new Pql2CompilationException("IN predicate has no function");
     }
+
     TreeSet<String> values = new TreeSet<>();
+
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
         values.add(node.getValueAsString());
       }
     }
+
     String[] valueArray = values.toArray(new String[values.size()]);
     FilterOperator filterOperator;
     if (_isNotInClause) {
@@ -146,11 +139,8 @@ public class InPredicateAstNode extends PredicateAstNode {
     } else {
       filterOperator = FilterOperator.IN;
     }
+
     return new HavingQueryTree(_function.buildAggregationInfo(),
         Collections.singletonList(StringUtil.join("\t\t", valueArray)), filterOperator, null);
-  }
-
-  public FunctionCallAstNode getFunction() {
-    return _function;
   }
 }

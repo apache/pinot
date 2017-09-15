@@ -31,12 +31,6 @@ public class HavingClauseComparisonTree {
   private ComparisonFunction _comparisonFunction;
   private List<HavingClauseComparisonTree> _subComparisonTree;
 
-  public HavingClauseComparisonTree() {
-    _filterOperator = null;
-    _comparisonFunction = null;
-    _subComparisonTree = null;
-  }
-
   public HavingClauseComparisonTree(FilterOperator filterOperator, ComparisonFunction comparisonFunction,
       List<HavingClauseComparisonTree> subComparisonTree) {
     _filterOperator = filterOperator;

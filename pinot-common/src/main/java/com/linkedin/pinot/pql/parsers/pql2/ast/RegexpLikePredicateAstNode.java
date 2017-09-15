@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
-import com.linkedin.pinot.common.utils.request.HavingQueryTree;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -24,6 +23,7 @@ import java.util.Set;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.HavingQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 
 public class RegexpLikePredicateAstNode extends PredicateAstNode {

@@ -26,7 +26,6 @@ import com.linkedin.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.HavingAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.InPredicateAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.OutputColumnAstNode;
-import com.linkedin.pinot.pql.parsers.pql2.ast.OutputColumnListAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.RegexpLikePredicateAstNode;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,8 +52,17 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
  * PQL 2 compiler.
  */
 public class Pql2Compiler implements AbstractCompiler {
-  private static final ErrorListener ERROR_LISTENER = new ErrorListener();
   private boolean _splitInClause = false;
+
+  private static class ErrorListener extends BaseErrorListener {
+    @Override
+    public void syntaxError(@NotNull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,
+        int charPositionInLine, @NotNull String msg, @Nullable RecognitionException e) {
+      throw new Pql2CompilationException(msg, offendingSymbol, line, charPositionInLine, e);
+    }
+  }
+
+  private static final ErrorListener ERROR_LISTENER = new ErrorListener();
 
   @Override
   public BrokerRequest compileToBrokerRequest(String expression) throws Pql2CompilationException {
@@ -70,8 +78,7 @@ public class Pql2Compiler implements AbstractCompiler {
    * @return BrokerRequest
    * @throws Pql2CompilationException
    */
-  public BrokerRequest compileToBrokerRequest(String expression, boolean splitInClause)
-      throws Pql2CompilationException {
+  public BrokerRequest compileToBrokerRequest(String expression, boolean splitInClause) throws Pql2CompilationException {
     _splitInClause = splitInClause;
     try {
       //
@@ -85,14 +92,18 @@ public class Pql2Compiler implements AbstractCompiler {
       parser.setErrorHandler(new BailErrorStrategy());
       parser.removeErrorListeners();
       parser.addErrorListener(ERROR_LISTENER);
+
       // Parse
       ParseTree parseTree = parser.root();
+
       ParseTreeWalker walker = new ParseTreeWalker();
       Pql2AstListener listener = new Pql2AstListener(expression, _splitInClause);
       walker.walk(listener, parseTree);
+
       AstNode rootNode = listener.getRootNode();
       //Validate the HAVING clause if any
       validateHavingClause(rootNode);
+
       BrokerRequest brokerRequest = new BrokerRequest();
       rootNode.updateBrokerRequest(brokerRequest);
       return brokerRequest;
@@ -111,11 +122,14 @@ public class Pql2Compiler implements AbstractCompiler {
     TokenStream tokenStream = new UnbufferedTokenStream<CommonToken>(lexer);
     PQL2Parser parser = new PQL2Parser(tokenStream);
     parser.setErrorHandler(new BailErrorStrategy());
+
     // Parse
     ParseTree parseTree = parser.expression();
+
     ParseTreeWalker walker = new ParseTreeWalker();
     Pql2AstListener listener = new Pql2AstListener(expression, _splitInClause);
     walker.walk(listener, parseTree);
+
     final AstNode rootNode = listener.getRootNode();
     return TransformExpressionTree.buildTree(rootNode);
   }
@@ -125,6 +139,7 @@ public class Pql2Compiler implements AbstractCompiler {
     BaseAstNode outList = (BaseAstNode) children.get(0);
     HavingAstNode havingList = null;
     boolean isThereHaving = false;
+
     for (int i = 1; i < children.size(); i++) {
       if (children.get(i) instanceof HavingAstNode) {
         havingList = (HavingAstNode) children.get(i);
@@ -132,17 +147,17 @@ public class Pql2Compiler implements AbstractCompiler {
         break;
       }
     }
+
     if (isThereHaving) {
-         /*
-          Check if the HAVING predicate function call is in the select list;
-          if not: add the missing function call to select list and set isInSelectList to false
-          */
+      // Check if the HAVING predicate function call is in the select list;
+      // if not: add the missing function call to select list and set isInSelectList to false
       List<FunctionCallAstNode> functionCalls = havingTreeDFSTraversalToFindFunctionCalls(havingList);
+
       if (functionCalls.isEmpty()) {
         throw new Pql2CompilationException("HAVING clause needs to have minimum one function call comparison");
       }
+
       List<? extends AstNode> outListChildren = outList.getChildren();
-      boolean havingPredicateIsNotInSelectList = true;
       for (FunctionCallAstNode havingFunction : functionCalls) {
         boolean functionCallIsInSelectList = false;
         for (AstNode anOutListChildren : outListChildren) {
@@ -156,6 +171,7 @@ public class Pql2Compiler implements AbstractCompiler {
             }
           }
         }
+
         if (functionCallIsInSelectList == false) {
           OutputColumnAstNode havingFunctionAstNode = new OutputColumnAstNode();
           havingFunction.setIsInSelectList(false);
@@ -214,13 +230,5 @@ public class Pql2Compiler implements AbstractCompiler {
       }
     }
     return functionCalls;
-  }
-
-  private static class ErrorListener extends BaseErrorListener {
-    @Override
-    public void syntaxError(@NotNull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,
-        int charPositionInLine, @NotNull String msg, @Nullable RecognitionException e) {
-      throw new Pql2CompilationException(msg, offendingSymbol, line, charPositionInLine, e);
-    }
   }
 }

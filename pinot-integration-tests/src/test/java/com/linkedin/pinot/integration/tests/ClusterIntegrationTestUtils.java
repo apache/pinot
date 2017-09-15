@@ -583,7 +583,13 @@ public class ClusterIntegrationTestUtils {
               failure(pqlQuery, sqlQueries, failureMessage);
             }
 
-            if (!pqlQuery.contains("HAVING") && pinotNumRecordsSelected != 0) {
+            // If the query has a HAVING clause and both H2 and Pinot have no groups, that is expected, so we don't need
+            // to compare the number of docs scanned
+            if (pqlQuery.contains("HAVING")) {
+              return;
+            }
+
+            if (pinotNumRecordsSelected != 0) {
               String failureMessage = "No group returned in Pinot but " + pinotNumRecordsSelected + " records selected";
               failure(pqlQuery, sqlQueries, failureMessage);
             }

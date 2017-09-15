@@ -18,7 +18,6 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.HavingQueryTree;
-import com.linkedin.pinot.common.utils.request.QueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 import java.util.Collections;
 
@@ -28,9 +27,6 @@ import java.util.Collections;
  */
 public class ComparisonPredicateAstNode extends PredicateAstNode {
   private String _operand;
-  private IdentifierAstNode _identifier;
-  private FunctionCallAstNode _function;
-
   private LiteralAstNode _literal;
 
   public ComparisonPredicateAstNode(String operand) {
@@ -44,23 +40,12 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
   public String getValue() {
     return _literal.getValueAsString();
   }
-  public FunctionCallAstNode getFunction() {
-    return _function;
-  }
-
-  public boolean isItFunctionCallComparison() {
-    if (_function == null) {
-      return false;
-    } else {
-      return true;
-    }
-  }
 
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
       if (_identifier == null && _function == null) {
-        _identifier = (IdentifierAstNode) childNode;
+        _identifier = ((IdentifierAstNode) childNode).getName();
       } else if (_identifier != null) {
         throw new Pql2CompilationException("Comparison between two columns is not supported.");
       } else {
@@ -70,8 +55,6 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
       if (_function == null && _identifier == null) {
         _function = (FunctionCallAstNode) childNode;
       } else if (_function != null) {
-        //ToDo
-        //Supporting comparing two functions in HAVING clause
         throw new Pql2CompilationException("Comparison between two functions is not supported.");
       } else {
         throw new Pql2CompilationException("Comparison between column and function is not supported.");
@@ -84,18 +67,22 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
         throw new Pql2CompilationException("Comparison between two constants is not supported.");
       }
     }
+
     // Add the child nonetheless
     super.addChild(childNode);
   }
 
   @Override
   public String toString() {
-    return "ComparisonPredicateAstNode{" + "_operand='" + _operand + '\'' + '}';
+    return "ComparisonPredicateAstNode{" +
+        "_operand='" + _operand + '\'' +
+        '}';
   }
 
   /**
    * This function creates a standard unified shaped string for the value and operand side of the comparison
-   * @return
+   *
+   * @returns A String containing the range representation of the predicate
    */
   private String createRangeStringForComparison() {
     String comparison = null;
@@ -141,14 +128,14 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
 
     if ("=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
-        return new FilterQueryTree(_identifier.getName(), Collections.singletonList(_literal.getValueAsString()),
+        return new FilterQueryTree(_identifier, Collections.singletonList(_literal.getValueAsString()),
             FilterOperator.EQUALITY, null);
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
       }
     } else if ("<>".equals(_operand) || "!=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
-        return new FilterQueryTree(_identifier.getName(), Collections.singletonList(_literal.getValueAsString()),
+        return new FilterQueryTree(_identifier, Collections.singletonList(_literal.getValueAsString()),
             FilterOperator.NOT, null);
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
@@ -160,7 +147,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
       }
 
       if (_identifier != null) {
-        return new FilterQueryTree(_identifier.getName(), Collections.singletonList(comparison), FilterOperator.RANGE,
+        return new FilterQueryTree(_identifier, Collections.singletonList(comparison), FilterOperator.RANGE,
             null);
       } else {
         throw new Pql2CompilationException("One column is needed for comparison.");

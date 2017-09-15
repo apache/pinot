@@ -16,10 +16,8 @@
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.HavingQueryTree;
-import com.linkedin.pinot.common.utils.request.QueryTree;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,9 +34,11 @@ public class PredicateListAstNode extends PredicateAstNode {
     for (int i = 0; i < childrenCount; i += 2) {
       PredicateAstNode predicate = (PredicateAstNode) getChildren().get(i);
       BooleanOperatorAstNode nextOperator = null;
+
       if (i + 1 < childrenCount) {
         nextOperator = (BooleanOperatorAstNode) getChildren().get(i + 1);
       }
+
       // 3 cases for the next operator:
       // - No next operator: Add the predicate to the AND predicates or to the parent OR predicate
       // - AND: Add the predicate to the AND predicates, creating it if necessary
@@ -101,11 +101,14 @@ public class PredicateListAstNode extends PredicateAstNode {
   public FilterQueryTree buildFilterQueryTree() {
     List<FilterQueryTree> orPredicates = new ArrayList<>();
     List<FilterQueryTree> andPredicates = new ArrayList<>();
+
     int childrenCount = getChildren().size();
     if (childrenCount == 1) {
       return ((PredicateAstNode) getChildren().get(0)).buildFilterQueryTree();
     }
+
     buildQueryTreePredicates(orPredicates, andPredicates, null, null, false);
+
     if (!orPredicates.isEmpty()) {
       return buildFilterPredicate(orPredicates, FilterOperator.OR);
     } else {
@@ -117,11 +120,14 @@ public class PredicateListAstNode extends PredicateAstNode {
   public HavingQueryTree buildHavingQueryTree() {
     List<HavingQueryTree> orPredicates = new ArrayList<>();
     List<HavingQueryTree> andPredicates = new ArrayList<>();
+
     int childrenCount = getChildren().size();
     if (childrenCount == 1) {
       return ((PredicateAstNode) getChildren().get(0)).buildHavingQueryTree();
     }
+
     buildQueryTreePredicates(null, null, orPredicates, andPredicates, true);
+
     if (!orPredicates.isEmpty()) {
       return buildHavingPredicate(orPredicates, FilterOperator.OR);
     } else {

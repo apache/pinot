@@ -36,12 +36,10 @@ import org.apache.commons.lang.mutable.MutableInt;
 
 
 public class RequestUtils {
-  public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
-  private static final String USE_STAR_TREE_KEY = "useStarTree";
-
   private RequestUtils() {
-
   }
+
+  private static final String USE_STAR_TREE_KEY = "useStarTree";
 
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
@@ -100,6 +98,7 @@ public class RequestUtils {
       Map<Integer, HavingFilterQuery> filterQueryMap, MutableInt currentId) {
     int currentNodeId = currentId.intValue();
     currentId.increment();
+
     final List<Integer> filterIds = new ArrayList<Integer>();
     if (null != tree.getChildren()) {
       for (final HavingQueryTree child : tree.getChildren()) {
@@ -110,6 +109,7 @@ public class RequestUtils {
         filterQueryMap.put(childNodeId, filterQuery);
       }
     }
+
     HavingFilterQuery havingFilterQuery = new HavingFilterQuery();
     havingFilterQuery.setAggregationInfo(tree.getAggregationInfo());
     havingFilterQuery.setId(currentNodeId);
@@ -153,6 +153,8 @@ public class RequestUtils {
     FilterQueryTree q2 = new FilterQueryTree(q.getColumn(), q.getValue(), q.getOperator(), c);
     return q2;
   }
+
+  public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
 
   /**
    * Returns true for the following, false otherwise:

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.request;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,6 +23,9 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.FilterQuery;
@@ -106,5 +108,24 @@ public class BrokerRequestSerializationTest {
     TSerializer compactSerializer = new TSerializer(new TCompactProtocol.Factory());
     normalSerializer.serialize(req);
     compactSerializer.serialize(req);
+
+//    int numRequests = 100000;
+//    TimerContext t = MetricsHelper.startTimer();
+//    TSerializer serializer = new TSerializer(new TCompactProtocol.Factory());
+//    //TSerializer serializer = new TSerializer();
+//    //Compact : Size 183 , Serialization Latency : 0.03361ms
+//    // Normal : Size 385 , Serialization Latency : 0.01144ms
+//
+//    for (int i = 0; i < numRequests; i++) {
+//      try {
+//        serializer.serialize(req);
+//        //System.out.println(s3.length);
+//        //break;
+//      } catch (TException e) {
+//        e.printStackTrace();
+//      }
+//    }
+//    t.stop();
+//    System.out.println("Latency is :" + (t.getLatencyMs() / (float) numRequests));
   }
 }

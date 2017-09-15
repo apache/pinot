@@ -16,6 +16,7 @@
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 
 
@@ -33,12 +34,28 @@ public class FunctionCallAstNode extends BaseAstNode {
     _isInSelectList = true;
   }
 
-  public boolean equals(FunctionCallAstNode functionCallAstNode) {
+  public boolean equals(Object obj) {
+    if (EqualityUtils.isNullOrNotSameClass(this, obj)) {
+      return false;
+    }
+
+    if (EqualityUtils.isSameReference(this, obj)) {
+      return true;
+    }
+
+    FunctionCallAstNode functionCallAstNode = (FunctionCallAstNode) obj;
     if (_name.equals(functionCallAstNode.getName()) && _expression.equals(functionCallAstNode.getExpression())) {
       return true;
     } else {
       return false;
     }
+  }
+
+  public int hashCode() {
+    int hashCode = EqualityUtils.hashCodeOf(_name);
+    hashCode = EqualityUtils.hashCodeOf(hashCode, _expression);
+    hashCode = EqualityUtils.hashCodeOf(hashCode, _isInSelectList);
+    return hashCode;
   }
 
   public void setIsInSelectList(boolean value) {
@@ -70,8 +87,7 @@ public class FunctionCallAstNode extends BaseAstNode {
         StringLiteralAstNode node = (StringLiteralAstNode) astNode;
         identifier = node.getText();
       } else {
-        throw new Pql2CompilationException(
-            "Child node of aggregation function is not an identifier, star or string literal.");
+        throw new Pql2CompilationException("Child node of aggregation function is not an identifier, star or string literal.");
       }
     }
 

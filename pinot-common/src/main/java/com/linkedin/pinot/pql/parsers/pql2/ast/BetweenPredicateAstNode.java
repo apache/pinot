@@ -18,7 +18,6 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.HavingQueryTree;
-import com.linkedin.pinot.common.utils.request.QueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 import java.util.Collections;
 
@@ -27,9 +26,6 @@ import java.util.Collections;
  * AST for the BETWEEN PQL clause.
  */
 public class BetweenPredicateAstNode extends PredicateAstNode {
-  private String _identifier;
-  private FunctionCallAstNode _function;
-
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
@@ -40,22 +36,6 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
     } else {
       super.addChild(childNode);
     }
-  }
-
-  public boolean isItFunctionCallComparison() {
-    if (_function == null) {
-      return false;
-    } else {
-      return true;
-    }
-  }
-
-  public FunctionCallAstNode getFunction() {
-    return _function;
-  }
-
-  public String getIdentifier() {
-    return _identifier;
   }
 
   public String getLeftValue() {
