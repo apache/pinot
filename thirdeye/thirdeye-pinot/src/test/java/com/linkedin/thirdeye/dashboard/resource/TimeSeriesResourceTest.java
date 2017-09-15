@@ -79,6 +79,16 @@ public class TimeSeriesResourceTest {
   }
 
   @Test
+  public void testTranformationFillZero() throws Exception {
+    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
+        "0", RANGE, null, null, "fillzero", null);
+    Map<String, List<? extends Number>> ts = out.get(RANGE);
+
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
+    assertEquals(ts.get("0"), Arrays.asList(1d, 0d, -1d, 0d, 1d, 0d));
+  }
+
+  @Test
   public void testTranformationTimestamp() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
         "0", RANGE, null, "10_MILLISECONDS", "timestamp", null);
