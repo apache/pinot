@@ -15,17 +15,16 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
+import com.linkedin.pinot.common.utils.CommonConstants;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class SegmentFetcherFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
@@ -39,6 +38,7 @@ public class SegmentFetcherFactory {
     SEGMENT_FETCHER_MAP.put("file", new LocalFileSegmentFetcher());
     SEGMENT_FETCHER_MAP.put("http", new HttpSegmentFetcher());
     SEGMENT_FETCHER_MAP.put("https", new HttpSegmentFetcher());
+    SEGMENT_FETCHER_MAP.put("hdfs", new HdfsSegmentFetcher());
   }
 
   public static void initSegmentFetcherFactory(Configuration pinotHelixProperties) {
