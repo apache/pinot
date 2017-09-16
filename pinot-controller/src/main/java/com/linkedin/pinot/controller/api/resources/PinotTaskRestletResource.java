@@ -72,11 +72,11 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/taskconfig/{taskName}")
-  @ApiOperation("Get the task config for the given task name")
-  public PinotTaskConfig getTaskConfig(
+  @ApiOperation("Get the child task configs for the given task name")
+  public List<PinotTaskConfig> getTaskConfigs(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
     try {
-      return _pinotHelixTaskResourceManager.getTaskConfig(taskName);
+      return _pinotHelixTaskResourceManager.getTaskConfigs(taskName);
     } catch (Exception e) {
       throw new WebApplicationException(e);
     }
@@ -132,7 +132,7 @@ public class PinotTaskRestletResource {
   @PUT
   @Path("/tasks/scheduletasks")
   @ApiOperation("Schedule tasks")
-  public Map<String, List<String>> scheduleTasks() {
+  public Map<String, String> scheduleTasks() {
     try {
       return _pinotTaskManager.scheduleTasks();
     } catch (Exception e) {

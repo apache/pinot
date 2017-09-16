@@ -63,9 +63,11 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
       TaskState taskState = entry.getValue();
       if (taskState == TaskState.NOT_STARTED || taskState == TaskState.IN_PROGRESS || taskState == TaskState.STOPPED) {
-        Map<String, String> configs = _clusterInfoProvider.getTaskConfig(entry.getKey()).getConfigs();
-        runningSegments.add(
-            configs.get(MinionConstants.TABLE_NAME_KEY) + "__" + configs.get(MinionConstants.SEGMENT_NAME_KEY));
+        for (PinotTaskConfig pinotTaskConfig : _clusterInfoProvider.getTaskConfigs(entry.getKey())) {
+          Map<String, String> configs = pinotTaskConfig.getConfigs();
+          runningSegments.add(
+              configs.get(MinionConstants.TABLE_NAME_KEY) + "__" + configs.get(MinionConstants.SEGMENT_NAME_KEY));
+        }
       }
     }
 

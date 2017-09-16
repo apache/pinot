@@ -102,13 +102,15 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
       }
     }
 
-    // Should create the task queues and generate 5 ConvertToRawIndexTask tasks
-    Assert.assertEquals(_taskManager.scheduleTasks().get(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 5);
+    // Should create the task queues and generate a ConvertToRawIndexTask task with 5 child tasks
+    Assert.assertEquals(_taskManager.scheduleTasks().size(), 1);
     Assert.assertEquals(_helixTaskResourceManager.getTaskQueues().size(), 1);
-    // Should generate 3 more ConvertToRawIndexTask tasks
-    Assert.assertEquals(_taskManager.scheduleTasks().get(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 3);
+
+    // Should generate one more ConvertToRawIndexTask task with 3 child tasks
+    Assert.assertEquals(_taskManager.scheduleTasks().size(), 1);
+
     // Should not generate more tasks
-    Assert.assertEquals(_taskManager.scheduleTasks().get(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).size(), 0);
+    Assert.assertTrue(_taskManager.scheduleTasks().isEmpty());
 
     // Wait at most 600 seconds for all tasks COMPLETED and new segments refreshed
     TestUtils.waitForCondition(new Function<Void, Boolean>() {

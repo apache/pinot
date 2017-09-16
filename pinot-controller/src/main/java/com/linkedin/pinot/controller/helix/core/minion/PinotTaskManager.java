@@ -126,10 +126,10 @@ public class PinotTaskManager {
   /**
    * Check the Pinot cluster status and schedule new tasks.
    *
-   * @return Map from task type to list of tasks scheduled
+   * @return Map from task type to task scheduled
    */
   @Nonnull
-  public Map<String, List<String>> scheduleTasks() {
+  public Map<String, String> scheduleTasks() {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -159,20 +159,20 @@ public class PinotTaskManager {
     }
 
     // Generate each type of tasks
-    Map<String, List<String>> tasksScheduled = new HashMap<>(taskTypes.size());
+    Map<String, String> tasksScheduled = new HashMap<>(taskTypes.size());
     // TODO: add config to control the max number of tasks for all task types & each task type
     for (String taskType : taskTypes) {
       LOGGER.info("Generating tasks for task type: {}", taskType);
       PinotTaskGenerator pinotTaskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
       Preconditions.checkNotNull(pinotTaskGenerator);
       List<PinotTaskConfig> pinotTaskConfigs = pinotTaskGenerator.generateTasks(enabledTableConfigMap.get(taskType));
-      List<String> taskNames = new ArrayList<>(pinotTaskConfigs.size());
-      for (PinotTaskConfig pinotTaskConfig : pinotTaskConfigs) {
-        LOGGER.info("Submitting task for task type: {} with task config: {}", taskType, pinotTaskConfig);
-        taskNames.add(_helixTaskResourceManager.submitTask(pinotTaskConfig));
-        _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, 1L);
+      int numTasks = pinotTaskConfigs.size();
+      if (numTasks > 0) {
+        LOGGER.info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType,
+            pinotTaskConfigs);
+        tasksScheduled.put(taskType, _helixTaskResourceManager.submitTask(pinotTaskConfigs));
+        _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
       }
-      tasksScheduled.put(taskType, taskNames);
     }
 
     return tasksScheduled;

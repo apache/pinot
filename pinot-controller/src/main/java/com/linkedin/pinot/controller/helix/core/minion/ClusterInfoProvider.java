@@ -109,14 +109,14 @@ public class ClusterInfoProvider {
   }
 
   /**
-   * Get the task config for the given task name.
+   * Get the child task configs for the given task name.
    *
    * @param taskName Task name
-   * @return Task config
+   * @return List of child task configs
    */
   @Nonnull
-  public PinotTaskConfig getTaskConfig(@Nonnull String taskName) {
-    return _pinotHelixTaskResourceManager.getTaskConfig(taskName);
+  public List<PinotTaskConfig> getTaskConfigs(@Nonnull String taskName) {
+    return _pinotHelixTaskResourceManager.getTaskConfigs(taskName);
   }
 
   /**
