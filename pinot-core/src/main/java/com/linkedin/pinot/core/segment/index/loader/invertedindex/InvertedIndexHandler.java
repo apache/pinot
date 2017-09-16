@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.loader.invertedindex;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
@@ -68,7 +69,11 @@ public class InvertedIndexHandler {
     Set<String> invertedIndexColumns = getInvertedIndexColumns();
 
     for (String column : invertedIndexColumns) {
-      createInvertedIndexForColumn(segmentMetadata.getColumnMetadataFor(column));
+      try {
+        createInvertedIndexForColumn(segmentMetadata.getColumnMetadataFor(column));
+      } catch (Exception e) {
+        LOGGER.warn("Inverted index not created for column {}", column);
+      }
     }
   }
 
@@ -163,9 +168,12 @@ public class InvertedIndexHandler {
           creator.add(i, dictIds, len);
         }
       }
+      creator.seal();
+    } catch (Exception e) {
+      creator.releaseResources();
+      Utils.rethrowException(e);
     }
 
-    creator.seal();
 
     // For v3, write the generated inverted index file into the single file and remove it.
     if (segmentVersion == SegmentVersion.v3) {

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.inv;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -117,31 +118,36 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
 
     start = System.currentTimeMillis();
 
-    // create buffers to store raw values
-    origValueBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE, null,
-        "value buffer create bitmap index for " + columnName);
-    valueBuffer = origValueBuffer.asIntBuffer();
-    if (!spec.isSingleValueField()) {
-      origLengths = MmapUtils.allocateDirectByteBuffer(numDocs * INT_SIZE, null,
-          "lengths buffer to create bitmap index for " + columnName);
-      lengths = origLengths.asIntBuffer();
-    } else {
-      origLengths = null;
-    }
+    try {
+      // create buffers to store raw values
+      origValueBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE, null,
+          "value buffer create bitmap index for " + columnName);
+      valueBuffer = origValueBuffer.asIntBuffer();
+      if (!spec.isSingleValueField()) {
+        origLengths = MmapUtils.allocateDirectByteBuffer(numDocs * INT_SIZE, null,
+            "lengths buffer to create bitmap index for " + columnName);
+        lengths = origLengths.asIntBuffer();
+      } else {
+        origLengths = null;
+      }
 
-    // create buffer to store posting lists
-    origPostingListBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE, null,
-        "posting list buffer to bitmap index for " + columnName);
-    postingListBuffer = origPostingListBuffer.asIntBuffer();
-    origPostingListLengths = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
-        "posting list lengths buffer to bitmap index for " + columnName);
-    postingListLengths = origPostingListLengths.asIntBuffer();
-    origPostingListStartOffsets = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
-        "posting list start offsets buffer to bitmap index for " + columnName);
-    postingListStartOffsets = origPostingListStartOffsets.asIntBuffer();
-    origPostingListCurrentOffsets = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
-        "posting list current offsets buffer to bitmap index for " + columnName);
-    postingListCurrentOffsets = origPostingListCurrentOffsets.asIntBuffer();
+      // create buffer to store posting lists
+      origPostingListBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE, null,
+          "posting list buffer to bitmap index for " + columnName);
+      postingListBuffer = origPostingListBuffer.asIntBuffer();
+      origPostingListLengths = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
+          "posting list lengths buffer to bitmap index for " + columnName);
+      postingListLengths = origPostingListLengths.asIntBuffer();
+      origPostingListStartOffsets = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
+          "posting list start offsets buffer to bitmap index for " + columnName);
+      postingListStartOffsets = origPostingListStartOffsets.asIntBuffer();
+      origPostingListCurrentOffsets = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
+          "posting list current offsets buffer to bitmap index for " + columnName);
+      postingListCurrentOffsets = origPostingListCurrentOffsets.asIntBuffer();
+    } catch (Exception e) {
+      releaseResources();
+      Utils.rethrowException(e);
+    }
   }
 
   @Override
@@ -238,24 +244,27 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
       IOUtils.closeQuietly(fisOffsets);
       IOUtils.closeQuietly(fos);
       IOUtils.closeQuietly(fos);
-      // MMaputils handles the null checks for buffer
-      MmapUtils.unloadByteBuffer(origValueBuffer);
-      origValueBuffer = null; valueBuffer = null;
-      if (origLengths != null) {
-        MmapUtils.unloadByteBuffer(origLengths);
-        origLengths = null; lengths = null;
-      }
-      MmapUtils.unloadByteBuffer(origPostingListBuffer);
-      origPostingListBuffer = null; postingListBuffer = null;
-      MmapUtils.unloadByteBuffer(origPostingListCurrentOffsets);
-      origPostingListCurrentOffsets = null; postingListCurrentOffsets = null;
-      MmapUtils.unloadByteBuffer(origPostingListLengths);
-      origPostingListLengths = null; postingListLengths = null;
-      MmapUtils.unloadByteBuffer(origPostingListStartOffsets);
-      origPostingListStartOffsets = null; postingListStartOffsets = null;
+      releaseResources();
       FileUtils.deleteQuietly(new File(tempOffsetsFile));
       FileUtils.deleteQuietly(new File(tempBitmapsFile));
     }
+  }
+
+  // Release all the memory that has been allocated in the constructor.
+  public void releaseResources() {
+    // MMaputils handles the null checks for buffer
+    MmapUtils.unloadByteBuffer(origValueBuffer);
+    origValueBuffer = null; valueBuffer = null;
+    MmapUtils.unloadByteBuffer(origLengths);
+    origLengths = null; lengths = null;
+    MmapUtils.unloadByteBuffer(origPostingListBuffer);
+    origPostingListBuffer = null; postingListBuffer = null;
+    MmapUtils.unloadByteBuffer(origPostingListCurrentOffsets);
+    origPostingListCurrentOffsets = null; postingListCurrentOffsets = null;
+    MmapUtils.unloadByteBuffer(origPostingListLengths);
+    origPostingListLengths = null; postingListLengths = null;
+    MmapUtils.unloadByteBuffer(origPostingListStartOffsets);
+    origPostingListStartOffsets = null; postingListStartOffsets = null;
   }
 
   /**
