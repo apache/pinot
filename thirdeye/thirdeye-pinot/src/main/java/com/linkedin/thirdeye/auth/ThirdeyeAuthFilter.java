@@ -36,13 +36,18 @@ public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthCon
         // Let the FE handle the redirect to login page when not authenticated
         || uriPath.equals("thirdeye-admin")
         // Let detector capture the screenshot without authentication error
-        || uriPath.startsWith("/app/#/screenshot/")
-        || uriPath.startsWith("anomalies/search/anomalyIds")
-
-        // at last any other path specified in the te-config
-        || authConfig.getAllowedPaths().contains(uriPath)) {
+        || uriPath.startsWith("app/#/screenshot/")
+        || uriPath.startsWith("#/screenshot/")
+        || uriPath.startsWith("anomalies/search/anomalyIds")) {
       return;
     }
+
+    for (String fragment : this.authConfig.getAllowedPaths()) {
+      if (uriPath.startsWith(fragment)) {
+        return;
+      }
+    }
+
     Optional<PrincipalAuthContext> authenticatedUser;
     try {
       AuthRequest credentials = getCredentials(containerRequestContext);
