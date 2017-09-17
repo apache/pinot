@@ -27,14 +27,15 @@ export default Ember.Controller.extend({
   isReplayStatusPending: true,
   isReplayStatusSuccess: false,
   isReplayStarted: false,
+  isGroupNameDuplicate: false,
+  isAlertNameDuplicate: false,
+  isFetchingDimensions: false,
   metricGranularityOptions: [],
   originalDimensions: [],
   bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
-  isGroupNameDuplicate: false,
-  isAlertNameDuplicate: false,
-
+  topDimensions: [],
   legendText: {
     dotted: 'WoW',
     solid: 'Observed'
@@ -348,7 +349,7 @@ export default Ember.Controller.extend({
       selectedGranularity: granularity
     });
 
-    this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
+    this.fetchAnomalyGraphData(graphConfig).then(metricData => {
       this.set('isMetricDataLoading', false);
       if (!this.isMetricGraphable(metricData)) {
         // Metric has no data. not graphing
@@ -360,6 +361,11 @@ export default Ember.Controller.extend({
           isMetricSelected: true,
           selectedMetric: Object.assign(metricData, { color: 'blue' })
         });
+        // Fetching top 5 dimensions to be added to graph when ready, if not present
+        if (Ember.isEmpty(this.get('topDimensions'))) {
+          this.getTopDimensions(graphConfig);
+          this.set('isFetchingDimensions', true);
+        }
       }
     })
     .catch((error) => {
@@ -371,6 +377,87 @@ export default Ember.Controller.extend({
         isMetricDataLoading: false,
         selectMetricErrMsg: error
       });
+    });
+  },
+
+  /**
+   * Get top 5 dimensions for graph
+   * @method getTopDimensions
+   * @param {Object} config - the current graph properties
+   * @return {undefined}
+   */
+  getTopDimensions(config) {
+    // TODO: Add filters in url
+    const url = `/rootcause/query?framework=relatedDimensions&anomalyStart=${config.currentStart}&anomalyEnd=${config.currentEnd}&baselineStart=${config.baselineStart}&baselineEnd=${config.baselineEnd}&analysisStart=${config.currentStart}&analysisEnd=${config.currentEnd}&urns=thirdeye:metric:${config.id}`;
+    const maxSize = 5;
+    const topDimensionGroups = [];
+
+    return fetch(url)
+      .then(checkStatus)
+      .then((dimensions) => {
+        // get top 5
+        const topDimensions = dimensions.sortBy('score').reverse().slice(0, maxSize);
+        const topDimensionLabels = [...new Set(topDimensions.map(key => key.label))];
+        // do another fetch for each dimension's group/value
+        this.fetchGraphDataForTopDimensions(topDimensionLabels, config, maxSize).then((topDimensionData) => {
+          // Set unique array of objects containing graph data for each top dimension
+          this.setProperties({
+            isFetchingDimensions: false,
+            topDimensions: topDimensionData
+          });
+        });
+      });
+  },
+
+  /**
+   * Enriches the list of functions by Id, adding the properties we may want to display.
+   * We are preparing to display the alerts that belong to the currently selected config group.
+   * @method fetchGraphDataForTopDimensions
+   * @param {Object} topDimensionLabels - the highest scoring dimensions (ex: ['continent=Europe'])
+   * @param {Object} config - the current graph properties
+   * @param {Number} targetSize - the desired number of dimensions to process
+   * @return {Ember.RSVP.Promise} A new list of dimensions
+   */
+  fetchGraphDataForTopDimensions(topDimensionLabels, config, targetSize) {
+    const dimensionList = [];
+    let dimensionObj = {};
+    let subDimensionObj = {};
+    let dimensionUrl = '';
+    let label = '';
+
+    return new Ember.RSVP.Promise((resolve) => {
+      /**
+       * Recursive iterator function walks through the topDimensionLabels array
+       * after each fetch callback
+       */
+      const buildDimensionObject = (index) => {
+        label = topDimensionLabels[index].split('=');
+        dimensionObj = {
+          name: label.join(':'),
+          group: label[0],
+          subDimension: label[1]
+        };
+        dimensionUrl = `/timeseries/compare/${config.id}/${config.currentStart}/${config.currentEnd}/${config.baselineStart}/${config.baselineEnd}?dimension=${dimensionObj.group}&filters=${encodeURIComponent(config.filters)}&granularity=${config.granularity}`;
+        // Fetch dimension-specific data for graph
+        fetch(dimensionUrl)
+          .then(checkStatus)
+          .then(data => {
+            subDimensionObj = data.subDimensionContributionMap[dimensionObj.subDimension] || null;
+            if (subDimensionObj) {
+              dimensionObj.baselineValues = subDimensionObj.baselineValues;
+              dimensionObj.currentValues = subDimensionObj.currentValues;
+              dimensionList.push(dimensionObj);
+            }
+            if (topDimensionLabels.length - 1 === index) {
+              resolve(dimensionList);
+            } else {
+              index++;
+              buildDimensionObject(index);
+            }
+        });
+      }
+      // Initiate the recursion until all dimensions have been loaded
+      buildDimensionObject(0);
     });
   },
 
@@ -719,6 +806,7 @@ export default Ember.Controller.extend({
     this.setProperties({
       isFormDisabled: false,
       isMetricSelected: false,
+      isFetchingDimensions: false,
       isMetricDataInvalid: false,
       selectedMetricOption: null,
       selectedPattern: null,
@@ -740,6 +828,7 @@ export default Ember.Controller.extend({
       isReplayStatusError: false,
       isGroupNameDuplicate: false,
       isAlertNameDuplicate: false,
+      topDimensions: [],
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({}),
@@ -768,7 +857,8 @@ export default Ember.Controller.extend({
         selectedPattern: null,
         selectedDimension: null,
         selectedGranularity: null,
-        selectedSensitivity: null
+        selectedSensitivity: null,
+        topDimensions: []
       });
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {

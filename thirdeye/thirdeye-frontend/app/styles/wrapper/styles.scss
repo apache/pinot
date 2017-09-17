@@ -69,7 +69,7 @@ body {
 .te-search-results {
   color: app-shade(black, 0.7);
   &__header {
-    display: flex;    
+    display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: $te-spacing;
@@ -92,20 +92,20 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
   &__edit-button {
     margin-left: $te-spacing;
   }
 
   &__title-group {
-    color: app-shade(black,0.85);	
+    color: app-shade(black,0.85);
     font-size: 21px;
-    display: flex; 
+    display: flex;
     align-items: center;
     flex-shrink: 1;
     overflow: hidden;
   }
-  
+
   &__title {
     min-width: 120px;
   }
@@ -138,7 +138,7 @@ body {
 
     &--active {
       color: #398B18;
-      background-color: #DCF0CB;    
+      background-color: #DCF0CB;
     }
 
     &--inactive {
@@ -172,7 +172,8 @@ body {
     border-top: 1px solid #E9E9E9;
   }
 
-  &__sub-label {
+  &__sub-label,
+  &__super-label {
     color: rgba(0,0,0,0.45);
 
     &--strong {
@@ -268,11 +269,11 @@ body {
     border-radius: 2px;
     box-shadow: none;
     color: app-shade(black, 0.85);
-  
+
     &:hover {
-      border-color: app-shade(black, 0.55);  
+      border-color: app-shade(black, 0.55);
     }
-  
+
     .ember-power-select-status-icon {
       border-top-color: app-shade(black, 0.7);
     }
@@ -280,12 +281,12 @@ body {
     .ember-power-select-placeholder {
       color: app-shade(black, 0.55);
     }
-    
+
     &[aria-disabled=true] {
       border-color: app-shade(black, 0.1);
       background-color: app-shade(black, 0);
       cursor: default;
-  
+
       .ember-power-select-trigger-multiple-input {
         background-color: app-shade(black, 0);
 
