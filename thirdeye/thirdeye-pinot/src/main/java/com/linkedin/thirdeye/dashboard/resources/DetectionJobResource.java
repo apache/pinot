@@ -74,6 +74,7 @@ public class DetectionJobResource {
   private EmailResource emailResource;
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
+  public static final String AUTOTUNE_FEATURE_KEY = "features";
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -577,7 +578,8 @@ public class DetectionJobResource {
       @QueryParam("end") String endTimeIso,
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
-      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds,
+      @QueryParam("tuningFeatures") String features) {
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
@@ -589,6 +591,9 @@ public class DetectionJobResource {
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     // create alert filter auto tune
     AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(alertFilter);
+    Properties autotuneProperties = autotuneConfig.getTuningProps();
+    autotuneProperties.setProperty(AUTOTUNE_FEATURE_KEY, features);
+    autotuneConfig.setTuningProps(autotuneProperties);
     BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
