@@ -4,6 +4,7 @@
  * @exports import-metric
  */
 import Ember from 'ember';
+import fetch from 'fetch';
 import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Controller.extend({
