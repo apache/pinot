@@ -197,9 +197,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         continue;
       }
 
-      OffHeapBitmapInvertedIndexCreator invertedIndexCreator =
-          new OffHeapBitmapInvertedIndexCreator(file, cardinality, totalDocs, totalNumberOfEntries, fieldSpec);
-      invertedIndexCreatorMap.put(column, invertedIndexCreator);
+      try {
+        OffHeapBitmapInvertedIndexCreator invertedIndexCreator =
+            new OffHeapBitmapInvertedIndexCreator(file, cardinality, totalDocs, totalNumberOfEntries, fieldSpec);
+        invertedIndexCreatorMap.put(column, invertedIndexCreator);
+      } catch (Exception e) {
+        LOGGER.warn("Inverted index not created for column {}", column, e);
+      }
     }
   }
 
