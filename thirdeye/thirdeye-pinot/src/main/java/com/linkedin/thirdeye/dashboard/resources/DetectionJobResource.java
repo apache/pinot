@@ -75,6 +75,7 @@ public class DetectionJobResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
   public static final String AUTOTUNE_FEATURE_KEY = "features";
+  public static final String PREVIOUS_FEATURE_KEY = "oldFeatures";
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -569,6 +570,8 @@ public class DetectionJobResource {
    * @param autoTuneType the type of auto tune to invoke (default is "AUTOTUNE")
    * @param holidayStarts: holidayStarts in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @param holidayEnds: holidayEnds in in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
+   * @param features: a list of features separated by comma, ex: weight,score.
+   *                Note that, the feature must be a existing field name in MergedAnomalyResult or a pre-set feature name
    * @return HTTP response of request: string of alert filter
    */
   @POST
@@ -593,6 +596,10 @@ public class DetectionJobResource {
     AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(alertFilter);
     if (StringUtils.isNotBlank(features)) {
       Properties autotuneProperties = autotuneConfig.getTuningProps();
+      String previousFetrues = autotuneProperties.getProperty(AUTOTUNE_FEATURE_KEY);
+      if (StringUtils.isNotBlank(previousFetrues)) { // If there exists an old feature set, log in the properties.
+        autotuneProperties.setProperty(PREVIOUS_FEATURE_KEY, previousFetrues);
+      }
       autotuneProperties.setProperty(AUTOTUNE_FEATURE_KEY, features);
       autotuneConfig.setTuningProps(autotuneProperties);
     }
