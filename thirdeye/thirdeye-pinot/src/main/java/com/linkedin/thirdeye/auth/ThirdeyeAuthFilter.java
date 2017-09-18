@@ -37,9 +37,8 @@ public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthCon
         // Let the FE handle the redirect to login page when not authenticated
         || uriPath.equals("thirdeye-admin")
         // Let detector capture the screenshot without authentication error
-        || uriPath.startsWith("anomalies/search/anomalyIds")) {
-        || uriPath.startsWith("thirdeye/email/generate/datasets")
-
+        || uriPath.startsWith("anomalies/search/anomalyIds")
+        || uriPath.startsWith("thirdeye/email/generate/datasets")) {
       return;
     }
 
