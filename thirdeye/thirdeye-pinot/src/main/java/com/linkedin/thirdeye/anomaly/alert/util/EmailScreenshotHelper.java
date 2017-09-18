@@ -51,9 +51,11 @@ public class EmailScreenshotHelper {
     LOG.info("Phantom JS script {}", phantomScript);
     String imgPath = TEMP_PATH + anomalyId + SCREENSHOT_FILE_SUFFIX;
     LOG.info("imgPath {}", imgPath);
+    String phantomPath = configuration.getPhantomJsPath();
     Process proc = Runtime.getRuntime().exec(new String[]{configuration.getPhantomJsPath(), "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
         phantomScript, imgRoute, imgPath});
 
+    StringBuilder sbError = new StringBuilder();
     try (
       InputStream stderr = proc.getErrorStream();
       InputStreamReader isr = new InputStreamReader(stderr);
@@ -63,13 +65,16 @@ public class EmailScreenshotHelper {
       String line = br.readLine();
       if (line != null) {
         do {
+          sbError.append(line);
+          sbError.append('\n');
+
           line = br.readLine();
         } while (line != null);
       }
     }
     int exitVal = proc.waitFor();
     if (exitVal != 0) {
-      throw new Exception("PhantomJS process failed with error code: " + exitVal);
+      throw new Exception("PhantomJS process failed with error code " + exitVal + ":\n" + sbError.toString());
     }
     return imgPath;
   }

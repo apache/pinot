@@ -1,8 +1,7 @@
 import Ember from 'ember';
 import ApplicationRouteMixin from 'ember-simple-auth/mixins/application-route-mixin';
-import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
-export default Ember.Route.extend(ApplicationRouteMixin, AuthenticatedRouteMixin, {
+export default Ember.Route.extend(ApplicationRouteMixin, {
   moment: Ember.inject.service(),
   session: Ember.inject.service(),
 
