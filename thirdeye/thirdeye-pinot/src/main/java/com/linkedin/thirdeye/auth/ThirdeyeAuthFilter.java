@@ -38,6 +38,8 @@ public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthCon
         || uriPath.equals("thirdeye-admin")
         // Let detector capture the screenshot without authentication error
         || uriPath.startsWith("anomalies/search/anomalyIds")) {
+        || uriPath.startsWith("thirdeye/email/generate/datasets")
+
       return;
     }
 

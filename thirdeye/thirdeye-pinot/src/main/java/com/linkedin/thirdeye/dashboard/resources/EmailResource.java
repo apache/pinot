@@ -149,6 +149,7 @@ public class EmailResource {
     configuration.setSmtpConfiguration(getSmtpConfiguration(smtpHost, smtpPort));
     configuration.setDashboardHost(teHost);
     configuration.setPhantomJsPath(thirdeyeConfiguration.getPhantomJsPath());
+    configuration.setRootDir(thirdeyeConfiguration.getRootDir());
 
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
