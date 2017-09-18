@@ -591,9 +591,11 @@ public class DetectionJobResource {
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     // create alert filter auto tune
     AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(alertFilter);
-    Properties autotuneProperties = autotuneConfig.getTuningProps();
-    autotuneProperties.setProperty(AUTOTUNE_FEATURE_KEY, features);
-    autotuneConfig.setTuningProps(autotuneProperties);
+    if (StringUtils.isNotBlank(features)) {
+      Properties autotuneProperties = autotuneConfig.getTuningProps();
+      autotuneProperties.setProperty(AUTOTUNE_FEATURE_KEY, features);
+      autotuneConfig.setTuningProps(autotuneProperties);
+    }
     BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
