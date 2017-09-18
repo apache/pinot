@@ -46,7 +46,9 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
+import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -87,7 +89,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.controller.util.SegmentCompletionUtils.*;
+import static com.linkedin.pinot.controller.util.SegmentCompletionUtils.getSegmentNamePrefix;
 
 
 public class PinotLLCRealtimeSegmentManager {
@@ -1200,6 +1202,8 @@ public class PinotLLCRealtimeSegmentManager {
 
     private Exception _exception = null;
     private long _offset = -1;
+    private PinotKafkaConsumerFactory _pinotKafkaConsumerFactory = new SimpleConsumerFactory();
+
 
     private KafkaOffsetFetcher(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
       _topicName = topicName;
@@ -1218,9 +1222,10 @@ public class PinotLLCRealtimeSegmentManager {
 
     @Override
     public Boolean call() throws Exception {
-      SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(
-          new KafkaSimpleConsumerFactoryImpl(), _bootstrapHosts, "dummyClientId", _topicName, _partitionId,
-          KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+
+      PinotKafkaConsumer
+          kafkaConsumer = _pinotKafkaConsumerFactory.buildConsumer(_bootstrapHosts, "dummyClientId", _topicName,
+          _partitionId, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
       try {
         _offset = kafkaConsumer.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {
