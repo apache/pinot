@@ -30,14 +30,13 @@ public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthCon
     String uriPath = containerRequestContext.getUriInfo().getPath();
     if (!authConfig.isAuthEnabled()
         // authenticate end points should be out of auth filter
-        || uriPath.equals("auth/authenticate")|| uriPath.equals("auth/logout")
+        || uriPath.equals("auth/authenticate")
+        || uriPath.equals("auth/logout")
         // Landing page should not throw 401
         || uriPath.equals("thirdeye")
         // Let the FE handle the redirect to login page when not authenticated
         || uriPath.equals("thirdeye-admin")
         // Let detector capture the screenshot without authentication error
-        || uriPath.startsWith("app/#/screenshot/")
-        || uriPath.startsWith("#/screenshot/")
         || uriPath.startsWith("anomalies/search/anomalyIds")) {
       return;
     }
