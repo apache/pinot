@@ -41,13 +41,15 @@ public class AggregationGroupByPlanNode implements PlanNode {
   private final List<AggregationInfo> _aggregationInfos;
   private final GroupBy _groupBy;
   private final TransformPlanNode _transformPlanNode;
+  private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
 
   public AggregationGroupByPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest,
-      int numGroupsLimit) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit) {
     _indexSegment = indexSegment;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
     _groupBy = brokerRequest.getGroupBy();
+    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
   }
@@ -58,7 +60,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
     SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
     return new AggregationGroupByOperator(
         AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata), _groupBy,
-        _numGroupsLimit, transformOperator, segmentMetadata.getTotalRawDocs());
+        _maxInitialResultHolderCapacity, _numGroupsLimit, transformOperator, segmentMetadata.getTotalRawDocs());
   }
 
   @Override

@@ -58,8 +58,8 @@ import javax.annotation.Nonnull;
  */
 // TODO: Revisit to make trimming work. Currently trimming is disabled
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
-  private final String[] _groupByColumns;
   private final int _numGroupByColumns;
+  private final String[] _groupByColumns;
   private final int[] _cardinalities;
   private final boolean[] _isSingleValueColumn;
   private final Dictionary[] _dictionaries;
@@ -97,9 +97,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    * Constructor for the class. Initializes data members (reusable arrays).
    *
    * @param transformBlock Transform block for which to generate group keys
-   * @param groupByColumns group-by columns.
+   * @param groupByColumns Group-by columns
+   * @param arrayBasedThreshold Threshold for array based result holder
    */
-  public DictionaryBasedGroupKeyGenerator(TransformBlock transformBlock, String[] groupByColumns) {
+  public DictionaryBasedGroupKeyGenerator(TransformBlock transformBlock, String[] groupByColumns,
+      int arrayBasedThreshold) {
     _numGroupByColumns = groupByColumns.length;
     _groupByColumns = groupByColumns;
 
@@ -142,7 +144,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         _rawKeyHolder = new LongMapBasedHolder();
       } else {
         _globalGroupIdUpperBound = (int) cardinalityProduct;
-        if (cardinalityProduct > DefaultGroupByExecutor.MAX_INITIAL_RESULT_HOLDER_CAPACITY) {
+        if (cardinalityProduct > arrayBasedThreshold) {
           _rawKeyHolder = new IntMapBasedHolder();
         } else {
           _rawKeyHolder = new ArrayBasedHolder();

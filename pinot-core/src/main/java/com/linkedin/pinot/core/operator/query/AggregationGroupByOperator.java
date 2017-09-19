@@ -37,16 +37,18 @@ public class AggregationGroupByOperator extends BaseOperator {
 
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final GroupBy _groupBy;
+  private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final TransformExpressionOperator _transformOperator;
   private final long _numTotalRawDocs;
   private ExecutionStatistics _executionStatistics;
 
   public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull GroupBy groupBy, int numGroupsLimit, @Nonnull TransformExpressionOperator transformOperator,
-      long numTotalRawDocs) {
+      @Nonnull GroupBy groupBy, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      @Nonnull TransformExpressionOperator transformOperator, long numTotalRawDocs) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _groupBy = groupBy;
+    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
     _numTotalRawDocs = numTotalRawDocs;
@@ -64,7 +66,8 @@ public class AggregationGroupByOperator extends BaseOperator {
 
     // Perform aggregation group-by on all the blocks.
     GroupByExecutor groupByExecutor =
-        new DefaultGroupByExecutor(_aggregationFunctionContexts, _groupBy, _numGroupsLimit);
+        new DefaultGroupByExecutor(_aggregationFunctionContexts, _groupBy, _maxInitialResultHolderCapacity,
+            _numGroupsLimit);
     groupByExecutor.init();
     TransformBlock transformBlock;
     while ((transformBlock = (TransformBlock) _transformOperator.nextBlock()) != null) {
