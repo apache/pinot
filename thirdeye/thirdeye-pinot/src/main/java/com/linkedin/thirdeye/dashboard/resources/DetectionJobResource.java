@@ -74,6 +74,7 @@ public class DetectionJobResource {
   private EmailResource emailResource;
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
+  public static final String AUTOTUNE_FEATURE_KEY = "features";
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -568,6 +569,8 @@ public class DetectionJobResource {
    * @param autoTuneType the type of auto tune to invoke (default is "AUTOTUNE")
    * @param holidayStarts: holidayStarts in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @param holidayEnds: holidayEnds in in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
+   * @param features: a list of features separated by comma, ex: weight,score.
+   *                Note that, the feature must be a existing field name in MergedAnomalyResult or a pre-set feature name
    * @return HTTP response of request: string of alert filter
    */
   @POST
@@ -577,7 +580,8 @@ public class DetectionJobResource {
       @QueryParam("end") String endTimeIso,
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
-      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds,
+      @QueryParam("tuningFeatures") String features) {
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
@@ -589,6 +593,13 @@ public class DetectionJobResource {
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     // create alert filter auto tune
     AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(alertFilter);
+    if (StringUtils.isNotBlank(features)) {
+      Properties autotuneProperties = autotuneConfig.getTuningProps();
+      String previousFetrues = autotuneProperties.getProperty(AUTOTUNE_FEATURE_KEY);
+      LOG.info("The previous features for autotune is {}; now change to {}", previousFetrues, features);
+      autotuneProperties.setProperty(AUTOTUNE_FEATURE_KEY, features);
+      autotuneConfig.setTuningProps(autotuneProperties);
+    }
     BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
