@@ -13,6 +13,7 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
   private Long startTime;
   private Long endTime;
   private DimensionMap dimensions;
+  private Long jobId;
 
   // significance level
   private double score;
@@ -26,6 +27,14 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
   private boolean merged;
   private double avgCurrentVal;
   private double avgBaselineVal;
+
+  public Long getJobId() {
+    return jobId;
+  }
+
+  public void setJobId(Long jobId) {
+    this.jobId = jobId;
+  }
 
   public double getAvgCurrentVal(){
     return this.avgCurrentVal;
