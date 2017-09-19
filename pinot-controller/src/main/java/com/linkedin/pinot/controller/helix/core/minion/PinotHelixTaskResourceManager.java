@@ -135,7 +135,7 @@ public class PinotHelixTaskResourceManager {
    *
    * @param taskType Task type
    */
-  public synchronized void stopTaskQueue(@Nonnull String taskType) {
+  public synchronized void stopTaskQueue(@Nonnull String taskType) throws InterruptedException {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Stopping task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.stop(helixJobQueueName);
