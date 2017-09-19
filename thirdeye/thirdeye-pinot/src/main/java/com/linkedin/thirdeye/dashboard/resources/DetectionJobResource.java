@@ -75,7 +75,6 @@ public class DetectionJobResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
   public static final String AUTOTUNE_FEATURE_KEY = "features";
-  public static final String PREVIOUS_FEATURE_KEY = "oldFeatures";
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -597,9 +596,7 @@ public class DetectionJobResource {
     if (StringUtils.isNotBlank(features)) {
       Properties autotuneProperties = autotuneConfig.getTuningProps();
       String previousFetrues = autotuneProperties.getProperty(AUTOTUNE_FEATURE_KEY);
-      if (StringUtils.isNotBlank(previousFetrues)) { // If there exists an old feature set, log in the properties.
-        autotuneProperties.setProperty(PREVIOUS_FEATURE_KEY, previousFetrues);
-      }
+      LOG.info("The previous features for autotune is {}; now change to {}", previousFetrues, features);
       autotuneProperties.setProperty(AUTOTUNE_FEATURE_KEY, features);
       autotuneConfig.setTuningProps(autotuneProperties);
     }
