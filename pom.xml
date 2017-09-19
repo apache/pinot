@@ -116,6 +116,8 @@
     <async-http-client.version>1.9.21</async-http-client.version>
     <jersey.version>2.23</jersey.version>
     <swagger.version>1.5.10</swagger.version>
+    <jetty.version>8.1.8.v20121106</jetty.version>
+    <servlet.version>3.0.1</servlet.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g </argLine>
   </properties>
@@ -350,23 +352,23 @@
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-server</artifactId>
-        <version>8.1.8.v20121106</version>
+        <version>${jetty.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.servlet</groupId>
         <artifactId>javax.servlet-api</artifactId>
-        <version>3.0.1</version>
+        <version>${servlet.version}</version>
         <scope>compile</scope>
       </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-servlet</artifactId>
-        <version>8.1.8.v20121106</version>
+        <version>${jetty.version}</version>
       </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-webapp</artifactId>
-        <version>8.1.8.v20121106</version>
+        <version>${jetty.version}</version>
       </dependency>
       <dependency>
         <groupId>org.json</groupId>
