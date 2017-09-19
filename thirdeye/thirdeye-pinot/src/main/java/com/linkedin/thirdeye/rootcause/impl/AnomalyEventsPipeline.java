@@ -31,6 +31,7 @@ public class AnomalyEventsPipeline extends Pipeline {
     LINEAR,
     TRIANGULAR,
     QUADRATIC,
+    HYPERBOLA,
     DIMENSION,
     COMPOUND
   }
@@ -119,10 +120,12 @@ public class AnomalyEventsPipeline extends Pipeline {
         return new ScoreWrapper(new ScoreUtils.TriangularStartTimeStrategy(lookback, start, end));
       case QUADRATIC:
         return new ScoreWrapper(new ScoreUtils.QuadraticTriangularStartTimeStrategy(lookback, start, end));
+      case HYPERBOLA:
+        return new ScoreWrapper(new ScoreUtils.HyperbolaStrategy(start, end));
       case DIMENSION:
         return new DimensionStrategy();
       case COMPOUND:
-        return new CompoundStrategy(new ScoreUtils.QuadraticTriangularStartTimeStrategy(lookback, start, end));
+        return new CompoundStrategy(new ScoreUtils.HyperbolaStrategy(start, end));
       default:
         throw new IllegalArgumentException(String.format("Invalid strategy type '%s'", this.strategy));
     }
@@ -194,6 +197,10 @@ public class AnomalyEventsPipeline extends Pipeline {
       double scoreTime = this.delegateTime.score(dto.getStartTime(), dto.getEndTime());
       double scoreDimension = this.delegateDimension.score(dto, urn2entity);
       double scoreHasDimension = scoreDimension > 0 ? 1 : 0;
+
+      // ignore truncated results
+      if (scoreTime <= 0)
+        return 0;
 
       return 0.1 * scoreTime + 0.9 * Math.max(scoreTime, scoreHasDimension) + Math.min(scoreDimension, 1);
     }
