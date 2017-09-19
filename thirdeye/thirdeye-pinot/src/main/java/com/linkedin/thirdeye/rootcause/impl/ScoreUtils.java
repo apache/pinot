@@ -1,14 +1,6 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.rootcause.Entity;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.joda.time.Period;
 
 
@@ -19,7 +11,8 @@ public class ScoreUtils {
   public enum StrategyType {
     LINEAR,
     TRIANGULAR,
-    QUADRATIC
+    QUADRATIC,
+    HYPERBOLA
   }
 
   private ScoreUtils() {
@@ -95,6 +88,8 @@ public class ScoreUtils {
         return new TriangularStartTimeStrategy(lookback, start, end);
       case QUADRATIC:
         return new QuadraticTriangularStartTimeStrategy(lookback, start, end);
+      case HYPERBOLA:
+        return new HyperbolaStrategy(start, end);
       default:
         throw new IllegalArgumentException(String.format("Unknown score type '%s'", type));
     }
@@ -201,6 +196,30 @@ public class ScoreUtils {
     @Override
     public double score(long start, long end) {
       return Math.pow(this.delegate.score(start, end), 2);
+    }
+  }
+
+  /**
+   * Determines a score between {@code [0.0, 1.0]} based on the entity's start time. The score
+   * is proportional to the absolute distance from the anomaly region start and truncated to
+   * {@code 0.0} after the midpoint of this region.
+   */
+  public static final class HyperbolaStrategy implements TimeRangeStrategy {
+    private static final double COEFFICIENT = 1.0d / TimeUnit.HOURS.toMillis(1);
+
+    private final long start;
+    private final long end;
+
+    public HyperbolaStrategy(long start, long end) {
+      this.start = start;
+      this.end = end;
+    }
+
+    @Override
+    public double score(long start, long end) {
+      if (start >= (this.start + this.end) / 2)
+        return 0;
+      return 1.0d / (COEFFICIENT * Math.abs(start - this.start) + 1.0);
     }
   }
 }

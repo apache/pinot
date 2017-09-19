@@ -45,6 +45,16 @@ public class ScoreUtilsTest {
   }
 
   @Test
+  public void testHyperbolaStrategy() {
+    ScoreUtils.TimeRangeStrategy scorer = new ScoreUtils.HyperbolaStrategy(3600000, 7200000);
+    Assert.assertEquals(scorer.score(0, -1), 0.5d, EPSILON);
+    Assert.assertEquals(scorer.score(1800000, -1), 0.6666d, EPSILON);
+    Assert.assertEquals(scorer.score(3600000, -1), 1.0d, EPSILON);
+    Assert.assertEquals(scorer.score(5300000, -1), 0.6792d, EPSILON);
+    Assert.assertEquals(scorer.score(5400000, -1), 0.0d, EPSILON);
+  }
+
+  @Test
   public void testParsePeriod() {
     Assert.assertEquals(ScoreUtils.parsePeriod("1w"), TimeUnit.DAYS.toMillis(7));
     Assert.assertEquals(ScoreUtils.parsePeriod("2d"), TimeUnit.DAYS.toMillis(2));
