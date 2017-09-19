@@ -49,7 +49,6 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.tools.ClusterStateVerifier;
-import org.apache.helix.tools.ClusterStateVerifier.Verifier;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -305,7 +304,13 @@ public class PerfBenchmarkDriver {
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
     final ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkAddress);
 
-    Verifier customVerifier = new Verifier() {
+    /* Use one of these three classes instead of deprecated ClusterStateVerifier.
+    BestPossibleExternalViewVerifier
+    StrictMatchExternalViewVerifier
+    ClusterLiveNodesVerifier
+    */
+
+    org.apache.helix.tools.ClusterVerifiers.ClusterStateVerifier.Verifier customVerifier = new org.apache.helix.tools.ClusterVerifiers.ClusterStateVerifier.Verifier() {
 
       @Override
       public boolean verify() {
