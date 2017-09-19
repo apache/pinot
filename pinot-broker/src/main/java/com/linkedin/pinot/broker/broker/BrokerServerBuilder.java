@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.broker;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
 import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
@@ -46,14 +47,17 @@ import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
+import java.net.URI;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.webapp.WebAppContext;
+import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.servlet.ServletRegistration;
+import org.glassfish.grizzly.servlet.WebappContext;
+import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +96,7 @@ public class BrokerServerBuilder {
 
   private long delayedShutdownTimeMs = DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS;
 
-  private Server _server;
+  private HttpServer _httpServer;
   private final Configuration _config;
   private final LiveInstancesChangeListenerImpl listener;
 
@@ -198,23 +202,35 @@ public class BrokerServerBuilder {
     Configuration c = _config.subset(CLIENT_CONFIG_PREFIX);
     BrokerClientConf clientConfig = new BrokerClientConf(c);
 
-    _server = new Server(clientConfig.getQueryPort());
+    Preconditions.checkArgument(clientConfig.getQueryPort() > 0);
+    URI baseUri = URI.create("http://0.0.0.0:" + Integer.toString(clientConfig.getQueryPort()) + "/");
 
-    WebAppContext context = new WebAppContext();
-    context.addServlet(PinotClientRequestServlet.class, "/query");
-    context.addServlet(PinotBrokerHealthCheckServlet.class, "/health");
-    context.addServlet(PinotBrokerRoutingTableDebugServlet.class, "/debug/routingTable/*");
-    context.addServlet(PinotBrokerTimeBoundaryDebugServlet.class, "/debug/timeBoundary/*");
+    _httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri);
 
+    WebappContext context;
     if (clientConfig.enableConsole()) {
-      context.setResourceBase(clientConfig.getConsoleWebappPath());
-    } else {
-      context.setResourceBase("");
-    }
+      // Use "" for context path to make it "/"
+      context = new WebappContext("brokerServerContext", "", clientConfig.getConsoleWebappPath());
 
-    context.addEventListener(new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics, _timeBoundaryService));
+    } else {
+      context = new WebappContext("brokerServerContext");
+    }
+    ServletRegistration servletRegistration;
+    servletRegistration = context.addServlet("query", PinotClientRequestServlet.class);
+    servletRegistration.addMapping("/query");
+
+    servletRegistration = context.addServlet("health", PinotBrokerHealthCheckServlet.class);
+    servletRegistration.addMapping("/health");
+
+    servletRegistration = context.addServlet("debugRoutingTable", PinotBrokerRoutingTableDebugServlet.class);
+    servletRegistration.addMapping("/debug/routingTable/*");
+
+    servletRegistration = context.addServlet("debugTimeBoundary", PinotBrokerTimeBoundaryDebugServlet.class);
+    servletRegistration.addMapping("/debug/timeBoundary/*");
+
+    context.addListener(new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics, _timeBoundaryService));
     context.setAttribute(BrokerServerBuilder.class.toString(), this);
-    _server.setHandler(context);
+    context.deploy(_httpServer);
   }
 
   public void start() throws Exception {
@@ -234,9 +250,9 @@ public class BrokerServerBuilder {
     }
     LOGGER.info("Network running !!");
 
-    LOGGER.info("Starting Jetty server !!");
-    _server.start();
-    LOGGER.info("Started Jetty server !!");
+    LOGGER.info("Starting Grizzly server !!");
+    _httpServer.start();
+    LOGGER.info("Started Grizzly server !!");
   }
 
   public void stop() throws Exception {
@@ -255,9 +271,9 @@ public class BrokerServerBuilder {
     _state.set(State.SHUTDOWN);
     LOGGER.info("Network shutdown!!");
 
-    LOGGER.info("Stopping Jetty server !!");
-    _server.stop();
-    LOGGER.info("Stopped Jetty server !!");
+    LOGGER.info("Stopping Grizzly server !!");
+    _httpServer.shutdown();
+    LOGGER.info("Stopped Grizzly server !!");
   }
 
   public State getCurrentState() {
