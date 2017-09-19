@@ -90,6 +90,12 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-api</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.mail</groupId>
+          <artifactId>mail</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
