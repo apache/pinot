@@ -53,8 +53,12 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
 
   private Configuration getConf(String hadoopConfPath) {
     Configuration hadoopConf = new Configuration();
-    hadoopConf.addResource(new Path(hadoopConfPath,"core-site.xml"));
-    hadoopConf.addResource(new Path(hadoopConfPath,"hdfs-site.xml"));
+    if (Strings.isNullOrEmpty(hadoopConfPath)) {
+      LOGGER.warn("no hadoop conf path is provided, will rely on default config");
+    } else {
+      hadoopConf.addResource(new Path(hadoopConfPath, "core-site.xml"));
+      hadoopConf.addResource(new Path(hadoopConfPath, "hdfs-site.xml"));
+    }
     return hadoopConf;
   }
 
