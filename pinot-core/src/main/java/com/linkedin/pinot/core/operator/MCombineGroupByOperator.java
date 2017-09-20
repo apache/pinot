@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
@@ -110,17 +111,10 @@ public class MCombineGroupByOperator extends BaseOperator {
    * - Merged results are sorted and trimmed (for 'TOP N').
    * - Any exceptions encountered are also set in the merged result block
    *   that is returned.
-   *
-   * @return
    */
   @Override
   public Block getNextBlock() {
-    try {
-      return combineBlocks();
-    } catch (InterruptedException e) {
-      LOGGER.error("InterruptedException caught while executing CombineGroupBy", e);
-      return new IntermediateResultsBlock(QueryException.COMBINE_GROUP_BY_EXCEPTION_ERROR, e);
-    }
+    return combineBlocks();
   }
 
   /**
@@ -140,8 +134,7 @@ public class MCombineGroupByOperator extends BaseOperator {
    *
    * @return IntermediateResultBlock containing the final results from combine operation.
    */
-  private IntermediateResultsBlock combineBlocks()
-      throws InterruptedException {
+  private IntermediateResultsBlock combineBlocks() {
     int numOperators = _operators.size();
     final CountDownLatch operatorLatch = new CountDownLatch(numOperators);
     final Map<String, Object[]> resultsMap = new ConcurrentHashMap<>();
@@ -155,9 +148,10 @@ public class MCombineGroupByOperator extends BaseOperator {
       aggregationFunctions[i] = aggregationFunctionContexts[i].getAggregationFunction();
     }
 
+    Future[] futures = new Future[numOperators];
     for (int i = 0; i < numOperators; i++) {
       final int index = i;
-      _executorService.execute(new TraceRunnable() {
+      futures[i] = _executorService.submit(new TraceRunnable() {
         @SuppressWarnings("unchecked")
         @Override
         public void runJob() {
@@ -213,39 +207,52 @@ public class MCombineGroupByOperator extends BaseOperator {
       });
     }
 
-    boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
-    if (!opCompleted) {
-      // If this happens, the broker side should already timed out, just log the error in server side.
-      LOGGER.error("Timed out while combining group-by results, after {}ms.", _timeOutMs);
-      return new IntermediateResultsBlock(new TimeoutException("CombineGroupBy timed out."));
-    }
+    try {
+      boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
+      if (!opCompleted) {
+        // If this happens, the broker side should already timed out, just log the error and return
+        String errorMessage = "Timed out while combining group-by results after " + _timeOutMs + "ms";
+        LOGGER.error(errorMessage);
+        return new IntermediateResultsBlock(new TimeoutException(errorMessage));
+      }
 
-    // Trim the results map.
-    AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-        new AggregationGroupByTrimmingService(aggregationFunctions, (int) _brokerRequest.getGroupBy().getTopN());
-    List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
-    IntermediateResultsBlock mergedBlock =
-        new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
+      // Trim the results map.
+      AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
+          new AggregationGroupByTrimmingService(aggregationFunctions, (int) _brokerRequest.getGroupBy().getTopN());
+      List<Map<String, Object>> trimmedResults =
+          aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
+      IntermediateResultsBlock mergedBlock =
+          new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
 
-    // Set the processing exceptions.
-    if (!mergedProcessingExceptions.isEmpty()) {
-      mergedBlock.setProcessingExceptions(new ArrayList<>(mergedProcessingExceptions));
-    }
+      // Set the processing exceptions.
+      if (!mergedProcessingExceptions.isEmpty()) {
+        mergedBlock.setProcessingExceptions(new ArrayList<>(mergedProcessingExceptions));
+      }
 
-    // Set the execution statistics.
-    ExecutionStatistics executionStatistics = new ExecutionStatistics();
-    for (Operator operator : _operators) {
-      ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
-      if (executionStatisticsToMerge != null) {
-        executionStatistics.merge(executionStatisticsToMerge);
+      // Set the execution statistics.
+      ExecutionStatistics executionStatistics = new ExecutionStatistics();
+      for (Operator operator : _operators) {
+        ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
+        if (executionStatisticsToMerge != null) {
+          executionStatistics.merge(executionStatisticsToMerge);
+        }
+      }
+      mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
+      mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
+      mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
+      mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+
+      return mergedBlock;
+    } catch (Exception e) {
+      return new IntermediateResultsBlock(e);
+    } finally {
+      // Cancel all ongoing jobs
+      for (Future future : futures) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
       }
     }
-    mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
-    mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
-    mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
-    mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
-
-    return mergedBlock;
   }
 
   @Override

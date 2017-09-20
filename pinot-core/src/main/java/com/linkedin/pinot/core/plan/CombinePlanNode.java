@@ -15,6 +15,12 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.MCombineGroupByOperator;
+import com.linkedin.pinot.core.operator.MCombineOperator;
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
+import com.linkedin.pinot.core.util.trace.TraceCallable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -22,12 +28,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.MCombineGroupByOperator;
-import com.linkedin.pinot.core.operator.MCombineOperator;
-import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
-import com.linkedin.pinot.core.util.trace.TraceCallable;
 
 
 /**
@@ -45,12 +45,12 @@ public class CombinePlanNode implements PlanNode {
   private final long _timeOutMs;
 
   /**
-   * Constructor.
+   * Constructor for the class.
    *
-   * @param planNodes list of underlying plan nodes.
-   * @param brokerRequest broker request.
-   * @param executorService executor service.
-   * @param timeOutMs time out in milliseconds.
+   * @param planNodes List of underlying plan nodes
+   * @param brokerRequest Broker request
+   * @param executorService Executor service
+   * @param timeOutMs Time out in milliseconds for query execution (not for planning phase)
    */
   public CombinePlanNode(List<PlanNode> planNodes, BrokerRequest brokerRequest, ExecutorService executorService,
       long timeOutMs) {
@@ -62,70 +62,62 @@ public class CombinePlanNode implements PlanNode {
 
   @Override
   public Operator run() {
-    long start = System.currentTimeMillis();
-
     int numPlanNodes = _planNodes.size();
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
     if (numPlanNodes < NUM_PLAN_NODES_THRESHOLD_FOR_PARALLEL_RUN) {
-      // Small number of plan nodes, run them sequentially.
+      // Small number of plan nodes, run them sequentially
       for (PlanNode planNode : _planNodes) {
         operators.add(planNode.run());
       }
     } else {
-      // Large number of plan nodes, run them parallel.
+      // Large number of plan nodes, run them in parallel
 
-      // Calculate the timeout timestamp.
-      long timeout = start + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
+      // Calculate the time out timestamp
+      long endTime = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
 
-      // Submit all jobs.
-      List<Future<Operator>> futures = new ArrayList<>(numPlanNodes);
-      for (final PlanNode planNode : _planNodes) {
-        futures.add(_executorService.submit(new TraceCallable<Operator>() {
+      // Submit all jobs
+      Future[] futures = new Future[numPlanNodes];
+      for (int i = 0; i < numPlanNodes; i++) {
+        final int index = i;
+        futures[i] = _executorService.submit(new TraceCallable<Operator>() {
           @Override
-          public Operator callJob()
-              throws Exception {
-            return planNode.run();
+          public Operator callJob() throws Exception {
+            return _planNodes.get(index).run();
           }
-        }));
+        });
       }
 
-      // Try to get results from all jobs. Cancel all remaining jobs if caught any exception.
-      int index = 0;
+      // Get all results
       try {
-        while (index < numPlanNodes) {
-          Future<Operator> future = futures.get(index);
-          try {
-            operators.add(future.get(timeout - System.currentTimeMillis(), TimeUnit.MILLISECONDS));
-          } catch (Exception e) {
-            // Future object will throw ExecutionException for execution exception, need to check the cause to determine
-            // whether it is caused by bad query
-            Throwable cause = e.getCause();
-            if (cause instanceof BadQueryRequestException) {
-              throw (BadQueryRequestException) cause;
-            } else {
-              throw new RuntimeException("Caught exception while running CombinePlanNode.", e);
-            }
-          }
-          index++;
+        for (Future future : futures) {
+          operators.add((Operator) future.get(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS));
+        }
+      } catch (Exception e) {
+        // Future object will throw ExecutionException for execution exception, need to check the cause to determine
+        // whether it is caused by bad query
+        Throwable cause = e.getCause();
+        if (cause instanceof BadQueryRequestException) {
+          throw (BadQueryRequestException) cause;
+        } else {
+          throw new RuntimeException("Caught exception while running CombinePlanNode.", e);
         }
       } finally {
-        while (index < numPlanNodes) {
-          futures.get(index).cancel(true);
-          index++;
+        // Cancel all ongoing jobs
+        for (Future future : futures) {
+          if (!future.isDone()) {
+            future.cancel(true);
+          }
         }
       }
     }
 
-    long end = System.currentTimeMillis();
-    LOGGER.debug("CombinePlanNode.run took: {}ms", end - start);
-
     // TODO: use the same combine operator for both aggregation and selection query.
     if (_brokerRequest.isSetAggregationsInfo() && _brokerRequest.getGroupBy() != null) {
-      // Aggregation group-by query.
+      // Aggregation group-by query
       return new MCombineGroupByOperator(operators, _executorService, _timeOutMs, _brokerRequest);
     } else {
-      // Selection or aggregation only query.
+      // Selection or aggregation only query
       return new MCombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);
     }
   }
