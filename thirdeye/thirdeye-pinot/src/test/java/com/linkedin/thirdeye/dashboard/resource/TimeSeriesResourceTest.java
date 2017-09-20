@@ -69,6 +69,16 @@ public class TimeSeriesResourceTest {
   }
 
   @Test
+  public void testTranformationDifference() throws Exception {
+    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
+        "0", RANGE, null, null, "difference", null);
+    Map<String, List<? extends Number>> ts = out.get(RANGE);
+
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
+    assertEquals(ts.get("0"), Arrays.asList(null, -1d, -1d, 1d, 1d, null));
+  }
+
+  @Test
   public void testTranformationFillForward() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
         "0", RANGE, null, null, "fillforward", null);
@@ -108,6 +118,16 @@ public class TimeSeriesResourceTest {
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
     assertEquals(ts.get("2"), Arrays.asList(null, -0.333, -0.5d, 1d, 0.5d, null));
+  }
+
+  @Test
+  public void testTranformationOffset() throws Exception {
+    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
+        "9", RANGE, null, null, "offset", null);
+    Map<String, List<? extends Number>> ts = out.get(RANGE);
+
+    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
+    assertEquals(ts.get("9"), Arrays.asList(0d, -1d, -2d, -1d, 0d, null));
   }
 
   @Test
