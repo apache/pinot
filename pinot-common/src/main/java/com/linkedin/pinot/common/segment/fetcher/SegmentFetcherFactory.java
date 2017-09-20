@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationMap;
@@ -30,9 +32,8 @@ public class SegmentFetcherFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
 
   public static String SEGMENT_FETCHER_CLASS_KEY = "class";
-  public static String SEGMENT_FETCHER_PROTOCOL_KEY = "protocol";
 
-  private static Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new ConcurrentHashMap<String, SegmentFetcher>();
+  private static Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new ConcurrentHashMap<>();
 
   static {
     SEGMENT_FETCHER_MAP.put("file", new LocalFileSegmentFetcher());
@@ -45,14 +46,22 @@ public class SegmentFetcherFactory {
     Configuration segmentFetcherFactoryConfig =
         pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
+    // initialize predefined fetcher
+    for (String protocol: SEGMENT_FETCHER_MAP.keySet()) {
+      LOGGER.debug("initializing segment fetcher protocol {}", protocol);
+      initSegmentFetcher(protocol, new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol)));
+    }
+
+    // initialize dynamic loaded fetcher
     Iterator segmentFetcherFactoryConfigIterator = segmentFetcherFactoryConfig.getKeys();
     while (segmentFetcherFactoryConfigIterator.hasNext()) {
       Object configKeyObject = segmentFetcherFactoryConfigIterator.next();
       try {
         String segmentFetcherConfigKey = configKeyObject.toString();
-        String protocol = segmentFetcherConfigKey.split(".", 2)[0];
+        String protocol = segmentFetcherConfigKey.split("\\.", 2)[0];
         if (!SegmentFetcherFactory.containsProtocol(protocol)) {
-          SegmentFetcherFactory.initSegmentFetcher(
+          LOGGER.debug("initializing segment fetcher protocol " + protocol);
+          SegmentFetcherFactory.initSegmentFetcher(protocol,
               new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol)));
         }
       } catch (Exception e) {
@@ -61,15 +70,27 @@ public class SegmentFetcherFactory {
     }
   }
 
-  public static void initSegmentFetcher(Map<String, String> configs) {
+  @VisibleForTesting
+  protected static Map<String, SegmentFetcher> getPreloadedSegments() {
+    return SEGMENT_FETCHER_MAP;
+  }
+
+  private static void initSegmentFetcher(String protocol, Map<String, String> configs) {
     try {
-      String segmentFetcherKlass = configs.get(SEGMENT_FETCHER_CLASS_KEY);
-      SegmentFetcher segmentFetcher = (SegmentFetcher) Class.forName(segmentFetcherKlass).newInstance();
-      segmentFetcher.init(configs);
-      String segmentFetcherProtocol = configs.get(SEGMENT_FETCHER_PROTOCOL_KEY);
-      SEGMENT_FETCHER_MAP.put(segmentFetcherProtocol, segmentFetcher);
+      final SegmentFetcher fetcher;
+      if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
+        fetcher = SEGMENT_FETCHER_MAP.get(protocol);
+      } else {
+        String segmentFetcherKlass = configs.get(SEGMENT_FETCHER_CLASS_KEY);
+        if (Strings.isNullOrEmpty(segmentFetcherKlass)) {
+          throw new RuntimeException("No class def for provided segment fetcher " + protocol);
+        }
+        fetcher = (SegmentFetcher) Class.forName(segmentFetcherKlass).newInstance();
+        SEGMENT_FETCHER_MAP.put(protocol, fetcher);
+      }
+      fetcher.init(configs);
     } catch (Exception e) {
-      LOGGER.error("Failed to init SegmentFetcher: {}", Arrays.toString(configs.entrySet().toArray()));
+      LOGGER.error("Failed to init SegmentFetcher: " + Arrays.toString(configs.entrySet().toArray()), e);
     }
   }
 

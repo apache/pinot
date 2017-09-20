@@ -32,20 +32,30 @@ import java.util.Map;
  */
 public class HdfsSegmentFetcher implements SegmentFetcher {
 
-  private static final String PRINCIPLE = "kerberos.principle";
-  private static final String KEYTAB = "kerberos.keytab";
+  private static final String PRINCIPLE = "hadoop.kerberos.principle";
+  private static final String KEYTAB = "hadoop.kerberos.keytab";
+  private static final String HADOOP_CONF_PATH = "hadoop.conf.path";
   private static final Logger LOGGER = LoggerFactory.getLogger(HdfsSegmentFetcher.class);
   private FileSystem fs = null;
 
   @Override
   public void init(Map<String, String> configs) {
-    Configuration hadoopConf = new Configuration();
+    String hadoopConfPath = configs.get(HADOOP_CONF_PATH);
+    Configuration hadoopConf = getConf(hadoopConfPath);
     authenticate(hadoopConf, configs);
     try {
-      fs = FileSystem.get(new Configuration());
+      fs = FileSystem.get(hadoopConf);
+      LOGGER.debug("successfully initialized hdfs segment fetcher");
     } catch (IOException e) {
       LOGGER.error("failed to initialized the hdfs", e);
     }
+  }
+
+  private Configuration getConf(String hadoopConfPath) {
+    Configuration hadoopConf = new Configuration();
+    hadoopConf.addResource(new Path(hadoopConfPath,"core-site.xml"));
+    hadoopConf.addResource(new Path(hadoopConfPath,"hdfs-site.xml"));
+    return hadoopConf;
   }
 
   private void authenticate(Configuration hadoopConf, Map<String, String> configs) {
@@ -71,8 +81,19 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
 
   @Override
   public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+    LOGGER.debug("starting to fetch segment from hdfs");
+    try {
+      if (fs == null) {
+        LOGGER.error("uninitialized fs for fetching data from hdfs");
+        throw new RuntimeException("failed to get hdfs client");
+      }
+      
       fs.copyToLocalFile(new Path(uri), new Path(tempFile.toURI()));
-      LOGGER.info("copied {} from hdfs to {} in local for size %d", uri, tempFile.getAbsolutePath(), tempFile.length());
+      LOGGER.debug("copied {} from hdfs to {} in local for size {}", uri, tempFile.getAbsolutePath(), tempFile.length());
+    } catch(Exception ex) {
+      LOGGER.error(String.format("failed to fetch %s from hdfs", uri), ex);
+      throw ex;
+    }
   }
 
 }
