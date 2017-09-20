@@ -631,8 +631,6 @@ public class DetectionJobResource {
     for (long functionId : anomalyFunctionIds) {
       autotuneConfig.setId(null);
       autotuneConfig.setFunctionId(functionId);
-      AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
-      autotuneConfig.setAlertFilter(alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter()));
       long autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig);
       autotuneIds.add(autotuneId);
     }
