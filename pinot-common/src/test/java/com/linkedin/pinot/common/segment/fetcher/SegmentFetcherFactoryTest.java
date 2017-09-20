@@ -45,9 +45,9 @@ public class SegmentFetcherFactoryTest {
     conf.addProperty("pinot.server.segment.fetcher.http.other", "otherconfig");
     conf.addProperty("pinot.server.segment.fetcher.http2.more_other", "some-other");
     conf.addProperty("pinot.server.segment.fetcher.test.class", "com.linkedin.pinot.common.segment.fetcher.testSegmentFetcher");
-    SegmentFetcherFactory.getPreloadedSegments().put("hdfs", mockHdfsFetcher);
-    SegmentFetcherFactory.getPreloadedSegments().put("http", mockHttpFetcher);
-    SegmentFetcherFactory.getPreloadedSegments().put("https", mockHttpsFetcher);
+    SegmentFetcherFactory.getPreloadSegmentFetchers().put("hdfs", mockHdfsFetcher);
+    SegmentFetcherFactory.getPreloadSegmentFetchers().put("http", mockHttpFetcher);
+    SegmentFetcherFactory.getPreloadSegmentFetchers().put("https", mockHttpsFetcher);
 
     SegmentFetcherFactory.initSegmentFetcherFactory(conf);
     verify(mockHdfsFetcher, times(1))
@@ -58,7 +58,7 @@ public class SegmentFetcherFactoryTest {
         .init(eq(new HashMap<String, String>()));
 
     Assert.assertTrue(SegmentFetcherFactory.containsProtocol("test"));
-    Assert.assertEquals(1, ((testSegmentFetcher)SegmentFetcherFactory.getPreloadedSegments().get("test")).init_called);
+    Assert.assertEquals(1, ((testSegmentFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called);
   }
 
   @Test

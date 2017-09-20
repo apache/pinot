@@ -71,7 +71,7 @@ public class SegmentFetcherFactory {
   }
 
   @VisibleForTesting
-  protected static Map<String, SegmentFetcher> getPreloadedSegments() {
+  protected static Map<String, SegmentFetcher> getPreloadSegmentFetchers() {
     return SEGMENT_FETCHER_MAP;
   }
 
