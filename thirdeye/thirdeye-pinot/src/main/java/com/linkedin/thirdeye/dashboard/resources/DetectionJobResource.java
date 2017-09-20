@@ -24,6 +24,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import org.apache.commons.lang.NullArgumentException;
@@ -563,7 +564,7 @@ public class DetectionJobResource {
 
   /**
    *
-   * @param id anomaly function id
+   * @param ids a list of anomaly function ids, separate by comma, id1,id2,id3
    * @param startTimeIso start time of anomalies to tune alert filter in ISO format ex: 2016-5-23T00:00:00Z
    * @param endTimeIso end time of anomalies to tune alert filter in ISO format ex: 2016-5-23T00:00:00Z
    * @param autoTuneType the type of auto tune to invoke (default is "AUTOTUNE")
@@ -571,11 +572,11 @@ public class DetectionJobResource {
    * @param holidayEnds: holidayEnds in in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @param features: a list of features separated by comma, ex: weight,score.
    *                Note that, the feature must be a existing field name in MergedAnomalyResult or a pre-set feature name
-   * @return HTTP response of request: string of alert filter
+   * @return HTTP response of request: a list of autotune config id
    */
   @POST
-  @Path("/autotune/filter/{functionId}")
-  public Response tuneAlertFilter(@PathParam("functionId") long id,
+  @Path("/autotune/filter/{functionIds}")
+  public Response tuneAlertFilter(@PathParam("functionIds") String ids,
       @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso,
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
@@ -587,12 +588,25 @@ public class DetectionJobResource {
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
 
     // get anomalies by function id, start time and end time
-    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
-    List<MergedAnomalyResultDTO> anomalies = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
-    // get current alert filter, TODO: if no need to create blank alert filter
-    BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    List<Long> anomalyFunctionIds = new ArrayList<>();
+    for (String idString : ids.split(",")) {
+      long id = Long.valueOf(idString);
+      AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
+      if (anomalyFunctionSpec == null) {
+        LOG.warn("Anomaly detection function id {} doesn't exist", id);
+        continue;
+      }
+      anomalyFunctionIds.add(id);
+      anomalies.addAll(
+          getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds));
+    }
+    if (anomalyFunctionIds.isEmpty()) {
+      return Response.status(Status.BAD_REQUEST).entity("No valid function ids").build();
+    }
+
     // create alert filter auto tune
-    AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(alertFilter);
+    AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO();
     if (StringUtils.isNotBlank(features)) {
       Properties autotuneProperties = autotuneConfig.getTuningProps();
       String previousFetrues = autotuneProperties.getProperty(AUTOTUNE_FEATURE_KEY);
@@ -602,8 +616,6 @@ public class DetectionJobResource {
     }
     BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
-
-    String autotuneId = null;
 
     // tune
     try {
@@ -615,9 +627,14 @@ public class DetectionJobResource {
     }
 
     // write to DB
-    autotuneConfig.setFunctionId(id);
-    autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig).toString();
-    return Response.ok(autotuneId).build();
+    List<Long> autotuneIds = new ArrayList<>();
+    for (long functionId : anomalyFunctionIds) {
+      autotuneConfig.setId(null);
+      autotuneConfig.setFunctionId(functionId);
+      long autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig);
+      autotuneIds.add(autotuneId);
+    }
+    return Response.ok(autotuneIds).build();
   }
 
 
