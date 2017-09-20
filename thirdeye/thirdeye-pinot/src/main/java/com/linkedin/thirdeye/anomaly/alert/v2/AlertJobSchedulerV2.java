@@ -85,51 +85,68 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
       LOG.info("Scheduled jobs {}", scheduledJobs);
 
       for (AlertConfigDTO alertConfig : alertConfigs) {
-        Long id = alertConfig.getId();
-        String jobKey = getJobKey(id);
-        boolean isActive = alertConfig.isActive();
-        boolean isScheduled = scheduledJobs.contains(jobKey);
-
-        if (isActive) {
-          if (isScheduled) {
-            String cronInDatabase = alertConfig.getCronExpression();
-            List<Trigger> triggers =
-                (List<Trigger>) quartzScheduler.getTriggersOfJob(JobKey.jobKey(jobKey));
-            CronTrigger cronTrigger = (CronTrigger) triggers.get(0);
-            String cronInSchedule = cronTrigger.getCronExpression();
-            // cron expression has been updated, restart this job
-            if (!cronInDatabase.equals(cronInSchedule)) {
-              LOG.info(
-                  "Cron expression for config {} with jobKey {} has been changed from {}  to {}. "
-                      + "Restarting schedule", id, jobKey, cronInSchedule, cronInDatabase);
-              stopJob(jobKey);
-              startJob(alertConfig, jobKey);
-            }
-          } else {
-            LOG.info("Found active but not scheduled {}", id);
-            startJob(alertConfig, jobKey);
-          }
-        } else {
-          if (isScheduled) {
-            LOG.info("Found inactive but scheduled {}", id);
-            stopJob(jobKey);
-          }
-          // for all jobs with not isActive, and not isScheduled, no change required
+        try {
+          createOrUpdateAlertJob(scheduledJobs, alertConfig);
+        } catch (Exception e) {
+          LOG.error("Could not write job for alert config id {}. Skipping. {}", alertConfig.getId(), alertConfig, e);
         }
       }
 
       // for any scheduled jobs, not having a function in the database,
       // stop the schedule, as function has been deleted
       for (String scheduledJobKey : scheduledJobs) {
-        Long configId = getIdFromJobKey(scheduledJobKey);
-        AlertConfigDTO alertConfigSpec = alertConfigDAO.findById(configId);
-        if (alertConfigSpec == null) {
-          LOG.info("Found scheduled, but not in database {}", configId);
-          stopJob(scheduledJobKey);
+        try {
+          deleteAlertJob(scheduledJobKey);
+        } catch(Exception e) {
+          LOG.error("Could not delete alert job '{}'. Skipping.", scheduledJobKey, e);
         }
       }
-    } catch (SchedulerException e) {
-      LOG.error("Exception in reading active jobs", e);
+
+    } catch (Exception e) {
+      LOG.error("Error running scheduler", e);
+    }
+  }
+
+  private void deleteAlertJob(String scheduledJobKey) throws SchedulerException {
+    Long configId = getIdFromJobKey(scheduledJobKey);
+    AlertConfigDTO alertConfigSpec = alertConfigDAO.findById(configId);
+    if (alertConfigSpec == null) {
+      LOG.info("Found scheduled, but not in database {}", configId);
+      stopJob(scheduledJobKey);
+    }
+  }
+
+  private void createOrUpdateAlertJob(List<String> scheduledJobs, AlertConfigDTO alertConfig) throws SchedulerException {
+    Long id = alertConfig.getId();
+    String jobKey = getJobKey(id);
+    boolean isActive = alertConfig.isActive();
+    boolean isScheduled = scheduledJobs.contains(jobKey);
+
+    if (isActive) {
+      if (isScheduled) {
+        String cronInDatabase = alertConfig.getCronExpression();
+        List<Trigger> triggers =
+            (List<Trigger>) quartzScheduler.getTriggersOfJob(JobKey.jobKey(jobKey));
+        CronTrigger cronTrigger = (CronTrigger) triggers.get(0);
+        String cronInSchedule = cronTrigger.getCronExpression();
+        // cron expression has been updated, restart this job
+        if (!cronInDatabase.equals(cronInSchedule)) {
+          LOG.info(
+              "Cron expression for config {} with jobKey {} has been changed from {}  to {}. "
+                  + "Restarting schedule", id, jobKey, cronInSchedule, cronInDatabase);
+          stopJob(jobKey);
+          startJob(alertConfig, jobKey);
+        }
+      } else {
+        LOG.info("Found active but not scheduled {}", id);
+        startJob(alertConfig, jobKey);
+      }
+    } else {
+      if (isScheduled) {
+        LOG.info("Found inactive but scheduled {}", id);
+        stopJob(jobKey);
+      }
+      // for all jobs with not isActive, and not isScheduled, no change required
     }
   }
 
@@ -169,16 +186,15 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
     stopJob(jobKey);
   }
 
-  public void stopJob(String jobKey) throws SchedulerException {
+  private void stopJob(String jobKey) throws SchedulerException {
     if (!quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
-      throw new IllegalStateException(
-          "Cannot stop alert config " + jobKey + ", it has not been scheduled");
+      throw new IllegalStateException("Cannot stop alert config " + jobKey + ", it has not been scheduled");
     }
     quartzScheduler.deleteJob(JobKey.jobKey(jobKey));
     LOG.info("Stopped alert config {}", jobKey);
   }
 
-  private void scheduleJob(JobContext jobContext, AlertConfigDTO alertConfig) {
+  private void scheduleJob(JobContext jobContext, AlertConfigDTO alertConfig) throws SchedulerException {
     LOG.info("Starting {}", jobContext.getJobName());
     String triggerKey = String.format("alert_scheduler_trigger_%d", alertConfig.getId());
     CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
@@ -186,11 +202,7 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
     String jobKey = jobContext.getJobName();
     JobDetail job = JobBuilder.newJob(AlertJobRunnerV2.class).withIdentity(jobKey).build();
     job.getJobDataMap().put(AlertJobRunnerV2.ALERT_JOB_CONTEXT_V2, jobContext);
-    try {
-      quartzScheduler.scheduleJob(job, trigger);
-    } catch (SchedulerException e) {
-      LOG.error("Exception while scheduling alert job", e);
-    }
+    quartzScheduler.scheduleJob(job, trigger);
     LOG.info("Started {}: {}", jobKey, alertConfig);
   }
 
