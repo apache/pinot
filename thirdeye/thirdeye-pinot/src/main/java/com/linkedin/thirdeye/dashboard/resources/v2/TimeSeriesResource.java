@@ -65,11 +65,13 @@ import org.slf4j.LoggerFactory;
 public class TimeSeriesResource {
   enum TransformationType {
     CUMULATIVE,
+    DIFFERENCE,
+    CHANGE,
     FILLFORWARD,
     FILLZERO,
     TIMESTAMP,
-    CHANGE,
     RELATIVE,
+    OFFSET,
     LOG,
   }
 
@@ -124,21 +126,21 @@ public class TimeSeriesResource {
    *
    * <p>The result is structured hierarchically as follows:
    * <pre>
-   * [time range 0]:
-   *   [metric id 0]:
+   * [time_range 0]:
+   *   [metric_id 0]:
    *     value 0, value 1, ..., value n
-   *   [metric id 1]:
-   *     value 0, value 1, ..., value n
-   *   timestamp:
-   *     timestamp 0, timestamp 1, ..., timestamp n
-   * [time range 1]:
-   *   [metric id 0]:
-   *     value 0, value 1, ..., value n
-   *   [metric id 1]:
+   *   [metric_id 1]:
    *     value 0, value 1, ..., value n
    *   timestamp:
    *     timestamp 0, timestamp 1, ..., timestamp n
-   * }</pre>
+   * [time_range 1]:
+   *   [metric_id 0]:
+   *     value 0, value 1, ..., value n
+   *   [metric_id 1]:
+   *     value 0, value 1, ..., value n
+   *   timestamp:
+   *     timestamp 0, timestamp 1, ..., timestamp n
+   * </pre>
    * Note that the timestamp column is always present.</p>
    *
    * <p>Transformations are applied to each time series before aggregation in the order they
@@ -146,7 +148,31 @@ public class TimeSeriesResource {
    * nested in a similar way. Note, that if one or more aggregations are specified the
    * time ranges must be of equal length.</p>
    *
-   * <p>Sample queries:
+   * <p>Available transformations are:
+   * <pre>
+   *   CUMULATIVE    rolling sum of values
+   *   DIFFERENCE    differences from previous to current value
+   *   CHANGE        relative changes from previous to current value
+   *   FILLFORWARD   fills nulls with last non-null value (first value may still be null)
+   *   FILLZERO      fills nulls with 0
+   *   TIMESTAMP     absolute timestamp instead of offset (no effect on aggregated series)
+   *   RELATIVE      values divided by first value of the series
+   *   OFFSET        values as offset from first value of the series
+   *   LOG           log10 of values
+   * </pre></p>
+   *
+   * <p>Available aggregations are:
+   * <pre>
+   *   SUM           sum across time ranges of values at the same offset
+   *   PRODUCT       product across time ranges
+   *   MEAN          mean across time ranges
+   *   MEDIAN        median across time ranges
+   *   STD           standard deviation across time ranges
+   *   MIN           minimum across time ranges
+   *   MAX           maximum across time ranges
+   * </pre></p>
+   *
+   * <p>Sample requests for endpoint:
    * <pre>
    * minimal example:    curl -X GET 'localhost:1426/timeseries/query?metricIds=0&ranges=1504076400000:1504162800000'
    * multiple metrics:   curl -X GET 'localhost:1426/timeseries/query?metricIds=0,1&ranges=1504076400000:1504162800000&granularity=1_HOURS'
@@ -286,6 +312,12 @@ public class TimeSeriesResource {
     return output;
   }
 
+  /**
+   * Helper to convert a metric slice into a jodatime utc interval.
+   *
+   * @param slice
+   * @return
+   */
   private static Interval slice2interval(MetricSlice slice) {
     return new Interval(slice.getStart(), slice.getEnd(), DateTimeZone.UTC);
   }
@@ -418,6 +450,8 @@ public class TimeSeriesResource {
     switch (transformation) {
       case CUMULATIVE:
         return transformTimeSeriesCumulative(data);
+      case DIFFERENCE:
+        return transformTimeSeriesDifference(data);
       case FILLFORWARD:
         return transformTimeSeriesFillForward(data);
       case FILLZERO:
@@ -428,6 +462,8 @@ public class TimeSeriesResource {
         return transformTimeSeriesChange(data);
       case RELATIVE:
         return transformTimeSeriesRelative(data);
+      case OFFSET:
+        return transformTimeSeriesOffset(data);
       case LOG:
         return transformTimeSeriesLog(data);
     }
@@ -446,6 +482,22 @@ public class TimeSeriesResource {
       if (data.getIndexName().equals(id))
         continue;
       data.addSeries(id, group.aggregate(id, DoubleSeries.SUM).getValues());
+    }
+    return data;
+  }
+
+  /**
+   * Returns time series of differences.
+   *
+   * @param data query results
+   * @return differences time series
+   */
+  private DataFrame transformTimeSeriesDifference(DataFrame data) {
+    for (String id : data.getSeriesNames()) {
+      if (data.getIndexName().equals(id))
+        continue;
+      DoubleSeries s = data.getDoubles(id);
+      data.addSeries(id, s.subtract(s.shift(1)));
     }
     return data;
   }
@@ -505,7 +557,7 @@ public class TimeSeriesResource {
   }
 
   /**
-   * Returns time series as relative offset to first value.
+   * Returns time series as relative value, divided by the series' first value.
    *
    * @param data query results
    * @return filled time series
@@ -523,6 +575,25 @@ public class TimeSeriesResource {
       } else {
         data.addSeries(id, DoubleSeries.nulls(s.size()));
       }
+    }
+    return data;
+  }
+
+  /**
+   * Returns time series as offset from the series' first value.
+   *
+   * @param data query results
+   * @return filled time series
+   */
+  private DataFrame transformTimeSeriesOffset(DataFrame data) {
+    for (String id : data.getSeriesNames()) {
+      if (data.getIndexName().equals(id))
+        continue;
+      DoubleSeries s = data.getDoubles(id);
+      if (s.size() <= 0)
+        continue;
+      final double base = s.first().doubleValue();
+      data.addSeries(id, s.subtract(base));
     }
     return data;
   }
