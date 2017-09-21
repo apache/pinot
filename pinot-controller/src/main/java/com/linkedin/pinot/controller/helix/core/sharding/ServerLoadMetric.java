@@ -15,23 +15,15 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import java.util.List;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.model.IdealState;
 
 
-/**
- * Given a segmentMetadata, each strategy has to implement its own method to compute the assigned instances.
- *
- *
- */
-public interface SegmentAssignmentStrategy {
-
-  List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName);
-
+/*
+This interface can be implemented by all approaches that assigns a numeric load metric to a server.
+Example load metrics are number of segments, storage size of segments, STeP paper cost model.
+STeP paper: http://people.csail.mit.edu/rytaft/step.pdf
+*/
+public interface ServerLoadMetric {
+  long computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance);
 }
-
-

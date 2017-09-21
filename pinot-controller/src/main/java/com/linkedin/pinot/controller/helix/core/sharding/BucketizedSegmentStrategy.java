@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -39,8 +40,9 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(BucketizedSegmentStrategy.class);
 
   @Override
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
+      int numReplicas, String tenantName) {
     String serverTenantName = null;
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
       serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
@@ -48,11 +50,14 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
       serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
     }
 
-    List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
+    List<String> allInstances =
+        HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName,
+            serverTenantName);
     List<String> selectedInstanceList = new ArrayList<String>();
     if (segmentMetadata.getShardingKey() != null) {
       for (String instance : allInstances) {
-        if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixAdmin).get("shardingKey")
+        if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixResourceManager.getHelixAdmin())
+            .get("shardingKey")
             .equalsIgnoreCase(segmentMetadata.getShardingKey())) {
           selectedInstanceList.add(instance);
         }

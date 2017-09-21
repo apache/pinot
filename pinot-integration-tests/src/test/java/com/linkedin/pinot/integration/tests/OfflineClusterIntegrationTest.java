@@ -34,6 +34,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -72,6 +73,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   protected int getNumServers() {
     return NUM_SERVERS;
+  }
+
+  protected String getSegmentAssignmentStrategy(){
+    return TableConfig.Builder.getDefaultSegmentAssignmentStrategy();
+  }
+
+  protected int getNumReplicas(){
+    return 3;
   }
 
   @BeforeClass
@@ -121,7 +130,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Create the table
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
-        getTaskConfig());
+        getTaskConfig(),getSegmentAssignmentStrategy(), getNumReplicas());
 
     // Upload all segments
     uploadSegments(_tarDir);

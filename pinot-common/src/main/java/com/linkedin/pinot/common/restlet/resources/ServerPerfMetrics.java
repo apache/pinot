@@ -13,17 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.helix.core.sharding;
+package com.linkedin.pinot.common.restlet.resources;
+
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 /**
- * Supported SegmentAssignmentStrategies.
- *
- *
+Server measure defined performance metrics as of object of this class
+This class can be expanded to contain more load metrics
  */
-public enum SegmentAssignmentStrategyEnum {
-  RandomAssignmentStrategy,
-  BalanceNumSegmentAssignmentStrategy,
-  BucketizedSegmentAssignmentStrategy,
-  ReplicaGroupSegmentAssignmentStrategy,
-  BalancedSegmentSizeSegmentAssignmentStrategy
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class ServerPerfMetrics {
+  public long segmentCount = 0;
+  public long segmentDiskSizeInBytes = 0;
+
+  public ServerPerfMetrics() {
+    segmentCount = 0;
+    segmentDiskSizeInBytes = 0;
+  }
+
+  public long getSegmentCount() {
+    return segmentCount;
+  }
+
+  public long getSegmentDiskSizeInBytes() {
+    return segmentDiskSizeInBytes;
+  }
 }

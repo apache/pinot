@@ -238,9 +238,16 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
       TableTaskConfig taskConfig) throws Exception {
+    addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
+        invertedIndexColumns, taskConfig, TableConfig.Builder.getDefaultSegmentAssignmentStrategy(), 3 );
+  }
+
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
+      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
+      TableTaskConfig taskConfig, String segmentAssignmentStrategy, int numReplicas) throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, taskConfig);
+            invertedIndexColumns, taskConfig, segmentAssignmentStrategy,numReplicas);
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
   }
 
@@ -256,16 +263,24 @@ public abstract class ClusterTest extends ControllerTest {
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
       List<String> invertedIndexColumns, TableTaskConfig taskConfig) throws Exception {
+      return getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode,
+          segmentVersion, invertedIndexColumns, taskConfig,  TableConfig.Builder.getDefaultSegmentAssignmentStrategy(), 3);
+  }
+
+  private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
+      String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
+      List<String> invertedIndexColumns, TableTaskConfig taskConfig, String segmentAssignmentStrategy, int numReplicas) throws Exception {
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName(timeColumnName)
         .setTimeType(timeType)
-        .setNumReplicas(3)
+        .setNumReplicas(numReplicas)
         .setBrokerTenant(brokerTenant)
         .setServerTenant(serverTenant)
         .setLoadMode(loadMode)
         .setSegmentVersion(segmentVersion.toString())
         .setInvertedIndexColumns(invertedIndexColumns)
         .setTaskConfig(taskConfig)
+        .setSegmentAssignmentStrategy(segmentAssignmentStrategy)
         .build();
   }
 

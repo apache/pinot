@@ -66,6 +66,7 @@ public class CommonConstants {
       public enum SegmentAssignmentStrategyType {
         RandomAssignmentStrategy,
         BalanceNumSegmentAssignmentStrategy,
+        BalanceSegmentsSizeSegmentAssignmentStrategy,
         BucketizedSegmentAssignmentStrategy,
         ReplicaGroupSegmentAssignmentStrategy
       }
@@ -167,6 +168,10 @@ public class CommonConstants {
       public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";
+    }
+
+    public static class ServerPerfMetricUris {
+      public static final String SERVER_SEGMENT_INFO_URI = "/ServerPerfMetrics/SegmentInfo";
     }
 
     public enum TableType {

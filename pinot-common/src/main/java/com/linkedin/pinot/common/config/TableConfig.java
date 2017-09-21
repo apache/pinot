@@ -416,6 +416,10 @@ public class TableConfig {
       return this;
     }
 
+    public static String getDefaultSegmentAssignmentStrategy() {
+      return DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY;
+    }
+
     public Builder setSortedColumn(String sortedColumn) {
       _sortedColumn = sortedColumn;
       return this;
