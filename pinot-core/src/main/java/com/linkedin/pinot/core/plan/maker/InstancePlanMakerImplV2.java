@@ -44,6 +44,10 @@ import org.slf4j.LoggerFactory;
 public class InstancePlanMakerImplV2 implements PlanMaker {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
 
+  private static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY = "max.init.group.holder.capacity";
+  private static final int DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
+  private final int _maxInitialResultHolderCapacity;
+
   // TODO: Fix the runtime trimming and add back the number of aggregation groups limit.
   // TODO: Need to revisit the runtime trimming solution. Current solution will remove group keys that should not be removed.
   // Limit on number of groups, beyond which results are truncated.
@@ -55,6 +59,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * Default constructor.
    */
   public InstancePlanMakerImplV2() {
+    _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
 //    _numAggrGroupsLimit = DEFAULT_NUM_AGGR_GROUPS_LIMIT;
   }
 
@@ -67,6 +72,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param queryExecutorConfig query executor configuration.
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
+    _maxInitialResultHolderCapacity = queryExecutorConfig.getConfig()
+        .getInt(MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY, DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+
     // TODO: Read the limit on number of aggregation groups in query result from config.
     // _numAggrGroupsLimit = queryExecutorConfig.getConfig().getInt(NUM_AGGR_GROUPS_LIMIT, DEFAULT_NUM_AGGR_GROUPS_LIMIT);
     // LOGGER.info("Maximum number of allowed groups for group-by query results: '{}'", _numAggrGroupsLimit);
@@ -78,7 +86,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         // Aggregation group-by query.
-        return new AggregationGroupByPlanNode(indexSegment, brokerRequest, _numAggrGroupsLimit);
+        return new AggregationGroupByPlanNode(indexSegment, brokerRequest, _maxInitialResultHolderCapacity,
+            _numAggrGroupsLimit);
       } else {
           // Aggregation only query.
         if (isFitForMetadataBasedPlan(brokerRequest)) {

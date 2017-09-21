@@ -214,7 +214,8 @@ public class TransformGroupByTest {
         TransformPlanNode.buildTransformExpressionTrees(expressions));
 
     AggregationGroupByOperator groupByOperator =
-        new AggregationGroupByOperator(aggrFuncContextArray, groupBy, Integer.MAX_VALUE, transformOperator, NUM_ROWS);
+        new AggregationGroupByOperator(aggrFuncContextArray, groupBy, 10_000, Integer.MAX_VALUE, transformOperator,
+            NUM_ROWS);
 
     IntermediateResultsBlock block = (IntermediateResultsBlock) groupByOperator.nextBlock();
     return block.getAggregationGroupByResult();
