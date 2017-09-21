@@ -65,9 +65,11 @@ public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthCon
     AuthRequest credentials = new AuthRequest();
     try {
       Map<String, Cookie> cookies = requestContext.getCookies();
-      if (cookies != null) {
+      if (cookies != null && cookies.containsKey(AuthResource.AUTH_TOKEN_NAME)) {
         String rawToken = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
         credentials.setToken(rawToken);
+      } else {
+        throw new IllegalAccessException("Auth cookie is missing!");
       }
     } catch (Exception e) {
       LOG.warn(e.getMessage(), e);

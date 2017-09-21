@@ -168,7 +168,7 @@ public class AnomaliesResource {
       MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
           .getDimensionMapMetricTimeSeriesMap().get(dimensions);
       String metricName = anomalyFunction.getMetric();
-      double currentVal = getTotalFromTimeSeries(currentTimeSeries, metricName, dataset.isAdditive());
+      double currentVal = getAverageFromTimeSeries(currentTimeSeries, metricName);
       response.setCurrentVal(currentVal);
 
       for (AlertConfigBean.COMPARE_MODE compareMode : AlertConfigBean.COMPARE_MODE.values()) {
@@ -182,7 +182,7 @@ public class AnomaliesResource {
         MetricTimeSeries baselineTimeSeries = anomalyDetectionInputContextBuilder.build()
             .getDimensionMapMetricTimeSeriesMap().get(dimensions);
         AnomalyDataCompare.CompareResult compareResult = new AnomalyDataCompare.CompareResult();
-        double baseLineval = getTotalFromTimeSeries(baselineTimeSeries, metricName, dataset.isAdditive());
+        double baseLineval = getAverageFromTimeSeries(baselineTimeSeries, metricName);
         compareResult.setBaselineValue(baseLineval);
         compareResult.setCompareMode(compareMode);
         compareResult.setChange(calculateChange(currentVal, baseLineval));
@@ -207,23 +207,15 @@ public class AnomaliesResource {
     return (currentValue - baselineValue) / baselineValue;
   }
 
-  double getTotalFromTimeSeries (MetricTimeSeries metricTimeSeries, String metricName, boolean isAdditive) {
-    double total = 0.0;
-
+  double getAverageFromTimeSeries(MetricTimeSeries metricTimeSeries, String metricName) {
     // MetricTimeSeries will have multiple values in case of derived/multimetric
-    Number[] metricTotals = metricTimeSeries.getMetricSums();
+    Double[] metricAverages = metricTimeSeries.getMetricAvgs(0d);
     Integer metricIndex = metricTimeSeries.getSchema().getMetricIndex(metricName);
     if (metricIndex != null) {
-      total = metricTotals[metricIndex].doubleValue();
+      return metricAverages[metricIndex];
     } else {
-      total = metricTotals[0].doubleValue();
+      return metricAverages[0];
     }
-
-    if (!isAdditive) {
-      // for non Additive data sets return the average
-      total /= metricTimeSeries.getTimeWindowSet().size();
-    }
-    return total;
   }
 
 

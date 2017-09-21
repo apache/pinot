@@ -246,41 +246,83 @@ public class MetricTimeSeries {
   }
 
   public Number[] getMetricSums() {
-    Number[] result = new Number[schema.getNumMetrics()];
+    Number[] sum = new Number[schema.getNumMetrics()];
+    int[] bucketCount = new int[schema.getNumMetrics()];
+    calculateMetricSumAndBucketCount(sum, bucketCount);
 
+    return sum;
+  }
+
+  /**
+   * Returns the average values of metrics. If a metric does not have any values, then its average value is null.
+   *
+   * @return the average values of metrics.
+   */
+  public Double[] getMetricAvgs() {
+    return getMetricAvgs(null);
+  }
+
+  /**
+   * Returns the average values of metrics. If a metric does not have any values, then its average value is
+   * valueOfdividedByZero.
+   *
+   * @param valueOfdividedByZero the value to be used when a metric does not have any values.
+   *
+   * @return the average values of metrics.
+   */
+  public Double[] getMetricAvgs(Double valueOfdividedByZero) {
+    Number[] sum = new Number[schema.getNumMetrics()];
+    int[] bucketCount = new int[schema.getNumMetrics()];
+    calculateMetricSumAndBucketCount(sum, bucketCount);
+
+    Double[] avg = new Double[schema.getNumMetrics()];
+    for (int i = 0; i < sum.length; i++) {
+      if (bucketCount[i] != 0) {
+        avg[i] = sum[i].doubleValue() / (double) bucketCount[i];
+      } else {
+        avg[i] = valueOfdividedByZero;
+      }
+    }
+
+    return avg;
+  }
+
+  private void calculateMetricSumAndBucketCount(Number[] sum, int[] bucketCount) {
     for (int i = 0; i < schema.getNumMetrics(); i++) {
-      result[i] = 0;
+      sum[i] = 0;
+      bucketCount[i] = 0;
     }
 
     for (Long time : metricsValue.keySet()) {
       for (int i = 0; i < schema.getNumMetrics(); i++) {
         String metricName = schema.getMetricName(i);
         MetricType metricType = schema.getMetricType(i);
-        Number metricValue = getOrDefault(time, metricName, 0);
+        Number metricValue = getOrDefault(time, metricName, null);
 
-        switch (metricType) {
-        case INT:
-          result[i] = result[i].intValue() + metricValue.intValue();
-          break;
-        case SHORT:
-          result[i] = result[i].shortValue() + metricValue.shortValue();
-          break;
-        case LONG:
-          result[i] = result[i].longValue() + metricValue.longValue();
-          break;
-        case FLOAT:
-          result[i] = result[i].floatValue() + metricValue.floatValue();
-          break;
-        case DOUBLE:
-          result[i] = result[i].doubleValue() + metricValue.doubleValue();
-          break;
-        default:
-          throw new IllegalStateException();
+        if (metricValue != null) {
+          switch (metricType) {
+          case INT:
+            sum[i] = sum[i].intValue() + metricValue.intValue();
+            break;
+          case SHORT:
+            sum[i] = sum[i].shortValue() + metricValue.shortValue();
+            break;
+          case LONG:
+            sum[i] = sum[i].longValue() + metricValue.longValue();
+            break;
+          case FLOAT:
+            sum[i] = sum[i].floatValue() + metricValue.floatValue();
+            break;
+          case DOUBLE:
+            sum[i] = sum[i].doubleValue() + metricValue.doubleValue();
+            break;
+          default:
+            throw new IllegalStateException();
+          }
+          ++bucketCount[i];
         }
       }
     }
-
-    return result;
   }
 
   public Integer[] getHasValueSums() {
