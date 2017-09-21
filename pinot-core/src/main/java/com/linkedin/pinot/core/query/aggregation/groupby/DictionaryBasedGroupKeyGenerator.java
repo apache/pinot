@@ -340,12 +340,14 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Nonnull
     @Override
     public int[] processMultiValue(int index) {
-      int[] rawKeys = getIntRawKeys(index);
-      int length = rawKeys.length;
-      int[] groupIds = new int[length];
+      int[] groupIds = getIntRawKeys(index);
+
+      // Convert raw keys to group ids
+      int length = groupIds.length;
       for (int i = 0; i < length; i++) {
-        groupIds[i] = getGroupId(rawKeys[i]);
+        groupIds[i] = getGroupId(groupIds[i]);
       }
+
       return groupIds;
     }
 
