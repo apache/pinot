@@ -114,7 +114,7 @@
     <ul class="investigate-wow">
       <li class="wow-card">
         <div class="wow-card-header">
-          <label class="label-medium-semibold">Current Total</label>
+          <label class="label-medium-semibold">Current Average</label>
         </div>
         <div class="wow-card-body">
           {{formatNumber (formatDouble currentValue)}}
