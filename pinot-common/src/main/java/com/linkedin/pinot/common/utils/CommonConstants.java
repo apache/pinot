@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import java.io.File;
 import org.apache.commons.lang.StringUtils;
+
+import java.io.File;
 
 
 public class CommonConstants {
@@ -301,5 +302,16 @@ public class CommonConstants {
       OFFLINE,
       REALTIME
     }
+  }
+
+  public static class SegmentFetcher {
+    public static class HdfsSegmentFetcher {
+      public static final String PRINCIPLE = "hadoop.kerberos.principle";
+      public static final String KEYTAB = "hadoop.kerberos.keytab";
+      public static final String HADOOP_CONF_PATH = "hadoop.conf.path";
+    }
+
+    public static final String RETRY = "retry.count";
+    public static final String RETRY_WAITIME_MS = "retry.wait.ms";
   }
 }

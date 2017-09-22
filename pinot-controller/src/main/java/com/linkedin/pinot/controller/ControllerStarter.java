@@ -113,7 +113,7 @@ public class ControllerStarter {
 
     // Start all components
     try {
-      LOGGER.info("initializing segment fetcher");
+      LOGGER.info("initializing segment fetchers for all protocols");
       SegmentFetcherFactory.initSegmentFetcherFactory(config);
 
       LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");

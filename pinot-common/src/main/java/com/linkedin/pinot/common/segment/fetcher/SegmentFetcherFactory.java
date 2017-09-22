@@ -48,8 +48,10 @@ public class SegmentFetcherFactory {
 
     // initialize predefined fetcher
     for (String protocol: SEGMENT_FETCHER_MAP.keySet()) {
-      LOGGER.debug("initializing segment fetcher protocol {}", protocol);
-      initSegmentFetcher(protocol, new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol)));
+      LOGGER.info("initializing segment fetcher for protocol [{}]", protocol);
+      Map<String, String> conf = new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol));
+      logFetcherInitConfig(protocol, conf);
+      initSegmentFetcher(protocol, conf);
     }
 
     // initialize dynamic loaded fetcher
@@ -60,9 +62,10 @@ public class SegmentFetcherFactory {
         String segmentFetcherConfigKey = configKeyObject.toString();
         String protocol = segmentFetcherConfigKey.split("\\.", 2)[0];
         if (!SegmentFetcherFactory.containsProtocol(protocol)) {
-          LOGGER.debug("initializing segment fetcher protocol " + protocol);
-          SegmentFetcherFactory.initSegmentFetcher(protocol,
-              new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol)));
+          LOGGER.info("initializing segment fetcher for protocol [{}]", protocol);
+          Map<String, String> conf = new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol));
+          logFetcherInitConfig(protocol, conf);
+          SegmentFetcherFactory.initSegmentFetcher(protocol, conf);
         }
       } catch (Exception e) {
         LOGGER.error("Got exception to process the key: " + configKeyObject);
@@ -109,5 +112,13 @@ public class SegmentFetcherFactory {
       return splitedUri[0];
     }
     throw new UnsupportedOperationException("Not supported uri: " + uri);
+  }
+
+  private static void logFetcherInitConfig(String protocol, Map<String, String> conf) {
+    LOGGER.info("Initializing protocol [{}] with the following configs:", protocol);
+    for (Map.Entry entry: conf.entrySet()) {
+      LOGGER.info("{}: {}", entry.getKey(), entry.getValue());
+    }
+    LOGGER.info("");
   }
 }

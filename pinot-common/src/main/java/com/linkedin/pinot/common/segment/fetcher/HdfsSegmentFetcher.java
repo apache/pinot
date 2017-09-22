@@ -26,28 +26,37 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-/**
- * Created by jamesshao on 9/14/17.
- */
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY_WAITIME_MS;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.PRINCIPLE;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.KEYTAB;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.HADOOP_CONF_PATH;
+
 public class HdfsSegmentFetcher implements SegmentFetcher {
 
-  private static final String PRINCIPLE = "hadoop.kerberos.principle";
-  private static final String KEYTAB = "hadoop.kerberos.keytab";
-  private static final String HADOOP_CONF_PATH = "hadoop.conf.path";
   private static final Logger LOGGER = LoggerFactory.getLogger(HdfsSegmentFetcher.class);
-  private FileSystem fs = null;
+  private FileSystem hadoopFS = null;
+  private int retryCount = 3;
+  private int retryWaitMs = 100;
 
   @Override
   public void init(Map<String, String> configs) {
     String hadoopConfPath = configs.get(HADOOP_CONF_PATH);
-    Configuration hadoopConf = getConf(hadoopConfPath);
-    authenticate(hadoopConf, configs);
+    if (configs.containsKey(RETRY)) {
+      retryCount = Integer.valueOf(configs.get(RETRY));
+    }
+    if (configs.containsKey(RETRY_WAITIME_MS)) {
+      retryWaitMs = Integer.valueOf(configs.get(RETRY_WAITIME_MS));
+    }
     try {
-      fs = FileSystem.get(hadoopConf);
-      LOGGER.debug("successfully initialized hdfs segment fetcher");
-    } catch (IOException e) {
-      LOGGER.error("failed to initialized the hdfs", e);
+      Configuration hadoopConf = getConf(hadoopConfPath);
+      authenticate(hadoopConf, configs);
+      hadoopFS = FileSystem.get(hadoopConf);
+      LOGGER.info("successfully initialized hdfs segment fetcher");
+    } catch (Exception e) {
+      LOGGER.error("failed to initialized the hdfs segment fetcher", e);
     }
   }
 
@@ -86,18 +95,37 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
   @Override
   public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
     LOGGER.debug("starting to fetch segment from hdfs");
+    String tempFilePath = tempFile.getAbsolutePath();
     try {
-      if (fs == null) {
-        LOGGER.error("uninitialized fs for fetching data from hdfs");
-        throw new RuntimeException("failed to get hdfs client");
+      Path remoteFile = new Path(uri);
+      Path localFile = new Path(tempFile.toURI());
+
+      int attemptCount = 0;
+      while (attemptCount++ < this.retryCount) {
+        try {
+          if (hadoopFS == null) {
+            LOGGER.error("uninitialized hadoopFS for fetching data from hdfs");
+            throw new RuntimeException("failed to get hdfs client");
+          }
+          long startMs = System.currentTimeMillis();
+          hadoopFS.copyToLocalFile(remoteFile, localFile);
+          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms",
+              uri, tempFilePath, tempFile.length(), System.currentTimeMillis() - startMs);
+          return;
+        } catch (IOException ex) {
+          LOGGER.warn(String.format("failed to fetch segment %s from hdfs, current tries: %d", uri, attemptCount), ex);
+        }
+        try {
+          TimeUnit.MILLISECONDS.sleep(retryWaitMs);
+        } catch (InterruptedException ex) {
+          throw new RuntimeException(ex);
+        }
       }
-      
-      fs.copyToLocalFile(new Path(uri), new Path(tempFile.toURI()));
-      LOGGER.debug("copied {} from hdfs to {} in local for size {}", uri, tempFile.getAbsolutePath(), tempFile.length());
-    } catch(Exception ex) {
-      LOGGER.error(String.format("failed to fetch %s from hdfs", uri), ex);
+      throw new IOException(String.format("failed to copy segment from hdfs %s to local %s for %d times",
+          uri, tempFilePath, retryCount));
+    } catch (Exception ex) {
+      LOGGER.error(String.format("failed to fetch %s from hdfs to local %s", uri, tempFilePath), ex);
       throw ex;
     }
   }
-
 }
