@@ -44,13 +44,13 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
   @Override
   public void init(Map<String, String> configs) {
     String hadoopConfPath = configs.get(HADOOP_CONF_PATH);
-    if (configs.containsKey(RETRY)) {
-      retryCount = Integer.valueOf(configs.get(RETRY));
-    }
-    if (configs.containsKey(RETRY_WAITIME_MS)) {
-      retryWaitMs = Integer.valueOf(configs.get(RETRY_WAITIME_MS));
-    }
     try {
+      if (configs.containsKey(RETRY)) {
+        retryCount = Integer.valueOf(configs.get(RETRY));
+      }
+      if (configs.containsKey(RETRY_WAITIME_MS)) {
+        retryWaitMs = Integer.valueOf(configs.get(RETRY_WAITIME_MS));
+      }
       Configuration hadoopConf = getConf(hadoopConfPath);
       authenticate(hadoopConf, configs);
       hadoopFS = FileSystem.get(hadoopConf);
