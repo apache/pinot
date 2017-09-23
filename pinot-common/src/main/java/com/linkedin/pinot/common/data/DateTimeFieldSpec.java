@@ -15,31 +15,19 @@
  */
 package com.linkedin.pinot.common.data;
 
-import java.util.concurrent.TimeUnit;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import org.apache.commons.lang3.EnumUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DateTimeFieldSpec extends FieldSpec {
-
-  private static final String FORMAT_TOKENS_ERROR_STR = "format must be of pattern size:timeunit:timeformat(:pattern)";
-  private static final String FORMAT_PATTERN_ERROR_STR = "format must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)";
-  private static final String TIME_FORMAT_ERROR_STR =
-      "format must be of format [0-9]+:<TimeUnit>:EPOCH or [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:<format>";
-  private static final String GRANULARITY_TOKENS_ERROR_STR = "granularity must be of format size:timeunit";
-  private static final String GRANULARITY_PATTERN_ERROR_STR = "granularity must be of format [0-9]+:<TimeUnit>";
-  private static final String NUMBER_REGEX = "[1-9][0-9]*";
-  private static final String COLON_SEPARATOR = ":";
 
   private String _format;
   private String _granularity;
@@ -97,37 +85,15 @@ public final class DateTimeFieldSpec extends FieldSpec {
   public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
       @Nonnull String granularity, DateTimeType dateTimeType) {
     super(name, dataType, true);
-    check(name, dataType, format, granularity);
+    Preconditions.checkNotNull(name);
+    Preconditions.checkNotNull(dataType);
+    Preconditions.checkArgument(DateTimeFieldSpecUtils.validFormat(format));
+    Preconditions.checkArgument(DateTimeFieldSpecUtils.validGranularity(granularity));
 
+    // TODO: Add validation for dateTimeType, and ensure only 1 is allowed
     _format = format;
     _granularity = granularity;
     _dateTimeType = dateTimeType;
-  }
-
-  private void check(String name, DataType dataType, String format, String granularity) {
-    Preconditions.checkNotNull(name);
-    Preconditions.checkNotNull(dataType);
-
-    Preconditions.checkNotNull(format);
-    String[] formatTokens = format.split(COLON_SEPARATOR);
-    Preconditions.checkArgument(formatTokens.length == 3 || formatTokens.length == 4,
-        FORMAT_TOKENS_ERROR_STR);
-    Preconditions.checkArgument(formatTokens[0].matches(NUMBER_REGEX)
-        && EnumUtils.isValidEnum(TimeUnit.class, formatTokens[1]), FORMAT_PATTERN_ERROR_STR);
-    if (formatTokens.length == 3) {
-      Preconditions.checkArgument(formatTokens[2].equals(TimeFormat.EPOCH.toString()),
-          TIME_FORMAT_ERROR_STR);
-    } else {
-      Preconditions.checkArgument(formatTokens[2].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-          TIME_FORMAT_ERROR_STR);
-    }
-
-    Preconditions.checkNotNull(granularity);
-    String[] granularityTokens = granularity.split(COLON_SEPARATOR);
-    Preconditions.checkArgument(granularityTokens.length == 2, GRANULARITY_TOKENS_ERROR_STR);
-    Preconditions.checkArgument(granularityTokens[0].matches(NUMBER_REGEX)
-        && EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[1]), GRANULARITY_PATTERN_ERROR_STR);
-
   }
 
 
@@ -177,13 +143,6 @@ public final class DateTimeFieldSpec extends FieldSpec {
     _dateTimeType = dateTimeType;
   }
 
-  public static String constructFormat(int columnSize, TimeUnit columnUnit, String columnTimeFormat) {
-    return Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit, columnTimeFormat);
-  }
-
-  public static String constructGranularity(int columnSize, TimeUnit columnUnit) {
-    return Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit);
-  }
 
   @Override
   public String toString() {

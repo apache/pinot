@@ -24,14 +24,18 @@ import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.HavingFilterQuery;
 import com.linkedin.pinot.common.request.HavingFilterQueryMap;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.lang.mutable.MutableInt;
 
 
@@ -201,8 +205,25 @@ public class RequestUtils {
     // Ensure that none of the group-by columns are metric or skipped for materialization.
     GroupBy groupBy = brokerRequest.getGroupBy();
     if (groupBy != null) {
+      Set<String> allGroupByColumns = new HashSet<>();
+
       List<String> groupByColumns = groupBy.getColumns();
-      for (String groupByColumn : groupByColumns) {
+      if (groupByColumns != null) {
+        allGroupByColumns.addAll(groupByColumns);
+      }
+
+      List<String> groupByExpressions = groupBy.getExpressions();
+      if (groupByExpressions != null) {
+        Pql2Compiler compiler = new Pql2Compiler();
+
+        for (String expression : groupByExpressions) {
+          TransformExpressionTree expressionTree = compiler.compileToExpressionTree(expression);
+          List<String> columnNames = new ArrayList<>();
+          expressionTree.getColumns(columnNames);
+          allGroupByColumns.addAll(columnNames);
+        }
+      }
+      for (String groupByColumn : allGroupByColumns) {
         if (metricColumnSet.contains(groupByColumn)) {
           return false;
         }
