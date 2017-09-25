@@ -5,8 +5,8 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.auth.AuthRequest;
 import com.linkedin.thirdeye.auth.ThirdeyeAuthFilter;
-import com.linkedin.thirdeye.auth.IAuthManager;
-import com.linkedin.thirdeye.auth.ThirdeyeAuthenticationManager;
+import com.linkedin.thirdeye.auth.AuthManager;
+import com.linkedin.thirdeye.auth.ThirdeyeAuthManager;
 import com.linkedin.thirdeye.auth.PrincipalAuthContext;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
@@ -176,7 +176,7 @@ public class ThirdEyeDashboardApplication
     }
 
     if (config.getAuthConfig() != null) {
-      IAuthManager authManager = new ThirdeyeAuthenticationManager(config.getAuthConfig());
+      AuthManager authManager = new ThirdeyeAuthManager(config.getAuthConfig());
       DAORegistry.getInstance().setAuthManager(authManager);
       env.jersey().register(new AuthResource());
 

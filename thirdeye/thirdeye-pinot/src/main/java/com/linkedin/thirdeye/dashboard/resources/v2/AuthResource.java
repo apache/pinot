@@ -1,7 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.google.common.base.Optional;
 import com.linkedin.thirdeye.auth.AuthRequest;
-import com.linkedin.thirdeye.auth.IAuthManager;
+import com.linkedin.thirdeye.auth.AuthManager;
 import com.linkedin.thirdeye.auth.PrincipalAuthContext;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +22,7 @@ import org.slf4j.LoggerFactory;
 public class AuthResource {
   public static final String AUTH_TOKEN_NAME = "te_auth";
   private static final Logger LOG = LoggerFactory.getLogger(AuthResource.class);
-  private final IAuthManager authManager;
+  private final AuthManager authManager;
 
   public AuthResource() {
     authManager = DAORegistry.getInstance().getAuthManager();
@@ -31,11 +32,13 @@ public class AuthResource {
   @POST
   public Response authenticate(AuthRequest authRequest) {
     try {
-      PrincipalAuthContext authContext =
-          authManager.authenticate(authRequest.getPrincipal(), authRequest.getPassword());
+      Optional<PrincipalAuthContext> authContext = authManager.authenticate(authRequest);
+      if (!authContext.isPresent()) {
+        return Response.status(Response.Status.UNAUTHORIZED).build();
+      }
 
       //Parameters : (String name, String value, String path, String domain, String comment, int maxAge, boolean secure)
-      NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, authManager.buildAuthToken(authContext), "/", null, null,
+      NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, authManager.buildAuthToken(authContext.get()), "/", null, null,
           (int) TimeUnit.DAYS.toSeconds(7), false);
       return Response.ok(authContext).cookie(cookie).build();
     } catch (Exception e) {

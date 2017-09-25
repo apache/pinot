@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datasource;
 
-import com.linkedin.thirdeye.auth.IAuthManager;
+import com.linkedin.thirdeye.auth.AuthManager;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
@@ -50,7 +50,7 @@ public class DAORegistry {
 
   private static final DAORegistry INSTANCE = new DAORegistry();
 
-  private IAuthManager authManager;
+  private AuthManager authManager;
 
   /****************************************************************************
    * SINGLETON
@@ -164,11 +164,11 @@ public class DAORegistry {
     return DaoProviderUtil.getInstance(ApplicationManagerImpl.class);
   }
 
-  public IAuthManager getAuthManager() {
+  public AuthManager getAuthManager() {
     return authManager;
   }
 
-  public void setAuthManager(IAuthManager authManager) {
+  public void setAuthManager(AuthManager authManager) {
     this.authManager = authManager;
   }
 }

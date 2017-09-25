@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.auth;
 
-public interface IAuthManager {
-  PrincipalAuthContext authenticate(String principal, String password) throws Exception;
+import com.google.common.base.Optional;
+
+
+public interface AuthManager {
+  Optional<PrincipalAuthContext> authenticate(AuthRequest authRequest) throws Exception;
 
   String buildAuthToken(PrincipalAuthContext principalAuthContext) throws Exception;
 
