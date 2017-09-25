@@ -23,7 +23,8 @@ export default Ember.Route.extend(ApplicationRouteMixin, {
    * @override ApplicationRouteMixin.routeAfterAuthentication
    */
   routeAfterAuthentication: 'rca',
-    /**
+
+  /**
    * Augments sessionAuthenticated.
    * @override ApplicationRouteMixin.sessionAuthenticated
    */
@@ -31,5 +32,14 @@ export default Ember.Route.extend(ApplicationRouteMixin, {
     this._super(...arguments);
 
     this.transitionTo('rca');
+  },
+
+  /**
+   * Augments sessionInvalidated so that it doesn't redirect
+   * to rootURL defined in environment.js
+   * @override ApplicationRouteMixin.sessionInvalidated
+   */
+  sessionInvalidated() {
+    this.transitionTo('login');
   }
 });

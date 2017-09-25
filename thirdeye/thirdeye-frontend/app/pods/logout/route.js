@@ -1,18 +1,18 @@
 import Ember from 'ember';
-import UnauthenticatedRouteMixin from 'ember-simple-auth/mixins/unauthenticated-route-mixin';
+import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 /**
  * Logout Page
  * This is necessary because we need to have access to this from
  * the old (non-Ember) UI
  */
-export default Ember.Route.extend(UnauthenticatedRouteMixin, {
+export default Ember.Route.extend(AuthenticatedRouteMixin, {
   session: Ember.inject.service(),
 
   routeIfAlreadyAuthenticated: 'rca',
 
   beforeModel() {
-    this._super();
+    this._super(...arguments);
 
     this.get('session').invalidate();
   }
