@@ -16,14 +16,16 @@
 package com.linkedin.pinot.query.transform;
 
 import com.linkedin.pinot.core.operator.docvalsets.ConstantBlockValSet;
+import com.linkedin.pinot.core.operator.transform.DateTimeConversionTransformUtils;
 import com.linkedin.pinot.core.operator.transform.function.DateTimeConversionTransform;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
 
 /**
  * Unit test for {@link DateTimeConversionTransform}.
@@ -33,18 +35,22 @@ public class DateTimeConversionTransformTest {
 
   private static final int NUM_ROWS = 3;
 
-  //Test conversion of a dateTimeColumn value from a format to millis
+  // Test conversion of a dateTimeColumn value from a format to millis
   @Test(dataProvider = "testDateTimeConversionTransformDataProvider")
-  public void testDateTimeConversionTransform(String inputFormat, String outputFormat, String outputGranularity,
-      long[] input, long[] expected) {
+  public void testDateTimeConversionTransform(String inputFormat, String outputFormat,
+      String outputGranularity, long[] input, long[] expected) {
 
-    TransformTestUtils.TestBlockValSet inputBlockSet = new TransformTestUtils.TestBlockValSet(input, NUM_ROWS);
+    TransformTestUtils.TestBlockValSet inputBlockSet =
+        new TransformTestUtils.TestBlockValSet(input, NUM_ROWS);
     ConstantBlockValSet inputFormatBlockSet = new ConstantBlockValSet(inputFormat, NUM_ROWS);
     ConstantBlockValSet outputFormatBlockSet = new ConstantBlockValSet(outputFormat, NUM_ROWS);
-    ConstantBlockValSet outputGranularityBlockSet = new ConstantBlockValSet(outputGranularity, NUM_ROWS);
+    ConstantBlockValSet outputGranularityBlockSet =
+        new ConstantBlockValSet(outputGranularity, NUM_ROWS);
 
     DateTimeConversionTransform function = new DateTimeConversionTransform();
-    long[] actual = function.transform(NUM_ROWS, inputBlockSet, inputFormatBlockSet, outputFormatBlockSet, outputGranularityBlockSet);
+    long[] actual =
+        function.transform(NUM_ROWS, inputBlockSet, inputFormatBlockSet, outputFormatBlockSet,
+            outputGranularityBlockSet);
 
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(actual[i], expected[i]);
@@ -106,7 +112,6 @@ public class DateTimeConversionTransformTest {
         "1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", input, expected
     });
 
-
     input = new long[NUM_ROWS];
     expected = new long[NUM_ROWS];
     input[0] = 5019660L /* 20170920T02:00:00 */;
@@ -141,6 +146,45 @@ public class DateTimeConversionTransformTest {
     expected[2] = 2487L;
     entries.add(new Object[] {
         "1:MILLISECONDS:EPOCH", "1:WEEKS:EPOCH", "1:MILLISECONDS", input, expected
+    });
+    return entries.toArray(new Object[entries.size()][]);
+  }
+
+  // Test the conversion of a millis value to date time column value in a format
+  @Test(dataProvider = "testConvertMillisToCustomFormatDataProvider")
+  public void testConvertMillisToCustomFormat(String format, long timeColumnValueMS,
+      long timeColumnValueExpected) {
+
+    Object timeColumnValueActual =
+        DateTimeConversionTransformUtils.convertMillisToFormat(timeColumnValueMS, format);
+    Assert.assertEquals(timeColumnValueActual, timeColumnValueExpected);
+  }
+
+  @DataProvider(name = "testConvertMillisToCustomFormatDataProvider")
+  public Object[][] provideTestConvertMillisToCustomFormatData() {
+
+    List<Object[]> entries = new ArrayList<>();
+    entries.add(new Object[] {
+        "1:HOURS:EPOCH", 1498892400000L, 416359L
+    });
+    entries.add(new Object[] {
+        "1:MILLISECONDS:EPOCH", 1498892400000L, 1498892400000L
+    });
+    entries.add(new Object[] {
+        "1:HOURS:EPOCH", 0L, 0L
+    });
+    entries.add(new Object[] {
+        "5:MINUTES:EPOCH", 1498892400000L, 4996308L
+    });
+    entries.add(new Object[] {
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L,
+        Long.valueOf(DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().print(1498892400000L))
+    });
+    entries.add(new Object[] {
+        "1:WEEKS:EPOCH", 1498892400000L, 2478L
+    });
+    entries.add(new Object[] {
+        "1:MONTHS:EPOCH", 1498892400000L, 570L
     });
     return entries.toArray(new Object[entries.size()][]);
   }

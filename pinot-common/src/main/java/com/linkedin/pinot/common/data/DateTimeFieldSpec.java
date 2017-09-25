@@ -87,8 +87,8 @@ public final class DateTimeFieldSpec extends FieldSpec {
     super(name, dataType, true);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(dataType);
-    Preconditions.checkArgument(DateTimeFieldSpecUtils.validFormat(format));
-    Preconditions.checkArgument(DateTimeFieldSpecUtils.validGranularity(granularity));
+    Preconditions.checkArgument(DateTimeFieldSpecUtils.isValidFormat(format));
+    Preconditions.checkArgument(DateTimeFieldSpecUtils.isValidGranularity(granularity));
 
     // TODO: Add validation for dateTimeType, and ensure only 1 is allowed
     _format = format;

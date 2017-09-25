@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
  */
 public class DateTimeFieldSpecUtilsTest {
 
-
   // Test conversion of a dateTimeColumn value from a format to millis
   @Test(dataProvider = "testFromFormatToMillisDataProvider")
   public void testFromFormatToMillis(String format, Object timeColumnValue, long millisExpected) {
@@ -57,19 +56,23 @@ public class DateTimeFieldSpecUtilsTest {
         "5:MINUTES:EPOCH", 4996308L, 1498892400000L
     });
     entries.add(new Object[] {
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "20170701", DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().parseMillis("20170701")
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "20170701",
+        DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().parseMillis("20170701")
     });
     entries.add(new Object[] {
-        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", "20170701 00", DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().parseMillis("20170701 00")
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", "20170701 00",
+        DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().parseMillis("20170701 00")
     });
     return entries.toArray(new Object[entries.size()][]);
   }
 
   // Test the conversion of a millis value to date time column value in a format
   @Test(dataProvider = "testFromMillisToFormatDataProvider")
-  public void testFromMillisToFormat(String format, long timeColumnValueMS, Object timeColumnValueExpected) {
+  public void testFromMillisToFormat(String format, long timeColumnValueMS, Class type,
+      Object timeColumnValueExpected) {
 
-    Object timeColumnValueActual = DateTimeFieldSpecUtils.fromMillisToFormat(timeColumnValueMS, format);
+    Object timeColumnValueActual =
+        DateTimeFieldSpecUtils.fromMillisToFormat(timeColumnValueMS, format, type);
     Assert.assertEquals(timeColumnValueActual, timeColumnValueExpected);
   }
 
@@ -78,22 +81,24 @@ public class DateTimeFieldSpecUtilsTest {
 
     List<Object[]> entries = new ArrayList<>();
     entries.add(new Object[] {
-        "1:HOURS:EPOCH", 1498892400000L, 416359L
+        "1:HOURS:EPOCH", 1498892400000L, Long.class, 416359L
     });
     entries.add(new Object[] {
-        "1:MILLISECONDS:EPOCH", 1498892400000L, 1498892400000L
+        "1:MILLISECONDS:EPOCH", 1498892400000L, Long.class, 1498892400000L
     });
     entries.add(new Object[] {
-        "1:HOURS:EPOCH", 0L, 0L
+        "1:HOURS:EPOCH", 0L, Long.class, 0L
     });
     entries.add(new Object[] {
-        "5:MINUTES:EPOCH", 1498892400000L, 4996308L
+        "5:MINUTES:EPOCH", 1498892400000L, Long.class, 4996308L
     });
     entries.add(new Object[] {
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().print(1498892400000L)
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L, String.class,
+        DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().print(1498892400000L)
     });
     entries.add(new Object[] {
-        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1498892400000L, DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().print(1498892400000L)
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1498892400000L, String.class,
+        DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().print(1498892400000L)
     });
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -129,30 +134,36 @@ public class DateTimeFieldSpecUtilsTest {
     List<Object[]> entries = new ArrayList<>();
 
     entries.add(new Object[] {
-        "1:HOURS:EPOCH", 1, TimeUnit.HOURS, com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.EPOCH, null
+        "1:HOURS:EPOCH", 1, TimeUnit.HOURS,
+        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.EPOCH, null
     });
 
     entries.add(new Object[] {
-        "5:MINUTES:EPOCH", 5, TimeUnit.MINUTES, com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.EPOCH, null
+        "5:MINUTES:EPOCH", 5, TimeUnit.MINUTES,
+        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.EPOCH, null
     });
 
     entries.add(new Object[] {
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1, TimeUnit.DAYS, com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd"
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1, TimeUnit.DAYS,
+        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd"
     });
 
     entries.add(new Object[] {
-        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.HOURS, com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd HH"
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.HOURS,
+        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "yyyyMMdd HH"
     });
     return entries.toArray(new Object[entries.size()][]);
   }
 
   // Test construct format given its components
   @Test(dataProvider = "testConstructFormatDataProvider")
-  public void testConstructFormat(int columnSize, TimeUnit columnUnit, String columnTimeFormat, String pattern,
-      String formatExpected1, String formatExpected2) {
+  public void testConstructFormat(int columnSize, TimeUnit columnUnit, String columnTimeFormat,
+      String pattern, String formatExpected1, String formatExpected2) {
     String formatActual1 = null;
     try {
-      formatActual1 = DateTimeFieldSpecUtils.constructFormat(columnSize, columnUnit, columnTimeFormat);
+      formatActual1 =
+          DateTimeFieldSpecUtils.constructFormat(columnSize, columnUnit, columnTimeFormat);
     } catch (Exception e) {
       // invalid arguments
     }
@@ -160,7 +171,8 @@ public class DateTimeFieldSpecUtilsTest {
 
     String formatActual2 = null;
     try {
-      formatActual2 = DateTimeFieldSpecUtils.constructFormat(columnSize, columnUnit, columnTimeFormat, pattern);
+      formatActual2 =
+          DateTimeFieldSpecUtils.constructFormat(columnSize, columnUnit, columnTimeFormat, pattern);
     } catch (Exception e) {
       // invalid arguments
     }
@@ -194,7 +206,8 @@ public class DateTimeFieldSpecUtilsTest {
         1, TimeUnit.HOURS, "DUMMY", "yyyyMMdd", null, null
     });
     entries.add(new Object[] {
-        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd", null, "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd"
+        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd", null,
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd"
     });
     entries.add(new Object[] {
         1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", null, null, null
@@ -283,10 +296,12 @@ public class DateTimeFieldSpecUtilsTest {
 
   // Test bucket millis to granularity
   @Test(dataProvider = "testBucketMillisDataProvider")
-  public void testBucketMillis(Long dateTimeColumnValueMS, String outputGranularity, Long expectedBucketedMillis) {
+  public void testBucketMillis(Long dateTimeColumnValueMS, String outputGranularity,
+      Long expectedBucketedMillis) {
     Long bucketedMillis = null;
     try {
-      bucketedMillis = DateTimeFieldSpecUtils.bucketDateTimeValueMS(dateTimeColumnValueMS, outputGranularity);
+      bucketedMillis =
+          DateTimeFieldSpecUtils.bucketDateTimeValueMS(dateTimeColumnValueMS, outputGranularity);
     } catch (Exception e) {
       // invalid arguments
     }
@@ -308,16 +323,20 @@ public class DateTimeFieldSpecUtilsTest {
         null, "1:HOURS", null
     });
     entries.add(new Object[] {
-        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:SECONDS", 1498919002000L /* Rounded to seconds 2017-07-01T07:23:22 000 */
+        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:SECONDS", 1498919002000L
+    /* Rounded to seconds 2017-07-01T07:23:22 000 */
     });
     entries.add(new Object[] {
-        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:MINUTES", 1498918980000L /* Rounded to minutes 2017-07-01T07:23:00 000 */
+        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:MINUTES", 1498918980000L
+    /* Rounded to minutes 2017-07-01T07:23:00 000 */
     });
     entries.add(new Object[] {
-        1498919002080L /* 2017-07-01T07:23:22 080 */, "5:MINUTES", 1498918800000L /* Rounded to 5 minutes 2017-07-01T07:20:00 000 */
+        1498919002080L /* 2017-07-01T07:23:22 080 */, "5:MINUTES", 1498918800000L
+    /* Rounded to 5 minutes 2017-07-01T07:20:00 000 */
     });
     entries.add(new Object[] {
-        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:HOURS", 1498917600000L /* Rounded to 1 hours 2017-07-01T07:20:00 000 */
+        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:HOURS", 1498917600000L
+    /* Rounded to 1 hours 2017-07-01T07:20:00 000 */
     });
     entries.add(new Object[] {
         1498892400000L, null, null
@@ -325,42 +344,5 @@ public class DateTimeFieldSpecUtilsTest {
 
     return entries.toArray(new Object[entries.size()][]);
   }
-
-
-//Test the conversion of a millis value to date time column value in a format
- @Test(dataProvider = "testConvertMillisToCustomFormatDataProvider")
- public void testConvertMillisToCustomFormat(String format, long timeColumnValueMS, long timeColumnValueExpected) {
-
-   Object timeColumnValueActual = DateTimeFieldSpecUtils.convertMillisToCustomFormat(timeColumnValueMS, format);
-   Assert.assertEquals(timeColumnValueActual, timeColumnValueExpected);
- }
-
- @DataProvider(name = "testConvertMillisToCustomFormatDataProvider")
- public Object[][] provideTestConvertMillisToCustomFormatData() {
-
-   List<Object[]> entries = new ArrayList<>();
-   entries.add(new Object[] {
-       "1:HOURS:EPOCH", 1498892400000L, 416359L
-   });
-   entries.add(new Object[] {
-       "1:MILLISECONDS:EPOCH", 1498892400000L, 1498892400000L
-   });
-   entries.add(new Object[] {
-       "1:HOURS:EPOCH", 0L, 0L
-   });
-   entries.add(new Object[] {
-       "5:MINUTES:EPOCH", 1498892400000L, 4996308L
-   });
-   entries.add(new Object[] {
-       "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L, Long.valueOf(DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().print(1498892400000L))
-   });
-   entries.add(new Object[] {
-       "1:WEEKS:EPOCH", 1498892400000L, 2478L
-   });
-   entries.add(new Object[] {
-       "1:MONTHS:EPOCH", 1498892400000L, 570L
-   });
-   return entries.toArray(new Object[entries.size()][]);
- }
 
 }
