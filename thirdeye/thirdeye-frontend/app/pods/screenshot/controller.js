@@ -14,17 +14,25 @@ export default Ember.Controller.extend({
     }
   },
 
+  /**
+   * Padding to be added to the graph
+   */
+  screenshotPadding: {
+    left: 50,
+    right: 100
+  },
+
   // Displaying points for screenshot for n < 100
   point: Ember.computed('anomaly.dates', function() {
     const datesCount = this.get('anomaly.dates.length');
     return {
       show: datesCount <= 100
-    }
+    };
   }),
 
   // Primary Anomaly details
   anomaly: Ember.computed.alias('model.anomalyDetailsList.firstObject'),
-  
+
   // Name of the metric for legend
   metricName: Ember.computed.alias('anomaly.metric'),
 
@@ -52,7 +60,7 @@ export default Ember.Controller.extend({
   ),
 
   /**
-   * Formats dates into ms unix 
+   * Formats dates into ms unix
    * @returns {Array}
    */
   dates: Ember.computed('anomaly.dates.@each', function() {
