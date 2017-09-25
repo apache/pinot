@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.utils.time;
 
-import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.EnumUtils;
