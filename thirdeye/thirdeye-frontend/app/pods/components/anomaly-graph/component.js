@@ -306,6 +306,9 @@ export default Ember.Component.extend({
 
   enableZoom: false,
 
+  // padding for the anomaly graph (optional)
+  padding: null,
+
   // dd for primary metric
   primaryMetricId: Ember.computed('componentId', function() {
     return this.get('componentId') + '-primary-metric-';
@@ -446,10 +449,7 @@ export default Ember.Component.extend({
       return {
         y: {
           show: true,
-          min: 0,
-          padding: {
-            bottom: 0
-          },
+          // min: 0,
           tick: {
             format: d3.format('2s')
           }
@@ -684,8 +684,8 @@ export default Ember.Component.extend({
    */
   primaryRegions: Ember.computed('primaryMetric', function() {
     const primaryMetric = this.get('primaryMetric') || {};
-    const { 
-      regions, 
+    const {
+      regions,
       color = 'orange'
     } = primaryMetric;
 
