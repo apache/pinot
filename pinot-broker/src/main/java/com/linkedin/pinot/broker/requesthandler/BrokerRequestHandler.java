@@ -58,6 +58,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -624,6 +625,14 @@ public class BrokerRequestHandler {
       @Nonnull List<ProcessingException> processingExceptions) {
     try {
       Map<ServerInstance, ByteBuf> serverResponseMap = compositeFuture.get();
+      Iterator<Entry<ServerInstance, ByteBuf>> iterator = serverResponseMap.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Entry<ServerInstance, ByteBuf> entry = iterator.next();
+        if (entry.getValue().readableBytes() == 0) {
+          LOGGER.warn("Got empty response from server: {]", entry.getKey().getShortHostName());
+          iterator.remove();
+        }
+      }
       Map<ServerInstance, Long> responseTimes = compositeFuture.getResponseTimes();
       scatterGatherStats.setResponseTimeMillis(responseTimes, isOfflineTable);
       return serverResponseMap;

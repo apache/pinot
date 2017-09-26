@@ -128,34 +128,42 @@ public abstract class QueryScheduler {
   /**
    * Process query and serialize response
    * @param request incoming query request
-   * @param e Executor service to use for parallelizing query processing
+   * @param executorService Executor service to use for parallelizing query processing
    * @return serialized query response
    */
-  protected byte[] processQueryAndSerialize(@Nonnull final ServerQueryRequest request, @Nonnull final ExecutorService e) {
+  @Nullable
+  protected byte[] processQueryAndSerialize(@Nonnull final ServerQueryRequest request,
+      @Nonnull final ExecutorService executorService) {
     DataTable result;
     try {
-      result = queryExecutor.processQuery(request, e);
-    } catch (Throwable t) {
-      // this is called iff queryTask fails with unhandled exception
+      result = queryExecutor.processQuery(request, executorService);
+    } catch (Exception e) {
+      // For not handled exceptions
       serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       result = new DataTableImplV2();
-      result.addException(QueryException.INTERNAL_ERROR);
+      result.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
+
     byte[] responseData = serializeDataTable(request, result);
+
+    // Log the statistics
+    InstanceRequest instanceRequest = request.getInstanceRequest();
     TimerContext timerContext = request.getTimerContext();
-    @Nonnull Map<String, String> resultMeta = result.getMetadata();
-    LOGGER.info("Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
-        request.getInstanceRequest().getRequestId(),
+    Map<String, String> resultMeta = result.getMetadata();
+    LOGGER.info(
+        "Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
+        instanceRequest.getRequestId(),
         request.getTableName(),
-        request.getInstanceRequest().getSearchSegments().size(),
+        instanceRequest.getSearchSegments().size(),
         request.getSegmentCountAfterPruning(),
         timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME),
-        request.getBrokerId(),
+        instanceRequest.getBrokerId(),
         getMetadataValue(resultMeta, DataTable.NUM_DOCS_SCANNED_METADATA_KEY),
         getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
         getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
         name());
+
     return responseData;
   }
 
@@ -170,34 +178,27 @@ public abstract class QueryScheduler {
    * @param instanceResponse DataTable to serialize
    * @return serialized response bytes
    */
-  public static byte[] serializeDataTable(@Nonnull ServerQueryRequest queryRequest, @Nonnull DataTable instanceResponse) {
+  @Nullable
+  public static byte[] serializeDataTable(@Nonnull ServerQueryRequest queryRequest,
+      @Nonnull DataTable instanceResponse) {
+    TimerContext timerContext = queryRequest.getTimerContext();
+    TimerContext.Timer responseSerializationTimer =
+        timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
 
     byte[] responseByte;
-
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
-    ServerMetrics metrics = queryRequest.getServerMetrics();
-    TimerContext timerContext = queryRequest.getTimerContext();
-    timerContext.startNewPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION);
-    long requestId = instanceRequest != null ? instanceRequest.getRequestId() : -1;
-    String brokerId = instanceRequest != null ? instanceRequest.getBrokerId() : "null";
-
     try {
-      if (instanceResponse == null) {
-        LOGGER.warn("Instance response is null for requestId: {}, brokerId: {}", requestId, brokerId);
-        responseByte = new byte[0];
-      } else {
-        responseByte = instanceResponse.toBytes();
-      }
+      responseByte = instanceResponse.toBytes();
     } catch (Exception e) {
-      metrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
-      LOGGER.error("Got exception while serializing response for requestId: {}, brokerId: {}",
-          requestId, brokerId, e);
+      queryRequest.getServerMetrics().addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+      LOGGER.error("Caught exception while serializing response for requestId: {}, brokerId: {}",
+          instanceRequest.getRequestId(), instanceRequest.getBrokerId(), e);
       responseByte = null;
     }
-    // we assume these phase timers are guaranteed to be started elsewhere..so ignore potential NPE
-    timerContext.getPhaseTimer(ServerQueryPhase.RESPONSE_SERIALIZATION).stopAndRecord();
-    timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.TOTAL_QUERY_TIME, timerContext.getQueryArrivalTimeNs());
-    timerContext.getPhaseTimer(ServerQueryPhase.TOTAL_QUERY_TIME).stopAndRecord();
+
+    responseSerializationTimer.stopAndRecord();
+    timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.TOTAL_QUERY_TIME, timerContext.getQueryArrivalTimeNs())
+        .stopAndRecord();
 
     return responseByte;
   }
