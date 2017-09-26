@@ -87,6 +87,9 @@ export default Ember.Route.extend({
       })
       .then((allApps) => {
         Object.assign(model, { allApps });
+      })
+      .catch((errors) => {
+        Object.assign(model, { loadError: true, loadErrorMsg: errors });
       });
   },
 

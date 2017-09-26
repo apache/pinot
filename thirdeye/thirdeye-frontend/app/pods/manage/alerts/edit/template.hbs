@@ -1,6 +1,12 @@
 <h1 class="te-title">Edit An Alert</h1>
 <main class="alert-create paper-container paper-container--padded te-form">
 
+{{#if isLoadError}}
+  {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+    <strong>Data Error!</strong> We were unable to fetch data for this alert.
+  {{/bs-alert}}
+{{/if}}
+
   <fieldset class="te-form__section te-form__section--first row">
     <div class="col-xs-12">
       <legend class="te-form__section-title">Metric Details</legend>

@@ -76,6 +76,8 @@ export default Ember.Controller.extend({
   allApplications: Ember.computed.reads('model.allApps'),
   selectedConfigGroup: Ember.computed.reads('model.originalConfigGroup'),
   selectedAppName: Ember.computed.reads('model.selectedAppName'),
+  isLoadError: Ember.computed.reads('model.loadError'),
+  loadErrorMessage: Ember.computed.reads('model.loadErrorMsg'),
 
   /**
    * Returns the list of existing config groups and updates it if a new one is added.
