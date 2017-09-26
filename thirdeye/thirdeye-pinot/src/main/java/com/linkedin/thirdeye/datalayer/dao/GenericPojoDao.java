@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.auth.IAuthManager;
-import com.linkedin.thirdeye.auth.PrincipalAuthContext;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
+import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
@@ -56,7 +56,6 @@ import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -167,15 +166,12 @@ public class GenericPojoDao {
   }
 
   private String getCurrentPrincipal() {
-    IAuthManager authManager = DAORegistry.getInstance().getAuthManager();
-    String user = "no-auth-user";
-    if (authManager != null) {
-      PrincipalAuthContext authContext = authManager.getCurrentPrincipal();
-      if (authContext != null) {
-        user = authContext.getPrincipal();
-      }
+    // TODO use injection
+    ThirdEyePrincipal principal = ThirdEyeAuthenticator.getCurrentPrincipal();
+    if (principal != null) {
+     return principal.getName();
     }
-    return user;
+    return "no-auth-user";
   }
 
   public <E extends AbstractBean> Long put(final E pojo) {

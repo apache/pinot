@@ -1,9 +1,9 @@
 package com.linkedin.thirdeye.datasource;
 
-import com.linkedin.thirdeye.auth.IAuthManager;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
+import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
@@ -12,7 +12,6 @@ import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
-import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -24,6 +23,7 @@ import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ApplicationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
@@ -32,7 +32,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EntityToEntityMappingManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.GroupedAnomalyResultsManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
@@ -49,8 +48,6 @@ import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 public class DAORegistry {
 
   private static final DAORegistry INSTANCE = new DAORegistry();
-
-  private IAuthManager authManager;
 
   /****************************************************************************
    * SINGLETON
@@ -162,13 +159,5 @@ public class DAORegistry {
 
   public ApplicationManager getApplicationDAO() {
     return DaoProviderUtil.getInstance(ApplicationManagerImpl.class);
-  }
-
-  public IAuthManager getAuthManager() {
-    return authManager;
-  }
-
-  public void setAuthManager(IAuthManager authManager) {
-    this.authManager = authManager;
   }
 }
