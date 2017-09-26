@@ -1,8 +1,10 @@
 import Base from 'ember-simple-auth/authenticators/base';
 import fetch from 'fetch';
+import Ember from 'ember';
 import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 
 export default Base.extend({
+  session: Ember.inject.service(),
   /**
    * Implements Base authenticator's authenticate method.
    * @param {Object}  credentials containing username and password
@@ -16,7 +18,13 @@ export default Base.extend({
       headers: { 'content-type': 'Application/Json' }
     };
 
-    return fetch(url, postProps).then(checkStatus);
+    return fetch(url, postProps).then(checkStatus).then((res) => {
+      // set expiration to 7 days
+      let expiration = 60 * 60 * 24 * 7;
+
+      this.set('session.store.cookieExpirationTime', expiration);
+      return res;
+    });
   },
 
   restore() {
