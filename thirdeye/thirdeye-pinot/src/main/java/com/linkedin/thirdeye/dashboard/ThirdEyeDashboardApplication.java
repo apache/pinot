@@ -193,7 +193,7 @@ public class ThirdEyeDashboardApplication
       env.jersey().register(new ThirdeyeAuthFilter(cachingAuthenticator, serializer, authConfig.getAllowedPaths()));
 
       // auth resource
-      env.jersey().register(new AuthResource(cachingAuthenticator, serializer));
+      env.jersey().register(new AuthResource(cachingAuthenticator, serializer, authConfig.getCookieTTL() * 1000));
     }
   }
 

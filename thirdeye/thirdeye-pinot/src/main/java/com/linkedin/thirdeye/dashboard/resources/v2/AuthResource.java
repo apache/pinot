@@ -27,10 +27,12 @@ public class AuthResource {
 
   private final Authenticator<Credentials, ThirdEyePrincipal> authenticator;
   private final AuthCookieSerializer serializer;
+  private final long cookieTTL;
 
-  public AuthResource(Authenticator<Credentials, ThirdEyePrincipal> authenticator, AuthCookieSerializer serializer) {
+  public AuthResource(Authenticator<Credentials, ThirdEyePrincipal> authenticator, AuthCookieSerializer serializer, long cookieTTL) {
     this.authenticator = authenticator;
     this.serializer = serializer;
+    this.cookieTTL = cookieTTL;
   }
 
   @Path("/authenticate")
@@ -51,9 +53,8 @@ public class AuthResource {
 
       final String cookieValue = this.serializer.serializeCookie(authCookie);
 
-      //Parameters : (String name, String value, String path, String domain, String comment, int maxAge, boolean secure)
-      NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, cookieValue, "/", null, null,
-          (int) TimeUnit.DAYS.toSeconds(7), false);
+      NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, cookieValue, "/", null, null, (int) (this.cookieTTL / 1000), false);
+
       return Response.ok(principal).cookie(cookie).build();
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -64,7 +65,6 @@ public class AuthResource {
   @Path("/logout")
   @GET
   public Response logout() {
-    //Parameters : (String name, String value, String path, String domain, String comment, int maxAge, boolean secure)
     NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, "", "/", null, null, -1, false);
     return Response.ok().cookie(cookie).build();
   }
@@ -75,6 +75,7 @@ public class AuthResource {
    */
   @GET
   public Response getPrincipalContext() {
+    // TODO refactor this, use injection
     ThirdEyePrincipal authContext = ThirdEyeAuthenticator.getCurrentPrincipal();
     if (authContext == null) {
       LOG.error("Could not find a valid the user");

@@ -33,13 +33,16 @@ public class ThirdeyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
   public void filter(ContainerRequestContext containerRequestContext) throws IOException {
     String uriPath = containerRequestContext.getUriInfo().getPath();
     // authenticate end points should be out of auth filter
-    if (uriPath.equals("auth/authenticate") || uriPath.equals("auth/logout")
+    if (uriPath.equals("auth")
+        || uriPath.equals("auth/authenticate")
+        || uriPath.equals("auth/logout")
         // Landing page should not throw 401
         || uriPath.equals("thirdeye")
         // Let the FE handle the redirect to login page when not authenticated
         || uriPath.equals("thirdeye-admin")
         // Let detector capture the screenshot without authentication error
-        || uriPath.startsWith("anomalies/search/anomalyIds") || uriPath.startsWith("thirdeye/email/generate/datasets")) {
+        || uriPath.startsWith("anomalies/search/anomalyIds")
+        || uriPath.startsWith("thirdeye/email/generate/datasets")) {
       return;
     }
 

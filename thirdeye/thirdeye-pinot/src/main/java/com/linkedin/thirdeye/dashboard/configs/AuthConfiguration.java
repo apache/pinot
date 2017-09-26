@@ -27,9 +27,9 @@ public class AuthConfiguration {
 
   Set<String> allowedPaths = new HashSet<>();
 
-  long cacheTTL;
+  long cacheTTL; // in seconds
 
-  long cookieTTL;
+  long cookieTTL; // in seconds
 
   public Set<String> getAllowedPaths() {
     return allowedPaths;

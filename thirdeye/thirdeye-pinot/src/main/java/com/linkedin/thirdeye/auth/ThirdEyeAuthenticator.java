@@ -71,12 +71,12 @@ public class ThirdEyeAuthenticator implements Authenticator<Credentials, ThirdEy
   }
 
   private static void setCurrentPrincipal(ThirdEyePrincipal principal) {
-    // TODO use injectors
+    // TODO refactor this, use injectors
     principalAuthContextThreadLocal.set(principal);
   }
 
   public static ThirdEyePrincipal getCurrentPrincipal() {
-    // TODO use injectors
+    // TODO refactor this, use injectors
     return principalAuthContextThreadLocal.get();
   }
 }
