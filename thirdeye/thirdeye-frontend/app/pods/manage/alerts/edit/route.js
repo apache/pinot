@@ -1,6 +1,8 @@
 import Ember from 'ember';
 import fetch from 'fetch';
 import moment from 'moment';
+import RSVP from 'rsvp';
+import _ from 'lodash';
 import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 
 /**
@@ -22,15 +24,15 @@ const parseProps = (filters) => {
     }, {});
 };
 
-
-
 export default Ember.Route.extend({
   model(params) {
     const { alertId: id } = params;
     if (!id) { return; }
+    const alertUrl = `/onboard/function/${id}`;
 
-    const url = `/onboard/function/${id}`;
-    return fetch(url).then(checkStatus);
+    return RSVP.hash({
+      function: fetch(alertUrl).then(checkStatus)
+    });
   },
 
   afterModel(model) {
@@ -40,13 +42,15 @@ export default Ember.Route.extend({
       filters,
       bucketUnit: granularity,
       id
-     } = model;
+     } = model.function;
 
     let metricId = '';
+    let allGroupNames = [];
+    let allGroups = [];
 
     return fetch(`/data/autocomplete/metric?name=${dataset}::${metricName}`).then(checkStatus)
-      .then((metrics) => {
-        const metric = metrics.pop();
+      .then((metricsByName) => {
+        const metric = metricsByName.pop();
         metricId = metric.id;
         return fetch(`/data/maxDataTime/metricId/${metricId}`).then(checkStatus);
       })
@@ -59,26 +63,30 @@ export default Ember.Route.extend({
         const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
         const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
         const baselineEnd = moment(currentEnd).subtract(1, 'week');
-        const url =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
+        const metricDataUrl =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
           `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}` +
           `&filters=${encodeURIComponent(formattedFilters)}`;
-        return fetch(url).then(checkStatus);
+        return fetch(metricDataUrl).then(checkStatus);
       })
       .then((metricData) => {
         Object.assign(metricData, { color: 'blue' })
         Object.assign(model, { metricData });
-
-        return fetch(`/thirdeye/email/functions`).then(checkStatus);
+        return fetch(`/thirdeye/entity/ALERT_CONFIG`).then(checkStatus);
       })
-      .then((groupConfigs) => {
-        // Temporary fix to match alert functions to subscribtion group
-        const subscriptionGroups = groupConfigs[id] || [];
-
-        // Back end supports 1-many relationships, however, we currently
-        // enforces 1-1 in the front end
-        const subscriptionGroup = subscriptionGroups.pop();
-
-        Object.assign(model, { subscriptionGroup });
+      .then((allConfigGroups) => {
+        // TODO: confirm dedupe
+        const uniqueGroups = _.uniq(allConfigGroups, name);
+        Object.assign(model, { allConfigGroups: uniqueGroups });
+        return fetch(`/thirdeye/email/function/${id}`).then(checkStatus);
+      })
+      .then((groupByAlertId) => {
+        const originalConfigGroup = groupByAlertId ? groupByAlertId.pop() : null;
+        const selectedAppName = originalConfigGroup ? originalConfigGroup.application : null;
+        Object.assign(model, { originalConfigGroup, selectedAppName });
+        return fetch('/thirdeye/entity/APPLICATION').then(checkStatus);
+      })
+      .then((allApps) => {
+        Object.assign(model, { allApps });
       });
   },
 
@@ -88,6 +96,7 @@ export default Ember.Route.extend({
      */
     refreshModel: function() {
       this.refresh();
+      this.transitionTo('manage.alerts.edit', this.currentModel.function.id);
     }
   }
 });
