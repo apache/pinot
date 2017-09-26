@@ -180,7 +180,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         }
       } catch (Exception e) {
         if (LOGGER.isErrorEnabled()) {
-          LOGGER.error("Caught exception in state transition for OFFLINE -> ONLINE for partition"
+          LOGGER.error("Caught exception in state transition for OFFLINE -> ONLINE for partitionl "
               + message.getPartitionName() + " of table " + message.getResourceName(), e);
         }
         Utils.rethrowException(e);

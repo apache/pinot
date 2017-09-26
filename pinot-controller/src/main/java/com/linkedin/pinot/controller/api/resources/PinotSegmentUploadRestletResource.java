@@ -174,6 +174,7 @@ public class PinotSegmentUploadRestletResource {
     }
     Response.ResponseBuilder builder = Response.ok(dataFile);
     builder.header("Content-Disposition", "attachment; filename=" + dataFile.getName());
+    builder.header("Content-Length", dataFile.length());
     return builder.build();
   }
 

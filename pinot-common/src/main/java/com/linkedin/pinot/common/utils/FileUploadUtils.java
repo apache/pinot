@@ -281,10 +281,14 @@ public class FileUploadUtils {
           throw new PermanentDownloadException(errMsg);
         }
       } else {
-        long ret = httpget.getResponseContentLength();
+        long ret = httpget.getResponseContentLength();  // Expected to be -1 if there is no content-length header.
         BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(file));
         IOUtils.copyLarge(httpget.getResponseBodyAsStream(), output);
         IOUtils.closeQuietly(output);
+        if (ret != -1 && ret != file.length()) {
+          // The content-length header was present and does not match the file length.
+          throw new RuntimeException("File length " + file.length() + " does not match content length " + ret);
+        }
         return ret;
       }
     } catch (Exception ex) {
