@@ -86,12 +86,12 @@
 
   <div class="manage-alert-results">
     {{#if paginatedSelectedAlerts}}
-      <section class="te-search-header"> 
+      <section class="te-search-header">
         <span class="te-search-title">
-          Alerts Found({{selectedAlerts.length}}) 
+          Alerts Found({{selectedAlerts.length}})
         </span>
         <span class="pull-right">
-          Showing {{paginatedSelectedAlerts.length}} of 
+          Showing {{paginatedSelectedAlerts.length}} of
           {{selectedAlerts.length}} {{if (gt selectedAlerts.length 1) 'alerts' 'alert'}}
         </span>
       </section>
@@ -114,10 +114,9 @@
                 {{alert.functionName}}
               </span>
             </div>
-            {{!-- TODO: add edit button once MVP is finalized --}}
-            {{!-- <div class="te-search-results__edit-button">
+            <div class="te-search-results__edit-button">
               {{#link-to "manage.alerts.edit" alert.id}}<span class="glyphicon glyphicon-pencil"></span>{{/link-to}}
-            </div> --}}
+            </div>
           </div>
           <ul class="te-search-results__list te-search-results__list--details-block row">
             <div class="col-xs-12 col-sm-6">
@@ -134,7 +133,7 @@
                 <div class="te-search-results__option">Application</div>
                 <div class="te-search-results__value" title={{alert.application}}>{{alert.application}}</div>
               </li>
-            </div> 
+            </div>
             <div class="col-xs-12 col-sm-6">
               <li class="te-search-results__row">
                 <div class="te-search-results__option">Type</div>

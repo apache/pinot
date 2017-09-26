@@ -617,7 +617,7 @@ export default Ember.Controller.extend({
           properties: 'metricTimezone=America/Los_Angeles;anomalyRemovalThreshold=1.0;scanMinWindowSize=1;continuumOffsetUnit=3600000;scanUseBootstrap=true;scanNumSimulations=500;scanTargetNumAnomalies=1;continuumOffsetSize=1440;scanMaxWindowSize=48;pValueThreshold=0.01;scanStepSize=1'
         },
         day: {
-          type: 'SPLINE_REGRESSION',
+          type: 'SPLINE_REGRESSION_VANILLA',
           windowSize: 1,
           windowUnit: 'DAYS',
           windowDelay: 0,
@@ -973,7 +973,8 @@ export default Ember.Controller.extend({
         emailConfig: { "functionIds": [] },
         recipients: this.get('alertGroupNewRecipient'),
         name: this.get('selectedConfigGroup.name') || this.get('newConfigGroupName').trim(),
-        application: this.get('selectedAppName').application || null
+        application: this.get('selectedAppName').application || null,
+        cronExpression: '0 0/5 * 1/1 * ? *'
       };
 
       // This object contains the data for the new alert function, with default fillers
@@ -1031,10 +1032,10 @@ export default Ember.Controller.extend({
           });
           return newFunctionId;
         })
-        // Todo: redirects once edit page is finalized
-        // .then((id) => {
-        //   this.transitionToRoute('manage.alerts.edit', id);
-        // })
+        // Redirects once edit page is finalized
+        .then((id) => {
+          this.transitionToRoute('manage.alerts.edit', id);
+        })
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         .catch((error) => {
           this.setAlertCreateErrorState(error);
