@@ -47,6 +47,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.ZNRecord;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -73,7 +74,6 @@ public class PinotTableRestletResource {
    *   Set the state for the specified {tableName} of specified type to the specified {state} (enable|disable|drop).
    *   Type here is type of the table, one of 'offline|realtime'.
    * {@inheritDoc}
-   * @see org.restlet.resource.ServerResource#get()
    */
 
   public static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
@@ -354,6 +354,25 @@ public class PinotTableRestletResource {
         throw new PinotHelixResourceManager.InvalidTableConfigException(
             "Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
       }
+    }
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/rebalance")
+  @ApiOperation(value = "Rebalances segments of a table across servers", notes = "Rebalances segments of a table across servers")
+  public ZNRecord rebalance(
+      @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "offline|realtime", required = true) @QueryParam("type") String tableType,
+      @ApiParam(value = "true|false", required = true, defaultValue = "true") @QueryParam("dryrun") Boolean dryRun
+  )
+  {
+    if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
+      return _pinotHelixResourceManager.rebalanceTable(tableName, dryRun, CommonConstants.Helix.TableType.OFFLINE);
+    } else if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name())) {
+      return _pinotHelixResourceManager.rebalanceTable(tableName, dryRun, CommonConstants.Helix.TableType.REALTIME);
+    } else {
+      throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
     }
   }
 }
