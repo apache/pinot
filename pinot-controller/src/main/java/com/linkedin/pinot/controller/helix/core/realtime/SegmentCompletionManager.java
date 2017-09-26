@@ -387,7 +387,7 @@ public class SegmentCompletionManager {
       if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
         initialCommitTimeMs = savedCommitTime;
       }
-      LOGGER = LoggerFactory.getLogger("SegmentFinalizerFSM_"  + segmentName.getSegmentName());
+      LOGGER = LoggerFactory.getLogger("SegmentCompletionFSM_"  + segmentName.getSegmentName());
       if (initialCommitTimeMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS * 1000) {
         // The table has a really high value configured for max commit time. Set it to a higher value than default
         // and go from there.
@@ -522,7 +522,7 @@ public class SegmentCompletionManager {
 
     public SegmentCompletionProtocol.Response stoppedConsuming(String instanceId, long offset, String reason) {
       synchronized (this) {
-        LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
+        LOGGER.info("Processing stoppedConsuming({}, {})", instanceId, offset);
         _excludedServerStateMap.add(instanceId);
         switch (_state) {
           case PARTIAL_CONSUMING:
