@@ -20,7 +20,6 @@ import javax.annotation.Nullable;
 
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.joda.time.format.DateTimeFormat;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.EqualityUtils;
@@ -144,6 +143,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
     _dateTimeType = dateTimeType;
   }
 
+  
   @Override
   public String toString() {
     return "< field type: DATE_TIME, field name: " + getName() + ", datatype: " + getDataType()
