@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.perf;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -28,6 +30,7 @@ import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+
 import java.io.File;
 import java.io.FilenameFilter;
 import java.util.ArrayList;
@@ -40,6 +43,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.log4j.Level;
 
 /**
@@ -58,6 +62,8 @@ public class FilterOperatorBenchmark {
     AtomicInteger totalDocsMatched = new AtomicInteger(0);
     Pql2Compiler pql2Compiler = new Pql2Compiler();
     BrokerRequest brokerRequest = pql2Compiler.compileToBrokerRequest(query);
+    InstanceRequest instanceRequst = new InstanceRequest(0, brokerRequest);
+    ServerQueryRequest serverQueryRequest = new ServerQueryRequest(instanceRequst, null);
     List<Callable<Void>> segmentProcessors = new ArrayList<>();
     long[] timesSpent = new long[segmentDirs.length];
     for (int i = 0; i < segmentDirs.length; i++) {
@@ -80,7 +86,7 @@ public class FilterOperatorBenchmark {
 
       IndexSegmentImpl indexSegmentImpl =
           (IndexSegmentImpl) ColumnarSegmentLoader.load(indexSegmentDir, indexLoadingConfig);
-      segmentProcessors.add(new SegmentProcessor(i, indexSegmentImpl, brokerRequest,
+      segmentProcessors.add(new SegmentProcessor(i, indexSegmentImpl, serverQueryRequest,
           totalDocsMatched, timesSpent));
     }
     ExecutorService executorService = Executors.newCachedThreadPool();
@@ -102,17 +108,17 @@ public class FilterOperatorBenchmark {
 
   public static class SegmentProcessor implements Callable<Void> {
     private IndexSegment indexSegmentImpl;
-    private BrokerRequest brokerRequest;
+    private ServerQueryRequest serverQueryRequest;
     AtomicInteger totalDocsMatched;
     private long[] timesSpent;
     private int id;
 
-    public SegmentProcessor(int id, IndexSegment indexSegmentImpl, BrokerRequest brokerRequest,
+    public SegmentProcessor(int id, IndexSegment indexSegmentImpl, ServerQueryRequest serverQueryRequest,
          AtomicInteger totalDocsMatched, long[] timesSpent) {
       super();
       this.id = id;
       this.indexSegmentImpl = indexSegmentImpl;
-      this.brokerRequest = brokerRequest;
+      this.serverQueryRequest = serverQueryRequest;
       this.totalDocsMatched = totalDocsMatched;
       this.timesSpent = timesSpent;
     }
@@ -124,7 +130,7 @@ public class FilterOperatorBenchmark {
     public Void call() {
       long start, end;
       start = System.currentTimeMillis();
-      FilterPlanNode planNode = new FilterPlanNode(indexSegmentImpl, brokerRequest);
+      FilterPlanNode planNode = new FilterPlanNode(indexSegmentImpl, serverQueryRequest);
       Operator filterOperator = planNode.run();
       filterOperator.open();
       Block block = filterOperator.nextBlock();

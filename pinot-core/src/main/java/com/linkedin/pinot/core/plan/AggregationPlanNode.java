@@ -15,16 +15,19 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.query.AggregationOperator;
 import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+
 import java.util.List;
+
 import javax.annotation.Nonnull;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,10 +43,10 @@ public class AggregationPlanNode implements PlanNode {
   private final List<AggregationInfo> _aggregationInfos;
   private final TransformPlanNode _transformPlanNode;
 
-  public AggregationPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
+  public AggregationPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull ServerQueryRequest serverQueryRequest) {
     _indexSegment = indexSegment;
-    _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
+    _aggregationInfos = serverQueryRequest.getBrokerRequest().getAggregationsInfo();
+    _transformPlanNode = new TransformPlanNode(_indexSegment, serverQueryRequest);
   }
 
   @Override

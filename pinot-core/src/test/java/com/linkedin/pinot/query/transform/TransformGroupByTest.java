@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
@@ -51,6 +52,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.util.TestUtils;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -62,6 +64,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -193,7 +196,8 @@ public class TransformGroupByTest {
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     Pql2Compiler compiler = new Pql2Compiler();
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
+    ServerQueryRequest serverQueryRequest = compiler.compileToServerQueryRequest(query);
+    BrokerRequest brokerRequest = serverQueryRequest.getBrokerRequest();
 
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
     int numAggFunctions = aggregationsInfo.size();
@@ -211,7 +215,7 @@ public class TransformGroupByTest {
     Set<String> expressions = new HashSet<>(groupBy.getExpressions());
 
     TransformExpressionOperator transformOperator = new TransformExpressionOperator(projectionOperator,
-        TransformPlanNode.buildTransformExpressionTrees(expressions));
+        TransformPlanNode.buildTransformExpressionTrees(expressions, serverQueryRequest.getExpressionTreeMap()));
 
     AggregationGroupByOperator groupByOperator =
         new AggregationGroupByOperator(aggrFuncContextArray, groupBy, 10_000, Integer.MAX_VALUE, transformOperator,

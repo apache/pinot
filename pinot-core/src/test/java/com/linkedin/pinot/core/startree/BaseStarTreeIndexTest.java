@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
@@ -26,9 +27,11 @@ import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
 import org.testng.Assert;
 
 
@@ -41,7 +44,7 @@ public abstract class BaseStarTreeIndexTest {
   // Set up segment before running test.
   protected IndexSegment _segment;
 
-  protected BrokerRequest _brokerRequest;
+  protected ServerQueryRequest _serverQueryRequest;
   protected int _numMetricColumns;
   protected Dictionary[] _metricDictionaries;
   protected BlockSingleValIterator[] _metricValIterators;
@@ -66,11 +69,11 @@ public abstract class BaseStarTreeIndexTest {
     }
 
     for (String query : getHardCodedQueries()) {
-      _brokerRequest = COMPILER.compileToBrokerRequest(query);
-
+      _serverQueryRequest = COMPILER.compileToServerQueryRequest(query);
+      BrokerRequest brokerRequest = _serverQueryRequest.getBrokerRequest();
       List<String> groupByColumns;
-      if (_brokerRequest.isSetGroupBy()) {
-        groupByColumns = _brokerRequest.getGroupBy().getColumns();
+      if (brokerRequest.isSetGroupBy()) {
+        groupByColumns = brokerRequest.getGroupBy().getColumns();
       } else {
         groupByColumns = Collections.emptyList();
       }
@@ -89,7 +92,7 @@ public abstract class BaseStarTreeIndexTest {
    * Helper method to compute the result using raw docs.
    */
   private Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
+    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_serverQueryRequest.getBrokerRequest());
     Operator filterOperator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _segment, true);
     Assert.assertFalse(filterOperator instanceof StarTreeIndexOperator);
 
@@ -100,7 +103,7 @@ public abstract class BaseStarTreeIndexTest {
    * Helper method to compute the result using aggregated docs.
    */
   private Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
-    Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
+    Operator filterOperator = new FilterPlanNode(_segment, _serverQueryRequest).run();
     Assert.assertTrue(filterOperator instanceof StarTreeIndexOperator);
 
     return compute(filterOperator);

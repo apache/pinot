@@ -15,10 +15,11 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
-
 import com.linkedin.pinot.pql.parsers.pql2.ast.BaseAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.ComparisonPredicateAstNode;
@@ -27,9 +28,11 @@ import com.linkedin.pinot.pql.parsers.pql2.ast.HavingAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.InPredicateAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.OutputColumnAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.RegexpLikePredicateAstNode;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
+
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -67,6 +70,15 @@ public class Pql2Compiler implements AbstractCompiler {
   @Override
   public BrokerRequest compileToBrokerRequest(String expression) throws Pql2CompilationException {
     return compileToBrokerRequest(expression, false);
+  }
+
+
+  @Override
+  public ServerQueryRequest compileToServerQueryRequest(String expression) throws Pql2CompilationException {
+    BrokerRequest brokerRequest = compileToBrokerRequest(expression, false);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+    ServerQueryRequest serverQueryRequest = new ServerQueryRequest(instanceRequest, null);
+    return serverQueryRequest;
   }
 
   /**
