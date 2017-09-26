@@ -83,23 +83,25 @@
 
     <div class="col-xs-12">
       <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
+        {{#if isFetchingDimensions}}
+          <div class="te-form__super-label">...Loading top 5 dimensions by score</div>
+        {{/if}}
         {{#if isMetricDataLoading}}
-          <section>
-            <div class="spinner-wrapper--self-serve">
-              {{ember-spinner}}
-            </div>
-          </section>
+          <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
         {{/if}}
         {{#if isMetricSelected}}
           {{anomaly-graph
             primaryMetric=selectedMetric
+            selectedDimensions=topDimensions
+            dimensions=topDimensions
+            showDimensions=true
             isLoading=loading
             showSubchart=true
             showLegend=false
             legendText=legendText
             enableZoom=true
             componentId='create-alert'
-            showGraphLegend=false
+            showGraphLegend=true
             height=400
           }}
           <div class="te-form__note">
@@ -113,7 +115,6 @@
         {{/if}}
       </div>
     </div>
-    
   </fieldset>
 
   <fieldset class="te-form__se  ction row">
@@ -167,7 +168,7 @@
         required=true
         as |sensitivity|
       }}
-  
+
         {{sensitivity}}
       {{/power-select}}
     </div>
@@ -184,8 +185,8 @@
             {{/tooltip-on-element}}
           </span>
         </label>
-        {{#x-toggle 
-          value=selectedWeeklyEffect 
+        {{#x-toggle
+          value=selectedWeeklyEffect
           classNames="te-toggle te-toggle--form te-toggle--left"
           theme='ios'
           showLabels=true
@@ -197,7 +198,7 @@
               <span class="te-label te-label--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
             {{/toggle.label}}
             {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-        {{/x-toggle}} 
+        {{/x-toggle}}
       </div>
     {{/if}}
 
