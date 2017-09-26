@@ -63,6 +63,10 @@ public class DateTimeFieldSpecUtilsTest {
         "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", "20170701 00",
         DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().parseMillis("20170701 00")
     });
+    entries.add(new Object[] {
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", "20170701 00 -07:00",
+        1498892400000L
+    });
     return entries.toArray(new Object[entries.size()][]);
   }
 
@@ -99,6 +103,10 @@ public class DateTimeFieldSpecUtilsTest {
     entries.add(new Object[] {
         "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1498892400000L, String.class,
         DateTimeFormat.forPattern("yyyyMMdd HH").withZoneUTC().print(1498892400000L)
+    });
+    entries.add(new Object[] {
+        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", 1498892400000L, String.class,
+        DateTimeFormat.forPattern("yyyyMMdd HH Z").withZoneUTC().print(1498892400000L)
     });
     return entries.toArray(new Object[entries.size()][]);
   }
