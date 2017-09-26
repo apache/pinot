@@ -76,11 +76,11 @@ public class AuthResource {
   @GET
   public Response getPrincipalContext() {
     // TODO refactor this, use injection
-    ThirdEyePrincipal authContext = ThirdEyeAuthenticator.getCurrentPrincipal();
-    if (authContext == null) {
+    ThirdEyePrincipal principal = ThirdEyeAuthenticator.getCurrentPrincipal();
+    if (principal == null) {
       LOG.error("Could not find a valid the user");
       return Response.status(Response.Status.UNAUTHORIZED).build();
     }
-    return Response.ok(authContext).build();
+    return Response.ok(principal).build();
   }
 }
