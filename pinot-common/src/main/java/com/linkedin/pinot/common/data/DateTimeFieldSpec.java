@@ -143,7 +143,6 @@ public final class DateTimeFieldSpec extends FieldSpec {
     _dateTimeType = dateTimeType;
   }
 
-  
   @Override
   public String toString() {
     return "< field type: DATE_TIME, field name: " + getName() + ", datatype: " + getDataType()
