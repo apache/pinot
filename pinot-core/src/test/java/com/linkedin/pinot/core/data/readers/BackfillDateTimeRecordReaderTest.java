@@ -36,7 +36,10 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.minion.BackfillDateTimeColumn;
+import com.linkedin.pinot.core.minion.BackfillDateTimeColumn.BackfillDateTimeRecordReader;
 
 /**
  * Tests the PinotSegmentRecordReader to check that the records being generated
@@ -88,7 +91,7 @@ public class BackfillDateTimeRecordReaderTest {
       Object timeColumnValue = timeFieldSpec.getIncomingGranularitySpec().fromMillis(timestamp);
       fields.put(timeFieldSpec.getName(), timeColumnValue);
 
-      Object dateTimeColumnValue = dateTimeFieldSpec.fromMillis(timestamp);
+      Object dateTimeColumnValue = DateTimeFieldSpecUtils.fromMillisToFormat(timestamp, dateTimeFieldSpec.getFormat(), Object.class);
       fields.put(dateTimeFieldSpec.getName(), dateTimeColumnValue);
 
       GenericRow row = new GenericRow();
@@ -127,14 +130,13 @@ public class BackfillDateTimeRecordReaderTest {
   }
 
 
-
   @Test(dataProvider = "backfillRecordReaderDataProvider")
   public void testBackfillDateTimeRecordReader(TestRecordReader inputRecordReader, TimeFieldSpec timeFieldSpec,
       DateTimeFieldSpec dateTimeFieldSpec, Schema schemaExpected)
           throws Exception {
 
-    BackfillDateTimeRecordReader wrapperReader =
-        new BackfillDateTimeRecordReader(inputRecordReader, timeFieldSpec, dateTimeFieldSpec);
+    BackfillDateTimeColumn backfillDateTimeColumn = new BackfillDateTimeColumn(null, null, timeFieldSpec, dateTimeFieldSpec);
+    BackfillDateTimeRecordReader wrapperReader = backfillDateTimeColumn.getbackfillDateTimeRecordReader(inputRecordReader);
 
     // check that schema has new column
     Schema schemaActual = wrapperReader.getSchema();
@@ -158,7 +160,7 @@ public class BackfillDateTimeRecordReaderTest {
 
       // check that datetime column has correct value as per its format
       Long timeColumnValueMS = timeFieldSpec.getIncomingGranularitySpec().toMillis(timeColumnValueActual);
-      Object dateTimeColumnValueExpected = dateTimeFieldSpec.fromMillis(timeColumnValueMS);
+      Object dateTimeColumnValueExpected = DateTimeFieldSpecUtils.fromMillisToFormat(timeColumnValueMS, dateTimeFieldSpec.getFormat(), Object.class);
       Assert.assertEquals(dateTimeColumnValueActual, dateTimeColumnValueExpected);
     }
     wrapperReader.close();
