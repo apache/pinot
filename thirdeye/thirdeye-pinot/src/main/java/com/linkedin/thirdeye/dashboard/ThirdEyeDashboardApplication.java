@@ -6,11 +6,12 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.auth.ThirdeyeAuthFilter;
-import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
+import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
@@ -29,7 +30,6 @@ import com.linkedin.thirdeye.dashboard.resources.MetricConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.OnboardDatasetMetricResource;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.OverrideConfigResource;
-import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
@@ -43,13 +43,11 @@ import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
-
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.auth.Authenticator;
 import io.dropwizard.auth.CachingAuthenticator;
@@ -58,7 +56,6 @@ import io.dropwizard.bundles.redirect.RedirectBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -66,12 +63,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 import java.util.concurrent.TimeUnit;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
-
+import org.codehaus.jackson.map.ObjectMapper;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -183,7 +179,7 @@ public class ThirdEyeDashboardApplication
     if (config.getAuthConfig() != null && config.getAuthConfig().isAuthEnabled()) {
       final AuthConfiguration authConfig = config.getAuthConfig();
       final SecretKeySpec aesKey = new SecretKeySpec(authConfig.getAuthKey().getBytes("UTF-8"), "AES");
-      final AuthCookieSerializer serializer = new AuthCookieSerializer(aesKey);
+      final AuthCookieSerializer serializer = new AuthCookieSerializer(aesKey, new ObjectMapper());
 
       final ThirdEyeAuthenticator authenticator = new ThirdEyeAuthenticator(authConfig.getDomainSuffix(), authConfig.getLdapUrl());
       final Authenticator<Credentials, ThirdEyePrincipal> cachingAuthenticator = new CachingAuthenticator<>(

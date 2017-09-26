@@ -11,9 +11,9 @@ public class AuthCookieSerializer {
   final Key aesKey;
   final ObjectMapper mapper;
 
-  public AuthCookieSerializer(Key aesKey) {
+  public AuthCookieSerializer(Key aesKey, ObjectMapper mapper) {
     this.aesKey = aesKey;
-    this.mapper = new ObjectMapper();
+    this.mapper = mapper;
   }
 
   public String serializeCookie(AuthCookie cookie) throws Exception {

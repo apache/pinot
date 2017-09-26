@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.auth.Credentials;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import io.dropwizard.auth.Authenticator;
-import java.util.concurrent.TimeUnit;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
