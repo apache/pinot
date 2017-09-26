@@ -2204,16 +2204,17 @@ public class PinotHelixResourceManager {
     } else {
       targetNumReplicas = Integer.parseInt(tableConfig.getValidationConfig().getReplication());
     }
-    final String tenantName = tableConfig.getTenantConfig().getServer().replaceAll(tableType.toString(), "");
+    final String tenantName = tableConfig.getTenantConfig().getServer();
     final String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
 
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    IdealState newIdealState;
     if (dryRun) {
-      idealState = rebalanceResource(idealState, targetNumReplicas, tableNameWithType, tenantName);
+      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+      newIdealState = getRebalancedIdealState(idealState, targetNumReplicas, tableNameWithType, tenantName);
     } else {
-      idealState = rebalanceResource(targetNumReplicas, tableNameWithType, tenantName);
+      newIdealState = rebalanceResource(targetNumReplicas, tableNameWithType, tenantName);
     }
-    return idealState.getRecord();
+    return newIdealState.getRecord();
   }
 
   private IdealState rebalanceResource(final int targetNumReplicas, final String tableNameWithType, final String tenantName) {
@@ -2221,14 +2222,14 @@ public class PinotHelixResourceManager {
       @Nullable
       @Override
       public IdealState apply(@Nullable IdealState idealState) {
-        return rebalanceResource(idealState, targetNumReplicas, tableNameWithType, tenantName);
+        return getRebalancedIdealState(idealState, targetNumReplicas, tableNameWithType, tenantName);
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
 
     return  _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
   }
 
-  private IdealState rebalanceResource(IdealState idealState, final int targetNumReplicas, final String tableNameWithType, final String tenantName) {
+  private IdealState getRebalancedIdealState(IdealState idealState, final int targetNumReplicas, final String tableNameWithType, final String tenantName) {
     int numReplicasInIdealState = Integer.parseInt(idealState.getReplicas());
     final TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     List<Map.Entry<String, Map<String,String>>> removedEntries = new LinkedList<>();
@@ -2263,7 +2264,7 @@ public class PinotHelixResourceManager {
       }
       AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableNameWithType, partitions, states);
 
-      String serverTenant = TableNameBuilder.forType(tableType).tableNameWithType(tenantName);
+      String serverTenant = ControllerTenantNameBuilder.getTenantName(tenantName, tableType.getServerType());
       List<String> instancesInClusterWithTag = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenant);
       List<String> enabledInstancesWithTag =
           HelixHelper.getEnabledInstancesWithTag(_helixAdmin, _helixClusterName, serverTenant);
@@ -2274,19 +2275,12 @@ public class PinotHelixResourceManager {
           rebalanceStrategy.computePartitionAssignment(instancesInClusterWithTag, enabledInstancesWithTag,
               mapFields, new ClusterDataCache());
       final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
-      for (String segmentId : newMapping.keySet()) {
-        Map<String, String> instanceStateMap = newMapping.get(segmentId);
-        idealState.getInstanceStateMap(segmentId).clear();
-        for (String instanceId : instanceStateMap.keySet()) {
-          idealState.setPartitionState(segmentId, instanceId, instanceStateMap.get(instanceId));
-        }
+      for (Map.Entry<String, Map<String, String>> entry : newMapping.entrySet()) {
+        idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
       }
       // If we removed any entries, add them back here
       for (Map.Entry<String, Map<String, String>> entry: removedEntries) {
-        Map<String, String> stateMap = entry.getValue();
-        for (String instanceId : stateMap.keySet()) {
-          idealState.setPartitionState(entry.getKey(), instanceId, stateMap.get(instanceId));
-        }
+        idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
       }
     }
     idealState.setReplicas(Integer.toString(targetNumReplicas));

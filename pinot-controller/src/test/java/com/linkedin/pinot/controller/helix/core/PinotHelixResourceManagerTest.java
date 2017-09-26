@@ -175,7 +175,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   @Test
   public void testRebalance() throws Exception {
     // We use reflections to call the real rebalance method so that we don't have to set up tableconfig.
-    Method method = PinotHelixResourceManager.class.getDeclaredMethod("rebalanceResource", IdealState.class, int.class, String.class, String.class);
+    Method method = PinotHelixResourceManager.class.getDeclaredMethod("getRebalancedIdealState", IdealState.class, int.class, String.class, String.class);
     method.setAccessible(true);
     final String tableName = "someTable";
     final String offlineTenant = tableName + "_OFFLINE";
