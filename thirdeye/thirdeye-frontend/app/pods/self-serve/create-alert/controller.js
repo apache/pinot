@@ -973,7 +973,8 @@ export default Ember.Controller.extend({
         emailConfig: { "functionIds": [] },
         recipients: this.get('alertGroupNewRecipient'),
         name: this.get('selectedConfigGroup.name') || this.get('newConfigGroupName').trim(),
-        application: this.get('selectedAppName').application || null
+        application: this.get('selectedAppName').application || null,
+        cronExpression: '0 0/5 * 1/1 * ? *'
       };
 
       // This object contains the data for the new alert function, with default fillers
