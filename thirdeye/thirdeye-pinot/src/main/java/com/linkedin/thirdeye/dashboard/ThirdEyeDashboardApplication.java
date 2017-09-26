@@ -8,7 +8,7 @@ import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
-import com.linkedin.thirdeye.auth.ThirdeyeAuthFilter;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
@@ -186,7 +186,7 @@ public class ThirdEyeDashboardApplication
           env.metrics(), authenticator, CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
 
       // auth filter
-      env.jersey().register(new ThirdeyeAuthFilter(cachingAuthenticator, serializer, authConfig.getAllowedPaths()));
+      env.jersey().register(new ThirdEyeAuthFilter(cachingAuthenticator, serializer, authConfig.getAllowedPaths()));
 
       // auth resource
       env.jersey().register(new AuthResource(cachingAuthenticator, serializer, authConfig.getCookieTTL() * 1000));

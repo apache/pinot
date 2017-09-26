@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
@@ -167,7 +167,7 @@ public class GenericPojoDao {
 
   private String getCurrentPrincipal() {
     // TODO use injection
-    ThirdEyePrincipal principal = ThirdEyeAuthenticator.getCurrentPrincipal();
+    ThirdEyePrincipal principal = ThirdEyeAuthFilter.getCurrentPrincipal();
     if (principal != null) {
      return principal.getName();
     }

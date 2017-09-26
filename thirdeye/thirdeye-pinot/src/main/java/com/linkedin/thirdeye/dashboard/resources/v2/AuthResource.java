@@ -4,7 +4,7 @@ import com.google.common.base.Optional;
 import com.linkedin.thirdeye.auth.AuthCookie;
 import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
-import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import io.dropwizard.auth.Authenticator;
 import javax.ws.rs.GET;
@@ -75,7 +75,7 @@ public class AuthResource {
   @GET
   public Response getPrincipalContext() {
     // TODO refactor this, use injection
-    ThirdEyePrincipal principal = ThirdEyeAuthenticator.getCurrentPrincipal();
+    ThirdEyePrincipal principal = ThirdEyeAuthFilter.getCurrentPrincipal();
     if (principal == null) {
       LOG.error("Could not find a valid the user");
       return Response.status(Response.Status.UNAUTHORIZED).build();

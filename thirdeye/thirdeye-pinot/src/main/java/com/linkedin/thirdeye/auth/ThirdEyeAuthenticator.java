@@ -15,7 +15,6 @@ public class ThirdEyeAuthenticator implements Authenticator<Credentials, ThirdEy
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthenticator.class);
 
   private static final String LDAP_CONTEXT_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
-  private static final ThreadLocal<ThirdEyePrincipal> principalAuthContextThreadLocal = new ThreadLocal<>();
 
   private final String domainSuffix;
   private final String ldapUrl;
@@ -49,14 +48,14 @@ public class ThirdEyeAuthenticator implements Authenticator<Credentials, ThirdEy
         try {
           new InitialDirContext(env).close();
         } catch (NamingException e) {
-          throw new AuthenticationException(e);
+          LOG.error("Could not authenticate {} with LDAP", credentials.getPrincipal(), e);
+          return Optional.absent();
         }
 
         ThirdEyePrincipal principal = new ThirdEyePrincipal();
         principal.setName(credentials.getPrincipal());
 
-        LOG.info("Successfully authenticated {}", credentials.getPrincipal());
-        setCurrentPrincipal(principal);
+        LOG.info("Successfully authenticated {} with LDAP", credentials.getPrincipal());
         return Optional.of(principal);
       }
 
@@ -66,17 +65,7 @@ public class ThirdEyeAuthenticator implements Authenticator<Credentials, ThirdEy
       throw new AuthenticationException(e);
     }
 
-    LOG.info("Authentication failed for {}", credentials.getPrincipal());
+    LOG.info("Could not authenticate {}", credentials.getPrincipal());
     return Optional.absent();
-  }
-
-  private static void setCurrentPrincipal(ThirdEyePrincipal principal) {
-    // TODO refactor this, use injectors
-    principalAuthContextThreadLocal.set(principal);
-  }
-
-  public static ThirdEyePrincipal getCurrentPrincipal() {
-    // TODO refactor this, use injectors
-    return principalAuthContextThreadLocal.get();
   }
 }
