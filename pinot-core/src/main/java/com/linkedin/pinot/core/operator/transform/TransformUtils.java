@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.transform;
 
 import com.linkedin.pinot.core.operator.transform.function.AdditionTransform;
+import com.linkedin.pinot.core.operator.transform.function.DateTimeConversionTransform;
 import com.linkedin.pinot.core.operator.transform.function.DivisionTransform;
 import com.linkedin.pinot.core.operator.transform.function.MultiplicationTransform;
 import com.linkedin.pinot.core.operator.transform.function.SubtractionTransform;
@@ -39,7 +40,8 @@ public class TransformUtils {
       SubtractionTransform.class.getName(),
       MultiplicationTransform.class.getName(),
       DivisionTransform.class.getName(),
-      TimeConversionTransform.class.getName()
+      TimeConversionTransform.class.getName(),
+      DateTimeConversionTransform.class.getName()
   };
 
   /**

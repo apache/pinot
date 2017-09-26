@@ -15,6 +15,9 @@
  */
 package com.linkedin.thirdeye.hadoop.push;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -35,6 +38,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
 /**
@@ -220,6 +224,15 @@ public class SegmentPushControllerAPIs {
       }
     }
     return deleteSuccessful;
+  }
+
+  public static void main(String[] args) throws FileNotFoundException {
+    String host = "localhost";
+    String port = "9000";
+    File segmentTar = new File("/Users/npawar/testHadoop/registration_hourly/segments/abandonment_rate_hourly_additive_OFFLINE/abandonment_rate_hourly_additive_hourly_2017-09-21-02_2017-09-21-02_0.tar.gz");
+    //File segmentTar = new File("/Users/npawar/testHadoop/registration_hourly/segments/registration_hourly_additive_OFFLINE/registration_hourly_additive_HOURLY_2017-09-16-040000_2017-09-16-040000_0.tar.gz");
+    int status = FileUploadUtils.sendSegmentFile(host, port, segmentTar.getName(), segmentTar, segmentTar.length());
+    System.out.println(status);
   }
 
 }
