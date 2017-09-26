@@ -120,7 +120,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       LOGGER.debug("Matched {} segments", numSegmentsMatched);
       if (numSegmentsMatched == 0) {
         DataTable emptyDataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
-        emptyDataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+        Map<String, String> metadata = emptyDataTable.getMetadata();
+        metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+        metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
+        metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
+        metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
 
         // Stop and record the query processing timer for early bailout.
         queryProcessingTimer.stopAndRecord();
