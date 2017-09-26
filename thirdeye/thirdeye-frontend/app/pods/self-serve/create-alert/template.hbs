@@ -113,7 +113,7 @@
         {{/if}}
       </div>
     </div>
-    
+
   </fieldset>
 
   <fieldset class="te-form__se  ction row">
@@ -148,7 +148,7 @@
         <span>
           <i class="glyphicon glyphicon-question-sign"></i>
           {{#tooltip-on-element}}
-            How sensitive do you want your alert to be?
+            How sensitive do you want your alert to be? "Sensitive" sends emails for most anomalies. "Robust" only sends emails for the strongest anomalies. You can always see the full list of anomalies on ThirdEye.
           {{/tooltip-on-element}}
         </span>
       </label>
@@ -167,7 +167,7 @@
         required=true
         as |sensitivity|
       }}
-  
+
         {{sensitivity}}
       {{/power-select}}
     </div>
@@ -184,8 +184,8 @@
             {{/tooltip-on-element}}
           </span>
         </label>
-        {{#x-toggle 
-          value=selectedWeeklyEffect 
+        {{#x-toggle
+          value=selectedWeeklyEffect
           classNames="te-toggle te-toggle--form te-toggle--left"
           theme='ios'
           showLabels=true
@@ -197,7 +197,7 @@
               <span class="te-label te-label--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
             {{/toggle.label}}
             {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-        {{/x-toggle}} 
+        {{/x-toggle}}
       </div>
     {{/if}}
 
@@ -232,7 +232,7 @@
 
     {{!-- Field: App Name --}}
     <div class="form-group col-xs-12">
-      <label for="anomaly-form-app-name" class="control-label te-label required">Related Product or Team *</label>
+      <label for="anomaly-form-app-name" class="control-label te-label required">Related Application, Product or Team *</label>
        {{#power-select
           options=allApplicationNames
           selected=selectedAppName
