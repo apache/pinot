@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * groupKey={D1=G1} : a1, a2
  * groupKey={} : a3, a4
  *
- * User could assign the auxiliary email recipients as follows and retrieved through group keys:
+ * ThirdEyePrincipal could assign the auxiliary email recipients as follows and retrieved through group keys:
  *     {{D1=G1}:"group1AuxiliaryRecipents.com",{}:"rollUp.com"}
  */
 public class DimensionalAlertGrouper extends BaseAlertGrouper {

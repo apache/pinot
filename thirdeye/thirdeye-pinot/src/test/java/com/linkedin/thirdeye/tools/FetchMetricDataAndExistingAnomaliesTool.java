@@ -301,7 +301,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     HttpGet httpGet = new HttpGet(urlBuilder.toString());
 
     // Execute GET command
-    httpGet.addHeader("User-Agent", "User");
+    httpGet.addHeader("ThirdEyePrincipal-Agent", "ThirdEyePrincipal");
 
     HttpResponse response = client.execute(httpGet);
 

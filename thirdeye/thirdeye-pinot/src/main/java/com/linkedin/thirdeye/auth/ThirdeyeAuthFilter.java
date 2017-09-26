@@ -1,80 +1,84 @@
 package com.linkedin.thirdeye.auth;
 
-import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
+import com.google.common.base.Optional;
 import com.linkedin.thirdeye.dashboard.resources.v2.AuthResource;
 import io.dropwizard.auth.AuthFilter;
+import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.Response;
-import com.google.common.base.Optional;
-import joptsimple.internal.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ThirdeyeAuthFilter extends AuthFilter<AuthRequest, PrincipalAuthContext> {
+public class ThirdeyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipal> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdeyeAuthFilter.class);
-  private final Authenticator<AuthRequest, PrincipalAuthContext> authenticator;
-  private final AuthConfiguration authConfig;
-  public ThirdeyeAuthFilter(Authenticator<AuthRequest, PrincipalAuthContext> authenticator, AuthConfiguration authConfig) {
+
+  private final Authenticator<Credentials, ThirdEyePrincipal> authenticator;
+  private final AuthCookieSerializer serializer;
+  private final Set<String> allowedPaths;
+
+  public ThirdeyeAuthFilter(Authenticator<Credentials, ThirdEyePrincipal> authenticator, AuthCookieSerializer serializer, Set<String> allowedPaths) {
     this.authenticator = authenticator;
-    this.authConfig = authConfig;
+    this.serializer = serializer;
+    this.allowedPaths = allowedPaths;
   }
 
   @Override
   public void filter(ContainerRequestContext containerRequestContext) throws IOException {
     String uriPath = containerRequestContext.getUriInfo().getPath();
-    if (!authConfig.isAuthEnabled()
-        // authenticate end points should be out of auth filter
-        || uriPath.equals("auth/authenticate")
-        || uriPath.equals("auth/logout")
+    // authenticate end points should be out of auth filter
+    if (uriPath.equals("auth/authenticate") || uriPath.equals("auth/logout")
         // Landing page should not throw 401
         || uriPath.equals("thirdeye")
         // Let the FE handle the redirect to login page when not authenticated
         || uriPath.equals("thirdeye-admin")
         // Let detector capture the screenshot without authentication error
-        || uriPath.startsWith("anomalies/search/anomalyIds")
-        || uriPath.startsWith("thirdeye/email/generate/datasets")) {
+        || uriPath.startsWith("anomalies/search/anomalyIds") || uriPath.startsWith("thirdeye/email/generate/datasets")) {
       return;
     }
 
-    for (String fragment : this.authConfig.getAllowedPaths()) {
+    for (String fragment : this.allowedPaths) {
       if (uriPath.startsWith(fragment)) {
         return;
       }
     }
 
-    Optional<PrincipalAuthContext> authenticatedUser;
+    Credentials credentials;
     try {
-      AuthRequest credentials = getCredentials(containerRequestContext);
-      authenticatedUser = authenticator.authenticate(credentials);
-    } catch (Exception e) {
-      throw new WebApplicationException("Unable to validate credentials", Response.Status.UNAUTHORIZED);
-    }
-    if (!authenticatedUser.isPresent() || Strings.isNullOrEmpty(authenticatedUser.get().getName())) {
-      throw new WebApplicationException("Credentials not valid", Response.Status.UNAUTHORIZED);
-    }
-    LOG.info("authenticated user: {}, access end point: {}", authenticatedUser.get().getName(), uriPath);
-  }
-
-  private AuthRequest getCredentials(ContainerRequestContext requestContext) {
-    AuthRequest credentials = new AuthRequest();
-    try {
-      Map<String, Cookie> cookies = requestContext.getCookies();
-      if (cookies != null && cookies.containsKey(AuthResource.AUTH_TOKEN_NAME)) {
-        String rawToken = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
-        credentials.setToken(rawToken);
-      } else {
-        throw new IllegalAccessException("Auth cookie is missing!");
-      }
-    } catch (Exception e) {
-      LOG.warn(e.getMessage(), e);
+      credentials = getCredentials(containerRequestContext);
+    } catch(Exception e) {
+      LOG.error("Error while extracting credentials from cookie");
       throw new WebApplicationException("Unable to parse credentials", Response.Status.UNAUTHORIZED);
     }
+
+    try {
+      Optional<ThirdEyePrincipal> authenticatedUser = authenticator.authenticate(credentials);
+      if (!authenticatedUser.isPresent()) {
+        throw new WebApplicationException("Unable to validate credentials", Response.Status.UNAUTHORIZED);
+      }
+    } catch (AuthenticationException e) {
+      LOG.error("Error while authenticating credentials for {}", credentials.getPrincipal());
+      throw new WebApplicationException("Error while authenticating credentials", Response.Status.UNAUTHORIZED);
+    }
+  }
+
+  private Credentials getCredentials(ContainerRequestContext requestContext) throws Exception {
+    Credentials credentials = new Credentials();
+
+    Map<String, Cookie> cookies = requestContext.getCookies();
+    if (cookies != null && cookies.containsKey(AuthResource.AUTH_TOKEN_NAME)) {
+      String rawCookie = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
+      AuthCookie cookie = this.serializer.deserializeCookie(rawCookie);
+      credentials.setPrincipal(cookie.getPrincipal());
+      credentials.setPassword(cookie.getPassword()); // TODO replace with token in DB
+    }
+
     return credentials;
   }
 }

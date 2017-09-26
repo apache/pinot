@@ -1,9 +1,9 @@
 package com.linkedin.thirdeye.auth;
 
-public class AuthRequest {
+public class AuthCookie {
   String principal;
-  String password;
-  String token;
+  String password; // TODO replace with sessionId or token in DB
+  long timeCreated;
 
   public String getPrincipal() {
     return principal;
@@ -21,11 +21,11 @@ public class AuthRequest {
     this.password = password;
   }
 
-  public String getToken() {
-    return token;
+  public long getTimeCreated() {
+    return timeCreated;
   }
 
-  public void setToken(String token) {
-    this.token = token;
+  public void setTimeCreated(long timeCreated) {
+    this.timeCreated = timeCreated;
   }
 }

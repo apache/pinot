@@ -5,21 +5,17 @@ import java.util.HashSet;
 import java.util.Set;
 
 
-public class PrincipalAuthContext implements Principal {
-  String principal;
+public class ThirdEyePrincipal implements Principal {
+  String name;
   Set<String> groups = new HashSet<>();
 
   @Override
   public String getName() {
-    return principal;
+    return name;
   }
 
-  public String getPrincipal() {
-    return principal;
-  }
-
-  public void setPrincipal(String principal) {
-    this.principal = principal;
+  public void setName(String name) {
+    this.name = name;
   }
 
   public Set<String> getGroups() {

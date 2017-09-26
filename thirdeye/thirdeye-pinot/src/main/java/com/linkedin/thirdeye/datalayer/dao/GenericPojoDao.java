@@ -4,8 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.auth.AuthManager;
-import com.linkedin.thirdeye.auth.PrincipalAuthContext;
+import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
@@ -170,7 +169,7 @@ public class GenericPojoDao {
     AuthManager authManager = DAORegistry.getInstance().getAuthManager();
     String user = "no-auth-user";
     if (authManager != null) {
-      PrincipalAuthContext authContext = authManager.getCurrentPrincipal();
+      ThirdEyePrincipal authContext = authManager.getCurrentPrincipal();
       if (authContext != null) {
         user = authContext.getPrincipal();
       }

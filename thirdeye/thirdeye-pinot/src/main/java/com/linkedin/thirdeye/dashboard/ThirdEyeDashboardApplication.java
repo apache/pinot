@@ -1,14 +1,16 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.google.common.cache.CacheBuilder;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.auth.AuthRequest;
+import com.linkedin.thirdeye.auth.AuthCookieSerializer;
+import com.linkedin.thirdeye.auth.Credentials;
+import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.auth.ThirdeyeAuthFilter;
-import com.linkedin.thirdeye.auth.AuthManager;
-import com.linkedin.thirdeye.auth.ThirdeyeAuthManager;
-import com.linkedin.thirdeye.auth.PrincipalAuthContext;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
@@ -50,6 +52,7 @@ import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
 
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.auth.Authenticator;
+import io.dropwizard.auth.CachingAuthenticator;
 import io.dropwizard.bundles.redirect.PathRedirect;
 import io.dropwizard.bundles.redirect.RedirectBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -64,6 +67,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import java.util.concurrent.TimeUnit;
+import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
 
@@ -175,15 +180,20 @@ public class ThirdEyeDashboardApplication
       LOG.error("Error loading the resource", e);
     }
 
-    if (config.getAuthConfig() != null) {
-      AuthManager authManager = new ThirdeyeAuthManager(config.getAuthConfig());
-      DAORegistry.getInstance().setAuthManager(authManager);
-      env.jersey().register(new AuthResource());
+    if (config.getAuthConfig() != null && config.getAuthConfig().isAuthEnabled()) {
+      final AuthConfiguration authConfig = config.getAuthConfig();
+      final SecretKeySpec aesKey = new SecretKeySpec(authConfig.getAuthKey().getBytes("UTF-8"), "AES");
+      final AuthCookieSerializer serializer = new AuthCookieSerializer(aesKey);
 
-      // add default auth filter
-      env.jersey()
-          .register(new ThirdeyeAuthFilter((Authenticator<AuthRequest, PrincipalAuthContext>) authManager,
-              config.getAuthConfig()));
+      final ThirdEyeAuthenticator authenticator = new ThirdEyeAuthenticator(authConfig.getDomainSuffix(), authConfig.getLdapUrl());
+      final Authenticator<Credentials, ThirdEyePrincipal> cachingAuthenticator = new CachingAuthenticator<>(
+          env.metrics(), authenticator, CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
+
+      // auth filter
+      env.jersey().register(new ThirdeyeAuthFilter(cachingAuthenticator, serializer, authConfig.getAllowedPaths()));
+
+      // auth resource
+      env.jersey().register(new AuthResource(cachingAuthenticator, serializer));
     }
   }
 

@@ -802,7 +802,7 @@ public class AnomaliesResource {
    * @param datasetConfig
    *      The dataset configuration which the anomalyFunctionSpec is monitoring
    * @param dataRangeIntervals
-   *      User-defined data range intervals, the first is the monitoring window, the rest are the training window
+   *      ThirdEyePrincipal-defined data range intervals, the first is the monitoring window, the rest are the training window
    * @param dimensions
    *      The dimension map of the timelineview is surfacing
    * @return
