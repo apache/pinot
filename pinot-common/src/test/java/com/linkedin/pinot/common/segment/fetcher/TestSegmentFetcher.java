@@ -15,14 +15,15 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
-import java.io.File;
-import java.util.Map;
+import org.apache.commons.configuration.Configuration;
 
-public class testSegmentFetcher implements SegmentFetcher {
+import java.io.File;
+
+public class TestSegmentFetcher implements SegmentFetcher {
   public int init_called = 0;
 
   @Override
-  public void init(Map<String, String> configs) {
+  public void init(Configuration configs) {
     init_called++;
   }
 

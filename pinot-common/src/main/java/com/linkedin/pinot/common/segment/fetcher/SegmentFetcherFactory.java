@@ -19,11 +19,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,7 +47,7 @@ public class SegmentFetcherFactory {
     // initialize predefined fetcher
     for (String protocol: SEGMENT_FETCHER_MAP.keySet()) {
       LOGGER.info("initializing segment fetcher for protocol [{}]", protocol);
-      Map<String, String> conf = new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol));
+      Configuration conf = segmentFetcherFactoryConfig.subset(protocol);
       logFetcherInitConfig(protocol, conf);
       initSegmentFetcher(protocol, conf);
     }
@@ -63,7 +61,7 @@ public class SegmentFetcherFactory {
         String protocol = segmentFetcherConfigKey.split("\\.", 2)[0];
         if (!SegmentFetcherFactory.containsProtocol(protocol)) {
           LOGGER.info("initializing segment fetcher for protocol [{}]", protocol);
-          Map<String, String> conf = new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol));
+          Configuration conf = segmentFetcherFactoryConfig.subset(protocol);
           logFetcherInitConfig(protocol, conf);
           SegmentFetcherFactory.initSegmentFetcher(protocol, conf);
         }
@@ -78,13 +76,13 @@ public class SegmentFetcherFactory {
     return SEGMENT_FETCHER_MAP;
   }
 
-  private static void initSegmentFetcher(String protocol, Map<String, String> configs) {
+  private static void initSegmentFetcher(String protocol, Configuration configs) {
     try {
       final SegmentFetcher fetcher;
       if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
         fetcher = SEGMENT_FETCHER_MAP.get(protocol);
       } else {
-        String segmentFetcherKlass = configs.get(SEGMENT_FETCHER_CLASS_KEY);
+        String segmentFetcherKlass = configs.getString(SEGMENT_FETCHER_CLASS_KEY);
         if (Strings.isNullOrEmpty(segmentFetcherKlass)) {
           throw new RuntimeException("No class def for provided segment fetcher " + protocol);
         }
@@ -93,7 +91,7 @@ public class SegmentFetcherFactory {
       }
       fetcher.init(configs);
     } catch (Exception e) {
-      LOGGER.error("Failed to init SegmentFetcher: " + Arrays.toString(configs.entrySet().toArray()), e);
+      LOGGER.error("Failed to init SegmentFetcher: " + protocol, e);
     }
   }
 
@@ -114,10 +112,12 @@ public class SegmentFetcherFactory {
     throw new UnsupportedOperationException("Not supported uri: " + uri);
   }
 
-  private static void logFetcherInitConfig(String protocol, Map<String, String> conf) {
+  private static void logFetcherInitConfig(String protocol, Configuration conf) {
     LOGGER.info("Initializing protocol [{}] with the following configs:", protocol);
-    for (Map.Entry entry: conf.entrySet()) {
-      LOGGER.info("{}: {}", entry.getKey(), entry.getValue());
+    Iterator iter = conf.getKeys();
+    while (iter.hasNext()) {
+      String key = (String) iter.next();
+      LOGGER.info("{}: {}", key, conf.getString(key));
     }
     LOGGER.info("");
   }

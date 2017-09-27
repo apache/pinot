@@ -16,16 +16,12 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationMap;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.mockito.ArgumentCaptor;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.util.HashMap;
-
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 public class SegmentFetcherFactoryTest {
@@ -41,21 +37,18 @@ public class SegmentFetcherFactoryTest {
     conf.addProperty("pinot.server.segment.fetcher.hdfs.hadoop.conf.path", "file:///somewhere/folder");
     conf.addProperty("pinot.server.segment.fetcher.http.other", "otherconfig");
     conf.addProperty("pinot.server.segment.fetcher.http2.more_other", "some-other");
-    conf.addProperty("pinot.server.segment.fetcher.test.class", "com.linkedin.pinot.common.segment.fetcher.testSegmentFetcher");
+    conf.addProperty("pinot.server.segment.fetcher.test.class", "com.linkedin.pinot.common.segment.fetcher.TestSegmentFetcher");
     SegmentFetcherFactory.getPreloadSegmentFetchers().put("hdfs", mockHdfsFetcher);
     SegmentFetcherFactory.getPreloadSegmentFetchers().put("http", mockHttpFetcher);
     SegmentFetcherFactory.getPreloadSegmentFetchers().put("https", mockHttpsFetcher);
 
     SegmentFetcherFactory.initSegmentFetcherFactory(conf);
-    verify(mockHdfsFetcher, times(1))
-        .init(eq(new ConfigurationMap(conf.subset("pinot.server.segment.fetcher.hdfs"))));
-    verify(mockHttpFetcher, times(1))
-        .init(eq(new ConfigurationMap(conf.subset("pinot.server.segment.fetcher.http"))));
-    verify(mockHttpsFetcher, times(1))
-        .init(eq(new HashMap<String, String>()));
-
+    ArgumentCaptor<Configuration> captor = ArgumentCaptor.forClass(Configuration.class);
+    verify(mockHdfsFetcher).init(captor.capture());
+    Assert.assertEquals(captor.getValue().getString("hadoop.conf.path"), "file:///somewhere/folder");
+    Assert.assertEquals(captor.getValue().getString("other"), null);
     Assert.assertTrue(SegmentFetcherFactory.containsProtocol("test"));
-    Assert.assertEquals(1, ((testSegmentFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called);
+    Assert.assertEquals(1, ((TestSegmentFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called);
   }
 
   @Test

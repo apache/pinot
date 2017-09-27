@@ -16,6 +16,8 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.google.common.base.Strings;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -25,33 +27,29 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Callable;
 
 import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY_DEFAULT;
 import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY_WAITIME_MS;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.PRINCIPLE;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.KEYTAB;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY_WAITIME_MS_DEFAULT;
 import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.HADOOP_CONF_PATH;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.KEYTAB;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.PRINCIPLE;
 
 public class HdfsSegmentFetcher implements SegmentFetcher {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HdfsSegmentFetcher.class);
   private FileSystem hadoopFS = null;
-  private int retryCount = 3;
-  private int retryWaitMs = 100;
+  private int retryCount = RETRY_DEFAULT;
+  private int retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
 
   @Override
-  public void init(Map<String, String> configs) {
-    String hadoopConfPath = configs.get(HADOOP_CONF_PATH);
+  public void init(org.apache.commons.configuration.Configuration configs) {
     try {
-      if (configs.containsKey(RETRY)) {
-        retryCount = Integer.valueOf(configs.get(RETRY));
-      }
-      if (configs.containsKey(RETRY_WAITIME_MS)) {
-        retryWaitMs = Integer.valueOf(configs.get(RETRY_WAITIME_MS));
-      }
-      Configuration hadoopConf = getConf(hadoopConfPath);
+      retryCount = configs.getInt(RETRY, retryCount);
+      retryWaitMs = configs.getInt(RETRY_WAITIME_MS, retryWaitMs);
+      Configuration hadoopConf = getConf(configs.getString(HADOOP_CONF_PATH));
       authenticate(hadoopConf, configs);
       hadoopFS = FileSystem.get(hadoopConf);
       LOGGER.info("successfully initialized hdfs segment fetcher");
@@ -71,9 +69,9 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
     return hadoopConf;
   }
 
-  private void authenticate(Configuration hadoopConf, Map<String, String> configs) {
-    String principal = configs.get(PRINCIPLE);
-    String keytab = configs.get(KEYTAB);
+  private void authenticate(Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {
+    String principal = configs.getString(PRINCIPLE);
+    String keytab = configs.getString(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {
       UserGroupInformation.setConfiguration(hadoopConf);
       if (UserGroupInformation.isSecurityEnabled()) {
@@ -93,36 +91,32 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+  public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
     LOGGER.debug("starting to fetch segment from hdfs");
-    String tempFilePath = tempFile.getAbsolutePath();
+    final String tempFilePath = tempFile.getAbsolutePath();
     try {
-      Path remoteFile = new Path(uri);
-      Path localFile = new Path(tempFile.toURI());
+      final Path remoteFile = new Path(uri);
+      final Path localFile = new Path(tempFile.toURI());
 
-      int attemptCount = 0;
-      while (attemptCount++ < this.retryCount) {
-        try {
-          if (hadoopFS == null) {
-            LOGGER.error("uninitialized hadoopFS for fetching data from hdfs");
-            throw new RuntimeException("failed to get hdfs client");
+      RetryPolicy fixDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(retryCount, retryWaitMs);
+      fixDelayRetryPolicy.attempt(new Callable<Boolean>() {
+        @Override
+        public Boolean call() throws Exception {
+          try{
+            if (hadoopFS == null) {
+                throw new RuntimeException("hadoopFS client is not initialized when trying to copy files");
+              }
+              long startMs = System.currentTimeMillis();
+              hadoopFS.copyToLocalFile(remoteFile, localFile);
+              LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms",
+                  uri, tempFilePath, tempFile.length(), System.currentTimeMillis() - startMs);
+              return true;
+          } catch (IOException ex) {
+            LOGGER.warn(String.format("failed to fetch segment %s from hdfs, might retry", uri), ex);
+            return false;
           }
-          long startMs = System.currentTimeMillis();
-          hadoopFS.copyToLocalFile(remoteFile, localFile);
-          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms",
-              uri, tempFilePath, tempFile.length(), System.currentTimeMillis() - startMs);
-          return;
-        } catch (IOException ex) {
-          LOGGER.warn(String.format("failed to fetch segment %s from hdfs, current tries: %d", uri, attemptCount), ex);
         }
-        try {
-          TimeUnit.MILLISECONDS.sleep(retryWaitMs);
-        } catch (InterruptedException ex) {
-          throw new RuntimeException(ex);
-        }
-      }
-      throw new IOException(String.format("failed to copy segment from hdfs %s to local %s for %d times",
-          uri, tempFilePath, retryCount));
+      });
     } catch (Exception ex) {
       LOGGER.error(String.format("failed to fetch %s from hdfs to local %s", uri, tempFilePath), ex);
       throw ex;

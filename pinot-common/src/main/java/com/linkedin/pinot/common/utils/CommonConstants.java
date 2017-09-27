@@ -312,6 +312,8 @@ public class CommonConstants {
     }
 
     public static final String RETRY = "retry.count";
+    public static final int RETRY_DEFAULT = 3;
     public static final String RETRY_WAITIME_MS = "retry.wait.ms";
+    public static final int RETRY_WAITIME_MS_DEFAULT = 100;
   }
 }

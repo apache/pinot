@@ -15,12 +15,13 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import org.apache.commons.configuration.Configuration;
+
 import java.io.File;
-import java.util.Map;
 
 public interface SegmentFetcher {
 
-  void init(Map<String, String> configs);
+  void init(Configuration configs);
 
   void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
 
