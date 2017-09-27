@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MinMaxPriorityQueue;
@@ -165,11 +164,6 @@ public class PinotLLCRealtimeSegmentManager {
     _tableConfigCache = new TableConfigCache(_propertyStore);
   }
 
-  @VisibleForTesting
-  public KafkaStreamMetadata makeKafkaStreamMetadata(String tableWithType) throws Exception {
-    return new KafkaStreamMetadata(_tableConfigCache.getTableConfig(tableWithType).getIndexingConfig().getStreamConfigs());
-  }
-
   public static PinotLLCRealtimeSegmentManager getInstance() {
     if (INSTANCE == null) {
       throw new RuntimeException("Not yet created");
@@ -313,7 +307,7 @@ public class PinotLLCRealtimeSegmentManager {
 
       KafkaStreamMetadata kafkaStreamMetadata = null;
       try {
-        kafkaStreamMetadata = makeKafkaStreamMetadata(realtimeTableName);
+        kafkaStreamMetadata = new KafkaStreamMetadata(_tableConfigCache.getTableConfig(realtimeTableName).getIndexingConfig().getStreamConfigs());
       } catch (Exception e) {
         LOGGER.error("Problem getting stream configs for table {}", rawTableName);
         throw new RuntimeException(e);
