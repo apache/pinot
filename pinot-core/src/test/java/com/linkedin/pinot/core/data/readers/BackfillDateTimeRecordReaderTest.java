@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -135,7 +136,7 @@ public class BackfillDateTimeRecordReaderTest {
       DateTimeFieldSpec dateTimeFieldSpec, Schema schemaExpected)
           throws Exception {
 
-    BackfillDateTimeColumn backfillDateTimeColumn = new BackfillDateTimeColumn(null, null, timeFieldSpec, dateTimeFieldSpec);
+    BackfillDateTimeColumn backfillDateTimeColumn = new BackfillDateTimeColumn(new File("original"), new File("backup"), timeFieldSpec, dateTimeFieldSpec);
     BackfillDateTimeRecordReader wrapperReader = backfillDateTimeColumn.getbackfillDateTimeRecordReader(inputRecordReader);
 
     // check that schema has new column
@@ -242,6 +243,20 @@ public class BackfillDateTimeRecordReaderTest {
     wrapperSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
     entries.add(new Object[] {
         inputRecordReader, timeFieldSpec, dateTimeFieldSpec, wrapperSchema
+    });
+
+
+    // timeSpec in hoursSinceEpoch, dateTimeFieldSpec in hoursSinceEpoch, add new dateTimeFieldSpec in millisSinceEpoch
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "Date"));
+    dateTimeFieldSpec = new DateTimeFieldSpec("hoursSinceEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", DateTimeType.DERIVED);
+    inputData = createTestDataWithTimespec(timeFieldSpec, dateTimeFieldSpec);
+    inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
+    inputRecordReader = new TestRecordReader(inputData, inputSchema);
+    DateTimeFieldSpec dateTimeFieldSpecNew = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS", DateTimeType.PRIMARY);
+    wrapperSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
+    wrapperSchema = createPinotSchemaWrapperWithDateTimeSpec(wrapperSchema, dateTimeFieldSpecNew);
+    entries.add(new Object[] {
+        inputRecordReader, timeFieldSpec, dateTimeFieldSpecNew, wrapperSchema
     });
 
     return entries.toArray(new Object[entries.size()][]);

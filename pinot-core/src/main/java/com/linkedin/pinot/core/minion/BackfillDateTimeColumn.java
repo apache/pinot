@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.minion;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
@@ -45,7 +46,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>BackfillDateTimeColumn</code> class takes a segment, a timeSpec from the segment, and a
  * dateTimeSpec.
- * It creates a column corresponding to the dateTimeSpec configs, using the values from the timeSpec
+ * It creates a new segment with a new column corresponding to the dateTimeSpec configs, using the values from the timeSpec
  * <ul>
  *  <li>If a column corresponding to the dateTimeSpec already exists, it is overwritten</li>
  *  <li>If not, a new date time column is created</li>
@@ -66,6 +67,8 @@ public class BackfillDateTimeColumn {
       throws Exception {
     _originalIndexDir = originalIndexDir;
     _backfilledIndexDir = backfilledIndexDir;
+    Preconditions.checkArgument(!_originalIndexDir.getAbsolutePath().equals(_backfilledIndexDir.getAbsolutePath()),
+        "Original index dir and backfill index dir should not be the same");
     _srcTimeFieldSpec = srcTimeSpec;
     _destDateTimeFieldSpec = destDateTimeSpec;
   }
@@ -240,7 +243,10 @@ public class BackfillDateTimeColumn {
      */
     private Object convertTimeFieldToDateTimeFieldSpec(Object timeColumnValue) {
 
-      TimeGranularitySpec timeGranularitySpec = _timeFieldSpec.getIncomingGranularitySpec();
+      TimeGranularitySpec timeGranularitySpec = _timeFieldSpec.getOutgoingGranularitySpec();
+      if (timeGranularitySpec == null) {
+          timeGranularitySpec = _timeFieldSpec.getIncomingGranularitySpec();
+      }
       String formatFromTimeSpec =
           DateTimeFieldSpecUtils.constructFormat(timeGranularitySpec.getTimeUnitSize(),
               timeGranularitySpec.getTimeType(), timeGranularitySpec.getTimeFormat());

@@ -68,7 +68,7 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
   private String _destDateTimeFieldSpec;
 
 
-  @Option(name = "-backupDir", required = false, metaVar = "<string>", usage = "Path to backup segments")
+  @Option(name = "-backupDir", required = true, metaVar = "<string>", usage = "Path to backup segments")
   private String _backupDir;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
@@ -150,6 +150,10 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
       throw new RuntimeException("Must specify controller host and port.");
     }
 
+    if (_backupDir == null) {
+      throw new RuntimeException("Must specify path to backup segments");
+    }
+
     if (_srcTimeFieldSpec == null || _destDateTimeFieldSpec == null) {
       throw new RuntimeException("Must specify srcTimeFieldSpec and destTimeFieldSpec.");
     }
@@ -177,9 +181,6 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
       }
     }
 
-    if (_backupDir == null) {
-      _backupDir = TMP_DIR;
-    }
     File backupDir = new File(_backupDir, BACKUP_FOLDER);
     File tableBackupDir = new File(backupDir, _tableName);
     File downloadDir = new File(TMP_DIR, DOWNLOAD_FOLDER);
