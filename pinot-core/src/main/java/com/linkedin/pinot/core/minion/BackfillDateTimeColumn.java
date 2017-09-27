@@ -201,6 +201,11 @@ public class BackfillDateTimeColumn {
           newSchema.addField(metricFieldSpec);
         }
         newSchema.addField(schema.getTimeFieldSpec());
+        for (DateTimeFieldSpec dateTimeFieldSpec : schema.getDateTimeFieldSpecs()) {
+          if (!dateTimeFieldSpec.getName().equals(_dateTimeFieldSpec.getName())) {
+            newSchema.addField(dateTimeFieldSpec);
+          }
+        }
         newSchema.addField(_dateTimeFieldSpec);
         newSchema.setSchemaName(schema.getSchemaName());
         return newSchema;
