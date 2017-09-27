@@ -1986,6 +1986,72 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testJoinMultiIndex() {
+    DataFrame dfLeft = new DataFrame()
+        .addSeries("A", 1, 1, 1, 2, 2)
+        .addSeries("B", "a", "b", "c", "d", "e")
+        .addSeries("V", 0, 1, 2, 3, 4)
+        .setIndex("A", "B");
+
+    DataFrame dfRight = new DataFrame()
+        .addSeries("A", 1, 1, 2, 2, 2)
+        .addSeries("B", "a", "b", "c", "d", "e")
+        .addSeries("W", "a", "aa", "aaa", "aaaa", "aaaaa")
+        .setIndex("A", "B");
+
+    DataFrame joined = dfLeft.joinOuter(dfRight).sortedByIndex();
+
+    Assert.assertEquals(joined.size(), 6);
+    Assert.assertEquals(joined.getSeriesNames().size(), 4);
+    Assert.assertEquals(joined.getIndexNames().size(), 2);
+    assertEquals(joined.getLongs("A"), 1, 1, 1, 2, 2, 2);
+    assertEquals(joined.getStrings("B"), "a", "b", "c", "c", "d", "e");
+    assertEquals(joined.getLongs("V"), 0, 1, 2, LNULL, 3, 4);
+    assertEquals(joined.getStrings("W"), "a", "aa", SNULL, "aaa", "aaaa", "aaaaa");
+  }
+
+  @Test
+  public void testAddSeriesMultiIndex() {
+    DataFrame dfLeft = new DataFrame()
+        .addSeries("A", 1, 1, 1, 2, 2)
+        .addSeries("B", "a", "b", "c", "d", "e")
+        .addSeries("V", 0, 1, 2, 3, 4)
+        .setIndex("A", "B");
+
+    DataFrame dfRight = new DataFrame()
+        .addSeries("A", 1, 1, 2, 2, 2)
+        .addSeries("B", "a", "b", "c", "d", "e")
+        .addSeries("W", "a", "aa", "aaa", "aaaa", "aaaaa")
+        .setIndex("A", "B");
+
+    dfLeft.addSeries(dfRight, "W");
+
+    Assert.assertEquals(dfLeft.size(), 5);
+    Assert.assertEquals(dfLeft.getSeriesNames().size(), 4);
+    Assert.assertEquals(dfLeft.getIndexNames().size(), 2);
+    assertEquals(dfLeft.getStrings("W"), "a", "aa", SNULL, "aaaa", "aaaaa");
+  }
+
+  @Test
+  public void testJoinIndexRetention() {
+    DataFrame dfLeft = new DataFrame()
+        .addSeries("a", 0)
+        .addSeries("b", 0)
+        .setIndex("a");
+
+    DataFrame dfRight = new DataFrame()
+        .addSeries("a", 0)
+        .addSeries("b", 0)
+        .setIndex("a", "b");
+
+    DataFrame joined = dfLeft.joinOuter(dfRight, Arrays.asList("a", "b"));
+
+    Assert.assertEquals(joined.getSeriesNames().size(), 2);
+    Assert.assertEquals(joined.getIndexNames().size(), 1);
+    Assert.assertEquals(joined.getIndexNames().get(0), "a");
+  }
+
+  @Test
   public void testBooleanHasTrueFalseNull() {
     BooleanSeries s1 = DataFrame.toSeries(new boolean[0]);
     Assert.assertFalse(s1.hasFalse());

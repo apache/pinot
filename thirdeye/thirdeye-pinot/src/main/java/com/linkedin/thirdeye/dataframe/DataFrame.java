@@ -1269,6 +1269,16 @@ public class DataFrame {
   }
 
   /**
+   * Returns a copy of the DataFrame sorted by series values referenced by its index.
+   *
+   * @throws IllegalArgumentException if the series does not exist
+   * @return sorted DataFrame copy
+   */
+  public DataFrame sortedByIndex() {
+    return this.sortedBy(this.indexNames);
+  }
+
+  /**
    * Returns a copy of the DataFrame sorted by series values referenced by {@code seriesNames}.
    * The resulting sorted order is the equivalent of applying a stable sort to the nth series
    * first, and then sorting iteratively by series until the 1st series.
@@ -1951,7 +1961,13 @@ public class DataFrame {
 
     for(int i=0; i<numSeries; i++)
       joined.addSeries(joinKeyNames.get(i), joinKeys[i]);
-    joined.setIndex(joinKeyNames);
+
+    List<String> newIndex = new ArrayList<>();
+    for (String name : joinKeyNames) {
+      if (left.indexNames.contains(name))
+        newIndex.add(name);
+    }
+    joined.setIndex(newIndex);
 
     for(String name : seriesRight) {
       Series s = rightData.get(name);
