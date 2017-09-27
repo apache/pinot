@@ -36,13 +36,13 @@ import com.linkedin.pinot.tools.backfill.BackfillSegmentUtils;
  * Class to download a segment, and backfill it with dateTimeFieldSpec corresponding to the timeFieldSpec
  *
  */
-public class BackfillSegmentColumnCommand extends AbstractBaseAdminCommand implements Command {
+public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand implements Command {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String OUTPUT_FOLDER = "output";
   private static final String DOWNLOAD_FOLDER = "download";
   private static final String BACKUP_FOLDER = "backup";
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(BackfillSegmentColumnCommand.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BackfillDateTimeColumnCommand.class);
 
   @Option(name = "-controllerHost", required = true, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
@@ -76,43 +76,43 @@ public class BackfillSegmentColumnCommand extends AbstractBaseAdminCommand imple
   private boolean _help = false;
 
 
-  public BackfillSegmentColumnCommand setControllerHost(String controllerHost) {
+  public BackfillDateTimeColumnCommand setControllerHost(String controllerHost) {
     _controllerHost = controllerHost;
     return this;
   }
 
-  public BackfillSegmentColumnCommand setControllerPort(String controllerPort) {
+  public BackfillDateTimeColumnCommand setControllerPort(String controllerPort) {
     _controllerPort = controllerPort;
     return this;
   }
 
-  public BackfillSegmentColumnCommand setTableName(String tableName) {
+  public BackfillDateTimeColumnCommand setTableName(String tableName) {
     _tableName = tableName;
     return this;
   }
 
 
-  public BackfillSegmentColumnCommand setSegmentNames(String segmentNames) {
+  public BackfillDateTimeColumnCommand setSegmentNames(String segmentNames) {
     _segmentNames = segmentNames;
     return this;
   }
 
-  public BackfillSegmentColumnCommand setSegmentType(SegmentType segmentType) {
+  public BackfillDateTimeColumnCommand setSegmentType(SegmentType segmentType) {
     _segmentType = segmentType;
     return this;
   }
 
-  public BackfillSegmentColumnCommand setSrcTimeFieldSpec(String srcTimeFieldSpec) {
+  public BackfillDateTimeColumnCommand setSrcTimeFieldSpec(String srcTimeFieldSpec) {
     _srcTimeFieldSpec = srcTimeFieldSpec;
     return this;
   }
 
-  public BackfillSegmentColumnCommand setDestDateTimeFieldSpec(String destDateTimeFieldSpec) {
+  public BackfillDateTimeColumnCommand setDestDateTimeFieldSpec(String destDateTimeFieldSpec) {
     _destDateTimeFieldSpec = destDateTimeFieldSpec;
     return this;
   }
 
-  public BackfillSegmentColumnCommand setBackupDir(String backupDir) {
+  public BackfillDateTimeColumnCommand setBackupDir(String backupDir) {
     _backupDir = backupDir;
     return this;
   }

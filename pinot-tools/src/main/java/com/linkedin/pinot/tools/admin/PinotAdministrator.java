@@ -34,7 +34,7 @@ import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
 import com.linkedin.pinot.tools.admin.command.AddTenantCommand;
 import com.linkedin.pinot.tools.admin.command.AvroSchemaToPinotSchema;
-import com.linkedin.pinot.tools.admin.command.BackfillSegmentColumnCommand;
+import com.linkedin.pinot.tools.admin.command.BackfillDateTimeColumnCommand;
 import com.linkedin.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import com.linkedin.pinot.tools.admin.command.ChangeTableState;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
@@ -90,7 +90,7 @@ public class PinotAdministrator {
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
       @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
       @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
-      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillSegmentColumnCommand.class)
+      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class)
   })
   Command _subCommand;
   // @formatter:on
