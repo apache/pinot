@@ -1153,7 +1153,7 @@ public class DataFrameTest {
 
     Assert.assertEquals(out.getSeriesNames().size(), 10);
     Assert.assertEquals(out.size(), 2);
-    assertEquals(out.getIndex().getLongs(), 0, 1);
+    assertEquals(out.getIndexSingleton().getLongs(), 0, 1);
     assertEquals(out.getLongs("sum"), 6, 9);
     assertEquals(out.getLongs("product"), 6, 20);
     assertEquals(out.getLongs("min"), 1, 4);
@@ -1946,7 +1946,7 @@ public class DataFrameTest {
     DataFrame dfRight = new DataFrame(5)
         .addSeries("two", 11, 12, 13, 14, 15);
 
-    Assert.assertEquals(dfLeft.getIndex(), dfRight.getIndex());
+    Assert.assertEquals(dfLeft.getIndexSingleton(), dfRight.getIndexSingleton());
 
     dfLeft.addSeries(dfRight);
 
@@ -2259,7 +2259,9 @@ public class DataFrameTest {
   public void testIndexNone() {
     DataFrame df = new DataFrame();
     Assert.assertFalse(df.hasIndex());
-    df.getIndex();
+    Assert.assertEquals(df.getIndexNames().size(), 0);
+    Assert.assertEquals(df.getIndexSeries().size(), 0);
+    df.getIndexSingleton();
   }
 
   @Test
@@ -2274,7 +2276,10 @@ public class DataFrameTest {
     DataFrame df = new DataFrame(5)
         .addSeries("test", DataFrame.toSeries(VALUES_BOOLEAN))
         .setIndex("test");
-    Assert.assertEquals(df.copy().getIndexName(), "test");
+    Assert.assertTrue(df.copy().hasIndex());
+    Assert.assertEquals(df.copy().getIndexSeries().size(), 1);
+    Assert.assertEquals(df.copy().getIndexNames().size(), 1);
+    Assert.assertEquals(df.copy().getIndexNames().get(0), "test");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -2286,11 +2291,11 @@ public class DataFrameTest {
   @Test
   public void testIndexRename() {
     DataFrame df = new DataFrame(0);
-    Series index = df.getIndex();
-    df.renameSeries(df.getIndexName(), "test");
+    Series index = df.getIndexSeries().get(0);
+    df.renameSeries(df.getIndexNames().get(0), "test");
     df.addSeries(DataFrame.COLUMN_INDEX_DEFAULT, DataFrame.toSeries(new double[0]));
-    Assert.assertEquals(df.getIndexName(), "test");
-    Assert.assertEquals(df.getIndex(), index);
+    Assert.assertEquals(df.getIndexNames().get(0), "test");
+    Assert.assertEquals(df.getIndexSeries().get(0), index);
   }
 
   @Test
@@ -3566,7 +3571,7 @@ public class DataFrameTest {
 
     Assert.assertEquals(out.size(), 4);
     Assert.assertEquals(out.getSeriesNames().size(), 2);
-    Assert.assertEquals(out.getIndexName(), "one");
+    Assert.assertEquals(out.getIndexNames().get(0), "one");
     assertEquals(out.getStrings("three"), "1", "2", "3", "4");
     assertEquals(out.getLongs("one"), 1, 2, 3, 4);
   }
@@ -3582,7 +3587,7 @@ public class DataFrameTest {
 
     Assert.assertEquals(out.size(), 4);
     Assert.assertEquals(out.getSeriesNames().size(), 1);
-    Assert.assertEquals(out.getIndexName(), null);
+    Assert.assertFalse(out.hasIndex());
     assertEquals(out.getLongs("one"), 1, 2, 3, 4);
   }
 

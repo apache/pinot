@@ -425,8 +425,8 @@ public abstract class Grouping {
      * @return group sizes
      */
     public GroupingDataFrame count() {
-      // TODO data frames without index
-      return this.grouping.count(this.source.getIndex());
+      Series anySeries = this.source.series.values().iterator().next();
+      return this.grouping.count(anySeries);
     }
 
     public GroupingDataFrame sum(String seriesName) {
