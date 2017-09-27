@@ -43,6 +43,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
   private final String _zkBrokerUrl;
   private final String _bootstrapHosts;
   private final String _decoderClass;
+  private String _consumerFactoryName;
   private final long _kafkaConnectionTimeoutMillis;
   private final int _kafkaFetchTimeoutMillis;
   private final Map<String, String> _decoderProperties = new HashMap<String, String>();
@@ -80,6 +81,13 @@ public class KafkaStreamMetadata implements StreamMetadata {
     _decoderClass =
         streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
             CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_CLASS));
+
+    _consumerFactoryName = streamConfigMap.get(StringUtil
+        .join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_FACTORY));
+    if (_consumerFactoryName == null) {
+      _consumerFactoryName = Helix.DataSource.Realtime.Kafka.ConsumerFactory.SIMPLE_CONSUMER_FACTORY_STRING;
+    }
+    LOGGER.info("Setting consumer factory to {}", _consumerFactoryName);
 
     final String kafkaConnectionTimeoutPropertyKey = StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
         Helix.DataSource.Realtime.Kafka.KAFKA_CONNECTION_TIMEOUT_MILLIS);
@@ -166,6 +174,10 @@ public class KafkaStreamMetadata implements StreamMetadata {
     return _decoderClass;
   }
 
+  public String getConsumerFactoryName() {
+    return _consumerFactoryName;
+  }
+
   public Map<String, String> getDecoderProperties() {
     return _decoderProperties;
   }
@@ -215,7 +227,8 @@ public class KafkaStreamMetadata implements StreamMetadata {
         isEqual(_zkBrokerUrl, that._zkBrokerUrl) &&
         isEqual(_decoderClass, that._decoderClass) &&
         isEqual(_decoderProperties, that._decoderProperties) &&
-        isEqual(_streamConfigMap, that._streamConfigMap);
+        isEqual(_streamConfigMap, that._streamConfigMap) &&
+        isEqual(_consumerFactoryName, that._consumerFactoryName);
   }
 
   @Override
@@ -226,6 +239,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
     result = hashCodeOf(result, _decoderClass);
     result = hashCodeOf(result, _decoderProperties);
     result = hashCodeOf(result, _streamConfigMap);
+    result = hashCodeOf(result, _consumerFactoryName);
     return result;
   }
 

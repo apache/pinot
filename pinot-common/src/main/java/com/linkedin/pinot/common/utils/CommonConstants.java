@@ -135,6 +135,7 @@ public class CommonConstants {
           public static final String KAFKA_FETCH_TIMEOUT_MILLIS = "kafka.fetch.timeout.ms";
           public static final String ZK_BROKER_URL = "kafka.zk.broker.url";
           public static final String KAFKA_BROKER_LIST = "kafka.broker.list";
+          public static final String CONSUMER_FACTORY = "kafka.consumer.factory.class.name";
 
           // Consumer properties
           public static final String AUTO_OFFSET_RESET = "auto.offset.reset";
@@ -154,6 +155,10 @@ public class CommonConstants {
           public static class HighLevelConsumer {
             public static final String ZK_CONNECTION_STRING = "kafka.hlc.zk.connect.string";
             public static final String GROUP_ID = "kafka.hlc.group.id";
+          }
+
+          public static class ConsumerFactory {
+            public static final String SIMPLE_CONSUMER_FACTORY_STRING = "com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory";
           }
         }
       }

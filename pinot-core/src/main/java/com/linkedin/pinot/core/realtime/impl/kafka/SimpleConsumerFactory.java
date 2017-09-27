@@ -16,18 +16,20 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import javax.annotation.Nonnull;
 
 
-public class SimpleConsumerFactory implements PinotKafkaConsumerFactory {
-  public PinotKafkaConsumer buildConsumer(String bootstrapNodes, String clientId, String topic, int partition,
-      long connectTimeoutMillis) {
+public class SimpleConsumerFactory extends PinotKafkaConsumerFactory {
+  public PinotKafkaConsumer buildConsumer(String clientId, int partition, KafkaStreamMetadata kafkaStreamMetadata) {
     KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, bootstrapNodes, clientId, topic, partition, connectTimeoutMillis);
+    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, kafkaStreamMetadata.getBootstrapHosts(),
+        clientId, kafkaStreamMetadata.getKafkaTopicName(), partition, kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
   }
 
-  public PinotKafkaConsumer buildMetadataFetcher(@Nonnull String bootstrapNodes, @Nonnull String clientId, @Nonnull long connectTimeoutMillis) {
+  public PinotKafkaConsumer buildMetadataFetcher(@Nonnull String clientId, KafkaStreamMetadata kafkaStreamMetadata) {
     KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, bootstrapNodes, clientId, connectTimeoutMillis);
+    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, kafkaStreamMetadata.getBootstrapHosts(),
+        clientId, kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
   }
 }

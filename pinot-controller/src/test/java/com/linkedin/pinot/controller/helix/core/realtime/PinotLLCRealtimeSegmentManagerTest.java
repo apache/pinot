@@ -349,6 +349,19 @@ public class PinotLLCRealtimeSegmentManagerTest {
     return mockTableConfig;
   }
 
+  private static KafkaStreamMetadata getKafkaStreamMetadata() {
+    Map<String, String> streamPropMap = new HashMap<>(1);
+    streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
+    streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), "smallest");
+    streamPropMap.put(StringUtil.join(".",
+        CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST), "host:1234");
+    KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(streamPropMap);
+    return kafkaStreamMetadata;
+  }
+
   @Test
   public void testUpdatingKafkaPartitions() throws Exception {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
@@ -489,7 +502,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), tableConfigStartOffset);
-    KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(streamPropMap);
     TableConfig tableConfig = mock(TableConfig.class);
     IndexingConfig indexingConfig = mock(IndexingConfig.class);
     when(indexingConfig.getStreamConfigs()).thenReturn(streamPropMap);
@@ -735,6 +747,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
       CONTROLLER_CONF.setControllerVipHost("vip");
       CONTROLLER_CONF.setControllerPort("9000");
       CONTROLLER_CONF.setDataDir(baseDir.toString());
+    }
+
+    @Override
+    public KafkaStreamMetadata makeKafkaStreamMetadata(String tableWithType) throws Exception {
+      return PinotLLCRealtimeSegmentManagerTest.getKafkaStreamMetadata();
     }
 
     @Override

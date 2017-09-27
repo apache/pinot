@@ -313,7 +313,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig, String kafkaConsumerFactoryName)
       throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
@@ -321,6 +321,7 @@ public abstract class ClusterTest extends ControllerTest {
       // LLC
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
+      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_FACTORY, kafkaConsumerFactoryName);
     } else {
       // HLC
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
@@ -366,7 +367,7 @@ public abstract class ClusterTest extends ControllerTest {
         invertedIndexColumns, taskConfig);
     addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
         timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
-        noDictionaryColumns, taskConfig);
+        noDictionaryColumns, taskConfig, null);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {
