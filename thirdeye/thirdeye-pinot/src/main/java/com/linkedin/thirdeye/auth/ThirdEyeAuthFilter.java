@@ -92,7 +92,7 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
         LOG.error("Empty cookie. Skipping.");
         return credentials;
       }
-
+      
       AuthCookie cookie = this.serializer.deserializeCookie(rawCookie);
       credentials.setPrincipal(cookie.getPrincipal());
       credentials.setPassword(cookie.getPassword()); // TODO replace with token in DB
