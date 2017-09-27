@@ -1447,6 +1447,20 @@ public class DataFrame {
    * @return DataFrameGrouping
    */
   public Grouping.DataFrameGrouping groupByValue(String... seriesNames) {
+    return this.groupByValue(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on the labels provided by the series referenced by
+   * {@code seriesNames} row by row.  The method can group across multiple columns.  It returns
+   * the key column as object series of {@code Tuples} constructed from the input columns.
+   *
+   * @see Grouping.GroupingByValue
+   *
+   * @param seriesNames series containing grouping labels
+   * @return DataFrameGrouping
+   */
+  public Grouping.DataFrameGrouping groupByValue(List<String> seriesNames) {
     return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByValue.from(names2series(seriesNames)));
   }
 
@@ -2149,9 +2163,13 @@ public class DataFrame {
   }
 
   Series[] names2series(String... names) {
-    Series[] inputSeries = new Series[names.length];
-    for(int i=0; i<names.length; i++) {
-      inputSeries[i] = assertSeriesExists(names[i]);
+    return names2series(Arrays.asList(names));
+  }
+
+  Series[] names2series(List<String> names) {
+    Series[] inputSeries = new Series[names.size()];
+    for(int i=0; i<names.size(); i++) {
+      inputSeries[i] = assertSeriesExists(names.get(i));
     }
     return inputSeries;
   }

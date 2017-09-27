@@ -1166,6 +1166,22 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testGroupingExpressionDefaultOperation() {
+    DataFrame out = new DataFrame()
+        .addSeries("a", 1, 1, 2, 2, 2)
+        .addSeries("b", "1", "1", "2", "2", "2")
+        .groupByValue("a", "b")
+        .aggregate("a", "a:first:first", "b");
+
+    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    Assert.assertEquals(out.size(), 2);
+    Assert.assertEquals(out.getIndexSingleton().type(), Series.SeriesType.OBJECT);
+    assertEquals(out.getLongs("a"), 1, 2);
+    assertEquals(out.getLongs("first"), 1, 2);
+    assertEquals(out.getStrings("b"), "1", "2");
+  }
+
+  @Test
   public void testStableMultiSortDoubleLong() {
     DataFrame mydf = new DataFrame(new long[] { 1, 2, 3, 4, 5, 6, 7, 8 })
         .addSeries("double", 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0)
