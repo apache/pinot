@@ -28,7 +28,6 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import java.util.List;
 import java.util.Map;
@@ -53,8 +52,6 @@ public class PinotTableIdealStateBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableIdealStateBuilder.class);
   public static final String ONLINE = "ONLINE";
   public static final String OFFLINE = "OFFLINE";
-  public static final String DROPPED = "DROPPED";
-  private static final long KAFKA_CONNECTION_TIMEOUT_MILLIS = 10000L;
 
   /**
    *
@@ -310,11 +307,9 @@ public class PinotTableIdealStateBuilder {
       if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
         throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
       }
-      // TODO: Factory should be loaded from config
-      PinotKafkaConsumerFactory _pinotKafkaConsumerFactory = new SimpleConsumerFactory();
-      PinotKafkaConsumer consumerWrapper = _pinotKafkaConsumerFactory.buildMetadataFetcher(bootstrapHosts,
-          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, KAFKA_CONNECTION_TIMEOUT_MILLIS);
-
+      PinotKafkaConsumerFactory pinotKafkaConsumerFactory = PinotKafkaConsumerFactory.create(_kafkaStreamMetadata);
+      PinotKafkaConsumer consumerWrapper = pinotKafkaConsumerFactory.buildMetadataFetcher(
+          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, _kafkaStreamMetadata);
       try {
         _partitionCount = consumerWrapper.getPartitionCount(kafkaTopicName, /*maxWaitTimeMs=*/5000L);
         if (_exception != null) {

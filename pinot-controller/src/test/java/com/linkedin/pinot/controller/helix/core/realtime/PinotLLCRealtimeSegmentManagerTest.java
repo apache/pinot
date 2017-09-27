@@ -17,6 +17,7 @@
 package com.linkedin.pinot.controller.helix.core.realtime;
 
 import com.google.common.io.Files;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -38,6 +39,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -349,6 +351,18 @@ public class PinotLLCRealtimeSegmentManagerTest {
     return mockTableConfig;
   }
 
+  private static Map<String, String> getStreamConfigs() {
+    Map<String, String> streamPropMap = new HashMap<>(1);
+    streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
+    streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), "smallest");
+    streamPropMap.put(StringUtil.join(".",
+        CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST), "host:1234");
+    return streamPropMap;
+  }
+
   @Test
   public void testUpdatingKafkaPartitions() throws Exception {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
@@ -489,7 +503,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), tableConfigStartOffset);
-    KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(streamPropMap);
     TableConfig tableConfig = mock(TableConfig.class);
     IndexingConfig indexingConfig = mock(IndexingConfig.class);
     when(indexingConfig.getStreamConfigs()).thenReturn(streamPropMap);
@@ -728,6 +741,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     protected FakePinotLLCRealtimeSegmentManager(boolean setupInitialSegments, List<String> existingLLCSegments) {
       super(null, clusterName, null, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()));
+      try {
+        TableConfigCache mockCache = mock(TableConfigCache.class);
+        TableConfig mockTableConfig = mock(TableConfig.class);
+        IndexingConfig mockIndexingConfig = mock(IndexingConfig.class);
+        when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexingConfig);
+        when(mockIndexingConfig.getStreamConfigs()).thenReturn(getStreamConfigs());
+        when(mockCache.getTableConfig(anyString())).thenReturn(mockTableConfig);
+
+        Field tableConfigCacheField = PinotLLCRealtimeSegmentManager.class.getDeclaredField("_tableConfigCache");
+        tableConfigCacheField.setAccessible(true);
+        tableConfigCacheField.set(this, mockCache);
+      } catch (Exception e) {
+        Utils.rethrowException(e);
+      }
+
       _setupInitialSegments = setupInitialSegments;
       if (existingLLCSegments != null) {
         _existingLLCSegments = existingLLCSegments;

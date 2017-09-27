@@ -47,7 +47,6 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.MessageBatch;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -173,7 +172,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
   private SegmentFileAndOffset _segmentFileAndOffset;
-  private final PinotKafkaConsumerFactory _pinotKafkaConsumerFactory;
+  private PinotKafkaConsumerFactory _pinotKafkaConsumerFactory;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -869,11 +868,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instanceId);
-    _pinotKafkaConsumerFactory = new SimpleConsumerFactory();
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
+    _pinotKafkaConsumerFactory = PinotKafkaConsumerFactory.create(_kafkaStreamMetadata);
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     _kafkaBootstrapNodes = indexingConfig.getStreamConfigs()
@@ -1013,8 +1012,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     segmentLogger.info("Creating new Kafka consumer wrapper, reason: {}", reason);
-    _consumerWrapper = _pinotKafkaConsumerFactory.buildConsumer(_kafkaBootstrapNodes, _clientId, _kafkaTopic,
-        _kafkaPartitionId, _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
+    _consumerWrapper = _pinotKafkaConsumerFactory.buildConsumer(_clientId, _kafkaPartitionId, _kafkaStreamMetadata);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

@@ -45,10 +45,10 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -88,8 +88,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.linkedin.pinot.controller.util.SegmentCompletionUtils.getSegmentNamePrefix;
 
 
 public class PinotLLCRealtimeSegmentManager {
@@ -307,7 +305,15 @@ public class PinotLLCRealtimeSegmentManager {
 
       metadata.setCreationTime(now);
 
-      final long startOffset = getPartitionOffset(topicName, bootstrapHosts, initialOffset, i);
+      KafkaStreamMetadata kafkaStreamMetadata = null;
+      try {
+        kafkaStreamMetadata = new KafkaStreamMetadata(_tableConfigCache.getTableConfig(realtimeTableName).getIndexingConfig().getStreamConfigs());
+      } catch (Exception e) {
+        LOGGER.error("Problem getting stream configs for table {}", rawTableName);
+        throw new RuntimeException(e);
+      }
+
+      final long startOffset = getPartitionOffset(initialOffset, i, kafkaStreamMetadata);
       LOGGER.info("Setting start offset for segment {} to {}", segName, startOffset);
       metadata.setStartOffset(startOffset);
       metadata.setEndOffset(END_OFFSET_FOR_CONSUMING_SEGMENTS);
@@ -533,7 +539,7 @@ public class PinotLLCRealtimeSegmentManager {
       return false;
     }
     for (File file : tableDir.listFiles()) {
-      if (file.getName().startsWith(getSegmentNamePrefix(segmentName))) {
+      if (file.getName().startsWith(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
         LOGGER.warn("Deleting " + file);
         FileUtils.deleteQuietly(file);
       }
@@ -871,21 +877,19 @@ public class PinotLLCRealtimeSegmentManager {
 
   protected long getKafkaPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria,
       int partitionId) {
-    final String topicName = kafkaStreamMetadata.getKafkaTopicName();
-    final String bootstrapHosts = kafkaStreamMetadata.getBootstrapHosts();
-
-    return getPartitionOffset(topicName, bootstrapHosts, offsetCriteria, partitionId);
+    return getPartitionOffset(offsetCriteria, partitionId, kafkaStreamMetadata);
   }
 
-  private long getPartitionOffset(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
-    KafkaOffsetFetcher kafkaOffsetFetcher = new KafkaOffsetFetcher(topicName, bootstrapHosts, offsetCriteria, partitionId);
+  private long getPartitionOffset(final String offsetCriteria, int partitionId, KafkaStreamMetadata kafkaStreamMetadata) {
+    KafkaOffsetFetcher kafkaOffsetFetcher = new KafkaOffsetFetcher(offsetCriteria, partitionId, kafkaStreamMetadata);
     RetryPolicy policy = RetryPolicies.fixedDelayRetryPolicy(3, 1000);
     boolean success = policy.attempt(kafkaOffsetFetcher);
     if (success) {
       return kafkaOffsetFetcher.getOffset();
     }
     Exception e = kafkaOffsetFetcher.getException();
-    LOGGER.error("Could not get offset for topic {} partition {}, criteria {}", topicName, partitionId, offsetCriteria, e);
+    LOGGER.error("Could not get offset for topic {} partition {}, criteria {}",
+        kafkaStreamMetadata.getKafkaTopicName(), partitionId, offsetCriteria, e);
     throw new RuntimeException(e);
   }
 
@@ -1196,20 +1200,21 @@ public class PinotLLCRealtimeSegmentManager {
 
   private static class KafkaOffsetFetcher implements Callable<Boolean> {
     private final String _topicName;
-    private final String _bootstrapHosts;
     private final String _offsetCriteria;
     private final int _partitionId;
 
     private Exception _exception = null;
     private long _offset = -1;
-    private PinotKafkaConsumerFactory _pinotKafkaConsumerFactory = new SimpleConsumerFactory();
+    private PinotKafkaConsumerFactory _pinotKafkaConsumerFactory;
+    KafkaStreamMetadata _kafkaStreamMetadata;
 
 
-    private KafkaOffsetFetcher(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
-      _topicName = topicName;
-      _bootstrapHosts = bootstrapHosts;
+    private KafkaOffsetFetcher(final String offsetCriteria, int partitionId, KafkaStreamMetadata kafkaStreamMetadata) {
       _offsetCriteria = offsetCriteria;
       _partitionId = partitionId;
+      _pinotKafkaConsumerFactory = PinotKafkaConsumerFactory.create(kafkaStreamMetadata);
+      _kafkaStreamMetadata = kafkaStreamMetadata;
+      _topicName = kafkaStreamMetadata.getKafkaTopicName();
     }
 
     private long getOffset() {
@@ -1224,8 +1229,7 @@ public class PinotLLCRealtimeSegmentManager {
     public Boolean call() throws Exception {
 
       PinotKafkaConsumer
-          kafkaConsumer = _pinotKafkaConsumerFactory.buildConsumer(_bootstrapHosts, "dummyClientId", _topicName,
-          _partitionId, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+          kafkaConsumer = _pinotKafkaConsumerFactory.buildConsumer("dummyClientId", _partitionId, _kafkaStreamMetadata);
       try {
         _offset = kafkaConsumer.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {
