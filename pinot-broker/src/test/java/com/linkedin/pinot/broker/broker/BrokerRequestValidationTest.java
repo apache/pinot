@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.broker;
 
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
+import com.linkedin.pinot.broker.routing.TimeBoundaryService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
@@ -50,10 +51,22 @@ public class BrokerRequestValidationTest {
     PropertiesConfiguration config = new PropertiesConfiguration(
         new File(BrokerServerBuilderTest.class.getClassLoader().getResource("broker.properties").toURI()));
 
+    // Create a dummy time boundary service
+    TimeBoundaryService timeBoundaryService = new TimeBoundaryService() {
+      @Override
+      public TimeBoundaryInfo getTimeBoundaryInfoFor(String table) {
+        return null;
+      }
+
+      @Override
+      public void remove(String tableName) {
+        return;
+      }
+    };
+
     // Set the value for query response limit.
     config.addProperty(QUERY_RESPONSE_LIMIT_CONFIG, QUERY_RESPONSE_LIMIT);
-    brokerBuilder = new BrokerServerBuilder(config, null, null, null);
-
+    brokerBuilder = new BrokerServerBuilder(config, null, timeBoundaryService, null);
     brokerBuilder.buildNetwork();
     brokerBuilder.buildHTTP();
     brokerBuilder.start();

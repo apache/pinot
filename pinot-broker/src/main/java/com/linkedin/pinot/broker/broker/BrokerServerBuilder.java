@@ -23,11 +23,6 @@ import com.linkedin.pinot.broker.routing.CfgBasedRouting;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.broker.routing.RoutingTable;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService;
-import com.linkedin.pinot.broker.servlet.PinotBrokerHealthCheckServlet;
-import com.linkedin.pinot.broker.servlet.PinotBrokerRoutingTableDebugServlet;
-import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
-import com.linkedin.pinot.broker.servlet.PinotBrokerTimeBoundaryDebugServlet;
-import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
@@ -54,10 +49,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.grizzly.servlet.ServletRegistration;
-import org.glassfish.grizzly.servlet.WebappContext;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +87,8 @@ public class BrokerServerBuilder {
 
   private long delayedShutdownTimeMs = DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS;
 
-  private HttpServer _httpServer;
+  private BrokerAdminApiApplication _brokerAdminApplication;
+
   private final Configuration _config;
   private final LiveInstancesChangeListenerImpl listener;
 
@@ -205,32 +197,8 @@ public class BrokerServerBuilder {
     Preconditions.checkArgument(clientConfig.getQueryPort() > 0);
     URI baseUri = URI.create("http://0.0.0.0:" + Integer.toString(clientConfig.getQueryPort()) + "/");
 
-    _httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri);
-
-    WebappContext context;
-    if (clientConfig.enableConsole()) {
-      // Use "" for context path to make it "/"
-      context = new WebappContext("brokerServerContext", "", clientConfig.getConsoleWebappPath());
-
-    } else {
-      context = new WebappContext("brokerServerContext");
-    }
-    ServletRegistration servletRegistration;
-    servletRegistration = context.addServlet("query", PinotClientRequestServlet.class);
-    servletRegistration.addMapping("/query");
-
-    servletRegistration = context.addServlet("health", PinotBrokerHealthCheckServlet.class);
-    servletRegistration.addMapping("/health");
-
-    servletRegistration = context.addServlet("debugRoutingTable", PinotBrokerRoutingTableDebugServlet.class);
-    servletRegistration.addMapping("/debug/routingTable/*");
-
-    servletRegistration = context.addServlet("debugTimeBoundary", PinotBrokerTimeBoundaryDebugServlet.class);
-    servletRegistration.addMapping("/debug/timeBoundary/*");
-
-    context.addListener(new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics, _timeBoundaryService));
-    context.setAttribute(BrokerServerBuilder.class.toString(), this);
-    context.deploy(_httpServer);
+    _brokerAdminApplication = new BrokerAdminApiApplication(this, _brokerMetrics, _requestHandler, _timeBoundaryService);
+    _brokerAdminApplication.start(clientConfig.getQueryPort());
   }
 
   public void start() throws Exception {
@@ -249,10 +217,6 @@ public class BrokerServerBuilder {
       listener.init(_connPool, BrokerRequestHandler.DEFAULT_BROKER_TIME_OUT_MS);
     }
     LOGGER.info("Network running !!");
-
-    LOGGER.info("Starting Grizzly server !!");
-    _httpServer.start();
-    LOGGER.info("Started Grizzly server !!");
   }
 
   public void stop() throws Exception {
@@ -271,9 +235,7 @@ public class BrokerServerBuilder {
     _state.set(State.SHUTDOWN);
     LOGGER.info("Network shutdown!!");
 
-    LOGGER.info("Stopping Grizzly server !!");
-    _httpServer.shutdown();
-    LOGGER.info("Stopped Grizzly server !!");
+    _brokerAdminApplication.stop();
   }
 
   public State getCurrentState() {

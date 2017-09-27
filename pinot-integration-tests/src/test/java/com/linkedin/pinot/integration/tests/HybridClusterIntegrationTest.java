@@ -171,7 +171,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Test
   public void testBrokerDebugOutput() throws Exception {
     String tableName = getTableName();
-    Assert.assertNotNull(getDebugInfo("debug/timeBoundary"));
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + tableName));
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
