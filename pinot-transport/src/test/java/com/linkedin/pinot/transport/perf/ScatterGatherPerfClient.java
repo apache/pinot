@@ -15,6 +15,31 @@
  */
 package com.linkedin.pinot.transport.perf;
 
+import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.transport.common.CompositeFuture;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
+import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
+import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
+import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
+import com.linkedin.pinot.transport.pool.KeyedPool;
+import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistry;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timer;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -39,36 +64,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.LatencyMetric;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.BucketingSelection;
-import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.ReplicaSelection;
-import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
-import com.linkedin.pinot.transport.common.SegmentId;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
-import com.linkedin.pinot.transport.config.RoutingTableConfig;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
-import com.linkedin.pinot.transport.pool.KeyedPool;
-import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.HashedWheelTimer;
-import io.netty.util.Timer;
 
 
 public class ScatterGatherPerfClient implements Runnable {
@@ -78,9 +73,6 @@ public class ScatterGatherPerfClient implements Runnable {
   private static final String NUM_REQUESTS_OPT_NAME = "num_requests";
   private static final String REQUEST_SIZE_OPT_NAME = "request_size";
   private static final String TABLE_NAME_OPT_NAME = "resource_name";
-
-  // RequestId Generator
-  private static AtomicLong _requestIdGen = new AtomicLong(0);
 
   //Routing Config and Pool
   private final RoutingTableConfig _routingConfig;
@@ -232,8 +224,6 @@ public class ScatterGatherPerfClient implements Runnable {
         System.out.println("Total time :" + tc.getLatencyMs());
         System.out
             .println("Throughput (Requests/Second) :" + ((_numRequestsMeasured * 1.0 * 1000) / tc.getLatencyMs()));
-        System.out.println("Latency :" + new LatencyMetric<Histogram>(_latencyHistogram));
-        System.out.println("Scatter-Gather Latency :" + new LatencyMetric<Histogram>(_scatterGather.getLatency()));
       }
     } catch (Exception ex) {
       System.err.println("Client stopped abnormally ");
@@ -459,32 +449,7 @@ public class ScatterGatherPerfClient implements Runnable {
     }
 
     @Override
-    public ReplicaSelection getReplicaSelection() {
-      return new FirstReplicaSelection();
-    }
-
-    @Override
-    public ReplicaSelectionGranularity getReplicaSelectionGranularity() {
-      return ReplicaSelectionGranularity.SEGMENT_ID_SET;
-    }
-
-    @Override
-    public Object getHashKey() {
-      return null;
-    }
-
-    @Override
-    public int getNumSpeculativeRequests() {
-      return 0;
-    }
-
-    @Override
-    public BucketingSelection getPredefinedSelection() {
-      return null;
-    }
-
-    @Override
-    public long getRequestTimeoutMS() {
+    public long getRequestTimeoutMs() {
       return 10000; //10 second timeout
     }
 
@@ -496,27 +461,6 @@ public class ScatterGatherPerfClient implements Runnable {
     @Override
     public BrokerRequest getBrokerRequest() {
       return null;
-    }
-  }
-
-  /**
-   * Selects the first replica in the list
-   *
-   */
-  public static class FirstReplicaSelection extends ReplicaSelection {
-
-    @Override
-    public void reset(SegmentId p) {
-    }
-
-    @Override
-    public void reset(SegmentIdSet p) {
-    }
-
-    @Override
-    public ServerInstance selectServer(SegmentId p, List<ServerInstance> orderedServers, Object hashKey) {
-      //System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
-      return orderedServers.get(0);
     }
   }
 
@@ -566,10 +510,6 @@ public class ScatterGatherPerfClient implements Runnable {
 
   public int getNumRequestsMeasured() {
     return _numRequestsMeasured;
-  }
-
-  public TimerContext getTimerContext() {
-    return _timerContext;
   }
 
   public long getBeginFirstRequestTime() {
