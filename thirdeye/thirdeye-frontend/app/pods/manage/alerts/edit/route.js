@@ -40,7 +40,8 @@ export default Ember.Route.extend({
       metric: metricName,
       collection: dataset,
       filters,
-      bucketUnit: granularity,
+      bucketSize,
+      bucketUnit,
       id
      } = model.function;
 
@@ -64,8 +65,8 @@ export default Ember.Route.extend({
         const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
         const baselineEnd = moment(currentEnd).subtract(1, 'week');
         const metricDataUrl =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
-          `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}` +
-          `&filters=${encodeURIComponent(formattedFilters)}`;
+          `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=` +
+          `${bucketSize + '_' + bucketUnit}&filters=${encodeURIComponent(formattedFilters)}`;
         return fetch(metricDataUrl).then(checkStatus);
       })
       .then((metricData) => {
