@@ -43,11 +43,7 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.serde.SerDe;
-import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.ReplicaSelection;
-import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
-import com.linkedin.pinot.transport.common.RoundRobinReplicaSelection;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
@@ -119,8 +115,6 @@ public class BrokerRequestHandler {
   private final int _queryResponseLimit;
   private final AtomicLong _requestIdGenerator;
   private final String _brokerId;
-  // TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
-  private RoundRobinReplicaSelection _replicaSelection;
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
       ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry,
@@ -129,7 +123,6 @@ public class BrokerRequestHandler {
     _timeBoundaryService = timeBoundaryService;
     _reduceServiceRegistry = reduceServiceRegistry;
     _scatterGatherer = scatterGatherer;
-    _replicaSelection = new RoundRobinReplicaSelection();
     _brokerMetrics = brokerMetrics;
     _optimizer = new BrokerRequestOptimizer();
     _requestIdGenerator = new AtomicLong(0);
@@ -153,8 +146,7 @@ public class BrokerRequestHandler {
    * @throws Exception
    */
   @Nonnull
-  public BrokerResponse handleRequest(@Nonnull JSONObject request)
-      throws Exception {
+  public BrokerResponse handleRequest(@Nonnull JSONObject request) throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     String pql = request.getString("pql");
     LOGGER.debug("Query string for requestId {}: {}", requestId, pql);
@@ -339,9 +331,8 @@ public class BrokerRequestHandler {
     }
 
     ReduceService reduceService = _reduceServiceRegistry.get(responseType);
-    // TODO: wire up the customized BucketingSelection.
     return processOptimizedBrokerRequests(brokerRequest, offlineBrokerRequest, realtimeBrokerRequest, reduceService,
-        scatterGatherStats, null, requestId);
+        scatterGatherStats, requestId);
   }
 
   /**
@@ -451,7 +442,6 @@ public class BrokerRequestHandler {
    * @param offlineBrokerRequest broker request for OFFLINE table.
    * @param realtimeBrokerRequest broker request for REALTIME table.
    * @param reduceService reduce service.
-   * @param bucketingSelection customized bucketing selection.
    * @param scatterGatherStats scatter-gather statistics.
    * @param requestId request ID.
    * @return broker response.
@@ -460,8 +450,7 @@ public class BrokerRequestHandler {
   @Nonnull
   private BrokerResponse processOptimizedBrokerRequests(@Nonnull BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nonnull ReduceService reduceService, @Nonnull ScatterGatherStats scatterGatherStats,
-      @Nullable BucketingSelection bucketingSelection, long requestId)
+      @Nonnull ReduceService reduceService, @Nonnull ScatterGatherStats scatterGatherStats, long requestId)
       throws InterruptedException {
     ResponseType serverResponseType = BrokerResponseFactory.getResponseType(originalBrokerRequest.getResponseFormat());
     PhaseTimes phaseTimes = new PhaseTimes();
@@ -473,16 +462,14 @@ public class BrokerRequestHandler {
     if (offlineBrokerRequest != null) {
       offlineTableName = offlineBrokerRequest.getQuerySource().getTableName();
       offlineCompositeFuture =
-          routeAndScatterBrokerRequest(offlineBrokerRequest, phaseTimes, scatterGatherStats, true, bucketingSelection,
-              requestId);
+          routeAndScatterBrokerRequest(offlineBrokerRequest, phaseTimes, scatterGatherStats, true, requestId);
     }
     String realtimeTableName = null;
     CompositeFuture<ByteBuf> realtimeCompositeFuture = null;
     if (realtimeBrokerRequest != null) {
       realtimeTableName = realtimeBrokerRequest.getQuerySource().getTableName();
       realtimeCompositeFuture =
-          routeAndScatterBrokerRequest(realtimeBrokerRequest, phaseTimes, scatterGatherStats, false, bucketingSelection,
-              requestId);
+          routeAndScatterBrokerRequest(realtimeBrokerRequest, phaseTimes, scatterGatherStats, false, requestId);
     }
     if ((offlineCompositeFuture == null) && (realtimeCompositeFuture == null)) {
       // No server found in either OFFLINE or REALTIME table.
@@ -561,8 +548,7 @@ public class BrokerRequestHandler {
   @Nullable
   private CompositeFuture<ByteBuf> routeAndScatterBrokerRequest(@Nonnull BrokerRequest brokerRequest,
       @Nonnull PhaseTimes phaseTimes, @Nonnull ScatterGatherStats scatterGatherStats, boolean isOfflineTable,
-      @Nullable BucketingSelection bucketingSelection, long requestId)
-      throws InterruptedException {
+      long requestId) throws InterruptedException {
     // Step 1: find the candidate servers to be queried for each set of segments from the routing table.
     // TODO: add checks for whether all segments are covered.
     long routingStartTime = System.nanoTime();
@@ -578,9 +564,7 @@ public class BrokerRequestHandler {
     // Step 2: select servers for each segment set and scatter request to the servers.
     long scatterStartTime = System.nanoTime();
     ScatterGatherRequestImpl scatterRequest =
-        new ScatterGatherRequestImpl(brokerRequest, segmentServices, _replicaSelection,
-            ReplicaSelectionGranularity.SEGMENT_ID_SET, brokerRequest.getBucketHashKey(), 0, bucketingSelection,
-            requestId, _brokerTimeOutMs, _brokerId);
+        new ScatterGatherRequestImpl(brokerRequest, segmentServices, requestId, _brokerTimeOutMs, _brokerId);
     CompositeFuture<ByteBuf> compositeFuture =
         _scatterGatherer.scatterGather(scatterRequest, scatterGatherStats, isOfflineTable, _brokerMetrics);
     phaseTimes.addToScatterTime(System.nanoTime() - scatterStartTime);
@@ -604,8 +588,8 @@ public class BrokerRequestHandler {
       routingOptions =
           Splitter.on(",").omitEmptyStrings().trimResults().splitToList(debugOptions.get("routingOptions"));
     }
-    RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(tableName, routingOptions,
-        brokerRequest);
+    RoutingTableLookupRequest routingTableLookupRequest =
+        new RoutingTableLookupRequest(tableName, routingOptions, brokerRequest);
     return _routingTable.findServers(routingTableLookupRequest);
   }
 
@@ -719,26 +703,14 @@ public class BrokerRequestHandler {
   private static class ScatterGatherRequestImpl implements ScatterGatherRequest {
     private final BrokerRequest _brokerRequest;
     private final Map<ServerInstance, SegmentIdSet> _segmentServices;
-    private final ReplicaSelection _replicaSelection;
-    private final ReplicaSelectionGranularity _replicaSelectionGranularity;
-    private final Object _hashKey;
-    private final int _numSpeculativeRequests;
-    private final BucketingSelection _bucketingSelection;
     private final long _requestId;
     private final long _requestTimeoutMs;
     private final String _brokerId;
 
     public ScatterGatherRequestImpl(BrokerRequest request, Map<ServerInstance, SegmentIdSet> segmentServices,
-        ReplicaSelection replicaSelection, ReplicaSelectionGranularity replicaSelectionGranularity, Object hashKey,
-        int numSpeculativeRequests, BucketingSelection bucketingSelection, long requestId, long requestTimeoutMs,
-        String brokerId) {
+        long requestId, long requestTimeoutMs, String brokerId) {
       _brokerRequest = request;
       _segmentServices = segmentServices;
-      _replicaSelection = replicaSelection;
-      _replicaSelectionGranularity = replicaSelectionGranularity;
-      _hashKey = hashKey;
-      _numSpeculativeRequests = numSpeculativeRequests;
-      _bucketingSelection = bucketingSelection;
       _requestId = requestId;
       _requestTimeoutMs = requestTimeoutMs;
       _brokerId = brokerId;
@@ -758,33 +730,7 @@ public class BrokerRequestHandler {
       r.setSearchSegments(querySegments.getSegmentsNameList());
       r.setBrokerId(_brokerId);
       // _serde is not threadsafe.
-      return getSerde().serialize(r);
-      //      return _serde.serialize(r);
-    }
-
-    @Override
-    public ReplicaSelection getReplicaSelection() {
-      return _replicaSelection;
-    }
-
-    @Override
-    public ReplicaSelectionGranularity getReplicaSelectionGranularity() {
-      return _replicaSelectionGranularity;
-    }
-
-    @Override
-    public Object getHashKey() {
-      return _hashKey;
-    }
-
-    @Override
-    public int getNumSpeculativeRequests() {
-      return _numSpeculativeRequests;
-    }
-
-    @Override
-    public BucketingSelection getPredefinedSelection() {
-      return _bucketingSelection;
+      return new SerDe(new TCompactProtocol.Factory()).serialize(r);
     }
 
     @Override
@@ -793,12 +739,8 @@ public class BrokerRequestHandler {
     }
 
     @Override
-    public long getRequestTimeoutMS() {
+    public long getRequestTimeoutMs() {
       return _requestTimeoutMs;
-    }
-
-    public SerDe getSerde() {
-      return new SerDe(new TCompactProtocol.Factory());
     }
 
     @Override
@@ -807,8 +749,7 @@ public class BrokerRequestHandler {
     }
   }
 
-  public String getRoutingTableSnapshot(String tableName)
-      throws Exception {
+  public String getRoutingTableSnapshot(String tableName) throws Exception {
     return _routingTable.dumpSnapshot(tableName);
   }
 }
