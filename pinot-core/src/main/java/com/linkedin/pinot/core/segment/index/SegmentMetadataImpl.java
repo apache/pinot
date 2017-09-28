@@ -320,6 +320,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
     }
 
+    final Iterator<String> dateTime =
+        _segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS).iterator();
+    while (dateTime.hasNext()) {
+      final String columnName = dateTime.next();
+      if (columnName.trim().length() > 0) {
+        _allColumns.add(columnName);
+      }
+    }
     // Set segment name.
     _segmentName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_NAME);
 

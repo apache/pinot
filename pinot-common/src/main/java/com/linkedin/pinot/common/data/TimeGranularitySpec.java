@@ -18,11 +18,14 @@ package com.linkedin.pinot.common.data;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+
 import java.util.concurrent.TimeUnit;
+
 import javax.annotation.Nonnull;
 
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
 
 
 /**
@@ -43,6 +46,7 @@ import org.joda.time.DateTime;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TimeGranularitySpec {
   private static final int DEFAULT_TIME_UNIT_SIZE = 1;
+  private static final String COLON_SEPARATOR = ":";
 
   private DataType _dataType;
   private TimeUnit _timeType;
@@ -192,6 +196,61 @@ public class TimeGranularitySpec {
    */
   public DateTime toDateTime(long timeSinceEpoch) {
     return new DateTime(_timeType.toMillis(timeSinceEpoch * _timeUnitSize));
+  }
+
+  /**
+   * Convert the timeColumnValue to millis
+   *
+   * eg:
+   * 1) given timeColumnValue = 416359 and timeGranularitySpec:{timeUnitSize=1,timetype=HOURS,timeFormat=EPOCH},
+   * timeGranularitySpec.toMillis(416359) = 1498892400000 (i.e. timeColumnValue*60*60*1000)
+   *
+   * 2) given timeColumnValue = 4996308 and timeGranularitySpec:{timeUnitSize=5,timetype=MINUTES,timeFormat=EPOCH},
+   * timeGranularitySpec.toMillis(4996308) = 1498892400000 (i.e. timeColumnValue*5*60*1000)
+   *
+   * 3) given timeColumnValue = 20170701 and timeGranularitySpec:{timeUnitSize=1,timetype=DAYS,timeFormat=SIMPLE_DATE_FORMAT:yyyyMMdd},
+   * timeGranularitySpec.toMillis(20170701) = 1498892400000
+   *
+   * @param timeColumnValue - time column value to convert
+   * @return time column value in millis
+   */
+  public Long toMillis(Object timeColumnValue) {
+    Preconditions.checkNotNull(timeColumnValue);
+    Long timeColumnValueMS = 0L;
+    if (_timeFormat.equals(TimeFormat.EPOCH.toString())) {
+      timeColumnValueMS = TimeUnit.MILLISECONDS.convert((Long) timeColumnValue * _timeUnitSize, _timeType);
+    } else {
+      String pattern = _timeFormat.split(COLON_SEPARATOR)[1];
+      timeColumnValueMS = DateTimeFormat.forPattern(pattern).parseMillis(String.valueOf(timeColumnValue));
+    }
+    return timeColumnValueMS;
+  }
+
+  /**
+   * Convert the time value in millis to the format from timeGranularitySpec
+   * eg:
+   * 1) given timeColumnValueMS = 1498892400000 and timeGranularitySpec:{timeUnitSize=1,timetype=HOURS,timeFormat=EPOCH},
+   * timeGranularitySpec.fromMillis(1498892400000) = 416359 (i.e. timeColumnValueMS/(1000*60*60))
+   *
+   * 2) given timeColumnValueMS = 1498892400000 and timeGranularitySpec:{timeUnitSize=5,timetype=MINUTES,timeFormat=EPOCH},
+   * timeGranularitySpec.fromMillis(1498892400000) = 4996308 (i.e. timeColumnValueMS/(1000*60*5))
+   *
+   * 3) given timeColumnValueMS = 1498892400000 and timeGranularitySpec:{timeUnitSize=1,timetype=DAYS,timeFormat=SIMPLE_DATE_FORMAT:yyyyMMdd},
+   * timeGranularitySpec.fromMillis(1498892400000) = 20170701
+   *
+   * @param timeColumnValueMS - millis value to convert
+   * @return time value in timeGranularitySpec format
+   */
+  public Object fromMillis(Long timeColumnValueMS) {
+    Preconditions.checkNotNull(timeColumnValueMS);
+    Object timeColumnValue = null;
+    if (_timeFormat.equals(TimeFormat.EPOCH.toString())) {
+      timeColumnValue = _timeType.convert(timeColumnValueMS, TimeUnit.MILLISECONDS) / _timeUnitSize;
+    } else {
+      String pattern = _timeFormat.split(COLON_SEPARATOR)[1];
+      timeColumnValue = DateTimeFormat.forPattern(pattern).print(timeColumnValueMS);
+    }
+    return timeColumnValue;
   }
 
   @Override

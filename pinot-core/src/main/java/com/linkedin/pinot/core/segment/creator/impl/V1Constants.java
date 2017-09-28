@@ -119,6 +119,7 @@ public class V1Constants {
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";
       public static final String TIME_INTERVAL = "segment.time.interval";
+      public static final String DATETIME_COLUMNS = "segment.datetime.column.names";
       public static final String CUSTOM_PROPERTIES_PREFIX = "segment.custom";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
       public static final String SEGMENT_TOTAL_RAW_DOCS = "segment.total.raw.docs";
@@ -165,6 +166,9 @@ public class V1Constants {
       public static final String PARTITION_FUNCTION = "partitionFunction";
       public static final String NUM_PARTITIONS = "numPartitions";
       public static final String PARTITION_VALUES = "partitionValues";
+      public static final String DATETIME_FORMAT = "datetimeFormat";
+      public static final String DATETIME_GRANULARITY = "datetimeGranularity";
+      public static final String DATETIME_TYPE = "datetimeType";
 
 
       private static final String COLUMN_PROPS_KEY_PREFIX = "column.";

@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.indexsegment.generator;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
+import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
@@ -30,6 +31,7 @@ import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -41,7 +43,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import javax.annotation.Nonnull;
+
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -312,7 +316,7 @@ public class SegmentGeneratorConfig {
     if (_segmentTimeColumnName != null) {
       return _segmentTimeColumnName;
     }
-    return getQualifyingDimensions(FieldType.TIME);
+    return getQualifyingFields(FieldType.TIME);
   }
 
   public void setTimeColumnName(String timeColumnName) {
@@ -473,7 +477,7 @@ public class SegmentGeneratorConfig {
 
   @JsonIgnore
   public String getMetrics() {
-    return getQualifyingDimensions(FieldType.METRIC);
+    return getQualifyingFields(FieldType.METRIC);
   }
 
   /**
@@ -514,7 +518,12 @@ public class SegmentGeneratorConfig {
 
   @JsonIgnore
   public String getDimensions() {
-    return getQualifyingDimensions(FieldType.DIMENSION);
+    return getQualifyingFields(FieldType.DIMENSION);
+  }
+
+  @JsonIgnore
+  public String getDateTimeColumnNames() {
+    return getQualifyingFields(FieldType.DATE_TIME);
   }
 
   public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
@@ -526,20 +535,20 @@ public class SegmentGeneratorConfig {
   }
 
   /**
-   * Returns a comma separated list of qualifying dimension name strings
+   * Returns a comma separated list of qualifying field name strings
    * @param type FieldType to filter on
    * @return
    */
   @JsonIgnore
-  private String getQualifyingDimensions(FieldType type) {
-    List<String> dimensions = new ArrayList<>();
+  private String getQualifyingFields(FieldType type) {
+    List<String> fields = new ArrayList<>();
 
     for (final FieldSpec spec : getSchema().getAllFieldSpecs()) {
       if (spec.getFieldType() == type) {
-        dimensions.add(spec.getName());
+        fields.add(spec.getName());
       }
     }
-    Collections.sort(dimensions);
-    return StringUtils.join(dimensions, ",");
+    Collections.sort(fields);
+    return StringUtils.join(fields, ",");
   }
 }

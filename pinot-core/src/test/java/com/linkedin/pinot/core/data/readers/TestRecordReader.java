@@ -64,14 +64,17 @@ public class TestRecordReader extends BaseRecordReader {
 
   @Override
   public GenericRow next() {
-    GenericRow row = rows.get(recordNumber);
-    recordNumber ++;
-    return row;
+    return next(new GenericRow());
   }
 
   @Override
   public GenericRow next(GenericRow row) {
-    return next();
+    GenericRow testRow = rows.get(recordNumber);
+    for (String fieldName : testRow.getFieldNames()) {
+      row.putField(fieldName, testRow.getValue(fieldName));
+    }
+    recordNumber ++;
+    return row;
   }
 
   @Override

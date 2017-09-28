@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -37,11 +39,13 @@ import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwa
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -306,6 +310,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(TABLE_NAME, config.getTableName());
     properties.setProperty(DIMENSIONS, config.getDimensions());
     properties.setProperty(METRICS, config.getMetrics());
+    properties.setProperty(DATETIME_COLUMNS, config.getDateTimeColumnNames());
     properties.setProperty(TIME_COLUMN_NAME, config.getTimeColumnName());
     properties.setProperty(TIME_INTERVAL, "not_there");
     properties.setProperty(SEGMENT_TOTAL_RAW_DOCS, String.valueOf(totalRawDocs));
@@ -423,6 +428,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, NUM_PARTITIONS), numPartitions);
       String partitionValues = ColumnPartitionConfig.rangesToString(partitionRanges);
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, PARTITION_VALUES), partitionValues);
+    }
+
+    // datetime field
+    if (fieldSpec.getFieldType().equals(FieldType.DATE_TIME)) {
+      DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATETIME_FORMAT),
+          dateTimeFieldSpec.getFormat());
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATETIME_GRANULARITY),
+          dateTimeFieldSpec.getGranularity());
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATETIME_TYPE),
+          dateTimeFieldSpec.getDateTimeType().toString());
     }
 
     // HLL derived fields
