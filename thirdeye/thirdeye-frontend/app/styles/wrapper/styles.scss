@@ -172,7 +172,8 @@ body {
     border-top: 1px solid #E9E9E9;
   }
 
-  &__sub-label {
+  &__sub-label,
+  &__super-label {
     color: rgba(0,0,0,0.45);
 
     &--strong {
