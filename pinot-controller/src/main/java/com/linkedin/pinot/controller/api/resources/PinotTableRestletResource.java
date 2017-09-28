@@ -242,7 +242,7 @@ public class PinotTableRestletResource {
   @PUT
   @Path("/tables/{tableName}")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Updates table config for a table ", notes = "Deletes a table of specific type")
+  @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
       String tableConfigStr
@@ -287,6 +287,27 @@ public class PinotTableRestletResource {
     }
 
     return new SuccessResponse("Table config updated for " + tableName);
+  }
+
+  @POST
+  @Path("/tables/validate")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Validate table config for a table",
+      notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
+          + " This allows us to validate table config before apply.")
+  public String checkTableConfig (String tableConfigStr) throws Exception {
+    try {
+      JSONObject tableConfigValidateStr = new JSONObject();
+      TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(tableConfigStr));
+      if (tableConfig.getTableType() == CommonConstants.Helix.TableType.OFFLINE) {
+        tableConfigValidateStr.put(CommonConstants.Helix.TableType.OFFLINE.name(), TableConfig.toJSONConfig(tableConfig));
+      } else {
+        tableConfigValidateStr.put(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
+      }
+      return tableConfigValidateStr.toString();
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid JSON", Response.Status.BAD_REQUEST);
+    }
   }
 
   private PinotResourceManagerResponse toggleTableState(String tableName, String state) {
