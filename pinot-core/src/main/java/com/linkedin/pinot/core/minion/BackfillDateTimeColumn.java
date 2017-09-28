@@ -244,9 +244,7 @@ public class BackfillDateTimeColumn {
     private Object convertTimeFieldToDateTimeFieldSpec(Object timeColumnValue) {
 
       TimeGranularitySpec timeGranularitySpec = _timeFieldSpec.getOutgoingGranularitySpec();
-      if (timeGranularitySpec == null) {
-          timeGranularitySpec = _timeFieldSpec.getIncomingGranularitySpec();
-      }
+
       String formatFromTimeSpec =
           DateTimeFieldSpecUtils.constructFormat(timeGranularitySpec.getTimeUnitSize(),
               timeGranularitySpec.getTimeType(), timeGranularitySpec.getTimeFormat());
