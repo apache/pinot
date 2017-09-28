@@ -207,22 +207,7 @@ public class RequestUtils {
     // Ensure that none of the group-by columns are metric or skipped for materialization.
     GroupBy groupBy = brokerRequest.getGroupBy();
     if (groupBy != null) {
-      Set<String> allGroupByColumns = new HashSet<>();
-
-      List<String> groupByColumns = groupBy.getColumns();
-      if (groupByColumns != null) {
-        allGroupByColumns.addAll(groupByColumns);
-      }
-
-      List<String> groupByExpressions = groupBy.getExpressions();
-      if (groupByExpressions != null) {
-        for (String expression : groupByExpressions) {
-          TransformExpressionTree expressionTree = PQL2_COMPILER.compileToExpressionTree(expression);
-          List<String> columns = new ArrayList<>();
-          expressionTree.getColumns(columns);
-          allGroupByColumns.addAll(columns);
-        }
-      }
+      Set<String> allGroupByColumns = getAllGroupByColumns(groupBy);
 
       for (String groupByColumn : allGroupByColumns) {
         if (metricColumnSet.contains(groupByColumn)) {
@@ -303,5 +288,32 @@ public class RequestUtils {
     }
     String useStarTreeString = debugOptions.get(USE_STAR_TREE_KEY);
     return (useStarTreeString != null) ? Boolean.valueOf(useStarTreeString) : true;
+  }
+
+  /**
+   * Helper method to extract all column names from group by columns and expressions
+   * @param groupBy
+   * @return
+   */
+  public static Set<String> getAllGroupByColumns(GroupBy groupBy) {
+    Set<String> allGroupByColumns = new HashSet<>();
+
+    if (groupBy != null) {
+      List<String> groupByColumns = groupBy.getColumns();
+      if (groupByColumns != null) {
+        allGroupByColumns.addAll(groupByColumns);
+      }
+
+      List<String> groupByExpressions = groupBy.getExpressions();
+      if (groupByExpressions != null) {
+        for (String expression : groupByExpressions) {
+          TransformExpressionTree expressionTree = PQL2_COMPILER.compileToExpressionTree(expression);
+          List<String> columns = new ArrayList<>();
+          expressionTree.getColumns(columns);
+          allGroupByColumns.addAll(columns);
+        }
+      }
+    }
+    return allGroupByColumns;
   }
 }
