@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.core.common.Operator;
@@ -22,6 +23,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,9 +38,9 @@ public class SelectionPlanNode implements PlanNode {
   private final Selection _selection;
   private final ProjectionPlanNode _projectionPlanNode;
 
-  public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+  public SelectionPlanNode(IndexSegment indexSegment, ServerQueryRequest serverQueryRequest) {
     _indexSegment = indexSegment;
-    _selection = brokerRequest.getSelections();
+    _selection = serverQueryRequest.getBrokerRequest().getSelections();
     int maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
     if ((_selection.getSelectionSortSequence() == null) || _selection.getSelectionSortSequence().isEmpty()) {
@@ -46,7 +48,7 @@ public class SelectionPlanNode implements PlanNode {
       maxDocPerNextCall = Math.min(_selection.getOffset() + _selection.getSize(), maxDocPerNextCall);
     }
 
-    DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, brokerRequest, maxDocPerNextCall);
+    DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, serverQueryRequest, maxDocPerNextCall);
     _projectionPlanNode = new ProjectionPlanNode(_indexSegment,
         SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment), docIdSetPlanNode);
   }

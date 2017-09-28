@@ -15,11 +15,12 @@
  */
 package com.linkedin.pinot.core.plan.maker;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
+
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
@@ -33,20 +34,20 @@ public interface PlanMaker {
    * Make segment level {@link PlanNode} which contains execution plan on only one segment.
    *
    * @param indexSegment index segment.
-   * @param brokerRequest broker request.
+   * @param serverQueryRequest server query request.
    * @return segment level plan node.
    */
-  PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest);
+  PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, ServerQueryRequest serverQueryRequest);
 
   /**
    * Make instance level {@link Plan} which contains execution plan on multiple segments.
    *
    * @param segmentDataManagers list of segment data manager.
-   * @param brokerRequest broker request.
+   * @param serverQueryRequest server query request.
    * @param executorService executor service.
    * @param timeOutMs time out in milliseconds.
    * @return instance level plan.
    */
-  Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
+  Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, ServerQueryRequest serverQueryRequest,
       ExecutorService executorService, long timeOutMs);
 }

@@ -15,10 +15,11 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,13 +33,13 @@ public class DocIdSetPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(DocIdSetPlanNode.class);
   public static int MAX_DOC_PER_CALL = 10000;
   private final IndexSegment _indexSegment;
-  private final BrokerRequest _brokerRequest;
+  private final ServerQueryRequest _serverQueryRequest;
   private final PlanNode _filterNode;
   private final int _maxDocPerCall;
   private BReusableFilteredDocIdSetOperator _projectOp = null;
 
-  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest query) {
-    this(indexSegment, query, MAX_DOC_PER_CALL);
+  public DocIdSetPlanNode(IndexSegment indexSegment, ServerQueryRequest serverQueryRequest) {
+    this(indexSegment, serverQueryRequest, MAX_DOC_PER_CALL);
   }
 
   /**
@@ -46,11 +47,11 @@ public class DocIdSetPlanNode implements PlanNode {
    * @param query
    * @param maxDocPerCall must be <= MAX_DOC_PER_CALL
    */
-  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest query, int maxDocPerCall) {
+  public DocIdSetPlanNode(IndexSegment indexSegment, ServerQueryRequest serverQueryRequest, int maxDocPerCall) {
     _maxDocPerCall = Math.min(maxDocPerCall, MAX_DOC_PER_CALL);
     _indexSegment = indexSegment;
-    _brokerRequest = query;
-    _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
+    _serverQueryRequest = serverQueryRequest;
+    _filterNode = new FilterPlanNode(_indexSegment, _serverQueryRequest);
   }
 
   @Override

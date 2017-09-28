@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.utils.request;
 
 import com.google.common.collect.ImmutableSet;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -24,14 +25,17 @@ import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.HavingFilterQuery;
 import com.linkedin.pinot.common.request.HavingFilterQueryMap;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.lang.mutable.MutableInt;
 
 
@@ -171,8 +175,9 @@ public class RequestUtils {
    *
    */
   public static boolean isFitForStarTreeIndex(SegmentMetadata segmentMetadata, FilterQueryTree filterTree,
-      BrokerRequest brokerRequest) {
+      ServerQueryRequest serverQueryRequest) {
 
+    BrokerRequest brokerRequest = serverQueryRequest.getBrokerRequest();
     // If broker request disables use of star tree, return false.
     if (!isStarTreeEnabledInBrokerRequest(brokerRequest)) {
       return false;
@@ -201,8 +206,25 @@ public class RequestUtils {
     // Ensure that none of the group-by columns are metric or skipped for materialization.
     GroupBy groupBy = brokerRequest.getGroupBy();
     if (groupBy != null) {
+      Set<String> allGroupByColumns = new HashSet<>();
+
       List<String> groupByColumns = groupBy.getColumns();
-      for (String groupByColumn : groupByColumns) {
+      if (groupByColumns != null) {
+        allGroupByColumns.addAll(groupByColumns);
+      }
+
+      List<String> expressions = groupBy.getExpressions();
+      if (expressions != null) {
+        Map<String, TransformExpressionTree> expressionTreeMap = serverQueryRequest.getExpressionTreeMap();
+        for (String expression : expressions) {
+          TransformExpressionTree transformExpressionTree = expressionTreeMap.get(expression);
+          List<String> columns = new ArrayList<>();
+          transformExpressionTree.getColumns(columns);
+          allGroupByColumns.addAll(columns);
+        }
+      }
+
+      for (String groupByColumn : allGroupByColumns) {
         if (metricColumnSet.contains(groupByColumn)) {
           return false;
         }

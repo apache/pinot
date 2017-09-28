@@ -16,15 +16,24 @@
 
 package com.linkedin.pinot.common.query;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+
 import javax.annotation.Nullable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +53,7 @@ public class ServerQueryRequest {
   private ListenableFuture<DataTable> resultFuture;
   // Timing information for different phases of query execution
   private final TimerContext timerContext;
+  private final Map<String, TransformExpressionTree> expressionTreeMap;
 
   private final ServerMetrics serverMetrics;
   private int segmentCountAfterPruning = -1;
@@ -54,6 +64,17 @@ public class ServerQueryRequest {
     BrokerRequest brokerRequest = (request == null) ? null : request.getQuery();
     filterQueryTree = (brokerRequest == null) ? null : RequestUtils.generateFilterQueryTree(brokerRequest);
     timerContext = new TimerContext(brokerRequest, serverMetrics);
+    expressionTreeMap = new HashMap<>();
+    GroupBy groupBy = brokerRequest.getGroupBy();
+    if (groupBy != null) {
+      List<String> expressions = groupBy.getExpressions();
+      if (expressions != null) {
+        Pql2Compiler pqlCompiler = new Pql2Compiler();
+        for (String expression : expressions) {
+          expressionTreeMap.put(expression, pqlCompiler.compileToExpressionTree(expression));
+        }
+      }
+    }
   }
 
   public @Nullable String getBrokerId() {
@@ -82,6 +103,14 @@ public class ServerQueryRequest {
    */
   public FilterQueryTree getFilterQueryTree() {
     return filterQueryTree;
+  }
+
+  /**
+   * Returns a map of expression to compiled expression tree, for all expressions in group by
+   * @return
+   */
+  public Map<String, TransformExpressionTree> getExpressionTreeMap() {
+    return expressionTreeMap;
   }
 
   /**

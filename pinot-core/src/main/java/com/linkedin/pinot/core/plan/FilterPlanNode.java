@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.plan;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
@@ -34,12 +34,14 @@ import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,13 +50,13 @@ import org.slf4j.LoggerFactory;
  */
 public class FilterPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterPlanNode.class);
-  private final BrokerRequest _brokerRequest;
+  private final ServerQueryRequest _serverQueryRequest;
   private final IndexSegment _segment;
   private boolean _optimizeAlwaysFalse;
 
-  public FilterPlanNode(IndexSegment segment, BrokerRequest brokerRequest) {
+  public FilterPlanNode(IndexSegment segment, ServerQueryRequest serverQueryRequest) {
     _segment = segment;
-    _brokerRequest = brokerRequest;
+    _serverQueryRequest = serverQueryRequest;
     _optimizeAlwaysFalse = true;
   }
 
@@ -62,10 +64,10 @@ public class FilterPlanNode implements PlanNode {
   public Operator run() {
     long start = System.currentTimeMillis();
     Operator operator;
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
+    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_serverQueryRequest.getBrokerRequest());
     if (_segment.getSegmentMetadata().hasStarTree()
-        && RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), filterQueryTree, _brokerRequest)) {
-      operator = new StarTreeIndexOperator(_segment, _brokerRequest);
+        && RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), filterQueryTree, _serverQueryRequest)) {
+      operator = new StarTreeIndexOperator(_segment, _serverQueryRequest.getBrokerRequest());
     } else {
       operator = constructPhysicalOperator(filterQueryTree, _segment, _optimizeAlwaysFalse);
     }
@@ -231,7 +233,7 @@ public class FilterPlanNode implements PlanNode {
   @Override
   public void showTree(String prefix) {
     final String treeStructure = prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: "
-        + _brokerRequest.getFilterQuery();
+        + _serverQueryRequest.getBrokerRequest().getFilterQuery();
     LOGGER.debug(treeStructure);
   }
 }

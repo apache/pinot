@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Operator;
@@ -24,8 +24,11 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+
 import java.util.List;
+
 import javax.annotation.Nonnull;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,14 +47,14 @@ public class AggregationGroupByPlanNode implements PlanNode {
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
 
-  public AggregationGroupByPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest,
+  public AggregationGroupByPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull ServerQueryRequest serverQueryRequest,
       int maxInitialResultHolderCapacity, int numGroupsLimit) {
     _indexSegment = indexSegment;
-    _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _groupBy = brokerRequest.getGroupBy();
+    _aggregationInfos = serverQueryRequest.getBrokerRequest().getAggregationsInfo();
+    _groupBy = serverQueryRequest.getBrokerRequest().getGroupBy();
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
-    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
+    _transformPlanNode = new TransformPlanNode(_indexSegment, serverQueryRequest);
   }
 
   @Override

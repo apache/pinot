@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.plan.maker;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
@@ -31,9 +32,11 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.SelectionPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,44 +84,46 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   }
 
   @Override
-  public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+  public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, ServerQueryRequest serverQueryRequest) {
+    BrokerRequest brokerRequest = serverQueryRequest.getBrokerRequest();
     // Aggregation query.
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         // Aggregation group-by query.
-        return new AggregationGroupByPlanNode(indexSegment, brokerRequest, _maxInitialResultHolderCapacity,
+        return new AggregationGroupByPlanNode(indexSegment, serverQueryRequest, _maxInitialResultHolderCapacity,
             _numAggrGroupsLimit);
       } else {
           // Aggregation only query.
         if (isFitForMetadataBasedPlan(brokerRequest)) {
           return new MetadataBasedAggregationPlanNode(indexSegment, brokerRequest.getAggregationsInfo());
         } else {
-          return new AggregationPlanNode(indexSegment, brokerRequest);
+          return new AggregationPlanNode(indexSegment, serverQueryRequest);
         }
       }
     }
 
     // Selection query.
     if (brokerRequest.isSetSelections()) {
-      return new SelectionPlanNode(indexSegment, brokerRequest);
+      return new SelectionPlanNode(indexSegment, serverQueryRequest);
     }
 
     throw new UnsupportedOperationException("The query contains no aggregation or selection.");
   }
 
   @Override
-  public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, BrokerRequest brokerRequest,
+  public Plan makeInterSegmentPlan(List<SegmentDataManager> segmentDataManagers, ServerQueryRequest serverQueryRequest,
       ExecutorService executorService, long timeOutMs) {
     // TODO: pass in List<IndexSegment> directly.
     List<IndexSegment> indexSegments = new ArrayList<>(segmentDataManagers.size());
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       indexSegments.add(segmentDataManager.getSegment());
     }
+    BrokerRequest brokerRequest = serverQueryRequest.getBrokerRequest();
     BrokerRequestPreProcessor.preProcess(indexSegments, brokerRequest);
 
     List<PlanNode> planNodes = new ArrayList<>();
     for (IndexSegment indexSegment : indexSegments) {
-      planNodes.add(makeInnerSegmentPlan(indexSegment, brokerRequest));
+      planNodes.add(makeInnerSegmentPlan(indexSegment, serverQueryRequest));
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, brokerRequest, executorService, timeOutMs);
 

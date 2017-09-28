@@ -133,7 +133,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       final Plan globalQueryPlan =
-          _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, executorService,
+          _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, queryRequest, executorService,
               getResourceTimeOut(instanceRequest.getQuery()));
       planBuildTimer.stopAndRecord();
 

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 
@@ -24,4 +25,5 @@ import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 public interface AbstractCompiler {
   BrokerRequest compileToBrokerRequest(String expression);
   TransformExpressionTree compileToExpressionTree(String expression);
+  ServerQueryRequest compileToServerQueryRequest(String expression);
 }

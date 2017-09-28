@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -27,6 +27,7 @@ import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,7 @@ public abstract class BaseQueriesTest {
    */
   @SuppressWarnings("unchecked")
   protected <T extends Operator> T getOperatorForQuery(String query) {
-    return (T) PLAN_MAKER.makeInnerSegmentPlan(getIndexSegment(), COMPILER.compileToBrokerRequest(query)).run();
+    return (T) PLAN_MAKER.makeInnerSegmentPlan(getIndexSegment(), COMPILER.compileToServerQueryRequest(query)).run();
   }
 
   /**
@@ -80,10 +81,10 @@ public abstract class BaseQueriesTest {
    * @return broker response.
    */
   protected BrokerResponseNative getBrokerResponseForQuery(String query) {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
+    ServerQueryRequest serverQueryRequest = COMPILER.compileToServerQueryRequest(query);
 
     // Server side.
-    Plan plan = PLAN_MAKER.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE, 10_000);
+    Plan plan = PLAN_MAKER.makeInterSegmentPlan(getSegmentDataManagers(), serverQueryRequest, EXECUTOR_SERVICE, 10_000);
     plan.execute();
     DataTable instanceResponse = plan.getInstanceResponse();
 
@@ -92,7 +93,7 @@ public abstract class BaseQueriesTest {
     Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     dataTableMap.put(new ServerInstance("localhost:1111"), instanceResponse);
-    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap);
+    return brokerReduceService.reduceOnDataTable(serverQueryRequest.getBrokerRequest(), dataTableMap);
   }
 
   /**
