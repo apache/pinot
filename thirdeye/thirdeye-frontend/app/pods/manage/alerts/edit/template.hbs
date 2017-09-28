@@ -50,21 +50,28 @@
         type="text"
         id="select-dimension"
         class="form-control te-input te-input--read-only"
-        value=dimensions
+        value=alertDimension
         disabled=true
       }}
     </div>
 
     <div class="col-xs-12">
       <div class="te-graph-alert">
+        {{#if alertDimension}}
+          <div class="te-form__super-label">...Displaying top 5 contributing subDimensions for <strong>{{alertDimension}}</strong></div>
+        {{/if}}
         {{anomaly-graph
           primaryMetric=metricData
+          selectedDimensions=topDimensions
+          dimensions=topDimensions
+          showDimensions=true
+          isLoading=loading
           showSubchart=true
           showLegend=false
           legendText=legendText
           enableZoom=true
           componentId='create-alert'
-          showGraphLegend=false
+          showGraphLegend=true
           height=400
         }}
       </div>

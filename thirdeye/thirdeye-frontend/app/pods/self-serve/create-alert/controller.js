@@ -27,14 +27,15 @@ export default Ember.Controller.extend({
   isReplayStatusPending: true,
   isReplayStatusSuccess: false,
   isReplayStarted: false,
+  isGroupNameDuplicate: false,
+  isAlertNameDuplicate: false,
+  isFetchingDimensions: false,
+  isDimensionFetchDone: false,
   metricGranularityOptions: [],
   originalDimensions: [],
   bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
-  isGroupNameDuplicate: false,
-  isAlertNameDuplicate: false,
-
   legendText: {
     dotted: 'WoW',
     solid: 'Observed'
@@ -318,12 +319,14 @@ export default Ember.Controller.extend({
    */
   triggerGraphFromMetric(metricId) {
     const id = metricId.id;
+    const maxDimensionSize = 5;
     const maxTime = this.get('maxTime');
+    const selectedDimension = this.get('selectedDimension');
     const currentEnd = moment(maxTime).isValid()
       ? moment(maxTime).valueOf()
       : moment().subtract(1, 'day').endOf('day').valueOf();
     const filters = this.get('selectedFilters') || '';
-    const dimension = this.get('selectedDimension') || 'All';
+    const dimension = selectedDimension || 'All';
     const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
     const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
     const baselineEnd = moment(currentEnd).subtract(1, 'week');
@@ -348,14 +351,28 @@ export default Ember.Controller.extend({
       selectedGranularity: granularity
     });
 
-    this.fetchAnomalyGraphData(this.get('graphConfig')).then(metricData => {
-      this.set('isMetricDataLoading', false);
+    this.fetchAnomalyGraphData(graphConfig).then(metricData => {
       if (!this.isMetricGraphable(metricData)) {
         // Metric has no data. not graphing
         this.clearAll();
         this.set('isMetricDataInvalid', true);
       } else {
-        // Metric has data. now sending new data to graph
+        // Dimensions are selected. Compile, rank, and send them to the graph.
+        if(selectedDimension) {
+          this.getTopDimensions(metricData, graphConfig, maxDimensionSize, selectedDimension)
+            .then(orderedDimensions => {
+              this.setProperties({
+                isMetricSelected: true,
+                isFetchingDimensions: false,
+                isDimensionFetchDone: true,
+                isMetricDataLoading: false,
+                topDimensions: orderedDimensions,
+              });
+            });
+        } else {
+          this.set('isMetricDataLoading', false);
+        }
+        // Metric has data. now sending new data to graph.
         this.setProperties({
           isMetricSelected: true,
           selectedMetric: Object.assign(metricData, { color: 'blue' })
@@ -366,10 +383,57 @@ export default Ember.Controller.extend({
       // The request failed. No graph to render.
       this.clearAll();
       this.setProperties({
-        isSelectMetricError: true,
-        isMetricDataInvalid: true,
         isMetricDataLoading: false,
         selectMetricErrMsg: error
+      });
+    });
+  },
+
+  /**
+   * If a dimension has been selected, the metric data object will contain subdimensions.
+   * This method calls for dimension ranking by metric, filters for the selected dimension,
+   * and returns a sorted list of graph-ready dimension objects.
+   * @method getTopDimensions
+   * @param {Object} data - the graphable metric data returned from fetchAnomalyGraphData()
+   * @param {Object} config - the graph configuration object
+   * @param {Number} maxSize - number of sub-dimensions to display on graph
+   * @param {String} selectedDimension - the user-selected dimension to graph
+   * @return {undefined}
+   */
+  getTopDimensions(data, config, maxSize, selectedDimension) {
+    const url = `/rootcause/query?framework=relatedDimensions&anomalyStart=${config.currentStart}&anomalyEnd=${config.currentEnd}&baselineStart=${config.baselineStart}&baselineEnd=${config.baselineEnd}&analysisStart=${config.currentStart}&analysisEnd=${config.currentEnd}&urns=thirdeye:metric:${config.id}&filters=${encodeURIComponent(config.filters)}`;
+    const colors = ['orange', 'teal', 'purple', 'red', 'green', 'pink'];
+    const dimensionObj = data.subDimensionContributionMap || {};
+    let dimensionList = [];
+    let topDimensions = [];
+    let topDimensionLabels = [];
+    let filteredDimensions = [];
+    let colorIndex = 0;
+
+    return new Ember.RSVP.Promise((resolve) => {
+      fetch(url).then(checkStatus)
+        .then((scoredDimensions) => {
+          // Select scored dimensions belonging the selected one
+          filteredDimensions =  _.filter(scoredDimensions, function(dimension) {
+            return dimension.label.split('=')[0] === selectedDimension;
+          });
+          // Prep a sorted list of labels for our dimension's top contributing sub-dimensions
+          topDimensions = filteredDimensions.sortBy('score').reverse().slice(0, maxSize);
+          topDimensionLabels = [...new Set(topDimensions.map(key => key.label.split('=')[1]))];
+          // Build the array of subdimension objects for the selected dimension
+          for(let subDimension of topDimensionLabels){
+            if (subDimension && dimensionObj[subDimension]) {
+              dimensionList.push({
+                name: subDimension,
+                color: colors[colorIndex],
+                baselineValues: dimensionObj[subDimension].baselineValues,
+                currentValues: dimensionObj[subDimension].currentValues,
+              });
+              colorIndex++;
+            }
+          }
+          // Return sorted list of dimension objects
+          resolve(dimensionList);
       });
     });
   },
@@ -717,9 +781,11 @@ export default Ember.Controller.extend({
    */
   clearAll() {
     this.setProperties({
+      isFetchingDimensions: false,
       isFormDisabled: false,
       isMetricSelected: false,
       isMetricDataInvalid: false,
+      isSelectMetricError: false,
       selectedMetricOption: null,
       selectedPattern: null,
       selectedGranularity: null,
@@ -760,15 +826,11 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectMetric(selectedObj) {
+      this.clearAll();
       this.setProperties({
         isMetricDataLoading: true,
-        isSelectMetricError: false,
+        topDimensions: null,
         selectedMetricOption: selectedObj,
-        selectedFilters: JSON.stringify({}),
-        selectedPattern: null,
-        selectedDimension: null,
-        selectedGranularity: null,
-        selectedSensitivity: null
       });
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {
@@ -820,6 +882,23 @@ export default Ember.Controller.extend({
         this.set('selectedDimension', 'All');
       }
       // Fetch new graph data with selected filters
+      this.triggerGraphFromMetric(this.get('selectedMetricOption'));
+    },
+
+    /**
+     * When a dimension is selected, fetch new anomaly graph data based on that dimension
+     * and trigger a new graph load, showing the top contributing subdimensions.
+     * @method onSelectFilter
+     * @param {Object} selectedDimension - The selected dimension to apply
+     * @return {undefined}
+     */
+    onSelectDimension(selectedDimension) {
+      this.setProperties({
+        selectedDimension,
+        isMetricDataLoading: true,
+        isFetchingDimensions: true,
+        isDimensionFetchDone: false
+      });
       this.triggerGraphFromMetric(this.get('selectedMetricOption'));
     },
 
@@ -1032,7 +1111,7 @@ export default Ember.Controller.extend({
           });
           return newFunctionId;
         })
-        // Redirects once edit page is finalized
+        // Redirects to manage alerts
         .then((id) => {
           this.transitionToRoute('manage.alerts.edit', id);
         })

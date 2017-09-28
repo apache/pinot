@@ -65,9 +65,10 @@ export default Ember.Controller.extend({
    * Properties from model, using 'reads' so that changes are cancellable
    */
   metricData: Ember.computed.reads('model.metricData'),
+  alertDimension: Ember.computed.reads('model.function.exploreDimensions'),
+  metricDimensions: Ember.computed.reads('model.metricDimensions'),
   metricName: Ember.computed.reads('model.function.metric'),
   granularity: Ember.computed.reads('model.function.bucketUnit'),
-  dimensions: Ember.computed.reads('model.function.exploreDimensions'),
   alertFilters: Ember.computed.reads('model.function.filters'),
   alertConfigGroups: Ember.computed.reads('model.allConfigGroups'),
   alertFunctionName: Ember.computed.reads('model.function.functionName'),
@@ -95,6 +96,50 @@ export default Ember.Controller.extend({
       } else {
         return groupsFromModel;
       }
+    }
+  ),
+
+  /**
+   * If a dimension has been selected, the metric data object will contain subdimensions.
+   * This method calls for dimension ranking by metric, filters for the selected dimension,
+   * and returns a sorted list of graph-ready dimension objects.
+   * @method getTopDimensions
+   * @return {Array} dimensionList: array of graphable dimensions
+   */
+  topDimensions: Ember.computed(
+    'metricDimensions',
+    'alertDimension',
+    'metricData',
+    function() {
+      const maxSize = 5;
+      const selectedDimension = this.get('alertDimension');
+      const scoredDimensions = this.get('metricDimensions');
+      const colors = ['orange', 'teal', 'purple', 'red', 'green', 'pink'];
+      const dimensionObj = this.get('metricData.subDimensionContributionMap') || {};
+      const filteredDimensions =  _.filter(scoredDimensions, function(dimension) {
+        return dimension.label.split('=')[0] === selectedDimension;
+      });
+      const topDimensions = filteredDimensions.sortBy('score').reverse().slice(0, maxSize);
+      const topDimensionLabels = [...new Set(topDimensions.map(key => key.label.split('=')[1]))];
+      let dimensionList = [];
+      let colorIndex = 0;
+
+      // Build the array of subdimension objects for the selected dimension
+      for(let subDimension of topDimensionLabels){
+        if (dimensionObj[subDimension] && subDimension !== '') {
+          dimensionList.push({
+            name: subDimension,
+            metricName: subDimension,
+            color: colors[colorIndex],
+            baselineValues: dimensionObj[subDimension].baselineValues,
+            currentValues: dimensionObj[subDimension].currentValues,
+          });
+          colorIndex++;
+        }
+      }
+
+      // Return sorted list of dimension objects
+      return dimensionList;
     }
   ),
 

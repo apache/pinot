@@ -68,7 +68,7 @@
         classNames="te-input"
         options=dimensions
         selected=selectedDimension
-        onchange=(action (mut selectedDimension))
+        onchange=(action "onSelectDimension")
         loadingMessage="Waiting for the server...."
         placeholder="Break Dimensions By..."
         searchPlaceholder="Type to filter..."
@@ -83,23 +83,25 @@
 
     <div class="col-xs-12">
       <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
+        {{#if (or isFetchingDimensions isDimensionFetchDone)}}
+          <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top 5 contributing subDimensions for <strong>{{selectedDimension}}</strong></div>
+        {{/if}}
         {{#if isMetricDataLoading}}
-          <section>
-            <div class="spinner-wrapper--self-serve">
-              {{ember-spinner}}
-            </div>
-          </section>
+          <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
         {{/if}}
         {{#if isMetricSelected}}
           {{anomaly-graph
             primaryMetric=selectedMetric
+            selectedDimensions=topDimensions
+            dimensions=topDimensions
+            showDimensions=true
             isLoading=loading
             showSubchart=true
             showLegend=false
             legendText=legendText
             enableZoom=true
             componentId='create-alert'
-            showGraphLegend=false
+            showGraphLegend=true
             height=400
           }}
           <div class="te-form__note">
@@ -113,7 +115,6 @@
         {{/if}}
       </div>
     </div>
-
   </fieldset>
 
   <fieldset class="te-form__se  ction row">
@@ -229,13 +230,13 @@
       }}
     </div>
 
-
     {{!-- Field: App Name --}}
     <div class="form-group col-xs-12">
       <label for="anomaly-form-app-name" class="control-label te-label required">Related Application, Product or Team *</label>
        {{#power-select
           options=allApplicationNames
           selected=selectedAppName
+          searchField="application"
           onchange=(action "onSelectAppName")
           loadingMessage="Waiting for the server...."
           placeholder="Select an existing product/team name"
@@ -249,14 +250,13 @@
         {{/power-select}}
     </div>
 
-
-
     {{!-- Field: Select Existing Subscription Group --}}
     <div class="form-group col-sm-6">
       <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
       {{#power-select
         options=filteredConfigGroups
         selected=selectedConfigGroup
+        searchField="name"
         onchange=(action "onSelectConfigGroup")
         disabled=(not isMetricSelected)
         loadingMessage="Waiting for the server...."
