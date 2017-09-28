@@ -7,6 +7,8 @@ import org.apache.http.HttpHost;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.cookie.BasicClientCookie;
+
 
 /**
  * Utility classes for calling detector endpoints to execute/schedule jobs
@@ -23,8 +25,12 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
   private static final String INIT_AUTOTUNE = "initautotune/filter/";
   private static final String REPLAY_FUNCTION = "replay/function/";
 
-  public DetectionResourceHttpUtils(String detectionHost, int detectionPort) {
+  public DetectionResourceHttpUtils(String detectionHost, int detectionPort, String authToken) {
     super(new HttpHost(detectionHost, detectionPort));
+    BasicClientCookie cookie = new BasicClientCookie("te_auth", authToken);
+    cookie.setDomain(detectionHost);
+    cookie.setPath("/");
+    super.addCookie(cookie);
   }
 
   public String enableAnomalyFunction(String id) throws ClientProtocolException, IOException {

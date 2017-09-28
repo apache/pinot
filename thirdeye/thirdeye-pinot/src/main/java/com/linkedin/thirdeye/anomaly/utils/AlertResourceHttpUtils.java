@@ -6,6 +6,8 @@ import org.apache.http.HttpHost;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.cookie.BasicClientCookie;
+
 
 /**
  * Utility classes for calling detector endpoints to execute/schedule jobs
@@ -15,8 +17,12 @@ public class AlertResourceHttpUtils extends AbstractResourceHttpUtils {
   private static String ALERT_JOB_ENDPOINT = "/api/alert-job/";
   private static String ADHOC = "/ad-hoc";
 
-  public AlertResourceHttpUtils(String alertHost, int alertPort) {
+  public AlertResourceHttpUtils(String alertHost, int alertPort, String authToken) {
     super(new HttpHost(alertHost, alertPort));
+    BasicClientCookie cookie = new BasicClientCookie("te_auth", authToken);
+    cookie.setDomain(alertHost);
+    cookie.setPath("/");
+    super.addCookie(cookie);
   }
 
   public String enableEmailConfiguration(String id) throws ClientProtocolException, IOException {

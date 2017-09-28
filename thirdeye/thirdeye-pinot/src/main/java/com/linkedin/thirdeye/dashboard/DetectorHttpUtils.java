@@ -8,6 +8,8 @@ import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
 
 import com.linkedin.thirdeye.anomaly.utils.AbstractResourceHttpUtils;
+import org.apache.http.impl.cookie.BasicClientCookie;
+
 
 /**
  * Utility classes for calling detector endpoints to execute/schedule jobs
@@ -18,8 +20,12 @@ public class DetectorHttpUtils extends AbstractResourceHttpUtils {
   private static String EMAIL_JOBS_ENDPOINT = "/api/email-jobs/";
   private static String ADHOC = "/ad-hoc";
 
-  public DetectorHttpUtils(String detectorHost, int detectorPort) {
+  public DetectorHttpUtils(String detectorHost, int detectorPort, String authToken) {
     super(new HttpHost(detectorHost, detectorPort));
+    BasicClientCookie cookie = new BasicClientCookie("te_auth", authToken);
+    cookie.setDomain(detectorHost);
+    cookie.setPath("/");
+    super.addCookie(cookie);
   }
 
   public String enableAnomalyFunction(String id) throws ClientProtocolException, IOException {
