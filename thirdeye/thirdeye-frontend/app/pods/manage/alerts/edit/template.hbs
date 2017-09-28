@@ -57,6 +57,9 @@
 
     <div class="col-xs-12">
       <div class="te-graph-alert">
+        {{#if alertDimension}}
+          <div class="te-form__super-label">...Displaying top 5 contributing subDimensions for <strong>{{alertDimension}}</strong></div>
+        {{/if}}
         {{anomaly-graph
           primaryMetric=metricData
           selectedDimensions=topDimensions
