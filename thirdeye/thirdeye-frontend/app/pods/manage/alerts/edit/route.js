@@ -39,6 +39,7 @@ export default Ember.Route.extend({
     const {
       metric: metricName,
       collection: dataset,
+      exploreDimensions,
       filters,
       bucketSize,
       bucketUnit,
@@ -48,6 +49,7 @@ export default Ember.Route.extend({
     let metricId = '';
     let allGroupNames = [];
     let allGroups = [];
+    let metricDimensionURl = '';
 
     return fetch(`/data/autocomplete/metric?name=${dataset}::${metricName}`).then(checkStatus)
       .then((metricsByName) => {
@@ -56,17 +58,21 @@ export default Ember.Route.extend({
         return fetch(`/data/maxDataTime/metricId/${metricId}`).then(checkStatus);
       })
       .then((maxTime) => {
+        const dimension = exploreDimensions || 'All';
         const currentEnd = moment(maxTime).isValid()
           ? moment(maxTime).valueOf()
           : moment().subtract(1, 'day').endOf('day').valueOf();
         const formattedFilters = JSON.stringify(parseProps(filters));
-        const dimension = 'All';
         const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
         const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
         const baselineEnd = moment(currentEnd).subtract(1, 'week');
         const metricDataUrl =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
           `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=` +
           `${bucketSize + '_' + bucketUnit}&filters=${encodeURIComponent(formattedFilters)}`;
+        metricDimensionURl = `/rootcause/query?framework=relatedDimensions&anomalyStart=${currentStart}` +
+          `&anomalyEnd=${currentEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}` +
+          `&analysisStart=${currentStart}&analysisEnd=${currentEnd}&urns=thirdeye:metric:${metricId}` +
+          `&filters=${encodeURIComponent(filters)}`;
         return fetch(metricDataUrl).then(checkStatus);
       })
       .then((metricData) => {
@@ -88,6 +94,11 @@ export default Ember.Route.extend({
       })
       .then((allApps) => {
         Object.assign(model, { allApps });
+        if (exploreDimensions) {
+          return fetch(metricDimensionURl).then(checkStatus).then((metricDimensions) => {
+            Object.assign(model, { metricDimensions });
+          });
+        }
       })
       .catch((errors) => {
         Object.assign(model, { loadError: true, loadErrorMsg: errors });

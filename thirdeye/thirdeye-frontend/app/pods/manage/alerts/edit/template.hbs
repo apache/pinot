@@ -50,7 +50,7 @@
         type="text"
         id="select-dimension"
         class="form-control te-input te-input--read-only"
-        value=dimensions
+        value=alertDimension
         disabled=true
       }}
     </div>
@@ -59,12 +59,16 @@
       <div class="te-graph-alert">
         {{anomaly-graph
           primaryMetric=metricData
+          selectedDimensions=topDimensions
+          dimensions=topDimensions
+          showDimensions=true
+          isLoading=loading
           showSubchart=true
           showLegend=false
           legendText=legendText
           enableZoom=true
           componentId='create-alert'
-          showGraphLegend=false
+          showGraphLegend=true
           height=400
         }}
       </div>
