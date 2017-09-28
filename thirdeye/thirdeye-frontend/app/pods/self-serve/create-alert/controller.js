@@ -422,7 +422,7 @@ export default Ember.Controller.extend({
           topDimensionLabels = [...new Set(topDimensions.map(key => key.label.split('=')[1]))];
           // Build the array of subdimension objects for the selected dimension
           for(let subDimension of topDimensionLabels){
-            if (dimensionObj[subDimension] && subDimension !== '') {
+            if (subDimension && dimensionObj[subDimension]) {
               dimensionList.push({
                 name: subDimension,
                 color: colors[colorIndex],
