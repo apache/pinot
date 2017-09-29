@@ -48,13 +48,13 @@ public class CleanupAndRegenerateAnomaliesTool {
   private DetectionResourceHttpUtils detectionResourceHttpUtils;
 
   public CleanupAndRegenerateAnomaliesTool(String startTime, String endTime, String datasets, String functionIds,
-      File persistenceFile, String detectionHost, int detectionPort)
+      File persistenceFile, String detectionHost, int detectionPort, String token)
       throws Exception {
     init(persistenceFile);
     this.monitoringWindowStartTime = startTime;
     this.monitoringWindowEndTime = endTime;
     this.functionIds = getFunctionIds(datasets, functionIds);
-    detectionResourceHttpUtils = new DetectionResourceHttpUtils(detectionHost, detectionPort);
+    detectionResourceHttpUtils = new DetectionResourceHttpUtils(detectionHost, detectionPort, token);
   }
 
   public void init(File persistenceFile) throws Exception {
@@ -226,8 +226,10 @@ public class CleanupAndRegenerateAnomaliesTool {
       doForceBackfill = Boolean.parseBoolean(forceBackfill);
     }
 
+    String authToken = "";
+
     CleanupAndRegenerateAnomaliesTool tool = new CleanupAndRegenerateAnomaliesTool(startTimeIso,
-        endTimeIso, datasets, functionIds, persistenceFile, detectorHost, detectorPort);
+        endTimeIso, datasets, functionIds, persistenceFile, detectorHost, detectorPort, authToken);
 
     if (runMode.equals(Mode.DELETE)) {
       // DELETE mode deletes *ALL* anomalies for all functions in functionIds or datasets

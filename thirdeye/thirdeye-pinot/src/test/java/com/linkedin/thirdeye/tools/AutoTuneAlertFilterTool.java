@@ -36,18 +36,21 @@ public class AutoTuneAlertFilterTool {
 
   private static final int APPLICATION_PORT = 1867;
   private static final String LOCALHOST = "localhost";
+  private DetectionResourceHttpUtils httpUtils;
+
 
   public static String CSVSEPERATOR = ",";
   public static String CSVESCAPE = ";";
 
 
-  public AutoTuneAlertFilterTool(File persistenceFile){
+  public AutoTuneAlertFilterTool(File persistenceFile, String authToken){
     DaoProviderUtil.init(persistenceFile);
     anomalyFunctionDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
     autotuneConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl.class);
 
+    httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT, authToken);
   }
 
   public static class EvaluationNode{
@@ -66,7 +69,8 @@ public class AutoTuneAlertFilterTool {
       return headers;
     }
 
-    public EvaluationNode(Long Id, String metricName, String collection, String alertFilterStr, Properties alertFilterEvaluations){
+    public EvaluationNode(Long Id, String metricName, String collection, String alertFilterStr,
+        Properties alertFilterEvaluations){
 
       alertFilterEvaluations.put(ID, Id);
       alertFilterEvaluations.put(METRICNAME, metricName);
@@ -92,7 +96,6 @@ public class AutoTuneAlertFilterTool {
 
 
   public String getTunedAlertFilterByFunctionId(Long functionId, String startTimeISO, String endTimeISO, String AUTOTUNE_TYPE, String holidayStarts, String holidayEnds) throws Exception{
-    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try {
       return httpUtils.runAutoTune(functionId, startTimeISO, endTimeISO, AUTOTUNE_TYPE, holidayStarts, holidayEnds);
     } catch (Exception e) {
@@ -103,7 +106,6 @@ public class AutoTuneAlertFilterTool {
 
 
   public String evaluateAlertFilterByFunctionId(Long functionId, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds){
-    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try{
       return httpUtils.getEvalStatsAlertFilter(functionId, startTimeISO, endTimeISO, holidayStarts, holidayEnds);
     } catch (Exception e) {
@@ -113,7 +115,6 @@ public class AutoTuneAlertFilterTool {
   }
 
   public String evaluateAlertFilterByAutoTuneId(Long autotuneId, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds){
-    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try{
       return httpUtils.evalAutoTune(autotuneId, startTimeISO, endTimeISO, holidayStarts, holidayEnds);
     } catch (Exception e){
@@ -184,8 +185,8 @@ public class AutoTuneAlertFilterTool {
     return functionIds;
   }
 
-  public Boolean checkAnomaliesHasLabels(Long functionId, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds){
-    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
+  public Boolean checkAnomaliesHasLabels(Long functionId, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds, String authToken){
+    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT, authToken);
     try{
       return Boolean.valueOf(httpUtils.checkHasLabels(functionId, startTimeISO, endTimeISO, holidayStarts, holidayEnds));
     } catch (Exception e) {
@@ -194,8 +195,8 @@ public class AutoTuneAlertFilterTool {
     return null;
   }
 
-  public String getInitAutoTuneByFunctionId(Long functionId, String startTimeISO, String endTimeISO, String AUTOTUNE_TYPE, int nExpected,String holidayStarts, String holidayEnds) throws Exception{
-    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
+  public String getInitAutoTuneByFunctionId(Long functionId, String startTimeISO, String endTimeISO, String AUTOTUNE_TYPE, int nExpected,String holidayStarts, String holidayEnds, String authToken) throws Exception{
+    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT, authToken);
     try {
       return httpUtils.initAutoTune(functionId, startTimeISO, endTimeISO, AUTOTUNE_TYPE, nExpected, holidayStarts, holidayEnds);
     } catch (Exception e) {

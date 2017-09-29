@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
-import com.sun.xml.internal.ws.api.policy.PolicyResolver;
 import java.io.IOException;
 import java.io.InputStream;
 
