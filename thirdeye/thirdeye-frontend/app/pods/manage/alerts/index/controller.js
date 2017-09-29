@@ -111,7 +111,7 @@ export default Ember.Controller.extend({
       const pageNumber = this.get('currentPage');
       let alerts = this.get('selectedAlerts');
 
-      return alerts.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
+      return alerts.slice((pageNumber - 1) * pageSize, pageNumber * pageSize).sortBy('functionName');
     }
   ),
 
