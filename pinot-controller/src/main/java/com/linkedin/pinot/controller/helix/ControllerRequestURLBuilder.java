@@ -214,4 +214,7 @@ public class ControllerRequestURLBuilder {
   public String forSegmentListAPIWithTableType(String tableName, String tableType) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName + "?type=" + tableType);
   }
+  public String forSegmentListAPI(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName);
+  }
 }
