@@ -136,11 +136,12 @@ public class PinotSegmentUploadRestletResource {
     final String realtime = "REALTIME";
     final String offline = "OFFLINE";
 
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableTypeStr == null) {
-      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(offline)));
-      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(realtime)));
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.OFFLINE));
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.REALTIME));
     } else {
-      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(tableTypeStr)));
+      ret.put(formatSegments(tableName, tableType));
     }
     return ret.toString();
   }
