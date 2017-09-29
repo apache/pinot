@@ -355,15 +355,19 @@ export default Ember.Controller.extend({
 
   /**
    * Display success banners while model reloads
-   * @method resetView
+   * @method confirmEditSuccess
    * @return {undefined}
    */
-  resetView() {
+  confirmEditSuccess() {
     const that = this;
-    this.send('refreshModel');
+    this.setProperties({
+      isEditAlertSuccess: true,
+      isProcessingForm: false
+    });
     Ember.run.later((function() {
       that.clearAll();
-    }), 2000);
+      that.send('refreshModel');
+    }), 3000);
   },
 
   /**
@@ -385,11 +389,7 @@ export default Ember.Controller.extend({
       isNewConfigGroupSaved: false,
       isProcessingForm: false,
       updatedRecipients: [],
-      isActive: this.get('model.function.isActive'),
-      selectedConfigGroup: this.get('model.originalConfigGroup')
     });
-    // Question: why doesn't this trigger selectedApplication which is listening to
-    // changes in selectedConfigGroup?
   },
 
   /**
@@ -522,6 +522,7 @@ export default Ember.Controller.extend({
      */
     onCancel() {
       this.clearAll();
+      this.transitionToRoute('manage.alerts');
     },
 
     /**
@@ -594,7 +595,6 @@ export default Ember.Controller.extend({
           return fetch(configUrl, postProps).then((res) => checkStatus(res, 'post'))
           .then((saveConfigResponseA) => {
             this.setProperties({
-              isEditAlertSuccess: true,
               selectedConfigGroupRecipients: cleanRecipientsArr,
               alertGroupNewRecipient: null,
               newConfigGroupName: null
@@ -615,12 +615,15 @@ export default Ember.Controller.extend({
                     selectedConfigGroup: this.get('newConfigGroupObj')
                   });
                 }
-                this.resetView();
+                this.confirmEditSuccess();
+                return;
               });
             } else {
-              this.resetView();
+              this.confirmEditSuccess();
             }
           });
+        } else {
+          this.confirmEditSuccess();
         }
       })
       .catch((error) => {

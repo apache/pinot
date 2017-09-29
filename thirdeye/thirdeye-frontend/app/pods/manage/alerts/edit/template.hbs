@@ -162,10 +162,11 @@
 
     {{!-- Field: App Name --}}
     <div class="form-group col-xs-10">
-      <label for="anomaly-form-app-name" class="control-label te-label required">Related Product or Team</label>
+      <label for="anomaly-form-app-name" class="control-label te-label required">Related Application, Product or Team</label>
       {{#power-select
         options=allApplications
         selected=selectedApplication
+        searchField="application"
         onchange=(action "onSelectAppName")
         loadingMessage="Waiting for the server...."
         placeholder="Select an existing product/team name"
@@ -204,6 +205,7 @@
       {{#power-select
         options=allAlertsConfigGroups
         selected=selectedConfigGroup
+        searchField="name"
         onchange=(action "onSelectConfigGroup")
         loadingMessage="Waiting for the server...."
         placeholder="Select an existing alert subscription group"
@@ -288,7 +290,7 @@
 
   {{#if (and isEditAlertSuccess (not isEditAlertError))}}
     {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
-      <strong>Edit Alert Success!</strong> You have successfully edited alert {{alertId}}. Refreshing view now.
+      <strong>Edit Alert Success!</strong> You have successfully edited alert {{alertId}}.
     {{/bs-alert}}
   {{/if}}
 
