@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,8 @@ public class HolidayEventsPipeline extends Pipeline {
 
   private static final String PROP_STRATEGY = "strategy";
   private static final String PROP_STRATEGY_DEFAULT = StrategyType.COMPOUND.toString();
+
+  private static final long OVERFETCH = TimeUnit.DAYS.toMillis(1);
 
   private final StrategyType strategy;
   private final EventDataProviderManager eventDataProvider;
@@ -100,8 +103,9 @@ public class HolidayEventsPipeline extends Pipeline {
   private List<EventDTO> getHolidayEvents(long start, long end) {
     EventFilter filter = new EventFilter();
     filter.setEventType(EventType.HOLIDAY.toString());
-    filter.setStartTime(start);
-    filter.setEndTime(end);
+    // overfetch to allow for timezone discrepancies
+    filter.setStartTime(start - OVERFETCH);
+    filter.setEndTime(end + OVERFETCH);
     return eventDataProvider.getEvents(filter);
   }
 
