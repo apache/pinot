@@ -17,10 +17,7 @@ public class OnboardResourceHttpUtils extends AbstractResourceHttpUtils {
 
   public OnboardResourceHttpUtils(String onboardHost, int onboardPost, String authToken) {
     super(new HttpHost(onboardHost, onboardPost));
-    BasicClientCookie cookie = new BasicClientCookie("te_auth", authToken);
-    cookie.setDomain(onboardHost);
-    cookie.setPath("/");
-    super.addCookie(cookie);
+    addAuthenticationCookie(authToken);
   }
 
   public String getClonedFunctionID(long functionId, String tag, boolean isCloneAnomaly) throws IOException{

@@ -31,6 +31,13 @@ public abstract class AbstractResourceHttpUtils {
     cookieStore.addCookie(cookie);
   }
 
+  public void addAuthenticationCookie(String authToken) {
+    BasicClientCookie cookie = new BasicClientCookie("te_auth", authToken);
+    cookie.setDomain(resourceHttpHost.getHostName());
+    cookie.setPath("/");
+    addCookie(cookie);
+  }
+
   protected HttpHost getResourceHttpHost() {
     return resourceHttpHost;
   }

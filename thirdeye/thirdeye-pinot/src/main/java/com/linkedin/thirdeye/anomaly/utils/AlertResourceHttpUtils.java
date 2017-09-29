@@ -19,10 +19,7 @@ public class AlertResourceHttpUtils extends AbstractResourceHttpUtils {
 
   public AlertResourceHttpUtils(String alertHost, int alertPort, String authToken) {
     super(new HttpHost(alertHost, alertPort));
-    BasicClientCookie cookie = new BasicClientCookie("te_auth", authToken);
-    cookie.setDomain(alertHost);
-    cookie.setPath("/");
-    super.addCookie(cookie);
+    addAuthenticationCookie(authToken);
   }
 
   public String enableEmailConfiguration(String id) throws ClientProtocolException, IOException {

@@ -22,10 +22,7 @@ public class DetectorHttpUtils extends AbstractResourceHttpUtils {
 
   public DetectorHttpUtils(String detectorHost, int detectorPort, String authToken) {
     super(new HttpHost(detectorHost, detectorPort));
-    BasicClientCookie cookie = new BasicClientCookie("te_auth", authToken);
-    cookie.setDomain(detectorHost);
-    cookie.setPath("/");
-    super.addCookie(cookie);
+    addAuthenticationCookie(authToken);
   }
 
   public String enableAnomalyFunction(String id) throws ClientProtocolException, IOException {
