@@ -119,7 +119,7 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
   // upcoming event
   if (displayStart >= analysisEnd) {
     isFuture = true;
-    displayStart = analysisEnd - 3600000;
+    displayStart = moment(analysisEnd).subtract(1, 'hour').valueOf();
     displayEnd = analysisEnd;
     displayLabel += " (upcoming)";
   }
