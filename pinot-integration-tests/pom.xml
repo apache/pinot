@@ -199,5 +199,13 @@
       <artifactId>jnr-posix</artifactId>
       <version>3.0.12</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+    </dependency>
   </dependencies>
 </project>

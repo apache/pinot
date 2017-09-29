@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
@@ -33,13 +34,6 @@ import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentMan
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
@@ -47,6 +41,14 @@ import org.apache.helix.PreConnectCallback;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -110,6 +112,9 @@ public class ControllerStarter {
 
     // Start all components
     try {
+      LOGGER.info("initializing segment fetchers for all protocols");
+      SegmentFetcherFactory.initSegmentFetcherFactory(config);
+
       LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
       helixResourceManager.start();
 

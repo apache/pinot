@@ -15,56 +15,53 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
-import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.PermanentDownloadException;
-import java.io.File;
-import java.util.Map;
-
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import java.io.File;
+import java.util.concurrent.Callable;
+
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
+
 
 public class HttpSegmentFetcher implements SegmentFetcher {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HttpSegmentFetcher.class);
-  private static final String MAX_RETRIES = "maxRetries";
-  private static final int DEFAULT_MAX_RETRIES = 3;
-  private int maxRetryCount = DEFAULT_MAX_RETRIES;
+  private int retryCount = RETRY_DEFAULT;
+  private int retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
 
   @Override
-  public void init(Map<String, String> configs) {
-    if (configs.containsKey(MAX_RETRIES)) {
-      try {
-        maxRetryCount = Integer.parseInt(configs.get(MAX_RETRIES));
-      } catch (Exception e) {
-        maxRetryCount = DEFAULT_MAX_RETRIES;
-      }
-    }
+  public void init(Configuration configs) {
+    retryCount = configs.getInt(RETRY, RETRY_DEFAULT);
+    retryWaitMs = configs.getInt(RETRY_WAITIME_MS, RETRY_WAITIME_MS_DEFAULT);
   }
 
   @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
-    for (int retry = 1; retry <= maxRetryCount; ++retry) {
-      try {
-        final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
-        LOGGER.info(
-            "Downloaded file from {} to {}; Length of httpGetResponseContent: {}; Length of downloaded file: {}", uri,
-            tempFile, httpGetResponseContentLength, tempFile.length());
-        return;
-      } catch (PermanentDownloadException e) {
-        LOGGER.error("Failed to download file from {}", uri, e);
-        Utils.rethrowException(e);
-      } catch (Exception e) {
-        LOGGER.error("Failed to download file from {}, retry: {}", uri, retry, e);
-        if (retry == maxRetryCount) {
-          LOGGER.error("Exceeded maximum retry count while fetching file from {} to local file: {}, aborting.", uri, tempFile, e);
+  public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
+    RetryPolicy policy = RetryPolicies.exponentialBackoffRetryPolicy(retryCount, retryWaitMs, 5);
+    policy.attempt(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        try {
+          final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
+          LOGGER.info(
+              "Downloaded file from {} to {}; Length of httpGetResponseContent: {}; Length of downloaded file: {}", uri,
+              tempFile, httpGetResponseContentLength, tempFile.length());
+          return true;
+        } catch (PermanentDownloadException e) {
+          LOGGER.error("Failed to download file from {}, won't retry", uri, e);
           throw e;
-        } else {
-          long backOffTimeInSec = 5 * retry;
-          Thread.sleep(backOffTimeInSec * 1000);
+        } catch (Exception e) {
+          LOGGER.error("Failed to download file from {}, might retry", uri, e);
+          return false;
         }
       }
-    }
+    });
   }
+
 }

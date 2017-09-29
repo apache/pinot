@@ -15,19 +15,19 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
-import java.io.File;
-import java.util.Map;
-
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
 
 public class LocalFileSegmentFetcher implements SegmentFetcher {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LocalFileSegmentFetcher.class);
 
   @Override
-  public void init(Map<String, String> configs) {
+  public void init(Configuration configs) {
   }
 
   @Override

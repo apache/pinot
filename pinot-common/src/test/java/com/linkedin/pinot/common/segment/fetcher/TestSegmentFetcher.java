@@ -19,10 +19,16 @@ import org.apache.commons.configuration.Configuration;
 
 import java.io.File;
 
-public interface SegmentFetcher {
+public class TestSegmentFetcher implements SegmentFetcher {
+  public int init_called = 0;
 
-  void init(Configuration configs);
+  @Override
+  public void init(Configuration configs) {
+    init_called++;
+  }
 
-  void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
+  @Override
+  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
 
+  }
 }
