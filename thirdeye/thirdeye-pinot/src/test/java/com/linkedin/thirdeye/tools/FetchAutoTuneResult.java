@@ -47,13 +47,14 @@ public class FetchAutoTuneResult {
     String DIR_TO_FILE = args[5];
     String holidayStarts = args[6];
     String holidayEnds = args[7];
-    AutoTuneAlertFilterTool executor = new AutoTuneAlertFilterTool(new File(path2PersistenceFile));
+    String authToken = "";
+    AutoTuneAlertFilterTool executor = new AutoTuneAlertFilterTool(new File(path2PersistenceFile), authToken);
     List<Long> functionIds = executor.getAllFunctionIdsByCollection(Collection);
 
     if(AUTOTUNE_MODE.equals(AUTOTUNE)){
       reTuneAndEvalToCSVByCollection(executor, functionIds, STARTTIME, ENDTIME, holidayStarts, holidayEnds, DIR_TO_FILE + Collection + CSVSUFFIX);
     } else if (AUTOTUNE_MODE.equals(INITTUNE)){
-      initFilterAndEvalToCSVByCollection(executor, functionIds, STARTTIME, ENDTIME, holidayStarts, holidayEnds, DIR_TO_FILE + Collection + CSVSUFFIX);
+      initFilterAndEvalToCSVByCollection(executor, functionIds, STARTTIME, ENDTIME, holidayStarts, holidayEnds, DIR_TO_FILE + Collection + CSVSUFFIX, authToken);
     } else {
       System.out.println("Error! no such autotune mode!");
     }
@@ -116,7 +117,7 @@ public class FetchAutoTuneResult {
    * @throws Exception
    */
   public static void initFilterAndEvalToCSVByCollection(AutoTuneAlertFilterTool executor, List<Long> functionIds,
-      String STARTTIME, String ENDTIME, String holidayStarts, String holidayEnds, String fileName) throws Exception {
+      String STARTTIME, String ENDTIME, String holidayStarts, String holidayEnds, String fileName, String authToken) throws Exception {
     Map<String, String> outputMap = new HashMap<>();
     for (Long functionId : functionIds) {
       StringBuilder outputVal = new StringBuilder();
@@ -126,7 +127,7 @@ public class FetchAutoTuneResult {
 
       long autotuneId = Long.valueOf(
           executor.getInitAutoTuneByFunctionId(functionId, STARTTIME, ENDTIME, AUTOTUNE, DEFAULT_NEXPECTEDANOMALIES,
-              holidayStarts, holidayEnds));
+              holidayStarts, holidayEnds, authToken));
 
       boolean isUpdated = autotuneId != -1;
       String tunedEvals = "";

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.utils;
 import java.io.IOException;
 import org.apache.http.HttpHost;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.cookie.BasicClientCookie;
 
 
 /**
@@ -14,8 +15,9 @@ public class OnboardResourceHttpUtils extends AbstractResourceHttpUtils {
   private static final String CLONE_KEY = "clone";
   private static final String DELETE_EXISTING_ANOMALIES = "deleteExistingAnomalies";
 
-  public OnboardResourceHttpUtils(String onboardHost, int onboardPost) {
+  public OnboardResourceHttpUtils(String onboardHost, int onboardPost, String authToken) {
     super(new HttpHost(onboardHost, onboardPost));
+    addAuthenticationCookie(authToken);
   }
 
   public String getClonedFunctionID(long functionId, String tag, boolean isCloneAnomaly) throws IOException{
