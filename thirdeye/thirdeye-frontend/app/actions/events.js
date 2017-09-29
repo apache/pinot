@@ -100,22 +100,38 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
   }
 
   let isBaseline = false;
+  let isFuture = false;
+  let isOngoing = false;
   let {
     start: displayStart,
     end: displayEnd,
     label: displayLabel
   } = event;
+
+  // baseline event
   if ((baselineStart < displayEnd && displayStart < baselineEnd)) {
     isBaseline = true;
     displayStart -= baselineOffset;
     displayEnd -= baselineOffset;
     displayLabel += " (baseline)";
   }
-  if (displayEnd <= 0) {
+
+  // upcoming event
+  if (displayStart >= analysisEnd) {
+    isFuture = true;
+    displayStart = analysisEnd - 3600000;
     displayEnd = analysisEnd;
+    displayLabel += " (upcoming)";
   }
 
-  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd, displayLabel });
+  // ongoing event
+  if (displayEnd <= 0) {
+    isOngoing = true;
+    displayEnd = analysisEnd;
+    displayLabel += " (ongoing)";
+  }
+
+  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, isFuture, isOngoing, displayStart, displayEnd, displayLabel });
 };
 
 /**
