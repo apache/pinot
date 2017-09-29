@@ -179,7 +179,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       // There should be one element in the array
       JSONObject element = (JSONObject) array.get(0);
       JSONArray segments = (JSONArray) element.get("OFFLINE");
-      Assert.assertEquals(segments.length(), getExpectedOfflineSegments());
+      Assert.assertEquals(segments.length(), 8);
     }
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
@@ -188,7 +188,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       // There should be one element in the array
       JSONObject element = (JSONObject) array.get(0);
       JSONArray segments = (JSONArray) element.get("REALTIME");
-      Assert.assertEquals(segments.length(), getExpectedRealtimeSegments());
+      Assert.assertEquals(segments.length(), 3);
     }
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder. forSegmentListAPI(getTableName()));
@@ -205,10 +205,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       JSONObject realtimeElement = (JSONObject)array.get(realtimeIndex);
 
       JSONArray realtimeSegments = (JSONArray) realtimeElement.get("REALTIME");
-      Assert.assertEquals(realtimeSegments.length(), getExpectedRealtimeSegments());
+      Assert.assertEquals(realtimeSegments.length(), 3);
 
       JSONArray offlineSegments = (JSONArray) offlineElement.get("OFFLINE");
-      Assert.assertEquals(offlineSegments.length(), getExpectedOfflineSegments());
+      Assert.assertEquals(offlineSegments.length(), 8);
     }
   }
 
@@ -284,13 +284,5 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    */
   protected void cleanup() throws Exception {
     FileUtils.deleteDirectory(_tempDir);
-  }
-
-  protected int getExpectedOfflineSegments() {
-    return 8;
-  }
-
-  protected int getExpectedRealtimeSegments() {
-    return 3;
   }
 }
