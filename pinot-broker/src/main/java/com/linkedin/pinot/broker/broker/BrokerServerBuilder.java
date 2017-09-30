@@ -211,7 +211,6 @@ public class BrokerServerBuilder {
     }
     _state.set(State.STARTING);
     _connPool.start();
-    _routingTable.start();
     _state.set(State.RUNNING);
     if (listener != null) {
       listener.init(_connPool, BrokerRequestHandler.DEFAULT_BROKER_TIME_OUT_MS);
@@ -229,7 +228,6 @@ public class BrokerServerBuilder {
     _state.set(State.SHUTTING_DOWN);
     _connPool.shutdown();
     _eventLoopGroup.shutdownGracefully();
-    _routingTable.shutdown();
     _poolTimeoutExecutor.shutdown();
     _requestSenderPool.shutdown();
     _state.set(State.SHUTDOWN);

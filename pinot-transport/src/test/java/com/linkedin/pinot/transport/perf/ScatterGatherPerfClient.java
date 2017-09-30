@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
@@ -430,7 +429,7 @@ public class ScatterGatherPerfClient implements Runnable {
   public static class SimpleScatterGatherRequest implements ScatterGatherRequest {
     private final byte[] _brokerRequest;
     private final long _requestId;
-    private final Map<ServerInstance, SegmentIdSet> _pgToServersMap;
+    private final Map<String, List<String>> _pgToServersMap;
 
     public SimpleScatterGatherRequest(byte[] q, PerTableRoutingConfig routingConfig, long requestId) {
       _brokerRequest = q;
@@ -439,12 +438,12 @@ public class ScatterGatherPerfClient implements Runnable {
     }
 
     @Override
-    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
+    public Map<String, List<String>> getRoutingTable() {
       return _pgToServersMap;
     }
 
     @Override
-    public byte[] getRequestForService(ServerInstance service, SegmentIdSet queryPartitions) {
+    public byte[] getRequestForService(List<String> segments) {
       return _brokerRequest;
     }
 

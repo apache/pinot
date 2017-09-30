@@ -15,44 +15,35 @@
  */
 package com.linkedin.pinot.broker.routing;
 
+import java.util.List;
 import java.util.Map;
 
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
-
+/**
+ * Instance level routing table manager.
+ */
 public interface RoutingTable {
-  /**
-   * Return the candidate set of servers that hosts each segment-set.
-   * The List of services are expected to be ordered so that replica-selection strategy can be
-   * applied to them to select one Service among the list for each segment.
-   *
-   * @return SegmentSet to Servers map.
-   */
-  Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request);
 
   /**
-   * Returns whether or not a routing table exists and is not empty for a given table.
+   * Get the routing table (map from server to list of segments) based on the lookup request.
    *
-   * @param tableName The table name for which to check if a routing table exists
-   * @return true if the routing table exists and isn't empty
+   * @param request Routing table lookup request
+   * @return Map from server to list of segments
+   */
+  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request);
+
+  /**
+   * Return whether the routing table for the given table exists.
+   *
+   * @param tableName Table name
+   * @return Whether the routing table exists
    */
   boolean routingTableExists(String tableName);
 
   /**
-   * Initialize and start the Routing table population
-   */
-  void start();
-
-  /**
-   * Shutdown Routing table cleanly
-   */
-  void shutdown();
-
-  /**
-   * Dumps a snapshot of the routing table.
+   * Dump a snapshot of all the routing tables for the given table.
    *
-   * @param tableName The table name or empty string for all tables.
+   * @param tableName Table name or null for all tables.
    * @throws Exception
    */
   String dumpSnapshot(String tableName) throws Exception;

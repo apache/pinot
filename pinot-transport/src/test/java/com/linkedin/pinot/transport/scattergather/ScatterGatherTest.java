@@ -22,8 +22,8 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
@@ -38,7 +38,9 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.ResourceLeakDetector;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,19 +63,20 @@ public class ScatterGatherTest {
   @Test
   public void testNormal() throws Exception {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
+    String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];
-    Map<ServerInstance, SegmentIdSet> serverToSegmentsMap = new HashMap<>(NUM_SERVERS);
-    Map<ServerInstance, String> serverToRequestMap = new HashMap<>(NUM_SERVERS);
+    Map<String, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
 
     for (int i = 0; i < NUM_SERVERS; i++) {
       int serverPort = BASE_SERVER_PORT + i;
       nettyServers[i] = new NettyTCPServer(serverPort, new TestRequestHandlerFactory(0L, false), null);
       new Thread(nettyServers[i]).start();
 
-      ServerInstance serverInstance = new ServerInstance(LOCAL_HOST, serverPort);
-      serverInstances[i] = serverInstance;
-      serverToSegmentsMap.put(serverInstance, new SegmentIdSet());
-      serverToRequestMap.put(serverInstance, "request_" + i);
+      String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + LOCAL_HOST
+          + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
+      serverNames[i] = serverName;
+      serverInstances[i] = ServerInstance.forInstanceName(serverName);
+      routingTable.put(serverName, Collections.singletonList("segment_" + i));
     }
 
     // Setup client
@@ -87,8 +90,7 @@ public class ScatterGatherTest {
     BrokerMetrics brokerMetrics = new BrokerMetrics(metricsRegistry);
 
     // Send the request
-    ScatterGatherRequest scatterGatherRequest =
-        new TestScatterGatherRequest(serverToSegmentsMap, serverToRequestMap, 10_000L);
+    ScatterGatherRequest scatterGatherRequest = new TestScatterGatherRequest(routingTable, 10_000L);
     CompositeFuture<ByteBuf> future =
         scatterGather.scatterGather(scatterGatherRequest, scatterGatherStats, brokerMetrics);
 
@@ -97,7 +99,7 @@ public class ScatterGatherTest {
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS);
     for (int i = 0; i < NUM_SERVERS; i++) {
       Assert.assertEquals(getResponse(serverToResponseMap.get(serverInstances[i])),
-          serverToRequestMap.get(serverInstances[i]));
+          routingTable.get(serverNames[i]).get(0));
     }
 
     // Should get empty error map
@@ -116,9 +118,9 @@ public class ScatterGatherTest {
   @Test
   public void testTimeout() throws Exception {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
+    String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];
-    Map<ServerInstance, SegmentIdSet> serverToSegmentsMap = new HashMap<>(NUM_SERVERS);
-    Map<ServerInstance, String> serverToRequestMap = new HashMap<>(NUM_SERVERS);
+    Map<String, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
 
     for (int i = 0; i < NUM_SERVERS; i++) {
       int serverPort = BASE_SERVER_PORT + i;
@@ -131,10 +133,11 @@ public class ScatterGatherTest {
       }
       new Thread(nettyServers[i]).start();
 
-      ServerInstance serverInstance = new ServerInstance(LOCAL_HOST, serverPort);
-      serverInstances[i] = serverInstance;
-      serverToSegmentsMap.put(serverInstance, new SegmentIdSet());
-      serverToRequestMap.put(serverInstance, "request_" + i);
+      String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + LOCAL_HOST
+          + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
+      serverNames[i] = serverName;
+      serverInstances[i] = ServerInstance.forInstanceName(serverName);
+      routingTable.put(serverName, Collections.singletonList("segment_" + i));
     }
 
     // Setup client
@@ -148,8 +151,7 @@ public class ScatterGatherTest {
     BrokerMetrics brokerMetrics = new BrokerMetrics(metricsRegistry);
 
     // Send the request
-    ScatterGatherRequest scatterGatherRequest =
-        new TestScatterGatherRequest(serverToSegmentsMap, serverToRequestMap, 1000L);
+    ScatterGatherRequest scatterGatherRequest = new TestScatterGatherRequest(routingTable, 1000L);
     CompositeFuture<ByteBuf> future =
         scatterGather.scatterGather(scatterGatherRequest, scatterGatherStats, brokerMetrics);
 
@@ -158,7 +160,7 @@ public class ScatterGatherTest {
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS - 1);
     for (int i = 1; i < NUM_SERVERS; i++) {
       Assert.assertEquals(getResponse(serverToResponseMap.get(serverInstances[i])),
-          serverToRequestMap.get(serverInstances[i]));
+          routingTable.get(serverNames[i]).get(0));
     }
 
     // Should get error from the timeout server
@@ -178,9 +180,9 @@ public class ScatterGatherTest {
   @Test
   public void testError() throws Exception {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
+    String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];
-    Map<ServerInstance, SegmentIdSet> serverToSegmentsMap = new HashMap<>(NUM_SERVERS);
-    Map<ServerInstance, String> serverToRequestMap = new HashMap<>(NUM_SERVERS);
+    Map<String, List<String>> routingTable = new HashMap<>(NUM_SERVERS);
 
     for (int i = 0; i < NUM_SERVERS; i++) {
       int serverPort = BASE_SERVER_PORT + i;
@@ -194,10 +196,11 @@ public class ScatterGatherTest {
       }
       new Thread(nettyServers[i]).start();
 
-      ServerInstance serverInstance = new ServerInstance(LOCAL_HOST, serverPort);
-      serverInstances[i] = serverInstance;
-      serverToSegmentsMap.put(serverInstance, new SegmentIdSet());
-      serverToRequestMap.put(serverInstance, "request_" + i);
+      String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + LOCAL_HOST
+          + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + serverPort;
+      serverNames[i] = serverName;
+      serverInstances[i] = ServerInstance.forInstanceName(serverName);
+      routingTable.put(serverName, Collections.singletonList("segment_" + i));
     }
 
     // Setup client
@@ -211,8 +214,7 @@ public class ScatterGatherTest {
     BrokerMetrics brokerMetrics = new BrokerMetrics(metricsRegistry);
 
     // Send the request
-    ScatterGatherRequest scatterGatherRequest =
-        new TestScatterGatherRequest(serverToSegmentsMap, serverToRequestMap, 10_000L);
+    ScatterGatherRequest scatterGatherRequest = new TestScatterGatherRequest(routingTable, 10_000L);
     CompositeFuture<ByteBuf> future =
         scatterGather.scatterGather(scatterGatherRequest, scatterGatherStats, brokerMetrics);
 
@@ -221,7 +223,7 @@ public class ScatterGatherTest {
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS - 1);
     for (int i = 1; i < NUM_SERVERS; i++) {
       Assert.assertEquals(getResponse(serverToResponseMap.get(serverInstances[i])),
-          serverToRequestMap.get(serverInstances[i]));
+          routingTable.get(serverNames[i]).get(0));
     }
 
     // Should get error from the error server
@@ -258,25 +260,22 @@ public class ScatterGatherTest {
   }
 
   private static class TestScatterGatherRequest implements ScatterGatherRequest {
-    private final Map<ServerInstance, SegmentIdSet> _serverToSegmentsMap;
-    private final Map<ServerInstance, String> _serverToRequestMap;
+    private final Map<String, List<String>> _routingTable;
     private final long _timeoutMs;
 
-    public TestScatterGatherRequest(Map<ServerInstance, SegmentIdSet> serverToSegmentsMap,
-        Map<ServerInstance, String> serverToRequestMap, long timeoutMs) {
-      _serverToSegmentsMap = serverToSegmentsMap;
-      _serverToRequestMap = serverToRequestMap;
+    public TestScatterGatherRequest(Map<String, List<String>> routingTable, long timeoutMs) {
+      _routingTable = routingTable;
       _timeoutMs = timeoutMs;
     }
 
     @Override
-    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
-      return _serverToSegmentsMap;
+    public Map<String, List<String>> getRoutingTable() {
+      return _routingTable;
     }
 
     @Override
-    public byte[] getRequestForService(ServerInstance service, SegmentIdSet queryPartitions) {
-      return _serverToRequestMap.get(service).getBytes();
+    public byte[] getRequestForService(List<String> segments) {
+      return segments.get(0).getBytes();
     }
 
     @Override

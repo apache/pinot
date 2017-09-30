@@ -16,22 +16,18 @@
 
 package com.linkedin.pinot.broker.routing.builder;
 
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
-import com.linkedin.pinot.broker.routing.builder.LargeClusterRoutingTableBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -40,11 +36,10 @@ import static org.testng.Assert.assertTrue;
 public class LargeClusterRoutingTableBuilderTest {
   private static final boolean EXHAUSTIVE = false;
   private static final long RANDOM_SEED = System.currentTimeMillis();
-  private LargeClusterRoutingTableBuilder _largeClusterRoutingTableBuilder =
-      new LargeClusterRoutingTableBuilder(new Random(RANDOM_SEED));
+  private LargeClusterRoutingTableBuilder _largeClusterRoutingTableBuilder = new LargeClusterRoutingTableBuilder();
 
   private interface RoutingTableValidator {
-    boolean isRoutingTableValid(ServerToSegmentSetMap routingTable, ExternalView externalView,
+    boolean isRoutingTableValid(Map<String, List<String>> routingTable, ExternalView externalView,
         List<InstanceConfig> instanceConfigs);
   }
 
@@ -57,20 +52,18 @@ public class LargeClusterRoutingTableBuilderTest {
   public void testRoutingTableCoversAllSegmentsExactlyOnce() {
     validateAssertionOverMultipleRoutingTables(new RoutingTableValidator() {
       @Override
-      public boolean isRoutingTableValid(ServerToSegmentSetMap routingTable, ExternalView externalView,
+      public boolean isRoutingTableValid(Map<String, List<String>> routingTable, ExternalView externalView,
           List<InstanceConfig> instanceConfigs) {
         Set<String> unassignedSegments = new HashSet<>();
         unassignedSegments.addAll(externalView.getPartitionSet());
 
-        for (String server : routingTable.getServerSet()) {
-          final Set<String> serverSegmentSet = routingTable.getSegmentSet(server);
-
-          if (!unassignedSegments.containsAll(serverSegmentSet)) {
+        for (List<String> segmentsForServer : routingTable.values()) {
+          if (!unassignedSegments.containsAll(segmentsForServer)) {
             // A segment is already assigned to another server and/or doesn't exist in external view
             return false;
           }
 
-          unassignedSegments.removeAll(serverSegmentSet);
+          unassignedSegments.removeAll(segmentsForServer);
         }
 
         return unassignedSegments.isEmpty();
@@ -98,11 +91,11 @@ public class LargeClusterRoutingTableBuilderTest {
 
     validateAssertionForOneRoutingTable(new RoutingTableValidator() {
       @Override
-      public boolean isRoutingTableValid(ServerToSegmentSetMap routingTable, ExternalView externalView,
+      public boolean isRoutingTableValid(Map<String, List<String>> routingTable, ExternalView externalView,
           List<InstanceConfig> instanceConfigs) {
-        for (String server : routingTable.getServerSet()) {
+        for (String serverName : routingTable.keySet()) {
           // These servers should not appear in the routing table
-          if (server.equals(disabledHelixInstanceName) || server.equals(shuttingDownInstanceName)) {
+          if (serverName.equals(disabledHelixInstanceName) || serverName.equals(shuttingDownInstanceName)) {
             return false;
           }
         }
@@ -125,14 +118,14 @@ public class LargeClusterRoutingTableBuilderTest {
 
     _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
 
-    List<ServerToSegmentSetMap> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
+    List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
     int routingTableCount = 0;
     int largerThanDesiredRoutingTableCount = 0;
 
-    for (ServerToSegmentSetMap routingTable : routingTables) {
+    for (Map<String, List<String>> routingTable : routingTables) {
       routingTableCount++;
-      if (desiredServerCount < routingTable.getServerSet().size()) {
+      if (desiredServerCount < routingTable.size()) {
         largerThanDesiredRoutingTableCount++;
       }
     }
@@ -153,21 +146,22 @@ public class LargeClusterRoutingTableBuilderTest {
 
     _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
 
-    List<ServerToSegmentSetMap> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
+    List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
     Map<String, Integer> segmentCountPerServer = new HashMap<>();
 
     // Count number of segments assigned per server
-    for (ServerToSegmentSetMap routingTable : routingTables) {
-      for (String server : routingTable.getServerSet()) {
-        Integer segmentCountForServer = segmentCountPerServer.get(server);
+    for (Map<String, List<String>> routingTable : routingTables) {
+      for (Map.Entry<String, List<String>> entry : routingTable.entrySet()) {
+        String serverName = entry.getKey();
+        Integer numSegmentsForServer = segmentCountPerServer.get(serverName);
 
-        if (segmentCountForServer == null) {
-          segmentCountForServer = 0;
+        if (numSegmentsForServer == null) {
+          numSegmentsForServer = 0;
         }
 
-        segmentCountForServer += routingTable.getSegmentSet(server).size();
-        segmentCountPerServer.put(server, segmentCountForServer);
+        numSegmentsForServer += entry.getValue().size();
+        segmentCountPerServer.put(serverName, numSegmentsForServer);
       }
     }
 
@@ -245,18 +239,10 @@ public class LargeClusterRoutingTableBuilderTest {
       ExternalView externalView, List<InstanceConfig> instanceConfigs, String tableName) {
 
     _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
-    List<ServerToSegmentSetMap> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
+    List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
-    for (ServerToSegmentSetMap routingTable : routingTables) {
-      boolean isValid = routingTableValidator.isRoutingTableValid(routingTable, externalView, instanceConfigs);
-
-      if (!isValid) {
-        System.out.println("externalView = " + externalView);
-        System.out.println("routingTable = " + routingTable);
-        System.out.println("RANDOM_SEED = " + RANDOM_SEED);
-      }
-
-      assertTrue(isValid, message);
+    for (Map<String, List<String>> routingTable : routingTables) {
+      assertTrue(routingTableValidator.isRoutingTableValid(routingTable, externalView, instanceConfigs), message);
     }
   }
 

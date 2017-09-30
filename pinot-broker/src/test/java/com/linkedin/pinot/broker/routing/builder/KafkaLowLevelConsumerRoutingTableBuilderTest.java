@@ -15,9 +15,13 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.configuration.BaseConfiguration;
@@ -27,15 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
-import com.linkedin.pinot.broker.routing.builder.KafkaLowLevelConsumerRoutingTableBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -128,17 +124,17 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
       routingTableBuilder.computeRoutingTableFromExternalView(
           "table_REALTIME", externalView, instanceConfigs);
 
-      List<ServerToSegmentSetMap> routingTables = routingTableBuilder.getRoutingTables();
+      List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
 
       long endTime = System.nanoTime();
       totalNanos += endTime - startTime;
 
       // Check that all routing tables generated match all segments, with no duplicates
-      for (ServerToSegmentSetMap routingTable : routingTables) {
-        Set<String> assignedSegments = new HashSet<String>();
+      for (Map<String, List<String>> routingTable : routingTables) {
+        Set<String> assignedSegments = new HashSet<>();
 
-        for (String server : routingTable.getServerSet()) {
-          for (String segment : routingTable.getSegmentSet(server)) {
+        for (List<String> segmentsForServer : routingTable.values()) {
+          for (String segment : segmentsForServer) {
             assertFalse(assignedSegments.contains(segment));
             assignedSegments.add(segment);
           }
@@ -180,17 +176,16 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
     }
 
     routingTableBuilder.computeRoutingTableFromExternalView("table", externalView, instanceConfigs);
-    List<ServerToSegmentSetMap> routingTables = routingTableBuilder.getRoutingTables();
-    for (ServerToSegmentSetMap routingTable : routingTables) {
-      for (String server : routingTable.getServerSet()) {
-        Set<String> segmentSet = routingTable.getSegmentSet(server);
-        assertEquals(segmentSet.size(), ONLINE_SEGMENT_COUNT + 1, "");
+    List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+    for (Map<String, List<String>> routingTable : routingTables) {
+      for (List<String> segmentsForServer : routingTable.values()) {
+        assertEquals(segmentsForServer.size(), ONLINE_SEGMENT_COUNT + 1);
 
         // Should only contain the first consuming segment, not the second
-        assertTrue(segmentSet.contains(segmentNames.get(ONLINE_SEGMENT_COUNT).getSegmentName()),
+        assertTrue(segmentsForServer.contains(segmentNames.get(ONLINE_SEGMENT_COUNT).getSegmentName()),
             "Segment set does not contain the first segment in consuming state");
         for (int i = ONLINE_SEGMENT_COUNT + 1; i < SEGMENT_COUNT; i++) {
-          assertFalse(segmentSet.contains(segmentNames.get(i).getSegmentName()),
+          assertFalse(segmentsForServer.contains(segmentNames.get(i).getSegmentName()),
               "Segment set contains a segment in consuming state that should not be there");
         }
       }

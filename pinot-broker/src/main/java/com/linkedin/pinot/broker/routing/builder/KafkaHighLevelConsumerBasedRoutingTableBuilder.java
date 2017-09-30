@@ -15,30 +15,22 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
-
-public class KafkaHighLevelConsumerBasedRoutingTableBuilder extends AbstractRoutingTableBuilder {
-
+public class KafkaHighLevelConsumerBasedRoutingTableBuilder extends BaseRoutingTableBuilder {
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -46,43 +38,35 @@ public class KafkaHighLevelConsumerBasedRoutingTableBuilder extends AbstractRout
 
   @Override
   public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigList) {
+      List<InstanceConfig> instanceConfigs) {
+    List<Map<String, List<String>>> routingTables = new ArrayList<>();
+    Map<String, Map<String, List<String>>> groupIdToRouting = new HashMap<>();
 
-    RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
+    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
+    for (String segmentName : externalView.getPartitionSet()) {
+      for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
+        String serverName = entry.getKey();
+        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
+            && !instancePruner.isInactive(serverName) && SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
+          HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
+          String groupId = hlcSegmentName.getGroupId();
 
-    Set<String> segments = externalView.getPartitionSet();
-    List<ServerToSegmentSetMap> routingTables = new ArrayList<ServerToSegmentSetMap>();
-    Map<String, Map<String, Set<String>>> groupIdToRouting = new HashMap<String, Map<String, Set<String>>>();
-    for (String segment : segments) {
-      Map<String, String> instanceMap = externalView.getStateMap(segment);
-      for (String instance : instanceMap.keySet()) {
-        if (!instanceMap.get(instance).equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
-            || pruner.isInactive(instance)) {
-          continue;
+          Map<String, List<String>> routingTableForGroupId = groupIdToRouting.get(groupId);
+          if (routingTableForGroupId == null) {
+            routingTableForGroupId = new HashMap<>();
+            groupIdToRouting.put(groupId, routingTableForGroupId);
+          }
+          List<String> segmentsForServer = routingTableForGroupId.get(serverName);
+          if (segmentsForServer == null) {
+            segmentsForServer = new ArrayList<>();
+            routingTableForGroupId.put(serverName, segmentsForServer);
+          }
+          segmentsForServer.add(segmentName);
         }
-
-        // Skip segments that are not high level consumer segments
-        if (!SegmentName.isHighLevelConsumerSegmentName(segment))
-          continue;
-
-        HLCSegmentName hlcSegmentName = new HLCSegmentName(segment);
-        String groupId = hlcSegmentName.getGroupId();
-        if (!groupIdToRouting.containsKey(groupId)) {
-          groupIdToRouting.put(groupId, new HashMap<String, Set<String>>());
-        }
-        if (!groupIdToRouting.get(groupId).containsKey(instance)) {
-          groupIdToRouting.get(groupId).put(instance, new HashSet<String>());
-        }
-        groupIdToRouting.get(groupId).get(instance).add(segment);
       }
     }
-    for (Map<String, Set<String>> replicaRouting : groupIdToRouting.values()) {
-      routingTables.add(new ServerToSegmentSetMap(replicaRouting));
-    }
+    routingTables.addAll(groupIdToRouting.values());
+
     setRoutingTables(routingTables);
-    setIsEmpty(groupIdToRouting.isEmpty());
   }
-
-
-
 }

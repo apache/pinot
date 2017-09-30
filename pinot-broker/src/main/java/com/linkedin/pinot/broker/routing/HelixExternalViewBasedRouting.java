@@ -23,12 +23,10 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerTimer;
-import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -94,10 +92,10 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   @Override
-  public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
     String tableName = request.getTableName();
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
-    return routingTableBuilder.findServers(request);
+    return routingTableBuilder.getRoutingTable(request);
   }
 
   @Override
@@ -108,16 +106,6 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   public void setBrokerMetrics(BrokerMetrics brokerMetrics) {
     _brokerMetrics = brokerMetrics;
-  }
-
-  @Override
-  public void start() {
-    LOGGER.info("Starting HelixExternalViewBasedRouting!");
-  }
-
-  @Override
-  public void shutdown() {
-    LOGGER.info("Shutting down HelixExternalViewBasedRouting!");
   }
 
   public void markDataResourceOnline(TableConfig tableConfig, ExternalView externalView,
@@ -574,9 +562,9 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
         JSONArray entries = new JSONArray();
         RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(currentTable);
-        List<ServerToSegmentSetMap> routingTables = routingTableBuilder.getRoutingTables();
-        for (ServerToSegmentSetMap serverToInstaceMap : routingTables) {
-          entries.put(new JSONObject(serverToInstaceMap.toString()));
+        List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+        for (Map<String, List<String>> routingTable : routingTables) {
+          entries.put(new JSONObject(routingTable.toString()));
         }
         tableEntry.put("routingTableEntries", entries);
         routingTableSnapshot.put(tableEntry);

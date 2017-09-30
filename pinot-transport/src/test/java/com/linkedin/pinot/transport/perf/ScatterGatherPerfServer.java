@@ -17,23 +17,20 @@ package com.linkedin.pinot.transport.perf;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
+import com.linkedin.pinot.transport.netty.NettyServer;
+import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
+import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import com.linkedin.pinot.transport.netty.NettyTCPServer;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.CountDownLatch;
-
-import io.netty.buffer.ByteBuf;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
-import com.linkedin.pinot.transport.netty.NettyServer;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
-import com.linkedin.pinot.transport.netty.NettyTCPServer;
 
 /**
  *

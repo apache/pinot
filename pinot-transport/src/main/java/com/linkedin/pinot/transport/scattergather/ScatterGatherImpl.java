@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
@@ -93,16 +92,15 @@ public class ScatterGatherImpl implements ScatterGather {
       ScatterGatherStats scatterGatherStats, Boolean isOfflineTable, BrokerMetrics brokerMetrics)
       throws InterruptedException {
     ScatterGatherRequest scatterGatherRequest = scatterGatherRequestContext._request;
-    Map<ServerInstance, SegmentIdSet> serverToSegmentsMap = scatterGatherRequest.getSegmentsServicesMap();
-
-    CountDownLatch requestDispatchLatch = new CountDownLatch(serverToSegmentsMap.size());
+    Map<String, List<String>> routingTable = scatterGatherRequest.getRoutingTable();
+    CountDownLatch requestDispatchLatch = new CountDownLatch(routingTable.size());
 
     // async checkout of connections and then dispatch of request
-    List<SingleRequestHandler> handlers = new ArrayList<>(serverToSegmentsMap.size());
+    List<SingleRequestHandler> handlers = new ArrayList<>(routingTable.size());
 
-    for (Entry<ServerInstance, SegmentIdSet> entry : serverToSegmentsMap.entrySet()) {
-      ServerInstance server = entry.getKey();
-      String shortServerName = server.getShortHostName();
+    for (Entry<String, List<String>> entry : routingTable.entrySet()) {
+      ServerInstance serverInstance = ServerInstance.forInstanceName(entry.getKey());
+      String shortServerName = serverInstance.getShortHostName();
       if (isOfflineTable != null) {
         if (isOfflineTable) {
           shortServerName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
@@ -111,8 +109,9 @@ public class ScatterGatherImpl implements ScatterGather {
         }
       }
       scatterGatherStats.initServer(shortServerName);
-      SingleRequestHandler handler = new SingleRequestHandler(_connPool, server, scatterGatherRequest, entry.getValue(),
-          scatterGatherRequestContext.getRemainingTimeMs(), requestDispatchLatch, brokerMetrics);
+      SingleRequestHandler handler =
+          new SingleRequestHandler(_connPool, serverInstance, scatterGatherRequest, entry.getValue(),
+              scatterGatherRequestContext.getRemainingTimeMs(), requestDispatchLatch, brokerMetrics);
       // Submit to thread-pool for checking-out and sending request
       _executorService.submit(handler);
       handlers.add(handler);
@@ -189,7 +188,7 @@ public class ScatterGatherImpl implements ScatterGather {
     // Scatter Request
     private final ScatterGatherRequest _request;
     // List Of Partitions to be queried on the server
-    private final SegmentIdSet _segmentIds;
+    private final List<String> _segments;
     // Server Instance to be queried
     private final ServerInstance _server;
     // Latch to signal completion of dispatching request
@@ -215,12 +214,12 @@ public class ScatterGatherImpl implements ScatterGather {
     private long _endTime;
 
     public SingleRequestHandler(KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connPool,
-        ServerInstance server, ScatterGatherRequest request, SegmentIdSet segmentIds, long timeoutMS,
+        ServerInstance server, ScatterGatherRequest request, List<String> segments, long timeoutMS,
         CountDownLatch latch, final BrokerMetrics brokerMetrics) {
       _connPool = connPool;
       _server = server;
       _request = request;
-      _segmentIds = segmentIds;
+      _segments = segments;
       _requestDispatchLatch = latch;
       _timeoutMS = timeoutMS;
       _initTime = System.currentTimeMillis();
@@ -268,7 +267,7 @@ public class ScatterGatherImpl implements ScatterGather {
       try {
         serverResponseFuture = _connPool.checkoutObject(_server);
 
-        byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
+        byte[] serializedRequest = _request.getRequestForService(_segments);
         int ntries = 0;
         // Try a maximum of pool size objects.
         while (true) {

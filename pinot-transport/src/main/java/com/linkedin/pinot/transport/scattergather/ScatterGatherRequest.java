@@ -16,8 +16,7 @@
 package com.linkedin.pinot.transport.scattergather;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
+import java.util.List;
 import java.util.Map;
 
 
@@ -29,25 +28,24 @@ import java.util.Map;
 public interface ScatterGatherRequest {
 
   /**
-   * Return the candidate set of servers that hosts each segment-set.
-   * The List of services are expected to be ordered so that replica-selection strategy can be
-   * applied to them to select one Service among the list for each segment.
+   * Get the routing table (map from server to list of segments).
    *
-   * @return SegmentSet to Request map.
+   * @return Map from server to list of segments
    */
-  Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap();
+  Map<String, List<String>> getRoutingTable();
 
   /**
-   * Return the requests that will be sent to the service which is hosting a group of interested segments
-   * @param service Service to which segments will be sent.
-   * @param querySegments Segments to be queried in the service identified by Service.
-   * @return byte[] request to be sent
+   * Get the request to be sent to the server.
+   *
+   * @param segments List of segments to be queried
+   * @return Request to be sent
    */
-  byte[] getRequestForService(ServerInstance service, SegmentIdSet querySegments);
+  byte[] getRequestForService(List<String> segments);
 
   /**
-   * Request Id for tracing purpose
-   * @return
+   * Get the request id for tracing purpose.
+   *
+   * @return Request id
    */
   long getRequestId();
 

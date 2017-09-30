@@ -16,23 +16,6 @@
 
 package com.linkedin.pinot.broker.routing.builder;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-
-import org.apache.commons.lang.math.IntRange;
-import org.apache.helix.AccessOption;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.broker.routing.FakePropertyStore;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
@@ -44,20 +27,33 @@ import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.transport.common.SegmentId;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import org.apache.commons.lang.math.IntRange;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class PartitionAwareRealtimeRoutingTableBuilderTest {
   private static final String REALTIME_TABLE_NAME = "myTable_REALTIME";
   private static final String PARTITION_FUNCTION_NAME = "Modulo";
   private static final String PARTITION_COLUMN = "memberId";
-  private static final Random random = new Random();
+
+  private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private static final Random RANDOM = new Random();
 
   private int NUM_REPLICA;
   private int NUM_PARTITION;
@@ -69,10 +65,10 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     int numIterations = 50;
 
     for (int iter = 0; iter < numIterations; iter++) {
-      NUM_PARTITION = random.nextInt(8) + 3;
-      NUM_REPLICA = random.nextInt(3) + 3;
-      NUM_SERVERS = random.nextInt(10) + 3;
-      NUM_SEGMENTS = random.nextInt(100) + 3;
+      NUM_PARTITION = RANDOM.nextInt(8) + 3;
+      NUM_REPLICA = RANDOM.nextInt(3) + 3;
+      NUM_SERVERS = RANDOM.nextInt(10) + 3;
+      NUM_SEGMENTS = RANDOM.nextInt(100) + 3;
 
       // Create the fake property store
       FakePropertyStore fakePropertyStore = new FakePropertyStore();
@@ -110,15 +106,15 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
       // Check the query that requires to scan all segment.
       String countStarQuery = "select count(*) from myTable";
-      Map<ServerInstance, SegmentIdSet> routingResult =
-          routingTableBuilder.findServers(buildRoutingTableLookupRequest(countStarQuery));
+      Map<String, List<String>> routingTable =
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
 
       // Check that all segments are covered exactly for once.
       Set<String> assignedSegments = new HashSet<>();
-      for (SegmentIdSet segmentIdSet : routingResult.values()) {
-        for (SegmentId segment : segmentIdSet.getSegments()) {
-          Assert.assertFalse(assignedSegments.contains(segment.getSegmentId()));
-          assignedSegments.add(segment.getSegmentId());
+      for (List<String> segmentsForServer : routingTable.values()) {
+        for (String segmentName: segmentsForServer) {
+          Assert.assertFalse(assignedSegments.contains(segmentName));
+          assignedSegments.add(segmentName);
         }
       }
       Assert.assertEquals(assignedSegments.size(), NUM_SEGMENTS);
@@ -126,14 +122,14 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
       // Check the broker side server and segment pruning.
       for (int queryPartition = 0; queryPartition < 100; queryPartition++) {
         String filterQuery = "select count(*) from myTable where " + PARTITION_COLUMN + " = " + queryPartition;
-        routingResult = routingTableBuilder.findServers(buildRoutingTableLookupRequest(filterQuery));
+        routingTable = routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery));
 
         int partition = queryPartition % NUM_PARTITION;
         assignedSegments = new HashSet<>();
-        for (SegmentIdSet segmentIdSet : routingResult.values()) {
-          for (SegmentId segment : segmentIdSet.getSegments()) {
-            Assert.assertFalse(assignedSegments.contains(segment.getSegmentId()));
-            assignedSegments.add(segment.getSegmentId());
+        for (List<String> segmentsForServer : routingTable.values()) {
+          for (String segmentName: segmentsForServer) {
+            Assert.assertFalse(assignedSegments.contains(segmentName));
+            assignedSegments.add(segmentName);
           }
         }
         Assert.assertEquals(assignedSegments.size(), partitionSegmentCount.get(partition).intValue());
@@ -187,15 +183,15 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
     // Check the query that requires to scan all segment.
     String countStarQuery = "select count(*) from myTable";
-    Map<ServerInstance, SegmentIdSet> routingResult =
-        routingTableBuilder.findServers(buildRoutingTableLookupRequest(countStarQuery));
+    Map<String, List<String>> routingTable =
+        routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
 
     // Check that all segments are covered exactly for once.
     Set<String> assignedSegments = new HashSet<>();
-    for (SegmentIdSet segmentIdSet : routingResult.values()) {
-      for (SegmentId segment : segmentIdSet.getSegments()) {
-        Assert.assertFalse(assignedSegments.contains(segment.getSegmentId()));
-        assignedSegments.add(segment.getSegmentId());
+    for (List<String> segmentsForServer : routingTable.values()) {
+      for (String segmentName: segmentsForServer) {
+        Assert.assertFalse(assignedSegments.contains(segmentName));
+        assignedSegments.add(segmentName);
       }
     }
     Assert.assertEquals(assignedSegments.size(), ONLINE_SEGMENTS + 1);
@@ -280,11 +276,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   }
 
   private RoutingTableLookupRequest buildRoutingTableLookupRequest(String query) {
-    Pql2Compiler compiler = new Pql2Compiler();
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(REALTIME_TABLE_NAME,
-        Collections.<String>emptyList(), brokerRequest);
-    return request;
+    return new RoutingTableLookupRequest(COMPILER.compileToBrokerRequest(query));
   }
 
   private TableConfig buildRealtimeTableConfig() throws Exception {
