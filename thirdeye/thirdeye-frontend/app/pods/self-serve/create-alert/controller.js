@@ -687,7 +687,7 @@ export default Ember.Controller.extend({
           windowDelay: 0,
           windowDelayUnit: 'DAYS',
           cron: '0%200%2014%201%2F1%20*%20%3F%20*',
-          properties: `pValueThreshold=0.05;logTransform=true;weeklyEffectRemovedInPrediction=false;weeklyEffectModeled=${weeklyEffect}`
+          properties: `continuumOffsetSize=90;continuumOffsetUnit=86400000;pValueThreshold=0.05;logTransform=true;weeklyEffectRemovedInPrediction=false;weeklyEffectModeled=${weeklyEffect}`
         }
       };
 
