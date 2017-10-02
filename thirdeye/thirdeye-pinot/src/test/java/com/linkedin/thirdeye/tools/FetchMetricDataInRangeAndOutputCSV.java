@@ -23,7 +23,7 @@ public class FetchMetricDataInRangeAndOutputCSV {
   private static final Logger LOG = LoggerFactory.getLogger(FetchAnomaliesInRangeAndOutputCSV.class);
   private static final String DEFAULT_HOST = "localhost";
   private static final String DEFAULT_PORT = "1426";
-  private static final String TOKEN = "";
+  private static final String AUTHENTICATION_TOKEN = "";
 
   /**
    * Fetch metric historical data from server and parse the json object
@@ -97,7 +97,7 @@ public class FetchMetricDataInRangeAndOutputCSV {
     try {
       FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO =
           new FetchMetricDataAndExistingAnomaliesTool(new File(path2PersistenceFile));
-      metricContent = thirdEyeDAO.fetchMetric(DEFAULT_HOST, Integer.valueOf(DEFAULT_PORT), TOKEN, dataset,
+      metricContent = thirdEyeDAO.fetchMetric(DEFAULT_HOST, Integer.valueOf(DEFAULT_PORT), AUTHENTICATION_TOKEN, dataset,
           metric, dataRangeStart, dataRangeEnd,
           timeUnit, dimensions,
           filters, dateTimeZone.getID());
