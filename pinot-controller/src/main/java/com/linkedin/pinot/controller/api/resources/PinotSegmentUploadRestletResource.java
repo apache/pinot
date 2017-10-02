@@ -510,14 +510,12 @@ public class PinotSegmentUploadRestletResource {
     long endMillis = interval.getEndMillis();
 
     if (!TimeUtils.timeValueInValidRange(startMillis) || !TimeUtils.timeValueInValidRange(endMillis)) {
-      Date startDate = new Date(interval.getStartMillis());
-      Date endDate = new Date(interval.getEndMillis());
-
       Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
       Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
 
-      LOGGER.error("Invalid start time '{}' or end time '{}' for segment, must be between '{}' and '{}'", startDate,
-          endDate, minDate, maxDate);
+      LOGGER.error("Invalid start time '{}ms' or end time '{}ms' for segment {}, must be between '{}' and '{}' (timecolumn {}, timeunit {})",
+          interval.getStartMillis(), interval.getEndMillis(), metadata.getName(), minDate, maxDate, metadata.getTimeColumn(),
+          metadata.getTimeUnit().toString());
       return false;
     }
 
