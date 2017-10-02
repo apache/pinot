@@ -95,19 +95,19 @@ Sample queries:
 
 ```sql
 /*Total number of documents in the table*/
-select count(*) from baseballStats limit 0
+select count(*) from baseballStats
 
 /*Top 5 run scorers of all time*/ 
-select sum('runs') from baseballStats group by playerName top 5 limit 0
+select sum(runs) from baseballStats group by playerName top 5
 
 /*Top 5 run scorers of the year 2000*/
-select sum('runs') from baseballStats where yearID=2000 group by playerName top 5 limit 0
+select sum(runs) from baseballStats where yearID = 2000 group by playerName top 5
 
 /*Top 10 run scorers after 2000*/
-select sum('runs') from baseballStats where yearID>=2000 group by playerName limit 0
+select sum(runs) from baseballStats where yearID >= 2000 group by playerName
 
 /*Select playerName,runs,homeRuns for 10 records from the table and order them by yearID*/
-select playerName,runs,homeRuns from baseballStats order by yearID limit 10
+select playerName, runs, homeRuns from baseballStats order by yearID limit 10
 
 ```
 
@@ -142,16 +142,16 @@ Open Pinot Query Console at http://localhost:9000/query and run queries. Here ar
 
 ```sql
 /*Total number of documents in the table*/
-select count(*) from meetupRsvp limit 0 
+select count(*) from meetupRsvp
 
 /*Top 10 cities with the most rsvp*/	
-select sum(rsvp_count) from meetupRsvp group by group_city top 10 limit 0 
+select sum(rsvp_count) from meetupRsvp group by group_city top 10
 
 /*Show 10 most recent rsvps*/
 select * from meetupRsvp order by mtime limit 10 
 
 /*Show top 10 rsvp'ed events*/
-select sum(rsvp_count) from meetupRsvp group by event_name top 10 limit 0 
+select sum(rsvp_count) from meetupRsvp group by event_name top 10
 
 ```
 
