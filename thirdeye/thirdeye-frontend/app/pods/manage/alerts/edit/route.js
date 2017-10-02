@@ -40,6 +40,7 @@ export default Ember.Route.extend({
       metric: metricName,
       collection: dataset,
       exploreDimensions,
+      functionName,
       filters,
       bucketSize,
       bucketUnit,
@@ -50,6 +51,7 @@ export default Ember.Route.extend({
     let allGroupNames = [];
     let allGroups = [];
     let metricDimensionURl = '';
+    let selectedAppName = '';
 
     return fetch(`/data/autocomplete/metric?name=${dataset}::${metricName}`).then(checkStatus)
       .then((metricsByName) => {
@@ -88,12 +90,13 @@ export default Ember.Route.extend({
       })
       .then((groupByAlertId) => {
         const originalConfigGroup = groupByAlertId ? groupByAlertId.pop() : null;
-        const selectedAppName = originalConfigGroup ? originalConfigGroup.application : null;
+        selectedAppName = originalConfigGroup ? originalConfigGroup.application : null;
         Object.assign(model, { originalConfigGroup, selectedAppName });
         return fetch('/thirdeye/entity/APPLICATION').then(checkStatus);
       })
       .then((allApps) => {
-        Object.assign(model, { allApps });
+        const selectedApplication = _.find(allApps, function(appsObj) { return appsObj.application === selectedAppName; });
+        Object.assign(model, { allApps, selectedApplication });
         if (exploreDimensions) {
           return fetch(metricDimensionURl).then(checkStatus).then((metricDimensions) => {
             Object.assign(model, { metricDimensions });
@@ -105,13 +108,45 @@ export default Ember.Route.extend({
       });
   },
 
+  resetController(controller, isExiting, transition) {
+    this._super(...arguments);
+
+    if (isExiting) {
+      controller.clearAll();
+    }
+  },
+
+  setupController(controller, model) {
+    this._super(controller, model);
+
+    controller.setProperties({
+      model,
+      metricData: model.metricData,
+      alertDimension: model.function.exploreDimensions,
+      metricDimensions: model.metricDimensions,
+      metricName: model.function.metric,
+      granularity: model.function.bucketSize + '_' + model.function.bucketUnit,
+      alertFilters: model.function.filters,
+      alertConfigGroups: model.allConfigGroups,
+      alertFunctionName: model.function.functionName,
+      alertId: model.function.id,
+      isActive: model.function.isActive,
+      allApplications: model.allApps,
+      selectedConfigGroup: model.originalConfigGroup,
+      selectedApplication: model.selectedApplication,
+      selectedAppName: model.selectedAppName,
+      isLoadError: model.loadError,
+      loadErrorMessage: model.loadErrorMsg,
+      isGraphVisible: true
+    });
+  },
+
   actions: {
     /**
      * Action called on submission to reload the route's model
      */
     refreshModel: function() {
       this.refresh();
-      this.transitionTo('manage.alerts.edit', this.currentModel.function.id);
     }
   }
 });
