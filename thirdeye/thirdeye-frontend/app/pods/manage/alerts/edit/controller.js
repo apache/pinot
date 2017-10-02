@@ -60,25 +60,8 @@ export default Ember.Controller.extend({
   isNewConfigGroupSaved: false, // to trigger end-of-process cues
   isProcessingForm: false, // to trigger submit disable
   updatedRecipients: [], // placeholder for all email recipients
-
-  /**
-   * Properties from model, using 'reads' so that changes are cancellable
-   */
-  metricData: Ember.computed.reads('model.metricData'),
-  alertDimension: Ember.computed.reads('model.function.exploreDimensions'),
-  metricDimensions: Ember.computed.reads('model.metricDimensions'),
-  metricName: Ember.computed.reads('model.function.metric'),
-  granularity: Ember.computed.reads('model.function.bucketUnit'),
-  alertFilters: Ember.computed.reads('model.function.filters'),
-  alertConfigGroups: Ember.computed.reads('model.allConfigGroups'),
-  alertFunctionName: Ember.computed.reads('model.function.functionName'),
-  alertId: Ember.computed.reads('model.function.id'),
-  isActive: Ember.computed.reads('model.function.isActive'),
-  allApplications: Ember.computed.reads('model.allApps'),
-  selectedConfigGroup: Ember.computed.reads('model.originalConfigGroup'),
-  selectedAppName: Ember.computed.reads('model.selectedAppName'),
-  isLoadError: Ember.computed.reads('model.loadError'),
-  loadErrorMessage: Ember.computed.reads('model.loadErrorMsg'),
+  isGraphVisible: true, // we will hide it when transitioning to a new route to avoid errors
+  isExiting: false, // exit detection
 
   /**
    * Returns the list of existing config groups and updates it if a new one is added.
@@ -213,21 +196,6 @@ export default Ember.Controller.extend({
   ),
 
   /**
-   * Returns list of all applications for dropdown
-   * @method selectedApplication
-   * @return {Array} Array of application names
-   */
-  selectedApplication: Ember.computed(
-    'selectedConfigGroup',
-    'allApplications',
-    function() {
-      const appString = this.get('selectedConfigGroup.application');
-      const allApps = this.get('allApplications');
-      return _.find(allApps, function(appsObj) { return appsObj.application === appString; });
-    }
-  ),
-
-  /**
    * If user chooses to assign the current alert to a new config group, we will need to post
    * these basic properties for a new record to be created. On Submit, we add the current alert
    * Id to emailConfig.functionIds and make sure none are duplicates.
@@ -256,8 +224,13 @@ export default Ember.Controller.extend({
   isEmptyEmail: Ember.computed(
     'selectedConfigGroupRecipients',
     'alertGroupNewRecipient',
+    'isExiting',
     function() {
-      return Ember.isEmpty(this.get('selectedConfigGroupRecipients')) && Ember.isEmpty(this.get('alertGroupNewRecipient'));
+      if (this.get('isExiting')) {
+        return false;
+      } else {
+        return Ember.isEmpty(this.get('selectedConfigGroupRecipients')) && Ember.isEmpty(this.get('alertGroupNewRecipient'));
+      }
     }
   ),
 
@@ -360,14 +333,11 @@ export default Ember.Controller.extend({
    */
   confirmEditSuccess() {
     const that = this;
-    this.setProperties({
-      isEditAlertSuccess: true,
-      isProcessingForm: false
-    });
+    this.set('isEditAlertSuccess', true);
     Ember.run.later((function() {
       that.clearAll();
-      that.send('refreshModel');
-    }), 3000);
+      this.transitionToRoute('manage.alerts');
+    }), 2000);
   },
 
   /**
@@ -377,18 +347,37 @@ export default Ember.Controller.extend({
    */
   clearAll() {
     this.setProperties({
+      model: null,
+      isExiting: true,
       isSubmitDisabled: false,
       isEmailError: false,
       isDuplicateEmail: false,
       isEditedConfigGroup: false,
       isNewConfigGroup: false,
-      alertGroupNewRecipient: null,
-      newConfigGroupName: null,
       isEditAlertError: false,
       isEditAlertSuccess: false,
       isNewConfigGroupSaved: false,
       isProcessingForm: false,
+      isGraphVisible: false,
+      isActive: false,
+      isLoadError: false,
+      alertGroupNewRecipient: null,
+      newConfigGroupName: null,
       updatedRecipients: [],
+      metricData: null,
+      alertDimension: null,
+      metricDimensions: null,
+      metricName: null,
+      granularity: null,
+      alertFilters: null,
+      alertConfigGroups: null,
+      alertFunctionName: null,
+      alertId: null,
+      allApplications: null,
+      selectedConfigGroup: null,
+      selectedApplication: null,
+      selectedAppName: null,
+      loadErrorMessage: null
     });
   },
 
