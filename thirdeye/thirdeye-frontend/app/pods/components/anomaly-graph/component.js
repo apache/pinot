@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import moment from 'moment';
 import d3 from 'd3';
+import { eventWeightMapping } from 'thirdeye-frontend/actions/constants';
 
 const COLOR_MAPPING = {
   blue: '#33AADA',
@@ -451,7 +452,7 @@ export default Ember.Component.extend({
           show: true,
           // min: 0,
           tick: {
-            format: d3.format('2s')
+            format: d3.format('.2s')
           }
         },
         y2: {
@@ -771,8 +772,24 @@ export default Ember.Component.extend({
       title: function(d) {
         return moment(d).format('MM/DD hh:mm a');
       },
-      value: function(val) {
-        return d3.format('2s')(val);
+      value: function(val, ratio, id) {
+        const isMetric = ['current', 'expected'].some((category) => {
+          return id.includes(category);
+        });
+
+        if (isMetric) {
+          return d3.format('.3s')(val);
+        } else {
+          // do not return values if data point is an event
+
+          const eventType = Object.keys(eventWeightMapping).find((key) => {
+            if (val == eventWeightMapping[key]) {
+              return key;
+            }
+          });
+
+          return eventType || '';
+        }
       }
     }
   },
