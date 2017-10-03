@@ -25,7 +25,6 @@ import com.linkedin.pinot.common.exception.PermanentDownloadException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.EqualityUtils;
@@ -51,33 +50,28 @@ public class SegmentFetcherAndLoader {
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final DataManager _dataManager;
-  private final SegmentMetadataLoader _metadataLoader;
-  private final String _instanceId;
 
   private final int _segmentLoadMaxRetryCount;
   private final long _segmentLoadMinRetryDelayMs; // Min delay (in msecs) between retries
 
-  public SegmentFetcherAndLoader(DataManager dataManager, SegmentMetadataLoader metadataLoader,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, Configuration pinotHelixProperties, String instanceId) {
+  public SegmentFetcherAndLoader(DataManager dataManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      Configuration pinotHelixProperties) {
     _propertyStore = propertyStore;
     _dataManager = dataManager;
-    _metadataLoader = metadataLoader;
-    _instanceId = instanceId;
     int maxRetries = Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT);
     try {
-      maxRetries = pinotHelixProperties
-          .getInt(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MAX_RETRY_COUNT, maxRetries);
+      maxRetries =
+          pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MAX_RETRY_COUNT, maxRetries);
     } catch (Exception e) {
       // Keep the default value
     }
     _segmentLoadMaxRetryCount = maxRetries;
 
-    long minRetryDelayMillis =
-        Long.parseLong(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS);
+    long minRetryDelayMillis = Long.parseLong(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS);
     try {
-      minRetryDelayMillis = pinotHelixProperties.getLong(
-          CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS,
-          minRetryDelayMillis);
+      minRetryDelayMillis =
+          pinotHelixProperties.getLong(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS,
+              minRetryDelayMillis);
     } catch (Exception e) {
       // Keep the default value
     }
@@ -169,7 +163,7 @@ public class SegmentFetcherAndLoader {
             TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
             final String uri = newSegmentZKMetadata.getDownloadUrl();
             final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
-            final SegmentMetadata segmentMetadata = _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
+            final SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
             _dataManager.addSegment(segmentMetadata, tableConfig, schema);
             LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName,
                 segmentMetadata.getCrc());

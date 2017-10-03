@@ -24,7 +24,6 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
@@ -65,7 +64,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   private boolean _isStarted = false;
-  private SegmentMetadataLoader _segmentMetadataLoader;
 
   @Override
   public synchronized void init(Configuration dataManagerConfig) {
@@ -74,33 +72,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("InstanceDataManager Config:" + _instanceDataManagerConfig.toString());
       File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
       if (!instanceDataDir.exists()) {
-        instanceDataDir.mkdirs();
+        Preconditions.checkState(instanceDataDir.mkdirs());
       }
       File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
       if (!instanceSegmentTarDir.exists()) {
-        instanceSegmentTarDir.mkdirs();
-      }
-      try {
-        _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-        LOGGER.info("Loaded SegmentMetadataLoader for class name : "
-            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-      } catch (Exception e) {
-        LOGGER
-            .error(
-                "Cannot initialize SegmentMetadataLoader for class name : "
-                    + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : "
-                    + e.getMessage(), e);
+        Preconditions.checkState(instanceSegmentTarDir.mkdirs());
       }
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
       LOGGER.error("Error in initializing HelixDataManager, StackTrace is : " + e.getMessage(), e);
     }
-
-  }
-
-  private static SegmentMetadataLoader getSegmentMetadataLoader(String segmentMetadataLoaderClassName)
-      throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-    return (SegmentMetadataLoader) Class.forName(segmentMetadataLoaderClassName).newInstance();
   }
 
   @Override
@@ -280,11 +261,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public String getSegmentFileDirectory() {
     return _instanceDataManagerConfig.getInstanceSegmentTarDir();
-  }
-
-  @Override
-  public SegmentMetadataLoader getSegmentMetadataLoader() {
-    return _segmentMetadataLoader;
   }
 
   @Override

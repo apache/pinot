@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.ZkUtils;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.starter.ServerInstance;
@@ -120,8 +119,8 @@ public class HelixServerStarter {
     _helixManager.connect();
     ZkHelixPropertyStore<ZNRecord> zkPropertyStore = ZkUtils.getZkPropertyStore(_helixManager, helixClusterName);
 
-    SegmentFetcherAndLoader fetcherAndLoader = new SegmentFetcherAndLoader(_serverInstance.getInstanceDataManager(),
-        new ColumnarSegmentMetadataLoader(), zkPropertyStore, pinotHelixProperties, _instanceId);
+    SegmentFetcherAndLoader fetcherAndLoader =
+        new SegmentFetcherAndLoader(_serverInstance.getInstanceDataManager(), zkPropertyStore, pinotHelixProperties);
 
     // Register state model factory
     final StateModelFactory<?> stateModelFactory =
