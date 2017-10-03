@@ -8,11 +8,16 @@ import { task, timeout } from 'ember-concurrency';
 import fetch from 'fetch';
 
 export default Ember.Controller.extend({
-  queryParams: ['selectedSearchMode'],
+  queryParams: ['selectedSearchMode', 'alertId'],
   /**
    * Alerts Search Mode options
    */
   searchModes: ['All Alerts', 'Alerts', 'Subscriber Groups', 'Applications'],
+
+  /**
+   * Alerts Search Mode options
+   */
+  sortModes: ['Edited:first', 'Edited:last', 'A to Z', 'Z to A'],
 
   /**
    * True when results appear
@@ -23,6 +28,11 @@ export default Ember.Controller.extend({
    * Default Search Mode
    */
   selectedSearchMode: 'All Alerts',
+
+  /**
+   * Default Sort Mode
+   */
+  selectedSortMode: 'Edited:last',
 
   /**
    * Array of Alerts we're displaying
@@ -106,12 +116,33 @@ export default Ember.Controller.extend({
     'selectedAlerts.@each',
     'pageSize',
     'currentPage',
+    'selectedSortMode',
     function() {
       const pageSize = this.get('pageSize');
       const pageNumber = this.get('currentPage');
+      const incomingAlertObj = this.get('incomingAlertId');
+      const sortOrder = this.get('selectedSortMode');
       let alerts = this.get('selectedAlerts');
 
-      return alerts.slice((pageNumber - 1) * pageSize, pageNumber * pageSize).sortBy('functionName');
+      switch(sortOrder) {
+        case 'Edited:first': {
+          alerts = alerts.sortBy('id');
+          break;
+        }
+        case 'Edited:last': {
+          alerts = alerts = alerts.sortBy('id').reverse();
+          break;
+        }
+        case 'A to Z': {
+          alerts = alerts.sortBy('functionName');
+          break;
+        }
+        case 'Z to A': {
+          alerts = alerts.sortBy('functionName').reverse();
+          break;
+        }
+      }
+      return alerts.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
     }
   ),
 
@@ -186,6 +217,11 @@ export default Ember.Controller.extend({
         });
       }
       this.set('selectedSearchMode', mode);
+    },
+
+    // Handles UI sort change
+    onSortModeChange(mode) {
+      this.set('selectedSortMode', mode);
     },
 
     /**
