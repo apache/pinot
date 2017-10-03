@@ -54,9 +54,15 @@
     margin-right: $te-default-element-spacing;
   }
 
+  &__sort {
+    float: right;
+    min-width: 100px;
+    margin-left: $te-default-element-spacing;
+  }
+
   &__input {
     float: left;
-    width: 60%;
+    width: 59%;
     min-width: 300px;
   }
 

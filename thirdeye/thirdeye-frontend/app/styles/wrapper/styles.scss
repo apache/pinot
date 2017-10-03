@@ -146,6 +146,12 @@ body {
       background-color: lighten($te-red, 30%);
     }
   }
+
+  &__prop {
+    &--missing {
+      color: app-shade(black, 3);
+    }
+  }
 }
 
 .te-form {
