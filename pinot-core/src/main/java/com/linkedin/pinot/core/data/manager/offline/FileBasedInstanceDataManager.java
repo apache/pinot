@@ -22,9 +22,9 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.Collection;
@@ -53,7 +53,6 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   private FileBasedInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<String, TableDataManager>();
   private boolean _isStarted = false;
-  private SegmentMetadataLoader _segmentMetadataLoader;
 
   public FileBasedInstanceDataManager() {
     //LOGGER.info("InstanceDataManager is a Singleton");
@@ -72,7 +71,6 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, null);
       _tableDataManagerMap.put(tableName, tableDataManager);
     }
-    _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
   }
 
   @Override
@@ -90,22 +88,6 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, null);
       _tableDataManagerMap.put(tableName, tableDataManager);
     }
-    try {
-      _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-      LOGGER.info("Loaded SegmentMetadataLoader for class name : "
-          + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-    } catch (Exception e) {
-      LOGGER.error(
-          "Cannot initialize SegmentMetadataLoader for class name : "
-              + _instanceDataManagerConfig.getSegmentMetadataLoaderClass(), e);
-      Utils.rethrowException(e);
-    }
-  }
-
-  private SegmentMetadataLoader getSegmentMetadataLoader(String segmentMetadataLoaderClassName)
-      throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-    return (SegmentMetadataLoader) Class.forName(segmentMetadataLoaderClassName).newInstance();
-
   }
 
   public void addTable(TableDataManagerConfig tableConfig) {
@@ -134,7 +116,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       File bootstrapSegmentDir = new File(_instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
       if (bootstrapSegmentDir.exists()) {
         for (File segment : bootstrapSegmentDir.listFiles()) {
-          addSegment(_segmentMetadataLoader.load(segment), null, null);
+          addSegment(new SegmentMetadataImpl(segment), null, null);
           LOGGER.info("Bootstrapped segment from directory : " + segment.getAbsolutePath());
         }
       } else {
@@ -155,10 +137,6 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   @Override
   public int getMaxParallelRefreshThreads() {
     return 1;
-  }
-
-  public synchronized void addTableDataManager(String tableName, TableDataManager tableDataManager) {
-    _tableDataManagerMap.put(tableName, tableDataManager);
   }
 
   @Nonnull
@@ -219,11 +197,6 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   @Override
   public String getSegmentFileDirectory() {
     return _instanceDataManagerConfig.getInstanceSegmentTarDir();
-  }
-
-  @Override
-  public SegmentMetadataLoader getSegmentMetadataLoader() {
-    return _segmentMetadataLoader;
   }
 
   @Nonnull

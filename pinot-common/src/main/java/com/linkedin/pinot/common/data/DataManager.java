@@ -17,7 +17,6 @@ package com.linkedin.pinot.common.data;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -46,8 +45,6 @@ public interface DataManager {
   String getSegmentDataDirectory();
 
   String getSegmentFileDirectory();
-
-  SegmentMetadataLoader getSegmentMetadataLoader();
 
   @Nonnull
   List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType);

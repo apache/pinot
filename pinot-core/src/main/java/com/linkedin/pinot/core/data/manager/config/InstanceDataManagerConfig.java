@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
-import org.apache.commons.configuration.Configuration;
 import com.linkedin.pinot.common.segment.ReadMode;
+import org.apache.commons.configuration.Configuration;
 
 
 public interface InstanceDataManagerConfig {
@@ -29,8 +29,6 @@ public interface InstanceDataManagerConfig {
   String getInstanceSegmentTarDir();
 
   String getInstanceBootstrapSegmentDir();
-
-  String getSegmentMetadataLoaderClass();
 
   ReadMode getReadMode();
 

@@ -15,9 +15,8 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import org.apache.commons.lang.StringUtils;
-
 import java.io.File;
+import org.apache.commons.lang.StringUtils;
 
 
 public class CommonConstants {
@@ -207,8 +206,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
     public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
-    public static final String CONFIG_OF_INSTANCE_SEGMENT_METADATA_LOADER_CLASS =
-        "pinot.server.instance.segment.metadata.loader.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS = "pinot.server.query.executor.pruner.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
@@ -231,8 +228,6 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
     public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
         DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
-    public static final String DEFAULT_SEGMENT_METADATA_LOADER_CLASS =
-        "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader";
     public static final String DEFAULT_DATA_MANAGER_CLASS =
         "com.linkedin.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
