@@ -372,7 +372,7 @@ public class TimeSeriesResource {
   private static Map<String, List<? extends Number>> convertDataToMap(DataFrame data) {
     Map<String, List<? extends Number>> output = new HashMap<>();
     for (String name : data.getSeriesNames()) {
-      if (data.getIndexName().equals(name)) {
+      if (data.getIndexNames().contains(name)) {
         output.put(name, data.getLongs(name).toList());
         continue;
       }
@@ -479,7 +479,7 @@ public class TimeSeriesResource {
   private DataFrame transformTimeSeriesCumulative(DataFrame data) {
     Grouping.DataFrameGrouping group = data.groupByExpandingWindow();
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       data.addSeries(id, group.aggregate(id, DoubleSeries.SUM).getValues());
     }
@@ -494,7 +494,7 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesDifference(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
       data.addSeries(id, s.subtract(s.shift(1)));
@@ -536,7 +536,7 @@ public class TimeSeriesResource {
       public long apply(long... values) {
         return granularity.toMillis(values[0]) + start;
       }
-    }, data.getIndexName());
+    }, data.getIndexNames().get(0));
     return data;
   }
 
@@ -548,7 +548,7 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesChange(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
       data.addSeries(id, s.divide(s.shift(1).replace(0d, DoubleSeries.NULL)).subtract(1));
@@ -564,7 +564,7 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesRelative(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
       if (s.size() <= 0)
@@ -587,7 +587,7 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesOffset(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
       if (s.size() <= 0)
@@ -606,7 +606,7 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesLog(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       data.mapInPlace(new Series.DoubleFunction() {
         @Override
