@@ -91,6 +91,8 @@ public class HolidayEventsPipeline extends Pipeline {
     Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
+    // TODO add related dimension entities
+
     Set<HolidayEventEntity> entities = new MaxScoreSet<>();
     entities.addAll(EntityUtils.addRelated(score(strategyAnomaly,
         this.getHolidayEvents(analysis.getStart(), anomaly.getEnd()), urn2entity, anomaly.getScore()), anomaly));
