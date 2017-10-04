@@ -50,13 +50,15 @@ public abstract class BaseTimeSeriesResponseParser implements TimeSeriesResponse
       Range<DateTime> timeRange = ranges.get(timeBucketId);
       ThirdEyeResponseRow responseRow = responseMap.get(String.valueOf(timeBucketId));
 
-      TimeSeriesRow.Builder builder = new TimeSeriesRow.Builder();
-      builder.setStart(timeRange.lowerEndpoint());
-      builder.setEnd(timeRange.upperEndpoint());
+      if (responseRow != null) {
+        TimeSeriesRow.Builder builder = new TimeSeriesRow.Builder();
+        builder.setStart(timeRange.lowerEndpoint());
+        builder.setEnd(timeRange.upperEndpoint());
 
-      addMetric(metricFunctions, responseRow, builder);
-      TimeSeriesRow row = builder.build();
-      rows.add(row);
+        addMetric(metricFunctions, responseRow, builder);
+        TimeSeriesRow row = builder.build();
+        rows.add(row);
+      }
     }
 
     return rows;
@@ -80,15 +82,17 @@ public abstract class BaseTimeSeriesResponseParser implements TimeSeriesResponse
 
       ThirdEyeResponseRow responseRow = responseMap.get(timeDimensionValue);
 
-      TimeSeriesRow.Builder builder = new TimeSeriesRow.Builder();
-      builder.setStart(timeRange.lowerEndpoint());
-      builder.setEnd(timeRange.upperEndpoint());
-      builder.setDimensionNames(dimensionNames);
-      builder.setDimensionValues(dimensionValues);
-      addMetric(metricFunctions, responseRow, builder);
+      if (responseRow != null) {
+        TimeSeriesRow.Builder builder = new TimeSeriesRow.Builder();
+        builder.setStart(timeRange.lowerEndpoint());
+        builder.setEnd(timeRange.upperEndpoint());
+        builder.setDimensionNames(dimensionNames);
+        builder.setDimensionValues(dimensionValues);
+        addMetric(metricFunctions, responseRow, builder);
 
-      TimeSeriesRow row = builder.build();
-      thresholdRows.add(row);
+        TimeSeriesRow row = builder.build();
+        thresholdRows.add(row);
+      }
     }
 
     return thresholdRows;

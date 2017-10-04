@@ -168,7 +168,10 @@ public class AnomaliesResource {
       MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
           .getDimensionMapMetricTimeSeriesMap().get(dimensions);
       String metricName = anomalyFunction.getMetric();
-      double currentVal = getAverageFromTimeSeries(currentTimeSeries, metricName);
+      double currentVal = 0d;
+      if (currentTimeSeries != null) {
+        currentVal = getAverageFromTimeSeries(currentTimeSeries, metricName);
+      }
       response.setCurrentVal(currentVal);
 
       for (AlertConfigBean.COMPARE_MODE compareMode : AlertConfigBean.COMPARE_MODE.values()) {
@@ -182,7 +185,10 @@ public class AnomaliesResource {
         MetricTimeSeries baselineTimeSeries = anomalyDetectionInputContextBuilder.build()
             .getDimensionMapMetricTimeSeriesMap().get(dimensions);
         AnomalyDataCompare.CompareResult compareResult = new AnomalyDataCompare.CompareResult();
-        double baseLineval = getAverageFromTimeSeries(baselineTimeSeries, metricName);
+        double baseLineval = 0d;
+        if (baselineTimeSeries != null) {
+          baseLineval = getAverageFromTimeSeries(baselineTimeSeries, metricName);
+        }
         compareResult.setBaselineValue(baseLineval);
         compareResult.setCompareMode(compareMode);
         compareResult.setChange(calculateChange(currentVal, baseLineval));
