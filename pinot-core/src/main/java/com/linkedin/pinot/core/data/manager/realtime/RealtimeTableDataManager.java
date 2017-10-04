@@ -83,14 +83,13 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.create(getServerInstance());
     LOGGER = LoggerFactory.getLogger(_tableName + "-RealtimeTableDataManager");
-    File consumersDir = new File(_tableDataDir, CONSUMERS_DIR);
-    consumersDir.mkdirs();
-    File statsFile = new File(consumersDir, STATS_FILE_NAME);
+
+    File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
-    } catch (IOException |ClassNotFoundException e) {
+    } catch (IOException | ClassNotFoundException e) {
       LOGGER.error("Error reading history object for table {} from {}", _tableName, statsFile.getAbsolutePath(), e);
-      File savedFile = new File(consumersDir, STATS_FILE_NAME + "." + UUID.randomUUID());
+      File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
       try {
         FileUtils.moveFile(statsFile, savedFile);
       } catch (IOException e1) {
@@ -111,7 +110,14 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   }
 
   public String getConsumerDir() {
-    return _tableDataDir + File.separator + CONSUMERS_DIR;
+    File consumerDir = new File(_tableDataManagerConfig.getConsumerDir(), _tableName);
+    if (!consumerDir.exists()) {
+      if (!consumerDir.mkdirs()) {
+        LOGGER.error("Failed to create consumer directory {}", consumerDir.getAbsolutePath());
+      }
+    }
+
+    return consumerDir.getAbsolutePath();
   }
 
   public void notifySegmentCommitted(RealtimeSegmentZKMetadata metadata, IndexSegment segment) {

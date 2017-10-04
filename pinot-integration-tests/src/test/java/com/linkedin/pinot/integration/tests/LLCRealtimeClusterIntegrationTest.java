@@ -17,11 +17,14 @@ package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import java.io.File;
 import java.util.List;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -29,6 +32,19 @@ import org.testng.annotations.Test;
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
+  public static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+
+  @BeforeClass
+  @Override
+  public void setUp() throws Exception {
+    // Remove the consumer directory
+    File consumerDirectory = new File(CONSUMER_DIRECTORY);
+    if (consumerDirectory.exists()) {
+      FileUtils.deleteDirectory(consumerDirectory);
+    }
+
+    super.setUp();
+  }
 
   @Override
   protected boolean useLlc() {
@@ -43,8 +59,14 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @Override
   protected void overrideOfflineServerConf(Configuration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION,
-        "true");
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, "true");
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
+  }
+
+  @Test
+  public void testConsumerDirectoryExists() {
+    File consumerDirectory = new File(CONSUMER_DIRECTORY, "mytable_REALTIME");
+    Assert.assertTrue(consumerDirectory.exists(), "The off heap consumer directory does not exist");
   }
 
   @Test
