@@ -3,14 +3,6 @@ import moment from 'moment';
 
 const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
-const isBetween = (date, start, end) => {
-  date = Number(date);
-  start = Number(start);
-  end = Number(end);
-
-  return moment(date).isBetween(start, end);
-};
-
 export default Ember.Controller.extend({
   queryParams: [
     'granularity',
@@ -33,18 +25,26 @@ export default Ember.Controller.extend({
   subchartStart: 0,
   subchartEnd: 0,
   predefinedRanges: {},
+  shouldReset: false,
 
   /**
    * Upper bound (end) for date range
    * @type {String}
    */
-  maxTime: Ember.computed('model.maxTime', function() {
-    const maxTime = this.get('model.maxTime');
+  maxTime: Ember.computed(
+    'model.maxTime',
+    'granularity',
+    function() {
+      let maxTime = this.get('model.maxTime');
+      maxTime = maxTime ? moment(maxTime) : moment();
 
-    return maxTime
-      ? moment(maxTime).format(serverDateFormat)
-      : moment().format(serverDateFormat);
-  }),
+      // edge case handling for daily granularity
+      if (this.get('granularity') === 'DAYS') {
+        maxTime.startOf('day');
+      }
+      return maxTime.format(serverDateFormat);
+    }
+  ),
 
   /**
    * Indicates the date format to be used based on granularity
@@ -129,8 +129,6 @@ export default Ember.Controller.extend({
   // converts startDate from unix ms to serverDateFormat
   viewRegionStart: Ember.computed(
     'startDate',
-    'analysisStart',
-    'analysisEnd',
     {
       get() {
         const start = this.get('startDate');
@@ -146,11 +144,12 @@ export default Ember.Controller.extend({
         const analysisStart = this.get('analysisStart');
 
         if (+start > +analysisStart) {
-          this.set('analysisStart', undefined);
-          this.set('analysisEnd', undefined);
+          this.set('shouldReset', true);
         }
 
         this.set('startDate', start);
+        Ember.run.once(this, this.get('actions.resetAnalysisDates'));
+
         return moment(value).format(serverDateFormat);
       }
     }
@@ -159,9 +158,6 @@ export default Ember.Controller.extend({
   // converts endDate from unix ms to serverDateFormat
   viewRegionEnd: Ember.computed(
     'endDate',
-    'analysisStart',
-    'analysisEnd',
-    'model.maxTime',
     {
       get() {
         const end = this.get('endDate');
@@ -170,16 +166,16 @@ export default Ember.Controller.extend({
       },
       set(key, value) {
         if (!value || value === 'Invalid date') { return this.get('endDate') || 0; }
-        const maxTime = this.get('model.maxTime');
+        const maxTime = moment(this.get('maxTime')).valueOf();
         const end = moment(value).valueOf();
         const newEnd = (+maxTime < +end) ? maxTime : end;
         const analysisEnd = this.get('analysisEnd');
 
         if (+newEnd < +analysisEnd) {
-          this.set('analysisStart', undefined);
-          this.set('analysisEnd', undefined);
+          this.set('shouldReset', true);
         }
         this.set('endDate', newEnd);
+        Ember.run.once(this, this.get('actions.resetAnalysisDates'));
 
         return moment(value).format(serverDateFormat);
       }
@@ -205,8 +201,7 @@ export default Ember.Controller.extend({
 
       if (granularity === 'DAYS') {
         return moment(+end)
-          .subtract(1, 'day')
-          .endOf('day')
+          .startOf('day')
           .format(serverDateFormat);
       }
 
@@ -228,14 +223,12 @@ export default Ember.Controller.extend({
         let analysisEnd = 0;
         let analysisStart = 0;
         let subchartStart = 0;
-        let subchartEnd = endDate.clone();
-
 
         // Handles this logic here instead of inside SetupController
         // so that query params are updating properly
         if (value === 'DAYS') {
           endDate = endDate.clone().startOf('day');
-          analysisEnd = endDate.clone();
+          analysisEnd = endDate.clone().startOf('day');
           startDate = endDate.clone().subtract(29, 'days').startOf('day').valueOf();
           analysisStart = analysisEnd.clone().subtract('1', 'day');
           subchartStart = endDate.clone().subtract(1, 'week').startOf('day');
@@ -256,11 +249,11 @@ export default Ember.Controller.extend({
           startDate,
           endDate: endDate.valueOf(),
           subchartStart: subchartStart.valueOf(),
-          subchartEnd: subchartEnd.valueOf(),
+          subchartEnd: analysisEnd.valueOf(),
           analysisEnd: analysisEnd.valueOf(),
           analysisStart: analysisStart.valueOf(),
           displayStart: subchartStart.valueOf(),
-          displayEnd: subchartEnd.valueOf()
+          displayEnd: analysisEnd.valueOf()
         });
 
         return value;
@@ -317,6 +310,35 @@ export default Ember.Controller.extend({
      */
     onModeChange(compareMode){
       this.set('compareMode', compareMode);
+    },
+
+    /**
+     * Resets anoamly and investigations regions
+     */
+    resetAnalysisDates() {
+      let offset = 1;
+      let granularity = this.get('granularity');
+      const {
+        shouldReset,
+        startDate,
+        endDate
+      } = this.getProperties('shouldReset', 'startDate', 'endDate');
+
+      if (shouldReset) {
+        if (granularity.includes('minutes')) {
+          granularity = 'minutes';
+          offset = 5;
+        }
+
+        this.setProperties({
+          analysisStart: moment(endDate).subtract(offset, granularity),
+          analysisEnd: endDate,
+          displayStart: startDate,
+          displayEnd: endDate,
+          shouldReset: false
+        });
+      }
     }
+
   }
 });

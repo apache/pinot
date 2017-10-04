@@ -119,7 +119,7 @@ export default Ember.Component.extend({
     const end = this.get('end');
 
     for (let index = 0; index < dates.length; index++) {
-      if (dates[index] > end) {
+      if (dates[index] >= end) {
         return index;
       }
     }
@@ -135,13 +135,13 @@ export default Ember.Component.extend({
     'dates',
     function() {
       const start = this.get('startIndex') || 0;
-      const end = this.get('endIndex') || 0;
+      const end = this.get('endIndex')|| 0;
 
       const dates = this.get('dates');
       if (!(start && end)) {
         return dates;
       }
-      return _.slice(dates, start, end);
+      return _.slice(dates, start, end + 1);
     }
   ),
 
@@ -155,7 +155,7 @@ export default Ember.Component.extend({
       const rows = this.get('primaryMetricRows');
 
 
-      return filterRow(rows, startIndex, endIndex) || [];
+      return filterRow(rows, startIndex, endIndex +1) || [];
     }
   ),
 
@@ -169,7 +169,7 @@ export default Ember.Component.extend({
        const rows = this.get('relatedMetricRows');
 
 
-       return filterRow(rows, startIndex, endIndex) || [];
+       return filterRow(rows, startIndex, endIndex +1) || [];
      }
   ),
 
@@ -199,7 +199,7 @@ export default Ember.Component.extend({
            name: dimension.name
          };
          valueKeys.forEach((key) => {
-           hash[key] = _.slice(dimension[key], startIndex, endIndex);
+           hash[key] = _.slice(dimension[key], startIndex, endIndex + 1);
          });
          return hash;
        }) || [];
