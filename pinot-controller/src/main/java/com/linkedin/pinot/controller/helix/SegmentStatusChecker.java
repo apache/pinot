@@ -56,6 +56,7 @@ public class SegmentStatusChecker {
   private static final String CONTROLLER_LEADER_CHANGE = "CONTROLLER LEADER CHANGE";
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
+  public static final String CONSUMING = "CONSUMING";
   private ScheduledExecutorService _executorService;
   ControllerMetrics _metricsRegistry;
   private ControllerConf _config;
@@ -234,8 +235,11 @@ public class SegmentStatusChecker {
           continue;
         }
         for (Map.Entry<String, String> serverAndState : externalView.getStateMap(partitionName).entrySet()) {
-          // Count number of online replicas
-          if (serverAndState.getValue().equals(ONLINE)) {
+          // Count number of online replicas. Ignore if state is CONSUMING.
+          // It is possible for a segment to be ONLINE in idealstate, and CONSUMING in EV for a short period of time.
+          // So, ignore this combination. If a segment exists in this combination for a long time, we will get
+          // kafka-partition-not-consuming alert anyway.
+          if (serverAndState.getValue().equals(ONLINE) || serverAndState.getValue().equals(CONSUMING)) {
             nReplicas++;
           }
           if (serverAndState.getValue().equals(ERROR)) {
