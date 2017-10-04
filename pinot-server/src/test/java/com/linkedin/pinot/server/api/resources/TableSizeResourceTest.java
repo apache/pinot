@@ -17,77 +17,54 @@ package com.linkedin.pinot.server.api.resources;
 
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Response;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class TableSizeResourceTest {
-  public static final Logger LOGGER = LoggerFactory.getLogger(TableSizeResourceTest.class);
-  private static final String TABLE_NAME = ResourceTestHelper.DEFAULT_TABLE_NAME;
+public class TableSizeResourceTest extends BaseResourceTest {
   private static final String TABLE_SIZE_PATH = "/tables/" + TABLE_NAME + "/size";
-
-  ResourceTestHelper testHelper = new ResourceTestHelper();
-  WebTarget target;
-  @BeforeClass
-  public void setupTest()
-      throws Exception {
-    testHelper.setup();
-    target = testHelper.target;
-  }
-
-  @AfterTest
-  public void tearDownTest()
-      throws Exception {
-    testHelper.tearDown();
-  }
 
   @Test
   public void testTableSizeNotFound() {
-    Response response = target.path("table/unknownTable/size").request().get(Response.class);
+    Response response = _webTarget.path("table/unknownTable/size").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
-
   @Test
   public void testTableSizeDetailed() {
-    TableSizeInfo tableSizeInfo = target.path(TABLE_SIZE_PATH).request().get(TableSizeInfo.class);
-    IndexSegment indexSegment = testHelper.indexSegment;
+    TableSizeInfo tableSizeInfo = _webTarget.path(TABLE_SIZE_PATH).request().get(TableSizeInfo.class);
+    IndexSegment defaultSegment = _indexSegments.get(0);
 
     Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 1);
-    Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, indexSegment.getSegmentName());
-    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes,
-        indexSegment.getDiskSizeBytes());
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, defaultSegment.getSegmentName());
+    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes, defaultSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
   }
 
   @Test
   public void testTableSizeNoDetails() {
-    TableSizeInfo tableSizeInfo = target.path(TABLE_SIZE_PATH).queryParam("detailed", "false")
-        .request().get(TableSizeInfo.class);
+    TableSizeInfo tableSizeInfo =
+        _webTarget.path(TABLE_SIZE_PATH).queryParam("detailed", "false").request().get(TableSizeInfo.class);
+    IndexSegment defaultSegment = _indexSegments.get(0);
+
     Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, testHelper.indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 0);
   }
 
   @Test
   public void testTableSizeOld() {
-    TableSizeInfo tableSizeInfo = target.path("/table/" + TABLE_NAME + "/size").request().get(TableSizeInfo.class);
+    TableSizeInfo tableSizeInfo = _webTarget.path("/table/" + TABLE_NAME + "/size").request().get(TableSizeInfo.class);
+    IndexSegment defaultSegment = _indexSegments.get(0);
 
     Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
-    IndexSegment indexSegment = testHelper.indexSegment;
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 1);
-    Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, indexSegment.getSegmentName());
-    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes,
-        indexSegment.getDiskSizeBytes());
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, indexSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, defaultSegment.getSegmentName());
+    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes, defaultSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
   }
 }

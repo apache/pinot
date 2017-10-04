@@ -92,7 +92,7 @@ public abstract class BaseQueriesTest {
     Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     dataTableMap.put(new ServerInstance("localhost:1111"), instanceResponse);
-    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap);
+    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
   }
 
   /**
