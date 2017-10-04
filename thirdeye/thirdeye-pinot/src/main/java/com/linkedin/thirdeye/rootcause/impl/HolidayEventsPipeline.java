@@ -214,7 +214,7 @@ public class HolidayEventsPipeline extends Pipeline {
       if (scoreTime <= 0)
         return 0;
 
-      return 0.1 * scoreTime + 0.9 * Math.max(scoreTime, scoreHasDimension) + Math.min(scoreDimension, 1);
+      return scoreTime + scoreHasDimension + Math.min(scoreDimension, 1);
     }
   }
 }
