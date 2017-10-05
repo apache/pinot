@@ -65,16 +65,29 @@ export default Ember.Route.extend({
           ? moment(maxTime).valueOf()
           : moment().subtract(1, 'day').endOf('day').valueOf();
         const formattedFilters = JSON.stringify(parseProps(filters));
-        const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
+        const isMinutely = bucketUnit.toLowerCase().includes('minute');
         const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
         const baselineEnd = moment(currentEnd).subtract(1, 'week');
-        const metricDataUrl =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
+        let currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
+        let metricDataUrl = '';
+
+        // Load less data if granularity is 'minutes'
+        if (isMinutely) {
+          currentStart = moment(currentEnd).subtract(2, 'week').valueOf();
+        }
+
+        // Prepare call for metric graph data
+        metricDataUrl =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
           `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=` +
           `${bucketSize + '_' + bucketUnit}&filters=${encodeURIComponent(formattedFilters)}`;
+
+        // Prepare call for dimension graph data
         metricDimensionURl = `/rootcause/query?framework=relatedDimensions&anomalyStart=${currentStart}` +
           `&anomalyEnd=${currentEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}` +
           `&analysisStart=${currentStart}&analysisEnd=${currentEnd}&urns=thirdeye:metric:${metricId}` +
           `&filters=${encodeURIComponent(filters)}`;
+
+        // Fetch graph metric data
         return fetch(metricDataUrl).then(checkStatus);
       })
       .then((metricData) => {

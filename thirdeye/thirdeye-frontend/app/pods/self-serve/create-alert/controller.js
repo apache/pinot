@@ -312,7 +312,8 @@ export default Ember.Controller.extend({
   },
 
   /**
-   * Loads time-series data into the anomaly-graph component
+   * Loads time-series data into the anomaly-graph component.
+   * Note: 'MINUTE' granularity loads 1 week of data. Otherwise, it loads 1 month.
    * @method triggerGraphFromMetric
    * @param {Number} metricId - Id of selected metric to graph
    * @return {undefined}
@@ -322,15 +323,16 @@ export default Ember.Controller.extend({
     const maxDimensionSize = 5;
     const maxTime = this.get('maxTime');
     const selectedDimension = this.get('selectedDimension');
+    const filters = this.get('selectedFilters') || '';
+    const dimension = selectedDimension || 'All';
     const currentEnd = moment(maxTime).isValid()
       ? moment(maxTime).valueOf()
       : moment().subtract(1, 'day').endOf('day').valueOf();
-    const filters = this.get('selectedFilters') || '';
-    const dimension = selectedDimension || 'All';
     const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
     const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
     const baselineEnd = moment(currentEnd).subtract(1, 'week');
     const granularity = this.get('selectedGranularity') || this.get('granularities.firstObject') || '';
+    const isMinutely = granularity.toLowerCase().includes('minute');
     const graphConfig = {
       id,
       dimension,
@@ -342,15 +344,19 @@ export default Ember.Controller.extend({
       filters
     };
 
-    if (Ember.isEmpty(filters)) {
-      this.set('isFilterSelectDisabled', true);
+    // Reduce data volume by narrowing graph window to 2 weeks for minute granularity
+    if (isMinutely) {
+      graphConfig.currentStart = moment(currentEnd).subtract(2, 'week').valueOf();
     }
 
+    // Update graph, and related fields
     this.setProperties({
       graphConfig: graphConfig,
-      selectedGranularity: granularity
+      selectedGranularity: granularity,
+      isFilterSelectDisabled: Ember.isEmpty(filters)
     });
 
+    // Fetch new graph metric data
     this.fetchAnomalyGraphData(graphConfig).then(metricData => {
       if (!this.isMetricGraphable(metricData)) {
         // Metric has no data. not graphing
