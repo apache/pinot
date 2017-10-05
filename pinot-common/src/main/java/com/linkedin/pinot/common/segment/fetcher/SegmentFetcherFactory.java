@@ -34,10 +34,31 @@ public class SegmentFetcherFactory {
   private static Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new ConcurrentHashMap<>();
 
   static {
-    SEGMENT_FETCHER_MAP.put("file", new LocalFileSegmentFetcher());
-    SEGMENT_FETCHER_MAP.put("http", new HttpSegmentFetcher());
-    SEGMENT_FETCHER_MAP.put("https", new HttpSegmentFetcher());
-    SEGMENT_FETCHER_MAP.put("hdfs", new HdfsSegmentFetcher());
+    instantiateSegmentFetcher("file", LocalFileSegmentFetcher.class);
+    instantiateSegmentFetcher("http", HttpSegmentFetcher.class);
+    instantiateSegmentFetcher("https", HttpSegmentFetcher.class);
+    instantiateSegmentFetcher("hdfs", "com.linkedin.pinot.common.segment.fetcher.HdfsSegmentFetcher");
+  }
+
+  private static <T extends SegmentFetcher> void instantiateSegmentFetcher(String protocol, Class<T> clazz) {
+    try {
+      SegmentFetcher fetcher = clazz.newInstance();
+      SEGMENT_FETCHER_MAP.put(protocol, fetcher);
+    } catch (Exception | LinkageError e) {
+      LOGGER.warn(
+          "Caught exception while instantiating segment fetcher for protocol {} and class name {}, this protocol will not be available.",
+          protocol, clazz.getName(), e);
+    }
+  }
+
+  private static void instantiateSegmentFetcher(String protocol, String className) {
+    try {
+      instantiateSegmentFetcher(protocol, (Class<SegmentFetcher>) Class.forName(className));
+    } catch (Exception | LinkageError e) {
+      LOGGER.warn(
+          "Caught exception while instantiating segment fetcher for protocol {} and class name {}, this protocol will not be available.",
+          protocol, className, e);
+    }
   }
 
   public static void initSegmentFetcherFactory(Configuration pinotHelixProperties) {
