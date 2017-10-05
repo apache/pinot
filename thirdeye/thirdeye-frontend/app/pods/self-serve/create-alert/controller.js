@@ -666,10 +666,10 @@ export default Ember.Controller.extend({
           isActive: true
         },
         minute: {
-          type: 'SIGN_TEST_VANILLA',
+          type: 'CONFIDENCE_INTERVAL_SIGN_TEST',
           windowSize: 6,
           windowUnit: 'HOURS',
-          properties: 'signTestWindowSize=24;anomalyRemovalThreshold=0.6;signTestPattern=UP,DOWN;pValueThreshold=0.01;signTestBaselineShift=0.0,0.0;signTestBaselineLift=1.10,0.90;baseline=w/4wAvg;decayRate=0.5;signTestStepSize=1'
+          properties: 'signTestWindowSize=24;anomalyRemovalThreshold=0.6;baseline=w/3wAvg;decayRate=0.5;signTestStepSize=1;slidingWindowWidth=8;confidenceLevel=0.99'
         },
         hour: {
           type: 'REGRESSION_GAUSSIAN_SCAN',
