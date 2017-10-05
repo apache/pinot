@@ -111,8 +111,10 @@ public class SegmentFetcherFactory {
         SEGMENT_FETCHER_MAP.put(protocol, fetcher);
       }
       fetcher.init(configs);
-    } catch (Exception e) {
+    } catch (Exception | LinkageError e) {
       LOGGER.error("Failed to init SegmentFetcher: " + protocol, e);
+      // If initialization fails, remove the protocol from the fetcher map.
+      SEGMENT_FETCHER_MAP.remove(protocol);
     }
   }
 
