@@ -236,37 +236,47 @@ public class EntityMappingPipeline extends Pipeline {
   private List<EntityToEntityMappingDTO> filterMappings(List<EntityToEntityMappingDTO> mappings) {
     List<EntityToEntityMappingDTO> output = new ArrayList<>();
     for (EntityToEntityMappingDTO mapping : mappings) {
-      if (passesFilters(mapping)) {
+      if (passesInputFilters(mapping) && passesOutputFilters(mapping)) {
         output.add(mapping);
       }
     }
     return output;
   }
 
-  private boolean passesFilters(EntityToEntityMappingDTO mapping) {
-    boolean passesInput = this.inputFilters.isEmpty();
-    if (!passesInput) {
-      for (String filter : this.inputFilters) {
-        if (mapping.getFromURN().startsWith(filter)) {
-          passesInput = true;
-          break;
-        }
+  /**
+   * Applies input filters with {@code OR} semantics. If the set of filters in empty, passes by default.
+   *
+   * @param mapping entity mapping
+   * @return {@code true} if a filter matches or the set of filters is empty, otherwise {@code false}
+   */
+  private boolean passesInputFilters(EntityToEntityMappingDTO mapping) {
+    if (this.inputFilters.isEmpty()) {
+      return true;
+    }
+    for (String filter : this.inputFilters) {
+      if (mapping.getFromURN().startsWith(filter)) {
+        return true;
       }
     }
-    if (!passesInput) {
-      return false;
-    }
+    return false;
+  }
 
-    boolean passesOutput = this.outputFilters.isEmpty();
-    if (!passesOutput) {
-      for (String filter : this.outputFilters) {
-        if (mapping.getToURN().startsWith(filter)) {
-          passesOutput = true;
-          break;
-        }
+  /**
+   * Applies output filters with {@code OR} semantics. If the set of filters in empty, passes by default.
+   *
+   * @param mapping entity mapping
+   * @return {@code true} if a filter matches or the set of filters is empty, otherwise {@code false}
+   */
+  private boolean passesOutputFilters(EntityToEntityMappingDTO mapping) {
+    if (this.outputFilters.isEmpty()) {
+      return true;
+    }
+    for (String filter : this.outputFilters) {
+      if (mapping.getToURN().startsWith(filter)) {
+        return true;
       }
     }
-    return passesOutput;
+    return false;
   }
 
   private static Map<String, Set<EntityToEntityMappingDTO>> toMap(Iterable<EntityToEntityMappingDTO> mappings) {
