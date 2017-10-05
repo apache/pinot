@@ -187,8 +187,22 @@ public class TimeGranularitySpec {
     this._timeFormat = timeFormat;
   }
 
+  @Deprecated
   public String getTimeFormat() {
     return _timeFormat;
+  }
+
+  public boolean isSimpleDateFormat() {
+    return _timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString());
+  }
+
+  public boolean isEpochTimeFormat() {
+    return _timeFormat.equals(TimeFormat.EPOCH.toString());
+  }
+
+  public String getSimpleDateTimeFormat() {
+    Preconditions.checkArgument(_timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()), "Not simple date format");
+    return _timeFormat.split(":")[1];
   }
 
   /**
