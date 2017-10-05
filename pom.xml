@@ -316,7 +316,7 @@
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
-        <version>4.0.27.Final</version>
+        <version>4.1.4.Final</version>
       </dependency>
       <dependency>
         <groupId>it.unimi.dsi</groupId>
