@@ -16,19 +16,6 @@ import org.apache.commons.lang.StringUtils;
 
 
 public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
-  private static final DimensionEntityFormatter DIMENSION_FORMATTER = new DimensionEntityFormatter();
-  private final static MetricEntityFormatter METRIC_FORMATTER = new MetricEntityFormatter();
-
-  private final MetricConfigManager metricDAO;
-
-  public AnomalyEventFormatter(MetricConfigManager metricDAO) {
-    this.metricDAO = metricDAO;
-  }
-
-  public AnomalyEventFormatter() {
-    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
-  }
-
   @Override
   public boolean applies(EventEntity entity) {
     return entity instanceof AnomalyEventEntity;
@@ -49,15 +36,6 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     String label = String.format("%s (%s)", func.getFunctionName(), StringUtils.join(dimensions, ", "));
     String link = String.format("thirdeye#investigate?anomalyId=%d", dto.getId());
 
-    RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, dto.getStartTime(), dto.getEndTime(), null);
-
-    for(Map.Entry<String, String> entry : dto.getDimensions().entrySet()) {
-      DimensionEntity de = DimensionEntity.fromDimension(entity.getScore(), entry.getKey(), entry.getValue(), DimensionEntity.TYPE_GENERATED);
-      out.addRelatedEntity(DIMENSION_FORMATTER.format(de));
-    }
-
-    // TODO add metrics as related entites
-
-    return out;
+    return makeRootCauseEventEntity(entity, label, link, dto.getStartTime(), dto.getEndTime(), null);
   }
 }

@@ -14,8 +14,6 @@ import java.util.Map;
 
 
 public class HolidayEventFormatter extends RootCauseEventEntityFormatter {
-  private static final DimensionEntityFormatter DIMENSION_FORMATTER = new DimensionEntityFormatter();
-
   @Override
   public boolean applies(EventEntity entity) {
     return entity instanceof HolidayEventEntity;
@@ -40,12 +38,6 @@ public class HolidayEventFormatter extends RootCauseEventEntityFormatter {
 
     String label = String.format("%s %s", eventDto.getName(), dimensions.toString());
     String link =  String.format("https://www.google.com/search?q=%s", eventDto.getName());
-    RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, eventDto.getStartTime(), eventDto.getEndTime(), "");
-
-    for (DimensionEntity dimensionEntity : relatedDimensionEntities) {
-      out.addRelatedEntity(DIMENSION_FORMATTER.format(dimensionEntity));
-    }
-
-    return out;
+    return makeRootCauseEventEntity(entity, label, link, eventDto.getStartTime(), eventDto.getEndTime(), "");
   }
 }

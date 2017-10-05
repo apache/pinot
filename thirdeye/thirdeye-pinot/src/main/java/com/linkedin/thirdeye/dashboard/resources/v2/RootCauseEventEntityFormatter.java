@@ -41,20 +41,4 @@ public abstract class RootCauseEventEntityFormatter extends RootCauseEntityForma
     out.setEventType(entity.getEventType());
     return out;
   }
-
-  /**
-   * Returns {@code true} if the entity is related to at least on TimeRangeEntity of type
-   * {@code TYPE_BASELINE}, otherwise returns {@code false}.
-   *
-   * @param e entity
-   * @return {@code true} if the entity is related to the baseline, {@code false} otherwise.
-   */
-  public static boolean isRelatedToBaseline(Entity e) {
-    for(Entity re : e.getRelated()) {
-      if(TimeRangeEntity.TYPE.isType(re))
-        if(TimeRangeEntity.fromURN(re.getUrn(), re.getScore()).getType().equals(TimeRangeEntity.TYPE_BASELINE))
-          return true;
-    }
-    return false;
-  }
 }
