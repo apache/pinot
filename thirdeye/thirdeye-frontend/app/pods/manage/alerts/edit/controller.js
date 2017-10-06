@@ -127,6 +127,15 @@ export default Ember.Controller.extend({
   ),
 
   /**
+   * We only want to display the custom legend if the alert has a value for dimension exploration
+   * @method showGraphLegend
+   * @return {Boolean}
+   */
+  showGraphLegend: Ember.computed('alertDimension', function() {
+    return Ember.isPresent(this.get('alertDimension'));
+  }),
+
+  /**
    * Returns the appropriate subtitle for selected config group monitored alerts
    * @method selectedConfigGroupSubtitle
    * @return {String} title of expandable section for selected config group
@@ -245,7 +254,10 @@ export default Ember.Controller.extend({
     'isDuplicateEmail',
     'isProcessingForm',
     function() {
-      return this.get('isEmptyEmail') || this.get('isProcessingForm') || this.get('isEmailError' || this.get('isDuplicateEmail'));
+      return this.get('isEmptyEmail') ||
+        this.get('isProcessingForm') ||
+        this.get('isEmailError' ||
+        this.get('isDuplicateEmail'));
     }
   ),
 
@@ -320,9 +332,13 @@ export default Ember.Controller.extend({
   isEmailValid(emailArr) {
     const emailRegex = /^.{3,}\@linkedin.com$/;
     let isValid = true;
+
     for (var email of emailArr) {
-      isValid = emailRegex.test(email);
+      if (!emailRegex.test(email)) {
+        isValid = false;
+      }
     }
+
     return isValid;
   },
 
@@ -336,7 +352,7 @@ export default Ember.Controller.extend({
     this.set('isEditAlertSuccess', true);
     Ember.run.later((function() {
       that.clearAll();
-      this.transitionToRoute('manage.alerts');
+      that.transitionToRoute('manage.alerts');
     }), 2000);
   },
 
@@ -431,7 +447,7 @@ export default Ember.Controller.extend({
       if (emailInput.trim() && existingEmailArr) {
         existingEmailArr = existingEmailArr.replace(/\s+/g, '').split(',');
         for (var email of newEmailArr) {
-          if (existingEmailArr.includes(email)) {
+          if (email.length && existingEmailArr.includes(email)) {
             isDuplicateEmail = true;
             badEmailArr.push(email);
           } else {
@@ -542,11 +558,11 @@ export default Ember.Controller.extend({
       // Disable submit for now and make sure we're clear of email errors
       this.setProperties({
         isProcessingForm: true,
-        isEmailError: !this.isEmailValid(newEmailsArr)
+        isEmailError: emailError
       });
 
       // Exit quietly (showing warning) in the event of error
-      if (emailError) { return; }
+      if (emailError || this.get('isDuplicateEmail')) { return; }
 
       // Assign these fresh editable values to the Alert object currently being edited
       Ember.set(postFunctionBody, 'functionName', this.get('alertFunctionName'));
