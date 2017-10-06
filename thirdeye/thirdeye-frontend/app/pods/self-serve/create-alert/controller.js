@@ -1140,7 +1140,6 @@ export default Ember.Controller.extend({
 
       // Exit quietly (showing warning) in the event of error
       if (emailError || this.get('isDuplicateEmail')) { return; }
-      return;
 
       // URL encode filters to avoid API issues
       newFunctionObj.filters = encodeURIComponent(newFunctionObj.filters);

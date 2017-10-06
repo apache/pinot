@@ -621,7 +621,6 @@ export default Ember.Controller.extend({
                   });
                 }
                 this.confirmEditSuccess();
-                return;
               });
             } else {
               this.confirmEditSuccess();
