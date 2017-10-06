@@ -658,6 +658,8 @@ public class BrokerRequestHandler {
             serverInstance, e);
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1L);
         processingExceptions.add(QueryException.getException(QueryException.DATA_TABLE_DESERIALIZATION_ERROR, e));
+      } finally {
+        byteBuf.release();
       }
     }
   }
