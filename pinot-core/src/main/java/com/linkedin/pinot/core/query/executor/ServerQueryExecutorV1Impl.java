@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
@@ -59,7 +60,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
   private volatile boolean _isStarted = false;
-  private long _defaultTimeOutMs = 15000;
+  private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
   private boolean _printQueryPlan = false;
   private final Map<String, Long> _resourceTimeOutMsMap = new ConcurrentHashMap<>();
   private ServerMetrics _serverMetrics;

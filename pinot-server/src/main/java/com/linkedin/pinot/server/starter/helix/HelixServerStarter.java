@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
 public class HelixServerStarter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
-  private final long MAX_QUERY_TIME_MILLIS;
+  private final long _maxQueryTimeMs;
 
   protected final HelixManager _helixManager;
   private final Configuration _pinotHelixProperties;
@@ -85,16 +85,8 @@ public class HelixServerStarter {
     _helixClusterName = helixClusterName;
     _pinotHelixProperties = pinotHelixProperties;
 
-    String maxQueryTime = pinotHelixProperties.getString(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT);
-    long maxQueryTimeLong;
-    try {
-      maxQueryTimeLong = Long.parseLong(maxQueryTime);
-    } catch (Exception e) {
-      LOGGER.warn("Could not parse the query executor timeout " + maxQueryTime + ", defaulting to "
-          + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT, e);
-      maxQueryTimeLong = Long.parseLong(CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT);
-    }
-    MAX_QUERY_TIME_MILLIS = maxQueryTimeLong;
+    _maxQueryTimeMs = pinotHelixProperties.getLong(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT,
+        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
 
     String hostname = pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
         NetUtil.getHostAddress());
@@ -277,7 +269,7 @@ public class HelixServerStarter {
     _adminApiApplication.stop();
     setShuttingDownStatus(true);
     if (_pinotHelixProperties.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, true)) {
-      Uninterruptibles.sleepUninterruptibly(MAX_QUERY_TIME_MILLIS, TimeUnit.MILLISECONDS);
+      Uninterruptibles.sleepUninterruptibly(_maxQueryTimeMs, TimeUnit.MILLISECONDS);
     }
     _helixManager.disconnect();
     _serverInstance.shutDown();

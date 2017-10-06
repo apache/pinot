@@ -92,6 +92,7 @@ public class ScatterGatherTest {
     CompositeFuture<ByteBuf> future =
         scatterGather.scatterGather(scatterGatherRequest, scatterGatherStats, brokerMetrics);
 
+    // Should have response from all servers
     Map<ServerInstance, ByteBuf> serverToResponseMap = future.get();
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS);
     for (int i = 0; i < NUM_SERVERS; i++) {
@@ -165,9 +166,6 @@ public class ScatterGatherTest {
     Assert.assertEquals(serverToErrorMap.size(), 1);
     Assert.assertTrue(serverToErrorMap.containsKey(serverInstances[0]));
 
-    connectionPool.getStats().refresh();
-    Assert.assertEquals(connectionPool.getStats().getTotalBadDestroyed(), 1);
-
     connectionPool.shutdown();
     executorService.shutdown();
     eventLoopGroup.shutdownGracefully();
@@ -230,9 +228,6 @@ public class ScatterGatherTest {
     Map<ServerInstance, Throwable> serverToErrorMap = future.getError();
     Assert.assertEquals(serverToErrorMap.size(), 1);
     Assert.assertTrue(serverToErrorMap.containsKey(serverInstances[0]));
-
-    connectionPool.getStats().refresh();
-    Assert.assertEquals(connectionPool.getStats().getTotalBadDestroyed(), 1);
 
     connectionPool.shutdown();
     executorService.shutdown();

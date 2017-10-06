@@ -104,7 +104,6 @@ public abstract class ClusterTest extends ControllerTest {
     Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
     configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
-    configuration.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, "10000");
     configuration.addProperty(Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
     configuration.setProperty(Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, false);
     return configuration;
@@ -137,7 +136,7 @@ public abstract class ClusterTest extends ControllerTest {
             Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
-        overrideOfflineServerConf(configuration);
+        overrideServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(_clusterName, zkStr, configuration));
       }
     } catch (Exception e) {
@@ -174,7 +173,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void overrideOfflineServerConf(Configuration configuration) {
+  protected void overrideServerConf(Configuration configuration) {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
@@ -313,8 +312,8 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig, String kafkaConsumerFactoryName)
-      throws Exception {
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig,
+      String kafkaConsumerFactoryName) throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
     if (useLlc) {
