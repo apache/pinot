@@ -15,6 +15,18 @@
  */
 package com.linkedin.pinot.core.offline;
 
+import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.OfflineTableDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -28,6 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.Assert;
@@ -35,18 +48,7 @@ import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
-import com.google.common.collect.ImmutableList;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineTableDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.yammer.metrics.core.MetricsRegistry;
+
 import static org.mockito.Mockito.*;
 
 
@@ -112,7 +114,8 @@ public class OfflineTableDataManagerTest {
       when(config.getTableName()).thenReturn(tableName);
       when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
     }
-    tableDataManager.init(config, new ServerMetrics(new MetricsRegistry()), null);
+    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
+        new ServerMetrics(new MetricsRegistry()));
     tableDataManager.start();
     Field segsMapField = AbstractTableDataManager.class.getDeclaredField("_segmentsMap");
     segsMapField.setAccessible(true);

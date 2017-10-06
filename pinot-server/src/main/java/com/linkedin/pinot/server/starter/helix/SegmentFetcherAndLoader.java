@@ -17,10 +17,8 @@ package com.linkedin.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.exception.PermanentDownloadException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -85,10 +83,6 @@ public class SegmentFetcherAndLoader {
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
     Preconditions.checkNotNull(newSegmentZKMetadata);
 
-    // Try to load table schema from Helix property store.
-    // This schema is used for adding default values for newly added columns.
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
-
     LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentId, tableName, newSegmentZKMetadata);
     try {
       // We lock the segment in order to get its metadata, and then release the lock, so it is possible
@@ -117,8 +111,7 @@ public class SegmentFetcherAndLoader {
             if (!isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentId,
                   tableName, localSegmentMetadata.getCrc());
-              TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
-              _dataManager.addSegment(localSegmentMetadata, tableConfig, schema);
+              _dataManager.addOfflineSegment(tableName, segmentId, indexDir);
               // TODO Update zk metadata with CRC for this instance
               return;
             }
@@ -160,11 +153,10 @@ public class SegmentFetcherAndLoader {
         for (retryCount = 0; retryCount < maxRetryCount; ++retryCount) {
           long attemptStartTime = System.currentTimeMillis();
           try {
-            TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
             final String uri = newSegmentZKMetadata.getDownloadUrl();
             final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
             final SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
-            _dataManager.addSegment(segmentMetadata, tableConfig, schema);
+            _dataManager.addOfflineSegment(tableName, segmentId, new File(localSegmentDir));
             LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName,
                 segmentMetadata.getCrc());
 
@@ -279,41 +271,5 @@ public class SegmentFetcherAndLoader {
 
   public String getSegmentLocalDirectory(String tableName, String segmentId) {
     return _dataManager.getSegmentDataDirectory() + "/" + tableName + "/" + segmentId;
-  }
-
-  public void reloadAllSegments(@Nonnull String tableNameWithType)
-      throws Exception {
-    for (SegmentMetadata segmentMetadata : _dataManager.getAllSegmentsMetadata(tableNameWithType)) {
-      reloadSegment(tableNameWithType, segmentMetadata);
-    }
-  }
-
-  public void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)
-      throws Exception {
-    SegmentMetadata segmentMetadata = _dataManager.getSegmentMetadata(tableNameWithType, segmentName);
-    if (segmentMetadata == null) {
-      LOGGER.warn("Cannot locate segment: {} in table: {]", segmentName, tableNameWithType);
-      return;
-    }
-    reloadSegment(tableNameWithType, segmentMetadata);
-  }
-
-  private void reloadSegment(@Nonnull String tableNameWithType, @Nonnull SegmentMetadata segmentMetadata)
-      throws Exception {
-    String segmentName = segmentMetadata.getName();
-
-    String indexDir = segmentMetadata.getIndexDir();
-    if (indexDir == null) {
-      LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
-      return;
-    }
-
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Schema schema = null;
-    // For OFFLINE table, try to get schema for default columns
-    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
-      schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-    }
-    _dataManager.reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
   }
 }

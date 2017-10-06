@@ -51,15 +51,12 @@ public class IndexLoadingConfig {
   private boolean _isRealtimeOffheapAllocation;
 
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
-      @Nullable TableConfig tableConfig) {
+      @Nonnull TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
-
-    if (tableConfig != null) {
-      extractFromTableConfig(tableConfig);
-    }
+    extractFromTableConfig(tableConfig);
   }
 
-  private void extractFromTableConfig(@Nullable TableConfig tableConfig) {
+  private void extractFromTableConfig(@Nonnull TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     String tableReadMode = indexingConfig.getLoadMode();
     if (tableReadMode != null) {
