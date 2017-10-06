@@ -233,7 +233,7 @@ public class CommonConstants {
         "com.linkedin.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
         "com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl";
-    public static final String DEFAULT_QUERY_EXECUTOR_TIMEOUT = "150000";
+    public static final long DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS = 15_000L;
     public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS =
         "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT = "5";
