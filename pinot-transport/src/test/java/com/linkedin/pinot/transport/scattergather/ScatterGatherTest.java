@@ -48,7 +48,6 @@ import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-
 public class ScatterGatherTest {
   private static final String LOCAL_HOST = "localhost";
   private static final int BASE_SERVER_PORT = 7071;
