@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import com.linkedin.pinot.transport.metrics.NettyServerWorkload;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -97,12 +98,13 @@ public class NettyTCPServer extends NettyServer {
       NettyServerMetrics serverMetric =
           new NettyServerMetrics(_registry, NettyTCPServer.class.getName() + "_" + Utils.getUniqueId() + "_");
 
+      NettyServerWorkload serverWorkload = new NettyServerWorkload();
       if (null != _globalMetrics) {
         _globalMetrics.addTransportClientMetrics(serverMetric);
       }
 
       ch.pipeline().addLast("request_handler",
-          new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric, _defaultLargeQueryLatencyMs));
+          new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric, _defaultLargeQueryLatencyMs, serverWorkload));
     }
   }
 }
