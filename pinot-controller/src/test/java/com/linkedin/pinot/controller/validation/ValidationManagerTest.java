@@ -41,7 +41,7 @@ import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegment
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;

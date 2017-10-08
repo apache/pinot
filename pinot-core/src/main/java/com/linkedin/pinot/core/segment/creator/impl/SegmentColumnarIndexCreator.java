@@ -40,7 +40,8 @@ import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwa
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
+import com.linkedin.pinot.startree.hll.HllConfig;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;

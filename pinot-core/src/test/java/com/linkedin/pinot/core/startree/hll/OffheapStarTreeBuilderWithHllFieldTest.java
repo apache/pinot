@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

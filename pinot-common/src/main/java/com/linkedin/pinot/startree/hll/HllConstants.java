@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.startree.hll;
+package com.linkedin.pinot.startree.hll;
 
 public class HllConstants {
     public static final int DEFAULT_LOG2M = 8;

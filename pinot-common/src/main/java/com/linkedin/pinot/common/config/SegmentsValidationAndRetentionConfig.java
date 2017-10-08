@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.startree.hll.HllConfig;
 import java.lang.reflect.Field;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -37,6 +39,8 @@ public class SegmentsValidationAndRetentionConfig {
 
   private String segmentAssignmentStrategy;
   private ReplicaGroupStrategyConfig replicaGroupStrategyConfig;
+  private StarTreeIndexSpec starTreeConfig;
+  private HllConfig hllConfig;
 
   // Number of replicas per partition of low-level kafka consumers. This config is used for realtime tables only.
   private String replicasPerPartition;
@@ -127,6 +131,22 @@ public class SegmentsValidationAndRetentionConfig {
 
   public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     this.replicaGroupStrategyConfig = replicaGroupStrategyConfig;
+  }
+
+  public StarTreeIndexSpec getStarTreeConfig() {
+    return starTreeConfig;
+  }
+
+  public void setStarTreeConfig(StarTreeIndexSpec starTreeConfig) {
+    this.starTreeConfig = starTreeConfig;
+  }
+
+  public HllConfig getHllConfigs() {
+    return hllConfig;
+  }
+
+  public void setHllConfig(HllConfig hllConfig) {
+    this.hllConfig = hllConfig;
   }
 
   @JsonIgnore

@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResul
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
+import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;

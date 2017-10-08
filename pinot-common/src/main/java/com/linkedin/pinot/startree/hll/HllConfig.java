@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.startree.hll;
+package com.linkedin.pinot.startree.hll;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableBiMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -30,8 +31,11 @@ import org.codehaus.jackson.annotate.JsonIgnore;
  * segment builder will generate corresponding hll derived fields on the fly.
  */
 public class HllConfig {
+  private static final ImmutableBiMap<Integer, Integer> LOG2M_TO_SIZE_IN_BYTES =
+      ImmutableBiMap.of(5, 32, 6, 52, 7, 96, 8, 180, 9, 352);
+
   private int hllLog2m = HllConstants.DEFAULT_LOG2M;
-  private int hllFieldSize = HllUtil.getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
+  private int hllFieldSize = getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
   private String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
   private Set<String> columnsToDeriveHllFields = new HashSet<>();
 
@@ -65,7 +69,7 @@ public class HllConfig {
     Preconditions.checkNotNull(columnsToDeriveHllFields, "ColumnsToDeriveHllFields should not be null.");
     Preconditions.checkNotNull(hllDeriveColumnSuffix, "HLL Derived Field Suffix should not be null.");
     this.hllLog2m = hllLog2m;
-    this.hllFieldSize = HllUtil.getHllFieldSizeFromLog2m(hllLog2m);
+    this.hllFieldSize = getHllFieldSizeFromLog2m(hllLog2m);
     this.hllDeriveColumnSuffix = hllDeriveColumnSuffix;
     this.columnsToDeriveHllFields = columnsToDeriveHllFields;
   }
@@ -117,5 +121,11 @@ public class HllConfig {
       }
     }
     return derivedHllFieldToOriginMap;
+  }
+
+  public static int getHllFieldSizeFromLog2m(int log2m) {
+    Preconditions.checkArgument(LOG2M_TO_SIZE_IN_BYTES.containsKey(log2m),
+        "Log2m: " + log2m + " is not in valid range.");
+    return LOG2M_TO_SIZE_IN_BYTES.get(log2m);
   }
 }
