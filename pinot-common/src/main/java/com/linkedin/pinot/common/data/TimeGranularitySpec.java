@@ -18,7 +18,8 @@ package com.linkedin.pinot.common.data;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-
+import java.text.SimpleDateFormat;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nonnull;
@@ -188,6 +189,15 @@ public class TimeGranularitySpec {
   }
 
   @Deprecated
+  /**
+   * To check the date format, use
+   *
+   * {@link #isSimpleDateFormat}
+   * {@link #isEpochTimeFormat}
+   *
+   * To get Simple Date format, use {@link #getSimpleDateTimeFormat}
+   *
+   */
   public String getTimeFormat() {
     return _timeFormat;
   }
@@ -200,9 +210,14 @@ public class TimeGranularitySpec {
     return _timeFormat.equals(TimeFormat.EPOCH.toString());
   }
 
-  public String getSimpleDateTimeFormat() {
-    Preconditions.checkArgument(_timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()), "Not simple date format");
-    return _timeFormat.split(":")[1];
+  public SimpleDateFormat getSimpleDateTimeFormat() {
+    Preconditions.checkArgument(_timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+        "Not simple date format");
+    String simpleDateFormatStr = _timeFormat.split(":")[1];
+    SimpleDateFormat simpleDateFormat = new SimpleDateFormat(simpleDateFormatStr);
+    simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+    return simpleDateFormat;
   }
 
   /**

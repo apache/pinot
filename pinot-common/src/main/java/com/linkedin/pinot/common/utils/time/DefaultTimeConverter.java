@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.utils.time;
 
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 
 public class DefaultTimeConverter implements TimeConverter {
 
@@ -33,8 +32,7 @@ public class DefaultTimeConverter implements TimeConverter {
     if(incoming.equals(outgoing)){
       needConversion = false;
     }
-    if (TimeFormat.EPOCH.toString().equals(incoming.getTimeFormat())
-        && TimeFormat.EPOCH.toString().equals(outgoing.getTimeFormat())) {
+    if (incoming.isEpochTimeFormat() && outgoing.isEpochTimeFormat()) {
       conversionSupported = true;
     }
     if (needConversion && !conversionSupported) {
