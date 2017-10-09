@@ -31,5 +31,33 @@ export default Ember.Route.extend({
       allConfigGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       allAppNames: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
     });
+  },
+
+  /**
+   * Model hook for the create alert route.
+   * @method resetController
+   * @param {Object} controller - active controller
+   * @param {Boolean} isExiting - exit status
+   * @param {Object} transition - transition obj
+   * @return {undefined}
+   */
+  resetController(controller, isExiting, transition) {
+    this._super(...arguments);
+    if (isExiting) {
+      controller.clearAll();
+    }
+  },
+
+  /**
+   * Model hook for the create alert route.
+   * @method setupController
+   * @param {Object} controller - active controller
+   * @param {Object} model - active model
+   * @return {undefined}
+   */
+  setupController(controller, model) {
+    this._super(controller, model);
+    controller.set('model', model);
   }
+
 });

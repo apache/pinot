@@ -680,7 +680,7 @@ export default Ember.Controller.extend({
     let isPresent = true;
 
     if (this.get('selectedConfigGroup') || this.get('newConfigGroupName')) {
-      isPresent = Ember.isPresent(this.get('selectedConfigGroupRecipients')) || Ember.isPresent(emailArr);
+      isPresent = Ember.isPresent(this.get('selectedGroupRecipients')) || Ember.isPresent(emailArr);
     }
 
     return isPresent;
@@ -831,7 +831,9 @@ export default Ember.Controller.extend({
   clearAll() {
     this.setProperties({
       isFetchingDimensions: false,
+      isDimensionFetchDone: false,
       isEmailError: false,
+      isEmptyEmail: false,
       isFormDisabled: false,
       isMetricSelected: false,
       isMetricDataInvalid: false,
@@ -1053,7 +1055,7 @@ export default Ember.Controller.extend({
      */
     validateAlertEmail(emailInput) {
       const newEmailArr = emailInput.replace(/\s+/g, '').split(',');
-      let existingEmailArr = this.get('selectedConfigGroupRecipients');
+      let existingEmailArr = this.get('selectedGroupRecipients');
       let cleanEmailArr = [];
       let badEmailArr = [];
       let isDuplicateEmail = false;
@@ -1137,7 +1139,7 @@ export default Ember.Controller.extend({
 
       this.setProperties({
         isProcessingForm: true,
-        isEmptyEmail: this.isEmailPresent(newEmailsArr),
+        isEmptyEmail: !this.isEmailPresent(newEmailsArr),
         isEmailError: emailError
       });
 
