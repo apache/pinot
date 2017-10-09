@@ -31,14 +31,21 @@ export default Ember.Controller.extend({
   isAlertNameDuplicate: false,
   isFetchingDimensions: false,
   isDimensionFetchDone: false,
+  isEmailError: false,
+  isDuplicateEmail: false,
+  showGraphLegend: false,
   metricGranularityOptions: [],
   originalDimensions: [],
   bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
   replayStatusClass: 'te-form__banner--pending',
   legendText: {
-    dotted: 'WoW',
-    solid: 'Observed'
+    dotted: {
+      text: 'WoW'
+    },
+    solid: {
+      text: 'Observed'
+    }
   },
 
   /**
@@ -381,6 +388,7 @@ export default Ember.Controller.extend({
         // Metric has data. now sending new data to graph.
         this.setProperties({
           isMetricSelected: true,
+          showGraphLegend: Ember.isPresent(selectedDimension),
           selectedMetric: Object.assign(metricData, { color: 'blue' })
         });
       }
@@ -644,6 +652,41 @@ export default Ember.Controller.extend({
   ),
 
   /**
+   * Double-check new email array for errors.
+   * @method isEmailValid
+   * @param {Array} emailArr - array of new emails entered by user
+   * @return {Boolean} whether errors were found
+   */
+  isEmailValid(emailArr) {
+    const emailRegex = /^.{3,}\@linkedin.com$/;
+    let isValid = true;
+
+    for (var email of emailArr) {
+      if (!emailRegex.test(email)) {
+        isValid = false;
+      }
+    }
+
+    return isValid;
+  },
+
+  /**
+   * Check for missing email address
+   * @method isEmailPresent
+   * @param {Array} emailArr - array of new emails entered by user
+   * @return {Boolean}
+   */
+  isEmailPresent(emailArr) {
+    let isPresent = true;
+
+    if (this.get('selectedConfigGroup') || this.get('newConfigGroupName')) {
+      isPresent = Ember.isPresent(this.get('selectedConfigGroupRecipients')) || Ember.isPresent(emailArr);
+    }
+
+    return isPresent;
+  },
+
+  /**
    * Build the new alert properties based on granularity presets. This will make replay possible.
    * @method newAlertProperties
    * @param {String} alertFunctionName - new function name
@@ -788,6 +831,7 @@ export default Ember.Controller.extend({
   clearAll() {
     this.setProperties({
       isFetchingDimensions: false,
+      isEmailError: false,
       isFormDisabled: false,
       isMetricSelected: false,
       isMetricDataInvalid: false,
@@ -947,6 +991,7 @@ export default Ember.Controller.extend({
       this.setProperties({
         selectedConfigGroup: selectedObj,
         newConfigGroupName: null,
+        isEmptyEmail: Ember.isEmpty(emails),
         selectedGroupRecipients: emails.split(',').filter(e => String(e).trim()).join(', ')
       });
       this.prepareFunctions(selectedObj).then(functionData => {
@@ -995,7 +1040,8 @@ export default Ember.Controller.extend({
       this.setProperties({
         newConfigGroupName: name,
         selectedConfigGroup: null,
-        selectedGroupRecipients: null
+        selectedGroupRecipients: null,
+        isEmptyEmail: Ember.isEmpty(this.get('alertGroupNewRecipient'))
       });
     },
 
@@ -1007,22 +1053,30 @@ export default Ember.Controller.extend({
      */
     validateAlertEmail(emailInput) {
       const newEmailArr = emailInput.replace(/\s+/g, '').split(',');
-      let existingEmailArr = this.get('selectedGroupRecipients');
+      let existingEmailArr = this.get('selectedConfigGroupRecipients');
       let cleanEmailArr = [];
       let badEmailArr = [];
       let isDuplicateEmail = false;
 
+      // Release submit button error state
+      this.setProperties({
+        isEmailError: false,
+        isProcessingForm: false,
+        isEditedConfigGroup: true,
+        isEmptyEmail: Ember.isPresent(this.get('newConfigGroupName')) && !emailInput.length
+      });
+
+      // Check for duplicates
       if (emailInput.trim() && existingEmailArr) {
         existingEmailArr = existingEmailArr.replace(/\s+/g, '').split(',');
         for (var email of newEmailArr) {
-          if (existingEmailArr.includes(email)) {
+          if (email.length && existingEmailArr.includes(email)) {
             isDuplicateEmail = true;
             badEmailArr.push(email);
           } else {
             cleanEmailArr.push(email);
           }
         }
-
         this.setProperties({
           isDuplicateEmail,
           duplicateEmails: badEmailArr.join()
@@ -1063,13 +1117,32 @@ export default Ember.Controller.extend({
       };
 
       // This object contains the data for the new alert function, with default fillers
-      const newFunctionObj = this.get('newAlertProperties');
+      const {
+        newAlertProperties: newFunctionObj,
+        selectedGroupRecipients: oldEmails,
+        alertGroupNewRecipient: newEmails
+      } = this.getProperties('newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
+
+      const newEmailsArr = newEmails ? newEmails.replace(/ /g,'').split(',') : [];
+      const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g,'').split(',') : [];
+      const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
+      const cleanRecipientsArr = newRecipientsArr.filter(e => String(e).trim()).join(',');
+      const emailError = !this.isEmailValid(newEmailsArr);
 
       // Are we in edit or create mode for config group?
       const isEditGroupMode = this.get('isAlertGroupEditModeActive');
 
       // A reference to whichever 'alert config' object will be sent. Let's default to the new one
       let finalConfigObj = newConfigObj;
+
+      this.setProperties({
+        isProcessingForm: true,
+        isEmptyEmail: this.isEmailPresent(newEmailsArr),
+        isEmailError: emailError
+      });
+
+      // Exit quietly (showing warning) in the event of error
+      if (emailError || this.get('isDuplicateEmail')) { return; }
 
       // URL encode filters to avoid API issues
       newFunctionObj.filters = encodeURIComponent(newFunctionObj.filters);
