@@ -1117,9 +1117,12 @@ export default Ember.Controller.extend({
       };
 
       // This object contains the data for the new alert function, with default fillers
-      const newFunctionObj = this.get('newAlertProperties');
-      const oldEmails = this.get('selectedGroupRecipients');
-      const newEmails = this.get('alertGroupNewRecipient');
+      const {
+        newAlertProperties: newFunctionObj,
+        selectedGroupRecipients: oldEmails,
+        alertGroupNewRecipient: newEmails
+      } = this.getProperties('newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
+
       const newEmailsArr = newEmails ? newEmails.replace(/ /g,'').split(',') : [];
       const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g,'').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;

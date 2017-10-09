@@ -71,8 +71,8 @@ export default Ember.Controller.extend({
     }
   ),
 
-  suscriberGroupNames: Ember.computed('model.suscriberGroupNames', function() {
-    const groupNames = this.get('model.suscriberGroupNames');
+  suscriberGroupNames: Ember.computed('model.suscriberGroups', function() {
+    const groupNames = this.get('model.suscriberGroups');
 
     return groupNames
       .filterBy('name')
@@ -81,8 +81,8 @@ export default Ember.Controller.extend({
       .sort();
   }),
 
-  applicationNames: Ember.computed('model.applicationNames', function() {
-    const appNames = this.get('model.applicationNames');
+  applicationNames: Ember.computed('model.applications', function() {
+    const appNames = this.get('model.applications');
 
     return appNames
       .map(app => app.application)
@@ -210,7 +210,7 @@ export default Ember.Controller.extend({
     // Handles UI mode change
     onSearchModeChange(mode) {
       if (mode === 'All Alerts') {
-        const allAlerts = this.get('model.filters');
+        const allAlerts = this.get('model.alerts');
         this.setProperties({
           selectedAlerts: allAlerts,
           resultsActive: true

@@ -131,9 +131,7 @@ export default Ember.Controller.extend({
    * @method showGraphLegend
    * @return {Boolean}
    */
-  showGraphLegend: Ember.computed('alertDimension', function() {
-    return Ember.isPresent(this.get('alertDimension'));
-  }),
+  showGraphLegend: Ember.computed.notEmpty('alertDimension'),
 
   /**
    * Returns the appropriate subtitle for selected config group monitored alerts
@@ -248,18 +246,7 @@ export default Ember.Controller.extend({
    * @method isSubmitDisabled
    * @return {Boolean} show/hide submit
    */
-  isSubmitDisabled: Ember.computed(
-    'isEmptyEmail',
-    'isEmailError',
-    'isDuplicateEmail',
-    'isProcessingForm',
-    function() {
-      return this.get('isEmptyEmail') ||
-        this.get('isProcessingForm') ||
-        this.get('isEmailError' ||
-        this.get('isDuplicateEmail'));
-    }
-  ),
+  isSubmitDisabled: Ember.computed.or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm}'),
 
   /**
    * Fetches an alert function record by name.
@@ -331,15 +318,7 @@ export default Ember.Controller.extend({
    */
   isEmailValid(emailArr) {
     const emailRegex = /^.{3,}\@linkedin.com$/;
-    let isValid = true;
-
-    for (var email of emailArr) {
-      if (!emailRegex.test(email)) {
-        isValid = false;
-      }
-    }
-
-    return isValid;
+    return emailArr.every(email => emailRegex.test(email));
   },
 
   /**
@@ -350,10 +329,10 @@ export default Ember.Controller.extend({
   confirmEditSuccess() {
     const that = this;
     this.set('isEditAlertSuccess', true);
-    Ember.run.later((function() {
-      that.clearAll();
-      that.transitionToRoute('manage.alerts');
-    }), 2000);
+    Ember.run.later(this, function() {
+      this.clearAll();
+      this.transitionToRoute('manage.alerts');
+    }, 2000);
   },
 
   /**
