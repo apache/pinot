@@ -1,5 +1,7 @@
 import Ember from 'ember';
 import ApplicationRouteMixin from 'ember-simple-auth/mixins/application-route-mixin';
+import fetch from 'fetch';
+import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Route.extend(ApplicationRouteMixin, {
   moment: Ember.inject.service(),
@@ -8,6 +10,15 @@ export default Ember.Route.extend(ApplicationRouteMixin, {
   beforeModel() {
     // calling this._super to trigger ember-simple-auth's hook
     this._super(...arguments);
+
+    // invalidates session if cookie expired
+    if (this.get('session.isAuthenticated')) {
+      fetch('/auth')
+        .then(checkStatus)
+        .catch(() => {
+          this.get('session').invalidate();
+        });
+    }
 
     this.get('moment').setTimeZone('America/Los_Angeles');
   },
