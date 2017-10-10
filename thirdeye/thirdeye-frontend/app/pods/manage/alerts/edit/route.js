@@ -50,6 +50,7 @@ export default Ember.Route.extend({
     let metricId = '';
     let allGroupNames = [];
     let allGroups = [];
+    let metricDataUrl = '';
     let metricDimensionURl = '';
     let selectedAppName = '';
 
@@ -65,16 +66,12 @@ export default Ember.Route.extend({
           ? moment(maxTime).valueOf()
           : moment().subtract(1, 'day').endOf('day').valueOf();
         const formattedFilters = JSON.stringify(parseProps(filters));
+        // Load less data if granularity is 'minutes'
         const isMinutely = bucketUnit.toLowerCase().includes('minute');
+        const duration = isMinutely ? { unit: 2, size: 'week' } : { unit: 1, size: 'month' };
+        const currentStart = moment(currentEnd).subtract(duration.unit, duration.size).valueOf();
         const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
         const baselineEnd = moment(currentEnd).subtract(1, 'week');
-        let currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
-        let metricDataUrl = '';
-
-        // Load less data if granularity is 'minutes'
-        if (isMinutely) {
-          currentStart = moment(currentEnd).subtract(2, 'week').valueOf();
-        }
 
         // Prepare call for metric graph data
         metricDataUrl =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
