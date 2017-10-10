@@ -46,18 +46,6 @@ export default Ember.Route.extend({
     if (isExiting) {
       controller.clearAll();
     }
-  },
-
-  /**
-   * Model hook for the create alert route.
-   * @method setupController
-   * @param {Object} controller - active controller
-   * @param {Object} model - active model
-   * @return {undefined}
-   */
-  setupController(controller, model) {
-    this._super(controller, model);
-    controller.set('model', model);
   }
 
 });
