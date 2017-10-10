@@ -103,6 +103,7 @@ create index raw_anomaly_result_job_idx on raw_anomaly_result_index(job_id);
 create index raw_anomaly_result_merged_idx on raw_anomaly_result_index(merged);
 create index raw_anomaly_result_data_missing_idx on raw_anomaly_result_index(data_missing);
 create index raw_anomaly_result_start_time_idx on raw_anomaly_result_index(start_time);
+create index raw_anomaly_result_base_id_idx on raw_anomaly_result_index(base_id);
 
 create table if not exists merged_anomaly_result_index (
     function_id bigint(20),
@@ -123,6 +124,7 @@ create index merged_anomaly_result_function_idx on merged_anomaly_result_index(f
 create index merged_anomaly_result_feedback_idx on merged_anomaly_result_index(anomaly_feedback_id);
 create index merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
 create index merged_anomaly_result_start_time_idx on merged_anomaly_result_index(start_time);
+create index merged_anomaly_result_base_id_idx on merged_anomaly_result_index(base_id);
 
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
