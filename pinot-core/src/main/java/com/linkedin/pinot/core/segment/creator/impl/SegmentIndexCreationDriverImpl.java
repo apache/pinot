@@ -15,24 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
-import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -69,12 +51,30 @@ import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import com.linkedin.pinot.core.util.CrcUtils;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Implementation of an index segment creator.
  */
-
+// TODO: Check resource leaks
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
@@ -197,6 +197,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public void build() throws Exception {
     if (createStarTree) {
+      // TODO: add on-heap star-tree builder
       buildStarTree();
     } else {
       buildRaw();
@@ -280,16 +281,22 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     buildIndexCreationInfo();
     LOGGER.info("Collected stats for {} raw documents, {} aggregated documents", totalRawDocs, totalAggDocs);
     long statCollectionFinishTime = System.currentTimeMillis();
-    // Initialize the index creation using the per-column statistics information
-    indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
-    //iterate over the data again,
-    Iterator<GenericRow> allRowsIterator = starTreeBuilder.iterator(0,
-        starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
+    try {
+      // Initialize the index creation using the per-column statistics information
+      indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
-    while (allRowsIterator.hasNext()) {
-      GenericRow genericRow = allRowsIterator.next();
-      indexCreator.indexRow(genericRow);
+      //iterate over the data again,
+      Iterator<GenericRow> allRowsIterator = starTreeBuilder.iterator(0,
+          starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
+
+      while (allRowsIterator.hasNext()) {
+        GenericRow genericRow = allRowsIterator.next();
+        indexCreator.indexRow(genericRow);
+      }
+    } catch (Exception e) {
+      indexCreator.close();
+      throw e;
     }
 
     // If no dimensionsSplitOrder was specified in starTreeIndexSpec, set the order used by the starTreeBuilder.
@@ -379,24 +386,30 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", totalDocs);
 
-    // Initialize the index creation using the per-column statistics information
-    indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
+    try {
+      // Initialize the index creation using the per-column statistics information
+      indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
-    // Build the index
-    recordReader.rewind();
-    LOGGER.info("Start building IndexCreator!");
-    GenericRow readRow = new GenericRow();
-    GenericRow transformedRow = new GenericRow();
-    while (recordReader.hasNext()) {
-      long start = System.currentTimeMillis();
-      transformedRow = readNextRowSanitized(readRow, transformedRow);
-      long stop = System.currentTimeMillis();
-      indexCreator.indexRow(transformedRow);
-      long stop1 = System.currentTimeMillis();
-      totalRecordReadTime += (stop - start);
-      totalIndexTime += (stop1 - stop);
+      // Build the index
+      recordReader.rewind();
+      LOGGER.info("Start building IndexCreator!");
+      GenericRow readRow = new GenericRow();
+      GenericRow transformedRow = new GenericRow();
+      while (recordReader.hasNext()) {
+        long start = System.currentTimeMillis();
+        transformedRow = readNextRowSanitized(readRow, transformedRow);
+        long stop = System.currentTimeMillis();
+        indexCreator.indexRow(transformedRow);
+        long stop1 = System.currentTimeMillis();
+        totalRecordReadTime += (stop - start);
+        totalIndexTime += (stop1 - stop);
+      }
+    } catch (Exception e) {
+      indexCreator.close();
+      throw e;
+    } finally {
+      recordReader.close();
     }
-    recordReader.close();
     LOGGER.info("Finished records indexing in IndexCreator!");
     int numErrors, numConversions, numNulls, numNullCols;
     if ((numErrors = extractor.getTotalErrors()) > 0) {
@@ -428,9 +441,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     segmentName = config.getSegmentNameGenerator().generateSegmentName(segmentStats.getColumnProfileFor(timeColumn));
     updateSegmentStartEndTimeIfNecessary(segmentStats.getColumnProfileFor(timeColumn));
 
-    // Write the index files to disk
-    indexCreator.setSegmentName(segmentName);
-    indexCreator.seal();
+    try {
+      // Write the index files to disk
+      indexCreator.setSegmentName(segmentName);
+      indexCreator.seal();
+    } finally {
+      indexCreator.close();
+    }
     LOGGER.info("Finished segment seal!");
 
     // Delete the directory named after the segment name, if it exists

@@ -15,16 +15,12 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
-import java.io.Closeable;
-import java.io.IOException;
-
-
 /**
  * Interface for index creator for single-values with variable length (eg strings).
  * Implementations of this interface write raw data values (in potentially compressed formats),
  * as opposed to dictionary encoded index.
  */
-public interface SingleValueRawIndexCreator extends ForwardIndexCreator, Closeable {
+public interface SingleValueRawIndexCreator extends ForwardIndexCreator {
 
   /**
    * This method creates an index for the given docId and int value.
@@ -64,8 +60,7 @@ public interface SingleValueRawIndexCreator extends ForwardIndexCreator, Closeab
    * @param docId Document id
    * @param valueToIndex Variable length string value to index.
    */
-  void index(int docId, String valueToIndex)
-      throws IOException;
+  void index(int docId, String valueToIndex);
 
   /**
    * This method creates an index for the given docId and byte[] value.
@@ -82,6 +77,5 @@ public interface SingleValueRawIndexCreator extends ForwardIndexCreator, Closeab
    * @param docId Document id
    * @param valueToIndex Object value to index.
    */
-  void index(int docId, Object valueToIndex)
-      throws IOException;
+  void index(int docId, Object valueToIndex);
 }
