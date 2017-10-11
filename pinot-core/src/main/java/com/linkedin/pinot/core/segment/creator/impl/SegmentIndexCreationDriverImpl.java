@@ -630,4 +630,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           "Unexpected data type encountered while updating StarTree node" + inputArray.getClass().getName());
     }
   }
+
+  public SegmentPreIndexStatsContainer getSegmentStats() {
+    return segmentStats;
+  }
 }
