@@ -2340,8 +2340,6 @@ public class DataFrame {
       groupKeyNames[i] = firstResultSet.getGroupKeyColumnName(i);
     }
 
-    System.out.println("groupKeyNames: " + Arrays.toString(groupKeyNames));
-
     for(int i=0; i<resultSetGroup.getResultSetCount(); i++) {
       ResultSet resultSet = resultSetGroup.getResultSet(i);
       String function = resultSet.getColumnName(0);
@@ -2365,9 +2363,6 @@ public class DataFrame {
       dfJoin.addSeries(function, makeGroupByValueSeries(resultSet));
       dfJoin.setIndex(COLUMN_JOIN_KEY);
 
-      System.out.println("dfJoin " + i + ":");
-      System.out.println(dfJoin);
-
       df = df.joinOuter(dfJoin);
     }
 
@@ -2381,9 +2376,6 @@ public class DataFrame {
         }
       }, COLUMN_JOIN_KEY));
     }
-
-    System.out.println("output (including key tuple):");
-    System.out.println(df);
 
     // remove key tuple series
     df.dropSeries(COLUMN_JOIN_KEY);
