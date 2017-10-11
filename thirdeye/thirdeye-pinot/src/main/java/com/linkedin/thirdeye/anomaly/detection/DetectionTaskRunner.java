@@ -138,6 +138,12 @@ public class DetectionTaskRunner implements TaskRunner {
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
       timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
 
+    // Set anomaly source on raw anomaly results
+    for (RawAnomalyResultDTO rawAnomaly : resultRawAnomalies.values()) {
+      rawAnomaly.setAnomalyResultSource(anomalyResultSource);
+    }
+
+    // Set anomaly source on merged anomaly results
     for (MergedAnomalyResultDTO mergedAnomaly : resultMergedAnomalies.values()) {
       mergedAnomaly.setAnomalyResultSource(anomalyResultSource);
     }
