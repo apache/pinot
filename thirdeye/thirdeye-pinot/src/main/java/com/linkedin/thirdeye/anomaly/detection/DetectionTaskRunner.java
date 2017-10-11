@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilter;
 import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilterFactory;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -101,7 +102,7 @@ public class DetectionTaskRunner implements TaskRunner {
 
 
   private void runTask(DateTime windowStart, DateTime windowEnd) throws Exception {
-
+    AnomalyResultSource anomalyResultSource = AnomalyResultSource.DEFAULT_ANOMALY_DETECTION;
     LOG.info("Running anomaly detection for time range {} to  {}", windowStart, windowEnd);
 
     AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
@@ -129,12 +130,17 @@ public class DetectionTaskRunner implements TaskRunner {
         detectionJobType.equals(DetectionJobType.OFFLINE))) {
       LOG.info("BACKFILL is triggered for Detection Job {}. Notified flag is set to be true", jobExecutionId);
       isBackfill = true;
+      anomalyResultSource = AnomalyResultSource.ANOMALY_REPLAY;
     }
 
     // Update merged anomalies
     TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
       timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
+
+    for (MergedAnomalyResultDTO mergedAnomaly : resultMergedAnomalies.values()) {
+      mergedAnomaly.setAnomalyResultSource(anomalyResultSource);
+    }
 
     detectionTaskSuccessCounter.inc();
 
