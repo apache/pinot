@@ -99,7 +99,7 @@ public class RealtimeFileBasedReaderTest {
 
     RealtimeSegmentConverter conveter =
         new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, tableName, segmentName, null);
-    conveter.build(segmentVersion);
+    conveter.build(segmentVersion, new ServerMetrics(new MetricsRegistry()));
 
     offlineSegment = Loaders.IndexSegment.load(new File("/tmp/realtime").listFiles()[0], ReadMode.mmap);
   }

@@ -590,7 +590,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     segmentLogger.info("Trying to build segment");
     final long buildStartTime = now();
     try {
-      converter.build(_segmentVersion);
+      converter.build(_segmentVersion, _serverMetrics);
     } catch (Exception e) {
       segmentLogger.error("Could not build segment", e);
       FileUtils.deleteQuietly(tempSegmentFolder);

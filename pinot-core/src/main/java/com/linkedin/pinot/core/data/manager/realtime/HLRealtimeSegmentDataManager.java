@@ -271,7 +271,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();
-          converter.build(_segmentVersion);
+          converter.build(_segmentVersion, serverMetrics);
           final long buildEndTime = System.nanoTime();
           segmentLogger.info("Built segment in {} ms",
               TimeUnit.MILLISECONDS.convert((buildEndTime - buildStartTime), TimeUnit.NANOSECONDS));

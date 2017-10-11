@@ -15,10 +15,14 @@
  */
 package com.linkedin.pinot.core.realtime.converter;
 
+import com.linkedin.pinot.common.config.ColumnPartitionConfig;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.common.metrics.ServerGauge;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
@@ -27,6 +31,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 
@@ -83,7 +88,7 @@ public class RealtimeSegmentConverter {
         new ArrayList<String>(), null/*StarTreeIndexSpec*/);
   }
 
-  public void build(@Nullable SegmentVersion segmentVersion) throws Exception {
+  public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics) throws Exception {
     // lets create a record reader
     RealtimeSegmentRecordReader reader;
     if (sortedColumn == null) {
@@ -115,9 +120,20 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(tableName);
     genConfig.setOutDir(outputPath);
     genConfig.setSegmentName(segmentName);
-    genConfig.setSegmentPartitionConfig(realtimeSegmentImpl.getSegmentPartitionConfig());
+    SegmentPartitionConfig segmentPartitionConfig = realtimeSegmentImpl.getSegmentPartitionConfig();
+    genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(genConfig, new RealtimeSegmentSegmentCreationDataSource(realtimeSegmentImpl, reader, dataSchema));
+    RealtimeSegmentSegmentCreationDataSource dataSource =
+        new RealtimeSegmentSegmentCreationDataSource(realtimeSegmentImpl, reader, dataSchema);
+    driver.init(genConfig, dataSource);
     driver.build();
+
+    if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap() != null) {
+      Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+      for (String columnName : columnPartitionMap.keySet()) {
+        int partitionRangeWidth = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitionRangeWidth();
+        serverMetrics.addValueToTableGauge(tableName, ServerGauge.REALTIME_SEGMENT_PARTITION_WIDTH, partitionRangeWidth);
+      }
+    }
   }
 }

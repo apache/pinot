@@ -202,4 +202,9 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
       }
     }
   }
+
+  @Override
+  public int getPartitionRangeWidth() {
+    return partitionRangeEnd - partitionRangeStart + 1;
+  }
 }
