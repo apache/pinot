@@ -852,6 +852,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       verify(segmentMetadata, times(2)).getTimeInterval();
       verify(segmentMetadata, times(1)).getVersion();
       verify(segmentMetadata, times(1)).getTotalRawDocs();
+      verify(segmentMetadata, times(1)).getColumnMetadataMap();
       verifyNoMoreInteractions(segmentMetadata);
     }
 

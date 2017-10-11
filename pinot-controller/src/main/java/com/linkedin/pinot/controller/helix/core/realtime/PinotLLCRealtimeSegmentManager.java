@@ -51,6 +51,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
@@ -496,6 +497,27 @@ public class PinotLLCRealtimeSegmentManager {
     return partitionMetadata;
   }
 
+  /**
+   * Given a segment metadata, build the finalized version of segment partition metadata. This partition metadata will
+   * be written as a part of SegmentZKMetadata.
+   * @param segmentMetadata Segment metadata
+   * @return
+   */
+  private SegmentPartitionMetadata getPartitionMetadataFromSegmentMetadata(SegmentMetadataImpl segmentMetadata) {
+    Map<String, ColumnPartitionMetadata> partitionMetadataMap = new HashMap<>();
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String columnName = entry.getKey();
+      ColumnMetadata columnMetadata = entry.getValue();
+      // Check if the column metadata contains the partition information
+      if (columnMetadata.getPartitionFunction() != null && columnMetadata.getPartitionRanges() != null) {
+        partitionMetadataMap.put(columnName,
+            new ColumnPartitionMetadata(columnMetadata.getPartitionFunction().toString(),
+                columnMetadata.getNumPartitions(), columnMetadata.getPartitionRanges()));
+      }
+    }
+    return new SegmentPartitionMetadata(partitionMetadataMap);
+  }
+
   protected List<String> getExistingSegments(String realtimeTableName) {
     String propStorePath = ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName);
     return  _propertyStore.getChildNames(propStorePath, AccessOption.PERSISTENT);
@@ -587,6 +609,7 @@ public class PinotLLCRealtimeSegmentManager {
     oldSegMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
     oldSegMetadata.setIndexVersion(segmentMetadata.getVersion());
     oldSegMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
+    oldSegMetadata.setPartitionMetadata(getPartitionMetadataFromSegmentMetadata(segmentMetadata));
 
     final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
     final String oldZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, committingSegmentNameStr);
