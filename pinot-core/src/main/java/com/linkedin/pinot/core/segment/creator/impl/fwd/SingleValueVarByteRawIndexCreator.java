@@ -37,14 +37,12 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   }
 
   @Override
-  public void index(int docId, String valueToIndex)
-      throws IOException {
+  public void index(int docId, String valueToIndex) {
     _indexWriter.setString(docId, valueToIndex);
   }
 
   @Override
-  public void index(int docId, Object valueToIndex)
-      throws IOException {
+  public void index(int docId, Object valueToIndex) {
     if (valueToIndex instanceof String) {
       _indexWriter.setString(docId, (String) valueToIndex);
     } else if (valueToIndex instanceof byte[]) {
@@ -56,14 +54,7 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   }
 
   @Override
-  public void index(int docId, byte[] valueToIndex) {
-    // TODO: Add support for byte[] values.
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _indexWriter.close();
   }
 }

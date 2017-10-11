@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.indexsegment.generator;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
@@ -31,7 +30,6 @@ import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,9 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import javax.annotation.Nonnull;
-
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -98,6 +94,8 @@ public class SegmentGeneratorConfig {
   private int _sequenceId = -1;
   private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
   private String _simpleDateFormat = null;
+  // Use on-heap or off-heap memory to generate index (currently only affect inverted index)
+  private boolean _onHeap = false;
 
   public SegmentGeneratorConfig() {
   }
@@ -137,10 +135,12 @@ public class SegmentGeneratorConfig {
     _creatorVersion = config._creatorVersion;
     _paddingCharacter = config._paddingCharacter;
     _hllConfig = config._hllConfig;
-    _segmentVersion = config._segmentVersion;
-    _segmentName = config._segmentName;
     _segmentNameGenerator = config._segmentNameGenerator;
+    _segmentPartitionConfig = config._segmentPartitionConfig;
     _sequenceId = config._sequenceId;
+    _timeColumnType = config._timeColumnType;
+    _simpleDateFormat = config._simpleDateFormat;
+    _onHeap = config._onHeap;
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -473,6 +473,14 @@ public class SegmentGeneratorConfig {
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
     _segmentNameGenerator = segmentNameGenerator;
+  }
+
+  public boolean isOnHeap() {
+    return _onHeap;
+  }
+
+  public void setOnHeap(boolean onHeap) {
+    _onHeap = onHeap;
   }
 
   @JsonIgnore

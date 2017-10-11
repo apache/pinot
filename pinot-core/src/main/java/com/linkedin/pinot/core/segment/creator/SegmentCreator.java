@@ -15,20 +15,20 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.commons.configuration.ConfigurationException;
 
 
 /**
  * Interface for segment creators, which create an index over a set of rows and writes the resulting index to disk.
  */
-public interface SegmentCreator {
+public interface SegmentCreator extends Closeable {
 
   /**
    * Initializes the segment creation.

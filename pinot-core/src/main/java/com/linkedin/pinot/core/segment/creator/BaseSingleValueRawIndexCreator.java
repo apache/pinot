@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
-import java.io.IOException;
-
-
 /**
  * Abstract base class implementation for {@link SingleValueRawIndexCreator}
  */
@@ -43,8 +40,7 @@ public abstract class BaseSingleValueRawIndexCreator implements SingleValueRawIn
   }
 
   @Override
-  public void index(int docId, String valueToIndex)
-      throws IOException {
+  public void index(int docId, String valueToIndex) {
     throw new UnsupportedOperationException();
   }
 
@@ -54,14 +50,7 @@ public abstract class BaseSingleValueRawIndexCreator implements SingleValueRawIn
   }
 
   @Override
-  public void index(int docId, Object valueToIndex)
-      throws IOException {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void close()
-      throws IOException {
+  public void index(int docId, Object valueToIndex) {
     throw new UnsupportedOperationException();
   }
 }

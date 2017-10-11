@@ -15,9 +15,8 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
-import java.io.IOException;
+import java.io.Closeable;
 
 
-public interface ForwardIndexCreator {
-  void close() throws IOException;
+public interface ForwardIndexCreator extends Closeable {
 }
