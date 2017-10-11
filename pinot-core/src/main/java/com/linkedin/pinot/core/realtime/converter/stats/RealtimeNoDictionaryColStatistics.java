@@ -206,4 +206,9 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   public List<IntRange> getPartitionRanges() {
     return null;
   }
+
+  @Override
+  public int getPartitionRangeWidth() {
+    return 0;
+  }
 }
