@@ -130,7 +130,7 @@ export default Ember.Component.extend({
       });
       var cell = div.selectAll("g").data(nodes).enter().append("svg:g").attr("class", "cell").attr("transform", function(d) {
         return "translate(" + d.x + "," + d.y + ")";
-      }).on("click", function(d) {
+      // }).on("click", function(d) {
         // return zoom(node == d.parent ? root : d.parent);
       }).on("mousemove", function(d) {
 
@@ -191,9 +191,6 @@ export default Ember.Component.extend({
         var factor = getChangeFactor(d);
         return getTextColor(factor);
       });
-
     }
-    // anchor page to dimension tree map if exists
-    Ember.$('.contribution-table').get(0).scrollIntoView();
   }
 });

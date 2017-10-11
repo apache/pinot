@@ -6,6 +6,7 @@
 import fetch from 'fetch';
 import Ember from 'ember';
 import moment from 'moment';
+import _ from 'lodash';
 import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 import { task, timeout } from 'ember-concurrency';
 
@@ -379,7 +380,7 @@ export default Ember.Controller.extend({
                 isFetchingDimensions: false,
                 isDimensionFetchDone: true,
                 isMetricDataLoading: false,
-                topDimensions: orderedDimensions,
+                topDimensions: orderedDimensions
               });
             });
         } else {
@@ -441,14 +442,14 @@ export default Ember.Controller.extend({
                 name: subDimension,
                 color: colors[colorIndex],
                 baselineValues: dimensionObj[subDimension].baselineValues,
-                currentValues: dimensionObj[subDimension].currentValues,
+                currentValues: dimensionObj[subDimension].currentValues
               });
               colorIndex++;
             }
           }
           // Return sorted list of dimension objects
           resolve(dimensionList);
-      });
+        });
     });
   },
 
@@ -882,7 +883,7 @@ export default Ember.Controller.extend({
       this.setProperties({
         isMetricDataLoading: true,
         topDimensions: null,
-        selectedMetricOption: selectedObj,
+        selectedMetricOption: selectedObj
       });
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {
@@ -1125,8 +1126,8 @@ export default Ember.Controller.extend({
         alertGroupNewRecipient: newEmails
       } = this.getProperties('newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
 
-      const newEmailsArr = newEmails ? newEmails.replace(/ /g,'').split(',') : [];
-      const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g,'').split(',') : [];
+      const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
+      const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
       const cleanRecipientsArr = newRecipientsArr.filter(e => String(e).trim()).join(',');
       const emailError = !this.isEmailValid(newEmailsArr);
