@@ -92,12 +92,10 @@
 
           <main class="paper-container">
             {{#containers/primary-metric-container as |summary actions|}}
-              {{#if summary.loading}}
-                <section class="paper-container">
-                  <div class="spinner-wrapper">
-                    {{ember-spinner}}
-                  </div>
-                </section>
+              {{#if (or summary.loading (not summary.loaded))}}
+                <div class="spinner-wrapper">
+                  {{ember-spinner}}
+                </div>
               {{/if}}
 
               {{#if summary.loaded}}

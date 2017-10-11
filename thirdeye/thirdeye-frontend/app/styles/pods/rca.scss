@@ -1,11 +1,20 @@
 .spinner-wrapper {
   margin: $te-default-element-spacing;
-  height: 250px;
+  height: 400px;
   position: relative;
 
   &--absolute {
     position: absolute;
     width: 100%;
+  }
+
+  &__border {
+    border: 1px solid $te-grey--border;
+    margin: 0;
+  }
+
+  &__margin-top {
+    margin-top: $te-default-element-spacing
   }
 }
 
@@ -25,7 +34,7 @@
 
 .paper-container {
   background-color: white;
-  border: 1px solid #E9E9E9;;
+  border: 1px solid $te-grey--border;
   margin-top: $te-spacing-lg;
   margin-bottom: $te-spacing-lg;
 
@@ -33,7 +42,6 @@
     padding: 24px;
   }
 }
-
 
 .paper-container__header,
 .paper-container__body,
@@ -55,4 +63,8 @@
 
 .rca-header--flush {
   justify-content: flex-start;
+}
+
+.rca-body {
+  min-height: 1000px;
 }

@@ -72,6 +72,7 @@ export default Ember.Route.extend({
     // Dispatches a redux action on query param change
     queryParamsDidChange(changedParams, oldParams) {
       const redux = this.get('redux');
+      let shouldReload = false;
       const controller = this.controller;
       let {
         analysisStart: start,
@@ -101,6 +102,7 @@ export default Ember.Route.extend({
             displayStart: Number(displayStart),
             dimensionsStart: Number(displayStart)
           });
+          shouldReload = true;
         }
 
         if (controller && displayEnd) {
@@ -109,11 +111,14 @@ export default Ember.Route.extend({
             displayEnd: Number(displayEnd),
             dimensionsEnd: Number(displayEnd)
           });
+          shouldReload = true;
         }
-
-        Ember.run.later(() => {
-          redux.dispatch(Actions.loaded());
-        });
+        if (shouldReload) {
+          Ember.run.later(() => {
+            redux.dispatch(Actions.loaded());
+          });
+          shouldReload = false;
+        }
       }
 
       this._super(...arguments);

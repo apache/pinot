@@ -2,9 +2,11 @@
   {{#containers/dimensions-container as |dimensions|}}
     <div class="row rca-header">
       <div class="col-xs-9">
-         <h3 class="te-sub-title te-sub-title--flush">Dimensions Analysis</h3> 
-        <span>(Investigation Period: {{moment-format dimensions.regionStart dateFormat}} -
-          {{moment-format dimensions.regionEnd dateFormat}})</span>
+          <h3 class="te-sub-title te-sub-title--flush">Dimensions Analysis</h3> 
+          {{#if dimensions.loaded}}
+            <span>(Investigation Period: {{moment-format dimensions.regionStart dateFormat}} -
+              {{moment-format dimensions.regionEnd dateFormat}})</span>
+          {{/if}}
       </div>
       <div class="col-xs-3 pull-right">
         <label class="te-label" for="select-dimension">Break Dimensions by: </label>
@@ -19,43 +21,53 @@
       </div>
     </div>
 
-    {{#if dimensions.loading}}
-      <div class="spinner-wrapper">
-        {{ember-spinner}}
-      </div>
-    {{/if}}
-    {{#containers/primary-metric-container as |summary actions|}}
+    <div class="rca-body">
+      {{#containers/primary-metric-container as |summary actions|}}
 
-      {{#if (and summary.loaded dimensions.loaded)}}
-        {{anomaly-graph
-          componentId='correlated-dimensions'
-          showGraphLegend=false
-          showLegend=true
-          showSubchart=true
-          primaryMetric=summary.primaryMetric 
-          dimensions=dimensions.subdimensions
-          selectedDimensions=summary.selectedDimensions
-          analysisStart=dimensions.regionStart
-          analysisEnd=dimensions.regionEnd
-          minDate=displayStart
-          maxDate=displayEnd
-          onSubchartChange=(action "setDateParams")
-          onSelection=(action actions.onSelection)
-          showDimensions=true}}
-
-        {{#if dimensions.loaded}}
+        {{#if (or dimensions.loading (not (and summary.loaded dimensions.heatmapLoaded)))}}
+          <div class="spinner-wrapper spinner-wrapper__border">
+            {{ember-spinner}}
+          </div>
+        {{else}}
+          {{anomaly-graph
+            componentId='correlated-dimensions'
+            showGraphLegend=false
+            showLegend=true
+            showSubchart=true
+            primaryMetric=summary.primaryMetric 
+            dimensions=dimensions.subdimensions
+            selectedDimensions=summary.selectedDimensions
+            analysisStart=dimensions.regionStart
+            analysisEnd=dimensions.regionEnd
+            minDate=displayStart
+            maxDate=displayEnd
+            onSubchartChange=(action "setDateParams")
+            onSelection=(action actions.onSelection)
+            showDimensions=true}}
+        {{/if}}
+        
           <div class="contribution-table paper-container">
             <div class="contribution-table__header">
               <div class="contribution-table__subnav">
                 <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "change") "thirdeye-link--active"}}" href="#" {{action "onTabChange" "change"}}>Trend Analysis</a>
               </div>
-               <div class="contribution-table__subnav">
+              <div class="contribution-table__subnav">
                 <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "details") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "details"}}>Contribution Analysis</a>
               </div> 
             </div>
             <div class="contribution-table__body paper-container__body">
-              {{#if (eq selectedTab "details")}}
-                {{outlet}}
+              {{#if (or dimensions.loading (not summary.loaded))}}
+                <div class="spinner-wrapper">
+                  {{ember-spinner}}
+                </div>
+              {{else if (eq selectedTab "details")}}
+                {{#if dimensions.heatmapLoaded}}
+                  {{outlet}}
+                {{else}} 
+                  <div class="spinner-wrapper">
+                    {{ember-spinner}}
+                  </div>
+                {{/if}}
               {{else}}
                 {{#if tableIsLoading}}
                   <div class="spinner-wrapper spinner-wrapper--absolute">
@@ -65,7 +77,7 @@
                 <div class="row rca-header">
                   <div class="col-xs-9"></div>
                   <div class="col-xs-3 pull-right">
-                     {{#x-toggle 
+                    {{#x-toggle 
                       value=showDetails 
                       classNames="te-toggle pull-right"
                       theme='ios'
@@ -94,9 +106,7 @@
             </div>
           </div>
 
-        {{/if}}
-      {{/if}}
-
-    {{/containers/primary-metric-container}}
+      {{/containers/primary-metric-container}}
+    </div>
   {{/containers/dimensions-container}}
  </section>

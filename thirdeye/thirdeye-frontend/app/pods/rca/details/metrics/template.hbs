@@ -1,7 +1,7 @@
 <section class="paper-container__body">
   {{#containers/metrics-container as |metricList|}}
     {{#containers/primary-metric-container as |summary actions|}}
-      {{#if summary.loaded}}
+
         <div class="rca-header row">
           <div class="col-xs-9">
             <h3 class="te-sub-title te-sub-title--flush">Metrics Correlation</h3> 
@@ -27,19 +27,17 @@
           </div>
         </div>
         <div class="rca-body">
-          {{#if (or metricList.loading summary.loading)}}
+          {{#if metricList.failed}}
+            Oops, something went wrong...
+
+          {{else if (or metricList.loading (not summary.loaded))}}
             <section>
-              <div class="spinner-wrapper">
+              <div class="spinner-wrapper spinner-wrapper__border">
                 {{ember-spinner}}
               </div>
             </section>
-          {{/if}}
 
-          {{#if metricList.failed}}
-            Oops, something went wrong...
-          {{/if}}
-
-          {{#if metricList.loaded}}
+          {{else if metricList.loaded}}
             {{#if splitView}}
               {{anomaly-graph
                 componentId='correlated-metrics'
@@ -103,8 +101,8 @@
                 </div>
               </div>
               <div class="contribution-table__body">
-                {{#if metricList.loading}}
-                  <div class="spinner-wrapper">
+                {{#if (or metricList.loading (not summary.loaded))}}
+                  <div class="spinner-wrapper spinner-wrapper">
                     {{ember-spinner}}
                   </div>
                 {{else}}
@@ -129,7 +127,6 @@
             </div>
 
         </div>
-      {{/if}}
     {{/containers/primary-metric-container}}
   {{/containers/metrics-container}}
 </section>

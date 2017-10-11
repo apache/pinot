@@ -29,6 +29,7 @@ const INITIAL_STATE = {
   timeseries: [],
   selectedDimension: 'All',
   heatmapData: {},
+  heatmapLoaded: false,
   regionStart: '',
   regionEnd :''
 };
@@ -58,7 +59,8 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
     case ActionTypes.SET: {
       const selectedDimension = action.payload;
       return Object.assign({}, state, {
-        selectedDimension
+        selectedDimension,
+        heatmapLoaded: false
       });
     }
 
@@ -75,6 +77,9 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
       const { selectedDimension } = state;
 
       const dimensions = Object.keys(subdimensionMap)
+        .filter((subdimension)=> {
+          return subdimension.length && subdimension !== 'All';
+        })
         .reduce((hash, subdimension, index) => {
           const subdimensionData = _.merge(
             {
@@ -93,7 +98,7 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
       return Object.assign({}, state, {
         timeseries,
         dimensions: Object.assign({}, state.dimensions, dimensions),
-        loaded: true,
+        heatmapLoaded: true,
         loading: false,
         failed: false
       });
