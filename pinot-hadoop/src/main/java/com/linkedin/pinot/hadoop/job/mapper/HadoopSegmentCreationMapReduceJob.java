@@ -138,12 +138,12 @@ public class HadoopSegmentCreationMapReduceJob {
       }
 
       context.write(new LongWritable(Long.parseLong(lineSplits[2])),
-          new Text(FileSystem.get(new Configuration()).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
+          new Text(FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
       LOGGER.info("finished the job successfully");
     }
 
     private String createSegment(String dataFilePath, Schema schema, Integer seqId) throws Exception {
-      final FileSystem fs = FileSystem.get(new Configuration());
+      final FileSystem fs = FileSystem.get(_properties);
       final Path hdfsDataPath = new Path(dataFilePath);
       final File dataPath = new File(_currentDiskWorkDir, "data");
       if (dataPath.exists()) {
