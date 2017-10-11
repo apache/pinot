@@ -128,7 +128,6 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
   if (displayEnd <= 0) {
     isOngoing = true;
     displayEnd = analysisEnd;
-    displayLabel += " (ongoing)";
   }
 
   return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, isFuture, isOngoing, displayStart, displayEnd, displayLabel });
