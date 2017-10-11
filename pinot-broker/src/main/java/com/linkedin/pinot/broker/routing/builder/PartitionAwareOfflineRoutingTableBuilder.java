@@ -15,27 +15,24 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentId;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+
 
 /**
  * Partition aware routing table builder for offline table.
@@ -64,7 +61,7 @@ import com.linkedin.pinot.transport.common.SegmentId;
  *   3. Compute the final routing look up table from external view and the mapping from step 2.
  *
  */
-public class PartitionAwareOfflineRoutingTableBuilder extends AbstractPartitionAwareRoutingTableBuilder {
+public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAwareRoutingTableBuilder {
 
   // When we use the table level replica group, we can assume that the number of partition is 1.
   private static final int TABLE_LEVEL_PARTITION_NUMBER = 0;
@@ -74,18 +71,16 @@ public class PartitionAwareOfflineRoutingTableBuilder extends AbstractPartitionA
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     super.init(configuration, tableConfig, propertyStore);
-    final String partitionColumn = _tableConfig.getValidationConfig().getReplicaGroupStrategyConfig().getPartitionColumn();
+    String partitionColumn = tableConfig.getValidationConfig().getReplicaGroupStrategyConfig().getPartitionColumn();
     _isPartitionLevelReplicaGroupAssignment = (partitionColumn != null);
+    _numReplicas = tableConfig.getValidationConfig().getReplicationNumber();
   }
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigList) {
-
-
-    RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
-    String[] segmentSet = externalView.getPartitionSet().toArray(new String[externalView.getPartitionSet().size()]);
-    _numReplicas = _tableConfig.getValidationConfig().getReplicationNumber();
+  public synchronized void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigs) {
+    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
+    Set<String> segmentSet = externalView.getPartitionSet();
 
     // Fetch the partition to replica group mapping table from the property store
     PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMappingZKMetadata =
@@ -93,14 +88,13 @@ public class PartitionAwareOfflineRoutingTableBuilder extends AbstractPartitionA
 
     // 1. Compute the partition id set by looking at the segment zk metadata and cache metadata when possible
     Set<Integer> partitionIds = new HashSet<>();
-    for (String segment : segmentSet) {
-      SegmentId segmentId = new SegmentId(segment);
-      SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentId);
+    for (String segmentName : segmentSet) {
+      SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentName);
       if (segmentZKMetadata == null || segmentZKMetadata.getPartitionMetadata() == null
           || segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().size() == 0) {
-        segmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segment);
+        segmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentName);
         if (segmentZKMetadata != null) {
-          _segmentToZkMetadataMapping.put(segmentId, segmentZKMetadata);
+          _segmentToZkMetadataMapping.put(segmentName, segmentZKMetadata);
         }
       }
       int partitionId = getPartitionId(segmentZKMetadata);
@@ -109,68 +103,62 @@ public class PartitionAwareOfflineRoutingTableBuilder extends AbstractPartitionA
       }
     }
 
-    // 2. Build a mapping table of (partition_id -> (server -> replica_id)) using the partition to replica group mapping.
-    Map<Integer, Map<ServerInstance, Integer>> perPartitionServerToReplicaIdMapping = new HashMap<>();
+    // 2. Build a map from partition to map from server to replica
+    Map<Integer, Map<String, Integer>> partitionToServerToReplicaMap = new HashMap<>();
     for (Integer partitionId : partitionIds) {
       for (int replicaId = 0; replicaId < _numReplicas; replicaId++) {
-        List<String> instancesFromReplicaGroup =
+        List<String> serversForPartitionAndReplica =
             partitionToReplicaGroupMappingZKMetadata.getInstancesfromReplicaGroup(partitionId, replicaId);
-        for (String instanceName : instancesFromReplicaGroup) {
-          if (!perPartitionServerToReplicaIdMapping.containsKey(partitionId)) {
-            perPartitionServerToReplicaIdMapping.put(partitionId, new HashMap<ServerInstance, Integer>());
+        for (String serverName : serversForPartitionAndReplica) {
+          Map<String, Integer> serverToReplicaMap = partitionToServerToReplicaMap.get(partitionId);
+          if (serverToReplicaMap == null) {
+            serverToReplicaMap = new HashMap<>();
+            partitionToServerToReplicaMap.put(partitionId, serverToReplicaMap);
           }
-          perPartitionServerToReplicaIdMapping.get(partitionId)
-              .put(ServerInstance.forInstanceName(instanceName), replicaId);
+          serverToReplicaMap.put(serverName, replicaId);
         }
       }
     }
 
     // 3. Compute the final routing look up table
-    Map<SegmentId, Map<Integer, ServerInstance>> segmentIdToServersMapping = new HashMap<>();
+    Map<String, Map<Integer, String>> segmentToReplicaToServerMap = new HashMap<>();
     for (String segmentName : segmentSet) {
       // Get partition_id from cached segment zk metadata
-      SegmentId segmentId = new SegmentId(segmentName);
-      SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentId);
+      SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentName);
       int partitionId = getPartitionId(segmentZKMetadata);
 
       // Initialize data intermediate data structures or data
-      Map<String, String> instanceToStateMap = new HashMap<>(externalView.getStateMap(segmentName));
-      Map<Integer, ServerInstance> serverInstanceMap = new HashMap<>();
+      Map<Integer, String> replicaToServerMap = new HashMap<>();
       int replicaIdForNoPartitionMetadata = 0;
 
-      for (String instance : instanceToStateMap.keySet()) {
-        if (pruner.isInactive(instance)) {
-          continue;
-        }
-        // We are only interested in the servers that are online.
-        if (instanceToStateMap.get(instance).equals("ONLINE")) {
+      for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
+        String serverName = entry.getKey();
+        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
+            && !instancePruner.isInactive(serverName)) {
           // If there's no partition number in the metadata, assign replica id sequentially.
-          ServerInstance serverInstance = ServerInstance.forInstanceName(instance);
           if (partitionId == NO_PARTITION_NUMBER) {
-            serverInstanceMap.put(replicaIdForNoPartitionMetadata, serverInstance);
-            replicaIdForNoPartitionMetadata++;
+            replicaToServerMap.put(replicaIdForNoPartitionMetadata++, serverName);
           } else {
-            int replicaId = perPartitionServerToReplicaIdMapping.get(partitionId).get(serverInstance);
-            serverInstanceMap.put(replicaId, serverInstance);
+            int replicaId = partitionToServerToReplicaMap.get(partitionId).get(serverName);
+            replicaToServerMap.put(replicaId, serverName);
           }
         }
       }
 
       // Update the final routing look up table.
-      if (!serverInstanceMap.isEmpty()) {
-        segmentIdToServersMapping.put(segmentId, serverInstanceMap);
+      if (!replicaToServerMap.isEmpty()) {
+        segmentToReplicaToServerMap.put(segmentName, replicaToServerMap);
       }
     }
 
     // Delete segment metadata from cache if the segment no longer exists in the external view.
-    Set<String> segmentsFromExternalView = new HashSet<>(Arrays.asList(segmentSet));
-    for (SegmentId segmentId : _segmentToZkMetadataMapping.keySet()) {
-      if (!segmentsFromExternalView.contains(segmentId.getSegmentId())) {
-        _segmentToZkMetadataMapping.remove(segmentId);
+    for (String segmentName : _segmentToZkMetadataMapping.keySet()) {
+      if (!segmentSet.contains(segmentName)) {
+        _segmentToZkMetadataMapping.remove(segmentName);
       }
     }
 
-    _mappingReference.set(segmentIdToServersMapping);
+    setSegmentToReplicaToServerMap(segmentToReplicaToServerMap);
   }
 
   /**

@@ -23,17 +23,14 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -141,14 +138,12 @@ public class RoutingTableTest {
     Assert.assertTrue(timeBoundaryUpdated.booleanValue());
   }
 
-  private void assertResourceRequest(HelixExternalViewBasedRouting routingTable, String resource,
-      String expectedSegmentList, int expectedNumSegment) {
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList(), null);
-    Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
+  private void assertResourceRequest(HelixExternalViewBasedRouting routing, String resource, String expectedSegmentList,
+      int expectedNumSegment) {
+    Map<String, List<String>> routingTable = routing.getRoutingTable(new RoutingTableLookupRequest(resource));
     List<String> selectedSegments = new ArrayList<>();
-    for (ServerInstance serverInstance : serversMap.keySet()) {
-      SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
+    for (List<String> segmentsForServer : routingTable.values()) {
+      selectedSegments.addAll(segmentsForServer);
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
     Arrays.sort(selectedSegmentArray);
@@ -251,14 +246,12 @@ public class RoutingTableTest {
     }
   }
 
-  private void assertResourceRequest(HelixExternalViewBasedRouting routingTable, String resource,
+  private void assertResourceRequest(HelixExternalViewBasedRouting routing, String resource,
       String[] expectedSegmentLists, int expectedNumSegment) {
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource, Collections.<String>emptyList(), null);
-    Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
+    Map<String, List<String>> routingTable = routing.getRoutingTable(new RoutingTableLookupRequest(resource));
     List<String> selectedSegments = new ArrayList<>();
-    for (ServerInstance serverInstance : serversMap.keySet()) {
-      SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
+    for (List<String> segmentsForServer : routingTable.values()) {
+      selectedSegments.addAll(segmentsForServer);
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
     Arrays.sort(selectedSegmentArray);

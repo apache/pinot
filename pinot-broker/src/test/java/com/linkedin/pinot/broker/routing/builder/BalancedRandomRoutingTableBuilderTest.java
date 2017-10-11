@@ -18,13 +18,11 @@ package com.linkedin.pinot.broker.routing.builder;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
-import com.linkedin.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
 
 
 /**
@@ -53,19 +51,16 @@ public class BalancedRandomRoutingTableBuilderTest {
     instanceConfigList.add(new InstanceConfig("Server_1.2.3.6_3456"));
 
     // Build routing table
-    
+
     routingTableBuilder.computeRoutingTableFromExternalView("dummy", externalView, instanceConfigList);
 
-    List<ServerToSegmentSetMap> routingTables = routingTableBuilder.getRoutingTables();
+    List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
     // Check that at least two routing tables are different
-    Iterator<ServerToSegmentSetMap> routingTableIterator = routingTables.iterator();
-    ServerToSegmentSetMap previous = routingTableIterator.next();
+    Iterator<Map<String, List<String>>> routingTableIterator = routingTables.iterator();
+    Map<String, List<String>> previous = routingTableIterator.next();
     while (routingTableIterator.hasNext()) {
-      ServerToSegmentSetMap current = routingTableIterator.next();
-//      System.out.println("current = " + current);
-//      System.out.println("previous = " + previous);
+      Map<String, List<String>> current = routingTableIterator.next();
       if (!current.equals(previous)) {
-        // Routing tables differ, test is successful
         return;
       }
     }

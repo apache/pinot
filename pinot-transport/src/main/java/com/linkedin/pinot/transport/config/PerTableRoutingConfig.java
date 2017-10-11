@@ -16,15 +16,11 @@
 package com.linkedin.pinot.transport.config;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.configuration.Configuration;
-
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentId;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 /**
@@ -47,19 +43,18 @@ public class PerTableRoutingConfig {
 
   private final Configuration _tableCfg;
   private int _numNodes;
-  private List<ServerInstance> _defaultServers;
-  private final Map<Integer, List<ServerInstance>> _nodeToInstancesMap;
+  private List<String> _defaultServers;
+  private final Map<Integer, List<String>> _nodeToInstancesMap;
 
   public PerTableRoutingConfig(Configuration cfg) {
     _tableCfg = cfg;
-    _nodeToInstancesMap = new HashMap<Integer, List<ServerInstance>>();
-    _defaultServers = new ArrayList<ServerInstance>();
+    _nodeToInstancesMap = new HashMap<>();
+    _defaultServers = new ArrayList<>();
     loadConfig();
   }
 
   @SuppressWarnings("unchecked")
   private void loadConfig() {
-
     if (null == _tableCfg) {
       return;
     }
@@ -68,18 +63,10 @@ public class PerTableRoutingConfig {
 
     _numNodes = _tableCfg.getInt(NUM_NODES_PER_REPLICA);
     for (int i = 0; i < _numNodes; i++) {
-      List<String> servers = _tableCfg.getList(getKey(SERVERS_FOR_NODE, i + ""));
-
-      if ((null != servers) && (!servers.isEmpty())) {
-        List<ServerInstance> servers2 = getServerInstances(servers);
-        _nodeToInstancesMap.put(i, servers2);
-      }
+      _nodeToInstancesMap.put(i, _tableCfg.getList(getKey(SERVERS_FOR_NODE, Integer.toString(i))));
     }
 
-    List<String> servers = _tableCfg.getList(getKey(SERVERS_FOR_NODE, DEFAULT_SERVERS_FOR_NODE));
-    if ((null != servers) && (!servers.isEmpty())) {
-      _defaultServers = getServerInstances(servers);
-    }
+    _defaultServers = _tableCfg.getList(getKey(SERVERS_FOR_NODE, DEFAULT_SERVERS_FOR_NODE));
   }
 
   private String getKey(String prefix, String suffix) {
@@ -91,7 +78,7 @@ public class PerTableRoutingConfig {
     return _numNodes;
   }
 
-  public List<ServerInstance> getDefaultServers() {
+  public List<String> getDefaultServers() {
     return _defaultServers;
   }
 
@@ -135,31 +122,15 @@ public class PerTableRoutingConfig {
    *
    * @return
    */
-  public Map<ServerInstance, SegmentIdSet> buildRequestRoutingMap() {
-    Map<ServerInstance, SegmentIdSet> resultMap = new HashMap<ServerInstance, SegmentIdSet>();
-    for (ServerInstance serverInstance : _defaultServers) {
-      SegmentId id = new SegmentId("default");
-      SegmentIdSet idSet = new SegmentIdSet();
-      idSet.addSegment(id);
-      resultMap.put(serverInstance, idSet);
+  public Map<String, List<String>> buildRequestRoutingMap() {
+    Map<String, List<String>> resultMap = new HashMap<>();
+    for (String serverName : _defaultServers) {
+      resultMap.put(serverName, Collections.singletonList("default"));
     }
     return resultMap;
   }
 
-  /**
-   * Generate server instances from their string representations
-   * @param servers
-   * @return
-   */
-  private static List<ServerInstance> getServerInstances(List<String> servers) {
-    List<ServerInstance> servers2 = new ArrayList<ServerInstance>();
-    for (String s : servers) {
-      servers2.add(new ServerInstance(s));
-    }
-    return servers2;
-  }
-
-  public Map<Integer, List<ServerInstance>> getNodeToInstancesMap() {
+  public Map<Integer, List<String>> getNodeToInstancesMap() {
     return _nodeToInstancesMap;
   }
 

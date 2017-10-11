@@ -15,62 +15,41 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.common.config.TableConfig;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
-import com.linkedin.pinot.broker.routing.RoutingTable;
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
-
 
 /**
- * Interface for creating a list of ServerToSegmentSetMap based on ExternalView from Helix.
+ * Build routing tables based on ExternalView from Helix.
  */
 public interface RoutingTableBuilder {
 
   /**
-   * Inits the routing table builder.
-   *
-   * @param configuration The configuration to use
+   * Initiate the routing table builder.
    */
   void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore);
 
   /**
-   * Builds one or more routing tables (maps of servers to segment lists) that are used for query routing. The union of
-   * the segment lists that are in each routing table should contain all data in Pinot.
-   *
-   * @param tableName The table name for which to build the routing table
-   * @param externalView The external view for the table
-   * @param instanceConfigList The instance configurations for the instances serving this particular table (used for
-   *                           pruning)
+   * Compute routing tables (map from server to list of segments) that are used for query routing from ExternalView.
+   * <p>Should be called whenever there is an ExternalView change.
    */
   void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigList);
+      List<InstanceConfig> instanceConfigs);
 
   /**
-   * Return the candidate set of servers that hosts each segment-set.
-   * The List of services are expected to be ordered so that replica-selection strategy can be
-   * applied to them to select one Service among the list for each segment.
-   *
-   * @return SegmentSet to Servers map.
+   * Get the routing table based on the given lookup request.
    */
-  Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request);
+  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request);
 
   /**
-   * @return List of routing tables used to route queries
+   * Get all pre-computed routing tables.
    */
-  List<ServerToSegmentSetMap> getRoutingTables();
-  
-  boolean isPartitionAware();
-
-
+  List<Map<String, List<String>>> getRoutingTables();
 }

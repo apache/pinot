@@ -15,24 +15,23 @@
  */
 package com.linkedin.pinot.transport.perf;
 
+import com.linkedin.pinot.common.metrics.AggregatedHistogram;
+import com.linkedin.pinot.common.metrics.LatencyMetric;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
+import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import com.yammer.metrics.core.Histogram;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-
-import com.linkedin.pinot.common.metrics.AggregatedHistogram;
-import com.linkedin.pinot.common.metrics.LatencyMetric;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
-import com.linkedin.pinot.transport.config.RoutingTableConfig;
-import com.yammer.metrics.core.Histogram;
 
 public class ScatterGatherPerfTester {
 
@@ -122,28 +121,32 @@ public class ScatterGatherPerfTester {
       RoutingTableConfig config = new RoutingTableConfig();
       Map<String, PerTableRoutingConfig> cfg = config.getPerTableRoutingCfg();
       PerTableRoutingConfig c = new PerTableRoutingConfig(null);
-      Map<Integer, List<ServerInstance>> instanceMap = c.getNodeToInstancesMap();
-      port = _startPortNum;
+      Map<Integer, List<String>> instanceMap = c.getNodeToInstancesMap();
 
       int numUniqueServers = _remoteServerHosts.size();
 
       for (int i = 0; i < _numServers; i++) {
-        List<ServerInstance> instances = new ArrayList<ServerInstance>();
-        String server = null;
-        if (_mode == ExecutionMode.RUN_BOTH)
-          server = "localhost";
-        else
-          server = _remoteServerHosts.get(i%numUniqueServers);
-        ServerInstance instance = new ServerInstance(server, port++);
-        instances.add(instance);
-        instanceMap.put(i, instances);
+        List<String> serverNames = new ArrayList<>();
+        String host;
+        if (_mode == ExecutionMode.RUN_BOTH) {
+          host = "localhost";
+        } else {
+          host = _remoteServerHosts.get(i % numUniqueServers);
+        }
+        String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + host
+            + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + port++;
+        serverNames.add(serverName);
+        instanceMap.put(i, serverNames);
       }
-      String server = null;
-      if (_mode == ExecutionMode.RUN_BOTH)
-        server = "localhost";
-      else
-        server = _remoteServerHosts.get(0);
-      c.getDefaultServers().add(new ServerInstance(server, port - 1));
+      String host;
+      if (_mode == ExecutionMode.RUN_BOTH) {
+        host = "localhost";
+      } else {
+        host = _remoteServerHosts.get(0);
+      }
+      String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + host
+          + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + port++;
+      c.getDefaultServers().add(serverName);
       cfg.put(_resourceName, c);
 
       System.out.println("Routing Config is :" + cfg);

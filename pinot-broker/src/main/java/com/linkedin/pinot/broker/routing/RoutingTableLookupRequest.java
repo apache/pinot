@@ -15,40 +15,62 @@
  */
 package com.linkedin.pinot.broker.routing;
 
-import java.util.List;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.QuerySource;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nonnull;
 
 
 /**
- * Routing table lookup request. Future filtering parameters for lookup needs to be added here.
- *
- *
+ * The class <code>RoutingTableLookupRequest</code> encapsulates all the information needed for routing table lookup.
  */
 public class RoutingTableLookupRequest {
+  private static final String ROUTING_OPTIONS_KEY = "routingOptions";
 
-  private final String tableName;
+  private final BrokerRequest _brokerRequest;
+  private final String _tableName;
+  private final List<String> _routingOptions;
 
-  private final List<String> routingOptions;
-
-  private BrokerRequest brokerRequest;
-  
-  public String getTableName() {
-    return tableName;
-  }
-
-  public List<String> getRoutingOptions() {
-    return routingOptions;
-  }
-  
+  @Nonnull
   public BrokerRequest getBrokerRequest() {
-    return brokerRequest;
+    return _brokerRequest;
   }
 
-  public RoutingTableLookupRequest(String tableName, List<String> routingOptions, BrokerRequest brokerRequest) {
-    super();
-    this.tableName = tableName;
-    this.routingOptions = routingOptions;
-    this.brokerRequest = brokerRequest;
+  @Nonnull
+  public String getTableName() {
+    return _tableName;
+  }
+
+  @Nonnull
+  public List<String> getRoutingOptions() {
+    return _routingOptions;
+  }
+
+  public RoutingTableLookupRequest(@Nonnull BrokerRequest brokerRequest) {
+    _brokerRequest = brokerRequest;
+    _tableName = brokerRequest.getQuerySource().getTableName();
+
+    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
+    if (debugOptions == null || !debugOptions.containsKey(ROUTING_OPTIONS_KEY)) {
+      _routingOptions = Collections.emptyList();
+    } else {
+      _routingOptions =
+          Splitter.on(',').omitEmptyStrings().trimResults().splitToList(debugOptions.get(ROUTING_OPTIONS_KEY));
+    }
+  }
+
+  @VisibleForTesting
+  public RoutingTableLookupRequest(@Nonnull String tableName) {
+    _brokerRequest = new BrokerRequest();
+    QuerySource querySource = new QuerySource();
+    querySource.setTableName(tableName);
+    _brokerRequest.setQuerySource(querySource);
+
+    _tableName = tableName;
+    _routingOptions = Collections.emptyList();
   }
 }

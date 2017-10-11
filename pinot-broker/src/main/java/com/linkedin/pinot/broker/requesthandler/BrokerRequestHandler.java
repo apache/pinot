@@ -44,7 +44,6 @@ import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
@@ -52,7 +51,6 @@ import io.netty.buffer.ByteBuf;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -552,9 +550,10 @@ public class BrokerRequestHandler {
     // Step 1: find the candidate servers to be queried for each set of segments from the routing table.
     // TODO: add checks for whether all segments are covered.
     long routingStartTime = System.nanoTime();
-    Map<ServerInstance, SegmentIdSet> segmentServices = findCandidateServers(brokerRequest);
+    Map<String, List<String>> routingTable =
+        _routingTable.getRoutingTable(new RoutingTableLookupRequest(brokerRequest));
     phaseTimes.addToRoutingTime(System.nanoTime() - routingStartTime);
-    if (segmentServices == null || segmentServices.isEmpty()) {
+    if (routingTable == null || routingTable.isEmpty()) {
       String tableNameWithType = brokerRequest.getQuerySource().getTableName();
       LOGGER.info("No server found or all segments are pruned for table: {}", tableNameWithType);
       _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1L);
@@ -564,33 +563,11 @@ public class BrokerRequestHandler {
     // Step 2: select servers for each segment set and scatter request to the servers.
     long scatterStartTime = System.nanoTime();
     ScatterGatherRequestImpl scatterRequest =
-        new ScatterGatherRequestImpl(brokerRequest, segmentServices, requestId, _brokerTimeOutMs, _brokerId);
+        new ScatterGatherRequestImpl(brokerRequest, routingTable, requestId, _brokerTimeOutMs, _brokerId);
     CompositeFuture<ByteBuf> compositeFuture =
         _scatterGatherer.scatterGather(scatterRequest, scatterGatherStats, isOfflineTable, _brokerMetrics);
     phaseTimes.addToScatterTime(System.nanoTime() - scatterStartTime);
     return compositeFuture;
-  }
-
-  /**
-   * Find the candidate servers to be queried for each set of segments from the routing table.
-   *
-   * @param brokerRequest broker request.
-   * @return map from server to set of segments.
-   */
-  @Nullable
-  private Map<ServerInstance, SegmentIdSet> findCandidateServers(@Nonnull BrokerRequest brokerRequest) {
-    String tableName = brokerRequest.getQuerySource().getTableName();
-    List<String> routingOptions;
-    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
-    if (debugOptions == null || !debugOptions.containsKey("routingOptions")) {
-      routingOptions = Collections.emptyList();
-    } else {
-      routingOptions =
-          Splitter.on(",").omitEmptyStrings().trimResults().splitToList(debugOptions.get("routingOptions"));
-    }
-    RoutingTableLookupRequest routingTableLookupRequest =
-        new RoutingTableLookupRequest(tableName, routingOptions, brokerRequest);
-    return _routingTable.findServers(routingTableLookupRequest);
   }
 
   /**
@@ -704,32 +681,32 @@ public class BrokerRequestHandler {
 
   private static class ScatterGatherRequestImpl implements ScatterGatherRequest {
     private final BrokerRequest _brokerRequest;
-    private final Map<ServerInstance, SegmentIdSet> _segmentServices;
+    private final Map<String, List<String>> _routingTable;
     private final long _requestId;
     private final long _requestTimeoutMs;
     private final String _brokerId;
 
-    public ScatterGatherRequestImpl(BrokerRequest request, Map<ServerInstance, SegmentIdSet> segmentServices,
-        long requestId, long requestTimeoutMs, String brokerId) {
+    public ScatterGatherRequestImpl(BrokerRequest request, Map<String, List<String>> routingTable, long requestId,
+        long requestTimeoutMs, String brokerId) {
       _brokerRequest = request;
-      _segmentServices = segmentServices;
+      _routingTable = routingTable;
       _requestId = requestId;
       _requestTimeoutMs = requestTimeoutMs;
       _brokerId = brokerId;
     }
 
     @Override
-    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
-      return _segmentServices;
+    public Map<String, List<String>> getRoutingTable() {
+      return _routingTable;
     }
 
     @Override
-    public byte[] getRequestForService(ServerInstance service, SegmentIdSet querySegments) {
+    public byte[] getRequestForService(List<String> segments) {
       InstanceRequest r = new InstanceRequest();
       r.setRequestId(_requestId);
       r.setEnableTrace(_brokerRequest.isEnableTrace());
       r.setQuery(_brokerRequest);
-      r.setSearchSegments(querySegments.getSegmentsNameList());
+      r.setSearchSegments(segments);
       r.setBrokerId(_brokerId);
       // _serde is not threadsafe.
       return new SerDe(new TCompactProtocol.Factory()).serialize(r);
