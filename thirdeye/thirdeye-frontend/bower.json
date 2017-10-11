@@ -2,7 +2,7 @@
   "name": "thirdeye-frontend",
   "dependencies": {
     "d3": "^3.5.17",
-    "c3": "https://github.com/apucher/c3.git#c811120f27efa5b3f2cfcb49a53b1f60347798fa",
+    "c3": "https://github.com/apucher/c3.git#9f258d5082769c59b13f12979b7cc7a513f2638d",
     "source-sans-pro": "https://github.com/adobe-fonts/source-sans-pro.git#release"
   }
 }
