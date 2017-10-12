@@ -28,17 +28,17 @@ import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
 
 public class DateTimeFieldSpecUtils {
 
-  private static final String FORMAT_TOKENS_ERROR_STR =
+  public static final String FORMAT_TOKENS_ERROR_STR =
       "format must be of pattern size:timeunit:timeformat(:pattern)";
-  private static final String FORMAT_PATTERN_ERROR_STR =
+  public static final String FORMAT_PATTERN_ERROR_STR =
       "format must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)";
-  private static final String TIME_FORMAT_ERROR_STR =
+  public static final String TIME_FORMAT_ERROR_STR =
       "format must be of format [0-9]+:<TimeUnit>:EPOCH or [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:<format>";
-  private static final String GRANULARITY_TOKENS_ERROR_STR =
+  public static final String GRANULARITY_TOKENS_ERROR_STR =
       "granularity must be of format size:timeunit";
-  private static final String GRANULARITY_PATTERN_ERROR_STR =
+  public static final String GRANULARITY_PATTERN_ERROR_STR =
       "granularity must be of format [0-9]+:<TimeUnit>";
-  private static final String NUMBER_REGEX = "[1-9][0-9]*";
+  public static final String NUMBER_REGEX = "[1-9][0-9]*";
 
   public static final String COLON_SEPARATOR = ":";
 
@@ -54,6 +54,7 @@ public class DateTimeFieldSpecUtils {
   public static final int GRANULARITY_SIZE_POSITION = 0;
   public static final int GRANULARITY_UNIT_POSITION = 1;
   public static final int MAX_GRANULARITY_TOKENS = 2;
+
 
   /**
    * Constructs a dateTimeSpec format, given the components of a format
@@ -108,12 +109,13 @@ public class DateTimeFieldSpecUtils {
   /**
    * Extracts the column size from the format of a dateTimeSpec
    * (1st token in colon separated format)
+   * This method should not do validation of outputGranularity.
+   * The validation should be handled by caller using {@link #isValidFormat(String)}
    * eg: if format=1:HOURS:EPOCH, will return 1
    * @return
    */
   @JsonIgnore
   public static int getColumnSizeFromFormat(String format) {
-    Preconditions.checkArgument(isValidFormat(format));
     String[] formatTokens = format.split(COLON_SEPARATOR);
     int size = Integer.valueOf(formatTokens[FORMAT_SIZE_POSITION]);
     return size;
@@ -122,12 +124,13 @@ public class DateTimeFieldSpecUtils {
   /**
    * Extracts the column unit from the format of a dateTimeSpec
    * (2nd token in colon separated format)
+   * This method should not do validation of outputGranularity.
+   * The validation should be handled by caller using {@link #isValidFormat(String)}
    * eg: if format=5:MINUTES:EPOCH, will return MINUTES
    * @return
    */
   @JsonIgnore
   public static TimeUnit getColumnUnitFromFormat(String format) {
-    Preconditions.checkArgument(isValidFormat(format));
     String[] formatTokens = format.split(COLON_SEPARATOR);
     TimeUnit unit = TimeUnit.valueOf(formatTokens[FORMAT_UNIT_POSITION]);
     return unit;
@@ -136,12 +139,13 @@ public class DateTimeFieldSpecUtils {
   /**
    * Extracts the TimeFormat from the format of a dateTimeSpec
    * (3rd token in colon separated format)
+   * This method should not do validation of outputGranularity.
+   * The validation should be handled by caller using {@link #isValidFormat(String)}
    * eg: if format=1:DAYS:EPOCH, will return EPOCH
    * @return
    */
   @JsonIgnore
   public static TimeFormat getTimeFormatFromFormat(String format) {
-    Preconditions.checkArgument(isValidFormat(format));
     String[] formatTokens = format.split(COLON_SEPARATOR);
     TimeFormat timeFormat = TimeFormat.valueOf(formatTokens[FORMAT_TIMEFORMAT_POSITION]);
     return timeFormat;
@@ -150,27 +154,29 @@ public class DateTimeFieldSpecUtils {
   /**
    * Extracts the simmple date format pattern from the format of a dateTimeSpec
    * (4th token in colon separated format in case of TimeFormat=SIMPLE_DATE_FORMAT)
+   * This method should not do validation of outputGranularity.
+   * The validation should be handled by caller using {@link #isValidFormat(String)}
    * eg: if format=1:HOURS:EPOCH, will throw exception
    * if format=1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH will return yyyyMMddHH
    * @return
    */
   @JsonIgnore
   public static String getSDFPatternFromFormat(String format) {
-    Preconditions.checkArgument(isValidFormat(format));
     String pattern = null;
-    String[] formatTokens = format.split(COLON_SEPARATOR);
-    Preconditions.checkArgument(formatTokens.length == MAX_FORMAT_TOKENS,
-        "SDF pattern does not exist for given format");
-    Preconditions.checkArgument(
-        formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-        "third token must be SIMPLE_DATE_FORMAT for an sdf pattern");
-    pattern = formatTokens[FORMAT_PATTERN_POSITION];
+    // split with limit, as pattern can have ':'
+    String[] formatTokens = format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
+    if (formatTokens.length == MAX_FORMAT_TOKENS) {
+      pattern = formatTokens[FORMAT_PATTERN_POSITION];
+    }
     return pattern;
   }
 
+
   /**
    * <ul>
-   * <li>Given a timestamp in millis, convert it to the given format</li>
+   * <li>Given a timestamp in millis, convert it to the given format
+   * This method should not do validation of outputGranularity.
+   * The validation should be handled by caller using {@link #isValidFormat(String)}</li>
    * <ul>
    * <li>1) given dateTimeColumnValueMS = 1498892400000 and format=1:HOURS:EPOCH,
    * dateTimeSpec.fromMillis(1498892400000) = 416359 (i.e. dateTimeColumnValueMS/(1000*60*60))</li>
@@ -189,12 +195,10 @@ public class DateTimeFieldSpecUtils {
   public static <T extends Object> T fromMillisToFormat(Long dateTimeColumnValueMS,
       String toFormat, Class<T> type) {
     Preconditions.checkNotNull(dateTimeColumnValueMS);
-    Preconditions.checkArgument(isValidFormat(toFormat));
 
     Object dateTimeColumnValue = null;
 
     TimeFormat timeFormat = getTimeFormatFromFormat(toFormat);
-
     if (timeFormat.equals(TimeFormat.EPOCH)) {
       int size = getColumnSizeFromFormat(toFormat);
       TimeUnit unit = getColumnUnitFromFormat(toFormat);
@@ -209,7 +213,9 @@ public class DateTimeFieldSpecUtils {
 
   /**
    * <ul>
-   * <li>Convert a time value in a format, to millis</li>
+   * <li>Convert a time value in a format, to millis.
+   * This method should not do validation of outputGranularity.
+   * The validation should be handled by caller using {@link #isValidFormat(String)}</li>
    * <ul>
    * <li>1) given dateTimeColumnValue = 416359 and format=1:HOURS:EPOCH
    * dateTimeSpec.toMillis(416359) = 1498892400000 (i.e. timeColumnValue*60*60*1000)</li>
@@ -226,12 +232,10 @@ public class DateTimeFieldSpecUtils {
   @JsonIgnore
   public static Long fromFormatToMillis(Object dateTimeColumnValue, String fromFormat) {
     Preconditions.checkNotNull(dateTimeColumnValue);
-    Preconditions.checkArgument(isValidFormat(fromFormat));
 
     Long timeColumnValueMS = 0L;
 
     TimeFormat timeFormat = getTimeFormatFromFormat(fromFormat);
-
     if (timeFormat.equals(TimeFormat.EPOCH)) {
       int size = getColumnSizeFromFormat(fromFormat);
       TimeUnit unit = getColumnUnitFromFormat(fromFormat);
@@ -240,7 +244,7 @@ public class DateTimeFieldSpecUtils {
       String pattern = getSDFPatternFromFormat(fromFormat);
       timeColumnValueMS =
           DateTimeFormat.forPattern(pattern).withZoneUTC()
-              .parseMillis((String) dateTimeColumnValue);
+              .parseMillis(String.valueOf(dateTimeColumnValue));
     }
 
     return timeColumnValueMS;
@@ -248,7 +252,9 @@ public class DateTimeFieldSpecUtils {
 
   /**
    * <ul>
-   * <li>Convert a granularity to millis</li>
+   * <li>Convert a granularity to millis.
+   * This method should not do validation of outputGranularity.
+   * The validation should be handled by caller using {@link #isValidGranularity(String)}</li>
    * <ul>
    * <li>1) granularityToMillis(1:HOURS) = 3600000 (60*60*1000)</li>
    * <li>2) granularityToMillis(1:MILLISECONDS) = 1</li>
@@ -260,35 +266,20 @@ public class DateTimeFieldSpecUtils {
    */
   @JsonIgnore
   public static Long granularityToMillis(String granularity) {
-    Preconditions.checkArgument(isValidGranularity(granularity));
 
     long granularityInMillis = 0;
 
     String[] granularityTokens = granularity.split(COLON_SEPARATOR);
-    Preconditions.checkArgument(granularityTokens.length == MAX_GRANULARITY_TOKENS,
-        "granularity must have 2 tokens of format [0-9]+:<TimeUnit>");
-
-    granularityInMillis =
-        TimeUnit.MILLISECONDS.convert(
-            Integer.valueOf(granularityTokens[GRANULARITY_SIZE_POSITION]),
-            TimeUnit.valueOf(granularityTokens[GRANULARITY_UNIT_POSITION]));
+    if (granularityTokens.length == MAX_GRANULARITY_TOKENS) {
+      granularityInMillis =
+          TimeUnit.MILLISECONDS.convert(
+              Integer.valueOf(granularityTokens[GRANULARITY_SIZE_POSITION]),
+              TimeUnit.valueOf(granularityTokens[GRANULARITY_UNIT_POSITION]));
+    }
     return granularityInMillis;
   }
 
-  /**
-   * Helper method to bucket a given timestamp in millis, into a bucket granularity
-   * @param dateTimeColumnValueMS - value to bucket
-   * @param outputGranularity - granularity to bucket into
-   * @return millis value, bucketed in the granularity
-   */
-  public static Long bucketDateTimeValueMS(Long dateTimeColumnValueMS, String outputGranularity) {
-    Preconditions.checkNotNull(dateTimeColumnValueMS);
-    Preconditions.checkArgument(isValidGranularity(outputGranularity));
 
-    long granularityMillis = DateTimeFieldSpecUtils.granularityToMillis(outputGranularity);
-    long bucketedDateTimeValueMS = (dateTimeColumnValueMS / granularityMillis) * granularityMillis;
-    return bucketedDateTimeValueMS;
-  }
 
   /**
    * Check correctness of format of {@link DateTimeFieldSpec}
@@ -298,7 +289,7 @@ public class DateTimeFieldSpecUtils {
   public static boolean isValidFormat(String format) {
 
     Preconditions.checkNotNull(format);
-    String[] formatTokens = format.split(COLON_SEPARATOR);
+    String[] formatTokens = format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     Preconditions.checkArgument(formatTokens.length == MIN_FORMAT_TOKENS
         || formatTokens.length == MAX_FORMAT_TOKENS, FORMAT_TOKENS_ERROR_STR);
     Preconditions.checkArgument(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX)

@@ -67,6 +67,10 @@ public class DateTimeFieldSpecUtilsTest {
         "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", "20170701 00 -07:00",
         1498892400000L
     });
+    entries.add(new Object[] {
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "8/7/2017 12:45:50 AM",
+        1502066750000L
+    });
     return entries.toArray(new Object[entries.size()][]);
   }
 
@@ -107,6 +111,14 @@ public class DateTimeFieldSpecUtilsTest {
     entries.add(new Object[] {
         "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH Z", 1498892400000L, String.class,
         DateTimeFormat.forPattern("yyyyMMdd HH Z").withZoneUTC().print(1498892400000L)
+    });
+    entries.add(new Object[] {
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1498892400000L, String.class,
+        DateTimeFormat.forPattern("M/d/yyyy h:mm:ss a").withZoneUTC().print(1498892400000L)
+    });
+    entries.add(new Object[] {
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", 1502066750000L, String.class,
+        DateTimeFormat.forPattern("M/d/yyyy h a").withZoneUTC().print(1502066750000L)
     });
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -160,6 +172,12 @@ public class DateTimeFieldSpecUtilsTest {
         "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.HOURS,
         com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "yyyyMMdd HH"
+    });
+
+    entries.add(new Object[] {
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1, TimeUnit.HOURS,
+        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        "M/d/yyyy h:mm:ss a"
     });
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -223,7 +241,10 @@ public class DateTimeFieldSpecUtilsTest {
     entries.add(new Object[] {
         -1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMDD", null, null
     });
-
+    entries.add(new Object[] {
+        1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "M/d/yyyy h:mm:ss a", null,
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a"
+    });
     return entries.toArray(new Object[entries.size()][]);
   }
 
@@ -290,64 +311,13 @@ public class DateTimeFieldSpecUtilsTest {
         "15:MINUTES", 900000L
     });
     entries.add(new Object[] {
-        "0:HOURS", null
+        "0:HOURS", 0L
     });
     entries.add(new Object[] {
         null, null
     });
     entries.add(new Object[] {
         "1:DUMMY", null
-    });
-
-    return entries.toArray(new Object[entries.size()][]);
-  }
-
-  // Test bucket millis to granularity
-  @Test(dataProvider = "testBucketMillisDataProvider")
-  public void testBucketMillis(Long dateTimeColumnValueMS, String outputGranularity,
-      Long expectedBucketedMillis) {
-    Long bucketedMillis = null;
-    try {
-      bucketedMillis =
-          DateTimeFieldSpecUtils.bucketDateTimeValueMS(dateTimeColumnValueMS, outputGranularity);
-    } catch (Exception e) {
-      // invalid arguments
-    }
-    Assert.assertEquals(bucketedMillis, expectedBucketedMillis);
-  }
-
-  @DataProvider(name = "testBucketMillisDataProvider")
-  public Object[][] provideTestBucketMillisData() {
-
-    List<Object[]> entries = new ArrayList<>();
-
-    entries.add(new Object[] {
-        1498892400000L, "1:MILLISECONDS", 1498892400000L
-    });
-    entries.add(new Object[] {
-        0L, "1:HOURS", 0L
-    });
-    entries.add(new Object[] {
-        null, "1:HOURS", null
-    });
-    entries.add(new Object[] {
-        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:SECONDS", 1498919002000L
-    /* Rounded to seconds 2017-07-01T07:23:22 000 */
-    });
-    entries.add(new Object[] {
-        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:MINUTES", 1498918980000L
-    /* Rounded to minutes 2017-07-01T07:23:00 000 */
-    });
-    entries.add(new Object[] {
-        1498919002080L /* 2017-07-01T07:23:22 080 */, "5:MINUTES", 1498918800000L
-    /* Rounded to 5 minutes 2017-07-01T07:20:00 000 */
-    });
-    entries.add(new Object[] {
-        1498919002080L /* 2017-07-01T07:23:22 080 */, "1:HOURS", 1498917600000L
-    /* Rounded to 1 hours 2017-07-01T07:20:00 000 */
-    });
-    entries.add(new Object[] {
-        1498892400000L, null, null
     });
 
     return entries.toArray(new Object[entries.size()][]);

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.query.transform;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
 
 
@@ -35,6 +36,13 @@ public class TransformTestUtils {
   public static class TestBlockValSet extends BaseBlockValSet {
     private Object _values;
     private int _numDocs;
+    private DataType _dataType;
+
+    public TestBlockValSet(Object values, int numDocs, DataType dataType) {
+      _values = values;
+      _numDocs = numDocs;
+      _dataType = dataType;
+    }
 
     public TestBlockValSet(Object values, int numDocs) {
       _values = values;
@@ -49,6 +57,16 @@ public class TransformTestUtils {
     @Override
     public double[] getDoubleValuesSV() {
       return (double[]) _values;
+    }
+
+    @Override
+    public String[] getStringValuesSV() {
+      return (String[]) _values;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return _dataType;
     }
 
     @Override
