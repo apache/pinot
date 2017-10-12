@@ -16,12 +16,13 @@
 package com.linkedin.pinot.hadoop.job;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -36,22 +37,15 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob.HadoopSegmentCreationMapper;
 
 
 public class SegmentCreationJob extends Configured {
 
   private static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
   private static final String TEMP = "temp";
-  private static final String PATH_TO_OUTPUT = "path.to.output";
   private static final String PATH_TO_SCHEMA = "path.to.schema";
-  private static final String PATH_TO_INPUT = "path.to.input";
-  private static final String SEGMENT_TABLE_NAME = "segment.table.name";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationJob.class);
 
@@ -70,9 +64,9 @@ public class SegmentCreationJob extends Configured {
     _jobName = jobName;
     _properties = properties;
 
-    _inputSegmentDir = _properties.getProperty(PATH_TO_INPUT);
+    _inputSegmentDir = _properties.getProperty(JobConfigConstants.PATH_TO_INPUT);
     String schemaFilePath = _properties.getProperty(PATH_TO_SCHEMA);
-    _outputDir = _properties.getProperty(PATH_TO_OUTPUT);
+    _outputDir = getOutputDir();
     _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
 
@@ -83,13 +77,24 @@ public class SegmentCreationJob extends Configured {
     LOGGER.info("path.to.deps.jar: {}", _depsJarPath);
     LOGGER.info("path.to.output: {}", _outputDir);
     LOGGER.info("path.to.schema: {}", schemaFilePath);
-    _dataSchema = Schema.fromFile(new File(schemaFilePath));
+    if (schemaFilePath != null) {
+      _dataSchema = Schema.fromFile(new File(schemaFilePath));
+    } else {
+      _dataSchema = null;
+    }
     LOGGER.info("schema: {}", _dataSchema);
     LOGGER.info("*********************************************************************");
+  }
 
-    if (getConf().get(SEGMENT_TABLE_NAME, null) == null) {
-      getConf().set(SEGMENT_TABLE_NAME, _dataSchema.getSchemaName());
-    }
+  protected String getOutputDir() {
+    return _properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT);
+  }
+
+  protected String getInputDir() {
+    return _inputSegmentDir;
+  }
+
+  protected void setOutputPath(Configuration configuration) {
 
   }
 
@@ -107,7 +112,7 @@ public class SegmentCreationJob extends Configured {
     fs.mkdirs(new Path(_stagingDir + "/input/"));
 
     if (fs.exists(new Path(_outputDir))) {
-      LOGGER.warn("Found the output folder, deleting it");
+      LOGGER.warn("Found the output folder {}, deleting it", _outputDir);
       fs.delete(new Path(_outputDir), true);
     }
     fs.mkdirs(new Path(_outputDir));
@@ -117,11 +122,16 @@ public class SegmentCreationJob extends Configured {
     for (FileStatus fileStatus : fileStatusArr) {
       inputDataFiles.addAll(getDataFilesFromPath(fs, fileStatus.getPath()));
     }
+    if (inputDataFiles.isEmpty()) {
+      LOGGER.error("No Input paths {}", inputPathPattern);
+      throw new RuntimeException("No input files " + inputPathPattern);
+    }
 
     for (int seqId = 0; seqId < inputDataFiles.size(); ++seqId) {
       FileStatus file = inputDataFiles.get(seqId);
       String completeFilePath = " " + file.getPath().toString() + " " + seqId;
-      Path newOutPutFile = new Path((_stagingDir + "/input/" + file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_') + ".txt"));
+      Path newOutPutFile = new Path((_stagingDir + "/input/" +
+          file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_') + ".txt"));
       FSDataOutputStream stream = fs.create(newOutPutFile);
       stream.writeUTF(completeFilePath);
       stream.flush();
@@ -130,10 +140,12 @@ public class SegmentCreationJob extends Configured {
 
     Job job = Job.getInstance(getConf());
 
+    setAdditionalJobProperties(job);
+
     job.setJarByClass(SegmentCreationJob.class);
     job.setJobName(_jobName);
 
-    job.setMapperClass(HadoopSegmentCreationMapper.class);
+    setMapperClass(job);
 
     if (System.getenv("HADOOP_TOKEN_FILE_LOCATION") != null) {
       job.getConfiguration().set("mapreduce.job.credentials.binary", System.getenv("HADOOP_TOKEN_FILE_LOCATION"));
@@ -149,10 +161,11 @@ public class SegmentCreationJob extends Configured {
     FileOutputFormat.setOutputPath(job, new Path(_stagingDir + "/output/"));
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
-    job.getConfiguration().set("data.schema", new ObjectMapper().writeValueAsString(_dataSchema));
+    if (_dataSchema != null) {
+      job.getConfiguration().set("data.schema", _dataSchema.toString());
+    }
+    setOutputPath(job.getConfiguration());
 
-    job.setMaxReduceAttempts(1);
-    job.setMaxMapAttempts(0);
     job.setNumReduceTasks(0);
     for (Object key : _properties.keySet()) {
       job.getConfiguration().set(key.toString(), _properties.getProperty(key.toString()));
@@ -168,16 +181,30 @@ public class SegmentCreationJob extends Configured {
       throw new RuntimeException("Job failed : " + job);
     }
 
-    LOGGER.info("Moving Segment Tar files from {} to: {}", _stagingDir + "/output/segmentTar", _outputDir);
-    FileStatus[] segmentArr = fs.listStatus(new Path(_stagingDir + "/output/segmentTar"));
-    for (FileStatus segment : segmentArr) {
-      fs.rename(segment.getPath(), new Path(_outputDir, segment.getPath().getName()));
-    }
+    moveToOutputDirectory(fs);
 
     // Delete temporary directory.
     LOGGER.info("Cleanup the working directory.");
     LOGGER.info("Deleting the dir: {}", _stagingDir);
     fs.delete(new Path(_stagingDir), true);
+  }
+
+  protected void setAdditionalJobProperties(Job job) throws Exception {
+
+  }
+
+  protected void moveToOutputDirectory(FileSystem fs) throws Exception {
+    LOGGER.info("Moving Segment Tar files from {} to: {}", _stagingDir + "/output/segmentTar", _outputDir);
+    FileStatus[] segmentArr = fs.listStatus(new Path(_stagingDir + "/output/segmentTar"));
+    for (FileStatus segment : segmentArr) {
+      fs.rename(segment.getPath(), new Path(_outputDir, segment.getPath().getName()));
+    }
+  }
+
+  protected Job setMapperClass(Job job) {
+    job.setMapperClass(HadoopSegmentCreationMapReduceJob.HadoopSegmentCreationMapper.class);
+    return job;
+
   }
 
   private void addDepsJarToDistributedCache(Path path, Job job) throws IOException {
