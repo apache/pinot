@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec.DerivedMetricType;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 
+import com.linkedin.pinot.startree.hll.HllSizeUtils;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -50,7 +51,7 @@ public class MetricBuffer {
       if (copyValue instanceof HyperLogLog) {
         // deep copy of hll field
         this.values[i] = HllUtil.clone((HyperLogLog)copyValue,
-            HllUtil.getLog2mFromHllFieldSize(copy.metricFieldSpecs.get(i).getFieldSize()));
+            HllSizeUtils.getLog2mFromHllFieldSize(copy.metricFieldSpecs.get(i).getFieldSize()));
       } else if (copyValue instanceof Number) {
         // number field is immutable
         this.values[i] = copyValue;
