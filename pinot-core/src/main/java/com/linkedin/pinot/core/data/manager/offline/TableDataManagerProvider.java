@@ -15,17 +15,16 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
- * Provide static function to get PartitionDataManager implementation.
- *
+ * Factory for {@link TableDataManager}.
  */
 public class TableDataManagerProvider {
   private TableDataManagerProvider() {
@@ -34,12 +33,9 @@ public class TableDataManagerProvider {
   private static final String OFFLINE_TABLE_DATA_MANAGER_TYPE = "OFFLINE";
   private static final String REALTIME_TABLE_DATA_MANAGER_TYPE = "REALTIME";
 
-  private static ServerMetrics _serverMetrics;
-
   public static TableDataManager getTableDataManager(@Nonnull TableDataManagerConfig tableDataManagerConfig,
-      @Nullable String serverInstance) {
-    Preconditions.checkNotNull(_serverMetrics);
-
+      @Nonnull String instanceId, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull ServerMetrics serverMetrics) {
     String tableDataManagerType = tableDataManagerConfig.getTableDataManagerType().toUpperCase();
     TableDataManager tableDataManager;
     switch (tableDataManagerType) {
@@ -54,15 +50,7 @@ public class TableDataManagerProvider {
             "Unsupported table data manager type: " + tableDataManagerType + " for table: "
                 + tableDataManagerConfig.getTableName());
     }
-    tableDataManager.init(tableDataManagerConfig, _serverMetrics, serverInstance);
+    tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics);
     return tableDataManager;
-  }
-
-  public static void setServerMetrics(ServerMetrics serverMetrics) {
-    _serverMetrics = serverMetrics;
-  }
-
-  public static ServerMetrics getServerMetrics() {
-    return _serverMetrics;
   }
 }

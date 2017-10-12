@@ -17,14 +17,11 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import java.io.File;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -37,14 +34,12 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
  */
 public interface TableDataManager {
 
-  void init(@Nonnull TableDataManagerConfig tableDataManagerConfig, @Nonnull ServerMetrics serverMetrics,
-      @Nullable String serverInstance);
+  void init(@Nonnull TableDataManagerConfig tableDataManagerConfig, @Nonnull String instanceId,
+      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull ServerMetrics serverMetrics);
 
   void start();
 
   void shutDown();
-
-  boolean isStarted();
 
   /**
    * Adds a loaded {@link IndexSegment} into the table.
@@ -54,19 +49,14 @@ public interface TableDataManager {
   /**
    * Adds a segment from local disk into the OFFLINE table.
    */
-  // TODO: here maybe better to pass in indexDir instead of metadata
-  void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
-      throws Exception;
+  void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception;
 
   /**
    * Adds a segment into the REALTIME table.
    * <p>The segment could be committed or under consuming.
    */
-  void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull TableConfig tableConfig,
-      @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
-      @Nonnull IndexLoadingConfig indexLoadingConfig)
-      throws Exception;
+  void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
+      @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception;
 
   /**
    * Removes a segment from the table.
