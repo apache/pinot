@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datasource;
 
+import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
@@ -45,7 +46,7 @@ import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 /**
  * Singleton service registry for Data Access Objects (DAOs)
  */
-public class DAORegistry {
+public class DAORegistry implements DaoProvider{
 
   private static final DAORegistry INSTANCE = new DAORegistry();
 
@@ -79,85 +80,108 @@ public class DAORegistry {
    * GETTERS/SETTERS
    */
 
+  @Override
   public AnomalyFunctionManager getAnomalyFunctionDAO() {
     return DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
   }
 
+  @Override
   public AlertConfigManager getAlertConfigDAO() {
     return DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
   }
 
-
+  @Override
   public RawAnomalyResultManager getRawAnomalyResultDAO() {
     return DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
   }
 
+  @Override
   public MergedAnomalyResultManager getMergedAnomalyResultDAO() {
     return DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
   }
 
+  @Override
   public JobManager getJobDAO() {
     return DaoProviderUtil.getInstance(JobManagerImpl.class);
   }
 
+  @Override
   public TaskManager getTaskDAO() {
     return DaoProviderUtil.getInstance(TaskManagerImpl.class);
   }
 
+  @Override
   public DatasetConfigManager getDatasetConfigDAO() {
     return DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);
   }
 
+  @Override
   public MetricConfigManager getMetricConfigDAO() {
     return DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
   }
 
-
+  @Override
   public DashboardConfigManager getDashboardConfigDAO() {
     return DaoProviderUtil.getInstance(DashboardConfigManagerImpl.class);
   }
 
+  @Override
   public OverrideConfigManager getOverrideConfigDAO() {
     return DaoProviderUtil.getInstance(OverrideConfigManagerImpl.class);
   }
 
+  @Override
   public DataCompletenessConfigManager getDataCompletenessConfigDAO() {
     return DaoProviderUtil.getInstance(DataCompletenessConfigManagerImpl.class);
   }
 
+  @Override
   public EventManager getEventDAO() {
     return DaoProviderUtil.getInstance(EventManagerImpl.class);
   }
 
+  @Override
   public DetectionStatusManager getDetectionStatusDAO() {
     return DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
   }
 
+  @Override
   public AutotuneConfigManager getAutotuneConfigDAO() {
     return DaoProviderUtil.getInstance(AutotuneConfigManagerImpl.class);
   }
 
+  @Override
   public ClassificationConfigManager getClassificationConfigDAO() {
     return DaoProviderUtil.getInstance(ClassificationConfigManagerImpl.class);
   }
 
+  @Override
   public EntityToEntityMappingManager getEntityToEntityMappingDAO() {
     return DaoProviderUtil.getInstance(EntityToEntityMappingManagerImpl.class);
   }
 
+  @Override
   public GroupedAnomalyResultsManager getGroupedAnomalyResultsDAO() {
     return DaoProviderUtil.getInstance(GroupedAnomalyResultsManagerImpl.class);
   }
 
+  @Override
   public OnboardDatasetMetricManager getOnboardDatasetMetricDAO() {
     return DaoProviderUtil.getInstance(OnboardDatasetMetricManagerImpl.class);
   }
 
+  @Override
   public ConfigManager getConfigDAO() {
     return DaoProviderUtil.getInstance(ConfigManagerImpl.class);
   }
 
+  @Override
   public ApplicationManager getApplicationDAO() {
     return DaoProviderUtil.getInstance(ApplicationManagerImpl.class);
+  }
+
+  @Override
+  public void restart(){
+
   }
 }

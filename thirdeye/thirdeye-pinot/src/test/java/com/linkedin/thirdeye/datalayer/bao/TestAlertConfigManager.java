@@ -1,23 +1,27 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class TestAlertConfigManager extends AbstractManagerTestBase {
+public class TestAlertConfigManager{
 
   Long alertConfigid;
 
+  private DaoProvider DAO_REGISTRY;
+  private AlertConfigManager alertConfigDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    DAO_REGISTRY = DAOTestBase.getInstance();
+    alertConfigDAO = DAO_REGISTRY.getAlertConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    DAO_REGISTRY.restart();
   }
 
   @Test

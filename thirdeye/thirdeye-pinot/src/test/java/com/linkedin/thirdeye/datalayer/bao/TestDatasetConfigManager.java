@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoProvider;
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import java.util.List;
 import org.testng.Assert;
@@ -7,32 +9,35 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class TestDatasetConfigManager extends AbstractManagerTestBase {
+public class TestDatasetConfigManager {
 
   private Long datasetConfigId1;
   private Long datasetConfigId2;
   private static String collection1 = "my dataset1";
   private static String collection2 = "my dataset2";
 
+  private DaoProvider DAO_REGISTRY;
+  private DatasetConfigManager datasetConfigDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    DAO_REGISTRY = DAOTestBase.getInstance();
+    datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    DAO_REGISTRY.restart();
   }
 
   @Test
   public void testCreate() {
 
-    DatasetConfigDTO datasetConfig1 = getTestDatasetConfig(collection1);
+    DatasetConfigDTO datasetConfig1 = DaoTestUtils.getTestDatasetConfig(collection1);
     datasetConfig1.setRequiresCompletenessCheck(true);
     datasetConfigId1 = datasetConfigDAO.save(datasetConfig1);
     Assert.assertNotNull(datasetConfigId1);
 
-    DatasetConfigDTO datasetConfig2 = getTestDatasetConfig(collection2);
+    DatasetConfigDTO datasetConfig2 = DaoTestUtils.getTestDatasetConfig(collection2);
     datasetConfig2.setActive(false);
     datasetConfig2.setRequiresCompletenessCheck(true);
     datasetConfigId2 = datasetConfigDAO.save(datasetConfig2);

@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoProvider;
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -10,19 +12,24 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
-public class TestAnomalyResultManager extends AbstractManagerTestBase {
+public class TestAnomalyResultManager {
 
   RawAnomalyResultDTO anomalyResult;
-  AnomalyFunctionDTO spec = getTestFunctionSpec("metric", "dataset");
+  AnomalyFunctionDTO spec = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
 
+  private DaoProvider DAO_REGISTRY;
+  private AnomalyFunctionManager anomalyFunctionDAO;
+  private RawAnomalyResultManager rawAnomalyResultDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    DAO_REGISTRY = DAOTestBase.getInstance();
+    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    DAO_REGISTRY.restart();
   }
 
   @Test
@@ -31,7 +38,7 @@ public class TestAnomalyResultManager extends AbstractManagerTestBase {
     Assert.assertNotNull(spec);
 
     // create anomaly result
-    anomalyResult = getAnomalyResult();
+    anomalyResult = DaoTestUtils.getAnomalyResult();
 
     anomalyResult.setFunction(spec);
     rawAnomalyResultDAO.save(anomalyResult);

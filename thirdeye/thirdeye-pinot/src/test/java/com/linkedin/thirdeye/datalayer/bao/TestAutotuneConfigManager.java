@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
+import com.linkedin.thirdeye.datalayer.DaoProvider;
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import java.util.List;
@@ -10,29 +12,35 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class TestAutotuneConfigManager extends AbstractManagerTestBase {
+public class TestAutotuneConfigManager {
   private long autotuneId;
-  AnomalyFunctionDTO function = getTestFunctionSpec("metric", "dataset");
+  AnomalyFunctionDTO function = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
   private long functionId = 1l;
   private static long start = 1l;
   private static long end = 2l;
 
+  private DaoProvider DAO_REGISTRY;
+  private AnomalyFunctionManager anomalyFunctionDAO;
+  private AutotuneConfigManager autotuneConfigDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    DAO_REGISTRY = DAOTestBase.getInstance();
+    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    DAO_REGISTRY.restart();
   }
+
   @Test
   public void testCreate() {
     functionId = anomalyFunctionDAO.save(function);
     Assert.assertNotNull(function.getId());
 
     autotuneId = autotuneConfigDAO.save(
-        getTestAutotuneConfig(functionId, start, end)
+        DaoTestUtils.getTestAutotuneConfig(functionId, start, end)
     );
     Assert.assertNotNull(autotuneId);
 

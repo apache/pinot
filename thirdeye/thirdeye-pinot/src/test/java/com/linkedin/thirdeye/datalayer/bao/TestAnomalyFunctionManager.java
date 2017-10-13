@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoProvider;
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import java.util.List;
 
 import org.testng.Assert;
@@ -10,25 +12,28 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
-public class TestAnomalyFunctionManager extends AbstractManagerTestBase {
+public class TestAnomalyFunctionManager {
 
   private Long anomalyFunctionId;
   private static String collection = "my dataset";
   private static String metricName = "__counts";
 
+  private DaoProvider DAO_REGISTRY;
+  private AnomalyFunctionManager anomalyFunctionDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    DAO_REGISTRY = DAOTestBase.getInstance();
+    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    DAO_REGISTRY.restart();
   }
 
   @Test
   public void testCreate() {
-    anomalyFunctionId = anomalyFunctionDAO.save(getTestFunctionSpec(metricName, collection));
+    anomalyFunctionId = anomalyFunctionDAO.save(DaoTestUtils.getTestFunctionSpec(metricName, collection));
     Assert.assertNotNull(anomalyFunctionId);
 
     // test fetch all

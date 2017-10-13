@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye;
 
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
-import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
+import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -53,7 +53,7 @@ public class TestDBResources {
   }
 
   private void init() throws Exception {
-    URL url = AbstractManagerTestBase.class.getResource("/persistence-local.yml");
+    URL url = DAOTestBase.class.getResource("/persistence-local.yml");
     File configFile = new File(url.toURI());
     PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
 
