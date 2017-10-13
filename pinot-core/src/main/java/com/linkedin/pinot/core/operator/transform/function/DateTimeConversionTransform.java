@@ -17,15 +17,21 @@ package com.linkedin.pinot.core.operator.transform.function;
 
 import java.lang.reflect.Array;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
+import org.apache.commons.lang3.EnumUtils;
+
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
+import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.transform.DateTimeConversionEvaluator;
+import com.linkedin.pinot.core.operator.transform.DateTimeConvertor;
+import com.linkedin.pinot.core.operator.transform.DateTimeConvertor.DateTimeTransformUnit;
+import com.linkedin.pinot.core.operator.transform.DateTimeConvertorFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
-
-import javax.annotation.concurrent.NotThreadSafe;
 
 /**
  * This class implements the date time conversion transform.
@@ -73,7 +79,10 @@ public class DateTimeConversionTransform implements TransformFunction {
     String outputFormat = outputDateTimeFormat[0];
     String[] outputDateTimeGranularity = input[3].getStringValuesSV();
     String outputGranularity = outputDateTimeGranularity[0];
-    DateTimeConversionEvaluator evaluator = new DateTimeConversionEvaluator(inputFormat, outputFormat, outputGranularity);
+
+    Preconditions.checkArgument(DateTimeFieldSpecUtils.isValidFormat(inputFormat));
+    Preconditions.checkArgument(isValidFormat(outputFormat));
+    Preconditions.checkArgument(DateTimeFieldSpecUtils.isValidGranularity(outputGranularity));
 
     if (_output == null || _output.length < length) {
       _output = new long[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
@@ -93,8 +102,11 @@ public class DateTimeConversionTransform implements TransformFunction {
         inputValues = input[0].getLongValuesSV();
         break;
     }
+
+    DateTimeConvertor dateTimeConvertor =
+        DateTimeConvertorFactory.getDateTimeConvertorFromFormats(inputFormat, outputFormat, outputGranularity);
     for (int i = 0; i < Array.getLength(inputValues); i ++) {
-      _output[i] = evaluator.transformDateTime(Array.get(inputValues, i));
+      _output[i] = dateTimeConvertor.convert(Array.get(inputValues, i));
     }
     return (T) _output;
   }
@@ -107,6 +119,42 @@ public class DateTimeConversionTransform implements TransformFunction {
   @Override
   public String getName() {
     return TRANSFORM_NAME;
+  }
+
+  /**
+   * Check correctness of format of {@link DateTimeFieldSpec}, but with TimeUnit extended to
+   * {@link DateTimeTransformUnit}
+   * @param format
+   * @return
+   */
+  private boolean isValidFormat(String format) {
+
+    Preconditions.checkNotNull(format);
+
+    String[] formatTokens =
+        format.split(DateTimeFieldSpecUtils.COLON_SEPARATOR, DateTimeFieldSpecUtils.MAX_FORMAT_TOKENS);
+    Preconditions.checkArgument(
+        formatTokens.length == DateTimeFieldSpecUtils.MIN_FORMAT_TOKENS ||
+        formatTokens.length == DateTimeFieldSpecUtils.MAX_FORMAT_TOKENS,
+        DateTimeFieldSpecUtils.FORMAT_TOKENS_ERROR_STR);
+    Preconditions.checkArgument(
+        formatTokens[DateTimeFieldSpecUtils.FORMAT_SIZE_POSITION].matches(DateTimeFieldSpecUtils.NUMBER_REGEX),
+        DateTimeFieldSpecUtils.FORMAT_PATTERN_ERROR_STR);
+    Preconditions.checkArgument(
+        EnumUtils.isValidEnum(DateTimeConvertor.DateTimeTransformUnit.class, formatTokens[DateTimeFieldSpecUtils.FORMAT_UNIT_POSITION]),
+        DateTimeFieldSpecUtils.FORMAT_PATTERN_ERROR_STR);
+
+    if (formatTokens.length == DateTimeFieldSpecUtils.MIN_FORMAT_TOKENS) {
+      Preconditions.checkArgument(
+          formatTokens[DateTimeFieldSpecUtils.FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
+          DateTimeFieldSpecUtils.TIME_FORMAT_ERROR_STR);
+    } else {
+      Preconditions.checkArgument(
+          formatTokens[DateTimeFieldSpecUtils.FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+          DateTimeFieldSpecUtils.TIME_FORMAT_ERROR_STR);
+      Preconditions.checkNotNull(formatTokens[DateTimeFieldSpecUtils.FORMAT_PATTERN_POSITION]);
+    }
+    return true;
   }
 
 }

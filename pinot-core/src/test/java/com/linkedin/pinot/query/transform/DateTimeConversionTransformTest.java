@@ -17,13 +17,13 @@ package com.linkedin.pinot.query.transform;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.operator.docvalsets.ConstantBlockValSet;
-import com.linkedin.pinot.core.operator.transform.DateTimeConversionEvaluator;
+import com.linkedin.pinot.core.operator.transform.DateTimeConvertor;
+import com.linkedin.pinot.core.operator.transform.DateTimeConvertorFactory;
 import com.linkedin.pinot.core.operator.transform.function.DateTimeConversionTransform;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -216,8 +216,8 @@ public class DateTimeConversionTransformTest {
   @Test(dataProvider = "testEvaluateDataProvider")
   public void testDateTimeConversionEvaluation(String inputFormat, String outputFormat,
       String outputGranularity, Object inputValue, Object expectedValue) {
-    DateTimeConversionEvaluator evaluator = new DateTimeConversionEvaluator(inputFormat, outputFormat, outputGranularity);
-    long actual = evaluator.transformDateTime(inputValue);
+    DateTimeConvertor convertor = DateTimeConvertorFactory.getDateTimeConvertorFromFormats(inputFormat, outputFormat, outputGranularity);
+    long actual = convertor.convert(inputValue);
     Assert.assertEquals(actual, expectedValue);
   }
 
