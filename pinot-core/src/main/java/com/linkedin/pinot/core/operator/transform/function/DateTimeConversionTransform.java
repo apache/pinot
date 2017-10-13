@@ -91,21 +91,21 @@ public class DateTimeConversionTransform implements TransformFunction {
     DataType valueType = input[0].getValueType();
     Object inputValues = null;
     switch (valueType) {
-      case STRING:
-        inputValues = input[0].getStringValuesSV();
-        break;
-      case INT:
-        inputValues = input[0].getIntValuesSV();
-        break;
-     case LONG:
-      default:
-        inputValues = input[0].getLongValuesSV();
-        break;
+    case STRING:
+      inputValues = input[0].getStringValuesSV();
+      break;
+    case INT:
+      inputValues = input[0].getIntValuesSV();
+      break;
+    case LONG:
+    default:
+      inputValues = input[0].getLongValuesSV();
+      break;
     }
 
     DateTimeConvertor dateTimeConvertor =
         DateTimeConvertorFactory.getDateTimeConvertorFromFormats(inputFormat, outputFormat, outputGranularity);
-    for (int i = 0; i < Array.getLength(inputValues); i ++) {
+    for (int i = 0; i < Array.getLength(inputValues); i++) {
       _output[i] = dateTimeConvertor.convert(Array.get(inputValues, i));
     }
     return (T) _output;

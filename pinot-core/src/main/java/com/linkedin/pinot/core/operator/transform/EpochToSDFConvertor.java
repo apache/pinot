@@ -17,6 +17,4 @@ public class EpochToSDFConvertor extends DateTimeConvertor {
     return dateTimeValueConverted;
   }
 
-
-
 }

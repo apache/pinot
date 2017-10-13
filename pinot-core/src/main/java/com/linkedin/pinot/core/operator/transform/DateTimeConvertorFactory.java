@@ -11,7 +11,8 @@ public class DateTimeConvertorFactory {
    * @param outputFormat
    * @return
    */
-  public static DateTimeConvertor getDateTimeConvertorFromFormats(String inputFormat, String outputFormat, String outputGranularity) {
+  public static DateTimeConvertor getDateTimeConvertorFromFormats(String inputFormat, String outputFormat,
+      String outputGranularity) {
     DateTimeConvertor dateTimeConvertor = null;
     TimeFormat inputTimeFormat = DateTimeFieldSpecUtils.getTimeFormatFromFormat(inputFormat);
     TimeFormat outputTimeFormat = DateTimeFieldSpecUtils.getTimeFormatFromFormat(outputFormat);

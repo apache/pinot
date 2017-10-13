@@ -17,5 +17,4 @@ public class SDFToSDFConvertor extends DateTimeConvertor {
     return dateTimeValueConverted;
   }
 
-
 }
