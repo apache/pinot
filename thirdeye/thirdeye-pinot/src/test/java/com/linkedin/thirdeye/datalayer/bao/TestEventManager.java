@@ -14,17 +14,17 @@ import org.testng.annotations.Test;
 public class TestEventManager {
   long testEventId;
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private EventManager eventDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    eventDAO = DAO_REGISTRY.getEventDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    eventDAO = testDAOProvider.getEventDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

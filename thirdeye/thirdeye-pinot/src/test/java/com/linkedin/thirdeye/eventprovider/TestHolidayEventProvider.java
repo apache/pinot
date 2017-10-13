@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.DaoProvider;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
@@ -31,18 +30,18 @@ public class TestHolidayEventProvider {
     long hoursAgo3 = new DateTime().minusHours(3).getMillis();
     long hoursAgo2 = new DateTime().minusHours(2).getMillis();
 
-    private DaoProvider DAO_REGISTRY;
+    private DaoProvider testDAOProvider;
     private EventManager eventDAO;
     @BeforeClass
     void beforeClass() {
-      DAO_REGISTRY = DAOTestBase.getInstance();
-      eventDAO = DAO_REGISTRY.getEventDAO();
+      testDAOProvider = DAOTestBase.getInstance();
+      eventDAO = testDAOProvider.getEventDAO();
       holidayEventProvider = new HolidayEventProvider();
     }
 
     @AfterClass(alwaysRun = true)
     void afterClass() {
-      DAO_REGISTRY.restart();
+      testDAOProvider.restart();
     }
 
     @Test

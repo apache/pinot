@@ -24,17 +24,17 @@ public class TestMetricConfigManager {
   private static String metric2 = "metric2";
   private static String derivedMetric1 = "metric3";
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private MetricConfigManager metricConfigDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    metricConfigDAO = testDAOProvider.getMetricConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

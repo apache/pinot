@@ -22,17 +22,17 @@ public class TestDataCompletenessConfigManager {
   private DateTime now = new DateTime();
   private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private DataCompletenessConfigManager dataCompletenessConfigDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    dataCompletenessConfigDAO = DAO_REGISTRY.getDataCompletenessConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    dataCompletenessConfigDAO = testDAOProvider.getDataCompletenessConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

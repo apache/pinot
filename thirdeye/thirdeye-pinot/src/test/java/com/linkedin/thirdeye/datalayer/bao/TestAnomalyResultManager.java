@@ -17,19 +17,19 @@ public class TestAnomalyResultManager {
   RawAnomalyResultDTO anomalyResult;
   AnomalyFunctionDTO spec = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    anomalyFunctionDAO = testDAOProvider.getAnomalyFunctionDAO();
+    rawAnomalyResultDAO = testDAOProvider.getRawAnomalyResultDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

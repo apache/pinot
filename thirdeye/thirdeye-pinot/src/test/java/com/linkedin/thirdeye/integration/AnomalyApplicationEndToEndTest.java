@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.integration;
 
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -9,47 +8,29 @@ import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
-import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskInfoFactory;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
-import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
-import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -60,14 +41,11 @@ import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -117,11 +95,11 @@ public class AnomalyApplicationEndToEndTest {
   private String classifierPropertiesFile = "/sample-classifier.properties";
   private String metric = "cost";
   private String collection = "test-collection";
-  private DaoProvider daoRegistry = DAOTestBase.getInstance();
+  private DaoProvider testDAOProvider = DAOTestBase.getInstance();
 
   @BeforeClass
   void beforeClass() {
-    Assert.assertNotNull(daoRegistry.getJobDAO());
+    Assert.assertNotNull(testDAOProvider.getJobDAO());
   }
 
   @AfterClass(alwaysRun = true)
@@ -213,17 +191,17 @@ public class AnomalyApplicationEndToEndTest {
 
 
     // create test anomaly function
-    functionId = daoRegistry.getAnomalyFunctionDAO().save(DaoTestUtils.getTestFunctionSpec(metric, collection));
+    functionId = testDAOProvider.getAnomalyFunctionDAO().save(DaoTestUtils.getTestFunctionSpec(metric, collection));
 
     // create test alert configuration
-    daoRegistry.getAlertConfigDAO().save(getTestAlertConfiguration("test alert v2"));
+    testDAOProvider.getAlertConfigDAO().save(getTestAlertConfiguration("test alert v2"));
 
     // create test dataset config
-    daoRegistry.getDatasetConfigDAO().save(getTestDatasetConfig(collection));
+    testDAOProvider.getDatasetConfigDAO().save(getTestDatasetConfig(collection));
 
     // create test grouping config
     classificationConfigId =
-        daoRegistry.getClassificationConfigDAO().save(getTestGroupingConfiguration(Collections.singletonList(functionId)));
+        testDAOProvider.getClassificationConfigDAO().save(getTestGroupingConfiguration(Collections.singletonList(functionId)));
 
     // setup function factory for worker and merger
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
@@ -242,7 +220,7 @@ public class AnomalyApplicationEndToEndTest {
   private ThirdEyeResponse getMockResponse(ThirdEyeRequest request) {
     ThirdEyeResponse response = null;
     Random rand = new Random();
-    DatasetConfigDTO datasetConfig = daoRegistry.getDatasetConfigDAO().findByDataset(collection);
+    DatasetConfigDTO datasetConfig = testDAOProvider.getDatasetConfigDAO().findByDataset(collection);
     TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     List<String[]> rows = new ArrayList<>();
     DateTime start = request.getStartTimeInclusive();
@@ -266,23 +244,23 @@ public class AnomalyApplicationEndToEndTest {
   @Test(enabled=true)
   public void testThirdeyeAnomalyApplication() throws Exception {
 
-    Assert.assertNotNull(daoRegistry.getJobDAO());
+    Assert.assertNotNull(testDAOProvider.getJobDAO());
 
     // setup caches and config
     setup();
 
-    Assert.assertNotNull(daoRegistry.getJobDAO());
+    Assert.assertNotNull(testDAOProvider.getJobDAO());
 
-    TaskManager taskDAO = daoRegistry.getTaskDAO();
+    TaskManager taskDAO = testDAOProvider.getTaskDAO();
 
     // startDataCompletenessChecker
     startDataCompletenessScheduler();
     Thread.sleep(10000);
-    int jobSizeDataCompleteness = daoRegistry.getJobDAO().findAll().size();
+    int jobSizeDataCompleteness = testDAOProvider.getJobDAO().findAll().size();
     int taskSizeDataCompleteness = taskDAO.findAll().size();
     Assert.assertTrue(jobSizeDataCompleteness == 1);
     Assert.assertTrue(taskSizeDataCompleteness == 2);
-    JobDTO jobDTO = daoRegistry.getJobDAO().findAll().get(0);
+    JobDTO jobDTO = testDAOProvider.getJobDAO().findAll().get(0);
     Assert.assertTrue(jobDTO.getJobName().startsWith(TaskType.DATA_COMPLETENESS.toString()));
     List<TaskDTO> taskDTOs = taskDAO.findAll();
     for (TaskDTO taskDTO : taskDTOs) {
@@ -302,12 +280,12 @@ public class AnomalyApplicationEndToEndTest {
 
     // check for number of entries in tasks and jobs
     Thread.sleep(10000);
-    int jobSize1 = daoRegistry.getJobDAO().findAll().size();
+    int jobSize1 = testDAOProvider.getJobDAO().findAll().size();
     int taskSize1 = taskDAO.findAll().size();
     Assert.assertTrue(jobSize1 > 0);
     Assert.assertTrue(taskSize1 > 0);
     Thread.sleep(10000);
-    int jobSize2 = daoRegistry.getJobDAO().findAll().size();
+    int jobSize2 = testDAOProvider.getJobDAO().findAll().size();
     int taskSize2 = taskDAO.findAll().size();
     Assert.assertTrue(jobSize2 > jobSize1);
     Assert.assertTrue(taskSize2 > taskSize1);
@@ -348,7 +326,7 @@ public class AnomalyApplicationEndToEndTest {
     Assert.assertTrue(monitorCount > 0);
 
     // check for job status
-    jobs = daoRegistry.getJobDAO().findAll();
+    jobs = testDAOProvider.getJobDAO().findAll();
     for (JobDTO job : jobs) {
       Assert.assertEquals(job.getStatus(), JobStatus.SCHEDULED);
     }
@@ -369,16 +347,16 @@ public class AnomalyApplicationEndToEndTest {
 
     // Raw anomalies of the same function and dimensions should have been merged by the worker, so we
     // check if any raw anomalies present, whose existence means the worker fails the synchronous merge.
-    List<RawAnomalyResultDTO> rawAnomalies = daoRegistry.getRawAnomalyResultDAO().findUnmergedByFunctionId(functionId);
+    List<RawAnomalyResultDTO> rawAnomalies = testDAOProvider.getRawAnomalyResultDAO().findUnmergedByFunctionId(functionId);
     Assert.assertTrue(rawAnomalies.size() == 0);
 
     // check merged anomalies
-    List<MergedAnomalyResultDTO> mergedAnomalies = daoRegistry.getMergedAnomalyResultDAO().findByFunctionId(functionId, true);
+    List<MergedAnomalyResultDTO> mergedAnomalies = testDAOProvider.getMergedAnomalyResultDAO().findByFunctionId(functionId, true);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
     // THE FOLLOWING TEST MAY FAIL OCCASIONALLY DUE TO MACHINE COMPUTATION POWER
     // check for job status COMPLETED
-    jobs = daoRegistry.getJobDAO().findAll();
+    jobs = testDAOProvider.getJobDAO().findAll();
     int completedJobCount = 0;
     for (JobDTO job : jobs) {
       int attempt = 0;
@@ -397,13 +375,13 @@ public class AnomalyApplicationEndToEndTest {
     // start classifier
     startClassifier();
     List<JobDTO> latestCompletedDetectionJobDTO =
-        daoRegistry.getJobDAO().findRecentScheduledJobByTypeAndConfigId(TaskType.ANOMALY_DETECTION, functionId, 0L);
+        testDAOProvider.getJobDAO().findRecentScheduledJobByTypeAndConfigId(TaskType.ANOMALY_DETECTION, functionId, 0L);
     Assert.assertNotNull(latestCompletedDetectionJobDTO);
     Assert.assertEquals(latestCompletedDetectionJobDTO.get(0).getStatus(), JobStatus.COMPLETED);
     Thread.sleep(5000);
-    jobs = daoRegistry.getJobDAO().findAll();
+    jobs = testDAOProvider.getJobDAO().findAll();
     List<JobDTO> latestCompletedClassificationJobDTO =
-        daoRegistry.getJobDAO().findRecentScheduledJobByTypeAndConfigId(TaskType.CLASSIFICATION, classificationConfigId, 0L);
+        testDAOProvider.getJobDAO().findRecentScheduledJobByTypeAndConfigId(TaskType.CLASSIFICATION, classificationConfigId, 0L);
     Assert.assertNotNull(latestCompletedClassificationJobDTO);
     Assert.assertEquals(latestCompletedClassificationJobDTO.get(0).getStatus(), JobStatus.COMPLETED);
   }

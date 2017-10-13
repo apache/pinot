@@ -15,17 +15,17 @@ import org.testng.annotations.Test;
 
 public class ConfigNamespaceTest {
   private ConfigNamespace cn;
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
 
   @BeforeMethod
   public void beforeMethod() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    this.cn = new ConfigNamespace("namespace", DAO_REGISTRY.getConfigDAO());
+    testDAOProvider = DAOTestBase.getInstance();
+    this.cn = new ConfigNamespace("namespace", testDAOProvider.getConfigDAO());
   }
 
   @AfterMethod(alwaysRun = true)
   public void afterMethod() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test
@@ -87,7 +87,7 @@ public class ConfigNamespaceTest {
 
   @Test
   public void testNamespace() {
-    ConfigManager configDAO = DAO_REGISTRY.getConfigDAO();
+    ConfigManager configDAO = testDAOProvider.getConfigDAO();
     ConfigNamespace cn1 = new ConfigNamespace("namespace", configDAO);
     ConfigNamespace cn2 = new ConfigNamespace("theOther", configDAO);
 

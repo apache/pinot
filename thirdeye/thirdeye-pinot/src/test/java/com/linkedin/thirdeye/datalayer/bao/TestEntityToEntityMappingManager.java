@@ -24,17 +24,17 @@ public class TestEntityToEntityMappingManager {
   private static final String METRIC_TO_SERVICE = "METRIC_TO_SERVICE";
   private static final String DIMENSION_TO_DIMENSION = "DIMENSION_TO_DIMENSION";
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private EntityToEntityMappingManager entityToEntityMappingDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    entityToEntityMappingDAO = DAO_REGISTRY.getEntityToEntityMappingDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    entityToEntityMappingDAO = testDAOProvider.getEntityToEntityMappingDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

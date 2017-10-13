@@ -6,25 +6,23 @@ import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class TestConfigManager {
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private ConfigManager configDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    configDAO = DAO_REGISTRY.getConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    configDAO = testDAOProvider.getConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

@@ -11,17 +11,17 @@ public class TestAlertConfigManager{
 
   Long alertConfigid;
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private AlertConfigManager alertConfigDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    alertConfigDAO = DAO_REGISTRY.getAlertConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    alertConfigDAO = testDAOProvider.getAlertConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

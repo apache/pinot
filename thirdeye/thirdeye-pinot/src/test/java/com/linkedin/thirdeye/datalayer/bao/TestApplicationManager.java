@@ -11,17 +11,17 @@ public class TestApplicationManager {
 
   Long applicationId;
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private ApplicationManager applicationDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    applicationDAO = DAO_REGISTRY.getApplicationDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    applicationDAO = testDAOProvider.getApplicationDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

@@ -19,19 +19,19 @@ public class TestAutotuneConfigManager {
   private static long start = 1l;
   private static long end = 2l;
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private AutotuneConfigManager autotuneConfigDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    anomalyFunctionDAO = testDAOProvider.getAnomalyFunctionDAO();
+    autotuneConfigDAO = testDAOProvider.getAutotuneConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

@@ -16,7 +16,7 @@ import org.testng.annotations.Test;
 
 public class ConfigNamespaceIntegrationTest {
   private final static Map<String, String> MAP_EXPECTED = new HashMap<>();
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   static {
     MAP_EXPECTED.put("a", "A");
     MAP_EXPECTED.put("b", "B");
@@ -56,16 +56,16 @@ public class ConfigNamespaceIntegrationTest {
 
   @BeforeMethod
   public void beforeMethod() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
+    testDAOProvider = DAOTestBase.getInstance();
   }
 
   @AfterMethod(alwaysRun = true)
   public void afterMethod() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   public void setupViaResource() throws IOException {
-    ConfigResource res = new ConfigResource(DAO_REGISTRY.getConfigDAO());
+    ConfigResource res = new ConfigResource(testDAOProvider.getConfigDAO());
     res.put("ns1", "string", "mystring");
     res.put("ns1", "list", "[1, 2, 3]");
     res.put("ns1", "listString", "[\"1\", \"2\", \"3\"]");
@@ -78,7 +78,7 @@ public class ConfigNamespaceIntegrationTest {
   public void testReadConfig() throws Exception {
     setupViaResource();
 
-    ConfigNamespace ns = new ConfigNamespace("ns1", DAO_REGISTRY.getConfigDAO());
+    ConfigNamespace ns = new ConfigNamespace("ns1", testDAOProvider.getConfigDAO());
     String string = ns.get("string");
     Assert.assertEquals(string, "mystring");
 

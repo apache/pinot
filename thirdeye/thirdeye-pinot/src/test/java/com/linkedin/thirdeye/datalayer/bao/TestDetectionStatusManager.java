@@ -22,17 +22,17 @@ public class TestDetectionStatusManager {
   private DateTime now = new DateTime();
   private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHH");
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private DetectionStatusManager detectionStatusDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    detectionStatusDAO = DAO_REGISTRY.getDetectionStatusDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    detectionStatusDAO = testDAOProvider.getDetectionStatusDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

@@ -14,19 +14,19 @@ import org.testng.annotations.Test;
 
 public class TestGroupedAnomalyResultsManager {
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    groupedAnomalyResultsDAO = DAO_REGISTRY.getGroupedAnomalyResultsDAO();
-    mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    groupedAnomalyResultsDAO = testDAOProvider.getGroupedAnomalyResultsDAO();
+    mergedAnomalyResultDAO = testDAOProvider.getMergedAnomalyResultDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test(dataProvider="groupedAnomalies")

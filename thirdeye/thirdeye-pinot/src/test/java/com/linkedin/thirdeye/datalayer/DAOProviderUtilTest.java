@@ -2,8 +2,6 @@ package com.linkedin.thirdeye.datalayer;
 
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -11,21 +9,21 @@ import org.testng.annotations.Test;
 
 
 public class DAOProviderUtilTest {
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   @BeforeClass
   public void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
+    testDAOProvider = DAOTestBase.getInstance();
   }
 
   @AfterClass(alwaysRun = true)
   public void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test
   public void testProviderReturnsSameInstance() {
-    MergedAnomalyResultManager m1 = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    MergedAnomalyResultManager m2 = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    MergedAnomalyResultManager m1 = testDAOProvider.getMergedAnomalyResultDAO();
+    MergedAnomalyResultManager m2 = testDAOProvider.getMergedAnomalyResultDAO();
     Assert.assertSame(m1, m2);
   }
 }

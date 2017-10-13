@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,21 +23,21 @@ public class TestMergedAnomalyResultManager{
   Long anomalyResultId;
   AnomalyFunctionDTO function = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
-    mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    anomalyFunctionDAO = testDAOProvider.getAnomalyFunctionDAO();
+    rawAnomalyResultDAO = testDAOProvider.getRawAnomalyResultDAO();
+    mergedAnomalyResultDAO = testDAOProvider.getMergedAnomalyResultDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

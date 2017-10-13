@@ -24,17 +24,17 @@ public class TestOnboardDatasetMetricManager {
   private static String metric2 = "m2";
   private static String metric3 = "m3";
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private OnboardDatasetMetricManager onboardDatasetMetricDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    onboardDatasetMetricDAO = DAO_REGISTRY.getOnboardDatasetMetricDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    onboardDatasetMetricDAO = testDAOProvider.getOnboardDatasetMetricDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

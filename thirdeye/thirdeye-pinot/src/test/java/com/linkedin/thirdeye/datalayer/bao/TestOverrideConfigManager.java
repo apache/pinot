@@ -19,17 +19,17 @@ public class TestOverrideConfigManager {
   private Long overrideConfigId1 = null;
   private DateTime now = new DateTime();
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private OverrideConfigManager overrideConfigDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    overrideConfigDAO = testDAOProvider.getOverrideConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

@@ -32,19 +32,19 @@ public class TestAnomalyTaskManager {
     allowedOldTaskStatus.add(TaskStatus.WAITING);
   }
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private JobManager jobDAO;
   private TaskManager taskDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    jobDAO = DAO_REGISTRY.getJobDAO();
-    taskDAO = DAO_REGISTRY.getTaskDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    jobDAO = testDAOProvider.getJobDAO();
+    taskDAO = testDAOProvider.getTaskDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

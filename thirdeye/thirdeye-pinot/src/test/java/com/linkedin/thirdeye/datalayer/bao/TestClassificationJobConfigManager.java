@@ -34,17 +34,17 @@ public class TestClassificationJobConfigManager {
   private Long configId1;
   private Long configId2;
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private ClassificationConfigManager classificationConfigDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    classificationConfigDAO = DAO_REGISTRY.getClassificationConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    classificationConfigDAO = testDAOProvider.getClassificationConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

@@ -16,17 +16,17 @@ public class TestDatasetConfigManager {
   private static String collection1 = "my dataset1";
   private static String collection2 = "my dataset2";
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private DatasetConfigManager datasetConfigDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    datasetConfigDAO = testDAOProvider.getDatasetConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

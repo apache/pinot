@@ -31,17 +31,17 @@ public class AutoOnboardPinotMetricsServiceTest {
   private String dataset = "test-collection";
   private Schema schema;
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
   private DashboardConfigManager dashboardConfigDAO;
 
   @BeforeMethod
   void beforeMethod() throws Exception {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-    dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    datasetConfigDAO = testDAOProvider.getDatasetConfigDAO();
+    metricConfigDAO = testDAOProvider.getMetricConfigDAO();
+    dashboardConfigDAO = testDAOProvider.getDashboardConfigDAO();
     testAutoLoadPinotMetricsService = new AutoOnboardPinotDataSource(null, null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, null);
@@ -49,7 +49,7 @@ public class AutoOnboardPinotMetricsServiceTest {
 
   @AfterMethod(alwaysRun = true)
   void afterMethod() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

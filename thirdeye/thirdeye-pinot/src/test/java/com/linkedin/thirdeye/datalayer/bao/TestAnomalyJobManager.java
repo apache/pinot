@@ -19,17 +19,17 @@ public class TestAnomalyJobManager {
   private Long anomalyJobId2;
   private Long anomalyJobId3;
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private JobManager jobDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    jobDAO = DAO_REGISTRY.getJobDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    jobDAO = testDAOProvider.getJobDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test

@@ -18,17 +18,17 @@ public class TestAnomalyFunctionManager {
   private static String collection = "my dataset";
   private static String metricName = "__counts";
 
-  private DaoProvider DAO_REGISTRY;
+  private DaoProvider testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   @BeforeClass
   void beforeClass() {
-    DAO_REGISTRY = DAOTestBase.getInstance();
-    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    testDAOProvider = DAOTestBase.getInstance();
+    anomalyFunctionDAO = testDAOProvider.getAnomalyFunctionDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    DAO_REGISTRY.restart();
+    testDAOProvider.restart();
   }
 
   @Test
