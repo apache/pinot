@@ -2,17 +2,12 @@ package com.linkedin.pinot.core.operator.transform;
 
 import java.util.concurrent.TimeUnit;
 
+import org.joda.time.Chronology;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeUtils;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Days;
-import org.joda.time.Hours;
-import org.joda.time.Interval;
-import org.joda.time.Minutes;
-import org.joda.time.Months;
-import org.joda.time.MutableDateTime;
-import org.joda.time.Seconds;
-import org.joda.time.Weeks;
-import org.joda.time.Years;
+import org.joda.time.DurationField;
+import org.joda.time.DurationFieldType;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -25,6 +20,8 @@ import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
 public abstract class DateTimeConvertor {
 
   private static final DateTime EPOCH_START_DATE = new DateTime(0L, DateTimeZone.UTC);
+  private static final Chronology CHRONOLOGY = DateTimeUtils.getInstantChronology(EPOCH_START_DATE);
+  private static final long EPOCH_START_DATE_MILLIS = 0L;
 
   /**
    * Time unit enum with range from MILLISECONDS to YEARS
@@ -42,11 +39,12 @@ public abstract class DateTimeConvertor {
 
   private int inputTimeSize;
   private TimeUnit inputTimeUnit;
-  private DateTimeFormatter inputDateTimeFormatter = null;
+  private DateTimeFormatter inputDateTimeFormatter;
 
   private int outputTimeSize;
   private DateTimeTransformUnit outputTimeUnit;
-  private DateTimeFormatter outputDateTimeFormatter = null;
+  private DurationField outputDurationField;
+  private DateTimeFormatter outputDateTimeFormatter;
 
   private Long outputGranularityMillis;
 
@@ -64,7 +62,40 @@ public abstract class DateTimeConvertor {
     String[] outputFormatTokens = outputFormat.split(DateTimeFieldSpecUtils.COLON_SEPARATOR);
     outputTimeUnit = DateTimeTransformUnit.valueOf(outputFormatTokens[DateTimeFieldSpecUtils.FORMAT_UNIT_POSITION]);
     TimeFormat outputTimeFormat = DateTimeFieldSpecUtils.getTimeFormatFromFormat(outputFormat);
-    if (outputTimeFormat.equals(TimeFormat.SIMPLE_DATE_FORMAT)) {
+    if (outputTimeFormat.equals(TimeFormat.EPOCH)) {
+      DurationFieldType durationFieldType;
+      switch (outputTimeUnit) {
+
+      case YEARS:
+        durationFieldType = DurationFieldType.years();
+        break;
+      case MONTHS:
+        durationFieldType = DurationFieldType.months();
+        break;
+      case WEEKS:
+        durationFieldType = DurationFieldType.weeks();
+        break;
+      case DAYS:
+        durationFieldType = DurationFieldType.days();
+        break;
+      case HOURS:
+        durationFieldType = DurationFieldType.hours();
+        break;
+      case MINUTES:
+        durationFieldType = DurationFieldType.minutes();
+        break;
+      case SECONDS:
+        durationFieldType = DurationFieldType.seconds();
+        break;
+      case MILLISECONDS:
+        durationFieldType = DurationFieldType.millis();
+        break;
+      default:
+        throw new IllegalArgumentException("Illegal argument for time unit: " + outputTimeUnit);
+      }
+      outputDurationField = durationFieldType.getField(CHRONOLOGY);
+
+    } else {
       String outputSDFFormat = DateTimeFieldSpecUtils.getSDFPatternFromFormat(outputFormat);
       outputDateTimeFormatter = DateTimeFormat.forPattern(outputSDFFormat).withZoneUTC();
     }
@@ -112,11 +143,14 @@ public abstract class DateTimeConvertor {
   /**
    * Given a timestamp in millis, convert it to epoch format, while also handling time units
    * such as WEEKS, MONTHS, YEARS
+   *
+   * Avoided using a switch case on {@link DateTimeTransformUnit}
+   * by simulating the functionality of {@link org.joda.time.base.BaseSingleFieldPeriod#between()}
    * <ul>
    * <li>1) given dateTimeColumnValueMS = 1498892400000 and format=1:HOURS:EPOCH,
-   * dateTimeSpec.fromMillis(1498892400000) = 416359 (i.e. dateTimeColumnValueMS/(1000*60*60))</li>
+   * convertMillisToEpoch(1498892400000) = 416359 (i.e. dateTimeColumnValueMS/(1000*60*60))</li>
    * <li>2) given dateTimeColumnValueMS = 1498892400000 and format=1:WEEKS:EPOCH,
-   * dateTimeSpec.fromMillis(1498892400000) = 2478 (i.e. timeColumnValueMS/(1000*60*60*24*7))</li>
+   * convertMillisToEpoch(1498892400000) = 2478 (i.e. dateTimeColumnValueMS/(1000*60*60*24*7))</li>
    * </ul>
    * @param dateTimeValueMillis - date time value in millis to convert
    * @param outputFormat
@@ -124,40 +158,9 @@ public abstract class DateTimeConvertor {
    */
   protected Long convertMillisToEpoch(Long dateTimeValueMillis) {
     Long convertedDateTime = 0L;
-
     if (dateTimeValueMillis != null) {
-      MutableDateTime inputDateTime = new MutableDateTime(dateTimeValueMillis, DateTimeZone.UTC);
-      Interval interval = new Interval(EPOCH_START_DATE, inputDateTime);
-      switch (outputTimeUnit) {
-
-      case YEARS:
-        convertedDateTime = (long) Years.yearsIn(interval).getYears();
-        break;
-      case MONTHS:
-        convertedDateTime = (long) Months.monthsIn(interval).getMonths();
-        break;
-      case WEEKS:
-        convertedDateTime = (long) Weeks.weeksIn(interval).getWeeks();
-        break;
-      case DAYS:
-        convertedDateTime = (long) Days.daysIn(interval).getDays();
-        break;
-      case HOURS:
-        convertedDateTime = (long) Hours.hoursIn(interval).getHours();
-        break;
-      case MINUTES:
-        convertedDateTime = (long) Minutes.minutesIn(interval).getMinutes();
-        break;
-      case SECONDS:
-        convertedDateTime = (long) Seconds.secondsIn(interval).getSeconds();
-        break;
-      case MILLISECONDS:
-        convertedDateTime = dateTimeValueMillis;
-        break;
-      default:
-        throw new IllegalArgumentException("Illegal argument for time unit: " + outputTimeUnit);
-      }
-      convertedDateTime = convertedDateTime / outputTimeSize;
+      convertedDateTime = outputDurationField
+          .getDifferenceAsLong(dateTimeValueMillis, EPOCH_START_DATE_MILLIS) / outputTimeSize;
     }
     return convertedDateTime;
   }
@@ -166,7 +169,7 @@ public abstract class DateTimeConvertor {
    * Given a timestamp in millis, convert it to sdf format
    * <ul>
    * <li>given dateTimeColumnValueMS = 1498892400000 and
-   * format=1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd, dateTimeSpec.fromMillis(1498892400000) = 20170701</li>
+   * format=1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd, convertMillisToSDF(1498892400000) = 20170701</li>
    * </ul>
    * @param dateTimeValueMillis - date time value in millis to convert
    * @param outputFormat
@@ -192,5 +195,4 @@ public abstract class DateTimeConvertor {
     }
     return bucketedDateTimeValueMS;
   }
-
 }
