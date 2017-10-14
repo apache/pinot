@@ -416,22 +416,23 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     // If offHeapAllocation, then gather some statistics before  destroying the segment.
     if (isOffHeapAllocation) {
-      RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
-      for (Map.Entry<String, MutableDictionary> entry : dictionaryMap.entrySet()) {
-        RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
-        columnStats.setCardinality(entry.getValue().length());
-        columnStats.setAvgColumnSize(entry.getValue().getAvgValueSize());
-        segmentStats.setColumnStats(entry.getKey(), columnStats);
+      if (numDocsIndexed > 0) {
+        RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
+        for (Map.Entry<String, MutableDictionary> entry : dictionaryMap.entrySet()) {
+          RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
+          columnStats.setCardinality(entry.getValue().length());
+          columnStats.setAvgColumnSize(entry.getValue().getAvgValueSize());
+          segmentStats.setColumnStats(entry.getKey(), columnStats);
+        }
+        segmentStats.setNumRowsConsumed(numDocsIndexed);
+        segmentStats.setMemUsedBytes(memoryManager.getTotalMemBytes());
+        final long now = System.currentTimeMillis();
+        final int numSeconds = (int) ((now - startTimeMillis) / 1000);
+        segmentStats.setNumSeconds(numSeconds);
+        statsHistory.addSegmentStats(segmentStats);
+        LOGGER.info("Segment used {} bytes of memory for {} rows consumed in {} seconds", memoryManager.getTotalMemBytes(), numDocsIndexed, numSeconds);
+        statsHistory.save();
       }
-      segmentStats.setNumRowsConsumed(numDocsIndexed);
-      segmentStats.setMemUsedBytes(memoryManager.getTotalMemBytes());
-      final long now = System.currentTimeMillis();
-      final int numSeconds  = (int)((now - startTimeMillis)/1000);
-      segmentStats.setNumSeconds(numSeconds);
-      statsHistory.addSegmentStats(segmentStats);
-      LOGGER.info("Segment used {} bytes of memory for {} rows consumed in {} seconds",
-          memoryManager.getTotalMemBytes(), numDocsIndexed, numSeconds);
-      statsHistory.save();
     }
 
     for (DataFileReader dfReader : columnIndexReaderWriterMap.values()) {
