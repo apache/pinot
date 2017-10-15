@@ -1,5 +1,7 @@
 package com.linkedin.pinot.transport.metrics;
 
+import com.linkedin.pinot.common.restlet.resources.ServerLoadMetric;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,115 +10,50 @@ import java.util.Map;
 /**
  * Created by Gandharv on 10/6/2017.
  */
+
 public class NettyServerWorkload {
-    private final Map<String, List<Load>> loadMap;
-    private final Map<String, Double> avgLatencyMap;
-    private Map<String, Double> avgSegmentsMap;
+
+    public static final long CAPTURE_WINDOW = 10000;
+    private final Map<String, List<ServerLoadMetric>> avgLoadMap;
 
     public NettyServerWorkload(){
-        loadMap = new HashMap<>();
-        avgLatencyMap = new HashMap<>();
-        avgSegmentsMap = new HashMap<>();
-
-        //read files here asynchronously
+        avgLoadMap = new HashMap<>();
     }
 
-    public void addWorkLoad(String tableName, Load load){
-        if(loadMap.containsKey(tableName)){
-            loadMap.get(tableName).add(load);
-        }else{
-            loadMap.put(tableName, new ArrayList<Load>());
-            this.addWorkLoad(tableName, load);
-        }
-
-        updateAvgLatency(tableName, load.latency);
-        updateAvgSegments(tableName, load.numSegments);
-
-        //update file here asynchronously
-    }
-
-    private void updateAvgSegments(String tableName, int numSegments) {
-        if(avgSegmentsMap.containsKey(tableName)){
-            int loadCount = this.loadMap.get(tableName).size();
-            double oldAvg = avgSegmentsMap.get(tableName);
-            double newAvg = (oldAvg*(loadCount-1) + numSegments)/loadCount;
-            avgSegmentsMap.put(tableName, newAvg);
-        }else{
-            avgSegmentsMap.put(tableName, (double) numSegments);
-        }
-    }
-
-    private void updateAvgLatency(String tableName, double latency) {
-        if(avgLatencyMap.containsKey(tableName)){
-            int loadCount = this.loadMap.get(tableName).size();
-            double oldAvg = avgLatencyMap.get(tableName);
-            double newAvg = (oldAvg*(loadCount-1) + latency)/loadCount;
-            avgLatencyMap.put(tableName, newAvg);
-        }else{
-            avgLatencyMap.put(tableName, latency);
-        }
-    }
-
-    public Double getAvgLatency(String tablename){
-        if(avgLatencyMap.containsKey(tablename)){
-            return avgLatencyMap.get(tablename);
-        }else{
-            return 0.0;
-        }
-    }
-
-    public Double getAvgSegments(String tablename){
-        if(avgSegmentsMap.containsKey(tablename)){
-            return avgSegmentsMap.get(tablename);
-        }else{
-            return 0.0;
-        }
-    }
-
-    public Double getAvgLatency(String tablename, long startTime){
-        if(loadMap.containsKey(tablename)) {
-            List<Load> loadList = loadMap.get(tablename);
-            if (loadList.isEmpty()) {
-                return 0.0;
-            } else {
-                int entryCount = 0;
-                double totalLatency = 0;
-                for (Load l : loadList) {
-                    if (l.timestamp >= startTime) {
-                        totalLatency += l.latency;
-                        entryCount++;
-                    }
-                }
-                return totalLatency / entryCount;
+    public void addWorkLoad(String tableName, ServerLoadMetric load){
+        if(avgLoadMap.containsKey(tableName)){
+            List<ServerLoadMetric> list = avgLoadMap.get(tableName);
+            ServerLoadMetric l = list.get(list.size()-1);
+            if(l.timestamp + CAPTURE_WINDOW <= load.timestamp){
+                //if incoming load within last window -> update window
+                updateLastWindow(tableName, load);
+            }else{
+                list.add(load);
             }
+        }else{
+            avgLoadMap.put(tableName, new ArrayList<ServerLoadMetric>());
+            ArrayList<ServerLoadMetric> list = new ArrayList<>();
+            list.add(load);
         }
-        return 0.0;
     }
 
-    public Double getAvgSegments(String tablename, long startTime){
-        if(loadMap.containsKey(tablename)) {
-            List<Load> loadList = loadMap.get(tablename);
-            if (loadList.isEmpty()) {
-                return 0.0;
-            } else {
-                int entryCount = 0;
-                double totalSegments = 0;
-                for (Load l : loadList) {
-                    if (l.timestamp >= startTime) {
-                        totalSegments += l.numSegments;
-                        entryCount++;
-                    }
-                }
-                return totalSegments / entryCount;
-            }
-        }
-        return 0.0;
+    private void updateLastWindow(String tableName, ServerLoadMetric load) {
+        List<ServerLoadMetric> list = avgLoadMap.get(tableName);
+        ServerLoadMetric lastLoad = list.get(list.size()-1);
+        Double currAvgLatency = lastLoad.avglatency;
+        Double CurrAvgSegments = lastLoad.avgSegments;
+        long n = lastLoad.numRequests;
+        lastLoad.avglatency = (currAvgLatency*n + load.avglatency)/(n+1);
+        lastLoad.avgSegments = (CurrAvgSegments*n + load.avgSegments)/(n+1);
+        list.add(list.size()-1, lastLoad);
     }
 
-    public static class Load{
-        long timestamp;
-        long latency;
-        int numSegments;
+    public List<ServerLoadMetric> getAvgLoad(String tablename){
+        if(avgLoadMap.containsKey(tablename)){
+            return avgLoadMap.get(tablename);
+        }else{
+            return null;
+        }
     }
 }
 
