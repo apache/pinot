@@ -39,7 +39,7 @@ export default Ember.Controller.extend({
    */
   selectedAlerts: [],
   selectedAll: [],
-  selectedSuscriberGroupName: [],
+  selectedsubscriberGroupName: [],
   selectedApplicationName: [],
 
   // default current Page
@@ -71,8 +71,9 @@ export default Ember.Controller.extend({
     }
   ),
 
-  suscriberGroupNames: Ember.computed('model.suscriberGroups', function() {
-    const groupNames = this.get('model.suscriberGroups');
+  // Groups array for search filter 'search by Subscriber Groups'
+  subscriberGroupNames: Ember.computed('model.subscriberGroups', function() {
+    const groupNames = this.get('model.subscriberGroups');
 
     return groupNames
       .filterBy('name')
@@ -81,6 +82,7 @@ export default Ember.Controller.extend({
       .sort();
   }),
 
+  // App names array for search filter 'search by Application'
   applicationNames: Ember.computed('model.applications', function() {
     const appNames = this.get('model.applications');
 
@@ -122,8 +124,12 @@ export default Ember.Controller.extend({
       const pageNumber = this.get('currentPage');
       const incomingAlertObj = this.get('incomingAlertId');
       const sortOrder = this.get('selectedSortMode');
+      const allGroups = this.get('model.subscriberGroups');
       let alerts = this.get('selectedAlerts');
+      let groupFunctionIds = [];
+      let foundAlert = {};
 
+      // Handle selected sort order
       switch(sortOrder) {
         case 'Edited:first': {
           alerts = alerts.sortBy('id');
@@ -142,6 +148,21 @@ export default Ember.Controller.extend({
           break;
         }
       }
+
+    // Itereate through config groups to enhance all alerts with extra properties (group name, application)
+    for (let config of allGroups) {
+      groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
+      for (let id of groupFunctionIds) {
+        foundAlert = _.find(alerts, function(alert) {
+          return alert.id === id;
+        });
+        if (foundAlert) {
+          Ember.set(foundAlert, 'application', config.application);
+          Ember.set(foundAlert, 'group', config.name);
+        }
+      }
+    }
+
       return alerts.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
     }
   ),
@@ -186,7 +207,7 @@ export default Ember.Controller.extend({
     this.set('isLoading', true);
     yield timeout(600);
 
-    this.set('selectedsuscriberGroupNames', groupName);
+    this.set('selectedsubscriberGroupNames', groupName);
     this.set('currentPage', 1);
 
     const url = `/data/autocomplete/functionByAlertName?alertName=${groupName}`;
