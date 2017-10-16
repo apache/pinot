@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -75,9 +76,10 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
-import org.joda.time.Hours;
 import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
@@ -469,6 +471,7 @@ public class AnomalyResource {
       @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters,
       @QueryParam("properties") String properties,
+      @QueryParam("isOverrideProperties") Boolean isOverrideProp,
       @QueryParam("isActive") Boolean isActive,
       @QueryParam("frequency") String frequency,
       @QueryParam("bucket") String userInputDataGranularity) throws Exception {
@@ -523,6 +526,9 @@ public class AnomalyResource {
       anomalyFunctionSpec.setFilters(filterString);
     }
     if (StringUtils.isNotBlank(properties)) {
+      if (isOverrideProp) {
+       anomalyFunctionSpec.setProperties(new String(""));
+      }
       Properties propertiesToUpdate = AnomalyFunctionDTO.toProperties(properties);
       Map<String, String> propertyMap = new HashMap<>();
       for (String propertyName : propertiesToUpdate.stringPropertyNames()) {
@@ -564,6 +570,36 @@ public class AnomalyResource {
     anomalyFunctionDAO.update(anomalyFunctionSpec);
     return Response.ok(id).build();
   }
+
+  /**
+   * Enable apply self-defined alert filter to anomaly function
+   * @param id functionId to be updated
+   * @param alertFilter alert filter in JSON format
+   * @return updated anomaly function
+   */
+  @PUT
+  @Path("/anomaly-function/{id}/alert-filter")
+  public Response applyAlertFilter(@NotNull @PathParam("id") Long id, @QueryParam("alertfilter") String alertFilter) {
+    Map<String, String> alertFilterConfig = new HashMap<>();
+    try{
+      JSONObject alertFilterJSON = new JSONObject(alertFilter);
+      Iterator<String> alertFilterKeys = alertFilterJSON.keys();
+      while(alertFilterKeys.hasNext()) {
+        String field = alertFilterKeys.next();
+        JSONArray paramArray = alertFilterJSON.getJSONArray(field);
+        alertFilterConfig.put(field, paramArray.get(0).toString());
+      }
+      } catch (JSONException e) {
+      throw new IllegalArgumentException(String.format("Failed to apply alert filter!, {}", e.getMessage()));
+    }
+    AnomalyFunctionDTO targetFunction = anomalyFunctionDAO.findById(id);
+    if(!alertFilterConfig.isEmpty()) {
+      targetFunction.setAlertFilter(alertFilterConfig);
+      anomalyFunctionDAO.update(targetFunction);
+    }
+    return Response.ok(anomalyFunctionDAO.findById(id)).build();
+  }
+
 
   /**
    * Apply an autotune configuration to an existing function
