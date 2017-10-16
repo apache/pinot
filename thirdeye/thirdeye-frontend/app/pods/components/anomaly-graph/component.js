@@ -243,6 +243,8 @@ export default Ember.Component.extend({
     const selectedDimensions = this.get('selectedDimensions') || [];
     const events = this.get('holidayEvents') || [];
 
+    primaryMetric.isSelected = true;
+
     const data = [
       primaryMetric,
       ...relatedMetric,
@@ -547,13 +549,21 @@ export default Ember.Component.extend({
    */
   primaryMetricColumn: Ember.computed(
     'primaryMetric',
+    'primaryMetric.isSelected',
     function() {
       const primaryMetric = this.get('primaryMetric');
 
-      const { baselineValues, currentValues } = primaryMetric.subDimensionContributionMap['All'];
+      // Return data only when it's selected
+      if (primaryMetric.isSelected) {
+        const { baselineValues, currentValues } = primaryMetric.subDimensionContributionMap['All'];
+        return [
+            [`${primaryMetric.metricName}-current`, ...currentValues],
+            [`${primaryMetric.metricName}-expected`, ...baselineValues]
+        ];
+      }
       return [
-        [`${primaryMetric.metricName}-current`, ...currentValues],
-        [`${primaryMetric.metricName}-expected`, ...baselineValues]
+        [`${primaryMetric.metricName}-current`],
+        [`${primaryMetric.metricName}-expected`]
       ];
     }
   ),
@@ -813,11 +823,22 @@ export default Ember.Component.extend({
 
   actions: {
     /**
+     * Shows/Hides the primary metric
+     */
+    onPrimaryMetricToggle() {
+      this.toggleProperty('primaryMetric.isSelected');
+    },
+
+    /**
      * Handles graph item selection
      */
     onSelection() {
       this.attrs.onSelection(...arguments);
     },
+
+    /**
+     * Shows/Hides the graph legend
+     */
     onToggle() {
       this.toggleProperty('showGraphLegend');
     },
