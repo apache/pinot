@@ -44,6 +44,37 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   @Test
+  public void zeroStatTest() throws Exception {
+    final String tmpDir = System.getProperty("java.io.tmpdir");
+    File serializedFile = new File(tmpDir, STATS_FILE_NAME);
+    serializedFile.deleteOnExit();
+    FileUtils.deleteQuietly(serializedFile);
+    String columName = "col1";
+
+    {
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
+      segmentStats.setMemUsedBytes(100);
+      segmentStats.setNumSeconds(101);
+      segmentStats.setNumRowsConsumed(102);
+
+      RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
+      columnStats.setAvgColumnSize(0);
+      columnStats.setCardinality(0);
+      segmentStats.setColumnStats(columName, columnStats);
+
+      history.addSegmentStats(segmentStats);
+
+      history.save();
+    }
+    {
+      RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
+      Assert.assertTrue(history.getEstimatedAvgColSize(columName) > 0);
+      Assert.assertTrue(history.getEstimatedCardinality(columName) > 0);
+    }
+  }
+
+  @Test
   public void serdeTest() throws Exception {
     final String tmpDir = System.getProperty("java.io.tmpdir");
     File serializedFile = new File(tmpDir, STATS_FILE_NAME);
@@ -164,7 +195,6 @@ public class RealtimeSegmentStatsHistoryTest {
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
       Assert.assertEquals(history.isFull(), savedIsFull);
       Assert.assertEquals(history.getCursor(), savedCursor);
-
     }
   }
 
