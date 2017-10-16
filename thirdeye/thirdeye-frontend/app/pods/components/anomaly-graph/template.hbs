@@ -4,7 +4,11 @@
       <h5 class="legend-title">Primary Metric</h5>
       <ul class="anomaly-graph__filter-group">
         <li class="anomaly-graph__filter-item">
-          {{input type="checkbox" id=(concat primaryMetricId metric.id) checked=true disabled=true}}
+          {{input 
+            type="checkbox" 
+            id=(concat primaryMetricId metric.id) 
+            change=(action "onPrimaryMetricToggle")
+            checked=true}}
           <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{primaryMetric.color}}" for="{{concat primaryMetricId metric.id}}" title={{primaryMetric.metricName}}> {{primaryMetric.metricName}} </label>
         </li>
       </ul>
