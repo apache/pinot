@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.io.readerwriter;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
@@ -78,6 +79,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
    * @return PinotDataBuffer
    */
   public PinotDataBuffer allocate(long size, String columnName) {
+    Preconditions.checkArgument(size > 0, "Illegal memory allocation " + size + " for segment " + _segmentName);
     PinotDataBuffer buffer = allocateInternal(size, columnName);
     _totalMemBytes += size;
     _buffers.add(buffer);
