@@ -1,16 +1,12 @@
 <aside class="manage-alert-filters col-md-3">
   <div class="manage-alert-filters__wrapper">
     <h1 class="manage-alert-filters__row manage-alert-filters__row--title">Manage Alerts</h1>
-    {{#accordion-list allowManyActiveItems=true as |accordion|}}
-      {{#accordion.item as |accordionItem|}}
-        {{#accordionItem.toggle}}
-          <div class="manage-alert-filters__row te-hide">Alerts </div>
-        {{/accordionItem.toggle}}
-        {{#accordionItem.panel}}
-          <div class="manage-alert-filters__options te-hide">Options go here</div>
-        {{/accordionItem.panel}}
-      {{/accordion.item}}
-    {{/accordion-list}}
+    {{!--  TODO: enable this filter component when ready
+      {{entity-filter
+        title="Refine results by"
+        filterBlocks=filterBlocks
+      }}
+    --}}
   </div>
 </aside>
 
@@ -71,8 +67,8 @@
       {{else if (eq selectedSearchMode 'Subscriber Groups')}}
         {{#power-select
           onchange=(perform searchByDatasetName)
-          selected=selectedsuscriberGroupNames
-          options=suscriberGroupNames
+          selected=selectedsubscriberGroupNames
+          options=subscriberGroupNames
           searchPlaceholder="Search for a dataset"
           placeholder="Search by Subscriber Group Name"
           allowClear=true
@@ -134,7 +130,7 @@
             </div>
           </div>
           <ul class="te-search-results__list te-search-results__list--details-block row">
-            <div class="col-xs-12 col-sm-6">
+            <div class="col-xs-12 col-sm-5">
               <li class="te-search-results__row">
                 {{!-- Todo: Dry this out --}}
                 <div class="te-search-results__option">Metric</div>
@@ -156,8 +152,24 @@
                   </span>
                 </div>
               </li>
+              <li class="te-search-results__row">
+                <div class="te-search-results__option">Watchers</div>
+                <div class="te-search-results__value" title={{alert.group}}>
+                  <span class="{{unless alert.group 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                    {{if alert.group alert.group 'N/A'}}
+                  </span>
+                </div>
+              </li>
             </div>
-            <div class="col-xs-12 col-sm-6">
+            <div class="col-xs-12 col-sm-7">
+              <li class="te-search-results__row">
+                <div class="te-search-results__option">Owner</div>
+                <div class="te-search-results__value" title={{alert.createdBy}}>
+                  <span class="{{unless alert.createdBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                    {{if alert.createdBy alert.createdBy 'N/A'}}
+                  </span>
+                </div>
+              </li>
               <li class="te-search-results__row">
                 <div class="te-search-results__option">Type</div>
                 <div class="te-search-results__value" title={{alert.type}}>{{alert.type}}</div>

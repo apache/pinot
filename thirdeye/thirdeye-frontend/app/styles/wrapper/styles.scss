@@ -80,17 +80,22 @@ body {
   }
   &__option {
     display: inline-block;
-    width: 120px;
-    min-width: 120px;
+    width: 100px;
+    min-width: 100px;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 14px;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: right;
+    margin-right: 10px;
+    color: app-shade(black, 4);
   }
 
   &__value {
     overflow: hidden;
     text-overflow: ellipsis;
+    color: black;
+    max-height: 19px;
   }
 
   &__edit-button {
@@ -107,7 +112,7 @@ body {
   }
 
   &__title {
-    min-width: 120px;
+    min-width: 95px;
   }
 
   &__list {
