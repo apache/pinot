@@ -20,23 +20,21 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.IOUtils;
+import org.apache.http.protocol.HTTP;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.utils.FileUploadUtils.FileUploadType;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+
+import static org.testng.AssertJUnit.assertTrue;
 
 
 @Test
@@ -66,6 +64,10 @@ public class FileUploadUtilsTest {
       Headers requestHeaders = httpExchange.getRequestHeaders();
       String uploadTypeStr = requestHeaders.getFirst(FileUploadUtils.UPLOAD_TYPE);
       FileUploadType uploadType = FileUploadType.valueOf(uploadTypeStr);
+      if (!requestHeaders.getFirst(HTTP.CONTENT_TYPE).equals("application/json")) {
+        sendResponse(httpExchange, 400, "failed");
+      }
+
       if (uploadType == FileUploadType.JSON) {
         InputStream bodyStream = httpExchange.getRequestBody();
         String requestBody = IOUtils.toString(bodyStream, "UTF-8");
@@ -85,8 +87,11 @@ public class FileUploadUtilsTest {
         // Shouldn't reach here
         Assert.assertTrue(false);
       }
-      String response = "OK";
-      httpExchange.sendResponseHeaders(200, response.length());
+      sendResponse(httpExchange, 200, "OK");
+    }
+
+    public void sendResponse(HttpExchange httpExchange, int code, String response) throws IOException {
+      httpExchange.sendResponseHeaders(code, response.length());
       OutputStream os = httpExchange.getResponseBody();
       os.write(response.getBytes());
       os.close();
@@ -100,9 +105,10 @@ public class FileUploadUtilsTest {
 
   @Test
   public void testSendFileWithUri() {
-    int respCode = FileUploadUtils.sendSegmentUri(TEST_HOST, TEST_PORT, TEST_URI);
+    int respCode = FileUploadUtils.sendSegmentUri(TEST_HOST, TEST_PORT, TEST_URI, 1, 1);
     Assert.assertEquals(respCode, 200);
   }
+
 
   @Test
   public void testSendFileWithJson() throws JSONException {
