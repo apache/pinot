@@ -313,8 +313,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     if (_maxItemsInOverflowHash > 0) {
       Map<Object, Integer> oldOverflowMap = valueToDictId.getOverflowMap();
       for (Map.Entry<Object, Integer> entry : oldOverflowMap.entrySet()) {
-        final long hashVal = Math.abs(entry.getKey().hashCode());
-        final int offsetInBuf = (int)(hashVal % newNumRows) * NUM_COLUMNS;
+        final int hashVal = entry.getKey().hashCode() & Integer.MAX_VALUE;
+        final int offsetInBuf = (hashVal % newNumRows) * NUM_COLUMNS;
         boolean done = false;
         for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
           if (iBuf.get(i) == NULL_VALUE_INDEX) {
@@ -371,12 +371,12 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
    * @return dictionary ID if found, NULL_VALUE_INDEX otherwise.
    */
   protected int getDictId(@Nonnull Object rawValue, byte[] serializedValue) {
-    final long hashVal = Math.abs(rawValue.hashCode());
+    final int hashVal = rawValue.hashCode() & Integer.MAX_VALUE;
     final ValueToDictId valueToDictId = _valueToDict;
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
     for (IntBuffer iBuf : iBufList) {
       final int modulo = iBuf.capacity()/NUM_COLUMNS;
-      final int offsetInBuf = (int)(hashVal % modulo)  * NUM_COLUMNS;
+      final int offsetInBuf = (hashVal % modulo)  * NUM_COLUMNS;
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         int dictId = iBuf.get(i);
         if (dictId != NULL_VALUE_INDEX) {
@@ -406,13 +406,13 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
    * @param serializedValue serialized representation of the value, may be null.
    */
   protected void indexValue(@Nonnull Object value, byte[] serializedValue) {
-    final long hashVal = Math.abs(value.hashCode());
+    final int hashVal = value.hashCode() & Integer.MAX_VALUE;
     ValueToDictId valueToDictId = _valueToDict;
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
 
     for (IntBuffer iBuf : iBufList) {
       final int modulo = iBuf.capacity()/NUM_COLUMNS;
-      final int offsetInBuf = (int)(hashVal % modulo) * NUM_COLUMNS;
+      final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         final int dictId = iBuf.get(i);
         if (dictId == NULL_VALUE_INDEX) {
@@ -445,7 +445,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     // Need a new buffer
     IntBuffer buf = expand();
     final int modulo = buf.capacity()/NUM_COLUMNS;
-    final int offsetInBuf = (int)(hashVal % modulo) * NUM_COLUMNS;
+    final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
     boolean done = false;
     for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
       if (buf.get(i) == NULL_VALUE_INDEX) {
