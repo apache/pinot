@@ -165,6 +165,17 @@ public class MutableDictionaryTest {
         valueToDictId.put(value, dictId);
       }
     }
+    if (dataType == FieldSpec.DataType.INT) {
+      Object value = new Integer(Integer.MIN_VALUE);
+      if (valueToDictId.containsKey(value)) {
+        Assert.assertEquals(dictionary.indexOf(value), (int) valueToDictId.get(value));
+      } else {
+        dictionary.index(value);
+        int dictId = dictionary.indexOf(value);
+        Assert.assertEquals(dictId, numEntries++);
+        valueToDictId.put(value, dictId);
+      }
+    }
   }
 
   private MutableDictionary makeOffHeapDictionary(int estCardinality, int maxOverflowSize,
