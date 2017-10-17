@@ -582,7 +582,7 @@ public class AnomalyResource {
       targetFunction.setAlertFilter(alertFilterConfig);
       anomalyFunctionDAO.update(targetFunction);
     }
-    return Response.ok().build();
+    return Response.ok(id).build();
   }
 
   /**
