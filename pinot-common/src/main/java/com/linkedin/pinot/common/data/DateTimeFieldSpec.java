@@ -23,7 +23,6 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -87,8 +86,8 @@ public final class DateTimeFieldSpec extends FieldSpec {
     super(name, dataType, true);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(dataType);
-    Preconditions.checkArgument(DateTimeFieldSpecUtils.isValidFormat(format));
-    Preconditions.checkArgument(DateTimeFieldSpecUtils.isValidGranularity(granularity));
+    Preconditions.checkArgument(DateTimeFormatSpec.isValidFormat(format));
+    Preconditions.checkArgument(DateTimeGranularitySpec.isValidGranularity(granularity));
 
     // TODO: Add validation for dateTimeType, and ensure only 1 is allowed
     _format = format;
@@ -143,7 +142,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
     _dateTimeType = dateTimeType;
   }
 
-  
+
   @Override
   public String toString() {
     return "< field type: DATE_TIME, field name: " + getName() + ", datatype: " + getDataType()

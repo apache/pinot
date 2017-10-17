@@ -15,14 +15,15 @@
  */
 package com.linkedin.pinot.query.transform;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.datetime.convertor.DateTimeConvertor;
+import com.linkedin.pinot.common.datetime.convertor.DateTimeConvertorFactory;
 import com.linkedin.pinot.core.operator.docvalsets.ConstantBlockValSet;
-import com.linkedin.pinot.core.operator.transform.DateTimeConversionTransformUtils;
 import com.linkedin.pinot.core.operator.transform.function.DateTimeConversionTransform;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -33,26 +34,25 @@ import org.testng.annotations.Test;
  */
 public class DateTimeConversionTransformTest {
 
-  private static final int NUM_ROWS = 3;
 
   // Test conversion of a dateTimeColumn value from a format to millis
   @Test(dataProvider = "testDateTimeConversionTransformDataProvider")
   public void testDateTimeConversionTransform(String inputFormat, String outputFormat,
-      String outputGranularity, long[] input, long[] expected) {
+      String outputGranularity, Object input, int numRows, DataType inputDataType, long[] expected) {
 
     TransformTestUtils.TestBlockValSet inputBlockSet =
-        new TransformTestUtils.TestBlockValSet(input, NUM_ROWS);
-    ConstantBlockValSet inputFormatBlockSet = new ConstantBlockValSet(inputFormat, NUM_ROWS);
-    ConstantBlockValSet outputFormatBlockSet = new ConstantBlockValSet(outputFormat, NUM_ROWS);
+        new TransformTestUtils.TestBlockValSet(input, numRows, inputDataType);
+    ConstantBlockValSet inputFormatBlockSet = new ConstantBlockValSet(inputFormat, numRows);
+    ConstantBlockValSet outputFormatBlockSet = new ConstantBlockValSet(outputFormat, numRows);
     ConstantBlockValSet outputGranularityBlockSet =
-        new ConstantBlockValSet(outputGranularity, NUM_ROWS);
+        new ConstantBlockValSet(outputGranularity, numRows);
 
     DateTimeConversionTransform function = new DateTimeConversionTransform();
     long[] actual =
-        function.transform(NUM_ROWS, inputBlockSet, inputFormatBlockSet, outputFormatBlockSet,
+        function.transform(numRows, inputBlockSet, inputFormatBlockSet, outputFormatBlockSet,
             outputGranularityBlockSet);
 
-    for (int i = 0; i < NUM_ROWS; i++) {
+    for (int i = 0; i < numRows; i++) {
       Assert.assertEquals(actual[i], expected[i]);
     }
   }
@@ -61,11 +61,12 @@ public class DateTimeConversionTransformTest {
   public Object[][] providetestDateTimeConversionTransformData() {
     long[] input = null;
     long[] expected = null;
+    String[] stringInput = null;
 
     List<Object[]> entries = new ArrayList<>();
 
-    input = new long[NUM_ROWS];
-    expected = new long[NUM_ROWS];
+    input = new long[3];
+    expected = new long[3];
     input[0] = 1505898000000L /* 20170920T02:00:00 */;
     input[1] = 1505898300000L /* 20170920T02:05:00 */;
     input[2] = 1505898960000L /* 20170920T02:16:00 */;
@@ -73,11 +74,11 @@ public class DateTimeConversionTransformTest {
     expected[1] = 1505898000000L; /* 20170920T02:00:00 */
     expected[2] = 1505898900000L; /* 20170920T02:15:00 */
     entries.add(new Object[] {
-        "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "15:MINUTES", input, expected
+        "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "15:MINUTES", input, 3, DataType.LONG, expected
     });
 
-    input = new long[NUM_ROWS];
-    expected = new long[NUM_ROWS];
+    input = new long[3];
+    expected = new long[3];
     input[0] = 1505898000000L /* 20170920T02:00:00 */;
     input[1] = 1505898300000L /* 20170920T02:05:00 */;
     input[2] = 1505898960000L /* 20170920T02:16:00 */;
@@ -85,11 +86,11 @@ public class DateTimeConversionTransformTest {
     expected[1] = 1505898300000L; /* 20170920T02:05:00 */
     expected[2] = 1505898960000L; /* 20170920T02:16:00 */
     entries.add(new Object[] {
-        "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", input, expected
+        "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", input, 3, DataType.LONG, expected
     });
 
-    input = new long[NUM_ROWS];
-    expected = new long[NUM_ROWS];
+    input = new long[3];
+    expected = new long[3];
     input[0] = 1505898000000L /* 20170920T02:00:00 */;
     input[1] = 1505898300000L /* 20170920T02:05:00 */;
     input[2] = 1505902560000L /* 20170920T03:16:00 */;
@@ -97,11 +98,11 @@ public class DateTimeConversionTransformTest {
     expected[1] = 418305L; /* 20170920T02:00:00 */
     expected[2] = 418306L; /* 20170920T02:15:00 */
     entries.add(new Object[] {
-        "1:MILLISECONDS:EPOCH", "1:HOURS:EPOCH", "1:HOURS", input, expected
+        "1:MILLISECONDS:EPOCH", "1:HOURS:EPOCH", "1:HOURS", input, 3, DataType.LONG, expected
     });
 
-    input = new long[NUM_ROWS];
-    expected = new long[NUM_ROWS];
+    input = new long[3];
+    expected = new long[3];
     input[0] = 1505890800000L; /* 20170920T00:00:00 */
     input[1] = 1505898300000L; /* 20170920T02:05:00 */
     input[2] = 1505985360000L; /* 20170921T02:16:00 */
@@ -109,11 +110,69 @@ public class DateTimeConversionTransformTest {
     expected[1] = 20170920L; /* 20170920T00:00:00 */
     expected[2] = 20170921L; /* 20170921T00:00:00 */
     entries.add(new Object[] {
-        "1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", input, expected
+        "1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", input, 3, DataType.LONG, expected
     });
 
-    input = new long[NUM_ROWS];
-    expected = new long[NUM_ROWS];
+
+    input = new long[3];
+    expected = new long[3];
+    expected[0] = 1505865600000L; /* 20170920T00:00:00 */
+    expected[1] = 1496275200000L; /* 20170601T00:00:00 */
+    expected[2] = 1505952000000L; /* 20170921T00:00:00 */
+    input[0] = 20170920L; /* 20170920T00:00:00 */
+    input[1] = 20170601L; /* 20170601T00:00:00 */
+    input[2] = 20170921L; /* 20170921T00:00:00 */
+    entries.add(new Object[] {
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS:EPOCH", "1:DAYS", input, 3, DataType.LONG, expected
+    });
+
+
+    stringInput = new String[4];
+    expected = new long[4];
+    stringInput[0] = "8/7/2017 1 AM";
+    stringInput[1] = "12/27/2016 11 PM";
+    stringInput[2] = "8/7/2017 12 AM";
+    stringInput[3] = "8/7/2017 12 PM";
+    expected[0] = 1502067600000L;
+    expected[1] = 1482879600000L;
+    expected[2] = 1502064000000L;
+    expected[3] = 1502107200000L;
+    entries.add(new Object[] {
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", "1:MILLISECONDS:EPOCH", "1:HOURS", stringInput, 4, DataType.STRING, expected
+    });
+
+
+    stringInput = new String[4];
+    expected = new long[4];
+    stringInput[0] = "8/7/2017 1:00:00 AM";
+    stringInput[1] = "12/27/2016 11:20:00 PM";
+    stringInput[2] = "8/7/2017 12:45:50 AM";
+    stringInput[3] = "8/7/2017 12:00:01 PM";
+    expected[0] = 1502067600000L;
+    expected[1] = 1482879600000L;
+    expected[2] = 1502064000000L;
+    expected[3] = 1502107200000L;
+    entries.add(new Object[] {
+        "1:SECONDS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:HOURS", stringInput, 4, DataType.STRING, expected
+    });
+
+
+    stringInput = new String[4];
+    expected = new long[4];
+    stringInput[0] = "8/7/2017 1:00:00 AM";
+    stringInput[1] = "12/27/2016 11:20:00 PM";
+    stringInput[2] = "8/7/2017 12:45:50 AM";
+    stringInput[3] = "8/7/2017 12:00:01 PM";
+    expected[0] = 1502067600000L;
+    expected[1] = 1482880800000L;
+    expected[2] = 1502066750000L;
+    expected[3] = 1502107201000L;
+    entries.add(new Object[] {
+        "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", stringInput, 4, DataType.STRING, expected
+    });
+
+    input = new long[3];
+    expected = new long[3];
     input[0] = 5019660L /* 20170920T02:00:00 */;
     input[1] = 5019661L /* 20170920T02:05:00 */;
     input[2] = 5019675L /* 20170920T03:15:00 */;
@@ -121,11 +180,11 @@ public class DateTimeConversionTransformTest {
     expected[1] = 1505898000000L; /* 20170920T02:00:00 */
     expected[2] = 1505901600000L; /* 20170920T03:00:00 */
     entries.add(new Object[] {
-        "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS", input, expected
+        "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS", input, 3, DataType.LONG, expected
     });
 
-    input = new long[NUM_ROWS];
-    expected = new long[NUM_ROWS];
+    input = new long[3];
+    expected = new long[3];
     input[0] = 5019660L /* 20170920T02:00:00 */;
     input[1] = 5019661L /* 20170920T02:05:00 */;
     input[2] = 5019675L /* 20170920T03:15:00 */;
@@ -133,11 +192,11 @@ public class DateTimeConversionTransformTest {
     expected[1] = 418305L; /* 20170920T02:00:00 */
     expected[2] = 418306L; /* 20170920T03:00:00 */
     entries.add(new Object[] {
-        "5:MINUTES:EPOCH", "1:HOURS:EPOCH", "1:HOURS", input, expected
+        "5:MINUTES:EPOCH", "1:HOURS:EPOCH", "1:HOURS", input, 3, DataType.LONG, expected
     });
 
-    input = new long[NUM_ROWS];
-    expected = new long[NUM_ROWS];
+    input = new long[3];
+    expected = new long[3];
     input[0] = 1505898000000L /* 20170920T02:00:00 */;
     input[1] = 1505199600000L /* 20170912T00:00:00 */;
     input[2] = 1504257300000L /* 20170901T00:20:00 */;
@@ -145,47 +204,74 @@ public class DateTimeConversionTransformTest {
     expected[1] = 2488L;
     expected[2] = 2487L;
     entries.add(new Object[] {
-        "1:MILLISECONDS:EPOCH", "1:WEEKS:EPOCH", "1:MILLISECONDS", input, expected
+        "1:MILLISECONDS:EPOCH", "1:WEEKS:EPOCH", "1:MILLISECONDS", input, 3, DataType.LONG, expected
     });
+
     return entries.toArray(new Object[entries.size()][]);
   }
 
-  // Test the conversion of a millis value to date time column value in a format
-  @Test(dataProvider = "testConvertMillisToCustomFormatDataProvider")
-  public void testConvertMillisToCustomFormat(String format, long timeColumnValueMS,
-      long timeColumnValueExpected) {
 
-    Object timeColumnValueActual =
-        DateTimeConversionTransformUtils.convertMillisToFormat(timeColumnValueMS, format);
-    Assert.assertEquals(timeColumnValueActual, timeColumnValueExpected);
+
+  // Test conversion of a dateTimeColumn value from a format to millis
+  @Test(dataProvider = "testEvaluateDataProvider")
+  public void testDateTimeConversionEvaluation(String inputFormat, String outputFormat,
+      String outputGranularity, Object inputValue, Object expectedValue) {
+    DateTimeConvertor convertor = DateTimeConvertorFactory.getDateTimeConvertorFromFormats(inputFormat, outputFormat, outputGranularity);
+    long actual = convertor.convert(inputValue);
+    Assert.assertEquals(actual, expectedValue);
   }
 
-  @DataProvider(name = "testConvertMillisToCustomFormatDataProvider")
-  public Object[][] provideTestConvertMillisToCustomFormatData() {
-
+  @DataProvider(name = "testEvaluateDataProvider")
+  public Object[][] provideTestEvaluateData() {
     List<Object[]> entries = new ArrayList<>();
     entries.add(new Object[] {
-        "1:HOURS:EPOCH", 1498892400000L, 416359L
+        "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "15:MINUTES", 1505898300000L, 1505898000000L
     });
+
     entries.add(new Object[] {
-        "1:MILLISECONDS:EPOCH", 1498892400000L, 1498892400000L
+        "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", 1505898000000L, 1505898000000L
     });
+
     entries.add(new Object[] {
-        "1:HOURS:EPOCH", 0L, 0L
+        "1:MILLISECONDS:EPOCH", "1:HOURS:EPOCH", "1:HOURS", 1505902560000L, 418306L
     });
+
     entries.add(new Object[] {
-        "5:MINUTES:EPOCH", 1498892400000L, 4996308L
+        "1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", 1505898300000L, 20170920L
     });
+
     entries.add(new Object[] {
-        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1498892400000L,
-        Long.valueOf(DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC().print(1498892400000L))
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS:EPOCH", "1:DAYS", 20170601, 1496275200000L
     });
+
     entries.add(new Object[] {
-        "1:WEEKS:EPOCH", 1498892400000L, 2478L
+        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", "1:MILLISECONDS:EPOCH", "1:HOURS", "8/7/2017 1 AM", 1502067600000L
     });
+
     entries.add(new Object[] {
-        "1:MONTHS:EPOCH", 1498892400000L, 570L
+        "1:SECONDS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:HOURS", "12/27/2016 11:20:00 PM", 1482879600000L
     });
+
+    entries.add(new Object[] {
+        "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", "8/7/2017 12:45:50 AM", 1502066750000L
+    });
+
+    entries.add(new Object[] {
+        "5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS", 5019675L, 1505901600000L
+    });
+
+    entries.add(new Object[] {
+        "5:MINUTES:EPOCH", "1:HOURS:EPOCH", "1:HOURS", 5019661L, 418305L
+    });
+
+    entries.add(new Object[] {
+        "1:MILLISECONDS:EPOCH", "1:WEEKS:EPOCH", "1:MILLISECONDS", 1505898000000L, 2489L
+    });
+
+    entries.add(new Object[] {
+        "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", null, 0L
+    });
+
     return entries.toArray(new Object[entries.size()][]);
   }
 

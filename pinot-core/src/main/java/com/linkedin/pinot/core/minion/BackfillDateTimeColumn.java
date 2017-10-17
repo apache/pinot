@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.minion;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -25,7 +26,6 @@ import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.BaseRecordReader;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -245,17 +245,16 @@ public class BackfillDateTimeColumn {
 
       TimeGranularitySpec timeGranularitySpec = _timeFieldSpec.getOutgoingGranularitySpec();
 
-      String formatFromTimeSpec =
-          DateTimeFieldSpecUtils.constructFormat(timeGranularitySpec.getTimeUnitSize(),
+      DateTimeFormatSpec formatFromTimeSpec =
+          DateTimeFormatSpec.constructFormat(timeGranularitySpec.getTimeUnitSize(),
               timeGranularitySpec.getTimeType(), timeGranularitySpec.getTimeFormat());
-      if (formatFromTimeSpec.equals(_dateTimeFieldSpec.getFormat())) {
+      if (formatFromTimeSpec.getFormat().equals(_dateTimeFieldSpec.getFormat())) {
         return timeColumnValue;
       }
 
       long timeColumnValueMS = timeGranularitySpec.toMillis(timeColumnValue);
-      Object dateTimeColumnValue =
-          DateTimeFieldSpecUtils.fromMillisToFormat(timeColumnValueMS,
-              _dateTimeFieldSpec.getFormat(), Object.class);
+      DateTimeFormatSpec toFormat = new DateTimeFormatSpec(_dateTimeFieldSpec.getFormat());
+      Object dateTimeColumnValue = toFormat.fromMillisToFormat(timeColumnValueMS, Object.class);
       return dateTimeColumnValue;
     }
 

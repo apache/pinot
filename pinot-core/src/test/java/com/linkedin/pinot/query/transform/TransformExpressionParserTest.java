@@ -36,7 +36,7 @@ public class TransformExpressionParserTest {
   public void testGroupBy() {
 
     String[] expectedGroupByColumns = new String[]{"col1", "col2", "col3"};
-    String[] expectedGroupByExpressions = new String[]{"udf1(col2)", "ud2(udf3(col1, col2), col3)"};
+    String[] expectedGroupByExpressions = new String[]{"udf1(col2)", "udf2(udf3(col1, col2), col3)"};
 
     String query =
         "select col1 from myTable group by " + StringUtil.join(",", expectedGroupByColumns) + "," + StringUtil.join(",",
@@ -59,7 +59,7 @@ public class TransformExpressionParserTest {
     for (int i = 0; i < expectedGroupByExpressions.length; i++) {
       int expressionIndex = i + expectedGroupByColumns.length;
       Assert.assertEquals(actualGroupByExpressions.get(expressionIndex),
-          expectedGroupByExpressions[i].replaceAll("\\s", ""));
+          expectedGroupByExpressions[i]);
     }
   }
 }

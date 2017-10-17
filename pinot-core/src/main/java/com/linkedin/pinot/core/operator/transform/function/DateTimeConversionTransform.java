@@ -15,15 +15,20 @@
  */
 package com.linkedin.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.transform.DateTimeConversionTransformUtils;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import java.lang.reflect.Array;
 
 import javax.annotation.concurrent.NotThreadSafe;
+
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.DateTimeFieldSpec;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec;
+import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.datetime.convertor.DateTimeConvertor;
+import com.linkedin.pinot.common.datetime.convertor.DateTimeConvertorFactory;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 
 /**
  * This class implements the date time conversion transform.
@@ -65,28 +70,40 @@ public class DateTimeConversionTransform implements TransformFunction {
   public <T> T transform(int length, BlockValSet... input) {
     Preconditions.checkArgument(input.length == 4, TRANSFORM_NAME + " expects four arguments");
 
-    long[] inputDateTimeValues = input[0].getLongValuesSV();
     String[] inputDateTimeFormat = input[1].getStringValuesSV();
-    String[] outputDateTimeFormat = input[2].getStringValuesSV();
-    String[] outputDateTimeGranularity = input[3].getStringValuesSV();
-
     String inputFormat = inputDateTimeFormat[0];
+    String[] outputDateTimeFormat = input[2].getStringValuesSV();
     String outputFormat = outputDateTimeFormat[0];
+    String[] outputDateTimeGranularity = input[3].getStringValuesSV();
     String outputGranularity = outputDateTimeGranularity[0];
+
+    Preconditions.checkArgument(DateTimeFormatSpec.isValidFormat(inputFormat));
+    Preconditions.checkArgument(DateTimeFormatSpec.isValidDateTimeTransformFormat(outputFormat));
+    Preconditions.checkArgument(DateTimeGranularitySpec.isValidGranularity(outputGranularity));
 
     if (_output == null || _output.length < length) {
       _output = new long[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
     }
 
-    for (int i = 0; i < inputDateTimeValues.length; i++) {
-      Long dateTimeColumnValueMS =
-          DateTimeFieldSpecUtils.fromFormatToMillis(inputDateTimeValues[i], inputFormat);
-      Long bucketedDateTimevalueMS =
-          DateTimeFieldSpecUtils.bucketDateTimeValueMS(dateTimeColumnValueMS, outputGranularity);
-      Long dateTimeValueConverted =
-          DateTimeConversionTransformUtils.convertMillisToFormat(bucketedDateTimevalueMS,
-              outputFormat);
-      _output[i] = dateTimeValueConverted;
+    DataType valueType = input[0].getValueType();
+    Object inputValues = null;
+    switch (valueType) {
+    case STRING:
+      inputValues = input[0].getStringValuesSV();
+      break;
+    case INT:
+      inputValues = input[0].getIntValuesSV();
+      break;
+    case LONG:
+    default:
+      inputValues = input[0].getLongValuesSV();
+      break;
+    }
+
+    DateTimeConvertor dateTimeConvertor =
+        DateTimeConvertorFactory.getDateTimeConvertorFromFormats(inputFormat, outputFormat, outputGranularity);
+    for (int i = 0; i < Array.getLength(inputValues); i++) {
+      _output[i] = dateTimeConvertor.convert(Array.get(inputValues, i));
     }
     return (T) _output;
   }
