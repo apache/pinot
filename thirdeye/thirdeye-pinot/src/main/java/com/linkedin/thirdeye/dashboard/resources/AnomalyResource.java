@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -75,9 +76,10 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
-import org.joda.time.Hours;
 import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
@@ -150,10 +152,8 @@ public class AnomalyResource {
   @GET
   @Path("/anomalies/view")
   public List<MergedAnomalyResultDTO> viewMergedAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
-      @QueryParam("startTimeIso") String startTimeIso,
-      @QueryParam("endTimeIso") String endTimeIso,
-      @QueryParam("metric") String metric,
-      @QueryParam("dimensions") String exploredDimensions,
+      @QueryParam("startTimeIso") String startTimeIso, @QueryParam("endTimeIso") String endTimeIso,
+      @QueryParam("metric") String metric, @QueryParam("dimensions") String exploredDimensions,
       @DefaultValue("true") @QueryParam("applyAlertFilter") boolean applyAlertFiler) {
 
     if (StringUtils.isBlank(dataset)) {
@@ -186,12 +186,17 @@ public class AnomalyResource {
 
       if (StringUtils.isNotBlank(metric)) {
         if (StringUtils.isNotBlank(exploredDimensions)) {
-          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+          anomalyResults =
+              anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions,
+                  startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
         } else {
-          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+          anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(),
+              endTime.getMillis(), loadRawAnomalies);
         }
       } else {
-        anomalyResults = anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+        anomalyResults =
+            anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis(),
+                loadRawAnomalies);
       }
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
@@ -202,8 +207,7 @@ public class AnomalyResource {
       try {
         anomalyResults = AlertFilterHelper.applyFiltrationRule(anomalyResults, alertFilterFactory);
       } catch (Exception e) {
-        LOG.warn(
-            "Failed to apply alert filters on anomalies for dataset:{}, metric:{}, start:{}, end:{}, exception:{}",
+        LOG.warn("Failed to apply alert filters on anomalies for dataset:{}, metric:{}, start:{}, end:{}, exception:{}",
             dataset, metric, startTimeIso, endTimeIso, e);
       }
     }
@@ -211,52 +215,47 @@ public class AnomalyResource {
     return anomalyResults;
   }
 
+  //View raw anomalies for collection
+  @GET
+  @Path("/raw-anomalies/view")
+  @Produces(MediaType.APPLICATION_JSON)
+  public String viewRawAnomaliesInRange(@QueryParam("functionId") String functionId,
+      @QueryParam("dataset") String dataset, @QueryParam("startTimeIso") String startTimeIso,
+      @QueryParam("endTimeIso") String endTimeIso, @QueryParam("metric") String metric) throws JsonProcessingException {
 
-//View raw anomalies for collection
- @GET
- @Path("/raw-anomalies/view")
- @Produces(MediaType.APPLICATION_JSON)
- public String viewRawAnomaliesInRange(
-     @QueryParam("functionId") String functionId,
-     @QueryParam("dataset") String dataset,
-     @QueryParam("startTimeIso") String startTimeIso,
-     @QueryParam("endTimeIso") String endTimeIso,
-     @QueryParam("metric") String metric) throws JsonProcessingException {
+    if (StringUtils.isBlank(functionId) && StringUtils.isBlank(dataset)) {
+      throw new IllegalArgumentException("must provide dataset or functionId");
+    }
+    DateTime endTime = DateTime.now();
+    if (StringUtils.isNotEmpty(endTimeIso)) {
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+    }
+    DateTime startTime = endTime.minusDays(7);
+    if (StringUtils.isNotEmpty(startTimeIso)) {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    }
 
-   if (StringUtils.isBlank(functionId) && StringUtils.isBlank(dataset)) {
-     throw new IllegalArgumentException("must provide dataset or functionId");
-   }
-   DateTime endTime = DateTime.now();
-   if (StringUtils.isNotEmpty(endTimeIso)) {
-     endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-   }
-   DateTime startTime = endTime.minusDays(7);
-   if (StringUtils.isNotEmpty(startTimeIso)) {
-     startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-   }
-
-   List<RawAnomalyResultDTO> rawAnomalyResults = new ArrayList<>();
-   if (StringUtils.isNotBlank(functionId)) {
-     rawAnomalyResults = rawAnomalyResultDAO.
-         findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), Long.valueOf(functionId));
-   } else if (StringUtils.isNotBlank(dataset)) {
-     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(dataset);
-     List<Long> functionIds = new ArrayList<>();
-     for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
-       if (StringUtils.isNotBlank(metric) && !anomalyFunction.getTopicMetric().equals(metric)) {
-         continue;
-       }
-       functionIds.add(anomalyFunction.getId());
-     }
-     for (Long id : functionIds) {
-       rawAnomalyResults.addAll(rawAnomalyResultDAO.
-           findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), id));
-     }
-   }
-   String response = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(rawAnomalyResults);
-   return response;
- }
-
+    List<RawAnomalyResultDTO> rawAnomalyResults = new ArrayList<>();
+    if (StringUtils.isNotBlank(functionId)) {
+      rawAnomalyResults = rawAnomalyResultDAO.
+          findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), Long.valueOf(functionId));
+    } else if (StringUtils.isNotBlank(dataset)) {
+      List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(dataset);
+      List<Long> functionIds = new ArrayList<>();
+      for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
+        if (StringUtils.isNotBlank(metric) && !anomalyFunction.getTopicMetric().equals(metric)) {
+          continue;
+        }
+        functionIds.add(anomalyFunction.getId());
+      }
+      for (Long id : functionIds) {
+        rawAnomalyResults.addAll(rawAnomalyResultDAO.
+            findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), id));
+      }
+    }
+    String response = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(rawAnomalyResults);
+    return response;
+  }
 
   /************* CRUD for anomaly functions of collection **********************************************/
   // View all anomaly functions
@@ -307,27 +306,20 @@ public class AnomalyResource {
   @POST
   @Path("/anomaly-function")
   public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
-      @NotNull @QueryParam("functionName") String functionName,
-      @NotNull @QueryParam("metric") String metric,
-      @NotNull @QueryParam("metricFunction") String metric_function,
-      @QueryParam("type") String type,
-      @NotNull @QueryParam("windowSize") String windowSize,
-      @NotNull @QueryParam("windowUnit") String windowUnit,
-      @QueryParam("windowDelay") @DefaultValue("0") String windowDelay,
-      @QueryParam("cron") String cron,
-      @QueryParam("windowDelayUnit") String windowDelayUnit,
-      @QueryParam("exploreDimension") String exploreDimensions,
-      @QueryParam("filters") String filters,
-      @QueryParam("dataGranularity") String userInputDataGranularity,
-      @NotNull @QueryParam("properties") String properties,
-      @QueryParam("isActive") boolean isActive)
-          throws Exception {
+      @NotNull @QueryParam("functionName") String functionName, @NotNull @QueryParam("metric") String metric,
+      @NotNull @QueryParam("metricFunction") String metric_function, @QueryParam("type") String type,
+      @NotNull @QueryParam("windowSize") String windowSize, @NotNull @QueryParam("windowUnit") String windowUnit,
+      @QueryParam("windowDelay") @DefaultValue("0") String windowDelay, @QueryParam("cron") String cron,
+      @QueryParam("windowDelayUnit") String windowDelayUnit, @QueryParam("exploreDimension") String exploreDimensions,
+      @QueryParam("filters") String filters, @QueryParam("dataGranularity") String userInputDataGranularity,
+      @NotNull @QueryParam("properties") String properties, @QueryParam("isActive") boolean isActive) throws Exception {
 
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(properties)) {
-      throw new UnsupportedOperationException("Received null for one of the mandatory params: "
-          + "dataset " + dataset + ", functionName " + functionName + ", metric " + metric
-          + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", properties" + properties);
+      throw new UnsupportedOperationException(
+          "Received null for one of the mandatory params: " + "dataset " + dataset + ", functionName " + functionName
+              + ", metric " + metric + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", properties"
+              + properties);
     }
 
     TimeGranularity dataGranularity;
@@ -338,7 +330,6 @@ public class AnomalyResource {
     } else {
       dataGranularity = TimeGranularity.fromString(userInputDataGranularity);
     }
-
 
     AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
     anomalyFunctionSpec.setActive(isActive);
@@ -361,15 +352,15 @@ public class AnomalyResource {
     int windowDelayTime = Integer.valueOf(windowDelay);
     TimeUnit windowDelayTimeUnit;
     switch (dataGranularityUnit) {
-    case MINUTES:
-      windowDelayTimeUnit = TimeUnit.MINUTES;
-      break;
-    case DAYS:
-      windowDelayTimeUnit = TimeUnit.DAYS;
-      break;
-    case HOURS:
-    default:
-      windowDelayTimeUnit = TimeUnit.HOURS;
+      case MINUTES:
+        windowDelayTimeUnit = TimeUnit.MINUTES;
+        break;
+      case DAYS:
+        windowDelayTimeUnit = TimeUnit.DAYS;
+        break;
+      case HOURS:
+      default:
+        windowDelayTimeUnit = TimeUnit.HOURS;
     }
     if (StringUtils.isNotBlank(windowDelayUnit)) {
       windowDelayTimeUnit = TimeUnit.valueOf(windowDelayUnit.toUpperCase());
@@ -390,7 +381,7 @@ public class AnomalyResource {
     anomalyFunctionSpec.setBucketSize(dataGranularity.getSize());
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
 
-    if(StringUtils.isNotEmpty(exploreDimensions)) {
+    if (StringUtils.isNotEmpty(exploreDimensions)) {
       anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
     }
     if (!StringUtils.isBlank(filters)) {
@@ -445,6 +436,8 @@ public class AnomalyResource {
    *    in the US
    * @param properties
    *    the properties of the detection function. The anomaly detection takes user-defined parameters via the properties.
+   * @param isOverrideProp
+   *    whether override whole properties using input properties (won't be useful if input properties is null)
    * @param isActive
    *    TRUE if the anomaly function is ready to be scheduled.
    * @param frequency
@@ -456,21 +449,14 @@ public class AnomalyResource {
    */
   @PUT
   @Path("/anomaly-function/{id}")
-  public Response updateAnomalyFunction(@NotNull @PathParam("id") Long id,
-      @QueryParam("dataset") String dataset,
-      @QueryParam("functionName") String functionName,
-      @QueryParam("metric") String metric,
-      @QueryParam("type") String type,
-      @QueryParam("windowSize") String windowSize,
-      @QueryParam("windowUnit") String windowUnit,
-      @QueryParam("windowDelay") String windowDelay,
-      @QueryParam("cron") String cron,
-      @QueryParam("windowDelayUnit") String windowDelayUnit,
-      @QueryParam("exploreDimension") String exploreDimensions,
-      @QueryParam("filters") String filters,
-      @QueryParam("properties") String properties,
-      @QueryParam("isActive") Boolean isActive,
-      @QueryParam("frequency") String frequency,
+  public Response updateAnomalyFunction(@NotNull @PathParam("id") Long id, @QueryParam("dataset") String dataset,
+      @QueryParam("functionName") String functionName, @QueryParam("metric") String metric,
+      @QueryParam("type") String type, @QueryParam("windowSize") String windowSize,
+      @QueryParam("windowUnit") String windowUnit, @QueryParam("windowDelay") String windowDelay,
+      @QueryParam("cron") String cron, @QueryParam("windowDelayUnit") String windowDelayUnit,
+      @QueryParam("exploreDimension") String exploreDimensions, @QueryParam("filters") String filters,
+      @QueryParam("properties") String properties, @QueryParam("isOverrideProperties") Boolean isOverrideProp,
+      @QueryParam("isActive") Boolean isActive, @QueryParam("frequency") String frequency,
       @QueryParam("bucket") String userInputDataGranularity) throws Exception {
 
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
@@ -528,10 +514,13 @@ public class AnomalyResource {
       for (String propertyName : propertiesToUpdate.stringPropertyNames()) {
         propertyMap.put(propertyName, propertiesToUpdate.getProperty(propertyName));
       }
+      if (isOverrideProp != null && isOverrideProp) {
+        anomalyFunctionSpec.setProperties(new String(""));
+      }
       anomalyFunctionSpec.updateProperties(propertyMap);
     }
 
-    if(StringUtils.isNotEmpty(exploreDimensions)) {
+    if (StringUtils.isNotEmpty(exploreDimensions)) {
       // Ensure that the explore dimension names are ordered as schema dimension names
       anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
     }
@@ -552,7 +541,8 @@ public class AnomalyResource {
       } else {
         LOG.warn("Non-feasible time granularity expression: {}", userInputDataGranularity);
         return Response.status(Response.Status.BAD_REQUEST)
-            .entity("Non-feasible time granularity expression: " + userInputDataGranularity).build();
+            .entity("Non-feasible time granularity expression: " + userInputDataGranularity)
+            .build();
       }
     }
 
@@ -562,6 +552,36 @@ public class AnomalyResource {
     }
 
     anomalyFunctionDAO.update(anomalyFunctionSpec);
+    return Response.ok(id).build();
+  }
+
+  /**
+   * Enable apply self-defined alert filter to anomaly function
+   * @param id functionId to be updated
+   * @param alertFilter alert filter in JSON format, for example:
+   *       {"features":["window_size_in_hour,weight"],"intercept":["0,0"],"pattern":["UP,DOWN"],"threshold":["0.01,0.01"],"sensitivity":["MEDIUM"],"type":["alpha_beta_logistic_two_side"],"slope":["0,0"],"beta":["1,1"]}
+   * @return OK if successfully applied alert filter
+   */
+  @PUT
+  @Path("/anomaly-function/{id}/alert-filter")
+  public Response applyAlertFilter(@NotNull @PathParam("id") Long id, @QueryParam("alertfilter") String alertFilter) {
+    Map<String, String> alertFilterConfig = new HashMap<>();
+    try {
+      JSONObject alertFilterJSON = new JSONObject(alertFilter);
+      Iterator<String> alertFilterKeys = alertFilterJSON.keys();
+      while (alertFilterKeys.hasNext()) {
+        String field = alertFilterKeys.next();
+        JSONArray paramArray = alertFilterJSON.getJSONArray(field);
+        alertFilterConfig.put(field, paramArray.get(0).toString());
+      }
+    } catch (JSONException e) {
+      throw new IllegalArgumentException(String.format("Failed to apply alert filter!, {}", e.getMessage()));
+    }
+    AnomalyFunctionDTO targetFunction = anomalyFunctionDAO.findById(id);
+    if (!alertFilterConfig.isEmpty()) {
+      targetFunction.setAlertFilter(alertFilterConfig);
+      anomalyFunctionDAO.update(targetFunction);
+    }
     return Response.ok(id).build();
   }
 
@@ -586,7 +606,8 @@ public class AnomalyResource {
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
     if (autotuneConfigDTO.getConfiguration() == null || autotuneConfigDTO.getConfiguration().isEmpty()) {
-      responseMessage.put("message", "Autotune configuration is null or empty. The original function is optimal. Nothing to change");
+      responseMessage.put("message",
+          "Autotune configuration is null or empty. The original function is optimal. Nothing to change");
       return Response.ok(responseMessage).build();
     }
 
@@ -599,14 +620,15 @@ public class AnomalyResource {
 
     // clone anomaly function and its anomaly results if requested
     if (isCloneFunction) {
-      OnboardResource
-          onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
+      OnboardResource onboardResource =
+          new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
       long cloneId;
       String tag = "clone";
       try {
         cloneId = onboardResource.cloneAnomalyFunctionById(originalFunction.getId(), "clone", isCloneAnomalies);
       } catch (Exception e) {
-        responseMessage.put("message", "Unable to clone function " + originalFunction.getId() + " with clone tag \"clone\"");
+        responseMessage.put("message",
+            "Unable to clone function " + originalFunction.getId() + " with clone tag \"clone\"");
         LOG.warn("Unable to clone function {} with clone tag \"{}\"", originalFunction.getId(), "clone");
         return Response.status(Response.Status.CONFLICT).entity(responseMessage).build();
       }
@@ -672,7 +694,7 @@ public class AnomalyResource {
       @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
       @QueryParam("mode") @DefaultValue("ONLINE") String mode) throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
-    if(anomalyFunctionSpec == null) {
+    if (anomalyFunctionSpec == null) {
       LOG.warn("Cannot find anomaly function {}", functionId);
       return Response.status(Response.Status.BAD_REQUEST).entity("Cannot find anomaly function " + functionId).build();
     }
@@ -699,19 +721,21 @@ public class AnomalyResource {
     HashMap<String, AnomalyTimelinesView> dimensionMapAnomalyTimelinesViewMap = new HashMap<>();
     AnomaliesResource anomaliesResource = new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory);
     DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection());
-    for(DimensionMap dimensionMap : dimensions) {
+    for (DimensionMap dimensionMap : dimensions) {
       AnomalyTimelinesView anomalyTimelinesView = null;
-      if(mode.equalsIgnoreCase("ONLINE")) {
+      if (mode.equalsIgnoreCase("ONLINE")) {
         // If online, use the monitoring time window to query time range and generate the baseline
-        anomalyTimelinesView = anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec,
-            datasetConfigDTO, startTime, endTime, dimensionMap);
+        anomalyTimelinesView =
+            anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO, startTime,
+                endTime, dimensionMap);
       } else {
         // If offline, request baseline in user-defined data range
         List<Pair<Long, Long>> dataRangeIntervals = new ArrayList<>();
         dataRangeIntervals.add(new Pair<Long, Long>(endTime.getMillis(), endTime.getMillis()));
         dataRangeIntervals.add(new Pair<Long, Long>(startTime.getMillis(), endTime.getMillis()));
-        anomalyTimelinesView = anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec,
-            datasetConfigDTO, dataRangeIntervals, dimensionMap);
+        anomalyTimelinesView =
+            anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO,
+                dataRangeIntervals, dimensionMap);
       }
       dimensionMapAnomalyTimelinesViewMap.put(dimensionMap.toJavaString(), anomalyTimelinesView);
     }
@@ -749,9 +773,9 @@ public class AnomalyResource {
     TimeSeries observed = timeSeriesTuple._1();
     TimeSeries expected = timeSeriesTuple._2();
     Interval timeSeriesInterval = observed.getTimeSeriesInterval();
-    List<MergedAnomalyResultDTO> mergedAnomalyResults = mergedAnomalyResultDAO
-        .findOverlappingByFunctionIdDimensions(anomalyFunctionSpec.getId(), timeSeriesInterval.getStartMillis(),
-            timeSeriesInterval.getEndMillis(), dimensionMap.toString(), true);
+    List<MergedAnomalyResultDTO> mergedAnomalyResults =
+        mergedAnomalyResultDAO.findOverlappingByFunctionIdDimensions(anomalyFunctionSpec.getId(),
+            timeSeriesInterval.getStartMillis(), timeSeriesInterval.getEndMillis(), dimensionMap.toString(), true);
 
     for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
       if (mergedAnomalyResult.getDimensions().equals(dimensionMap)) {
@@ -777,7 +801,9 @@ public class AnomalyResource {
               // the timestamp shifts ahead of correct timestamp because of start of DST
               if (timestampDateTime.minusHours(1).toLocalDate().equals(timestampDateTime.toLocalDate())) {
                 timestamp = timestampDateTime.minusHours(1).getMillis();
-              } else if (timestampDateTime.plusHours(1).toLocalDate().equals(timestampDateTime.plusDays(1).toLocalDate())) {
+              } else if (timestampDateTime.plusHours(1)
+                  .toLocalDate()
+                  .equals(timestampDateTime.plusDays(1).toLocalDate())) {
                 timestamp = (new DateTime(timestamp)).plusDays(1).withTimeAtStartOfDay().getMillis();
               }
             }
@@ -791,7 +817,7 @@ public class AnomalyResource {
 
         // Strategy 2: override the timeseries by the current and baseline values inside
         if (mergedAnomalyResult.getAnomalyResults().size() > 0) {
-          for(RawAnomalyResultDTO rawAnomalyResult : mergedAnomalyResult.getAnomalyResults()) {
+          for (RawAnomalyResultDTO rawAnomalyResult : mergedAnomalyResult.getAnomalyResults()) {
             if (!observed.hasTimestamp(rawAnomalyResult.getStartTime())) {
               // if the observed value in the timeseries is not removed, use the original observed value
               observed.set(rawAnomalyResult.getStartTime(), rawAnomalyResult.getAvgCurrentVal());
@@ -803,7 +829,8 @@ public class AnomalyResource {
           }
         } else {
           // Strategy 3: use the merged anomaly information for all missing points
-          for (long start = mergedAnomalyResult.getStartTime(); start < mergedAnomalyResult.getEndTime(); start += bucketMillis) {
+          for (long start = mergedAnomalyResult.getStartTime(); start < mergedAnomalyResult.getEndTime();
+              start += bucketMillis) {
             if (!observed.hasTimestamp(mergedAnomalyResult.getStartTime())) {
               // if the observed value in the timeseries is not removed, use the original observed value
               observed.set(start, mergedAnomalyResult.getAvgCurrentVal());
@@ -888,8 +915,8 @@ public class AnomalyResource {
       if (feedback == null) {
         continue;
       }
-      if (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY) ||
-          feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
+      if (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY) || feedback.getFeedbackType()
+          .equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
         return true;
       }
     }
@@ -923,10 +950,8 @@ public class AnomalyResource {
    */
   @GET
   @Path("anomaly-function/{id}/anomalies")
-  public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso,
-      @QueryParam("type") @DefaultValue("merged") String anomalyType,
+  public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId, @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso, @QueryParam("type") @DefaultValue("merged") String anomalyType,
       @QueryParam("apply-alert-filter") @DefaultValue("false") boolean applyAlertFiler) {
 
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
@@ -941,12 +966,12 @@ public class AnomalyResource {
       startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
     } catch (Exception e) {
-      throw new WebApplicationException("Unable to parse strings, " + startTimeIso + " and " + endTimeIso
-          + ", in ISO DateTime format", e);
+      throw new WebApplicationException(
+          "Unable to parse strings, " + startTimeIso + " and " + endTimeIso + ", in ISO DateTime format", e);
     }
 
-    LOG.info("Retrieving {} anomaly results for function {} in the time range: {} -- {}",
-        anomalyType, functionId, startTimeIso, endTimeIso);
+    LOG.info("Retrieving {} anomaly results for function {} in the time range: {} -- {}", anomalyType, functionId,
+        startTimeIso, endTimeIso);
 
     ArrayList<Long> idList = new ArrayList<>();
     if (anomalyType.equals("raw")) {
@@ -955,16 +980,15 @@ public class AnomalyResource {
         idList.add(dto.getId());
       }
     } else if (anomalyType.equals("merged")) {
-      List<MergedAnomalyResultDTO> mergedResults = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime,
-          endTime, functionId, true);
+      List<MergedAnomalyResultDTO> mergedResults =
+          mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId, true);
 
       // apply alert filter
       if (applyAlertFiler) {
         try {
           mergedResults = AlertFilterHelper.applyFiltrationRule(mergedResults, alertFilterFactory);
         } catch (Exception e) {
-          LOG.warn(
-              "Failed to apply alert filters on {} anomalies for function id:{}, start:{}, end:{}, exception:{}",
+          LOG.warn("Failed to apply alert filters on {} anomalies for function id:{}, start:{}, end:{}, exception:{}",
               anomalyType, functionId, startTimeIso, endTimeIso, e);
         }
       }
@@ -974,7 +998,7 @@ public class AnomalyResource {
       }
     }
 
-      return idList;
+    return idList;
   }
 
   // Activate anomaly function
@@ -1037,8 +1061,7 @@ public class AnomalyResource {
   @DELETE
   @Path("/anomaly-function")
   public Response deleteAnomalyFunctions(@NotNull @QueryParam("id") Long id,
-      @QueryParam("functionName") String functionName)
-      throws IOException {
+      @QueryParam("functionName") String functionName) throws IOException {
 
     if (id == null) {
       throw new IllegalArgumentException("id is a required query param");
@@ -1093,7 +1116,8 @@ public class AnomalyResource {
    */
   @POST
   @Path(value = "anomaly-merged-result/feedback/{anomaly_merged_result_id}")
-  public void updateAnomalyMergedResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId, String payload) {
+  public void updateAnomalyMergedResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId,
+      String payload) {
     try {
       MergedAnomalyResultDTO result = anomalyMergedResultDAO.findById(anomalyResultId);
       if (result == null) {
@@ -1151,10 +1175,10 @@ public class AnomalyResource {
    */
   @GET
   @Path("/anomaly-merged-result/timeseries/{anomaly_merged_result_id}")
-  public AnomalyTimelinesView getAnomalyMergedResultTimeSeries(@NotNull @PathParam("anomaly_merged_result_id") long anomalyResultId,
-      @NotNull @QueryParam("aggTimeGranularity") String aggTimeGranularity, @QueryParam("start") long viewWindowStartTime,
-      @QueryParam("end") long viewWindowEndTime)
-      throws Exception {
+  public AnomalyTimelinesView getAnomalyMergedResultTimeSeries(
+      @NotNull @PathParam("anomaly_merged_result_id") long anomalyResultId,
+      @NotNull @QueryParam("aggTimeGranularity") String aggTimeGranularity,
+      @QueryParam("start") long viewWindowStartTime, @QueryParam("end") long viewWindowEndTime) throws Exception {
 
     boolean loadRawAnomalies = false;
     MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId, loadRawAnomalies);
@@ -1163,9 +1187,8 @@ public class AnomalyResource {
     AnomalyTimelinesView anomalyTimelinesView = null;
 
     // check if there is AnomalyTimelinesView in the Properties. If yes, use the AnomalyTimelinesView
-    if(anomalyProps.containsKey("anomalyTimelinesView")) {
-      anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(
-          anomalyProps.get("anomalyTimelinesView"));
+    if (anomalyProps.containsKey("anomalyTimelinesView")) {
+      anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(anomalyProps.get("anomalyTimelinesView"));
     } else {
 
       DimensionMap dimensions = anomalyResult.getDimensions();
@@ -1178,7 +1201,8 @@ public class AnomalyResource {
         long anomalyWindowStartTime = anomalyResult.getStartTime();
         long anomalyWindowEndTime = anomalyResult.getEndTime();
 
-        long bucketMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
+        long bucketMillis =
+            TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
         long bucketCount = (anomalyWindowEndTime - anomalyWindowStartTime) / bucketMillis;
         long paddingMillis = Math.max(1, (bucketCount / 2)) * bucketMillis;
         if (paddingMillis > TimeUnit.DAYS.toMillis(1)) {
@@ -1193,7 +1217,8 @@ public class AnomalyResource {
         }
       }
 
-      TimeGranularity timeGranularity = Utils.getAggregationTimeGranularity(aggTimeGranularity, anomalyFunctionSpec.getCollection());
+      TimeGranularity timeGranularity =
+          Utils.getAggregationTimeGranularity(aggTimeGranularity, anomalyFunctionSpec.getCollection());
       long bucketMillis = timeGranularity.toMillis();
       // ThirdEye backend is end time exclusive, so one more bucket is appended to make end time inclusive for frontend.
       viewWindowEndTime += bucketMillis;
@@ -1226,7 +1251,8 @@ public class AnomalyResource {
       List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
       if (CollectionUtils.isNotEmpty(scalingFactors)) {
         Properties properties = anomalyFunction.getProperties();
-        MetricTransfer.rescaleMetric(metricTimeSeries, viewWindowStartTime, scalingFactors, anomalyFunctionSpec.getTopicMetric(), properties);
+        MetricTransfer.rescaleMetric(metricTimeSeries, viewWindowStartTime, scalingFactors,
+            anomalyFunctionSpec.getTopicMetric(), properties);
       }
 
       List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
@@ -1244,7 +1270,7 @@ public class AnomalyResource {
       anomalyTimelinesView.addSummary("currentStart", Long.toString(firstBucket.getCurrentStart()));
       anomalyTimelinesView.addSummary("baselineStart", Long.toString(firstBucket.getBaselineStart()));
 
-      TimeBucket lastBucket = timeBuckets.get(timeBuckets.size()-1);
+      TimeBucket lastBucket = timeBuckets.get(timeBuckets.size() - 1);
       anomalyTimelinesView.addSummary("currentEnd", Long.toString(lastBucket.getCurrentStart()));
       anomalyTimelinesView.addSummary("baselineEnd", Long.toString(lastBucket.getBaselineEnd()));
     }
@@ -1277,5 +1303,4 @@ public class AnomalyResource {
     }
     return new JSONObject(urlTemplates).toString();
   }
-
 }
