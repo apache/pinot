@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.transform;
+package com.linkedin.pinot.common.datetime.convertor;
 
 import java.util.concurrent.TimeUnit;
 
@@ -27,7 +27,9 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
-import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec;
+import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec.DateTimeTransformUnit;
 
 /**
  * Convertor for conversion of datetime values from an epoch/sdf format to another epoch/sdf format
@@ -35,22 +37,9 @@ import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
 public abstract class DateTimeConvertor {
 
   private static final DateTime EPOCH_START_DATE = new DateTime(0L, DateTimeZone.UTC);
-  private static final Chronology CHRONOLOGY = DateTimeUtils.getInstantChronology(EPOCH_START_DATE);
+  private static final Chronology EPOCH_START_CHRONOLOGY = DateTimeUtils.getInstantChronology(EPOCH_START_DATE);
   private static final long EPOCH_START_DATE_MILLIS = 0L;
 
-  /**
-   * Time unit enum with range from MILLISECONDS to YEARS
-   */
-  public enum DateTimeTransformUnit {
-    YEARS,
-    MONTHS,
-    WEEKS,
-    DAYS,
-    HOURS,
-    MINUTES,
-    SECONDS,
-    MILLISECONDS;
-  }
 
   private int inputTimeSize;
   private TimeUnit inputTimeUnit;
@@ -63,20 +52,20 @@ public abstract class DateTimeConvertor {
 
   private Long outputGranularityMillis;
 
-  public DateTimeConvertor(String inputFormat, String outputFormat, String outputGranularity) {
+  public DateTimeConvertor(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,
+      DateTimeGranularitySpec outputGranularity) {
 
-    inputTimeSize = DateTimeFieldSpecUtils.getColumnSizeFromFormat(inputFormat);
-    inputTimeUnit = DateTimeFieldSpecUtils.getColumnUnitFromFormat(inputFormat);
-    TimeFormat inputTimeFormat = DateTimeFieldSpecUtils.getTimeFormatFromFormat(inputFormat);
+    inputTimeSize = inputFormat.getColumnSize();
+    inputTimeUnit = inputFormat.getColumnUnit();
+    TimeFormat inputTimeFormat = inputFormat.getTimeFormat();
     if (inputTimeFormat.equals(TimeFormat.SIMPLE_DATE_FORMAT)) {
-      String inputSDFFormat = DateTimeFieldSpecUtils.getSDFPatternFromFormat(inputFormat);
+      String inputSDFFormat = inputFormat.getSDFPattern();
       inputDateTimeFormatter = DateTimeFormat.forPattern(inputSDFFormat).withZoneUTC();
     }
 
-    outputTimeSize = DateTimeFieldSpecUtils.getColumnSizeFromFormat(outputFormat);
-    String[] outputFormatTokens = outputFormat.split(DateTimeFieldSpecUtils.COLON_SEPARATOR);
-    outputTimeUnit = DateTimeTransformUnit.valueOf(outputFormatTokens[DateTimeFieldSpecUtils.FORMAT_UNIT_POSITION]);
-    TimeFormat outputTimeFormat = DateTimeFieldSpecUtils.getTimeFormatFromFormat(outputFormat);
+    outputTimeSize = outputFormat.getColumnSize();
+    outputTimeUnit = outputFormat.getColumnDateTimeTransformUnit();
+    TimeFormat outputTimeFormat = outputFormat.getTimeFormat();
     if (outputTimeFormat.equals(TimeFormat.EPOCH)) {
       DurationFieldType durationFieldType;
       switch (outputTimeUnit) {
@@ -108,14 +97,14 @@ public abstract class DateTimeConvertor {
       default:
         throw new IllegalArgumentException("Illegal argument for time unit: " + outputTimeUnit);
       }
-      outputDurationField = durationFieldType.getField(CHRONOLOGY);
+      outputDurationField = durationFieldType.getField(EPOCH_START_CHRONOLOGY);
 
     } else {
-      String outputSDFFormat = DateTimeFieldSpecUtils.getSDFPatternFromFormat(outputFormat);
+      String outputSDFFormat = outputFormat.getSDFPattern();
       outputDateTimeFormatter = DateTimeFormat.forPattern(outputSDFFormat).withZoneUTC();
     }
 
-    outputGranularityMillis = DateTimeFieldSpecUtils.granularityToMillis(outputGranularity);
+    outputGranularityMillis = outputGranularity.granularityToMillis();
   }
 
 

@@ -29,6 +29,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
@@ -37,7 +38,6 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.minion.BackfillDateTimeColumn;
 import com.linkedin.pinot.core.minion.BackfillDateTimeColumn.BackfillDateTimeRecordReader;
@@ -92,7 +92,8 @@ public class BackfillDateTimeRecordReaderTest {
       Object timeColumnValue = timeFieldSpec.getIncomingGranularitySpec().fromMillis(timestamp);
       fields.put(timeFieldSpec.getName(), timeColumnValue);
 
-      Object dateTimeColumnValue = DateTimeFieldSpecUtils.fromMillisToFormat(timestamp, dateTimeFieldSpec.getFormat(), Object.class);
+      DateTimeFormatSpec toFormat = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+      Object dateTimeColumnValue = toFormat.fromMillisToFormat(timestamp, Object.class);
       fields.put(dateTimeFieldSpec.getName(), dateTimeColumnValue);
 
       GenericRow row = new GenericRow();
@@ -161,7 +162,8 @@ public class BackfillDateTimeRecordReaderTest {
 
       // check that datetime column has correct value as per its format
       Long timeColumnValueMS = timeFieldSpec.getIncomingGranularitySpec().toMillis(timeColumnValueActual);
-      Object dateTimeColumnValueExpected = DateTimeFieldSpecUtils.fromMillisToFormat(timeColumnValueMS, dateTimeFieldSpec.getFormat(), Object.class);
+      DateTimeFormatSpec toFormat = new DateTimeFormatSpec(dateTimeFieldSpec.getFormat());
+      Object dateTimeColumnValueExpected = toFormat.fromMillisToFormat(timeColumnValueMS, Object.class);
       Assert.assertEquals(dateTimeColumnValueActual, dateTimeColumnValueExpected);
     }
     wrapperReader.close();

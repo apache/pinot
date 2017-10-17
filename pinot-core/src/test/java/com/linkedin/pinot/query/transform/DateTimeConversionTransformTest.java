@@ -16,9 +16,9 @@
 package com.linkedin.pinot.query.transform;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.datetime.convertor.DateTimeConvertor;
+import com.linkedin.pinot.common.datetime.convertor.DateTimeConvertorFactory;
 import com.linkedin.pinot.core.operator.docvalsets.ConstantBlockValSet;
-import com.linkedin.pinot.core.operator.transform.DateTimeConvertor;
-import com.linkedin.pinot.core.operator.transform.DateTimeConvertorFactory;
 import com.linkedin.pinot.core.operator.transform.function.DateTimeConversionTransform;
 
 import java.util.ArrayList;

@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.transform;
+package com.linkedin.pinot.common.datetime.convertor;
 
 import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
-import com.linkedin.pinot.common.utils.time.DateTimeFieldSpecUtils;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec;
+import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
 
 public class DateTimeConvertorFactory {
 
@@ -29,19 +30,28 @@ public class DateTimeConvertorFactory {
   public static DateTimeConvertor getDateTimeConvertorFromFormats(String inputFormat, String outputFormat,
       String outputGranularity) {
     DateTimeConvertor dateTimeConvertor = null;
-    TimeFormat inputTimeFormat = DateTimeFieldSpecUtils.getTimeFormatFromFormat(inputFormat);
-    TimeFormat outputTimeFormat = DateTimeFieldSpecUtils.getTimeFormatFromFormat(outputFormat);
+
+    DateTimeFormatSpec inputDateTimeFormatSpec = new DateTimeFormatSpec(inputFormat);
+    DateTimeFormatSpec outputDateTimeFormatSpec = new DateTimeFormatSpec(outputFormat);
+    DateTimeGranularitySpec outputDateTimeGranularitySpec = new DateTimeGranularitySpec(outputGranularity);
+
+    TimeFormat inputTimeFormat = inputDateTimeFormatSpec.getTimeFormat();
+    TimeFormat outputTimeFormat = outputDateTimeFormatSpec.getTimeFormat();
     if (inputTimeFormat.equals(TimeFormat.EPOCH)) {
       if (outputTimeFormat.equals(TimeFormat.EPOCH)) {
-        dateTimeConvertor = new EpochToEpochConvertor(inputFormat, outputFormat, outputGranularity);
+        dateTimeConvertor =
+            new EpochToEpochConvertor(inputDateTimeFormatSpec, outputDateTimeFormatSpec, outputDateTimeGranularitySpec);
       } else {
-        dateTimeConvertor = new EpochToSDFConvertor(inputFormat, outputFormat, outputGranularity);
+        dateTimeConvertor =
+            new EpochToSDFConvertor(inputDateTimeFormatSpec, outputDateTimeFormatSpec, outputDateTimeGranularitySpec);
       }
     } else {
       if (outputTimeFormat.equals(TimeFormat.EPOCH)) {
-        dateTimeConvertor = new SDFToEpochConvertor(inputFormat, outputFormat, outputGranularity);
+        dateTimeConvertor =
+            new SDFToEpochConvertor(inputDateTimeFormatSpec, outputDateTimeFormatSpec, outputDateTimeGranularitySpec);
       } else {
-        dateTimeConvertor = new SDFToSDFConvertor(inputFormat, outputFormat, outputGranularity);
+        dateTimeConvertor =
+            new SDFToSDFConvertor(inputDateTimeFormatSpec, outputDateTimeFormatSpec, outputDateTimeGranularitySpec);
       }
     }
     return dateTimeConvertor;

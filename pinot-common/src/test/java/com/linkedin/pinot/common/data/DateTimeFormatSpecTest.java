@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.utils.time;
+package com.linkedin.pinot.common.data;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,17 +25,19 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 
 /**
- * Tests for helper methods in DateTimeFieldSpecUtils
+ * Tests for DateTimeFormatSpec helper methods
  */
-public class DateTimeFieldSpecUtilsTest {
+public class DateTimeFormatSpecTest {
 
   // Test conversion of a dateTimeColumn value from a format to millis
   @Test(dataProvider = "testFromFormatToMillisDataProvider")
   public void testFromFormatToMillis(String format, Object timeColumnValue, long millisExpected) {
 
-    long millisActual = DateTimeFieldSpecUtils.fromFormatToMillis(timeColumnValue, format);
+    DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(format);
+    long millisActual = dateTimeFormatSpec.fromFormatToMillis(timeColumnValue);
     Assert.assertEquals(millisActual, millisExpected);
   }
 
@@ -76,11 +78,11 @@ public class DateTimeFieldSpecUtilsTest {
 
   // Test the conversion of a millis value to date time column value in a format
   @Test(dataProvider = "testFromMillisToFormatDataProvider")
-  public void testFromMillisToFormat(String format, long timeColumnValueMS, Class type,
+  public void testFromMillisToFormat(String format, long timeColumnValueMS, Class<?> type,
       Object timeColumnValueExpected) {
 
-    Object timeColumnValueActual =
-        DateTimeFieldSpecUtils.fromMillisToFormat(timeColumnValueMS, format, type);
+    DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(format);
+    Object timeColumnValueActual = dateTimeFormatSpec.fromMillisToFormat(timeColumnValueMS, type);
     Assert.assertEquals(timeColumnValueActual, timeColumnValueExpected);
   }
 
@@ -129,19 +131,19 @@ public class DateTimeFieldSpecUtilsTest {
       TimeUnit columnUnitFromFormatExpected, TimeFormat timeFormatFromFormatExpected,
       String sdfPatternFromFormatExpected) {
 
-    int columnSizeFromFormat = DateTimeFieldSpecUtils.getColumnSizeFromFormat(format);
+    DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(format);
+    int columnSizeFromFormat = dateTimeFormatSpec.getColumnSize();
     Assert.assertEquals(columnSizeFromFormat, columnSizeFromFormatExpected);
 
-    TimeUnit columnUnitFromFormat = DateTimeFieldSpecUtils.getColumnUnitFromFormat(format);
+    TimeUnit columnUnitFromFormat = dateTimeFormatSpec.getColumnUnit();
     Assert.assertEquals(columnUnitFromFormat, columnUnitFromFormatExpected);
 
-    com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat timeFormatFromFormat =
-        DateTimeFieldSpecUtils.getTimeFormatFromFormat(format);
+    TimeFormat timeFormatFromFormat = dateTimeFormatSpec.getTimeFormat();
     Assert.assertEquals(timeFormatFromFormat, timeFormatFromFormatExpected);
 
     String sdfPatternFromFormat = null;
     try {
-      sdfPatternFromFormat = DateTimeFieldSpecUtils.getSDFPatternFromFormat(format);
+      sdfPatternFromFormat = dateTimeFormatSpec.getSDFPattern();
     } catch (Exception e) {
       // No sdf pattern
     }
@@ -185,20 +187,20 @@ public class DateTimeFieldSpecUtilsTest {
   // Test construct format given its components
   @Test(dataProvider = "testConstructFormatDataProvider")
   public void testConstructFormat(int columnSize, TimeUnit columnUnit, String columnTimeFormat,
-      String pattern, String formatExpected1, String formatExpected2) {
-    String formatActual1 = null;
+      String pattern, DateTimeFormatSpec formatExpected1, DateTimeFormatSpec formatExpected2) {
+    DateTimeFormatSpec formatActual1 = null;
     try {
       formatActual1 =
-          DateTimeFieldSpecUtils.constructFormat(columnSize, columnUnit, columnTimeFormat);
+          DateTimeFormatSpec.constructFormat(columnSize, columnUnit, columnTimeFormat);
     } catch (Exception e) {
       // invalid arguments
     }
     Assert.assertEquals(formatActual1, formatExpected1);
 
-    String formatActual2 = null;
+    DateTimeFormatSpec formatActual2 = null;
     try {
       formatActual2 =
-          DateTimeFieldSpecUtils.constructFormat(columnSize, columnUnit, columnTimeFormat, pattern);
+          DateTimeFormatSpec.constructFormat(columnSize, columnUnit, columnTimeFormat, pattern);
     } catch (Exception e) {
       // invalid arguments
     }
@@ -211,13 +213,13 @@ public class DateTimeFieldSpecUtilsTest {
     List<Object[]> entries = new ArrayList<>();
 
     entries.add(new Object[] {
-        1, TimeUnit.HOURS, "EPOCH", null, "1:HOURS:EPOCH", null
+        1, TimeUnit.HOURS, "EPOCH", null, new DateTimeFormatSpec("1:HOURS:EPOCH"), null
     });
     entries.add(new Object[] {
-        1, TimeUnit.HOURS, "EPOCH", "yyyyMMdd", "1:HOURS:EPOCH", null
+        1, TimeUnit.HOURS, "EPOCH", "yyyyMMdd", new DateTimeFormatSpec("1:HOURS:EPOCH"), null
     });
     entries.add(new Object[] {
-        5, TimeUnit.MINUTES, "EPOCH", null, "5:MINUTES:EPOCH", null
+        5, TimeUnit.MINUTES, "EPOCH", null, new DateTimeFormatSpec("5:MINUTES:EPOCH"), null
     });
     entries.add(new Object[] {
         0, TimeUnit.HOURS, "EPOCH", null, null, null
@@ -233,7 +235,7 @@ public class DateTimeFieldSpecUtilsTest {
     });
     entries.add(new Object[] {
         1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "yyyyMMdd", null,
-        "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd"
+        new DateTimeFormatSpec("1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd")
     });
     entries.add(new Object[] {
         1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", null, null, null
@@ -243,83 +245,8 @@ public class DateTimeFieldSpecUtilsTest {
     });
     entries.add(new Object[] {
         1, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT", "M/d/yyyy h:mm:ss a", null,
-        "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a"
+        new DateTimeFormatSpec("1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a")
     });
-    return entries.toArray(new Object[entries.size()][]);
-  }
-
-  // Test construct granularity from components
-  @Test(dataProvider = "testConstructGranularityDataProvider")
-  public void testConstructGranularity(int size, TimeUnit unit, String granularityExpected) {
-    String granularityActual = null;
-    try {
-      granularityActual = DateTimeFieldSpecUtils.constructGranularity(size, unit);
-    } catch (Exception e) {
-      // invalid arguments
-    }
-    Assert.assertEquals(granularityActual, granularityExpected);
-  }
-
-  @DataProvider(name = "testConstructGranularityDataProvider")
-  public Object[][] provideTestConstructGranularityData() {
-
-    List<Object[]> entries = new ArrayList<>();
-
-    entries.add(new Object[] {
-        1, TimeUnit.HOURS, "1:HOURS"
-    });
-    entries.add(new Object[] {
-        5, TimeUnit.MINUTES, "5:MINUTES"
-    });
-    entries.add(new Object[] {
-        0, TimeUnit.HOURS, null
-    });
-    entries.add(new Object[] {
-        -1, TimeUnit.HOURS, null
-    });
-    entries.add(new Object[] {
-        1, null, null
-    });
-
-    return entries.toArray(new Object[entries.size()][]);
-  }
-
-  // Test granularity to millis
-  @Test(dataProvider = "testGranularityToMillisDataProvider")
-  public void testGranularityToMillis(String granularity, Long millisExpected) {
-    Long millisActual = null;
-    try {
-      millisActual = DateTimeFieldSpecUtils.granularityToMillis(granularity);
-    } catch (Exception e) {
-      // invalid arguments
-    }
-    Assert.assertEquals(millisActual, millisExpected);
-  }
-
-  @DataProvider(name = "testGranularityToMillisDataProvider")
-  public Object[][] provideTestGranularityToMillisData() {
-
-    List<Object[]> entries = new ArrayList<>();
-
-    entries.add(new Object[] {
-        "1:HOURS", 3600000L
-    });
-    entries.add(new Object[] {
-        "1:MILLISECONDS", 1L
-    });
-    entries.add(new Object[] {
-        "15:MINUTES", 900000L
-    });
-    entries.add(new Object[] {
-        "0:HOURS", 0L
-    });
-    entries.add(new Object[] {
-        null, null
-    });
-    entries.add(new Object[] {
-        "1:DUMMY", null
-    });
-
     return entries.toArray(new Object[entries.size()][]);
   }
 
