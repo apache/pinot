@@ -129,6 +129,22 @@ public class PinotSchemaRestletResource {
     return addOrUpdateSchema(null, multiPart);
   }
 
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/schemas/validate")
+  @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
+      + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")})
+  public String validateSchema (FormDataMultiPart multiPart) throws Exception {
+    Schema schema = getSchemaFromMultiPart(multiPart);
+    if (!schema.validate(LOGGER)) {
+      throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs", Response.Status.BAD_REQUEST);
+    }
+    return schema.getJSONSchema();
+  }
+
   /**
    * Internal method to add or update schema
    * @param schemaName null value indicates new schema (POST request) where schemaName is
