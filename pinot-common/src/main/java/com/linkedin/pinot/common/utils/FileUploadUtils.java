@@ -241,6 +241,7 @@ public class FileUploadUtils {
       postMethod = new PostMethod("http://" + host + ":" + port + "/" + SEGMENTS_PATH);
       postMethod.setRequestEntity(requestEntity);
       postMethod.setRequestHeader(UPLOAD_TYPE, FileUploadType.JSON.toString());
+      postMethod.setRequestHeader(HTTP.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
       int statusCode = FILE_UPLOAD_HTTP_CLIENT.executeMethod(postMethod);
       if (statusCode >= 400) {
         String errorString = "POST Status Code: " + statusCode + "\n";
