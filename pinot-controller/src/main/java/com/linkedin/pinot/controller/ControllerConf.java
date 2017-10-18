@@ -50,6 +50,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
+  private static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -62,6 +63,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = false;
   private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
+  private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
+      "com.linkedin.pinot.controller.api.access.AllowAllAccessFactory";
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -326,5 +329,13 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public String getJerseyAdminApiPort() {
     return getString(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
+  }
+
+  public String getAccessControlFactoryClass() {
+    return getString(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+  }
+
+  public void setAccessControlFactoryClass(String accessControlFactoryClass) {
+    setProperty(ACCESS_CONTROL_FACTORY_CLASS, accessControlFactoryClass);
   }
 }
