@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.api.resources;
 
 import java.io.IOException;
 import java.net.URI;
+import javax.annotation.Priority;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -28,11 +29,12 @@ import javax.ws.rs.ext.Provider;
 
 
 // A class to add the headers that we expect from clients. Pre-jersey API, the clients have been lax in specifying the
-// actualy content type that they POST or PUT. Most cases, it is JSON. In the jersey API, we have the power to receive
+// actual content type that they POST or PUT. Most cases, it is JSON. In the jersey API, we have the power to receive
 // objects as a typed object, if it can be de-serialized into one. So, we resort to replacing the content type with
 // the expected one.
 @PreMatching
 @Provider
+@Priority(1)
 public class HeaderAdder implements ContainerRequestFilter {
   public static final Logger LOGGER = LoggerFactory.getLogger(HeaderAdder.class);
 

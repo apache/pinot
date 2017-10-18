@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
+import com.linkedin.pinot.controller.api.access.AccessControlFactory;
 import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -147,6 +148,11 @@ public class ControllerStarter {
       LOGGER.info("Starting segment status manager");
       segmentStatusChecker.start(controllerMetrics);
 
+      String accessControlFactoryClass = config.getAccessControlFactoryClass();
+      LOGGER.info("Use class: {} as the access control factory", accessControlFactoryClass);
+      final AccessControlFactory accessControlFactory =
+          (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
+
       int jerseyPort = Integer.parseInt(config.getControllerPort());
 
       LOGGER.info("Controller download url base: {}", config.generateVipUrl());
@@ -164,6 +170,7 @@ public class ControllerStarter {
           bind(connectionManager).to(HttpConnectionManager.class);
           bind(executorService).to(Executor.class);
           bind(controllerMetrics).to(ControllerMetrics.class);
+          bind(accessControlFactory).to(AccessControlFactory.class);
         }
       });
 
