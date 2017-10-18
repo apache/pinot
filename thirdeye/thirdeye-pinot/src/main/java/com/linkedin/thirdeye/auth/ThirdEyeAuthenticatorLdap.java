@@ -11,15 +11,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ThirdEyeAuthenticator implements Authenticator<Credentials, ThirdEyePrincipal> {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthenticator.class);
+public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, ThirdEyePrincipal> {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthenticatorLdap.class);
 
   private static final String LDAP_CONTEXT_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
 
   private final String domainSuffix;
   private final String ldapUrl;
 
-  public ThirdEyeAuthenticator(String domainSuffix, String ldapUrl) {
+  public ThirdEyeAuthenticatorLdap(String domainSuffix, String ldapUrl) {
     this.domainSuffix = domainSuffix;
     this.ldapUrl = ldapUrl;
   }
