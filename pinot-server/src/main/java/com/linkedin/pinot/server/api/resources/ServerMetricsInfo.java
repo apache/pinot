@@ -24,7 +24,10 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import io.swagger.annotations.*;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
@@ -58,6 +61,10 @@ public class ServerMetricsInfo {
 
 
         ServerLatencyInfo serverLatencyInfo = new ServerLatencyInfo();
+        List<Double> server1latencies = Arrays.asList(1.0, 3.0, 5.0);
+        serverLatencyInfo.set_segmentLatencyInSecs(server1latencies);
+        serverLatencyInfo.set_serverName("server_1");
+        serverLatencyInfo.set_serverName("table_1");
 
         // Add logic for retrieving data.
 

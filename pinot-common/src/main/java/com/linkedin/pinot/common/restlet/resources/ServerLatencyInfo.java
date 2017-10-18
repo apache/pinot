@@ -17,30 +17,43 @@ package com.linkedin.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.util.ArrayList;
+import java.util.List;
+
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerLatencyInfo {
-    private String _serverName;
-    private double _segmentLatencyInSecs;
+    public String _serverName;
+    public String _tableName;
+    public List<Double> _segmentLatencyInSecs;
 
     public ServerLatencyInfo() {
         //We set default value to -1 as indication of error (e.g., timeout) in returning latency info from a Pinot server;
-        _segmentLatencyInSecs = -1;
+        _segmentLatencyInSecs = new ArrayList<Double>();
     }
 
-    public String getServerName() {
+    public String get_serverName() {
         return _serverName;
     }
 
-    public void setServerName(String sName) {
+    public void set_serverName(String sName) {
         _serverName = sName;
     }
 
-    public double getSegmentLatencyInSecs() {
+    public String get_tableName() {
+        return _tableName;
+    }
+    public void set_tableName(String _tableName) {
+        this._tableName = _tableName;
+    }
+
+    public List<Double> get_segmentLatencyInSecs() {
         return _segmentLatencyInSecs;
     }
 
-    public void setSegmentLatencyInSecs(double segmentLatencyInSecs) {
+    public void set_segmentLatencyInSecs(List<Double> segmentLatencyInSecs) {
         _segmentLatencyInSecs = segmentLatencyInSecs;
     }
+
+
 }

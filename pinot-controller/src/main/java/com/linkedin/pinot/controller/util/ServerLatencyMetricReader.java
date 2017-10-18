@@ -66,7 +66,7 @@ public class ServerLatencyMetricReader {
 
         String serverLatencyUrl;
          serverLatencyUrl = "http://" + serverNameOrEndpoint + CommonConstants.Helix.ServerMetricUris.SERVER_METRICS_INFO_URI;
-         serverLatencyUrl = serverLatencyUrl + tableName + "/LatencyInfo";
+        serverLatencyUrl = serverLatencyUrl+tableName+"/LatencyInfo";
 
         List<String> serverUrl = new ArrayList<>(1);
         serverUrl.add(serverLatencyUrl);

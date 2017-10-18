@@ -17,7 +17,7 @@ public class SegmentMetric {
     public static double computeInstanceLatencyMetric(HelixAdmin helixAdmin, IdealState idealState, String instance, String tableName) {
         ServerLatencyMetricReader serverlatencyMetricsReader =
                 new ServerLatencyMetricReader(executor, connectionManager, helixAdmin);
-        ServerLatencyInfo serverLatencyInfo = serverlatencyMetricsReader.getServerLatencyMetrics(instance, true, 300);
-        return serverLatencyInfo.getSegmentLatencyInSecs();
+        ServerLatencyInfo serverLatencyInfo = serverlatencyMetricsReader.getServerLatencyMetrics(instance, tableName,true, 300);
+        return serverLatencyInfo.get_segmentLatencyInSecs().get(0);
     }
 }

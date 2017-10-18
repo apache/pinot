@@ -5,6 +5,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.SegmentMetric;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
@@ -19,7 +20,7 @@ public class LatencyBasedSegmentAssignmentStrategy implements SegmentAssignmentS
    private static final double MAX_ACCEPTABLE_ERROR_RATE = 0.5;
    private static final Logger LOGGER = LoggerFactory.getLogger(RandomAssignmentStrategy.class);
     @Override
-    public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+    public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
         //We create a SegmentSizeMetric and pass it to BalancedLoadAssignmentStrategy
         //This means BalancedSegmentSizeSegmentAssignmentStrategy
 
@@ -37,14 +38,14 @@ public class LatencyBasedSegmentAssignmentStrategy implements SegmentAssignmentS
         List<String> selectedInstances = new ArrayList<>();
         Map<String, Double> reportedLatencyMetricPerInstanceMap = new HashMap<>();
         List<String> allTaggedInstances =
-                HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName,
+                HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName,
                         serverTenantName);
 
         // Calculate load metric for every eligible instance
         // We also log if more than a threshold percentage of servers return error for SegmentsInfo requests
         long numOfAllEligibleServers = allTaggedInstances.size();
         long numOfServersReturnError = 0;
-        IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
+        IdealState idealState = helixResourceManager.getHelixAdmin().getResourceIdealState(helixClusterName, tableName);
         if (idealState != null) {
             //If the partition set is empty, then mostly this is the first segment is being uploaded; load metric is zero
             //Otherwise we ask servers to return their load parameter
@@ -56,7 +57,7 @@ public class LatencyBasedSegmentAssignmentStrategy implements SegmentAssignmentS
                 // We Do not add servers, that are not tagged, to the map.
                 // By this approach, new segments will not be allotted to the server if tags changed.
                 for (String instanceName : allTaggedInstances) {
-                    double reportedMetric = SegmentMetric.computeInstanceLatencyMetric(helixAdmin, idealState, instanceName,tableName);
+                    double reportedMetric = SegmentMetric.computeInstanceLatencyMetric(helixResourceManager.getHelixAdmin(), idealState, instanceName,tableName);
                     if (reportedMetric != -1) {
                         reportedLatencyMetricPerInstanceMap.put(instanceName, reportedMetric);
                     } else {

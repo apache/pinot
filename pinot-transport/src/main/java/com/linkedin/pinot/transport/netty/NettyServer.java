@@ -234,15 +234,11 @@ public abstract class NettyServer implements Runnable {
     private final NettyServerMetrics _metric;
     private final NettyServerWorkload _workload;
 
-    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric, long defaultLargeQueryLatencyMs, NettyServerWorkload workload) {
+    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric, long defaultLargeQueryLatencyMs) {
       _handler = handler;
       _metric = metric;
       _defaultLargeQueryLatencyMs = defaultLargeQueryLatencyMs;
-      _workload = workload;
-    }
-
-    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric,  NettyServerWorkload workload) {
-      this(handler, metric, 100, workload);
+      _workload = new NettyServerWorkload();
     }
 
     @Override

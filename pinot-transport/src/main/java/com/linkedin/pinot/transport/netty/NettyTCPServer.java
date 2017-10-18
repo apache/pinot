@@ -98,13 +98,12 @@ public class NettyTCPServer extends NettyServer {
       NettyServerMetrics serverMetric =
           new NettyServerMetrics(_registry, NettyTCPServer.class.getName() + "_" + Utils.getUniqueId() + "_");
 
-      NettyServerWorkload serverWorkload = new NettyServerWorkload();
       if (null != _globalMetrics) {
         _globalMetrics.addTransportClientMetrics(serverMetric);
       }
 
       ch.pipeline().addLast("request_handler",
-          new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric, _defaultLargeQueryLatencyMs, serverWorkload));
+          new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric, _defaultLargeQueryLatencyMs));
     }
   }
 }
