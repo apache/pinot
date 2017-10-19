@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -63,6 +64,7 @@ public class HelixBrokerStarter {
   private final BrokerServerBuilder _brokerServerBuilder;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
+  private final MetricsRegistry _metricsRegistry;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
 
@@ -111,6 +113,7 @@ public class HelixBrokerStarter {
     _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, _spectatorHelixManager,
         pinotHelixProperties.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
+    _metricsRegistry = _brokerServerBuilder.getMetricsRegistry();
     ClusterChangeMediator clusterChangeMediator =
         new ClusterChangeMediator(_helixExternalViewBasedRouting, _brokerServerBuilder.getBrokerMetrics());
     _spectatorHelixManager.addExternalViewChangeListener(clusterChangeMediator);
@@ -262,6 +265,10 @@ public class HelixBrokerStarter {
       LOGGER.info("Disconnecting spectator Helix manager");
       _spectatorHelixManager.disconnect();
     }
+  }
+
+  public MetricsRegistry getMetricsRegistry() {
+    return _metricsRegistry;
   }
 
   public static void main(String[] args) throws Exception {
