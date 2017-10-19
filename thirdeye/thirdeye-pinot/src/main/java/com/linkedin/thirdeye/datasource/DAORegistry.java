@@ -181,7 +181,7 @@ public class DAORegistry implements DaoProvider{
   }
 
   @Override
-  public void restart(){
-    throw new UnsupportedOperationException("This class doesn't support restart() function");
+  public void cleanup(){
+    throw new UnsupportedOperationException("This class doesn't support cleanup() function");
   }
 }

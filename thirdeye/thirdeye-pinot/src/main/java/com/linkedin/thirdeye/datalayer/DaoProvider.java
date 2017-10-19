@@ -28,7 +28,7 @@ public interface DaoProvider {
    * This is for unit test usage. The restart is to clean up the DB so that the previous tests don't affect the following
    * unit tests.
    */
-  void restart();
+  void cleanup();
 
   AnomalyFunctionManager getAnomalyFunctionDAO();
 
