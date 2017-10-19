@@ -297,6 +297,10 @@ public class ControllerStarter {
     }
   }
 
+  public MetricsRegistry getMetricsRegistry() {
+    return _metricsRegistry;
+  }
+
   public static ControllerStarter startDefault() {
     return startDefault(null);
   }
