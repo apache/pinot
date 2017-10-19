@@ -231,7 +231,10 @@ public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCre
       // Append the bitmap data file to the inverted index file
       try (FileChannel out = new FileOutputStream(_invertedIndexFile, true).getChannel();
           FileChannel in = new FileInputStream(tempBitmapDataFile).getChannel()) {
-        out.transferFrom(in, 0, in.size());
+        // jfim: For some reason, it seems like the second argument of transferFrom is relative on Linux while it is
+        // an absolute position on MacOS X. As such, we reposition the stream to 0 on both platforms to make it an
+        // absolute position call.
+        out.position(0).transferFrom(in, out.size(), in.size());
       }
     } catch (Exception e) {
       FileUtils.deleteQuietly(_invertedIndexFile);
