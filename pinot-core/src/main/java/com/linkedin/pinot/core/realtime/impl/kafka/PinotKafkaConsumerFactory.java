@@ -35,4 +35,6 @@ public abstract class PinotKafkaConsumerFactory {
   public abstract PinotKafkaConsumer buildConsumer(@Nonnull String clientId, int partition, KafkaStreamMetadata kafkaStreamMetadata);
 
   public abstract PinotKafkaConsumer buildMetadataFetcher(@Nonnull String clientId, KafkaStreamMetadata kafkaStreamMetadata);
+
+  public abstract KafkaMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception;
 }

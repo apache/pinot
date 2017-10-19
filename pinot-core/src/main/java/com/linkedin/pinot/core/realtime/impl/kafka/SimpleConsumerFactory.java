@@ -32,4 +32,8 @@ public class SimpleConsumerFactory extends PinotKafkaConsumerFactory {
     return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, kafkaStreamMetadata.getBootstrapHosts(),
         clientId, kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
   }
+
+  public KafkaMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception {
+    return kafkaStreamProviderConfig.getDecoder();
+  }
 }

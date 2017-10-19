@@ -939,7 +939,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _realtimeSegment.setSegmentMetadata(segmentZKMetadata, schema);
 
     // Create message decoder
-    _messageDecoder = kafkaStreamProviderConfig.getDecoder();
+    _messageDecoder = _pinotKafkaConsumerFactory.getDecoder(kafkaStreamProviderConfig);
     _clientId = _kafkaPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
