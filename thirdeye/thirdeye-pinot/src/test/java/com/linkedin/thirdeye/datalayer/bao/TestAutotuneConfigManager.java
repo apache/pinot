@@ -31,7 +31,7 @@ public class TestAutotuneConfigManager {
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   @Test

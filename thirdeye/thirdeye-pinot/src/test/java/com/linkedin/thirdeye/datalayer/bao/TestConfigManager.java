@@ -22,7 +22,7 @@ public class TestConfigManager {
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   @Test

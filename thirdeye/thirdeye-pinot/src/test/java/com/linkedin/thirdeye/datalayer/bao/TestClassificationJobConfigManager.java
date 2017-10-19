@@ -44,7 +44,7 @@ public class TestClassificationJobConfigManager {
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   @Test

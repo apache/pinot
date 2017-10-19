@@ -17,7 +17,7 @@ public class DAOProviderUtilTest {
 
   @AfterClass(alwaysRun = true)
   public void afterClass() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   @Test

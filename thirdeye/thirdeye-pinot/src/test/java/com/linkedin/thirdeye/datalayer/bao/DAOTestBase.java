@@ -73,14 +73,12 @@ public class DAOTestBase implements DaoProvider {
   DataSource ds;
   String dbUrlId;
 
-  private static DaoProvider INSTANCE = new DAOTestBase();
-
   private DAOTestBase(){
     init();
   }
 
   public static DaoProvider getInstance(){
-    return INSTANCE;
+    return new DAOTestBase();
   }
 
   protected void init() {
@@ -119,6 +117,7 @@ public class DAOTestBase implements DaoProvider {
     }
   }
 
+  @Override
   public void cleanup() {
     try {
       cleanUpJDBC();
@@ -269,11 +268,5 @@ public class DAOTestBase implements DaoProvider {
   @Override
   public ApplicationManager getApplicationDAO() {
     return applicationDAO;
-  }
-
-  @Override
-  public void restart() {
-    cleanup();
-    init();
   }
 }

@@ -29,7 +29,7 @@ public class TestAnomalyJobManager {
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   @Test

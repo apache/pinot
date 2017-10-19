@@ -26,7 +26,7 @@ public class TestGroupedAnomalyResultsManager {
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   @Test(dataProvider="groupedAnomalies")

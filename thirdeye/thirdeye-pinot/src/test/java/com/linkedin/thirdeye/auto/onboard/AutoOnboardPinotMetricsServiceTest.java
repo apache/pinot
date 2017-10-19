@@ -49,7 +49,7 @@ public class AutoOnboardPinotMetricsServiceTest {
 
   @AfterMethod(alwaysRun = true)
   void afterMethod() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   @Test

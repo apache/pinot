@@ -41,7 +41,7 @@ public class TestHolidayEventProvider {
 
     @AfterClass(alwaysRun = true)
     void afterClass() {
-      testDAOProvider.restart();
+      testDAOProvider.cleanup();
     }
 
     @Test

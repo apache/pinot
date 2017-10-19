@@ -25,7 +25,7 @@ public class ConfigNamespaceTest {
 
   @AfterMethod(alwaysRun = true)
   public void afterMethod() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   @Test

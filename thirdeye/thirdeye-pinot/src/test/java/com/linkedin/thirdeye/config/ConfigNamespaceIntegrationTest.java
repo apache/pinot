@@ -61,7 +61,7 @@ public class ConfigNamespaceIntegrationTest {
 
   @AfterMethod(alwaysRun = true)
   public void afterMethod() {
-    testDAOProvider.restart();
+    testDAOProvider.cleanup();
   }
 
   public void setupViaResource() throws IOException {
