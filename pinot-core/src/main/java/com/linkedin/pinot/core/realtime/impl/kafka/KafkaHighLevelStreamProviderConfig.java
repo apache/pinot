@@ -175,7 +175,11 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   }
 
   public KafkaMessageDecoder getDecoder() throws Exception {
-    KafkaMessageDecoder ret = (KafkaMessageDecoder) Class.forName(decodeKlass).newInstance();
+    return getDecoder(decodeKlass);
+  }
+
+  public KafkaMessageDecoder getDecoder(String decodeClass) throws Exception {
+    KafkaMessageDecoder ret = (KafkaMessageDecoder) Class.forName(decodeClass).newInstance();
     ret.init(decoderProps, indexingSchema, kafkaTopicName);
     return ret;
   }
