@@ -166,6 +166,9 @@ public class EntityUtils {
     } else if(ServiceEntity.TYPE.isType(urn)) {
       return ServiceEntity.fromURN(urn, score);
 
+    } else if(DatasetEntity.TYPE.isType(urn)) {
+      return DatasetEntity.fromURN(urn, score);
+
     } else if(HyperlinkEntity.TYPE.isType(urn)) {
       return HyperlinkEntity.fromURL(urn, score);
     }

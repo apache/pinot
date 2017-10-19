@@ -1,24 +1,19 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,14 +28,24 @@ import org.slf4j.LoggerFactory;
 public class MetricDatasetPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricDatasetPipeline.class);
 
+  private enum MappingDirection {
+    METRIC_TO_DATASET,
+    DATASET_TO_METRIC
+  }
+
   private static final String PROP_COEFFICIENT = "coefficient";
-  private static final double PROP_COEFFICIENT_DEFAULT = 0.8;
+  private static final double PROP_COEFFICIENT_DEFAULT = 1.0;
+
+  private static final String PROP_DIRECTION = "direction";
+  private static final String PROP_DIRECTION_DEFAULT = MappingDirection.METRIC_TO_DATASET.toString();
+
   public static final String META_METRIC_COUNT = "__COUNT";
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
 
   private final double coefficient;
+  private final MappingDirection direction;
 
   /**
    * Constructor for dependency injection
@@ -48,15 +53,17 @@ public class MetricDatasetPipeline extends Pipeline {
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
    * @param coefficient coefficient for scoring dataset metrics
+   * @param direction mapping direction
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
    */
-  public MetricDatasetPipeline(String outputName, Set<String> inputNames, double coefficient, MetricConfigManager metricDAO,
+  public MetricDatasetPipeline(String outputName, Set<String> inputNames, double coefficient, MappingDirection direction, MetricConfigManager metricDAO,
       DatasetConfigManager datasetDAO) {
     super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.coefficient = coefficient;
+    this.direction = direction;
   }
 
   /**
@@ -64,57 +71,58 @@ public class MetricDatasetPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param properties configuration properties ({@code PROP_COEFFICIENT})
+   * @param properties configuration properties ({@code PROP_COEFFICIENT}, {@code PROP_DIRECTION})
    */
   public MetricDatasetPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.coefficient = MapUtils.getDoubleValue(properties, PROP_COEFFICIENT, PROP_COEFFICIENT_DEFAULT);
+    this.direction = MappingDirection.valueOf(MapUtils.getString(properties, PROP_DIRECTION, PROP_DIRECTION_DEFAULT));
   }
 
   @Override
   public PipelineResult run(PipelineContext context) {
-    Set<MetricEntity> metrics = context.filter(MetricEntity.class);
+    if (MappingDirection.METRIC_TO_DATASET.equals(this.direction)) {
+      // metric to dataset
+      Set<MetricEntity> metrics = context.filter(MetricEntity.class);
+      return new PipelineResult(context, metrics2datasets(metrics));
 
-    Set<String> datasets = new HashSet<>();
-    Map<String, Double> datasetScores = new HashMap<>();
-    Multimap<String, MetricEntity> related = ArrayListMultimap.create();
-    for(MetricEntity me : metrics) {
-      MetricConfigDTO metricDTO = this.metricDAO.findById(me.getId());
-
-      String d = metricDTO.getDataset();
-      datasets.add(d);
-
-      double metricScore = me.getScore() * this.coefficient;
-      if(!datasetScores.containsKey(d))
-        datasetScores.put(d, 0.0d);
-      datasetScores.put(d, Math.max(datasetScores.get(d), metricScore));
-
-      related.put(d, me);
+    } else {
+      // dataset to metric
+      Set<DatasetEntity> datasets = context.filter(DatasetEntity.class);
+      return new PipelineResult(context, datasets2metrics(datasets));
     }
+  }
 
-    Set<Entity> entities = new HashSet<>();
-    for(String d : datasets) {
-      DatasetConfigDTO dataset = datasetDAO.findByDataset(d);
+  private Set<MetricEntity> datasets2metrics(Iterable<DatasetEntity> datasets) {
+    Set<MetricEntity> entities = new MaxScoreSet<>();
+    for(DatasetEntity de : datasets) {
+      DatasetConfigDTO dataset = datasetDAO.findByDataset(de.getName());
       if(dataset == null) {
-        LOG.warn("Could not find dataset '{}'", d);
+        LOG.warn("Could not find dataset '{}'", de.getName());
         continue;
       }
 
-      double datasetScore = datasetScores.get(d);
-      Collection<MetricConfigDTO> dtos = metricDAO.findByDataset(d);
-
+      Collection<MetricConfigDTO> dtos = metricDAO.findByDataset(de.getName());
       dtos = removeInactive(dtos);
-      dtos = removeExisting(dtos, metrics);
       dtos = removeMeta(dtos);
 
       for(MetricConfigDTO dto : dtos) {
-        entities.add(MetricEntity.fromMetric(datasetScore, related.get(d), dto.getId()));
+        entities.add(MetricEntity.fromMetric(de.getScore() * coefficient, Collections.singleton(de), dto.getId()));
       }
     }
 
-    return new PipelineResult(context, entities);
+    return entities;
+  }
+
+  private Set<DatasetEntity> metrics2datasets(Iterable<MetricEntity> metrics) {
+    Set<DatasetEntity> entities = new MaxScoreSet<>();
+    for(MetricEntity me : metrics) {
+      MetricConfigDTO metricDTO = this.metricDAO.findById(me.getId());
+      entities.add(DatasetEntity.fromName(me.getScore() * coefficient, Collections.singleton(me), metricDTO.getDataset()));
+    }
+    return entities;
   }
 
   static Collection<MetricConfigDTO> removeMeta(Iterable<MetricConfigDTO> dtos) {
