@@ -873,18 +873,4 @@ public class DataResource {
     }
     return dataGranularity;
   }
-
-  public enum EntityType {
-    METRIC,
-    SERVICE,
-    DIMENSION,
-    DIMENSION_VAL,
-    CUSTOM
-  }
-
-  @GET
-  @Path("/entityTypes")
-  public List<EntityType> getEntityTypes() {
-    return Arrays.asList(EntityType.values());
-  }
 }
