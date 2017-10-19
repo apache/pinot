@@ -59,6 +59,7 @@
         <div class="separator"></div>
 
         <div class="query-results">
+          <div id="query-results-table-wrapper" style="overflow-x: scroll"></div>
           <textarea id="results-maker"></textarea>
         </div>
 
@@ -113,7 +114,7 @@
           {{else}}
             <td class="{{incomingGranularitySpec.fieldType}}">{{incomingGranularitySpec.name}}</td>
             <td class="{{incomingGranularitySpec.fieldType}}">{{incomingGranularitySpec.dataType}}</td>
-          {{/if}}  
+          {{/if}}
       {{/if}}
 
     </tbody>
@@ -130,7 +131,7 @@
         {{/each}}
       </tr>
     </thead>
-    
+
     <tbody>
       {{#each results}}
         <tr>
