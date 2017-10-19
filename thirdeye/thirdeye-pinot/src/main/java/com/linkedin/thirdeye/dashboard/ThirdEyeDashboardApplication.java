@@ -6,7 +6,8 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
-import com.linkedin.thirdeye.auth.ThirdEyeAuthenticator;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorDisabled;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorLdap;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
@@ -176,20 +177,25 @@ public class ThirdEyeDashboardApplication
       LOG.error("Error loading the resource", e);
     }
 
-    if (config.getAuthConfig() != null && config.getAuthConfig().isAuthEnabled()) {
+    if (config.getAuthConfig() != null) {
       final AuthConfiguration authConfig = config.getAuthConfig();
       final SecretKeySpec aesKey = new SecretKeySpec(authConfig.getAuthKey().getBytes("UTF-8"), "AES");
       final AuthCookieSerializer serializer = new AuthCookieSerializer(aesKey, new ObjectMapper());
 
-      final ThirdEyeAuthenticator authenticator = new ThirdEyeAuthenticator(authConfig.getDomainSuffix(), authConfig.getLdapUrl());
-      final Authenticator<Credentials, ThirdEyePrincipal> cachingAuthenticator = new CachingAuthenticator<>(
-          env.metrics(), authenticator, CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
+      // default permissive authenticator
+      Authenticator<Credentials, ThirdEyePrincipal> authenticator = new ThirdEyeAuthenticatorDisabled();
+
+      // ldap authenticator
+      if (authConfig.isAuthEnabled()) {
+        final ThirdEyeAuthenticatorLdap authenticatorLdap = new ThirdEyeAuthenticatorLdap(authConfig.getDomainSuffix(), authConfig.getLdapUrl());
+        authenticator = new CachingAuthenticator<>(env.metrics(), authenticatorLdap, CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
+      }
 
       // auth filter
-      env.jersey().register(new ThirdEyeAuthFilter(cachingAuthenticator, serializer, authConfig.getAllowedPaths()));
+      env.jersey().register(new ThirdEyeAuthFilter(authenticator, serializer, authConfig.getAllowedPaths()));
 
       // auth resource
-      env.jersey().register(new AuthResource(cachingAuthenticator, serializer, authConfig.getCookieTTL() * 1000));
+      env.jersey().register(new AuthResource(authenticator, serializer, authConfig.getCookieTTL() * 1000));
     }
   }
 
