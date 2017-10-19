@@ -141,7 +141,7 @@ public class SegmentsValidationAndRetentionConfig {
     this.starTreeConfig = starTreeConfig;
   }
 
-  public HllConfig getHllConfigs() {
+  public HllConfig getHllConfig() {
     return hllConfig;
   }
 

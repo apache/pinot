@@ -76,6 +76,7 @@ public class HllConfig {
 
   public void setHllLog2m(int hllLog2m) {
     this.hllLog2m = hllLog2m;
+    this.hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(hllLog2m);
   }
 
   public String getHllDeriveColumnSuffix() {
