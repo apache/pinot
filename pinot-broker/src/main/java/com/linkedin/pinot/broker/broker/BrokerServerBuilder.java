@@ -236,6 +236,10 @@ public class BrokerServerBuilder {
     _brokerAdminApplication.stop();
   }
 
+  public MetricsRegistry getMetricsRegistry()  {
+    return _registry;
+  }
+
   public State getCurrentState() {
     return _state.get();
   }
