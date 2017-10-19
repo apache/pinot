@@ -10,7 +10,7 @@ public enum PinotThirdeyeDataSourceProperties {
 
   private final String value;
 
-  private PinotThirdeyeDataSourceProperties(String value) {
+  PinotThirdeyeDataSourceProperties(String value) {
     this.value = value;
   }
 

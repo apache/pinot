@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.auto.onboard;
 
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -239,8 +240,9 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
     String sql = String.format("select count(*) from %s group by %s top 10", dataset, metricNamesColumn);
     try {
-
-      ResultSetGroup result = CACHE_REGISTRY.getResultSetGroupCache().get(new PinotQuery(sql, dataset));
+      PinotThirdEyeDataSource pinotThirdEyeDataSource = (PinotThirdEyeDataSource) CACHE_REGISTRY.getQueryCache()
+          .getDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+      ResultSetGroup result = pinotThirdEyeDataSource.executePQL(new PinotQuery(sql, dataset));
       ResultSet resultSet = result.getResultSet(0);
       int rowCount = resultSet.getRowCount();
       for (int i = 0; i < rowCount; i++) {

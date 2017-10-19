@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -20,10 +19,6 @@ public class QueryCache {
   public QueryCache(Map<String, ThirdEyeDataSource> dataSourceMap, ExecutorService executorService) {
     this.executorService = executorService;
     this.dataSourceMap = dataSourceMap;
-  }
-
-  public Map<String, ThirdEyeDataSource> getDataSourceMap() {
-    return dataSourceMap;
   }
 
   public ThirdEyeDataSource getDataSource(String dataSource) {
@@ -68,29 +63,7 @@ public class QueryCache {
     return responseFuturesMap;
   }
 
-  public Map<ThirdEyeRequest, ThirdEyeResponse> getQueryResultsAsyncAndWait(
-      final List<ThirdEyeRequest> requests) throws Exception {
-    return getQueryResultsAsyncAndWait(requests, 60);
-  }
-
-  public Map<ThirdEyeRequest, ThirdEyeResponse> getQueryResultsAsyncAndWait(
-      final List<ThirdEyeRequest> requests, int timeoutSeconds) throws Exception {
-    Map<ThirdEyeRequest, ThirdEyeResponse> responseMap = new LinkedHashMap<>();
-    for (final ThirdEyeRequest request : requests) {
-      Future<ThirdEyeResponse> responseFuture =
-          executorService.submit(new Callable<ThirdEyeResponse>() {
-            @Override
-            public ThirdEyeResponse call() throws Exception {
-              return getQueryResult(request);
-            }
-          });
-      responseMap.put(request, responseFuture.get(timeoutSeconds, TimeUnit.SECONDS));
-    }
-    return responseMap;
-  }
-
   public void clear() throws Exception {
     dataSourceMap.clear();
   }
-
 }

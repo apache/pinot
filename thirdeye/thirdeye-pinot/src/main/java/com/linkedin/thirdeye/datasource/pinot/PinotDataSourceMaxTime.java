@@ -16,23 +16,22 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * This class contains methods to return max date time for datasets in pinot
  */
 public class PinotDataSourceMaxTime {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataSourceMaxTime.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
-  private final Map<String, Long> collectionToPrevMaxDataTimeMap = new ConcurrentHashMap<String, Long>();
 
   private final static String COLLECTION_MAX_TIME_QUERY_TEMPLATE = "SELECT max(%s) FROM %s WHERE %s >= %s";
 
-  public PinotDataSourceMaxTime() {
+  private final Map<String, Long> collectionToPrevMaxDataTimeMap = new ConcurrentHashMap<String, Long>();
+  private final PinotThirdEyeDataSource pinotThirdEyeDataSource;
 
+  public PinotDataSourceMaxTime(PinotThirdEyeDataSource pinotThirdEyeDataSource) {
+    this.pinotThirdEyeDataSource = pinotThirdEyeDataSource;
   }
 
   /**
@@ -48,12 +47,12 @@ public class PinotDataSourceMaxTime {
       // By default, query only offline, unless dataset has been marked as realtime
       String tableName = ThirdEyeUtils.computeTableName(dataset);
       TimeSpec timeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
-      long prevMaxDataTime = getPrevMaxDataTime(dataset, timeSpec);
+      long prevMaxDataTime = getPrevMaxDataTime(dataset);
       String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), tableName,
           timeSpec.getColumnName(), prevMaxDataTime);
       PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, tableName);
-      CACHE_REGISTRY.getResultSetGroupCache().refresh(maxTimePinotQuery);
-      ResultSetGroup resultSetGroup = CACHE_REGISTRY.getResultSetGroupCache().get(maxTimePinotQuery);
+      pinotThirdEyeDataSource.refreshPQL(maxTimePinotQuery);
+      ResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
       if (resultSetGroup.getResultSetCount() == 0 || resultSetGroup.getResultSet(0).getRowCount() == 0) {
         LOGGER.warn("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
         this.collectionToPrevMaxDataTimeMap.remove(dataset);
@@ -82,12 +81,10 @@ public class PinotDataSourceMaxTime {
     return maxTime;
   }
 
-
-  private long getPrevMaxDataTime(String collection, TimeSpec timeSpec) {
+  private long getPrevMaxDataTime(String collection) {
     if (this.collectionToPrevMaxDataTimeMap.containsKey(collection)) {
       return collectionToPrevMaxDataTimeMap.get(collection);
     }
     return 0;
   }
-
 }

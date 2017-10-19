@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.completeness.checker;
 
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -208,7 +209,9 @@ public class DataCompletenessUtils {
         dataset, sb.toString(), timeSpec.getColumnName(), top);
     Map<Long, Long> timeValueToCount = new HashMap<>();
     try {
-      ResultSetGroup resultSetGroup = CACHE_REGISTRY.getResultSetGroupCache().get(new PinotQuery(pql, dataset));
+      PinotThirdEyeDataSource pinotThirdEyeDataSource = (PinotThirdEyeDataSource) CACHE_REGISTRY.getQueryCache()
+          .getDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+      ResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(new PinotQuery(pql, dataset));
       if (resultSetGroup == null || resultSetGroup.getResultSetCount() <= 0) {
         return bucketNameToCountStar;
       }
