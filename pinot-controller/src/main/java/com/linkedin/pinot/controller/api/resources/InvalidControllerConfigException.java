@@ -20,4 +20,8 @@ public class InvalidControllerConfigException extends Exception {
   public InvalidControllerConfigException(final String s) {
     super(s);
   }
+
+  public InvalidControllerConfigException(final String s, final Exception ex) {
+    super(s, ex);
+  }
 }

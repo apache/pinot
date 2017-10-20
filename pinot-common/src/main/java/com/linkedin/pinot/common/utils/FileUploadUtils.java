@@ -40,9 +40,11 @@ import org.apache.commons.httpclient.methods.multipart.PartSource;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.entity.ContentType;
+import org.apache.http.protocol.HTTP;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class FileUploadUtils {
 
@@ -184,6 +186,7 @@ public class FileUploadUtils {
       method = httpMethod.forUri("http://" + host + ":" + port + "/" + SEGMENTS_PATH);
       method.setRequestHeader(UPLOAD_TYPE, FileUploadType.URI.toString());
       method.setRequestHeader(DOWNLOAD_URI, uri);
+      method.setRequestHeader(HTTP.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
       FILE_UPLOAD_HTTP_CLIENT.executeMethod(method);
       if (method.getStatusCode() >= 400) {
         String errorString = "POST Status Code: " + method.getStatusCode() + "\n";
@@ -238,6 +241,7 @@ public class FileUploadUtils {
       postMethod = new PostMethod("http://" + host + ":" + port + "/" + SEGMENTS_PATH);
       postMethod.setRequestEntity(requestEntity);
       postMethod.setRequestHeader(UPLOAD_TYPE, FileUploadType.JSON.toString());
+      postMethod.setRequestHeader(HTTP.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
       int statusCode = FILE_UPLOAD_HTTP_CLIENT.executeMethod(postMethod);
       if (statusCode >= 400) {
         String errorString = "POST Status Code: " + statusCode + "\n";
