@@ -104,6 +104,12 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public int indexOf(Object rawValue) {
+    int index = insertionIndexOf(rawValue);
+    return (index >= 0) ? index : -1;
+  }
+
+  @Override
+  public int insertionIndexOf(Object rawValue) {
     byte[] serializedValue = ((String)rawValue).getBytes(UTF_8);
     return getDictId(rawValue, serializedValue);
   }

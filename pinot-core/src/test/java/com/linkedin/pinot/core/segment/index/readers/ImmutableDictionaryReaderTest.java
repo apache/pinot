@@ -59,7 +59,8 @@ public class ImmutableDictionaryReaderTest {
   private int _numBytesPerStringValue;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
 
     IntOpenHashSet intSet = new IntOpenHashSet();
@@ -121,7 +122,8 @@ public class ImmutableDictionaryReaderTest {
   }
 
   @Test
-  public void testIntDictionary() throws Exception {
+  public void testIntDictionary()
+      throws Exception {
     try (IntDictionary intDictionary = new IntDictionary(
         PinotDataBuffer.fromFile(new File(TEMP_DIR, INT_COLUMN_NAME + DICT_FILE_EXT), ReadMode.mmap,
             FileChannel.MapMode.READ_ONLY, INT_COLUMN_NAME), NUM_VALUES)) {
@@ -136,13 +138,14 @@ public class ImmutableDictionaryReaderTest {
         Assert.assertEquals(intDictionary.indexOf(_intValues[i]), i);
 
         int randomInt = RANDOM.nextInt();
-        Assert.assertEquals(intDictionary.indexOf(randomInt), Arrays.binarySearch(_intValues, randomInt));
+        Assert.assertEquals(intDictionary.insertionIndexOf(randomInt), Arrays.binarySearch(_intValues, randomInt));
       }
     }
   }
 
   @Test
-  public void testLongDictionary() throws Exception {
+  public void testLongDictionary()
+      throws Exception {
     try (LongDictionary longDictionary = new LongDictionary(
         PinotDataBuffer.fromFile(new File(TEMP_DIR, LONG_COLUMN_NAME + DICT_FILE_EXT), ReadMode.mmap,
             FileChannel.MapMode.READ_ONLY, LONG_COLUMN_NAME), NUM_VALUES)) {
@@ -157,13 +160,14 @@ public class ImmutableDictionaryReaderTest {
         Assert.assertEquals(longDictionary.indexOf(_longValues[i]), i);
 
         long randomLong = RANDOM.nextLong();
-        Assert.assertEquals(longDictionary.indexOf(randomLong), Arrays.binarySearch(_longValues, randomLong));
+        Assert.assertEquals(longDictionary.insertionIndexOf(randomLong), Arrays.binarySearch(_longValues, randomLong));
       }
     }
   }
 
   @Test
-  public void testFloatDictionary() throws Exception {
+  public void testFloatDictionary()
+      throws Exception {
     try (FloatDictionary floatDictionary = new FloatDictionary(
         PinotDataBuffer.fromFile(new File(TEMP_DIR, FLOAT_COLUMN_NAME + DICT_FILE_EXT), ReadMode.mmap,
             FileChannel.MapMode.READ_ONLY, FLOAT_COLUMN_NAME), NUM_VALUES)) {
@@ -178,13 +182,15 @@ public class ImmutableDictionaryReaderTest {
         Assert.assertEquals(floatDictionary.indexOf(_floatValues[i]), i);
 
         float randomFloat = RANDOM.nextFloat();
-        Assert.assertEquals(floatDictionary.indexOf(randomFloat), Arrays.binarySearch(_floatValues, randomFloat));
+        Assert.assertEquals(floatDictionary.insertionIndexOf(randomFloat),
+            Arrays.binarySearch(_floatValues, randomFloat));
       }
     }
   }
 
   @Test
-  public void testDoubleDictionary() throws Exception {
+  public void testDoubleDictionary()
+      throws Exception {
     try (DoubleDictionary doubleDictionary = new DoubleDictionary(
         PinotDataBuffer.fromFile(new File(TEMP_DIR, DOUBLE_COLUMN_NAME + DICT_FILE_EXT), ReadMode.mmap,
             FileChannel.MapMode.READ_ONLY, DOUBLE_COLUMN_NAME), NUM_VALUES)) {
@@ -199,13 +205,15 @@ public class ImmutableDictionaryReaderTest {
         Assert.assertEquals(doubleDictionary.indexOf(_doubleValues[i]), i);
 
         double randomDouble = RANDOM.nextDouble();
-        Assert.assertEquals(doubleDictionary.indexOf(randomDouble), Arrays.binarySearch(_doubleValues, randomDouble));
+        Assert.assertEquals(doubleDictionary.insertionIndexOf(randomDouble),
+            Arrays.binarySearch(_doubleValues, randomDouble));
       }
     }
   }
 
   @Test
-  public void testStringDictionary() throws Exception {
+  public void testStringDictionary()
+      throws Exception {
     try (StringDictionary stringDictionary = new StringDictionary(
         PinotDataBuffer.fromFile(new File(TEMP_DIR, STRING_COLUMN_NAME + DICT_FILE_EXT), ReadMode.mmap,
             FileChannel.MapMode.READ_ONLY, STRING_COLUMN_NAME), NUM_VALUES, _numBytesPerStringValue, (byte) 0)) {
@@ -214,7 +222,8 @@ public class ImmutableDictionaryReaderTest {
   }
 
   @Test
-  public void testOnHeapStringDictionary() throws Exception {
+  public void testOnHeapStringDictionary()
+      throws Exception {
     try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
         PinotDataBuffer.fromFile(new File(TEMP_DIR, STRING_COLUMN_NAME + DICT_FILE_EXT), ReadMode.mmap,
             FileChannel.MapMode.READ_ONLY, STRING_COLUMN_NAME), NUM_VALUES, _numBytesPerStringValue, (byte) 0)) {
@@ -231,7 +240,8 @@ public class ImmutableDictionaryReaderTest {
 
       // Test String longer than MAX_STRING_LENGTH
       String randomString = RandomStringUtils.random(RANDOM.nextInt(2 * MAX_STRING_LENGTH)).replace('\0', ' ');
-      Assert.assertEquals(stringDictionary.indexOf(randomString), Arrays.binarySearch(_stringValues, randomString));
+      Assert.assertEquals(stringDictionary.insertionIndexOf(randomString),
+          Arrays.binarySearch(_stringValues, randomString));
     }
   }
 

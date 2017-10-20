@@ -114,9 +114,14 @@ public final class ColumnIndexContainer {
   private static ImmutableDictionaryReader loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
       boolean loadOnHeap) throws IOException {
     FieldSpec.DataType dataType = metadata.getDataType();
-    if (loadOnHeap && (dataType != FieldSpec.DataType.STRING)) {
-      LOGGER.warn("Only support on-heap dictionary for String data type, load off-heap dictionary for column: {}",
-          metadata.getColumnName());
+    if (loadOnHeap) {
+      String columnName = metadata.getColumnName();
+      if ((dataType != FieldSpec.DataType.STRING)) {
+        LOGGER.warn("Only support on-heap dictionary for String data type, load off-heap dictionary for column: {}",
+            columnName);
+      } else {
+        LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
+      }
     }
 
     int length = metadata.getCardinality();

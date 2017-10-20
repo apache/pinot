@@ -26,6 +26,12 @@ public class StringDictionary extends ImmutableDictionaryReader {
 
   @Override
   public int indexOf(Object rawValue) {
+    int index = insertionIndexOf(rawValue);
+    return (index >= 0) ? index : -1;
+  }
+
+  @Override
+  public int insertionIndexOf(Object rawValue) {
     return binarySearch((String) rawValue);
   }
 

@@ -44,6 +44,12 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public int indexOf(Object rawValue) {
+    int index = insertionIndexOf(rawValue);
+    return (index >= 0) ? index : -1;
+  }
+
+  @Override
+  public int insertionIndexOf(Object rawValue) {
     if (rawValue instanceof String) {
       return getDictId(Double.valueOf((String) rawValue), null);
     } else {

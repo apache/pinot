@@ -182,8 +182,8 @@ public class LoadersTest {
     Assert.assertEquals(dict.getStringValue(1), "lynda 2.0");
     Assert.assertEquals(dict.get(0), "lynda");
     Assert.assertEquals(dict.get(1), "lynda 2.0");
-    Assert.assertEquals(dict.indexOf("lynda\0"), -2);
-    Assert.assertEquals(dict.indexOf("lynda\0\0"), -2);
+    Assert.assertEquals(dict.insertionIndexOf("lynda\0"), -2);
+    Assert.assertEquals(dict.insertionIndexOf("lynda\0\0"), -2);
   }
 
   @AfterClass

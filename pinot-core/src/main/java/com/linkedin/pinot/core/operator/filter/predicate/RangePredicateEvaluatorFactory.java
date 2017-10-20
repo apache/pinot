@@ -105,12 +105,12 @@ public class RangePredicateEvaluatorFactory {
       if (lower.equals("*")) {
         _rangeStartIndex = 0;
       } else {
-        _rangeStartIndex = dictionary.indexOf(lower);
+        _rangeStartIndex = dictionary.insertionIndexOf(lower);
       }
       if (upper.equals("*")) {
         _rangeEndIndex = dictionary.length() - 1;
       } else {
-        _rangeEndIndex = dictionary.indexOf(upper);
+        _rangeEndIndex = dictionary.insertionIndexOf(upper);
       }
 
       if (_rangeStartIndex < 0) {
