@@ -143,10 +143,13 @@ function fetchRelatedMetricIds() {
 
     const filters = JSON.parse(filterJson);
     const filterUrns = Object.keys(filters).map(key => 'thirdeye:dimension:' + key + ':' + filters[key] + ':provided');
-    const urns = [`thirdeye:metric:${metricId}`].concat(filterUrns).join(',');
+    const primaryUrn = `thirdeye:metric:${metricId}`;
+
+    const urns = [primaryUrn].concat(filterUrns).join(',');
 
     return fetch(`/rootcause/query?framework=relatedMetrics&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=${urns}`)
       .then(res => res.json())
+      .then(res => res.filter(metric => metric.urn != primaryUrn))
       .then(res => dispatch(loadRelatedMetricIds(res)));
   };
 }
