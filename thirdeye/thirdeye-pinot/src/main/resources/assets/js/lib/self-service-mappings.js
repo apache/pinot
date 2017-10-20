@@ -172,6 +172,12 @@ function updateEntityMapping() {
     return;
   }
 
+  if (fromUrn.includes(" ") || fromUrn.includes(",") || fromUrn.includes(";")
+      || toUrn.includes(" ") || toUrn.includes(",") || toUrn.includes(";")) {
+    alert("Cannot contain separators except ':' (colon)");
+    return;
+  }
+
   submitData("/entityMapping/create", payload, "admin", "html").success(function (data) {
     console.log("Adding mapping : ");
     fetchAndDisplayMappings(entityType1);
