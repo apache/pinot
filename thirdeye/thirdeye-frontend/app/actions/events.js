@@ -108,12 +108,14 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
     label: displayLabel
   } = event;
 
-  // baseline event
-  if ((baselineStart < displayEnd && displayStart < baselineEnd)) {
-    isBaseline = true;
-    displayStart -= baselineOffset;
-    displayEnd -= baselineOffset;
-    displayLabel += " (baseline)";
+  // baseline event (anomaly, holiday & gcn only)
+  if (['anomaly', 'holiday', 'gcn'].includes(event.eventType)) {
+    if ((baselineStart < displayEnd && displayStart < baselineEnd)) {
+      isBaseline = true;
+      displayStart -= baselineOffset;
+      displayEnd -= baselineOffset;
+      displayLabel += " (baseline)";
+    }
   }
 
   // upcoming event
@@ -148,6 +150,18 @@ const adjustHolidayTimestamp = (event) => {
 
       return Object.assign(event, { start, end });
     }
+  }
+
+  return event;
+};
+
+/**
+ * Helper function to append localized date/time to deployment event label
+ */
+const adjustInformedLabel = (event) => {
+  if (event.eventType == 'informed') {
+    let displayLabel = event.displayLabel + ' (' + moment(event.start).format('hh:mm a') + ')';
+    return Object.assign(event, { displayLabel });
   }
 
   return event;
@@ -247,6 +261,7 @@ function fetchEvents(start, end, mode) {
         return _.uniqBy(res, 'urn')
           .map(adjustHolidayTimestamp)
           .map(event => assignEventTimeInfo(event, anomalyStart, anomalyEnd, baselineStart, baselineEnd, analysisStart, analysisEnd))
+          .map(adjustInformedLabel)
           .map(assignEventColor)
           .map(setWeight)
           .map(assignHumanTimeInfo)
