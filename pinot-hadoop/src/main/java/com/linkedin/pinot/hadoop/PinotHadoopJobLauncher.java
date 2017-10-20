@@ -15,14 +15,16 @@
  */
 package com.linkedin.pinot.hadoop;
 
-import java.io.FileInputStream;
-import java.util.Arrays;
-import java.util.Properties;
-
+import azkaban.utils.Props;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.pbnj.creators.GeneratePinotData;
+import com.linkedin.pinot.pbnj.creators.PinotBuildAndPushJob;
 import com.linkedin.pinot.hadoop.job.SegmentCreationJob;
 import com.linkedin.pinot.hadoop.job.SegmentTarPushJob;
 import com.linkedin.pinot.hadoop.job.SegmentUriPushJob;
+import java.io.FileInputStream;
+import java.util.Arrays;
+import java.util.Properties;
 
 
 public class PinotHadoopJobLauncher {
@@ -32,7 +34,9 @@ public class PinotHadoopJobLauncher {
     SegmentTarPush,
     SegmentUriPush,
     SegmentCreationAndTarPush,
-    SegmentCreationAndUriPush
+    SegmentCreationAndUriPush,
+    PinotBuildAndPushJob,
+    GeneratePinotData
   }
 
   private static final String USAGE = "usage: [job_type] [job.properties]";
@@ -42,6 +46,8 @@ public class PinotHadoopJobLauncher {
   private static final String SEGMENT_PUSH_URI_JOB_NAME = PinotHadoopJobType.SegmentUriPush.toString();
   private static final String SEGMENT_CREATION_AND_TAR_PUSH_JOB_NAME = PinotHadoopJobType.SegmentCreationAndTarPush.toString();
   private static final String SEGMENT_CREATION_AND_URI_PUSH_JOB_NAME = PinotHadoopJobType.SegmentCreationAndUriPush.toString();
+  private static final String PINOT_BUILD_AND_PUSH_JOB_NAME = PinotHadoopJobType.PinotBuildAndPushJob.toString();
+  private static final String GENERATE_PINOT_DATA_JOB_NAME = PinotHadoopJobType.GeneratePinotData.toString();
 
   private static void usage() {
     System.err.println(USAGE);
@@ -66,6 +72,14 @@ public class PinotHadoopJobLauncher {
       case SegmentCreationAndUriPush:
         new SegmentCreationJob(StringUtil.join(":", SEGMENT_CREATION_JOB_NAME, SEGMENT_CREATION_AND_URI_PUSH_JOB_NAME), jobConf).run();
         new SegmentUriPushJob(StringUtil.join(":", SEGMENT_PUSH_TAR_JOB_NAME, SEGMENT_CREATION_AND_URI_PUSH_JOB_NAME), jobConf).run();
+        break;
+      case GeneratePinotData:
+        new GeneratePinotData(GENERATE_PINOT_DATA_JOB_NAME, jobConf).run();
+        break;
+      case PinotBuildAndPushJob:
+        Props props = new Props();
+        props.put(jobConf);
+        new PinotBuildAndPushJob(PINOT_BUILD_AND_PUSH_JOB_NAME, props).run();
         break;
       default:
         throw new RuntimeException("Not a valid jobType - " + jobType);

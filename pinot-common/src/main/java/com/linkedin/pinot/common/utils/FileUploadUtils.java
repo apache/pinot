@@ -16,6 +16,8 @@ package com.linkedin.pinot.common.utils;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.PermanentDownloadException;
+import com.linkedin.pinot.hadoop.ControllerRestApi;
+import com.linkedin.pinot.hadoop.job.PermanentPushFailureException;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -23,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpVersion;
@@ -39,8 +42,19 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.PartSource;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.protocol.HTTP;
+import org.apache.http.entity.mime.FormBodyPart;
+import org.apache.http.entity.mime.HttpMultipartMode;
+import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.content.InputStreamBody;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.CoreConnectionPNames;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -313,7 +327,7 @@ public class FileUploadUtils {
     public FileUploadType valueOf(Object o) {
       if (o != null) {
         String ostring = o.toString();
-        for (FileUploadType u: FileUploadType.values()) {
+        for (FileUploadType u : FileUploadType.values()) {
           if (ostring.equalsIgnoreCase(u.toString())) {
             return u;
           }
@@ -325,5 +339,109 @@ public class FileUploadUtils {
     public static FileUploadType getDefaultUploadType() {
       return TAR;
     }
+  }
+
+    public static int sendSegment(final String uriString, final String segmentName, final int pushTimeoutMs,
+        Path path, FileSystem fs, int maxRetries, int sleepTimeSec) {
+      return sendFileRetry(uriString, segmentName, pushTimeoutMs, path, fs, maxRetries, sleepTimeSec);
+    }
+
+    public static int sendFileRetry(final String uri, final String segmentName, int pushTimeoutMs, Path path, FileSystem fs,
+        int maxRetries, int sleepTimeSec) {
+      int retval;
+      for (int numRetries = 0; ; numRetries++) {
+        try {
+          InputStream inputStream = fs.open(path);
+          retval = sendFile(uri, segmentName, inputStream, pushTimeoutMs);
+          break;
+        } catch (Exception e) {
+          if (e instanceof PermanentPushFailureException) {
+            throw new PermanentPushFailureException("Exiting job. See https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Failures+for+PBNJ for more information", e);
+          }
+          if (numRetries >= maxRetries) {
+            throw new RuntimeException(e);
+          }
+          LOGGER.warn("Retry " + numRetries + " of Upload of File " + segmentName + " to URI " + uri
+              + " after error trying to send file  Sleeping for " + sleepTimeSec + " seconds. Caught Exception", e);
+          try {
+            Thread.sleep(sleepTimeSec * 1000);
+          } catch (Exception e1) {
+            LOGGER.warn(
+                "Upload of File " + segmentName + " to URI " + uri + " interrupted while waiting to retry after error. Caught Exception ", e1);
+            throw new RuntimeException(e1);
+          }
+        }
+      }
+      return retval;
+    }
+
+    public static int sendFile(final String uri, final String segmentName, final InputStream inputStream,
+        int pushTimeoutMs) {
+      // this method returns the response code only on success, and throws exception otherwise
+      LOGGER.info("Sending file " + segmentName + " to " + uri);
+      final BasicHttpParams httpParams = new BasicHttpParams();
+      // TODO: Fix when new version is updated
+      httpParams.setIntParameter(CoreConnectionPNames.SO_TIMEOUT, pushTimeoutMs);
+      org.apache.http.client.HttpClient client = new DefaultHttpClient(httpParams);
+
+      try {
+        LOGGER.info("URI is: " + uri);
+        HttpPost post = new HttpPost(uri);
+        String boundary = "-------------" + System.currentTimeMillis();
+
+        post.setHeader("Content-type", "multipart/form-data; boundary=" + boundary);
+        InputStreamBody contentBody =
+            new InputStreamBody(inputStream, ContentType.APPLICATION_OCTET_STREAM.toString(), segmentName);
+
+        MultipartEntity entity =
+            new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE, boundary, Charset.forName("UTF-8"));
+        FormBodyPart bodyPart = new FormBodyPart(segmentName, contentBody);
+        entity.addPart(bodyPart);
+        post.setEntity(entity);
+
+        // execute the request
+        HttpResponse response = client.execute(post);
+
+        // retrieve and process the response
+        int responseCode = response.getStatusLine().getStatusCode();
+        String host = ControllerRestApi.NOT_IN_RESPONSE;
+        if (response.containsHeader(ControllerRestApi.HDR_CONTROLLER_HOST)) {
+          host = response.getFirstHeader(ControllerRestApi.HDR_CONTROLLER_HOST).getValue();
+        }
+        String version = ControllerRestApi.NOT_IN_RESPONSE;
+        if (response.containsHeader(ControllerRestApi.HDR_CONTROLLER_VERSION)) {
+          version = response.getFirstHeader(ControllerRestApi.HDR_CONTROLLER_VERSION).getValue();
+        }
+        LOGGER.info("Controller host:" + host + ",Controller version:" + version + "(file:" + segmentName + ")");
+
+        // Throws a permanent exception to immediately kill job
+        if (responseCode >= 400 && responseCode < 500) {
+          String errorString = "Response Code: " + responseCode;
+          LOGGER.error("Error " + errorString + " trying to send file " + segmentName + " to " + uri);
+          InputStream content = response.getEntity().getContent();
+          String respBody = org.apache.commons.io.IOUtils.toString(content);
+          if (respBody != null && !respBody.isEmpty()) {
+            LOGGER.error("Response body for file " + segmentName + " uri " + uri + ":" + respBody);
+          }
+          throw new PermanentPushFailureException(errorString);
+        }
+
+        // Runtime exception allows retry for server errors
+        if (responseCode >= 500) {
+          String errorString = "Response Code: " + responseCode;
+          LOGGER.warn("Transient error " + errorString + " sending " + segmentName + " to " + uri);
+          InputStream content = response.getEntity().getContent();
+          String respBody = org.apache.commons.io.IOUtils.toString(content);
+          if (respBody != null && !respBody.isEmpty()) {
+            LOGGER.info("Response body for file " + segmentName + " uri " + uri + ":" + respBody);
+          }
+          throw new RuntimeException(errorString);
+        }
+
+        return responseCode;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+
   }
 }

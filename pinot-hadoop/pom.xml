@@ -65,6 +65,10 @@
   </profiles>
   <dependencies>
     <dependency>
+      <groupId>com.linkedin.azkaban</groupId>
+      <artifactId>azkaban-common</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
@@ -91,6 +95,15 @@
         </configuration>
       </plugin>
       <plugin>
+        <executions>
+          <!-- Run shade goal on package phase -->
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
         <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-shade-plugin</artifactId>
           <version>2.3</version>
