@@ -27,7 +27,7 @@ import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;

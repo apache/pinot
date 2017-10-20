@@ -15,22 +15,11 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
-import java.lang.reflect.Field;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.commons.lang.math.IntRange;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
+import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -39,7 +28,16 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.startree.hll.HllUtil;
+import com.linkedin.pinot.startree.hll.HllSizeUtils;
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang.math.IntRange;
+import org.codehaus.jackson.annotate.JsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
@@ -142,7 +140,7 @@ public class ColumnMetadata {
         case HLL:
           try {
             final int hllLog2m = config.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_HLL_LOG2M);
-            builder.setFieldSize(HllUtil.getHllFieldSizeFromLog2m(hllLog2m));
+            builder.setFieldSize(HllSizeUtils.getHllFieldSizeFromLog2m(hllLog2m));
             final String originColumnName = config.getString(getKeyFor(column, ORIGIN_COLUMN));
             builder.setOriginColumnName(originColumnName);
           } catch (RuntimeException e) {

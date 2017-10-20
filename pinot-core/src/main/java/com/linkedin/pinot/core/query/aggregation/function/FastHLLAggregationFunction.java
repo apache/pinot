@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import javax.annotation.Nonnull;
 

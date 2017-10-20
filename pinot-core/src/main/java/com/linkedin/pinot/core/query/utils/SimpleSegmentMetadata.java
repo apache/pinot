@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

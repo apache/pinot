@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import javax.annotation.Nonnull;
 
 

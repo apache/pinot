@@ -23,8 +23,9 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.startree.BaseStarTreeIndexTest;
 import com.linkedin.pinot.core.startree.StarTreeIndexTestSegmentHelper;
+import com.linkedin.pinot.startree.hll.HllConfig;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,10 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeSuite;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 /**

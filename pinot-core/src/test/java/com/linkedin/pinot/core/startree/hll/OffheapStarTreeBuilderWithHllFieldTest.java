@@ -20,6 +20,8 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
+import com.linkedin.pinot.startree.hll.HllConstants;
+import com.linkedin.pinot.startree.hll.HllSizeUtils;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +79,7 @@ public class OffheapStarTreeBuilderWithHllFieldTest {
       // add hll metric
       String hllMetricName = memberIdFieldName + hllDeriveFieldSuffix;
       MetricFieldSpec hllDerivedFieldSpec = new MetricFieldSpec(hllMetricName, FieldSpec.DataType.STRING,
-          HllUtil.getHllFieldSizeFromLog2m(log2m), MetricFieldSpec.DerivedMetricType.HLL);
+          HllSizeUtils.getHllFieldSizeFromLog2m(log2m), MetricFieldSpec.DerivedMetricType.HLL);
       schema.addField(hllDerivedFieldSpec);
       //
       builderConfig.maxLeafRecords = 10;

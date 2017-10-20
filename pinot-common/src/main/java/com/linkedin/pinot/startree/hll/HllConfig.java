@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.startree.hll;
+package com.linkedin.pinot.startree.hll;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
@@ -31,7 +31,7 @@ import org.codehaus.jackson.annotate.JsonIgnore;
  */
 public class HllConfig {
   private int hllLog2m = HllConstants.DEFAULT_LOG2M;
-  private int hllFieldSize = HllUtil.getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
+  private int hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
   private String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
   private Set<String> columnsToDeriveHllFields = new HashSet<>();
 
@@ -65,7 +65,7 @@ public class HllConfig {
     Preconditions.checkNotNull(columnsToDeriveHllFields, "ColumnsToDeriveHllFields should not be null.");
     Preconditions.checkNotNull(hllDeriveColumnSuffix, "HLL Derived Field Suffix should not be null.");
     this.hllLog2m = hllLog2m;
-    this.hllFieldSize = HllUtil.getHllFieldSizeFromLog2m(hllLog2m);
+    this.hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(hllLog2m);
     this.hllDeriveColumnSuffix = hllDeriveColumnSuffix;
     this.columnsToDeriveHllFields = columnsToDeriveHllFields;
   }
@@ -76,6 +76,7 @@ public class HllConfig {
 
   public void setHllLog2m(int hllLog2m) {
     this.hllLog2m = hllLog2m;
+    this.hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(hllLog2m);
   }
 
   public String getHllDeriveColumnSuffix() {
