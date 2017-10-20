@@ -27,10 +27,12 @@ import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceMan
 import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.minion.Converter;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import com.linkedin.pinot.minion.executor.BaseTaskExecutor;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -197,6 +199,16 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   }
 
   public static class TestTaskExecutor extends BaseTaskExecutor {
+    @Override
+    public String getTaskType() {
+      return TestTaskGenerator.TASK_TYPE;
+    }
+
+    @Override
+    public Converter getConverter(File indexDir, File convertedIndexDir, Map<String, String> configs) throws Exception {
+      return null;
+    }
+
     @Override
     public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
       Assert.assertTrue(_minionContext.getDataDir().exists());
