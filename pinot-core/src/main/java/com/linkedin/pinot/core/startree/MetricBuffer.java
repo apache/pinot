@@ -20,7 +20,6 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec.DerivedMetricType;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
-
 import com.linkedin.pinot.startree.hll.HllSizeUtils;
 import java.io.IOException;
 import java.nio.ByteBuffer;

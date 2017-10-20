@@ -30,7 +30,6 @@ import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.startree.hll.HllConfig;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
