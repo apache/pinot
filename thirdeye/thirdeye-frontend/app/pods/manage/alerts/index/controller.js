@@ -228,6 +228,26 @@ export default Ember.Controller.extend({
       this.set('resultsActive', true);
     },
 
+    // Handles filtering of alerts in response to filter selection
+    userDidSelectFilter(filterArr) {
+      let task = {};
+
+      // Reset results
+      this.send('onSearchModeChange', 'All Alerts');
+
+      // Now filter results accordingly. TODO: build filtering for each type.
+      for (let filter of filterArr) {
+        switch(filter.category) {
+          case 'Applications':
+            this.send('onSearchModeChange', 'Applications');
+            let task = this.get('searchByApplicationName');
+            let taskInstance = task.perform(filter.filter);
+            return taskInstance;
+            break;
+        }
+      }
+    },
+
     // Handles UI mode change
     onSearchModeChange(mode) {
       if (mode === 'All Alerts') {
