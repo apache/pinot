@@ -149,7 +149,7 @@ function fetchRelatedMetricIds() {
 
     return fetch(`/rootcause/query?framework=relatedMetrics&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=${urns}`)
       .then(res => res.json())
-      .then(res => res.filter(m => m.urn != primaryUrn))
+      .then(res => res.filter(metric => metric.urn != primaryUrn))
       .then(res => dispatch(loadRelatedMetricIds(res)));
   };
 }
