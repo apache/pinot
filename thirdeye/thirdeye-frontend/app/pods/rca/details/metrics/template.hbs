@@ -52,11 +52,10 @@
                 analysisStart=metricList.regionStart
                 analysisEnd=metricList.regionEnd
                 onSubchartChange=(action "onDateChange")
-                onSelection=(action actions.onMetricSelection)
               }}
-              {{#each summary.selectedMetrics as |metric|}}
+              {{#each summary.selectedMetrics as |metric index|}}
                 {{anomaly-graph
-                  componentId='correlated-metrics'
+                  componentId=(concat 'correlated-metrics-' index)
                   primaryMetric=metric
                   showLegend=false
                   enableZoom=true
