@@ -15,72 +15,67 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.google.common.collect.HashBiMap;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class StarTree implements StarTreeInterf {
+public class StarTree implements StarTreeInterf, Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTree.class);
   private static final long serialVersionUID = 1L;
 
-  StarTreeIndexNode root;
-  int numNodes = 0;
+  private final StarTreeIndexNode _root;
+  private final List<String> _dimensionNames;
 
-  private HashBiMap<String, Integer> dimensionNameToIndexMap;
+  private int _numNodes = -1;
 
-  public StarTree(StarTreeIndexNode root, HashBiMap<String, Integer> dimensionNameToIndexMap) {
-    this.root = root;
-    this.dimensionNameToIndexMap = dimensionNameToIndexMap;
+  public StarTree(StarTreeIndexNode root, List<String> dimensionNames) {
+    _root = root;
+    _dimensionNames = dimensionNames;
   }
 
   /**
    * {@inheritDoc}
-   * @return
    */
   @Override
   public StarTreeIndexNodeInterf getRoot() {
-    return root;
+    return _root;
   }
 
   /**
    * {@inheritDoc}
-   * @return
    */
   @Override
   public StarTreeFormatVersion getVersion() {
     return StarTreeFormatVersion.ON_HEAP;
   }
 
+
   /**
-   * Returns the total number of nodes in the star tree.
-   * For backward compatibility (trees without this info), it computes
-   * the number of nodes on the fly.
-   *
-   * @return
+   * {@inheritDoc}
    */
   @Override
   public int getNumNodes() {
-    if (numNodes == 0) {
-      numNodes = getNumNodes(root);
+    if (_numNodes == -1) {
+      _numNodes = getNumNodes(_root);
     }
-    return numNodes;
+    return _numNodes;
   }
 
   /**
    * {@inheritDoc}
-   * @return
    */
   @Override
-  public HashBiMap<String, Integer> getDimensionNameToIndexMap() {
-    return dimensionNameToIndexMap;
+  public List<String> getDimensionNames() {
+    return _dimensionNames;
   }
 
   /**
@@ -89,8 +84,7 @@ public class StarTree implements StarTreeInterf {
    * @throws IOException
    */
   @Override
-  public void writeTree(File outputFile)
-      throws IOException {
+  public void writeTree(File outputFile) throws IOException {
     OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(outputFile));
     ObjectOutputStream oos = new ObjectOutputStream(outputStream);
 
@@ -105,7 +99,7 @@ public class StarTree implements StarTreeInterf {
 
   @Override
   public void printTree() {
-    printTree(root, 0);
+    printTree(_root, 0);
   }
 
   /**
@@ -127,11 +121,7 @@ public class StarTree implements StarTreeInterf {
   }
 
   /**
-   * Helper method that computes and returns the number of nodes
-   * in the tree (by performing a dfs on the tree).
-   *
-   * @param root
-   * @return
+   * Helper method that computes and returns the number of nodes in the tree (by performing a dfs on the tree).
    */
   private static int getNumNodes(StarTreeIndexNode root) {
     if (root == null) {
@@ -146,5 +136,9 @@ public class StarTree implements StarTreeInterf {
       }
     }
     return numNodes;
+  }
+
+  @Override
+  public void close() {
   }
 }

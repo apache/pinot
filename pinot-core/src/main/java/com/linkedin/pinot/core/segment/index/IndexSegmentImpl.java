@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.startree.StarTreeInterf;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -135,6 +136,13 @@ public class IndexSegmentImpl implements IndexSegment {
       LOGGER.error("Failed to close segment directory: {}. Continuing with error.", segmentDirectory, e);
     }
     indexContainerMap.clear();
+    if (starTree != null) {
+      try {
+        starTree.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close star-tree. Continuing with error.", e);
+      }
+    }
   }
 
   @Override

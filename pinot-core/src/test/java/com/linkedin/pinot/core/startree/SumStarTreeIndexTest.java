@@ -23,7 +23,6 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -170,7 +169,7 @@ public class SumStarTreeIndexTest extends BaseStarTreeIndexTest {
    */
   private void compareMetadata(StarTreeInterf onHeapStarTree, StarTreeInterf offHeapStarTree) {
     Assert.assertEquals(offHeapStarTree.getNumNodes(), onHeapStarTree.getNumNodes(), "Number of nodes mis-match");
-    Assert.assertEquals(offHeapStarTree.getDimensionNameToIndexMap(), onHeapStarTree.getDimensionNameToIndexMap(),
+    Assert.assertEquals(offHeapStarTree.getDimensionNames(), onHeapStarTree.getDimensionNames(),
         "Dimension name to index map mis-match");
   }
 

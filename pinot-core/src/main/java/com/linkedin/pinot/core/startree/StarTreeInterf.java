@@ -15,16 +15,16 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.google.common.collect.HashBiMap;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
+import java.util.List;
 
 
 /**
  * Interface for StarTree.
  */
-public interface StarTreeInterf extends Serializable {
+public interface StarTreeInterf extends Closeable {
 
   /**
    * Returns the root of the StarTree.
@@ -48,7 +48,7 @@ public interface StarTreeInterf extends Serializable {
    * its index.
    * @return
    */
-  HashBiMap<String, Integer> getDimensionNameToIndexMap();
+  List<String> getDimensionNames();
 
   /**
    * Serializes and writes the StarTree on to the provided file.

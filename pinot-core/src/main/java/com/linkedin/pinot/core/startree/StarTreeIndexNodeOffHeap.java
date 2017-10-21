@@ -205,6 +205,16 @@ public class StarTreeIndexNodeOffHeap implements StarTreeIndexNodeInterf {
       return null;
     }
 
+    // Specialize star node for performance
+    if (dimensionValue == ALL) {
+      StarTreeIndexNodeOffHeap firstNode = new StarTreeIndexNodeOffHeap(dataBuffer, childrenStartIndex);
+      if (firstNode.getDimensionValue() == ALL) {
+        return firstNode;
+      } else {
+        return null;
+      }
+    }
+
     int lo = childrenStartIndex;
     int hi = childrenEndIndex;
 

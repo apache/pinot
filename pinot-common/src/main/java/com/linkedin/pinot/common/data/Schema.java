@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,11 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-
-import org.apache.commons.collections.CollectionUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -303,7 +299,7 @@ public final class Schema {
   @JsonIgnore
   @Nonnull
   public List<String> getDateTimeNames() {
-    return CollectionUtils.isEmpty(_dateTimeList) ? null : _dateTimeList;
+    return _dateTimeList;
   }
 
   @JsonIgnore

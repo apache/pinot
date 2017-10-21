@@ -15,22 +15,32 @@
  */
 package com.linkedin.pinot.core.startree.hll;
 
-import com.linkedin.pinot.common.data.*;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import com.linkedin.pinot.startree.hll.HllSizeUtils;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import java.io.File;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 
 public class OffheapStarTreeBuilderWithHllFieldTest {
@@ -128,7 +138,7 @@ public class OffheapStarTreeBuilderWithHllFieldTest {
         GenericRow row = iterator.next();
         for (String skipDimension : skipMaterializationForDimensions) {
           String rowValue = (String) row.getValue(skipDimension);
-          assert (rowValue.equals("ALL"));
+          Assert.assertEquals(rowValue, "null");
         }
         lastRow = row;
       }

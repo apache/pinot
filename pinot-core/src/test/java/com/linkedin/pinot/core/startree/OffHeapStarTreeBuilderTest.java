@@ -15,6 +15,12 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.core.data.GenericRow;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,22 +29,16 @@ import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.math.util.MathUtils;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.GenericRow;
 
+public class OffHeapStarTreeBuilderTest {
 
-public class TestOffheapStarTreeBuilder {
-
-  private void testSimpleCore(int numDimensions, int numMetrics, int numSkipMaterializationDimensions) throws Exception {
+  private void testSimpleCore(int numDimensions, int numMetrics, int numSkipMaterializationDimensions)
+      throws Exception {
     int ROWS = (int) MathUtils.factorial(numDimensions);
     StarTreeBuilderConfig builderConfig = new StarTreeBuilderConfig();
     Schema schema = new Schema();
@@ -57,7 +57,7 @@ public class TestOffheapStarTreeBuilder {
       }
     }
 
-    schema.setTimeFieldSpec(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
+    schema.addField(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < numMetrics; i++) {
       String metricName = "m" + (i + 1);
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.INT);
@@ -86,18 +86,12 @@ public class TestOffheapStarTreeBuilder {
     }
     builder.build();
     int totalDocs = builder.getTotalRawDocumentCount() + builder.getTotalAggregateDocumentCount();
-    Iterator<GenericRow> iterator = builder.iterator(0, totalDocs);
-    while(iterator.hasNext()) {
-      GenericRow row = iterator.next();
-//      System.out.println(row);
-    }
-
-    iterator = builder.iterator(builder.getTotalRawDocumentCount(), totalDocs);
+    Iterator<GenericRow> iterator = builder.iterator(builder.getTotalRawDocumentCount(), totalDocs);
     while (iterator.hasNext()) {
       GenericRow row = iterator.next();
       for (String skipDimension : skipMaterializationForDimensions) {
         String rowValue = (String) row.getValue(skipDimension);
-        assert(rowValue.equals("ALL"));
+        Assert.assertEquals(rowValue, "null");
       }
     }
 
@@ -109,8 +103,7 @@ public class TestOffheapStarTreeBuilder {
    * @throws Exception
    */
   @Test
-  public void testSimple()
-      throws Exception {
+  public void testSimple() throws Exception {
     testSimpleCore(3, 2, 0);
   }
 
@@ -119,8 +112,7 @@ public class TestOffheapStarTreeBuilder {
    * @throws Exception
    */
   @Test
-  public void testSkipMaterialization()
-      throws Exception {
+  public void testSkipMaterialization() throws Exception {
     testSimpleCore(6, 2, 2);
   }
 
@@ -138,7 +130,7 @@ public class TestOffheapStarTreeBuilder {
       schema.addField(dimensionFieldSpec);
       builderConfig.dimensionsSplitOrder.add(dimName);
     }
-    schema.setTimeFieldSpec(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
+    schema.addField(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < numMetrics; i++) {
       String metricName = "n" + (i + 1);
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.INT);
@@ -170,5 +162,4 @@ public class TestOffheapStarTreeBuilder {
     builder.build();
     FileUtils.deleteDirectory(builderConfig.outDir);
   }
-
 }
