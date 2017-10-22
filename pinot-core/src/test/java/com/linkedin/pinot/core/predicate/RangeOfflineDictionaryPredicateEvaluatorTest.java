@@ -208,8 +208,8 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
 
   private ImmutableDictionaryReader createReader(int rangeStart, int rangeEnd) {
     ImmutableDictionaryReader reader = mock(ImmutableDictionaryReader.class);
-    when(reader.indexOf("lower")).thenReturn(rangeStart);
-    when(reader.indexOf("upper")).thenReturn(rangeEnd);
+    when(reader.insertionIndexOf("lower")).thenReturn(rangeStart);
+    when(reader.insertionIndexOf("upper")).thenReturn(rangeEnd);
     when(reader.length()).thenReturn(DICT_LEN);
     return reader;
   }

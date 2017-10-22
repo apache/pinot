@@ -27,6 +27,12 @@ public class IntDictionary extends ImmutableDictionaryReader {
 
   @Override
   public int indexOf(Object rawValue) {
+    int index = insertionIndexOf(rawValue);
+    return (index >= 0) ? index : -1;
+  }
+
+  @Override
+  public int insertionIndexOf(Object rawValue) {
     int value;
     if (rawValue instanceof String) {
       value = Integer.parseInt((String) rawValue);

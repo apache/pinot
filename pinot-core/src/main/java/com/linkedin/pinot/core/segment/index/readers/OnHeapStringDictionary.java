@@ -17,6 +17,10 @@ package com.linkedin.pinot.core.segment.index.readers;
 
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,6 +36,8 @@ public class OnHeapStringDictionary extends ImmutableDictionaryReader {
   private final byte _paddingByte;
   private final String[] _unpaddedStrings;
   private final String[] _paddedStrings;
+  private final Map<String, Integer> _paddedStringToIdMap;
+  private final Map<String, Integer> _unPaddedStringToIdMap;
 
   public OnHeapStringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);
@@ -39,23 +45,39 @@ public class OnHeapStringDictionary extends ImmutableDictionaryReader {
     _paddingByte = paddingByte;
     byte[] buffer = new byte[numBytesPerValue];
     _unpaddedStrings = new String[length];
+    _unPaddedStringToIdMap = new HashMap<>(length);
+
     for (int i = 0; i < length; i++) {
       _unpaddedStrings[i] = getUnpaddedString(i, buffer);
+      _unPaddedStringToIdMap.put(_unpaddedStrings[i], i);
     }
+
     if (paddingByte == 0) {
       _paddedStrings = null;
+      _paddedStringToIdMap = null;
     } else {
       _paddedStrings = new String[length];
+      _paddedStringToIdMap = new HashMap<>(length);
+
       for (int i = 0; i < length; i++) {
         _paddedStrings[i] = getPaddedString(i, buffer);
+        _paddedStringToIdMap.put(_paddedStrings[i], i);
       }
     }
   }
 
   @Override
   public int indexOf(Object rawValue) {
+    Map<String, Integer> stringToIdMap = (_paddingByte == 0) ? _unPaddedStringToIdMap : _paddedStringToIdMap;
+    Integer index = stringToIdMap.get(rawValue);
+    return (index != null) ? index : -1;
+  }
+
+  @Override
+  public int insertionIndexOf(Object rawValue) {
     if (_paddingByte == 0) {
-      return Arrays.binarySearch(_unpaddedStrings, rawValue);
+      Integer id = _unPaddedStringToIdMap.get(rawValue);
+      return (id != null) ? id : Arrays.binarySearch(_unpaddedStrings, rawValue);
     } else {
       String paddedValue = addPadding((String) rawValue);
       return Arrays.binarySearch(_paddedStrings, paddedValue);
