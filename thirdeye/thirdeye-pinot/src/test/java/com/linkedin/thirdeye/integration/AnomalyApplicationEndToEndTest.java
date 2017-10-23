@@ -95,16 +95,18 @@ public class AnomalyApplicationEndToEndTest {
   private String classifierPropertiesFile = "/sample-classifier.properties";
   private String metric = "cost";
   private String collection = "test-collection";
-  private DaoProvider testDAOProvider = DAOTestBase.getInstance();
+  private DaoProvider testDAOProvider = null;
 
   @BeforeClass
   void beforeClass() {
+    testDAOProvider = DAOTestBase.getInstance();
     Assert.assertNotNull(testDAOProvider.getJobDAO());
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() throws Exception {
     cleanup_schedulers();
+    testDAOProvider.cleanup();
   }
 
   private void cleanup_schedulers() throws SchedulerException {
