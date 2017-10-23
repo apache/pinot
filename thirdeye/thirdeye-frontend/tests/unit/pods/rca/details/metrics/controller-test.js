@@ -1,8 +1,8 @@
 import { moduleFor, test } from 'ember-qunit';
 
-moduleFor('controller:rca/metrics', 'Unit | Controller | rca/metrics', {
+moduleFor('controller:rca/details/metrics', 'Unit | Controller | rca/details/metrics', {
   // Specify the other units that are required for this test.
-  // needs: ['controller:foo']
+  needs: ['controller:rca/details']
 });
 
 // Replace this with your real tests.

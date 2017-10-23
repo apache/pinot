@@ -6,6 +6,7 @@
 import Ember from 'ember';
 import { task, timeout } from 'ember-concurrency';
 import fetch from 'fetch';
+import _ from 'lodash';
 
 export default Ember.Controller.extend({
   queryParams: ['selectedSearchMode', 'alertId'],
@@ -122,7 +123,6 @@ export default Ember.Controller.extend({
     function() {
       const pageSize = this.get('pageSize');
       const pageNumber = this.get('currentPage');
-      const incomingAlertObj = this.get('incomingAlertId');
       const sortOrder = this.get('selectedSortMode');
       const allGroups = this.get('model.subscriberGroups');
       let alerts = this.get('selectedAlerts');
@@ -238,12 +238,12 @@ export default Ember.Controller.extend({
       // Now filter results accordingly. TODO: build filtering for each type.
       for (let filter of filterArr) {
         switch(filter.category) {
-          case 'Applications':
+          case 'Applications': {
             this.send('onSearchModeChange', 'Applications');
             let task = this.get('searchByApplicationName');
             let taskInstance = task.perform(filter.filter);
             return taskInstance;
-            break;
+          }
         }
       }
     },

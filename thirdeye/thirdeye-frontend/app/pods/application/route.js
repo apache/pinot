@@ -29,6 +29,18 @@ export default Ember.Route.extend(ApplicationRouteMixin, {
     // This is used to hide the navbar when accessing the screenshot page
     return targetName !== 'screenshot';
   },
+
+  /**
+   * if the app is in test mode, have the sessions automatically authenticated
+   * @method afterModel
+   * @return {undefined}
+   */
+  afterModel() {
+    if (this.container.lookupFactory('config:environment').environment === 'test') {
+      this.get('session.session').set('isAuthenticated', true);
+    }
+  },
+
   /**
    * Redirect route after authentication
    * @override ApplicationRouteMixin.routeAfterAuthentication

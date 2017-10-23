@@ -16,8 +16,8 @@
  * @exports entity-filter
  */
 
-/* global moment */
 import Ember from 'ember';
+import _ from 'lodash';
 
 export default Ember.Component.extend({
   /**
