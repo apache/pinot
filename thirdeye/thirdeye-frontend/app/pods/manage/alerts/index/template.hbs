@@ -4,7 +4,9 @@
     {{!--  TODO: enable this filter component when ready
       {{entity-filter
         title="Refine results by"
+        maxStrLen=25
         filterBlocks=filterBlocks
+        onSelectFilter=(action "userDidSelectFilter")
       }}
     --}}
   </div>

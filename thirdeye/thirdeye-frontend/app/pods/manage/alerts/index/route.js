@@ -15,18 +15,28 @@ export default Ember.Route.extend({
     const { queryParams } = transition;
     const isSearchModeAll = !queryParams.selectedSearchMode
       || (queryParams.selectedSearchMode === 'All Alerts');
-    const filterBlocks = {
-      'Quick Filters': ['Alerts I subscribe to', 'Alerts I own', 'All alerts'],
-      'Status': ['Active', 'Inactive'],
-      'Subscription Groups': model.subscriberGroups.map(group => group.name),
-      'Applications': model.applications.map(app => app.application),
-      'Owner': model.alerts.map(alert => alert.createdBy)
-    };
-
-    // Dedupe and remove null or empty values
-    for (var key in filterBlocks) {
-      filterBlocks[key] = Array.from(new Set(filterBlocks[key].filter(value => Ember.isPresent(value))));
-    }
+    const filterBlocks = [
+      {
+        name: 'Quick Filters',
+        filterKeys: ['Alerts I subscribe to', 'Alerts I own', 'All alerts']
+      },
+      {
+        name: 'Status',
+        filterKeys: ['Active', 'Inactive']
+      },
+      {
+        name: 'Subscription Groups',
+        filterKeys: model.subscriberGroups.map(group => group.name)
+      },
+      {
+        name: 'Applications',
+        filterKeys: model.applications.map(app => app.application)
+      },
+      {
+        name: 'Owner',
+        filterKeys: model.alerts.map(alert => alert.createdBy)
+      }
+    ];
 
     // Send filters to controller
     controller.setProperties({
