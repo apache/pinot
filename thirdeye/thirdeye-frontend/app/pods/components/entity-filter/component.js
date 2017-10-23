@@ -1,34 +1,74 @@
+/**
+ * Entity Filtering Component
+ * @module components/entity-filter
+ * @property {string} title             - title of filter side-bar
+ * @property {number} maxStrLen         - number of characters for filter name truncation
+ * @property {object} filterBlocks      - properties for each block of filters
+ * @property {array}   onSelectFilter   - closure action to bubble to controller on filter selection change
+ *
+ * @example
+ * {{entity-filter
+ *   title="Refine results by"
+ *   maxStrLen=25
+ *   filterBlocks=filterBlocks
+ *   onSelectFilter=(action "userDidSelectFilter")}}
+ *
+ * @exports entity-filter
+ */
+
+/* global moment */
 import Ember from 'ember';
 
 export default Ember.Component.extend({
+  /**
+   * Overwrite the init function
+   * @param {Object} args - Attributes for this component
+   */
   init() {
     this._super(...arguments);
     const filterBlocks = this.get('filterBlocks');
+    const isHidden = false;
 
     // Set up filter block object
     filterBlocks.forEach((block) => {
-      block.filtersArray = [];
-      block.isHidden = false;
+      let filtersArray = [];
+      let filterKeys = [];
+
       // Dedupe and remove null or empty values
-      block.filterKeys = Array.from(new Set(block.filterKeys.filter(value => Ember.isPresent(value))));
-      block.filterKeys.forEach((filter) => {
-        block.filtersArray.push({
+      filterKeys = Array.from(new Set(block.filterKeys.filter(value => Ember.isPresent(value))));
+      // Generate a name and Id for each one based on provided filter keys
+      filterKeys.forEach((filter) => {
+        filtersArray.push({
           isActive: false,
           name: filter,
           id: filter.dasherize()
         });
       });
+      // Now add new initialized props to block item
+      Object.assign(block, { filtersArray, filterKeys, isHidden });
     });
   },
 
+  /**
+   * Array containing the running list of all user-selected filters
+   * @type {Array}
+   */
   alertFilters: [],
 
+  /**
+   * Defined actions for component
+   */
   actions: {
     /**
      * Handles selection of filter items. Each time a filter is selected, this component will
      * pass an array of selected filters to its parent.
+     * @method onFilterSelection
+     * @param {String} category - name of the selected filter's parent block
+     * @param {Objedt} filterObj - contains the properties of the selected filter
+     * @return {undefined}
      */
     onFilterSelection(category, filterObj) {
+      // Note: toggleProperty will not be able to find 'filterObj', as it is not an observed property
       Ember.set(filterObj, 'isActive', !filterObj.isActive);
 
       if (filterObj.isActive) {
@@ -41,8 +81,15 @@ export default Ember.Component.extend({
       this.get('onSelectFilter')(this.get('alertFilters'));
     },
 
-    toggleDisplay(block) {
-      Ember.set(block, 'isHidden', !block.isHidden);
+    /**
+     * Handles expand/collapse of the filter block
+     * @method toggleDisplay
+     * @param {Objedt} clickedBlock - filter block object
+     * @return {undefined}
+     */
+    toggleDisplay(clickedBlock) {
+      // Note: toggleProperty will not be able to find 'filterBlocks', as it is not an observed property
+      Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
     }
   }
 });
