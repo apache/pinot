@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.anomaly.events.EventType;
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,12 +14,13 @@ import org.testng.annotations.Test;
 public class TestEventManager {
   long testEventId;
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private EventManager eventDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    eventDAO = testDAOProvider.getEventDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    eventDAO = daoRegistry.getEventDAO();
   }
 
   @AfterClass(alwaysRun = true)

@@ -1,52 +1,19 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.TestDBResources;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
-import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
-import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
-import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
-import org.joda.time.DateTime;
 
-public class DAOTestBase implements DaoProvider {
+public class DAOTestBase {
   protected AnomalyFunctionManager anomalyFunctionDAO;
   protected RawAnomalyResultManager rawAnomalyResultDAO;
   protected JobManager jobDAO;
@@ -77,7 +44,7 @@ public class DAOTestBase implements DaoProvider {
     init();
   }
 
-  public static DaoProvider getInstance(){
+  public static DAOTestBase getInstance(){
     return new DAOTestBase();
   }
 
@@ -117,7 +84,6 @@ public class DAOTestBase implements DaoProvider {
     }
   }
 
-  @Override
   public void cleanup() {
     try {
       cleanUpJDBC();
@@ -170,103 +136,7 @@ public class DAOTestBase implements DaoProvider {
     System.out.println("Cleaning database: done!");
   }
 
-  @Override
-  public AnomalyFunctionManager getAnomalyFunctionDAO() {
-    return anomalyFunctionDAO;
-  }
-
-  @Override
-  public RawAnomalyResultManager getRawAnomalyResultDAO() {
-    return rawAnomalyResultDAO;
-  }
-
-  @Override
-  public JobManager getJobDAO() {
-    return jobDAO;
-  }
-
-  @Override
-  public TaskManager getTaskDAO() {
-    return taskDAO;
-  }
-
-  @Override
-  public MergedAnomalyResultManager getMergedAnomalyResultDAO() {
-    return mergedAnomalyResultDAO;
-  }
-
-  @Override
-  public DatasetConfigManager getDatasetConfigDAO() {
-    return datasetConfigDAO;
-  }
-
-  @Override
-  public MetricConfigManager getMetricConfigDAO() {
-    return metricConfigDAO;
-  }
-
-  @Override
-  public DashboardConfigManager getDashboardConfigDAO() {
-    return dashboardConfigDAO;
-  }
-
-  @Override
-  public OverrideConfigManager getOverrideConfigDAO() {
-    return overrideConfigDAO;
-  }
-
-  @Override
-  public AlertConfigManager getAlertConfigDAO() {
-    return alertConfigDAO;
-  }
-
-  @Override
-  public DataCompletenessConfigManager getDataCompletenessConfigDAO() {
-    return dataCompletenessConfigDAO;
-  }
-
-  @Override
-  public EventManager getEventDAO() {
-    return eventDAO;
-  }
-
-  @Override
-  public DetectionStatusManager getDetectionStatusDAO() {
-    return detectionStatusDAO;
-  }
-
-  @Override
-  public AutotuneConfigManager getAutotuneConfigDAO() {
-    return autotuneConfigDAO;
-  }
-
-  @Override
-  public ClassificationConfigManager getClassificationConfigDAO() {
-    return classificationConfigDAO;
-  }
-
-  @Override
-  public EntityToEntityMappingManager getEntityToEntityMappingDAO() {
-    return entityToEntityMappingDAO;
-  }
-
-  @Override
-  public GroupedAnomalyResultsManager getGroupedAnomalyResultsDAO() {
-    return groupedAnomalyResultsDAO;
-  }
-
-  @Override
-  public OnboardDatasetMetricManager getOnboardDatasetMetricDAO() {
-    return onboardDatasetMetricDAO;
-  }
-
-  @Override
-  public ConfigManager getConfigDAO() {
-    return configDAO;
-  }
-
-  @Override
-  public ApplicationManager getApplicationDAO() {
-    return applicationDAO;
+  public DAORegistry getDaoRegistry() {
+    return daoRegistry;
   }
 }

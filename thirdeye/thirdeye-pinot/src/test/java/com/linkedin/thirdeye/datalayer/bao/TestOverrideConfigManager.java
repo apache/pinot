@@ -1,9 +1,9 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -19,12 +19,13 @@ public class TestOverrideConfigManager {
   private Long overrideConfigId1 = null;
   private DateTime now = new DateTime();
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private OverrideConfigManager overrideConfigDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    overrideConfigDAO = testDAOProvider.getOverrideConfigDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    overrideConfigDAO = daoRegistry.getOverrideConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)

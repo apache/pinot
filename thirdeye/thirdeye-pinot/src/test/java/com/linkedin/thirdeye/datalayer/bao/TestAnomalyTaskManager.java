@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -32,14 +32,15 @@ public class TestAnomalyTaskManager {
     allowedOldTaskStatus.add(TaskStatus.WAITING);
   }
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private JobManager jobDAO;
   private TaskManager taskDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    jobDAO = testDAOProvider.getJobDAO();
-    taskDAO = testDAOProvider.getTaskDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    jobDAO = daoRegistry.getJobDAO();
+    taskDAO = daoRegistry.getTaskDAO();
   }
 
   @AfterClass(alwaysRun = true)

@@ -6,7 +6,6 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -16,6 +15,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +31,7 @@ public class AutoOnboardPinotMetricsServiceTest {
   private String dataset = "test-collection";
   private Schema schema;
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
   private DashboardConfigManager dashboardConfigDAO;
@@ -39,9 +39,10 @@ public class AutoOnboardPinotMetricsServiceTest {
   @BeforeMethod
   void beforeMethod() throws Exception {
     testDAOProvider = DAOTestBase.getInstance();
-    datasetConfigDAO = testDAOProvider.getDatasetConfigDAO();
-    metricConfigDAO = testDAOProvider.getMetricConfigDAO();
-    dashboardConfigDAO = testDAOProvider.getDashboardConfigDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
+    metricConfigDAO = daoRegistry.getMetricConfigDAO();
+    dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
     testAutoLoadPinotMetricsService = new AutoOnboardPinotDataSource(null, null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, null);

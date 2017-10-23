@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -24,12 +24,13 @@ public class TestMetricConfigManager {
   private static String metric2 = "metric2";
   private static String derivedMetric1 = "metric3";
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private MetricConfigManager metricConfigDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    metricConfigDAO = testDAOProvider.getMetricConfigDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    metricConfigDAO = daoRegistry.getMetricConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)

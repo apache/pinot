@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import java.util.List;
 
@@ -19,12 +18,12 @@ public class TestAnomalyJobManager {
   private Long anomalyJobId2;
   private Long anomalyJobId3;
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private JobManager jobDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    jobDAO = testDAOProvider.getJobDAO();
+    jobDAO = testDAOProvider.getDaoRegistry().getJobDAO();
   }
 
   @AfterClass(alwaysRun = true)

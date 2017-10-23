@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.config;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import java.util.Arrays;
@@ -15,12 +14,12 @@ import org.testng.annotations.Test;
 
 public class ConfigNamespaceTest {
   private ConfigNamespace cn;
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
 
   @BeforeMethod
   public void beforeMethod() {
     testDAOProvider = DAOTestBase.getInstance();
-    this.cn = new ConfigNamespace("namespace", testDAOProvider.getConfigDAO());
+    this.cn = new ConfigNamespace("namespace", testDAOProvider.getDaoRegistry().getConfigDAO());
   }
 
   @AfterMethod(alwaysRun = true)
@@ -87,7 +86,7 @@ public class ConfigNamespaceTest {
 
   @Test
   public void testNamespace() {
-    ConfigManager configDAO = testDAOProvider.getConfigDAO();
+    ConfigManager configDAO = testDAOProvider.getDaoRegistry().getConfigDAO();
     ConfigNamespace cn1 = new ConfigNamespace("namespace", configDAO);
     ConfigNamespace cn2 = new ConfigNamespace("theOther", configDAO);
 

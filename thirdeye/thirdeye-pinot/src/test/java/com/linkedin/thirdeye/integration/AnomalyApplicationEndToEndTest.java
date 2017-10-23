@@ -21,7 +21,6 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
@@ -31,6 +30,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -95,12 +95,14 @@ public class AnomalyApplicationEndToEndTest {
   private String classifierPropertiesFile = "/sample-classifier.properties";
   private String metric = "cost";
   private String collection = "test-collection";
-  private DaoProvider testDAOProvider = null;
+  private DAOTestBase testDAOProvider = null;
+  private DAORegistry daoRegistry = null;
 
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    Assert.assertNotNull(testDAOProvider.getJobDAO());
+    daoRegistry = testDAOProvider.getDaoRegistry();
+    Assert.assertNotNull(daoRegistry.getJobDAO());
   }
 
   @AfterClass(alwaysRun = true)
@@ -193,17 +195,17 @@ public class AnomalyApplicationEndToEndTest {
 
 
     // create test anomaly function
-    functionId = testDAOProvider.getAnomalyFunctionDAO().save(DaoTestUtils.getTestFunctionSpec(metric, collection));
+    functionId = daoRegistry.getAnomalyFunctionDAO().save(DaoTestUtils.getTestFunctionSpec(metric, collection));
 
     // create test alert configuration
-    testDAOProvider.getAlertConfigDAO().save(getTestAlertConfiguration("test alert v2"));
+    daoRegistry.getAlertConfigDAO().save(getTestAlertConfiguration("test alert v2"));
 
     // create test dataset config
-    testDAOProvider.getDatasetConfigDAO().save(getTestDatasetConfig(collection));
+    daoRegistry.getDatasetConfigDAO().save(getTestDatasetConfig(collection));
 
     // create test grouping config
     classificationConfigId =
-        testDAOProvider.getClassificationConfigDAO().save(getTestGroupingConfiguration(Collections.singletonList(functionId)));
+        daoRegistry.getClassificationConfigDAO().save(getTestGroupingConfiguration(Collections.singletonList(functionId)));
 
     // setup function factory for worker and merger
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
@@ -222,7 +224,7 @@ public class AnomalyApplicationEndToEndTest {
   private ThirdEyeResponse getMockResponse(ThirdEyeRequest request) {
     ThirdEyeResponse response = null;
     Random rand = new Random();
-    DatasetConfigDTO datasetConfig = testDAOProvider.getDatasetConfigDAO().findByDataset(collection);
+    DatasetConfigDTO datasetConfig = daoRegistry.getDatasetConfigDAO().findByDataset(collection);
     TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     List<String[]> rows = new ArrayList<>();
     DateTime start = request.getStartTimeInclusive();
@@ -246,23 +248,23 @@ public class AnomalyApplicationEndToEndTest {
   @Test(enabled=true)
   public void testThirdeyeAnomalyApplication() throws Exception {
 
-    Assert.assertNotNull(testDAOProvider.getJobDAO());
+    Assert.assertNotNull(daoRegistry.getJobDAO());
 
     // setup caches and config
     setup();
 
-    Assert.assertNotNull(testDAOProvider.getJobDAO());
+    Assert.assertNotNull(daoRegistry.getJobDAO());
 
-    TaskManager taskDAO = testDAOProvider.getTaskDAO();
+    TaskManager taskDAO = daoRegistry.getTaskDAO();
 
     // startDataCompletenessChecker
     startDataCompletenessScheduler();
     Thread.sleep(10000);
-    int jobSizeDataCompleteness = testDAOProvider.getJobDAO().findAll().size();
+    int jobSizeDataCompleteness = daoRegistry.getJobDAO().findAll().size();
     int taskSizeDataCompleteness = taskDAO.findAll().size();
     Assert.assertTrue(jobSizeDataCompleteness == 1);
     Assert.assertTrue(taskSizeDataCompleteness == 2);
-    JobDTO jobDTO = testDAOProvider.getJobDAO().findAll().get(0);
+    JobDTO jobDTO = daoRegistry.getJobDAO().findAll().get(0);
     Assert.assertTrue(jobDTO.getJobName().startsWith(TaskType.DATA_COMPLETENESS.toString()));
     List<TaskDTO> taskDTOs = taskDAO.findAll();
     for (TaskDTO taskDTO : taskDTOs) {
@@ -282,12 +284,12 @@ public class AnomalyApplicationEndToEndTest {
 
     // check for number of entries in tasks and jobs
     Thread.sleep(10000);
-    int jobSize1 = testDAOProvider.getJobDAO().findAll().size();
+    int jobSize1 = daoRegistry.getJobDAO().findAll().size();
     int taskSize1 = taskDAO.findAll().size();
     Assert.assertTrue(jobSize1 > 0);
     Assert.assertTrue(taskSize1 > 0);
     Thread.sleep(10000);
-    int jobSize2 = testDAOProvider.getJobDAO().findAll().size();
+    int jobSize2 = daoRegistry.getJobDAO().findAll().size();
     int taskSize2 = taskDAO.findAll().size();
     Assert.assertTrue(jobSize2 > jobSize1);
     Assert.assertTrue(taskSize2 > taskSize1);
@@ -328,7 +330,7 @@ public class AnomalyApplicationEndToEndTest {
     Assert.assertTrue(monitorCount > 0);
 
     // check for job status
-    jobs = testDAOProvider.getJobDAO().findAll();
+    jobs = daoRegistry.getJobDAO().findAll();
     for (JobDTO job : jobs) {
       Assert.assertEquals(job.getStatus(), JobStatus.SCHEDULED);
     }
@@ -349,16 +351,16 @@ public class AnomalyApplicationEndToEndTest {
 
     // Raw anomalies of the same function and dimensions should have been merged by the worker, so we
     // check if any raw anomalies present, whose existence means the worker fails the synchronous merge.
-    List<RawAnomalyResultDTO> rawAnomalies = testDAOProvider.getRawAnomalyResultDAO().findUnmergedByFunctionId(functionId);
+    List<RawAnomalyResultDTO> rawAnomalies = daoRegistry.getRawAnomalyResultDAO().findUnmergedByFunctionId(functionId);
     Assert.assertTrue(rawAnomalies.size() == 0);
 
     // check merged anomalies
-    List<MergedAnomalyResultDTO> mergedAnomalies = testDAOProvider.getMergedAnomalyResultDAO().findByFunctionId(functionId, true);
+    List<MergedAnomalyResultDTO> mergedAnomalies = daoRegistry.getMergedAnomalyResultDAO().findByFunctionId(functionId, true);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
     // THE FOLLOWING TEST MAY FAIL OCCASIONALLY DUE TO MACHINE COMPUTATION POWER
     // check for job status COMPLETED
-    jobs = testDAOProvider.getJobDAO().findAll();
+    jobs = daoRegistry.getJobDAO().findAll();
     int completedJobCount = 0;
     for (JobDTO job : jobs) {
       int attempt = 0;
@@ -377,13 +379,13 @@ public class AnomalyApplicationEndToEndTest {
     // start classifier
     startClassifier();
     List<JobDTO> latestCompletedDetectionJobDTO =
-        testDAOProvider.getJobDAO().findRecentScheduledJobByTypeAndConfigId(TaskType.ANOMALY_DETECTION, functionId, 0L);
+        daoRegistry.getJobDAO().findRecentScheduledJobByTypeAndConfigId(TaskType.ANOMALY_DETECTION, functionId, 0L);
     Assert.assertNotNull(latestCompletedDetectionJobDTO);
     Assert.assertEquals(latestCompletedDetectionJobDTO.get(0).getStatus(), JobStatus.COMPLETED);
     Thread.sleep(5000);
-    jobs = testDAOProvider.getJobDAO().findAll();
+    jobs = daoRegistry.getJobDAO().findAll();
     List<JobDTO> latestCompletedClassificationJobDTO =
-        testDAOProvider.getJobDAO().findRecentScheduledJobByTypeAndConfigId(TaskType.CLASSIFICATION, classificationConfigId, 0L);
+        daoRegistry.getJobDAO().findRecentScheduledJobByTypeAndConfigId(TaskType.CLASSIFICATION, classificationConfigId, 0L);
     Assert.assertNotNull(latestCompletedClassificationJobDTO);
     Assert.assertEquals(latestCompletedClassificationJobDTO.get(0).getStatus(), JobStatus.COMPLETED);
   }

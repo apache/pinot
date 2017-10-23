@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -16,12 +16,13 @@ public class TestDatasetConfigManager {
   private static String collection1 = "my dataset1";
   private static String collection2 = "my dataset2";
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private DatasetConfigManager datasetConfigDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    datasetConfigDAO = testDAOProvider.getDatasetConfigDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)

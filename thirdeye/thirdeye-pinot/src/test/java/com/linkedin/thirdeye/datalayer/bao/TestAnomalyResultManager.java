@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -17,14 +17,15 @@ public class TestAnomalyResultManager {
   RawAnomalyResultDTO anomalyResult;
   AnomalyFunctionDTO spec = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    anomalyFunctionDAO = testDAOProvider.getAnomalyFunctionDAO();
-    rawAnomalyResultDAO = testDAOProvider.getRawAnomalyResultDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+    rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
   }
 
   @AfterClass(alwaysRun = true)

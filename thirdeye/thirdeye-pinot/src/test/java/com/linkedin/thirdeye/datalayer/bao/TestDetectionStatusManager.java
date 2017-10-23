@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 
 import org.joda.time.DateTime;
@@ -22,12 +22,13 @@ public class TestDetectionStatusManager {
   private DateTime now = new DateTime();
   private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHH");
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private DetectionStatusManager detectionStatusDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    detectionStatusDAO = testDAOProvider.getDetectionStatusDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
   }
 
   @AfterClass(alwaysRun = true)

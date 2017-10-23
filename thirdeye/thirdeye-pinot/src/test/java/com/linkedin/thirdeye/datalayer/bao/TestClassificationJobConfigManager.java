@@ -1,9 +1,8 @@
-
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,12 +33,13 @@ public class TestClassificationJobConfigManager {
   private Long configId1;
   private Long configId2;
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private ClassificationConfigManager classificationConfigDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    classificationConfigDAO = testDAOProvider.getClassificationConfigDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)

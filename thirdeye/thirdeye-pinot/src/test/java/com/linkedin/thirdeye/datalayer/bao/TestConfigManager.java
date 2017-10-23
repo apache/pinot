@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -12,12 +12,13 @@ import org.testng.annotations.Test;
 
 public class TestConfigManager {
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private ConfigManager configDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    configDAO = testDAOProvider.getConfigDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    configDAO = daoRegistry.getConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)

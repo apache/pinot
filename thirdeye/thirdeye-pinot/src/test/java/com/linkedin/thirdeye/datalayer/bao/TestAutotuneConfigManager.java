@@ -1,10 +1,10 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -19,14 +19,15 @@ public class TestAutotuneConfigManager {
   private static long start = 1l;
   private static long end = 2l;
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private AutotuneConfigManager autotuneConfigDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    anomalyFunctionDAO = testDAOProvider.getAnomalyFunctionDAO();
-    autotuneConfigDAO = testDAOProvider.getAutotuneConfigDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+    autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)

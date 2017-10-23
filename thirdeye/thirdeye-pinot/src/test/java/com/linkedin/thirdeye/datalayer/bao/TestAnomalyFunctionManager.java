@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import java.util.List;
 
@@ -18,12 +17,12 @@ public class TestAnomalyFunctionManager {
   private static String collection = "my dataset";
   private static String metricName = "__counts";
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    anomalyFunctionDAO = testDAOProvider.getAnomalyFunctionDAO();
+    anomalyFunctionDAO = testDAOProvider.getDaoRegistry().getAnomalyFunctionDAO();
   }
 
   @AfterClass(alwaysRun = true)

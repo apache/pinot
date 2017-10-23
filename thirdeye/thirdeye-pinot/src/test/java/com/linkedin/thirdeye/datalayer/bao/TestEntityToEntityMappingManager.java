@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoProvider;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -24,12 +24,13 @@ public class TestEntityToEntityMappingManager {
   private static final String METRIC_TO_SERVICE = "METRIC_TO_SERVICE";
   private static final String DIMENSION_TO_DIMENSION = "DIMENSION_TO_DIMENSION";
 
-  private DaoProvider testDAOProvider;
+  private DAOTestBase testDAOProvider;
   private EntityToEntityMappingManager entityToEntityMappingDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    entityToEntityMappingDAO = testDAOProvider.getEntityToEntityMappingDAO();
+    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
   }
 
   @AfterClass(alwaysRun = true)
