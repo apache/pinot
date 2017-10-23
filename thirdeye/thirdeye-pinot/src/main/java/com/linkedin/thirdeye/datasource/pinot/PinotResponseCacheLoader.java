@@ -12,5 +12,5 @@ public abstract class PinotResponseCacheLoader extends CacheLoader<PinotQuery, R
    *
    * @throws Exception when an error occurs connecting to the Pinot controller.
    */
-  abstract void init(Map<String, String> properties) throws Exception;
+  public abstract void init(Map<String, String> properties) throws Exception;
 }
