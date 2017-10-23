@@ -3,10 +3,9 @@ package com.linkedin.thirdeye.datalayer.bao;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import java.util.List;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -14,15 +13,15 @@ public class TestConfigManager {
 
   private DAOTestBase testDAOProvider;
   private ConfigManager configDAO;
-  @BeforeClass
-  void beforeClass() {
+  @BeforeMethod
+  void beforeMethod() {
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
     configDAO = daoRegistry.getConfigDAO();
   }
 
-  @AfterClass(alwaysRun = true)
-  void afterClass() {
+  @AfterMethod(alwaysRun = true)
+  void afterMethod() {
     testDAOProvider.cleanup();
   }
 
@@ -43,7 +42,6 @@ public class TestConfigManager {
 
   @Test
   public void testDeleteConfig() {
-    cleanup();
     ConfigDTO config = DaoTestUtils.getTestConfig("a", "b", "c");
     Assert.assertNotNull(this.configDAO.save(config));
 
@@ -54,7 +52,6 @@ public class TestConfigManager {
 
   @Test
   public void testOverrideWithDelete() {
-    cleanup();
     ConfigDTO config = DaoTestUtils.getTestConfig("a", "b", "c");
     Assert.assertNotNull(this.configDAO.save(config));
 
@@ -78,7 +75,6 @@ public class TestConfigManager {
 
   @Test
   public void testNamespace() {
-    cleanup();
     this.configDAO.save(DaoTestUtils.getTestConfig("a", "a", "v1"));
     this.configDAO.save(DaoTestUtils.getTestConfig("a", "b", "v2"));
     this.configDAO.save(DaoTestUtils.getTestConfig("b", "a", "v3"));
@@ -86,12 +82,5 @@ public class TestConfigManager {
 
     Assert.assertEquals(this.configDAO.findByNamespace("a").size(), 2);
     Assert.assertEquals(this.configDAO.findByNamespace("b").size(), 1);
-  }
-
-  private void cleanup(){
-    List<ConfigDTO> configs = configDAO.findAll();
-    for (ConfigDTO config : configs) {
-      configDAO.delete(config);
-    }
   }
 }

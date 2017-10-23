@@ -14,26 +14,6 @@ import java.sql.Connection;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 public class DAOTestBase {
-  protected AnomalyFunctionManager anomalyFunctionDAO;
-  protected RawAnomalyResultManager rawAnomalyResultDAO;
-  protected JobManager jobDAO;
-  protected TaskManager taskDAO;
-  protected MergedAnomalyResultManager mergedAnomalyResultDAO;
-  protected DatasetConfigManager datasetConfigDAO;
-  protected MetricConfigManager metricConfigDAO;
-  protected DashboardConfigManager dashboardConfigDAO;
-  protected OverrideConfigManager overrideConfigDAO;
-  protected AlertConfigManager alertConfigDAO;
-  protected DataCompletenessConfigManager dataCompletenessConfigDAO;
-  protected EventManager eventDAO;
-  protected DetectionStatusManager detectionStatusDAO;
-  protected AutotuneConfigManager autotuneConfigDAO;
-  protected ClassificationConfigManager classificationConfigDAO;
-  protected EntityToEntityMappingManager entityToEntityMappingDAO;
-  protected GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
-  protected OnboardDatasetMetricManager onboardDatasetMetricDAO;
-  protected ConfigManager configDAO;
-  protected ApplicationManager applicationDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -58,27 +38,6 @@ public class DAOTestBase {
       DaoProviderUtil.init(ds);
 
       daoRegistry = DAORegistry.getInstance();
-      anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
-      rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
-      jobDAO = daoRegistry.getJobDAO();
-      taskDAO = daoRegistry.getTaskDAO();
-      mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
-      datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
-      metricConfigDAO = daoRegistry.getMetricConfigDAO();
-      dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
-      overrideConfigDAO = daoRegistry.getOverrideConfigDAO();
-      alertConfigDAO = daoRegistry.getAlertConfigDAO();
-      dataCompletenessConfigDAO = daoRegistry.getDataCompletenessConfigDAO();
-      eventDAO = daoRegistry.getEventDAO();
-      anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
-      detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
-      autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
-      classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
-      entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
-      groupedAnomalyResultsDAO = daoRegistry.getGroupedAnomalyResultsDAO();
-      onboardDatasetMetricDAO = daoRegistry.getOnboardDatasetMetricDAO();
-      configDAO = daoRegistry.getConfigDAO();
-      applicationDAO = daoRegistry.getApplicationDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
