@@ -32,7 +32,8 @@ public class AutoOnboardPinotMetricsUtils {
   private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardPinotMetricsUtils.class);
 
   public AutoOnboardPinotMetricsUtils(DataSourceConfig dataSourceConfig) {
-      PinotThirdEyeDataSourceConfig pinotThirdeyeDataSourceConfig = PinotThirdEyeDataSourceConfig.createPinotThirdeyeDataSourceConfig(dataSourceConfig);
+    PinotThirdEyeDataSourceConfig pinotThirdeyeDataSourceConfig =
+        PinotThirdEyeDataSourceConfig.createFromDataSourceConfig(dataSourceConfig);
       this.pinotControllerClient = HttpClients.createDefault();
       this.pinotControllerHost = new HttpHost(pinotThirdeyeDataSourceConfig.getControllerHost(),
           pinotThirdeyeDataSourceConfig.getControllerPort());

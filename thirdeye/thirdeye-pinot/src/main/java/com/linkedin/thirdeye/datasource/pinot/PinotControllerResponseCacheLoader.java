@@ -1,16 +1,14 @@
-package com.linkedin.thirdeye.datasource.cache;
+package com.linkedin.thirdeye.datasource.pinot;
 
-import com.google.common.cache.CacheLoader;
 import com.linkedin.pinot.client.Connection;
 import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,8 +21,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSetGroup> {
-  private static final Logger LOG = LoggerFactory.getLogger(ResultSetGroupCacheLoader.class);
+public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader {
+  private static final Logger LOG = LoggerFactory.getLogger(PinotControllerResponseCacheLoader.class);
 
   private static final long CONNECTION_TIMEOUT = 60000;
 
@@ -40,8 +38,44 @@ public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSet
 
   private static final String BROKER_PREFIX = "Broker_";
 
-  public ResultSetGroupCacheLoader(PinotThirdEyeDataSourceConfig pinotThirdEyeDataSourceConfig) throws Exception {
+  /**
+   * Constructs a empty {@link PinotControllerResponseCacheLoader}. Please use init() to setup the connection of the
+   * constructed cache loader.
+   */
+  public PinotControllerResponseCacheLoader() { }
 
+  /**
+   * Constructs a {@link PinotControllerResponseCacheLoader} using the given data source config.
+   *
+   * @param pinotThirdEyeDataSourceConfig the data source config that provides controller's information.
+   *
+   * @throws Exception when an error occurs connecting to the Pinot controller.
+   */
+  public PinotControllerResponseCacheLoader(PinotThirdEyeDataSourceConfig pinotThirdEyeDataSourceConfig)
+      throws Exception {
+    this.init(pinotThirdEyeDataSourceConfig);
+  }
+
+  /**
+   * Initializes the cache loader using the given property map.
+   *
+   * @param properties the property map that provides controller's information.
+   *
+   * @throws Exception when an error occurs connecting to the Pinot controller.
+   */
+  public void init(Map<String, String> properties) throws Exception {
+    PinotThirdEyeDataSourceConfig dataSourceConfig = PinotThirdEyeDataSourceConfig.createFromProperties(properties);
+    this.init(dataSourceConfig);
+  }
+
+  /**
+   * Initializes the cache loader using the given data source config.
+   *
+   * @param pinotThirdEyeDataSourceConfig the data source config that provides controller's information.
+   *
+   * @throws Exception when an error occurs connecting to the Pinot controller.
+   */
+  private void init(PinotThirdEyeDataSourceConfig pinotThirdEyeDataSourceConfig) throws Exception {
     if (pinotThirdEyeDataSourceConfig.getBrokerUrl() != null
         && pinotThirdEyeDataSourceConfig.getBrokerUrl().trim().length() > 0) {
       ZkClient zkClient = new ZkClient(pinotThirdEyeDataSourceConfig.getZookeeperUrl());
@@ -60,8 +94,11 @@ public class ResultSetGroupCacheLoader extends CacheLoader<PinotQuery, ResultSet
             + instanceConfig.getPort();
       }
       this.connections = fromHostList(thirdeyeBrokers);
+      LOG.info("Created PinotControllerResponseCacheLoader with brokers {}", thirdeyeBrokers);
     } else {
       this.connections = fromZookeeper(pinotThirdEyeDataSourceConfig);
+      LOG.info("Created PinotControllerResponseCacheLoader with controller {}:{}",
+          pinotThirdEyeDataSourceConfig.getControllerHost(), pinotThirdEyeDataSourceConfig.getControllerPort());
     }
   }
 

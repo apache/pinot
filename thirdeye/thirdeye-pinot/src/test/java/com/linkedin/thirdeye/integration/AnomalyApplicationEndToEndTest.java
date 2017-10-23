@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.integration;
 
 import com.google.common.cache.LoadingCache;
-import com.linkedin.pinot.client.ResultSet;
-import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
@@ -34,7 +32,6 @@ import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -154,21 +151,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     LoadingCache<String, DatasetConfigDTO> mockDatasetConfigCache = Mockito.mock(LoadingCache.class);
     Mockito.when(mockDatasetConfigCache.get(collection)).thenReturn(getTestDatasetConfig(collection));
     cacheRegistry.registerDatasetConfigCache(mockDatasetConfigCache);
-
-    ResultSet mockResultSet = Mockito.mock(ResultSet.class);
-    Mockito.when(mockResultSet.getRowCount()).thenReturn(0);
-    final ResultSetGroup mockResultSetGroup = Mockito.mock(ResultSetGroup.class);
-    Mockito.when(mockResultSetGroup.getResultSet(0)).thenReturn(mockResultSet);
-    LoadingCache<PinotQuery, ResultSetGroup> mockResultSetGroupCache = Mockito.mock(LoadingCache.class);
-    Mockito.when(mockResultSetGroupCache.get(Matchers.any(PinotQuery.class)))
-    .thenAnswer(new Answer<ResultSetGroup>() {
-
-      @Override
-      public ResultSetGroup answer(InvocationOnMock invocation) throws Throwable {
-        return mockResultSetGroup;
-      }
-    });
-    cacheRegistry.registerResultSetGroupCache(mockResultSetGroupCache);
 
     // Application config
     thirdeyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();
