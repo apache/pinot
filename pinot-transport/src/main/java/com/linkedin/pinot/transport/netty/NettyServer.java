@@ -85,6 +85,7 @@ public abstract class NettyServer implements Runnable {
      * @return Serialized response
      */
     ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request);
+    ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request, NettyServerWorkload workload);
   }
 
   public interface RequestHandlerFactory {
@@ -232,13 +233,12 @@ public abstract class NettyServer implements Runnable {
     private final long _defaultLargeQueryLatencyMs;
     private final RequestHandler _handler;
     private final NettyServerMetrics _metric;
-    private final NettyServerWorkload _workload;
+    private final static NettyServerWorkload _workload = new NettyServerWorkload();
 
     public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric, long defaultLargeQueryLatencyMs) {
       _handler = handler;
       _metric = metric;
       _defaultLargeQueryLatencyMs = defaultLargeQueryLatencyMs;
-      _workload = new NettyServerWorkload();
     }
 
     @Override
@@ -252,7 +252,7 @@ public abstract class NettyServer implements Runnable {
       //Call processing handler
       final TimerContext requestProcessingLatency = MetricsHelper.startTimer();
       final ChannelHandlerContext requestChannelHandlerContext = ctx;
-      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request);
+      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request, _workload);
       Futures.addCallback(serializedQueryResponse, new FutureCallback<byte[]>() {
         void sendResponse(@Nonnull final byte[] result) {
           requestProcessingLatency.stop();
