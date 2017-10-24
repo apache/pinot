@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.config;
 
-import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
+import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -11,18 +13,19 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class ConfigNamespaceTest extends AbstractManagerTestBase {
+public class ConfigNamespaceTest {
   private ConfigNamespace cn;
+  private DAOTestBase testDAOProvider;
 
   @BeforeMethod
   public void beforeMethod() {
-    super.init();
-    this.cn = new ConfigNamespace("namespace", super.configDAO);
+    testDAOProvider = DAOTestBase.getInstance();
+    this.cn = new ConfigNamespace("namespace", DAORegistry.getInstance().getConfigDAO());
   }
 
   @AfterMethod(alwaysRun = true)
   public void afterMethod() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
@@ -84,8 +87,9 @@ public class ConfigNamespaceTest extends AbstractManagerTestBase {
 
   @Test
   public void testNamespace() {
-    ConfigNamespace cn1 = new ConfigNamespace("namespace", super.configDAO);
-    ConfigNamespace cn2 = new ConfigNamespace("theOther", super.configDAO);
+    ConfigManager configDAO = DAORegistry.getInstance().getConfigDAO();
+    ConfigNamespace cn1 = new ConfigNamespace("namespace", configDAO);
+    ConfigNamespace cn2 = new ConfigNamespace("theOther", configDAO);
 
     this.cn.put("a", "value");
     cn2.put("a", "other");

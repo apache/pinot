@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -13,23 +15,27 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class TestOverrideConfigManager extends AbstractManagerTestBase {
+public class TestOverrideConfigManager {
   private Long overrideConfigId1 = null;
   private DateTime now = new DateTime();
 
+  private DAOTestBase testDAOProvider;
+  private OverrideConfigManager overrideConfigDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    overrideConfigDAO = daoRegistry.getOverrideConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
   public void testCreate() {
-    OverrideConfigDTO overrideConfigDTO1 = getTestOverrideConfigForTimeSeries(now);
+    OverrideConfigDTO overrideConfigDTO1 = DaoTestUtils.getTestOverrideConfigForTimeSeries(now);
     overrideConfigId1 = overrideConfigDAO.save(overrideConfigDTO1);
     Assert.assertNotNull(overrideConfigId1);
     Assert.assertNotNull(overrideConfigDAO.findById(overrideConfigId1));

@@ -87,7 +87,6 @@ public class DAORegistry {
     return DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
   }
 
-
   public RawAnomalyResultManager getRawAnomalyResultDAO() {
     return DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
   }
@@ -111,7 +110,6 @@ public class DAORegistry {
   public MetricConfigManager getMetricConfigDAO() {
     return DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
   }
-
 
   public DashboardConfigManager getDashboardConfigDAO() {
     return DaoProviderUtil.getInstance(DashboardConfigManagerImpl.class);

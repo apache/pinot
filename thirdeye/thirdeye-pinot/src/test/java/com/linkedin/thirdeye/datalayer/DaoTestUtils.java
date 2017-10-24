@@ -1,7 +1,6 @@
-package com.linkedin.thirdeye.datalayer.bao;
+package com.linkedin.thirdeye.datalayer;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.TestDBResources;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
@@ -9,7 +8,6 @@ import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceE
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
@@ -25,142 +23,19 @@ import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
-import java.io.File;
-import java.io.FileReader;
-import java.net.URL;
-import java.sql.Connection;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
 
-public abstract class AbstractManagerTestBase {
-  protected AnomalyFunctionManager anomalyFunctionDAO;
-  protected RawAnomalyResultManager rawAnomalyResultDAO;
-  protected JobManager jobDAO;
-  protected TaskManager taskDAO;
-  protected MergedAnomalyResultManager mergedAnomalyResultDAO;
-  protected DatasetConfigManager datasetConfigDAO;
-  protected MetricConfigManager metricConfigDAO;
-  protected DashboardConfigManager dashboardConfigDAO;
-  protected OverrideConfigManager overrideConfigDAO;
-  protected AlertConfigManager alertConfigDAO;
-  protected DataCompletenessConfigManager dataCompletenessConfigDAO;
-  protected EventManager eventDAO;
-  protected DetectionStatusManager detectionStatusDAO;
-  protected AutotuneConfigManager autotuneConfigDAO;
-  protected ClassificationConfigManager classificationConfigDAO;
-  protected EntityToEntityMappingManager entityToEntityMappingDAO;
-  protected GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
-  protected OnboardDatasetMetricManager onboardDatasetMetricDAO;
-  protected ConfigManager configDAO;
-  protected ApplicationManager applicationDAO;
 
-  //  protected TestDBResources testDBResources;
-  protected DAORegistry daoRegistry;
-  DataSource ds;
-  String dbUrlId;
-
-  protected void init() {
-    try {
-      URL url = TestDBResources.class.getResource("/persistence-local.yml");
-      File configFile = new File(url.toURI());
-      PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
-      initializeDs(configuration);
-
-      DaoProviderUtil.init(ds);
-
-      daoRegistry = DAORegistry.getInstance();
-      anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
-      rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
-      jobDAO = daoRegistry.getJobDAO();
-      taskDAO = daoRegistry.getTaskDAO();
-      mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
-      datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
-      metricConfigDAO = daoRegistry.getMetricConfigDAO();
-      dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
-      overrideConfigDAO = daoRegistry.getOverrideConfigDAO();
-      alertConfigDAO = daoRegistry.getAlertConfigDAO();
-      dataCompletenessConfigDAO = daoRegistry.getDataCompletenessConfigDAO();
-      eventDAO = daoRegistry.getEventDAO();
-      anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
-      detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
-      autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
-      classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
-      entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
-      groupedAnomalyResultsDAO = daoRegistry.getGroupedAnomalyResultsDAO();
-      onboardDatasetMetricDAO = daoRegistry.getOnboardDatasetMetricDAO();
-      configDAO = daoRegistry.getConfigDAO();
-      applicationDAO = daoRegistry.getApplicationDAO();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  protected void cleanup() {
-    try {
-      cleanUpJDBC();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private void initializeDs(PersistenceConfig configuration) throws Exception {
-    ds = new DataSource();
-    dbUrlId =
-        configuration.getDatabaseConfiguration().getUrl() + System.currentTimeMillis() + "" + Math
-            .random();
-    ds.setUrl(dbUrlId);
-    System.out.println("Creating db with connection url : " + ds.getUrl());
-    ds.setPassword(configuration.getDatabaseConfiguration().getPassword());
-    ds.setUsername(configuration.getDatabaseConfiguration().getUser());
-    ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties()
-        .get("hibernate.connection.driver_class"));
-
-    // pool size configurations
-    ds.setMaxActive(200);
-    ds.setMinIdle(10);
-    ds.setInitialSize(10);
-
-    // when returning connection to pool
-    ds.setTestOnReturn(true);
-    ds.setRollbackOnReturn(true);
-
-    // Timeout before an abandoned(in use) connection can be removed.
-    ds.setRemoveAbandonedTimeout(600_000);
-    ds.setRemoveAbandoned(true);
-
-    Connection conn = ds.getConnection();
-    // create schema
-    URL createSchemaUrl = getClass().getResource("/schema/create-schema.sql");
-    ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
-    scriptRunner.setDelimiter(";", true);
-    scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
-  }
-
-  private void cleanUpJDBC() throws Exception {
-    System.out.println("Cleaning database: start");
-    try (Connection conn = ds.getConnection()) {
-      URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
-      ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
-      scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
-    }
-    new File(dbUrlId).delete();
-    System.out.println("Cleaning database: done!");
-  }
-
-  protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
+public class DaoTestUtils {
+  public static AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
     functionSpec.setFunctionName("integration test function 1");
     functionSpec.setType("WEEK_OVER_WEEK_RULE");
@@ -181,7 +56,7 @@ public abstract class AbstractManagerTestBase {
     return functionSpec;
   }
 
-  protected AnomalyFunctionDTO getTestFunctionAlphaBetaAlertFilterSpec(String metricName, String collection){
+  public static AnomalyFunctionDTO getTestFunctionAlphaBetaAlertFilterSpec(String metricName, String collection){
     AnomalyFunctionDTO functionSpec = getTestFunctionSpec(metricName, collection);
     Map<String, String> alphaBetaAlertFilter = new HashMap<>();
     alphaBetaAlertFilter.put("type", "alpha_beta");
@@ -192,7 +67,7 @@ public abstract class AbstractManagerTestBase {
     return functionSpec;
   }
 
-  protected AlertConfigDTO getTestAlertConfiguration(String name) {
+  public static AlertConfigDTO getTestAlertConfiguration(String name) {
     AlertConfigDTO alertConfigDTO = new AlertConfigDTO();
     alertConfigDTO.setName(name);
     alertConfigDTO.setActive(true);
@@ -209,7 +84,7 @@ public abstract class AbstractManagerTestBase {
     return alertConfigDTO;
   }
 
-  protected ClassificationConfigDTO getTestGroupingConfiguration(List<Long> mainFunctionIdList) {
+  public static ClassificationConfigDTO getTestGroupingConfiguration(List<Long> mainFunctionIdList) {
     ClassificationConfigDTO configDTO = new ClassificationConfigDTO();
     configDTO.setName("classificationJob");
     configDTO.setMainFunctionIdList(mainFunctionIdList);
@@ -218,7 +93,7 @@ public abstract class AbstractManagerTestBase {
     return configDTO;
   }
 
-  protected RawAnomalyResultDTO getAnomalyResult() {
+  public static RawAnomalyResultDTO getAnomalyResult() {
     RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
     anomalyResult.setScore(1.1);
     anomalyResult.setStartTime(System.currentTimeMillis());
@@ -231,7 +106,7 @@ public abstract class AbstractManagerTestBase {
     return anomalyResult;
   }
 
-  JobDTO getTestJobSpec() {
+  public static JobDTO getTestJobSpec() {
     JobDTO jobSpec = new JobDTO();
     jobSpec.setJobName("Test_Anomaly_Job");
     jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
@@ -243,7 +118,7 @@ public abstract class AbstractManagerTestBase {
     return jobSpec;
   }
 
-  protected DatasetConfigDTO getTestDatasetConfig(String collection) {
+  public static DatasetConfigDTO getTestDatasetConfig(String collection) {
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
     datasetConfigDTO.setDataset(collection);
     datasetConfigDTO.setDimensions(Lists.newArrayList("country", "browser", "environment"));
@@ -255,7 +130,7 @@ public abstract class AbstractManagerTestBase {
     return datasetConfigDTO;
   }
 
-  protected MetricConfigDTO getTestMetricConfig(String collection, String metric, Long id) {
+  public static MetricConfigDTO getTestMetricConfig(String collection, String metric, Long id) {
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     if (id != null) {
       metricConfigDTO.setId(id);
@@ -267,7 +142,7 @@ public abstract class AbstractManagerTestBase {
     return metricConfigDTO;
   }
 
-  protected OverrideConfigDTO getTestOverrideConfigForTimeSeries(DateTime now) {
+  public static OverrideConfigDTO getTestOverrideConfigForTimeSeries(DateTime now) {
     OverrideConfigDTO overrideConfigDTO = new OverrideConfigDTO();
     overrideConfigDTO.setStartTime(now.minusHours(8).getMillis());
     overrideConfigDTO.setEndTime(now.plusHours(8).getMillis());
@@ -287,7 +162,7 @@ public abstract class AbstractManagerTestBase {
     return overrideConfigDTO;
   }
 
-  protected DataCompletenessConfigDTO getTestDataCompletenessConfig(String dataset,
+  public static DataCompletenessConfigDTO getTestDataCompletenessConfig(String dataset,
       long dateToCheckInMS, String dateToCheckInSDF, boolean dataComplete) {
     DataCompletenessConfigDTO dataCompletenessConfigDTO = new DataCompletenessConfigDTO();
     dataCompletenessConfigDTO.setDataset(dataset);
@@ -300,7 +175,7 @@ public abstract class AbstractManagerTestBase {
     return dataCompletenessConfigDTO;
   }
 
-  protected DetectionStatusDTO getTestDetectionStatus(String dataset, long dateToCheckInMS,
+  public static DetectionStatusDTO getTestDetectionStatus(String dataset, long dateToCheckInMS,
       String dateToCheckInSDF, boolean detectionRun, long functionId) {
     DetectionStatusDTO detectionStatusDTO = new DetectionStatusDTO();
     detectionStatusDTO.setDataset(dataset);
@@ -311,7 +186,7 @@ public abstract class AbstractManagerTestBase {
     return detectionStatusDTO;
   }
 
-  protected AutotuneConfigDTO getTestAutotuneConfig(long functionId, long start, long end) {
+  public static AutotuneConfigDTO getTestAutotuneConfig(long functionId, long start, long end) {
     AutotuneConfigDTO autotuneConfigDTO = new AutotuneConfigDTO();
     autotuneConfigDTO.setFunctionId(functionId);
     autotuneConfigDTO.setStartTime(start);
@@ -327,7 +202,7 @@ public abstract class AbstractManagerTestBase {
     return autotuneConfigDTO;
   }
 
-  protected ClassificationConfigDTO getTestClassificationConfig(String name, List<Long> mainFunctionIdList,
+  public static ClassificationConfigDTO getTestClassificationConfig(String name, List<Long> mainFunctionIdList,
       List<Long> functionIds) {
     ClassificationConfigDTO classificationConfigDTO = new ClassificationConfigDTO();
     classificationConfigDTO.setName(name);
@@ -337,7 +212,7 @@ public abstract class AbstractManagerTestBase {
     return classificationConfigDTO;
   }
 
-  protected EntityToEntityMappingDTO getTestEntityToEntityMapping(String fromURN, String toURN, String mappingType) {
+  public static EntityToEntityMappingDTO getTestEntityToEntityMapping(String fromURN, String toURN, String mappingType) {
     EntityToEntityMappingDTO dto = new EntityToEntityMappingDTO();
     dto.setFromURN(fromURN);
     dto.setToURN(toURN);
@@ -346,7 +221,7 @@ public abstract class AbstractManagerTestBase {
     return dto;
   }
 
-  protected OnboardDatasetMetricDTO getTestOnboardConfig(String datasetName, String metricName, String dataSource) {
+  public static OnboardDatasetMetricDTO getTestOnboardConfig(String datasetName, String metricName, String dataSource) {
     OnboardDatasetMetricDTO dto = new OnboardDatasetMetricDTO();
     dto.setDatasetName(datasetName);
     dto.setMetricName(metricName);
@@ -354,7 +229,7 @@ public abstract class AbstractManagerTestBase {
     return dto;
   }
 
-  protected ConfigDTO getTestConfig(String namespace, String name, Object value) {
+  public static ConfigDTO getTestConfig(String namespace, String name, Object value) {
     ConfigDTO dto = new ConfigDTO();
     dto.setNamespace(namespace);
     dto.setName(name);

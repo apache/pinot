@@ -6,13 +6,16 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.thirdeye.auto.onboard.AutoOnboardPinotDataSource;
-import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
+import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -22,15 +25,24 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-public class AutoOnboardPinotMetricsServiceTest  extends AbstractManagerTestBase {
+public class AutoOnboardPinotMetricsServiceTest {
 
   private AutoOnboardPinotDataSource testAutoLoadPinotMetricsService;
   private String dataset = "test-collection";
   private Schema schema;
 
+  private DAOTestBase testDAOProvider;
+  private DatasetConfigManager datasetConfigDAO;
+  private MetricConfigManager metricConfigDAO;
+  private DashboardConfigManager dashboardConfigDAO;
+
   @BeforeMethod
   void beforeMethod() throws Exception {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
+    metricConfigDAO = daoRegistry.getMetricConfigDAO();
+    dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
     testAutoLoadPinotMetricsService = new AutoOnboardPinotDataSource(null, null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, null);
@@ -38,7 +50,7 @@ public class AutoOnboardPinotMetricsServiceTest  extends AbstractManagerTestBase
 
   @AfterMethod(alwaysRun = true)
   void afterMethod() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test

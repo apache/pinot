@@ -1,13 +1,15 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class TestEntityToEntityMappingManager extends AbstractManagerTestBase {
+public class TestEntityToEntityMappingManager {
   Long testId1 = null;
   Long testId2 = null;
   Long testId3 = null;
@@ -22,25 +24,29 @@ public class TestEntityToEntityMappingManager extends AbstractManagerTestBase {
   private static final String METRIC_TO_SERVICE = "METRIC_TO_SERVICE";
   private static final String DIMENSION_TO_DIMENSION = "DIMENSION_TO_DIMENSION";
 
+  private DAOTestBase testDAOProvider;
+  private EntityToEntityMappingManager entityToEntityMappingDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
   public void testCreate() {
-    EntityToEntityMappingDTO dto = getTestEntityToEntityMapping(metricURN1, metricURN2, METRIC_TO_METRIC);
+    EntityToEntityMappingDTO dto = DaoTestUtils.getTestEntityToEntityMapping(metricURN1, metricURN2, METRIC_TO_METRIC);
     testId1 = entityToEntityMappingDAO.save(dto);
     Assert.assertNotNull(testId1);
-    dto = getTestEntityToEntityMapping(metricURN1, serviceURN1, METRIC_TO_SERVICE);
+    dto = DaoTestUtils.getTestEntityToEntityMapping(metricURN1, serviceURN1, METRIC_TO_SERVICE);
     testId2 = entityToEntityMappingDAO.save(dto);
     Assert.assertNotNull(testId2);
-    dto = getTestEntityToEntityMapping(dimensionURN1, dimensionURN2, DIMENSION_TO_DIMENSION);
+    dto = DaoTestUtils.getTestEntityToEntityMapping(dimensionURN1, dimensionURN2, DIMENSION_TO_DIMENSION);
     testId3 = entityToEntityMappingDAO.save(dto);
     Assert.assertNotNull(testId3);
   }

@@ -1,23 +1,28 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class TestApplicationManager extends AbstractManagerTestBase {
+public class TestApplicationManager {
 
   Long applicationId;
 
+  private DAOTestBase testDAOProvider;
+  private ApplicationManager applicationDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    applicationDAO = daoRegistry.getApplicationDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test

@@ -1,13 +1,14 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
-import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class TestBaseAlertFilter extends AbstractManagerTestBase {
+public class TestBaseAlertFilter {
   private static String collection = "my dataset";
   private static String metricName = "__counts";
 
@@ -15,7 +16,7 @@ public class TestBaseAlertFilter extends AbstractManagerTestBase {
   // also test missing input parameter, will use default value defined in the specified class
   @Test
   public void testSetAlphaBetaParamter(){
-    AnomalyFunctionDTO anomalyFunctionSpec = getTestFunctionAlphaBetaAlertFilterSpec(metricName, collection);
+    AnomalyFunctionDTO anomalyFunctionSpec = DaoTestUtils.getTestFunctionAlphaBetaAlertFilterSpec(metricName, collection);
     Map<String, String> alertfilter = anomalyFunctionSpec.getAlertFilter();
     AlphaBetaAlertFilter alphaBetaAlertFilter = new AlphaBetaAlertFilter();
     alphaBetaAlertFilter.setParameters(alertfilter);

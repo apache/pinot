@@ -1,7 +1,8 @@
-
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,7 +11,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class TestClassificationJobConfigManager extends AbstractManagerTestBase {
+public class TestClassificationJobConfigManager {
   private static final List<Long> MAIN_FUNCTION_ID = Collections.singletonList(101L);
 
   private static final String NAME1 = "test classification name1";
@@ -32,24 +33,28 @@ public class TestClassificationJobConfigManager extends AbstractManagerTestBase 
   private Long configId1;
   private Long configId2;
 
+  private DAOTestBase testDAOProvider;
+  private ClassificationConfigManager classificationConfigDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
   public void testCreateConfig() {
-    ClassificationConfigDTO classificationConfig1 = this.getTestClassificationConfig(NAME1, MAIN_FUNCTION_ID1,
+    ClassificationConfigDTO classificationConfig1 = DaoTestUtils.getTestClassificationConfig(NAME1, MAIN_FUNCTION_ID1,
         AUX_FUNCTION_IDS1);
     configId1 = classificationConfigDAO.save(classificationConfig1);
     Assert.assertTrue(configId1 > 0);
 
-    ClassificationConfigDTO classificationConfig2 = this.getTestClassificationConfig(NAME2, MAIN_FUNCTION_ID2,
+    ClassificationConfigDTO classificationConfig2 = DaoTestUtils.getTestClassificationConfig(NAME2, MAIN_FUNCTION_ID2,
         AUX_FUNCTION_IDS2);
     classificationConfig2.setActive(false);
     configId2 = classificationConfigDAO.save(classificationConfig2);

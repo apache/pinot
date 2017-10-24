@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,19 +18,27 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
-public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
+public class TestMergedAnomalyResultManager{
   MergedAnomalyResultDTO mergedResult = null;
   Long anomalyResultId;
-  AnomalyFunctionDTO function = getTestFunctionSpec("metric", "dataset");
+  AnomalyFunctionDTO function = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
 
+  private DAOTestBase testDAOProvider;
+  private AnomalyFunctionManager anomalyFunctionDAO;
+  private RawAnomalyResultManager rawAnomalyResultDAO;
+  private MergedAnomalyResultManager mergedAnomalyResultDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+    rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
+    mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
@@ -37,7 +47,7 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     Assert.assertNotNull(function.getId());
 
     // create anomaly result
-    RawAnomalyResultDTO result = getAnomalyResult();
+    RawAnomalyResultDTO result = DaoTestUtils.getAnomalyResult();
     result.setFunction(function);
     rawAnomalyResultDAO.save(result);
 
