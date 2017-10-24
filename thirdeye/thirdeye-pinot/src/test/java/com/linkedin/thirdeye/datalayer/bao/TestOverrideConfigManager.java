@@ -24,7 +24,7 @@ public class TestOverrideConfigManager {
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
     overrideConfigDAO = daoRegistry.getOverrideConfigDAO();
   }
 

@@ -16,7 +16,7 @@ import org.apache.tomcat.jdbc.pool.DataSource;
 public class DAOTestBase {
 
   //  protected TestDBResources testDBResources;
-  protected DAORegistry daoRegistry;
+//  protected DAORegistry daoRegistry;
   DataSource ds;
   String dbUrlId;
 
@@ -37,7 +37,7 @@ public class DAOTestBase {
 
       DaoProviderUtil.init(ds);
 
-      daoRegistry = DAORegistry.getInstance();
+//      daoRegistry = DAORegistry.getInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -93,9 +93,5 @@ public class DAOTestBase {
     }
     new File(dbUrlId).delete();
     System.out.println("Cleaning database: done!");
-  }
-
-  public DAORegistry getDaoRegistry() {
-    return daoRegistry;
   }
 }

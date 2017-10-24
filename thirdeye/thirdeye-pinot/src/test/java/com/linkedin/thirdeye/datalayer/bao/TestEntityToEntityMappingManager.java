@@ -29,7 +29,7 @@ public class TestEntityToEntityMappingManager {
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
     entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
   }
 

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 
 import org.testng.Assert;
@@ -22,7 +23,8 @@ public class TestAnomalyFunctionManager {
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    anomalyFunctionDAO = testDAOProvider.getDaoRegistry().getAnomalyFunctionDAO();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
   }
 
   @AfterClass(alwaysRun = true)

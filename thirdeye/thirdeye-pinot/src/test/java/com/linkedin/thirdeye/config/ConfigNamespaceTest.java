@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.config;
 
 import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -19,7 +20,7 @@ public class ConfigNamespaceTest {
   @BeforeMethod
   public void beforeMethod() {
     testDAOProvider = DAOTestBase.getInstance();
-    this.cn = new ConfigNamespace("namespace", testDAOProvider.getDaoRegistry().getConfigDAO());
+    this.cn = new ConfigNamespace("namespace", DAORegistry.getInstance().getConfigDAO());
   }
 
   @AfterMethod(alwaysRun = true)
@@ -86,7 +87,7 @@ public class ConfigNamespaceTest {
 
   @Test
   public void testNamespace() {
-    ConfigManager configDAO = testDAOProvider.getDaoRegistry().getConfigDAO();
+    ConfigManager configDAO = DAORegistry.getInstance().getConfigDAO();
     ConfigNamespace cn1 = new ConfigNamespace("namespace", configDAO);
     ConfigNamespace cn2 = new ConfigNamespace("theOther", configDAO);
 

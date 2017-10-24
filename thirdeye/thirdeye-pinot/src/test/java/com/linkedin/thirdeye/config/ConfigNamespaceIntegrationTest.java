@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.config;
 
 import com.linkedin.thirdeye.dashboard.resources.v2.ConfigResource;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -64,7 +65,7 @@ public class ConfigNamespaceIntegrationTest {
   }
 
   public void setupViaResource() throws IOException {
-    ConfigResource res = new ConfigResource(testDAOProvider.getDaoRegistry().getConfigDAO());
+    ConfigResource res = new ConfigResource(DAORegistry.getInstance().getConfigDAO());
     res.put("ns1", "string", "mystring");
     res.put("ns1", "list", "[1, 2, 3]");
     res.put("ns1", "listString", "[\"1\", \"2\", \"3\"]");
@@ -77,7 +78,7 @@ public class ConfigNamespaceIntegrationTest {
   public void testReadConfig() throws Exception {
     setupViaResource();
 
-    ConfigNamespace ns = new ConfigNamespace("ns1", testDAOProvider.getDaoRegistry().getConfigDAO());
+    ConfigNamespace ns = new ConfigNamespace("ns1", DAORegistry.getInstance().getConfigDAO());
     String string = ns.get("string");
     Assert.assertEquals(string, "mystring");
 

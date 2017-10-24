@@ -29,7 +29,7 @@ public class TestMetricConfigManager {
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
   }
 

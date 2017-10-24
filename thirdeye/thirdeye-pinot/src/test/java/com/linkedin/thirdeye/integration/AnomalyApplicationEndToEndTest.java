@@ -101,7 +101,7 @@ public class AnomalyApplicationEndToEndTest {
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    daoRegistry = testDAOProvider.getDaoRegistry();
+    daoRegistry = DAORegistry.getInstance();
     Assert.assertNotNull(daoRegistry.getJobDAO());
   }
 

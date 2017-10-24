@@ -39,7 +39,7 @@ public class AutoOnboardPinotMetricsServiceTest {
   @BeforeMethod
   void beforeMethod() throws Exception {
     testDAOProvider = DAOTestBase.getInstance();
-    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
     dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();

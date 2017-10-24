@@ -38,7 +38,7 @@ public class TestAnomalyTaskManager {
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
     jobDAO = daoRegistry.getJobDAO();
     taskDAO = daoRegistry.getTaskDAO();
   }

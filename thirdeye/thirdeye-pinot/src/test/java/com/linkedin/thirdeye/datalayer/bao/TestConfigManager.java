@@ -16,7 +16,7 @@ public class TestConfigManager {
   @BeforeMethod
   void beforeMethod() {
     testDAOProvider = DAOTestBase.getInstance();
-    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
     configDAO = daoRegistry.getConfigDAO();
   }
 

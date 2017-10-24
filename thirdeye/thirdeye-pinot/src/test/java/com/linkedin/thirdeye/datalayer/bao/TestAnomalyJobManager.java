@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 
 import org.testng.Assert;
@@ -23,7 +24,7 @@ public class TestAnomalyJobManager {
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    jobDAO = testDAOProvider.getDaoRegistry().getJobDAO();
+    jobDAO = DAORegistry.getInstance().getJobDAO();
   }
 
   @AfterClass(alwaysRun = true)

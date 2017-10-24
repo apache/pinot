@@ -30,7 +30,7 @@ public class TestMergedAnomalyResultManager{
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
-    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
     anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
     mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();

@@ -23,7 +23,7 @@ public class DAOProviderUtilTest {
 
   @Test
   public void testProviderReturnsSameInstance() {
-    DAORegistry daoRegistry = testDAOProvider.getDaoRegistry();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
     MergedAnomalyResultManager m1 = daoRegistry.getMergedAnomalyResultDAO();
     MergedAnomalyResultManager m2 = daoRegistry.getMergedAnomalyResultDAO();
     Assert.assertSame(m1, m2);
