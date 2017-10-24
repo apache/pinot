@@ -196,8 +196,8 @@ export default Ember.Controller.extend({
     'selectedConfigGroup',
     'updatedRecipients',
     function() {
-      const newRecipients = this.get('updatedRecipients');
-      const originalRecipients = this.get('selectedConfigGroup.recipients');
+      const newRecipients = this.get('updatedRecipients') || [];
+      const originalRecipients = this.get('selectedConfigGroup.recipients') || [];
       const finalRecipients = Ember.isPresent(newRecipients) ? newRecipients : originalRecipients;
       return finalRecipients.replace(/,+$/g, '').replace(/,/g, ', ');
     }
