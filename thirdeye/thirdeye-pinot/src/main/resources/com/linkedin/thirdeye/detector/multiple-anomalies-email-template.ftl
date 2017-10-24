@@ -93,7 +93,7 @@
         <#if cid?has_content>
           <tr>
               <td style="padding: 24px;" colspan="2" align="center">
-                <img style="width: 70%;" src="cid:${cid}"\>
+                <a href="${anomalyDetails[0].anomalyURL}${anomalyDetails[0].anomalyId}" target="_blank"><img style="width: 70%;" src="cid:${cid}"\></a>
               </td>
           </tr>
         </#if>
