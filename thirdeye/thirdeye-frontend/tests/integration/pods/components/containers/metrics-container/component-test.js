@@ -1,10 +1,7 @@
-/**
- * TODO: Test manage/alerts search and filtering
- */
 import { moduleForComponent, test } from 'ember-qunit';
 import hbs from 'htmlbars-inline-precompile';
 
-moduleForComponent('manage/alerts', 'Integration | Component | manage/alerts', {
+moduleForComponent('containers/metrics-container', 'Integration | Component | containers/metrics container', {
   integration: true
 });
 
@@ -13,15 +10,15 @@ test('it renders', function(assert) {
   // Set any properties with this.set('myProperty', 'value');
   // Handle any actions with this.on('myAction', function(val) { ... });
 
-  this.render(hbs`{{manage/alerts}}`);
+  this.render(hbs`{{containers/metrics-container}}`);
 
   assert.equal(this.$().text().trim(), '');
 
   // Template block usage:
   this.render(hbs`
-    {{#manage/alerts}}
+    {{#containers/metrics-container}}
       template block text
-    {{/manage/alerts}}
+    {{/containers/metrics-container}}
   `);
 
   assert.equal(this.$().text().trim(), 'template block text');

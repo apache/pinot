@@ -1,8 +1,8 @@
 import { moduleFor, test } from 'ember-qunit';
 
-moduleFor('route:rca/metrics', 'Unit | Route | rca/metrics', {
+moduleFor('route:rca/details/metrics', 'Unit | Route | rca/details/metrics', {
   // Specify the other units that are required for this test.
-  // needs: ['controller:foo']
+  needs: ['service:redux']
 });
 
 test('it exists', function(assert) {

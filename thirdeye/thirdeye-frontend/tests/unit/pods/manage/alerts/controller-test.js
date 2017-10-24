@@ -1,6 +1,6 @@
 import { moduleFor, test } from 'ember-qunit';
 
-moduleFor('controller:manage/alerts', 'Unit | Controller | manage/alerts', {
+moduleFor('controller:manage/alerts/index', 'Unit | Controller | manage/alerts/index', {
   // Specify the other units that are required for this test.
   // needs: ['controller:foo']
 });
