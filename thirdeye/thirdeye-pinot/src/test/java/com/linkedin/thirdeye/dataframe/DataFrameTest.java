@@ -2627,6 +2627,45 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleQuantile() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 2, 3, 4, 5);
+    assertEquals(base.quantile(0.00), 1d);
+    assertEquals(base.quantile(0.25), 2d);
+    assertEquals(base.quantile(0.50), 3d);
+    assertEquals(base.quantile(0.75), 4d);
+    assertEquals(base.quantile(1.00), 5d);
+  }
+
+  @Test
+  public void testDoubleQuantileInterpolation() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 2, 3, 4, 5);
+    assertEquals(base.quantile(0.0000), 1.00);
+    assertEquals(base.quantile(0.0625), 1.25);
+    assertEquals(base.quantile(0.1250), 1.50);
+    assertEquals(base.quantile(0.1875), 1.75);
+    assertEquals(base.quantile(0.2500), 2.00);
+  }
+
+  @Test
+  public void testDoubleQuantileNull() {
+    DoubleSeries base = DataFrame.toSeries(DNULL);
+    assertEquals(base.quantile(0.00), DNULL);
+    assertEquals(base.quantile(1.00), DNULL);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDoubleQuantileFailLowQ() {
+    DoubleSeries base = DataFrame.toSeries(DNULL);
+    assertEquals(base.quantile(-0.01), DNULL);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDoubleQuantileFailHighQ() {
+    DoubleSeries base = DataFrame.toSeries(DNULL);
+    assertEquals(base.quantile(1.01), DNULL);
+  }
+
+  @Test
   public void testLongOperationsSeries() {
     LongSeries base = DataFrame.toSeries(LNULL, 0, 1, 5, 10);
     LongSeries mod = DataFrame.toSeries(1, 1, 1, 0, LNULL);
