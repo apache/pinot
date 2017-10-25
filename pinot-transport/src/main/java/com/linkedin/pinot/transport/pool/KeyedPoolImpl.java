@@ -137,7 +137,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
       }
     }
 
-    AsyncResponseFuture<T> future = new AsyncResponseFuture<T>(key, "ConnPool checkout future for key " + key);
+    AsyncResponseFuture<T> future = new AsyncResponseFuture<T>(key, "ConnPool checkout future for key " + key + "(" + context + ")");
     Cancellable cancellable = pool.get(future);
     future.setCancellable(cancellable);
     return future;
