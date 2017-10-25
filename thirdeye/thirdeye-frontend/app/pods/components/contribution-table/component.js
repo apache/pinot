@@ -91,7 +91,7 @@ export default Ember.Component.extend({
   }),
 
   /**
-   * Finds the index of the first date greater than start
+   * Finds the index of the first date greater than or equal to start
    * @param {Array} dates Array of dates
    * @param {Number} start Start date in unix ms
    * @return {Number} The start Index
@@ -101,7 +101,7 @@ export default Ember.Component.extend({
     const start = this.get('start');
 
     for (let index = 0; index < dates.length; index++) {
-      if (dates[index] > start) {
+      if (dates[index] >= start) {
         return index;
       }
     }
@@ -109,7 +109,7 @@ export default Ember.Component.extend({
   }),
 
   /**
-   * Finds the index of last date smaller than end
+   * Finds the index of the first date larger than end
    * @param {Array} dates Array of dates
    * @param {Number} end end date in unix ms
    * @return {Number} The end Index
@@ -123,7 +123,7 @@ export default Ember.Component.extend({
         return index;
       }
     }
-    return dates.length - 1;
+    return dates.length;
   }),
 
   /**
