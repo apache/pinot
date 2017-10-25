@@ -42,6 +42,8 @@ export default Ember.Route.extend({
       .catch(res => res);
 
     return {
+      analysisStart,
+      analysisEnd,
       displayStart,
       displayEnd
     };
@@ -51,13 +53,15 @@ export default Ember.Route.extend({
     this._super(controller, model);
 
     const {
+      analysisStart,
+      analysisEnd,
       displayStart,
       displayEnd
     } = model;
 
     controller.setProperties({
-      analysisStart: Number(displayStart),
-      analysisEnd: Number(displayEnd),
+      analysisStart: Number(analysisStart),
+      analysisEnd: Number(analysisEnd),
       displayStart: Number(displayStart),
       displayEnd: Number(displayEnd)
     });
@@ -92,17 +96,19 @@ export default Ember.Route.extend({
         }
 
         if (controller && displayStart) {
-          controller.setProperties({
-            displayStart: Number(displayStart),
-            analysisStart: Number(displayStart)
-          });
+          controller.set('displayStart', Number(displayStart));
         }
 
         if (controller && displayEnd) {
-          controller.setProperties({
-            displayEnd: Number(displayEnd),
-            analysisEnd: Number(displayEnd)
-          });
+          controller.set('displayEnd', Number(displayEnd));
+        }
+
+        if (controller && start) {
+          controller.set('analysisStart', Number(start));
+        }
+
+        if (controller && end) {
+          controller.set('analysisEnd', Number(end));
         }
 
         Ember.run.later(() => {

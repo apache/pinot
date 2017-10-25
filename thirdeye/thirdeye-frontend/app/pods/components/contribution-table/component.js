@@ -91,7 +91,7 @@ export default Ember.Component.extend({
   }),
 
   /**
-   * Finds the index of the first date greater than start
+   * Finds the index of the first date greater than or equal to start
    * @param {Array} dates Array of dates
    * @param {Number} start Start date in unix ms
    * @return {Number} The start Index
@@ -100,16 +100,16 @@ export default Ember.Component.extend({
     const dates = this.get('dates');
     const start = this.get('start');
 
-    for (let index = 0; index < dates.length; index++) {
-      if (dates[index] > start) {
-        return index;
-      }
+    const startIndex = dates.findIndex((v) => v >= start);
+    if (startIndex <= -1) {
+      return dates.length;
     }
-    return false;
+
+    return startIndex;
   }),
 
   /**
-   * Finds the index of last date smaller than end
+   * Finds the index of the first date larger than or end
    * @param {Array} dates Array of dates
    * @param {Number} end end date in unix ms
    * @return {Number} The end Index
@@ -118,12 +118,12 @@ export default Ember.Component.extend({
     const dates = this.get('dates');
     const end = this.get('end');
 
-    for (let index = 0; index < dates.length; index++) {
-      if (dates[index] >= end) {
-        return index;
-      }
+    const endIndex = dates.findIndex((v) => v > end);
+    if (endIndex <= -1) {
+      return dates.length;
     }
-    return dates.length - 1;
+
+    return endIndex;
   }),
 
   /**
@@ -141,7 +141,7 @@ export default Ember.Component.extend({
       if (!(start && end)) {
         return dates;
       }
-      return _.slice(dates, start, end + 1);
+      return _.slice(dates, start, end);
     }
   ),
 
@@ -155,7 +155,7 @@ export default Ember.Component.extend({
       const rows = this.get('primaryMetricRows');
 
 
-      return filterRow(rows, startIndex, endIndex +1) || [];
+      return filterRow(rows, startIndex, endIndex) || [];
     }
   ),
 
@@ -169,7 +169,7 @@ export default Ember.Component.extend({
        const rows = this.get('relatedMetricRows');
 
 
-       return filterRow(rows, startIndex, endIndex +1) || [];
+       return filterRow(rows, startIndex, endIndex) || [];
      }
   ),
 
@@ -199,7 +199,7 @@ export default Ember.Component.extend({
            name: dimension.name
          };
          valueKeys.forEach((key) => {
-           hash[key] = _.slice(dimension[key], startIndex, endIndex + 1);
+           hash[key] = _.slice(dimension[key], startIndex, endIndex);
          });
          return hash;
        }) || [];
