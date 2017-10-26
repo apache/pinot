@@ -21,10 +21,12 @@ import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
+import com.linkedin.pinot.controller.helix.core.minion.generator.BaseSegmentMutatingPinotTaskGenerator;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
@@ -160,13 +162,28 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     stopZk();
   }
 
-  private static class TestTaskGenerator implements PinotTaskGenerator {
+  private static class TestTaskGenerator extends BaseSegmentMutatingPinotTaskGenerator {
     public static final String TASK_TYPE = "TestTask";
 
     private final ClusterInfoProvider _clusterInfoProvider;
 
     public TestTaskGenerator(ClusterInfoProvider clusterInfoProvider) {
+      super(clusterInfoProvider);
       _clusterInfoProvider = clusterInfoProvider;
+    }
+
+    @Override
+    public Map<String, String> getConfigsForTask(TableConfig tableConfig, OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
+      Map<String, String> configs = new HashMap<>();
+      configs.put("tableName", tableConfig.getTableName());
+      configs.put("tableType", tableConfig.getTableType().toString());
+      return configs;
+    }
+
+    @Override
+    public PinotTaskConfig getScheduledSegmentTaskConfig(TableConfig tableConfig,
+        OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
+      return null;
     }
 
     @Nonnull
