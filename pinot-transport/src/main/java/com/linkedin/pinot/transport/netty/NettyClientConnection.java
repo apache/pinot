@@ -135,6 +135,15 @@ public abstract class NettyClientConnection {
     public ResponseFuture(ServerInstance key, Throwable error, String ctxt) {
       super(key, error, ctxt);
     }
+
+    @Override
+    protected void releaseResource(ByteBuf result) {
+      // Potential fix for a a leak during a race between calling cancel() and receiving response from the server.
+      // If a call is made to get the response before the cancel in a different thread,
+      // and we release it here, then the thread that processes the response may cause
+      // JVM crash.
+//      result.release();
+    }
   }
 
   /**

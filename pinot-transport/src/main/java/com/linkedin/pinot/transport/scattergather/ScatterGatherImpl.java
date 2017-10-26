@@ -118,7 +118,7 @@ public class ScatterGatherImpl implements ScatterGather {
     }
 
     // Create the composite future for returning
-    CompositeFuture<ByteBuf> response = new CompositeFuture<>("scatterRequest", GatherModeOnError.SHORTCIRCUIT_AND);
+    CompositeFuture<ByteBuf> response = new CompositeFuture<>("scatterRequest " + scatterGatherRequest.getRequestId(), GatherModeOnError.SHORTCIRCUIT_AND);
 
     // Wait for requests to be sent
     long timeRemaining = scatterGatherRequestContext.getRemainingTimeMs();
@@ -150,7 +150,7 @@ public class ScatterGatherImpl implements ScatterGather {
       // Some requests were not event sent (possibly because of checkout !!)
       // and so we cancel all of them here
       for (SingleRequestHandler h : handlers) {
-        LOGGER.info("Request to {} was sent successfully:{}, cancelling.", h.getServer(), h.isSent());
+        LOGGER.info("Request {} to {} was sent successfully:{}, cancelling.", scatterGatherRequest.getRequestId(), h.getServer(), h.isSent());
         h.cancel();
       }
     }
@@ -265,7 +265,7 @@ public class ScatterGatherImpl implements ScatterGather {
       long startTimeNs = System.nanoTime();
       long timeWaitedNs = 0;
       try {
-        serverResponseFuture = _connPool.checkoutObject(_server);
+        serverResponseFuture = _connPool.checkoutObject(_server, String.valueOf(_request.getRequestId()));
 
         byte[] serializedRequest = _request.getRequestForService(_segments);
         int ntries = 0;
@@ -302,7 +302,7 @@ public class ScatterGatherImpl implements ScatterGather {
                 "Could not connect to " + _server + " after " + ntries + " attempts(timeRemaining="
                     + timeRemainingMillis + "ms)");
           }
-          serverResponseFuture = _connPool.checkoutObject(_server);
+          serverResponseFuture = _connPool.checkoutObject(_server, "none");
           timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
         }
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
@@ -313,11 +313,11 @@ public class ScatterGatherImpl implements ScatterGather {
       } catch (TimeoutException e1) {
         LOGGER.warn("Timed out waiting for connection for server ({})({})(gotConnection={}):{}. See metric {}", _server,
             _request.getRequestId(), gotConnection, e1.getMessage(),
-            BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR.toString());
+            BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR.getMeterName());
         _responseFuture = new ResponseFuture(_server, e1, "Error Future for request " + _request.getRequestId());
       } catch (ConnectionLimitReachedException e) {
         LOGGER.warn("Request {} not sent (gotConnection={}):{}. See metric {}", _request.getRequestId(), gotConnection,
-            e.getMessage(), BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR);
+            e.getMessage(), BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR.getMeterName());
         _responseFuture = new ResponseFuture(_server, e, "Error Future for request " + _request.getRequestId());
       } catch (Exception e) {
         LOGGER.error("Got exception sending request ({})(gotConnection={}). Setting error future",
