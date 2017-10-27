@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datasource;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 import java.util.ArrayList;
@@ -41,12 +42,12 @@ public class ThirdEyeRequest {
 
   private ThirdEyeRequest(String requestReference, ThirdEyeRequestBuilder builder) {
     this.requestReference = requestReference;
-    this.metricFunctions = builder.metricFunctions;
+    this.metricFunctions = new ArrayList<>(builder.metricFunctions);
     this.startTime = builder.startTime;
     this.endTime = builder.endTime;
-    this.filterSet = builder.filterSet;
+    this.filterSet = ArrayListMultimap.create(builder.filterSet);
     this.filterClause = builder.filterClause;
-    this.groupByDimensions = builder.groupBy;
+    this.groupByDimensions = new ArrayList<>(builder.groupBy);
     this.groupByTimeGranularity = builder.groupByTimeGranularity;
     this.dataSource = builder.dataSource;
     metricNames = new ArrayList<>();
@@ -97,43 +98,38 @@ public class ThirdEyeRequest {
     return groupByDimensions;
   }
 
-
   public String getDataSource() {
     return dataSource;
   }
 
   @Override
-  public int hashCode() {
-    // TODO do we intentionally omit request reference here?
-    return Objects.hash(metricFunctions, startTime, endTime, filterSet, filterClause,
-        groupByDimensions, groupByTimeGranularity);
-  };
-
-  @Override
   public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
     if (!(o instanceof ThirdEyeRequest)) {
       return false;
     }
-    ThirdEyeRequest other = (ThirdEyeRequest) o;
-    // TODO do we intentionally omit request reference here?
-    return Objects.equals(getMetricFunctions(), other.getMetricFunctions())
-        && Objects.equals(getStartTimeInclusive(), other.getStartTimeInclusive())
-        && Objects.equals(getEndTimeExclusive(), other.getEndTimeExclusive())
-        && Objects.equals(getFilterSet(), other.getFilterSet())
-        && Objects.equals(getFilterClause(), other.getFilterClause())
-        && Objects.equals(getGroupBy(), other.getGroupBy())
-        && Objects.equals(getGroupByTimeGranularity(), other.getGroupByTimeGranularity());
+    ThirdEyeRequest that = (ThirdEyeRequest) o;
+    return Objects.equals(metricFunctions, that.metricFunctions) && Objects.equals(startTime, that.startTime) && Objects
+        .equals(endTime, that.endTime) && Objects.equals(filterSet, that.filterSet) && Objects.equals(filterClause,
+        that.filterClause) && Objects.equals(groupByDimensions, that.groupByDimensions) && Objects.equals(
+        groupByTimeGranularity, that.groupByTimeGranularity) && Objects.equals(metricNames, that.metricNames) && Objects
+        .equals(dataSource, that.dataSource) && Objects.equals(requestReference, that.requestReference);
+  }
 
-  };
+  @Override
+  public int hashCode() {
+    return Objects.hash(metricFunctions, startTime, endTime, filterSet, filterClause, groupByDimensions,
+        groupByTimeGranularity, metricNames, dataSource, requestReference);
+  }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("requestReference", requestReference)
-        .add("metricFunctions", metricFunctions)
-        .add("startTime", startTime).add("endTime", endTime).add("filterSet", filterSet)
-        .add("filterClause", filterClause).add("groupBy", groupByDimensions)
-        .add("groupByTimeGranularity", groupByTimeGranularity)
-        .add("dataSource", dataSource).toString();
+    return "ThirdEyeRequest{" + "metricFunctions=" + metricFunctions + ", startTime=" + startTime + ", endTime="
+        + endTime + ", filterSet=" + filterSet + ", filterClause='" + filterClause + '\'' + ", groupByDimensions="
+        + groupByDimensions + ", groupByTimeGranularity=" + groupByTimeGranularity + ", metricNames=" + metricNames
+        + ", dataSource='" + dataSource + '\'' + ", requestReference='" + requestReference + '\'' + '}';
   }
 
   public static class ThirdEyeRequestBuilder {
