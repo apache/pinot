@@ -123,20 +123,18 @@ public class DetectionTaskRunner implements TaskRunner {
     ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = dimensionalShuffleAndUnifyAnalyze(windowStart, windowEnd, adContext);
     detectionTaskSuccessCounter.inc();
 
-    boolean isBackfill = false;
     // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
     // induce alerts and emails.
     if (detectionJobType != null && (detectionJobType.equals(DetectionJobType.BACKFILL) ||
         detectionJobType.equals(DetectionJobType.OFFLINE))) {
       LOG.info("BACKFILL is triggered for Detection Job {}. Notified flag is set to be true", jobExecutionId);
-      isBackfill = true;
       anomalyResultSource = AnomalyResultSource.ANOMALY_REPLAY;
     }
 
     // Update merged anomalies
     TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
-      timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
+      timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies);
 
     // Set anomaly source on raw anomaly results
     for (RawAnomalyResultDTO rawAnomaly : resultRawAnomalies.values()) {
