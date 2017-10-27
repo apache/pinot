@@ -393,10 +393,9 @@ public class ClassificationTaskRunner implements TaskRunner {
 
         ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = ArrayListMultimap.create();
         resultRawAnomalies.putAll(dimensions, adhocRawAnomalies);
-        final boolean isBackfill = false;
         TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
         ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
-            timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
+            timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies);
         // The list of mergedAnomalies might contain the anomalies that are located inside the original monitoring
         // window, because the window might be extended to satisfy the min detection window.
         List<MergedAnomalyResultDTO> mergedAnomalies = resultMergedAnomalies.get(dimensions);
