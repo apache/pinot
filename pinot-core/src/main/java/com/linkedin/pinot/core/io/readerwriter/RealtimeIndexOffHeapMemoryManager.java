@@ -79,7 +79,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
    * @return PinotDataBuffer
    */
   public PinotDataBuffer allocate(long size, String columnName) {
-    Preconditions.checkArgument(size > 0, "Illegal memory allocation " + size + " for segment " + _segmentName);
+    Preconditions.checkArgument(size > 0, "Illegal memory allocation " + size + " for segment " + _segmentName + " column " + columnName);
     PinotDataBuffer buffer = allocateInternal(size, columnName);
     _totalMemBytes += size;
     _buffers.add(buffer);

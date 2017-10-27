@@ -58,6 +58,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final Logger LOGGER;
   public static final int[] EMPTY_DICTIONARY_IDS_ARRAY = new int[0];
 
+  private static final String MMGR_DICTIONARY_SUFFIX = ".dict";
+  private static final String MMGR_FWDINDEX_SUFFIX = ".fwd";
+
   private SegmentMetadataImpl _segmentMetadata;
   private final Schema dataSchema;
 
@@ -139,19 +142,19 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         }
         MutableDictionary dictionary =
             MutableDictionaryFactory.getMutableDictionary(dataType, isOffHeapAllocation, memoryManager,
-                dictionaryColumnSize, statsHistory.getEstimatedCardinality(columnName), columnName);
+                dictionaryColumnSize, statsHistory.getEstimatedCardinality(columnName), columnName + MMGR_DICTIONARY_SUFFIX);
         dictionaryMap.put(columnName, dictionary);
       }
 
       DataFileReader dataFileReader;
       if (fieldSpec.isSingleValueField()) {
         dataFileReader =
-            new FixedByteSingleColumnSingleValueReaderWriter(capacity, indexColumnSize, memoryManager, columnName);
+            new FixedByteSingleColumnSingleValueReaderWriter(capacity, indexColumnSize, memoryManager, columnName + MMGR_FWDINDEX_SUFFIX);
       } else {
         // TODO: Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
         dataFileReader =
             new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgMultiValueCount, capacity,
-                indexColumnSize, memoryManager, columnName);
+                indexColumnSize, memoryManager, columnName + MMGR_FWDINDEX_SUFFIX);
       }
       columnIndexReaderWriterMap.put(columnName, dataFileReader);
 

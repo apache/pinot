@@ -62,6 +62,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   // Whether memory for realtime consuming segments should be allocated off-heap.
   private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
+  // And whether the allocation should be direct (default is to allocate via mmap)
+  // Direct memory allocation may mean setting heap size appropriately when starting JVM.
+  // The metric ServerGauge.REALTIME_OFFHEAP_MEMORY_USED should indicate how much memory is needed.
+  private static final String DIRECT_REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap.direct";
 
   // Number of simultaneous segments that can be refreshed on one server.
   // Segment refresh works by loading the old as well as new versions of segments in memory, assigning
@@ -152,6 +156,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean isRealtimeOffHeapAllocation() {
     return _instanceDataManagerConfiguration.getBoolean(REALTIME_OFFHEAP_ALLOCATION, false);
+  }
+
+  @Override
+  public boolean isDirectRealtimeOffheapAllocation() {
+    return _instanceDataManagerConfiguration.getBoolean(DIRECT_REALTIME_OFFHEAP_ALLOCATION, true);
   }
 
   @Override

@@ -887,7 +887,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
     _tableStreamName = _tableName + "_" + kafkaStreamProviderConfig.getStreamName();
-    initMemoryManager(realtimeTableDataManager, indexLoadingConfig.isRealtimeOffheapAllocation(), _segmentNameStr);
+    initMemoryManager(realtimeTableDataManager, indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
+        _segmentNameStr);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
@@ -1027,8 +1028,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final long prevTime = _lastConsumedCount == 0 ? _consumeStartTime : _lastLogTime;
     // Log every minute or 100k events
     if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES) || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
-      segmentLogger.info("Consumed {} events from (rate:{}/s), currentOffset={}", rowsConsumed,
-            (float) (rowsConsumed) * 1000 / (now - prevTime), _currentOffset);
+      segmentLogger.info("Consumed {} events from (rate:{}/s), currentOffset={}, numRowsSoFar={}", rowsConsumed,
+            (float) (rowsConsumed) * 1000 / (now - prevTime), _currentOffset, _numRowsConsumed);
       _lastConsumedCount = _numRowsConsumed;
       _lastLogTime = now;
     }

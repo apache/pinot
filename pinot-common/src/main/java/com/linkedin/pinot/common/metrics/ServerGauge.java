@@ -34,6 +34,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   KAFKA_PARTITION_OFFSET_LAG("messages", false),
   REALTIME_OFFHEAP_MEMORY_USED("bytes", false),
   RUNNING_QUERIES("runningQueries", false),
+  NUM_SEGMENTS_SEARCHED("numSegmentsSearched", false),
   REALTIME_SEGMENT_PARTITION_WIDTH("realtimeSegmentPartitionWidth", false);
 
   private final String gaugeName;
