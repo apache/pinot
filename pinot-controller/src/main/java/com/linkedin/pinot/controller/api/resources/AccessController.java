@@ -18,20 +18,16 @@ package com.linkedin.pinot.controller.api.resources;
 import com.linkedin.pinot.controller.api.access.AccessControl;
 import com.linkedin.pinot.controller.api.access.AccessControlFactory;
 import java.io.IOException;
-import javax.annotation.Priority;
 import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.container.PreMatching;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@PreMatching
 @Provider
-@Priority(2)  // After HeaderAdder
 public class AccessController implements ContainerRequestFilter {
   private static final Logger LOGGER = LoggerFactory.getLogger(AccessController.class);
 
