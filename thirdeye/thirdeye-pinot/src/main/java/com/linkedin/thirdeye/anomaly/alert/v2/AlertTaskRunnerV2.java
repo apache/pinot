@@ -22,6 +22,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
@@ -45,6 +46,7 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -144,6 +146,18 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       // apply filtration rule
       List<MergedAnomalyResultDTO> results =
           AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
+
+      // only anomalies detected by default scheduler are sent
+      Iterator<MergedAnomalyResultDTO> mergedAnomalyIterator = results.iterator();
+      while (mergedAnomalyIterator.hasNext()) {
+        MergedAnomalyResultDTO anomaly = mergedAnomalyIterator.next();
+        if (anomaly.getAnomalyResultSource() == null) {
+          continue;
+        }
+        if (!AnomalyResultSource.DEFAULT_ANOMALY_DETECTION.equals(anomaly.getAnomalyResultSource())) {
+          mergedAnomalyIterator.remove();
+        }
+      }
 
       if (results.isEmpty()) {
         LOG.info("Zero anomalies found, skipping sending email");
