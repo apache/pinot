@@ -15,18 +15,14 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
-import com.google.common.collect.ImmutableList;
-import com.linkedin.pinot.common.restlet.resources.ServerLatencyInfo;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import io.swagger.annotations.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.*;
@@ -53,21 +49,23 @@ public class ServerMetricsInfo {
     @Path("/ServerMetricsInfo/{tableName}/LatencyInfo")
     @ApiOperation(value = "Show all hosted segments count and storage size", notes = "Storage size and count of all segments hosted by a Pinot Server")
     @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
-    public ServerLatencyInfo getLatencyInfo(@ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName) throws WebApplicationException {
+    public ServerLoadMetrics getLatencyInfo(@ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName) throws WebApplicationException {
         InstanceDataManager dataManager = (InstanceDataManager) serverInstance.getInstanceDataManager();
         if (dataManager == null) {
             throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
         }
 
 
-        ServerLatencyInfo serverLatencyInfo = new ServerLatencyInfo();
-        List<Double> server1latencies = Arrays.asList(1.0, 3.0, 5.0);
-        serverLatencyInfo.set_segmentLatencyInSecs(server1latencies);
-        serverLatencyInfo.set_serverName("server_1");
-        serverLatencyInfo.set_serverName("table_1");
+        ServerLoadMetrics serverLoadMetrics = new ServerLoadMetrics();
+        ServerLatencyMetric metric = new ServerLatencyMetric();
+        metric.set_avgSegments(100.0);
+        metric.set_avglatency(203.0);
+        metric.set_timestamp(100);
+        List<ServerLatencyMetric> server1latencies = new ArrayList<>();
+        server1latencies.add(metric);
 
         // Add logic for retrieving data.
 
-        return serverLatencyInfo;
+        return serverLoadMetrics;
     }
 }

@@ -35,8 +35,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
-This class implements a load-based segment assignment strategy where it needs a ServerLoadMetric object as input.
-It then asks all tagged instances to return the load metric using the ServerLoadMetric object.
+This class implements a load-based segment assignment strategy where it needs a ServerLatencyMetric object as input.
+It then asks all tagged instances to return the load metric using the ServerLatencyMetric object.
 Finally numReplicas of instances that have the least load are selected.
  */
 public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy {

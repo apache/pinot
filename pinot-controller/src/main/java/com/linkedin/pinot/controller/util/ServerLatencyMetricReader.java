@@ -18,7 +18,8 @@ package com.linkedin.pinot.controller.util;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.linkedin.pinot.common.http.MultiGetRequest;
-import com.linkedin.pinot.common.restlet.resources.ServerLatencyInfo;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 
 import java.net.SocketTimeoutException;
@@ -30,6 +31,8 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+
+import com.linkedin.pinot.controller.helix.core.sharding.ServerLoadMetric;
 import org.apache.commons.httpclient.ConnectTimeoutException;
 import org.apache.commons.httpclient.ConnectionPoolTimeoutException;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -54,15 +57,15 @@ public class ServerLatencyMetricReader {
     }
 
     public @Nullable
-    ServerLatencyInfo getServerLatencyMetrics(@Nonnull String serverNameOrEndpoint, @Nonnull String tableName, boolean isThisServerName,
-                                              @Nonnegative int timeoutMsec) {
+    ServerLoadMetrics getServerLatencyMetrics(@Nonnull String serverNameOrEndpoint, @Nonnull String tableName, boolean isThisServerName,
+                                                      @Nonnegative int timeoutMsec) {
         Preconditions.checkNotNull(serverNameOrEndpoint, "Server Name Or Endpoint name should not be null");
         Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
         if (isThisServerName) {
             Preconditions.checkNotNull(_helixAdmin, "_helixAdmin should not be null");
         }
 
-        ServerLatencyInfo serverLatencyInfo = new ServerLatencyInfo();
+        ServerLoadMetrics serverLatencyInfo = new ServerLoadMetrics();
 
         String serverLatencyUrl;
          serverLatencyUrl = "http://" + serverNameOrEndpoint + CommonConstants.Helix.ServerMetricUris.SERVER_METRICS_INFO_URI;
@@ -81,10 +84,7 @@ public class ServerLatencyMetricReader {
                 return serverLatencyInfo;
             }
             serverLatencyInfo =
-                    new ObjectMapper().readValue(getMethod.getResponseBodyAsString(), ServerLatencyInfo.class);
-            //serverLatencyInfo.setSegmentCount(serverLatencyMetrics.getNumOfSegments());
-            //serverLatencyInfo.setSegmentLatencyInSecs(serverLatencyMetrics.getSegmentsLatencyInSecs());
-
+                    new ObjectMapper().readValue(getMethod.getResponseBodyAsString(), ServerLoadMetrics.class);
         } catch (InterruptedException e) {
             LOGGER.warn("Interrupted exception while reading segments size for server: {}", serverNameOrEndpoint, e);
         } catch (ExecutionException e) {

@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
-import com.linkedin.pinot.common.restlet.resources.ServerLatencyInfo;
-import com.linkedin.pinot.common.restlet.resources.ServerPerfMetrics;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
@@ -27,6 +27,9 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class ServerMetricsInfoTest {
@@ -54,7 +57,13 @@ public class ServerMetricsInfoTest {
 
     @Test
     public void testServerPerfResource() {
-        ServerLatencyInfo serverLatencyInfo = target.path(CommonConstants.Helix.ServerMetricUris.SERVER_METRICS_INFO_URI+"table_0/LatencyInfo").request().get(ServerLatencyInfo.class);
-        Assert.assertEquals(serverLatencyInfo.get_tableName(), "table_0");
+        ServerLoadMetrics serverLatencyInfo = target.path(CommonConstants.Helix.ServerMetricUris.SERVER_METRICS_INFO_URI+"table_0/LatencyInfo").request().get(ServerLoadMetrics.class);
+        ServerLatencyMetric metric = new ServerLatencyMetric();
+        metric.set_avgSegments(100.0);
+        metric.set_avglatency(203.0);
+        metric.set_timestamp(100);
+        List<ServerLatencyMetric> server1latencies = new ArrayList<>();
+        server1latencies.add(metric);
+        Assert.assertEquals(serverLatencyInfo.get_latencies(), server1latencies);
     }
 }

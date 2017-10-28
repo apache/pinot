@@ -1,6 +1,8 @@
 package com.linkedin.pinot.controller.helix.core;
 
-import com.linkedin.pinot.common.restlet.resources.ServerLatencyInfo;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
+import com.linkedin.pinot.controller.helix.core.sharding.ServerLoadMetric;
 import com.linkedin.pinot.controller.util.ServerLatencyMetricReader;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
@@ -14,10 +16,10 @@ public class SegmentMetric {
     private static final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
     private static final Executor executor = Executors.newFixedThreadPool(1);
 
-    public static double computeInstanceLatencyMetric(HelixAdmin helixAdmin, IdealState idealState, String instance, String tableName) {
+    public static ServerLoadMetrics  computeInstanceLatencyMetric(HelixAdmin helixAdmin, IdealState idealState, String instance, String tableName) {
         ServerLatencyMetricReader serverlatencyMetricsReader =
                 new ServerLatencyMetricReader(executor, connectionManager, helixAdmin);
-        ServerLatencyInfo serverLatencyInfo = serverlatencyMetricsReader.getServerLatencyMetrics(instance, tableName,true, 300);
-        return serverLatencyInfo.get_segmentLatencyInSecs().get(0);
+        ServerLoadMetrics serverLatencyInfo = serverlatencyMetricsReader.getServerLatencyMetrics(instance, tableName,true, 300);
+        return serverLatencyInfo;
     }
 }

@@ -26,7 +26,7 @@ import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.restlet.resources.ServerLoadMetric;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
@@ -127,7 +127,7 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
     ListenableFuture<byte[]> queryResponse = queryScheduler.submit(queryRequest);
     requestProcessingLatency.stop();
     long latency = requestProcessingLatency.getLatencyMs();
-    final ServerLoadMetric metric = new ServerLoadMetric(queryStartTimeMs, requestProcessingLatency.getLatencyMs()*1.0, 1.0*instanceRequest.getSearchSegmentsSize());
+    final ServerLatencyMetric metric = new ServerLatencyMetric(queryStartTimeMs, requestProcessingLatency.getLatencyMs()*1.0, 1.0*instanceRequest.getSearchSegmentsSize());
     workload.addWorkLoad(instanceRequest.getQuery().getQuerySource().getTableName(), metric);
     return queryResponse;
   }

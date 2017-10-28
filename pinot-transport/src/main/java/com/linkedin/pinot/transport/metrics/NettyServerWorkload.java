@@ -1,6 +1,7 @@
 package com.linkedin.pinot.transport.metrics;
 
-import com.linkedin.pinot.common.restlet.resources.ServerLoadMetric;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,16 +15,16 @@ import java.util.Map;
 public class NettyServerWorkload {
 
     public static final long CAPTURE_WINDOW = 10000;
-    private final Map<String, List<ServerLoadMetric>> avgLoadMap;
+    private final Map<String, ServerLoadMetrics> avgLoadMap;
 
     public NettyServerWorkload(){
         avgLoadMap = new HashMap<>();
     }
 
-    public void addWorkLoad(String tableName, ServerLoadMetric load){
+    public void addWorkLoad(String tableName, ServerLatencyMetric load){
         if(avgLoadMap.containsKey(tableName)){
-            List<ServerLoadMetric> list = avgLoadMap.get(tableName);
-            ServerLoadMetric l = list.get(list.size()-1);
+            List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
+            ServerLatencyMetric l = list.get(list.size()-1);
             if(l._timestamp + CAPTURE_WINDOW >= load._timestamp){
                 //if incoming load within last window -> update window
                 updateLastWindow(tableName, load);
@@ -32,16 +33,18 @@ public class NettyServerWorkload {
                 list.add(load);
             }
         }else{
-            ArrayList<ServerLoadMetric> list = new ArrayList<>();
+            ArrayList<ServerLatencyMetric> list = new ArrayList<>();
             load._numRequests = 1;
             list.add(load);
-            avgLoadMap.put(tableName, list);
+            ServerLoadMetrics loadMetrics = new ServerLoadMetrics();
+            loadMetrics.set_latencies(list);
+            avgLoadMap.put(tableName, loadMetrics);
         }
     }
 
-    private void updateLastWindow(String tableName, ServerLoadMetric load) {
-        List<ServerLoadMetric> list = avgLoadMap.get(tableName);
-        ServerLoadMetric lastLoad = list.get(list.size()-1);
+    private void updateLastWindow(String tableName, ServerLatencyMetric load) {
+        List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
+        ServerLatencyMetric lastLoad = list.get(list.size()-1);
         Double currAvgLatency = lastLoad._avglatency;
         Double CurrAvgSegments = lastLoad._avgSegments;
         long n = lastLoad._numRequests;
@@ -51,7 +54,7 @@ public class NettyServerWorkload {
         list.set(list.size()-1, lastLoad);
     }
 
-    public List<ServerLoadMetric> getAvgLoad(String tablename){
+    public ServerLoadMetrics getAvgLoad(String tablename){
         if(avgLoadMap.containsKey(tablename)){
             return avgLoadMap.get(tablename);
         }else{

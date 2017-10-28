@@ -16,12 +16,10 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.restlet.resources.ServerLatencyInfo;
-import com.linkedin.pinot.common.restlet.resources.ServerPerfMetrics;
-import com.linkedin.pinot.common.restlet.resources.ServerSegmentInfo;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.util.ServerLatencyMetricReader;
-import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -29,7 +27,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -54,12 +51,8 @@ public class ServerLatencyMetricReaderTest {
     private final List<String> _serverList = new ArrayList<>();
     private final List<String> _tableList = new ArrayList<>();
     private final List<String> _endpointList = new ArrayList<>();
-    private List<Double> _server1latencies;
-    private List<Double> _server2Latencies;
-    private List<Double> _server3Latencies;
-    private ServerLatencyInfo _server1LatencyInfo;
-    private ServerLatencyInfo _server2LatencyInfo;
-    private ServerLatencyInfo _server3LatencyInfo;
+    private List<ServerLatencyMetric> _server1latencies;
+    private ServerLoadMetrics _server1LoadInfo;
 
     @BeforeClass
     public void setUp() throws IOException {
@@ -68,15 +61,14 @@ public class ServerLatencyMetricReaderTest {
             _tableList.add("table_" + i);
             _endpointList.add("localhost:" + (_serverPortStart + i));
         }
-        _server1latencies = Arrays.asList(1.0, 3.0, 5.0);
-        _server2Latencies = Arrays.asList(2.0, 3.0);
-        _server3Latencies = Arrays.asList();
-        _server1LatencyInfo = createSegmentsInfo(_serverList.get(0), _tableList.get(0), _server1latencies);
-        _server2LatencyInfo = createSegmentsInfo(_serverList.get(1), _tableList.get(1), _server2Latencies);
-        _server3LatencyInfo = createSegmentsInfo(_serverList.get(2), _tableList.get(2), _server3Latencies);
-        _servers.add(startServer(_serverPortStart,_tableList.get(0), createHandler(200, _server1LatencyInfo, 0)));
-        _servers.add(startServer(_serverPortStart + 1,_tableList.get(0), createHandler(200, _server2LatencyInfo, 0)));
-        _servers.add(startServer(_serverPortStart + 2,_tableList.get(0), createHandler(200, _server3LatencyInfo, 0)));
+        ServerLatencyMetric metric = new ServerLatencyMetric();
+        metric.set_avglatency(20.0);
+        metric.set_avgSegments(35.0);
+        metric.set_numRequests(40);
+        _server1latencies.add(metric);
+
+        _server1LoadInfo = createSegmentsInfo(_server1latencies);
+        _servers.add(startServer(_serverPortStart,_tableList.get(0), createHandler(200, _server1LoadInfo, 0)));
     }
 
     @AfterClass
@@ -88,19 +80,17 @@ public class ServerLatencyMetricReaderTest {
         }
     }
 
-    private ServerLatencyInfo createSegmentsInfo(String serverNameOrEndpoint, String tableName, List<Double> latencies) {
-        ServerLatencyInfo serverLatencyInfo = new ServerLatencyInfo();
-        serverLatencyInfo.set_serverName(serverNameOrEndpoint);
-        serverLatencyInfo.set_tableName(tableName);
-        serverLatencyInfo.set_segmentLatencyInSecs(latencies);
-        return serverLatencyInfo;
+    private ServerLoadMetrics createSegmentsInfo(List<ServerLatencyMetric> latencies) {
+        ServerLoadMetrics loadMetrics = new ServerLoadMetrics();
+        loadMetrics.set_latencies(latencies);
+        return loadMetrics;
     }
 
     private long segmentIndexToSize(int index) {
         return 100 + index * 100;
     }
 
-    private HttpHandler createHandler(final int status, final ServerLatencyInfo serverLatencyInfo,
+    private HttpHandler createHandler(final int status, final ServerLoadMetrics serverLoadMetric,
                                       final int sleepTimeMs) {
         return new HttpHandler() {
             @Override
@@ -112,7 +102,7 @@ public class ServerLatencyMetricReaderTest {
                         LOGGER.info("Handler interrupted during sleep");
                     }
                 }
-                String json = new ObjectMapper().writeValueAsString(serverLatencyInfo);
+                String json = new ObjectMapper().writeValueAsString(serverLoadMetric);
                 httpExchange.sendResponseHeaders(status, json.length());
                 OutputStream responseBody = httpExchange.getResponseBody();
                 responseBody.write(json.getBytes());
@@ -137,14 +127,10 @@ public class ServerLatencyMetricReaderTest {
     public void testServerLatencyMetricsReader() {
         ServerLatencyMetricReader  serverLatencyMetricReader =
                 new ServerLatencyMetricReader(_executor, _httpConnectionManager, null);
-        ServerLatencyInfo serverLatencyInfo;
+        ServerLoadMetrics serverLoadMetric;
         //Check metric for server1
-        serverLatencyInfo = serverLatencyMetricReader.getServerLatencyMetrics(_endpointList.get(0),_tableList.get(0), false, _timeoutMsec);
-        Assert.assertEquals(serverLatencyInfo.get_serverName(), _server1LatencyInfo.get_serverName());
-        Assert.assertEquals(serverLatencyInfo.get_tableName(),
-                _server1LatencyInfo.get_tableName());
-        Assert.assertEquals(serverLatencyInfo.get_segmentLatencyInSecs(),
-                _server1LatencyInfo.get_segmentLatencyInSecs());
+        serverLoadMetric = serverLatencyMetricReader.getServerLatencyMetrics(_endpointList.get(0),_tableList.get(0), false, _timeoutMsec);
+        Assert.assertEquals(serverLoadMetric.get_latencies(), _server1LoadInfo.get_latencies());
         //Check metrics for server2
 //        serverLatencyInfo = serverLatencyMetricReader.getServerLatencyMetrics(_endpointList.get(1),_tableList.get(1), false, _timeoutMsec);
 //        Assert.assertEquals(serverLatencyInfo.get_serverName(), _server2LatencyInfo.get_serverName());
@@ -165,8 +151,8 @@ public class ServerLatencyMetricReaderTest {
     public void testServerSizesErrors() {
         ServerLatencyMetricReader serverLatencyMetricReader =
                 new ServerLatencyMetricReader(_executor, _httpConnectionManager, null);
-        ServerLatencyInfo serverLatencyInfo;
+        ServerLoadMetrics serverLatencyInfo;
         serverLatencyInfo = serverLatencyMetricReader.getServerLatencyMetrics("FakeEndPoint","hell",false, _timeoutMsec);
-        Assert.assertEquals(serverLatencyInfo.get_tableName(), null);
+        Assert.assertEquals(serverLatencyInfo.get_latencies(), null);
     }
 }

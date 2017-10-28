@@ -1,6 +1,7 @@
 package com.linkedin.pinot.controller.helix.core.sharding;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.Pairs;
@@ -36,7 +37,7 @@ public class LatencyBasedSegmentAssignmentStrategy implements SegmentAssignmentS
         }
 
         List<String> selectedInstances = new ArrayList<>();
-        Map<String, Double> reportedLatencyMetricPerInstanceMap = new HashMap<>();
+        Map<String, ServerLoadMetrics> reportedLatencyMetricPerInstanceMap = new HashMap<>();
         List<String> allTaggedInstances =
                 HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName,
                         serverTenantName);
@@ -51,15 +52,15 @@ public class LatencyBasedSegmentAssignmentStrategy implements SegmentAssignmentS
             //Otherwise we ask servers to return their load parameter
             if (idealState.getPartitionSet().isEmpty()) {
                 for (String instance : allTaggedInstances) {
-                    reportedLatencyMetricPerInstanceMap.put(instance, (double) 0);
+                    reportedLatencyMetricPerInstanceMap.put(instance, new ServerLoadMetrics());
                 }
             } else {
                 // We Do not add servers, that are not tagged, to the map.
                 // By this approach, new segments will not be allotted to the server if tags changed.
                 for (String instanceName : allTaggedInstances) {
-                    double reportedMetric = SegmentMetric.computeInstanceLatencyMetric(helixResourceManager.getHelixAdmin(), idealState, instanceName,tableName);
-                    if (reportedMetric != -1) {
-                        reportedLatencyMetricPerInstanceMap.put(instanceName, reportedMetric);
+                    ServerLoadMetrics serverLoadMetrics = SegmentMetric.computeInstanceLatencyMetric(helixResourceManager.getHelixAdmin(), idealState, instanceName,tableName);
+                    if (serverLoadMetrics != null) {
+                        reportedLatencyMetricPerInstanceMap.put(instanceName, serverLoadMetrics);
                     } else {
                         numOfServersReturnError++;
                     }
@@ -75,7 +76,7 @@ public class LatencyBasedSegmentAssignmentStrategy implements SegmentAssignmentS
                 }
             }
         }
-
+/*
         // Select up to numReplicas instances with the least load assigned
         PriorityQueue<Pairs.Number2ObjectPair<String>> priorityQueue =
                 new PriorityQueue<Pairs.Number2ObjectPair<String>>(numReplicas,
@@ -90,7 +91,7 @@ public class LatencyBasedSegmentAssignmentStrategy implements SegmentAssignmentS
             selectedInstances.add(priorityQueue.poll().getB());
         }
         LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-                + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
+                + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));*/
         return selectedInstances;
     }
 }
