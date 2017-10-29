@@ -56,6 +56,8 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
       _memoryManager = new MmapMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
           serverMetrics);
     } else {
+      // It could on-heap allocation, in which case we still need a mem manager for fwd-index.
+      // Dictionary will be allocated on heap.
       _memoryManager = new DirectMemoryManager(segmentName, serverMetrics);
     }
   }
