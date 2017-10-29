@@ -57,6 +57,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Key of whether to enable default columns
   private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
 
+  // Key of how many parallel realtime segments can be built.
+  // A value of <= 0 indicates unlimited.
+  // Unlimited parallel builds can cause high GC pauses during segment builds, causing
+  // response times to suffer.
+  private static final String MAX_PARALLEL_SEGMENT_BUILDS = "realtime.max.parallel.segment.builds";
+
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
 
@@ -161,6 +167,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   public int getMaxParallelRefreshThreads() {
     return _instanceDataManagerConfiguration.getInt(MAX_PARALLEL_REFRESH_THREADS, 1);
+  }
+
+  public int getMaxParallelSegmentBuilds() {
+    return _instanceDataManagerConfiguration.getInt(MAX_PARALLEL_SEGMENT_BUILDS, 0);
   }
 
   @Override
