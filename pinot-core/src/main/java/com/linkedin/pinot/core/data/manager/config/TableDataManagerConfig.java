@@ -32,6 +32,7 @@ public class TableDataManagerConfig {
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
   private static final String TABLE_DATA_MANAGER_CONSUMER_DIRECTORY = "consumerDirectory";
   private static final String TABLE_DATA_MANAGER_NAME = "name";
+  private static final String TABLE_DATA_MANAGER_MAX_PARALLEL_SEGMENT_BUILDS = "maxParallelSegmentBuilds";
 
   private final Configuration _tableDataManagerConfig;
 
@@ -60,6 +61,10 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
   }
 
+  public int getMaxParallelSegmentBuilds() {
+    return _tableDataManagerConfig.getInt(TABLE_DATA_MANAGER_MAX_PARALLEL_SEGMENT_BUILDS);
+  }
+
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableName)
       throws ConfigurationException {
@@ -71,6 +76,7 @@ public class TableDataManagerConfig {
     String dataDir = instanceDataManagerConfig.getInstanceDataDir() + "/" + tableName;
     defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_CONSUMER_DIRECTORY, instanceDataManagerConfig.getConsumerDir());
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_MAX_PARALLEL_SEGMENT_BUILDS, instanceDataManagerConfig.getMaxParallelSegmentBuilds());
     switch (tableType) {
       case OFFLINE:
         defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, "offline");

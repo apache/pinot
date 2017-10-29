@@ -45,4 +45,6 @@ public interface InstanceDataManagerConfig {
   boolean isRealtimeOffHeapAllocation();
 
   boolean isDirectRealtimeOffheapAllocation();
+
+  int getMaxParallelSegmentBuilds();
 }
