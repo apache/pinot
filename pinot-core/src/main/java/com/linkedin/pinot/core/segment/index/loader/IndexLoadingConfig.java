@@ -49,6 +49,7 @@ public class IndexLoadingConfig {
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
   private boolean _enableSplitCommit;
   private boolean _isRealtimeOffheapAllocation;
+  private boolean _isDirectRealtimeOffheapAllocation;
 
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
       @Nonnull TableConfig tableConfig) {
@@ -116,6 +117,7 @@ public class IndexLoadingConfig {
     _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
 
     _isRealtimeOffheapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
+    _isDirectRealtimeOffheapAllocation = instanceDataManagerConfig.isDirectRealtimeOffheapAllocation();
 
     String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
@@ -202,6 +204,10 @@ public class IndexLoadingConfig {
 
   public boolean isRealtimeOffheapAllocation() {
     return _isRealtimeOffheapAllocation;
+  }
+
+  public boolean isDirectRealtimeOffheapAllocation() {
+    return _isDirectRealtimeOffheapAllocation;
   }
 
   @Nonnull

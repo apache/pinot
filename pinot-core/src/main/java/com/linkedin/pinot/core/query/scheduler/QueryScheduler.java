@@ -22,6 +22,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
@@ -163,6 +164,7 @@ public abstract class QueryScheduler {
         getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
         getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
         name());
+    serverMetrics.setValueOfTableGauge(request.getTableName(), ServerGauge.NUM_SEGMENTS_SEARCHED, request.getSegmentCountAfterPruning());
 
     return responseData;
   }

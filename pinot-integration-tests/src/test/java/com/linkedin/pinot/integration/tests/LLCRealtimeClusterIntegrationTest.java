@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
   public static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  public static final boolean isDirectAlloc = Math.random() < 0.5;
 
   @BeforeClass
   @Override
@@ -60,13 +61,16 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Override
   protected void overrideServerConf(Configuration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, "true");
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, Boolean.toString(isDirectAlloc));
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
   }
 
   @Test
   public void testConsumerDirectoryExists() {
     File consumerDirectory = new File(CONSUMER_DIRECTORY, "mytable_REALTIME");
-    Assert.assertTrue(consumerDirectory.exists(), "The off heap consumer directory does not exist");
+    if (!isDirectAlloc) {
+      Assert.assertTrue(consumerDirectory.exists(), "The off heap consumer directory does not exist");
+    }
   }
 
   @Test
