@@ -35,6 +35,7 @@ import javax.annotation.Nullable;
  */
 public class IndexLoadingConfig {
   private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
+  private static final int DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS = 0;
 
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
@@ -47,6 +48,7 @@ public class IndexLoadingConfig {
   private boolean _enableDefaultColumns = true;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
+  private int _maxParallelSegmentBuilds = DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS;
   private boolean _enableSplitCommit;
   private boolean _isRealtimeOffheapAllocation;
 
@@ -111,6 +113,8 @@ public class IndexLoadingConfig {
       _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
     }
 
+    _maxParallelSegmentBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
+
     _enableDefaultColumns = instanceDataManagerConfig.isEnableDefaultColumns();
 
     _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
@@ -149,6 +153,10 @@ public class IndexLoadingConfig {
   @Nonnull
   public Set<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
+  }
+
+  public int getMaxParallelSegmentBuilds() {
+    return _maxParallelSegmentBuilds;
   }
 
   /**

@@ -43,4 +43,6 @@ public interface InstanceDataManagerConfig {
   boolean isEnableSplitCommit();
 
   boolean isRealtimeOffHeapAllocation();
+
+  int getMaxParallelSegmentBuilds();
 }
