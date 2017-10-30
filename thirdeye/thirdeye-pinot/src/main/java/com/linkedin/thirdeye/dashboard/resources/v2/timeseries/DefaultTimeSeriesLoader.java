@@ -89,7 +89,6 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
         .setStartTimeInclusive(dataAlignedStart)
         .setEndTimeExclusive(end)
         .setMetricFunctions(functions)
-        .setGroupBy(dataset.getTimeColumn())
         .setGroupByTimeGranularity(granularity)
         .setDataSource(dataset.getDataSource());
 
