@@ -1115,6 +1115,26 @@ text {
   font-size: 26px;
   font-weight: lighter;
   margin: 0;
+  border-radius: 32px;
+}
+
+.anomaly-feedback-title__help {
+  font-size: 16px; 
+  font-weight: normal;
+  padding: 4 12px;
+  text-decoration: none;
+  color: #0073b1;
+}
+
+.anomaly-feedback-title__help:hover {
+  background-color: rgba(152,216,244,.25);
+  text-decoration: none;
+  color:#006097;
+}
+
+.anomaly-feedback-title__help:focus {
+  text-decoration: none;
+  color: #006097;
 }
 
 .anomaly-feedback-select {

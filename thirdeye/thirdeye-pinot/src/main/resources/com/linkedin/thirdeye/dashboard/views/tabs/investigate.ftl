@@ -2,7 +2,10 @@
   <div class="anomaly-feedback padding-all">
     <div class="container">
       <div class="row">
-        <h3 class="anomaly-feedback-title">Is this an anomaly?</h3>
+        <h3 class="anomaly-feedback-title">
+          <span>Is this an anomaly?</span>
+          <a class="anomaly-feedback-title__help thirdeye-link" href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
+        </h3>
       </div>
       <form class="anomaly-feedback-radio" id="anomaly-feedback-radio">
           <label class="radio-inline" for="feedback-radio-yes">
