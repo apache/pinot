@@ -90,7 +90,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       File[] segmentFiles = consumerDir.listFiles(new FilenameFilter() {
         @Override
         public boolean accept(File dir, String name) {
-          return ! name.equals(STATS_FILE_NAME);
+          return !name.equals(STATS_FILE_NAME);
         }
       });
       for (File file : segmentFiles) {

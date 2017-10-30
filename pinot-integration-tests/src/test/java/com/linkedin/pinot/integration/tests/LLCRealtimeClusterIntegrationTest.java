@@ -41,6 +41,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @BeforeClass
   @Override
   public void setUp() throws Exception {
+    // TODO Avoid printing to stdout. Instead, we need to add the seed to every assert in this (and super-classes)
     System.out.println("========== Using random seed value " + seed);
     // Remove the consumer directory
     File consumerDirectory = new File(CONSUMER_DIRECTORY);
