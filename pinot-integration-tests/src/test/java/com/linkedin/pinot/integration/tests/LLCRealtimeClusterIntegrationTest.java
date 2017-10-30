@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.io.File;
 import java.util.List;
+import java.util.Random;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
@@ -33,11 +34,14 @@ import org.testng.annotations.Test;
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
   public static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
-  public static final boolean isDirectAlloc = Math.random() < 0.5;
+  public static final long seed = System.currentTimeMillis();
+  public static final Random RANDOM = new Random(seed);
+  public static final boolean isDirectAlloc = RANDOM.nextDouble() < 0.5;
 
   @BeforeClass
   @Override
   public void setUp() throws Exception {
+    System.out.println("========== Using random seed value " + seed);
     // Remove the consumer directory
     File consumerDirectory = new File(CONSUMER_DIRECTORY);
     if (consumerDirectory.exists()) {
@@ -62,7 +66,9 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   protected void overrideServerConf(Configuration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, "true");
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, Boolean.toString(isDirectAlloc));
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
+    if (RANDOM.nextDouble() < 0.5) {
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
+    }
   }
 
   @Test
