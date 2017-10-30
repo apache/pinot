@@ -871,7 +871,7 @@ public class SegmentCompletionManager {
       SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response == null) {
         long maxTimeAllowedToCommitMs = now + extTimeSec * 1000;
-        if (maxTimeAllowedToCommitMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS * 1000) {
+        if (maxTimeAllowedToCommitMs > _startTimeMs + MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS * 1000) {
           LOGGER.warn("Not accepting lease extension from {} startTime={} requestedTime={}", instanceId, _startTimeMs, maxTimeAllowedToCommitMs);
           return abortAndReturnFailed();
         }
