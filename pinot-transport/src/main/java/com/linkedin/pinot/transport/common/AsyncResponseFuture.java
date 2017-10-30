@@ -110,12 +110,6 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
       _futureLock.lock();
       if (_state.isCompleted()) {
         LOGGER.info("{} Request is no longer pending. Cannot cancel !!", _ctxt);
-        // Potential fix for a leak when cancel gets called after a response is in.
-        // If a call is made to get the response before the cancel in a different thread,
-        // and we release it here, then the thread that processes the response may cause
-        // JVM crash.
-//        releaseResource(_delayedResponse);
-//        _delayedResponse = null;
         return false;
       }
       isCancelled = _cancellable.cancel();
@@ -134,11 +128,6 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
       _futureLock.lock();
       if (_state.isCompleted()) {
         LOGGER.debug("{} Request has already been completed. Discarding this response !!", _ctxt, result);
-        // Potential fix for a leak when cancel has been called before the response comes back.
-        // If a call is made to get the response before the cancel in a different thread,
-        // and we release it here, then the thread that processes the response may cause
-        // JVM crash.
-//        releaseResource(result);
         return;
       }
       _delayedResponse = result;
@@ -146,10 +135,6 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
     } finally {
       _futureLock.unlock();
     }
-  }
-
-  // It is expected that this method is called with the _state variable protected under lock
-  protected void releaseResource(T result) {
   }
 
   /**

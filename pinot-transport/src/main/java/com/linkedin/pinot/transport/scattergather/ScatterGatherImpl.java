@@ -62,7 +62,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
   @Nonnull
   @Override
-  public CompositeFuture<ByteBuf> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
+  public CompositeFuture<byte[]> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
       @Nonnull ScatterGatherStats scatterGatherStats, @Nullable Boolean isOfflineTable,
       @Nonnull BrokerMetrics brokerMetrics) throws InterruptedException {
     return sendRequest(new ScatterGatherRequestContext(scatterGatherRequest), scatterGatherStats, isOfflineTable,
@@ -71,7 +71,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
   @Nonnull
   @Override
-  public CompositeFuture<ByteBuf> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
+  public CompositeFuture<byte[]> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
       @Nonnull ScatterGatherStats scatterGatherStats, @Nonnull BrokerMetrics brokerMetrics)
       throws InterruptedException {
     return scatterGather(scatterGatherRequest, scatterGatherStats, null, brokerMetrics);
@@ -88,7 +88,7 @@ public class ScatterGatherImpl implements ScatterGather {
    * @return a composite future representing the gather process.
    * @throws InterruptedException
    */
-  private CompositeFuture<ByteBuf> sendRequest(ScatterGatherRequestContext scatterGatherRequestContext,
+  private CompositeFuture<byte[]> sendRequest(ScatterGatherRequestContext scatterGatherRequestContext,
       ScatterGatherStats scatterGatherStats, Boolean isOfflineTable, BrokerMetrics brokerMetrics)
       throws InterruptedException {
     ScatterGatherRequest scatterGatherRequest = scatterGatherRequestContext._request;
@@ -118,14 +118,15 @@ public class ScatterGatherImpl implements ScatterGather {
     }
 
     // Create the composite future for returning
-    CompositeFuture<ByteBuf> response = new CompositeFuture<>("scatterRequest " + scatterGatherRequest.getRequestId(), GatherModeOnError.SHORTCIRCUIT_AND);
+    CompositeFuture<byte[]> response = new CompositeFuture<>("scatterRequest " + scatterGatherRequest.getRequestId(),
+        GatherModeOnError.SHORTCIRCUIT_AND);
 
     // Wait for requests to be sent
     long timeRemaining = scatterGatherRequestContext.getRemainingTimeMs();
     boolean sentSuccessfully = requestDispatchLatch.await(timeRemaining, TimeUnit.MILLISECONDS);
 
     if (sentSuccessfully) {
-      List<ServerResponseFuture<ByteBuf>> responseFutures = new ArrayList<>();
+      List<ServerResponseFuture<byte[]>> responseFutures = new ArrayList<>();
       for (SingleRequestHandler h : handlers) {
         responseFutures.add(h.getResponseFuture());
         String shortServerName = h.getServer().getShortHostName();
@@ -150,7 +151,8 @@ public class ScatterGatherImpl implements ScatterGather {
       // Some requests were not event sent (possibly because of checkout !!)
       // and so we cancel all of them here
       for (SingleRequestHandler h : handlers) {
-        LOGGER.info("Request {} to {} was sent successfully:{}, cancelling.", scatterGatherRequest.getRequestId(), h.getServer(), h.isSent());
+        LOGGER.info("Request {} to {} was sent successfully:{}, cancelling.", scatterGatherRequest.getRequestId(),
+            h.getServer(), h.isSent());
         h.cancel();
       }
     }

@@ -91,14 +91,14 @@ public class ScatterGatherTest {
 
     // Send the request
     ScatterGatherRequest scatterGatherRequest = new TestScatterGatherRequest(routingTable, 10_000L);
-    CompositeFuture<ByteBuf> future =
+    CompositeFuture<byte[]> future =
         scatterGather.scatterGather(scatterGatherRequest, scatterGatherStats, brokerMetrics);
 
     // Should have response from all servers
-    Map<ServerInstance, ByteBuf> serverToResponseMap = future.get();
+    Map<ServerInstance, byte[]> serverToResponseMap = future.get();
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS);
     for (int i = 0; i < NUM_SERVERS; i++) {
-      Assert.assertEquals(getResponse(serverToResponseMap.get(serverInstances[i])),
+      Assert.assertEquals(new String(serverToResponseMap.get(serverInstances[i])),
           routingTable.get(serverNames[i]).get(0));
     }
 
@@ -152,14 +152,14 @@ public class ScatterGatherTest {
 
     // Send the request
     ScatterGatherRequest scatterGatherRequest = new TestScatterGatherRequest(routingTable, 1000L);
-    CompositeFuture<ByteBuf> future =
+    CompositeFuture<byte[]> future =
         scatterGather.scatterGather(scatterGatherRequest, scatterGatherStats, brokerMetrics);
 
     // Should have no response from the error server
-    Map<ServerInstance, ByteBuf> serverToResponseMap = future.get();
+    Map<ServerInstance, byte[]> serverToResponseMap = future.get();
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS - 1);
     for (int i = 1; i < NUM_SERVERS; i++) {
-      Assert.assertEquals(getResponse(serverToResponseMap.get(serverInstances[i])),
+      Assert.assertEquals(new String(serverToResponseMap.get(serverInstances[i])),
           routingTable.get(serverNames[i]).get(0));
     }
 
@@ -215,14 +215,14 @@ public class ScatterGatherTest {
 
     // Send the request
     ScatterGatherRequest scatterGatherRequest = new TestScatterGatherRequest(routingTable, 10_000L);
-    CompositeFuture<ByteBuf> future =
+    CompositeFuture<byte[]> future =
         scatterGather.scatterGather(scatterGatherRequest, scatterGatherStats, brokerMetrics);
 
     // Should have no response from the error server
-    Map<ServerInstance, ByteBuf> serverToResponseMap = future.get();
+    Map<ServerInstance, byte[]> serverToResponseMap = future.get();
     Assert.assertEquals(serverToResponseMap.size(), NUM_SERVERS - 1);
     for (int i = 1; i < NUM_SERVERS; i++) {
-      Assert.assertEquals(getResponse(serverToResponseMap.get(serverInstances[i])),
+      Assert.assertEquals(new String(serverToResponseMap.get(serverInstances[i])),
           routingTable.get(serverNames[i]).get(0));
     }
 
@@ -251,12 +251,6 @@ public class ScatterGatherTest {
         new KeyedPoolImpl<>(1, 1, 300000, 1, resourceManager, timedExecutor, poolExecutor, metricsRegistry);
     resourceManager.setPool(connectionPool);
     return connectionPool;
-  }
-
-  private String getResponse(ByteBuf byteBuf) {
-    byte[] bytes = new byte[byteBuf.readableBytes()];
-    byteBuf.readBytes(bytes);
-    return new String(bytes);
   }
 
   private static class TestScatterGatherRequest implements ScatterGatherRequest {

@@ -34,7 +34,6 @@ import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -45,7 +44,6 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -193,7 +191,7 @@ public class ScatterGatherPerfClient implements Runnable {
           sendRequestAndGetResponse(req, scatterGatherStats);
           _endLastResponseTime = System.currentTimeMillis();
         } else {
-          CompositeFuture<ByteBuf> future = asyncSendRequestAndGetResponse(req, scatterGatherStats);
+          CompositeFuture<byte[]> future = asyncSendRequestAndGetResponse(req, scatterGatherStats);
           _queue
               .offer(new QueueEntry(false, i >= _numRequestsToSkipForMeasurement, System.currentTimeMillis(), future));
         }
@@ -297,39 +295,20 @@ public class ScatterGatherPerfClient implements Runnable {
    * @return
    * @throws InterruptedException
    * @throws ExecutionException
-   * @throws IOException
-   * @throws ClassNotFoundException
    */
   private String sendRequestAndGetResponse(SimpleScatterGatherRequest request,
-      final ScatterGatherStats scatterGatherStats) throws InterruptedException,
-      ExecutionException, IOException, ClassNotFoundException {
+      final ScatterGatherStats scatterGatherStats) throws InterruptedException, ExecutionException {
     BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
-    CompositeFuture<ByteBuf> future = _scatterGather.scatterGather(request, scatterGatherStats,
-        brokerMetrics);
-    ByteBuf b = future.getOne();
-    String r = null;
-    if (null != b) {
-      byte[] b2 = new byte[b.readableBytes()];
-      b.readBytes(b2);
-      r = new String(b2);
-
-    }
-    return r;
-  }
-
-  private static void releaseByteBuf(CompositeFuture<ByteBuf> future) throws Exception {
-    Map<ServerInstance, ByteBuf> bMap = future.get();
-    if (null != bMap) {
-      for (Entry<ServerInstance, ByteBuf> bEntry : bMap.entrySet()) {
-        ByteBuf b = bEntry.getValue();
-        if (null != b) {
-          b.release();
-        }
-      }
+    CompositeFuture<byte[]> future = _scatterGather.scatterGather(request, scatterGatherStats, brokerMetrics);
+    byte[] bytes = future.getOne();
+    if (bytes == null) {
+      return null;
+    } else {
+      return new String(bytes);
     }
   }
 
-  private CompositeFuture<ByteBuf> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request,
+  private CompositeFuture<byte[]> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request,
       final ScatterGatherStats scatterGatherStats)
       throws InterruptedException {
     final BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
@@ -340,14 +319,14 @@ public class ScatterGatherPerfClient implements Runnable {
     private final boolean _last;
     private final boolean _measured;
     private final long _timeSentMs;
-    private final CompositeFuture<ByteBuf> future;
+    private final CompositeFuture<byte[]> _future;
 
-    public QueueEntry(boolean last, boolean measured, long timeSentMs, CompositeFuture<ByteBuf> future) {
+    public QueueEntry(boolean last, boolean measured, long timeSentMs, CompositeFuture<byte[]> future) {
       super();
       _last = last;
       _measured = measured;
       _timeSentMs = timeSentMs;
-      this.future = future;
+      _future = future;
     }
 
     public boolean isMeasured() {
@@ -358,8 +337,8 @@ public class ScatterGatherPerfClient implements Runnable {
       return _last;
     }
 
-    public CompositeFuture<ByteBuf> getFuture() {
-      return future;
+    public CompositeFuture<byte[]> getFuture() {
+      return _future;
     }
 
     public long getTimeSentMs() {
@@ -391,33 +370,15 @@ public class ScatterGatherPerfClient implements Runnable {
           break;
         }
 
-        ByteBuf b = null;
         try {
-          b = e.getFuture().getOne();
+          e.getFuture().getOne();
           _endLastResponseTime = System.currentTimeMillis();
-        } catch (InterruptedException e1) {
-          // TODO Auto-generated catch block
-          e1.printStackTrace();
         } catch (Exception e1) {
           // TODO Auto-generated catch block
           e1.printStackTrace();
         }
         long timeDiff = System.currentTimeMillis() - e.getTimeSentMs();
         _latencyHistogram.update(timeDiff);
-
-        String r = null;
-        if (null != b) {
-          byte[] b2 = new byte[b.readableBytes()];
-          b.readBytes(b2);
-          r = new String(b2);
-        }
-        //Release bytebuf
-        try {
-          releaseByteBuf(e.getFuture());
-        } catch (Exception e1) {
-          // TODO Auto-generated catch block
-          e1.printStackTrace();
-        }
       }
     }
   }

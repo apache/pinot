@@ -17,7 +17,6 @@ package com.linkedin.pinot.transport.scattergather;
 
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.transport.common.CompositeFuture;
-import io.netty.buffer.ByteBuf;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -47,17 +46,16 @@ public interface ScatterGather {
    * @param scatterGatherStats scatter-gather statistics.
    * @param isOfflineTable whether the scatter-gather target is an OFFLINE table.
    * @param brokerMetrics broker metrics to track execution statistics.
-   * @return future containing response from all services queried. The response is in ByteBuf ( not the byte[] ).
-   * Hence, the client is responsible for calling release() on the response.
+   * @return future containing response from all services queried.
    */
   @Nonnull
-  CompositeFuture<ByteBuf> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
+  CompositeFuture<byte[]> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
       @Nonnull ScatterGatherStats scatterGatherStats, @Nullable Boolean isOfflineTable,
       @Nonnull BrokerMetrics brokerMetrics)
       throws InterruptedException;
 
   @Nonnull
-  CompositeFuture<ByteBuf> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
+  CompositeFuture<byte[]> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
       @Nonnull ScatterGatherStats scatterGatherStats, @Nonnull BrokerMetrics brokerMetrics)
       throws InterruptedException;
 }
