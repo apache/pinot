@@ -112,13 +112,7 @@ public class SegmentCreation {
         adder.execute();
     }
 
-    public void uploadSegments(String segDir) throws Exception {
-        UploadSegmentCommand uploader = new UploadSegmentCommand();
-        uploader.setControllerPort(DEFAULT_CONTROLLER_PORT)
-                .setSegmentDir(segDir);
-        uploader.execute();
-    }
-
+    
     public static void main(String[] args) throws Exception {
         SegmentCreation seg = new SegmentCreation();
 
