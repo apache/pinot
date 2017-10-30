@@ -1,0 +1,46 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType" : "INT",
+      "name" : "SecondsEpoch"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Title"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Company"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Location"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Description"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Industry"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "EmploymentType"
+    },
+    {
+      "singleValueField" : false,
+      "dataType": "STRING",
+      "name": "Skills"
+    }
+  ],
+  "schemaName": "JobSchema"
+}

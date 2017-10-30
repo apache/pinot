@@ -1,0 +1,13 @@
+[
+  {
+    "column" : "Title",
+    "range" : false,
+    "cardinality" : 2
+  },
+  {
+    "column" : "SecondsEpoch",
+    "range" : true,
+    "rangeStart" : 946684800,
+    "rangeEnd"   : 1508873892
+  }
+]

@@ -98,6 +98,10 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     return "GenerateData";
   }
 
+  public void set_schemaAnnFile(String _schemaAnnFile) {
+    this._schemaAnnFile = _schemaAnnFile;
+  }
+
   @Override
   public void cleanup() {
 
