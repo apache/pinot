@@ -57,6 +57,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -150,6 +151,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
+  private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
 
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
@@ -209,6 +211,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
   private String _stopReason = null;
+  private final Semaphore _segBuildSemaphore;
 
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
@@ -565,7 +568,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         removeSegmentFile();
       }
       if (buildTimeLeaseMs <= 0) {
-        buildTimeLeaseMs = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds() * 1000L;
+        if (_segBuildSemaphore == null) {
+          buildTimeLeaseMs = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds() * 1000L;
+        } else {
+          // We know we are going to use a semaphore to limit number of segment builds, and could be
+          // blocked for a long time. The controller has not provided a lease time, so set one to
+          // some reasonable guess here.
+          buildTimeLeaseMs = BUILD_TIME_LEASE_SECONDS * 1000;
+        }
       }
       _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
       String segTarFile =  buildSegmentInternal(true);
@@ -577,49 +587,62 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected String buildSegmentInternal(boolean forCommit) {
-    long startTimeMillis = System.currentTimeMillis();
-    // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
-    // TODO Use an auto-closeable object to delete temp resources.
-    File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + String.valueOf(now()));
-    // lets convert the segment now
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
-            _segmentZKMetadata.getTableName(), _segmentZKMetadata.getSegmentName(), _sortedColumn,
-            _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
-    logStatistics();
-    segmentLogger.info("Trying to build segment");
-    final long buildStartTime = now();
     try {
-      converter.build(_segmentVersion, _serverMetrics);
-    } catch (Exception e) {
-      segmentLogger.error("Could not build segment", e);
-      FileUtils.deleteQuietly(tempSegmentFolder);
-      return null;
-    }
-    final long buildEndTime = now();
-    segmentLogger.info("Successfully built segment in {} ms", (buildEndTime - buildStartTime));
-    File destDir = makeSegmentDirPath();
-    FileUtils.deleteQuietly(destDir);
-    try {
-      FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
-      if (forCommit) {
-        TarGzCompressionUtils.createTarGzOfDirectory(destDir.getAbsolutePath());
+      if (_segBuildSemaphore != null) {
+        segmentLogger.info("Waiting to acquire semaphore for building segment");
+        _segBuildSemaphore.acquire();
       }
-    } catch (IOException e) {
-      segmentLogger.error("Exception during move/tar segment", e);
+      long startTimeMillis = System.currentTimeMillis();
+      // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
+      // TODO Use an auto-closeable object to delete temp resources.
+      File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + String.valueOf(now()));
+      // lets convert the segment now
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
+              _segmentZKMetadata.getTableName(), _segmentZKMetadata.getSegmentName(), _sortedColumn,
+              _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
+      logStatistics();
+      segmentLogger.info("Trying to build segment");
+      final long buildStartTime = now();
+      try {
+        converter.build(_segmentVersion, _serverMetrics);
+      } catch (Exception e) {
+        segmentLogger.error("Could not build segment", e);
+        FileUtils.deleteQuietly(tempSegmentFolder);
+        return null;
+      }
+      final long buildEndTime = now();
+      segmentLogger.info("Successfully built segment in {} ms", (buildEndTime - buildStartTime));
+      File destDir = makeSegmentDirPath();
+      FileUtils.deleteQuietly(destDir);
+      try {
+        FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
+        if (forCommit) {
+          TarGzCompressionUtils.createTarGzOfDirectory(destDir.getAbsolutePath());
+        }
+      } catch (IOException e) {
+        segmentLogger.error("Exception during move/tar segment", e);
+        FileUtils.deleteQuietly(tempSegmentFolder);
+        return null;
+      }
       FileUtils.deleteQuietly(tempSegmentFolder);
+      long endTimeMillis = System.currentTimeMillis();
+
+      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
+          TimeUnit.MILLISECONDS.toSeconds(endTimeMillis - startTimeMillis));
+
+      if (forCommit) {
+        return destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION;
+      }
+      return destDir.getAbsolutePath();
+    } catch (InterruptedException e) {
+      segmentLogger.error("Interrupted while waiting for semaphore");
       return null;
+    } finally {
+      if (_segBuildSemaphore != null) {
+        _segBuildSemaphore.release();
+      }
     }
-    FileUtils.deleteQuietly(tempSegmentFolder);
-    long endTimeMillis = System.currentTimeMillis();
-
-    _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
-        TimeUnit.MILLISECONDS.toSeconds(endTimeMillis - startTimeMillis));
-
-    if (forCommit) {
-      return destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION;
-    }
-    return destDir.getAbsolutePath();
   }
 
   protected SegmentCompletionProtocol.Response doSplitCommit(File segmentTarFile, SegmentCompletionProtocol.Response prevResponse) {
@@ -857,6 +880,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       IndexLoadingConfig indexLoadingConfig, Schema schema, ServerMetrics serverMetrics)
       throws Exception {
     initStatsHistory(realtimeTableDataManager);
+    _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
     _realtimeTableDataManager = realtimeTableDataManager;
