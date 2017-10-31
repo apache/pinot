@@ -1,6 +1,8 @@
 import Ember from 'ember';
 import c3 from 'c3';
+import d3 from 'd3';
 import _ from 'lodash';
+import moment from 'moment';
 
 export default Ember.Component.extend({
   tagName: 'div',
@@ -10,12 +12,19 @@ export default Ember.Component.extend({
   _chart: null,
   _seriesCache: null,
 
-  // wrapper
+  // external
   series: {
     example_series: {
       timestamps: [0, 1, 2, 5, 6],
       values: [10, 10, 5, 27, 28],
       type: 'line' // 'point', 'region'
+    }
+  },
+
+  tooltip: {
+    format: {
+      title: (d) => moment(d).format('MM/DD hh:mm a'),
+      value: (val, ratio, id) => d3.format('.3s')(val)
     }
   },
 
@@ -28,13 +37,12 @@ export default Ember.Component.extend({
     const addedKeys = Object.keys(series).filter(sid => !(sid in cache));
     const changedKeys = Object.keys(series).filter(sid => sid in cache && !_.isEqual(cache[sid], series[sid]));
     const deletedKeys = Object.keys(cache).filter(sid => !(sid in series));
-    const regionKeys = addedKeys.concat(changedKeys).filter(sid => series[sid].type == 'region');
+    const regionKeys = Object.keys(series).filter(sid => series[sid].type == 'region');
     console.log('addedKeys', addedKeys);
     console.log('changedKeys', changedKeys);
     console.log('deletedKeys', deletedKeys);
     console.log('regionKeys', deletedKeys);
 
-    // const regions = [{ axis: 'x', start: 1508454000000, end: 1508543940000 }];
     const regions = regionKeys.map(sid => {
       const t = series[sid].timestamps;
       return { axis: 'x', start: t[0], end: t[t.length - 1] };
@@ -45,12 +53,12 @@ export default Ember.Component.extend({
     const unload = unloadKeys.concat(unloadKeys.map(sid => sid + '-timestamps'));
     console.log('unload', unload);
 
-    const loadKeys = addedKeys.concat(changedKeys).filter(sid => !regionKeys.includes(sid))
+    const loadKeys = addedKeys.concat(changedKeys).filter(sid => !regionKeys.includes(sid));
     const xs = {};
     loadKeys.forEach(sid => xs[sid] = sid + '-timestamps');
     console.log('xs', xs);
 
-    const values = loadKeys.map(sid => [sid].concat(series[sid].values))
+    const values = loadKeys.map(sid => [sid].concat(series[sid].values));
     console.log('values', values);
 
     const timestamps = loadKeys.map(sid => [sid + '-timestamps'].concat(series[sid].timestamps));
@@ -61,8 +69,12 @@ export default Ember.Component.extend({
     console.log('types', types);
 
     const columns = values.concat(timestamps);
+    console.log('columns', columns);
 
-    const config = { unload, xs, columns, types, regions };
+    const tooltip = this.get('tooltip');
+    console.log('tooltip', tooltip);
+
+    const config = { unload, xs, columns, types, regions, tooltip };
 
     return config;
   },
@@ -100,6 +112,7 @@ export default Ember.Component.extend({
       types: diffConfig.types
     };
     config.regions = diffConfig.regions;
+    config.tooltip = diffConfig.tooltip;
     console.log('config', config);
 
     this.set('_chart', c3.generate(config));
