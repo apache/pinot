@@ -24,13 +24,17 @@ export default Ember.Controller.extend({
 
   types: null,
 
+  colors: null,
+
   series: Ember.computed(
     'model.data',
     'types',
+    'colors',
     function() {
       console.log('series()');
 
-      const types = this.get('types');
+      const types = this.get('types') || {};
+      const colors = this.get('colors') || {};
       const data = this.get('model.data') || {};
       console.log('data', data);
 
@@ -38,13 +42,18 @@ export default Ember.Controller.extend({
       Object.keys(data).forEach(range =>
         Object.keys(data[range]).filter(s => s != 'timestamp').forEach(mid => {
           const sid = range + '-' + mid;
-          const type = (types && (sid in types)) ? types[sid] : 'line';
           series[sid] = {
             timestamps: data[range]['timestamp'],
             values: data[range][mid],
-            type: type,
-            axis: 'y'
           };
+
+          if (sid in types) {
+            series[sid].type = types[sid];
+          }
+
+          if (sid in colors) {
+            series[sid].color = colors[sid];
+          }
       }));
 
       console.log('series', series);
@@ -59,8 +68,7 @@ export default Ember.Controller.extend({
       const data = this.get('model.data');
 
       data['myrange'] = {
-        [sid]: generateRandomData(100, 0, 20000),
-        "timestamp": generateSequentialData(100, 1508454000000, 1508543940000)
+        [sid]: generateRandomData(100, 0, 20000), "timestamp": generateSequentialData(100, 1508454000000, 1508543940000)
       };
 
       console.log('data', data);
@@ -90,7 +98,18 @@ export default Ember.Controller.extend({
       console.log('types', types);
       this.set('types', types);
       this.notifyPropertyChange('types');
+    },
+
+    changeColor(sid, color) {
+      console.log('changeColor()');
+
+      const colors = this.get('colors') || {};
+
+      colors['myrange-' + sid] = color;
+
+      console.log('colors', colors);
+      this.set('colors', colors);
+      this.notifyPropertyChange('colors');
     }
   }
-
 });

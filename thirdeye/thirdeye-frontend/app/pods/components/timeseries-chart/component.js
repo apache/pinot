@@ -17,7 +17,8 @@ export default Ember.Component.extend({
     example_series: {
       timestamps: [0, 1, 2, 5, 6],
       values: [10, 10, 5, 27, 28],
-      type: 'line' // 'point', 'region'
+      type: 'line', // 'scatter', 'region'
+      color: 'green'
     }
   },
 
@@ -45,7 +46,13 @@ export default Ember.Component.extend({
 
     const regions = regionKeys.map(sid => {
       const t = series[sid].timestamps;
-      return { axis: 'x', start: t[0], end: t[t.length - 1] };
+      let region = { start: t[0], end: t[t.length - 1] };
+
+      if ('color' in series[sid]) {
+        region.class = 'c3-region--' + series[sid].color;
+      }
+
+      return region;
     });
     console.log('regions', regions);
 
@@ -64,17 +71,21 @@ export default Ember.Component.extend({
     const timestamps = loadKeys.map(sid => [sid + '-timestamps'].concat(series[sid].timestamps));
     console.log('timestamps', timestamps);
 
+    const columns = values.concat(timestamps);
+    console.log('columns', columns);
+
+    const colors = {};
+    loadKeys.forEach(sid => colors[sid] = series[sid].color);
+    console.log('colors', colors);
+
     const types = {};
     loadKeys.forEach(sid => types[sid] = series[sid].type);
     console.log('types', types);
 
-    const columns = values.concat(timestamps);
-    console.log('columns', columns);
-
     const tooltip = this.get('tooltip');
     console.log('tooltip', tooltip);
 
-    const config = { unload, xs, columns, types, regions, tooltip };
+    const config = { unload, xs, columns, types, regions, tooltip, colors };
 
     return config;
   },
@@ -109,7 +120,8 @@ export default Ember.Component.extend({
     config.data = {
       xs: diffConfig.xs,
       columns: diffConfig.columns,
-      types: diffConfig.types
+      types: diffConfig.types,
+      colors: diffConfig.colors
     };
     config.regions = diffConfig.regions;
     config.tooltip = diffConfig.tooltip;
