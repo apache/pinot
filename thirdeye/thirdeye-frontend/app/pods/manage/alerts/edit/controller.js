@@ -217,6 +217,7 @@ export default Ember.Controller.extend({
         active: true,
         name: this.get('newConfigGroupName'),
         fromAddress: 'thirdeye-dev@linkedin.com',
+        cronExpression: '0 0/5 * 1/1 * ? *',
         emailConfig: {
           functionIds: []
         }
