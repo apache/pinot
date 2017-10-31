@@ -22,24 +22,27 @@ const generateSequentialData = (num, min=0, max=100) => {
 
 export default Ember.Controller.extend({
 
+  types: null,
+
   series: Ember.computed(
     'model.data',
+    'types',
     function() {
       console.log('series()');
 
+      const types = this.get('types');
       const data = this.get('model.data') || {};
-
       console.log('data', data);
 
       const series = {};
-
       Object.keys(data).forEach(range =>
         Object.keys(data[range]).filter(s => s != 'timestamp').forEach(mid => {
           const sid = range + '-' + mid;
+          const type = (types && (sid in types)) ? types[sid] : 'line';
           series[sid] = {
             timestamps: data[range]['timestamp'],
             values: data[range][mid],
-            type: 'line',
+            type: type,
             axis: 'y'
           };
       }));
@@ -50,18 +53,17 @@ export default Ember.Controller.extend({
   ),
 
   actions: {
-    addSeries() {
+    addSeries(sid) {
       console.log('addSeries()');
 
       const data = this.get('model.data');
 
       data['myrange'] = {
-        "a": generateRandomData(100, 0, 20000),
+        [sid]: generateRandomData(100, 0, 20000),
         "timestamp": generateSequentialData(100, 1508454000000, 1508543940000)
       };
 
       console.log('data', data);
-
       this.set('model.data', data);
       this.notifyPropertyChange('model');
     },
@@ -74,9 +76,20 @@ export default Ember.Controller.extend({
       delete data['myrange'];
 
       console.log('data', data);
-
       this.set('model.data', data);
       this.notifyPropertyChange('model');
+    },
+
+    changeType(sid, type) {
+      console.log('changeTypes()');
+
+      const types = this.get('types') || {};
+
+      types['myrange-' + sid] = type;
+
+      console.log('types', types);
+      this.set('types', types);
+      this.notifyPropertyChange('types');
     }
   }
 

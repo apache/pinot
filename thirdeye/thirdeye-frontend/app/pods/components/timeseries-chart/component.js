@@ -11,7 +11,13 @@ export default Ember.Component.extend({
   _seriesCache: null,
 
   // wrapper
-  series: null,
+  series: {
+    example_series: {
+      timestamps: [0, 1, 2, 5, 6],
+      values: [10, 10, 5, 27, 28],
+      type: 'line' // 'point', 'region'
+    }
+  },
 
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
@@ -22,33 +28,31 @@ export default Ember.Component.extend({
     const addedKeys = Object.keys(series).filter(sid => !(sid in cache));
     const changedKeys = Object.keys(series).filter(sid => sid in cache && !_.isEqual(cache[sid], series[sid]));
     const deletedKeys = Object.keys(cache).filter(sid => !(sid in series));
-
     console.log('addedKeys', addedKeys);
     console.log('changedKeys', changedKeys);
     console.log('deletedKeys', deletedKeys);
 
     const unloadKeys = changedKeys.concat(deletedKeys);
     const unload = unloadKeys.concat(unloadKeys.map(sid => sid + '-timestamps'));
-
     console.log('unload', unload);
 
     const xsKeys = addedKeys.concat(changedKeys);
     const xs = {};
     xsKeys.forEach(sid => xs[sid] = sid + '-timestamps');
-
     console.log('xs', xs);
 
     const columnsKeys = addedKeys.concat(changedKeys);
     const columns = columnsKeys.map(sid => [sid].concat(series[sid].values)).concat(
       columnsKeys.map(sid => [sid + '-timestamps'].concat(series[sid].timestamps))
     );
-
     console.log('columns', columns);
 
-    const config = {};
-    config['unload'] = unload;
-    config['xs'] = xs;
-    config['columns'] = columns;
+    const typesKeys = addedKeys.concat(changedKeys);
+    const types = {};
+    typesKeys.forEach(sid => types[sid] = series[sid].type);
+    console.log('types', types);
+
+    const config = { unload, xs, columns, types };
 
     return config;
   },
@@ -63,6 +67,8 @@ export default Ember.Component.extend({
     console.log('didUpdateAttrs()');
 
     const diffConfig = this._makeDiffConfig();
+    console.log('diffConfig', diffConfig);
+
     const chart = this.get('_chart');
     chart.load(diffConfig);
 
@@ -79,9 +85,9 @@ export default Ember.Component.extend({
     config.bindto = this.get('element');
     config.data = {
       xs: diffConfig.xs,
-      columns: diffConfig.columns
+      columns: diffConfig.columns,
+      types: diffConfig.types
     };
-
     console.log('config', config);
 
     this.set('_chart', c3.generate(config));
