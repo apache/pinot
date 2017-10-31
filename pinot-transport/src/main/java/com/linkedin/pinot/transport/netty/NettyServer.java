@@ -312,8 +312,14 @@ public abstract class NettyServer implements Runnable {
     public String toString() {
       return "NettyChannelInboundHandler [_handler=" + _handler + ", _metric=" + _metric + "]";
     }
-  }
 
+    public static NettyServerWorkload get_workload() {
+      return _workload;
+    }
+  }
+  public NettyServerWorkload getWorkload(){
+    return NettyChannelInboundHandler.get_workload();
+  }
   public boolean isShutdownComplete() {
     return _shutdownComplete.get();
   }

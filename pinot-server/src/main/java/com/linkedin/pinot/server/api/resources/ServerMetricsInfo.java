@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
 import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.server.starter.ServerInstance;
+import com.linkedin.pinot.transport.metrics.NettyServerWorkload;
 import io.swagger.annotations.*;
 
 import java.util.ArrayList;
@@ -50,22 +51,12 @@ public class ServerMetricsInfo {
     @ApiOperation(value = "Show all hosted segments count and storage size", notes = "Storage size and count of all segments hosted by a Pinot Server")
     @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
     public ServerLoadMetrics getLatencyInfo(@ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName) throws WebApplicationException {
-        InstanceDataManager dataManager = (InstanceDataManager) serverInstance.getInstanceDataManager();
-        if (dataManager == null) {
+        NettyServerWorkload workload =  serverInstance.getNettyServer().getWorkload();
+        if (workload == null) {
             throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
         }
 
-
-        ServerLoadMetrics serverLoadMetrics = new ServerLoadMetrics();
-        ServerLatencyMetric metric = new ServerLatencyMetric();
-        metric.set_avgSegments(100.0);
-        metric.set_avglatency(203.0);
-        metric.set_timestamp(100);
-        List<ServerLatencyMetric> server1latencies = new ArrayList<>();
-        server1latencies.add(metric);
-
-        // Add logic for retrieving data.
-
+        ServerLoadMetrics serverLoadMetrics = workload.getAvgLoad(tableName);
         return serverLoadMetrics;
     }
 }
