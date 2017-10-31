@@ -31,7 +31,6 @@ import com.linkedin.pinot.transport.pool.AsyncPoolResourceManagerAdapter;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.yammer.metrics.core.MetricsRegistry;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -89,9 +88,7 @@ public class NettySingleConnectionIntegrationTest {
       _requestHandler.setResponse(response);
       ResponseFuture responseFuture =
           _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-      ByteBuf byteBuf = responseFuture.getOne();
-      byte[] bytes = new byte[byteBuf.readableBytes()];
-      byteBuf.readBytes(bytes);
+      byte[] bytes = responseFuture.getOne();
       Assert.assertEquals(new String(bytes), response);
       Assert.assertEquals(_requestHandler.getRequest(), request);
     }
@@ -111,9 +108,7 @@ public class NettySingleConnectionIntegrationTest {
       _requestHandler.setResponse(response);
       ResponseFuture responseFuture =
           _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-      ByteBuf byteBuf = responseFuture.getOne();
-      byte[] bytes = new byte[byteBuf.readableBytes()];
-      byteBuf.readBytes(bytes);
+      byte[] bytes = responseFuture.getOne();
       Assert.assertEquals(new String(bytes), response);
       Assert.assertEquals(_requestHandler.getRequest(), request);
     }
@@ -146,9 +141,7 @@ public class NettySingleConnectionIntegrationTest {
     } catch (IllegalStateException e) {
       // Pass
     }
-    ByteBuf response = responseFuture.getOne();
-    byte[] bytes = new byte[response.readableBytes()];
-    response.readBytes(bytes);
+    byte[] bytes = responseFuture.getOne();
     Assert.assertEquals(new String(bytes), NettyTestUtils.DUMMY_RESPONSE);
     Assert.assertEquals(_requestHandler.getRequest(), NettyTestUtils.DUMMY_REQUEST);
   }

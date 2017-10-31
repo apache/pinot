@@ -47,7 +47,6 @@ import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
-import io.netty.buffer.ByteBuf;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -456,14 +455,14 @@ public class BrokerRequestHandler {
     // Step 1: find the candidate servers to be queried for each set of segments from the routing table.
     // Step 2: select servers for each segment set and scatter request to the servers.
     String offlineTableName = null;
-    CompositeFuture<ByteBuf> offlineCompositeFuture = null;
+    CompositeFuture<byte[]> offlineCompositeFuture = null;
     if (offlineBrokerRequest != null) {
       offlineTableName = offlineBrokerRequest.getQuerySource().getTableName();
       offlineCompositeFuture =
           routeAndScatterBrokerRequest(offlineBrokerRequest, phaseTimes, scatterGatherStats, true, requestId);
     }
     String realtimeTableName = null;
-    CompositeFuture<ByteBuf> realtimeCompositeFuture = null;
+    CompositeFuture<byte[]> realtimeCompositeFuture = null;
     if (realtimeBrokerRequest != null) {
       realtimeTableName = realtimeBrokerRequest.getQuerySource().getTableName();
       realtimeCompositeFuture =
@@ -478,8 +477,8 @@ public class BrokerRequestHandler {
     int numServersQueried = 0;
     long gatherStartTime = System.nanoTime();
     List<ProcessingException> processingExceptions = new ArrayList<>();
-    Map<ServerInstance, ByteBuf> offlineServerResponseMap = null;
-    Map<ServerInstance, ByteBuf> realtimeServerResponseMap = null;
+    Map<ServerInstance, byte[]> offlineServerResponseMap = null;
+    Map<ServerInstance, byte[]> realtimeServerResponseMap = null;
     if (offlineCompositeFuture != null) {
       numServersQueried += offlineCompositeFuture.getNumFutures();
       offlineServerResponseMap =
@@ -544,7 +543,7 @@ public class BrokerRequestHandler {
    * @return composite future used to gather responses.
    */
   @Nullable
-  private CompositeFuture<ByteBuf> routeAndScatterBrokerRequest(@Nonnull BrokerRequest brokerRequest,
+  private CompositeFuture<byte[]> routeAndScatterBrokerRequest(@Nonnull BrokerRequest brokerRequest,
       @Nonnull PhaseTimes phaseTimes, @Nonnull ScatterGatherStats scatterGatherStats, boolean isOfflineTable,
       long requestId) throws InterruptedException {
     // Step 1: find the candidate servers to be queried for each set of segments from the routing table.
@@ -564,7 +563,7 @@ public class BrokerRequestHandler {
     long scatterStartTime = System.nanoTime();
     ScatterGatherRequestImpl scatterRequest =
         new ScatterGatherRequestImpl(brokerRequest, routingTable, requestId, _brokerTimeOutMs, _brokerId);
-    CompositeFuture<ByteBuf> compositeFuture =
+    CompositeFuture<byte[]> compositeFuture =
         _scatterGatherer.scatterGather(scatterRequest, scatterGatherStats, isOfflineTable, _brokerMetrics);
     phaseTimes.addToScatterTime(System.nanoTime() - scatterStartTime);
     return compositeFuture;
@@ -581,15 +580,15 @@ public class BrokerRequestHandler {
    * @return server response map.
    */
   @Nullable
-  private Map<ServerInstance, ByteBuf> gatherServerResponses(@Nonnull CompositeFuture<ByteBuf> compositeFuture,
+  private Map<ServerInstance, byte[]> gatherServerResponses(@Nonnull CompositeFuture<byte[]> compositeFuture,
       @Nonnull ScatterGatherStats scatterGatherStats, boolean isOfflineTable, @Nonnull String tableNameWithType,
       @Nonnull List<ProcessingException> processingExceptions) {
     try {
-      Map<ServerInstance, ByteBuf> serverResponseMap = compositeFuture.get();
-      Iterator<Entry<ServerInstance, ByteBuf>> iterator = serverResponseMap.entrySet().iterator();
+      Map<ServerInstance, byte[]> serverResponseMap = compositeFuture.get();
+      Iterator<Entry<ServerInstance, byte[]>> iterator = serverResponseMap.entrySet().iterator();
       while (iterator.hasNext()) {
-        Entry<ServerInstance, ByteBuf> entry = iterator.next();
-        if (entry.getValue().readableBytes() == 0) {
+        Entry<ServerInstance, byte[]> entry = iterator.next();
+        if (entry.getValue().length == 0) {
           LOGGER.warn("Got empty response from server: {]", entry.getKey().getShortHostName());
           iterator.remove();
         }
@@ -617,26 +616,21 @@ public class BrokerRequestHandler {
    * @param tableNameWithType table name with type suffix.
    * @param processingExceptions list of processing exceptions.
    */
-  private void deserializeServerResponses(@Nonnull Map<ServerInstance, ByteBuf> responseMap, boolean isOfflineTable,
+  private void deserializeServerResponses(@Nonnull Map<ServerInstance, byte[]> responseMap, boolean isOfflineTable,
       @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull String tableNameWithType,
       @Nonnull List<ProcessingException> processingExceptions) {
-    for (Entry<ServerInstance, ByteBuf> entry : responseMap.entrySet()) {
+    for (Entry<ServerInstance, byte[]> entry : responseMap.entrySet()) {
       ServerInstance serverInstance = entry.getKey();
       if (!isOfflineTable) {
         serverInstance = serverInstance.withSeq(1);
       }
-      ByteBuf byteBuf = entry.getValue();
       try {
-        byte[] byteArray = new byte[byteBuf.readableBytes()];
-        byteBuf.readBytes(byteArray);
-        dataTableMap.put(serverInstance, DataTableFactory.getDataTable(byteArray));
+        dataTableMap.put(serverInstance, DataTableFactory.getDataTable(entry.getValue()));
       } catch (Exception e) {
         LOGGER.error("Caught exceptions while deserializing response for table: {} from server: {}", tableNameWithType,
             serverInstance, e);
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1L);
         processingExceptions.add(QueryException.getException(QueryException.DATA_TABLE_DESERIALIZATION_ERROR, e));
-      } finally {
-        byteBuf.release();
       }
     }
   }

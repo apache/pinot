@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
@@ -26,6 +24,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -121,7 +121,7 @@ public abstract class NettyClientConnection {
    * Future Handle provided to the request sender to asynchronously wait for response.
    * We use guava API for implementing Futures.
    */
-  public static class ResponseFuture extends AsyncResponseFuture<ByteBuf> {
+  public static class ResponseFuture extends AsyncResponseFuture<byte[]> {
 
     public ResponseFuture(ServerInstance key, String ctxt) {
       super(key, ctxt);
@@ -134,15 +134,6 @@ public abstract class NettyClientConnection {
      */
     public ResponseFuture(ServerInstance key, Throwable error, String ctxt) {
       super(key, error, ctxt);
-    }
-
-    @Override
-    protected void releaseResource(ByteBuf result) {
-      // Potential fix for a a leak during a race between calling cancel() and receiving response from the server.
-      // If a call is made to get the response before the cancel in a different thread,
-      // and we release it here, then the thread that processes the response may cause
-      // JVM crash.
-//      result.release();
     }
   }
 
