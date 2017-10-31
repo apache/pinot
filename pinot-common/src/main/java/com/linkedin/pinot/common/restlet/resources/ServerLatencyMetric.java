@@ -6,6 +6,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
  * Created by Gandharv on 10/14/2017.
  */
 public class ServerLatencyMetric {
+    public static final int OBJ_SIZE = 8*4;
     public long _timestamp;
     public Double _avglatency;
     public Double  _avgSegments;
@@ -51,5 +52,10 @@ public class ServerLatencyMetric {
 
     public void set_timestamp(long _timestamp) {
         this._timestamp = _timestamp;
+    }
+
+    @Override
+    public String toString() {
+        return (this._timestamp + "," + this._avglatency + "," + this._avgSegments + "\n");
     }
 }
