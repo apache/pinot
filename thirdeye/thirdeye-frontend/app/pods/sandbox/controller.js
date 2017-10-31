@@ -26,15 +26,19 @@ export default Ember.Controller.extend({
 
   colors: null,
 
+  axes: null,
+
   series: Ember.computed(
     'model.data',
     'types',
     'colors',
+    'axes',
     function() {
       console.log('series()');
 
       const types = this.get('types') || {};
       const colors = this.get('colors') || {};
+      const axes = this.get('axes') || {};
       const data = this.get('model.data') || {};
       console.log('data', data);
 
@@ -53,6 +57,10 @@ export default Ember.Controller.extend({
 
           if (sid in colors) {
             series[sid].color = colors[sid];
+          }
+
+          if (sid in axes) {
+            series[sid].axis = axes[sid];
           }
       }));
 
@@ -110,6 +118,18 @@ export default Ember.Controller.extend({
       console.log('colors', colors);
       this.set('colors', colors);
       this.notifyPropertyChange('colors');
+    },
+
+    changeAxis(sid, axis) {
+      console.log('changeAxis()');
+
+      const axes = this.get('axes') || {};
+
+      axes['myrange-' + sid] = axis;
+
+      console.log('axes', axes);
+      this.set('axes', axes);
+      this.notifyPropertyChange('axes');
     }
   }
 });

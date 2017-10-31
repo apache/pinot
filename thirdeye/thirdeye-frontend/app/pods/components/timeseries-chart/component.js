@@ -29,6 +29,19 @@ export default Ember.Component.extend({
     }
   },
 
+  axis: {
+    y: {
+      show: true
+    },
+    y2: {
+      show: false
+    },
+    x: {
+      type: 'timeseries',
+      show: true
+    }
+  },
+
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
@@ -85,7 +98,14 @@ export default Ember.Component.extend({
     const tooltip = this.get('tooltip');
     console.log('tooltip', tooltip);
 
-    const config = { unload, xs, columns, types, regions, tooltip, colors };
+    const axis = this.get('axis');
+    console.log('axis', axis);
+
+    const axes = {};
+    loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
+    console.log('axes', axes);
+
+    const config = { unload, xs, columns, types, regions, tooltip, colors, axis, axes };
 
     return config;
   },
@@ -121,8 +141,10 @@ export default Ember.Component.extend({
       xs: diffConfig.xs,
       columns: diffConfig.columns,
       types: diffConfig.types,
-      colors: diffConfig.colors
+      colors: diffConfig.colors,
+      axes: diffConfig.axes
     };
+    config.axis = diffConfig.axis;
     config.regions = diffConfig.regions;
     config.tooltip = diffConfig.tooltip;
     console.log('config', config);
