@@ -28,31 +28,41 @@ export default Ember.Component.extend({
     const addedKeys = Object.keys(series).filter(sid => !(sid in cache));
     const changedKeys = Object.keys(series).filter(sid => sid in cache && !_.isEqual(cache[sid], series[sid]));
     const deletedKeys = Object.keys(cache).filter(sid => !(sid in series));
+    const regionKeys = addedKeys.concat(changedKeys).filter(sid => series[sid].type == 'region');
     console.log('addedKeys', addedKeys);
     console.log('changedKeys', changedKeys);
     console.log('deletedKeys', deletedKeys);
+    console.log('regionKeys', deletedKeys);
+
+    // const regions = [{ axis: 'x', start: 1508454000000, end: 1508543940000 }];
+    const regions = regionKeys.map(sid => {
+      const t = series[sid].timestamps;
+      return { axis: 'x', start: t[0], end: t[t.length - 1] };
+    });
+    console.log('regions', regions);
 
     const unloadKeys = changedKeys.concat(deletedKeys);
     const unload = unloadKeys.concat(unloadKeys.map(sid => sid + '-timestamps'));
     console.log('unload', unload);
 
-    const xsKeys = addedKeys.concat(changedKeys);
+    const loadKeys = addedKeys.concat(changedKeys).filter(sid => !regionKeys.includes(sid))
     const xs = {};
-    xsKeys.forEach(sid => xs[sid] = sid + '-timestamps');
+    loadKeys.forEach(sid => xs[sid] = sid + '-timestamps');
     console.log('xs', xs);
 
-    const columnsKeys = addedKeys.concat(changedKeys);
-    const columns = columnsKeys.map(sid => [sid].concat(series[sid].values)).concat(
-      columnsKeys.map(sid => [sid + '-timestamps'].concat(series[sid].timestamps))
-    );
-    console.log('columns', columns);
+    const values = loadKeys.map(sid => [sid].concat(series[sid].values))
+    console.log('values', values);
 
-    const typesKeys = addedKeys.concat(changedKeys);
+    const timestamps = loadKeys.map(sid => [sid + '-timestamps'].concat(series[sid].timestamps));
+    console.log('timestamps', timestamps);
+
     const types = {};
-    typesKeys.forEach(sid => types[sid] = series[sid].type);
+    loadKeys.forEach(sid => types[sid] = series[sid].type);
     console.log('types', types);
 
-    const config = { unload, xs, columns, types };
+    const columns = values.concat(timestamps);
+
+    const config = { unload, xs, columns, types, regions };
 
     return config;
   },
@@ -70,6 +80,7 @@ export default Ember.Component.extend({
     console.log('diffConfig', diffConfig);
 
     const chart = this.get('_chart');
+    chart.regions(diffConfig.regions);
     chart.load(diffConfig);
 
     this._updateCache();
@@ -88,6 +99,7 @@ export default Ember.Component.extend({
       columns: diffConfig.columns,
       types: diffConfig.types
     };
+    config.regions = diffConfig.regions;
     console.log('config', config);
 
     this.set('_chart', c3.generate(config));
