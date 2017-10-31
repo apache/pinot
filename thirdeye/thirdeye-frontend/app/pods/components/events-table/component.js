@@ -14,6 +14,7 @@ export default Ember.Component.extend({
     'eventsInRange.@each.type',
     'selectedTab',
     function() {
+      debugger;
       const events = this.get('eventsInRange');
       const selectedTab = this.get('selectedTab');
 

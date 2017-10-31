@@ -1,0 +1,17 @@
+
+<div class="paper-container">
+  {{anomaly-graph 
+    componentId='correlated-events' 
+    primaryMetric=model.primaryMetric 
+    events=model.events 
+    showGraphLegend=false
+    showLegend=false
+    height=400 
+    showEvents=true 
+    showSubchart=true 
+  }}
+
+  {{events-table
+    events=model.events
+  }}
+</div>
