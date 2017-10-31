@@ -69,7 +69,7 @@ export default Ember.Component.extend({
     });
     console.log('regions', regions);
 
-    const unloadKeys = changedKeys.concat(deletedKeys);
+    const unloadKeys = deletedKeys.concat(regionKeys);
     const unload = unloadKeys.concat(unloadKeys.map(sid => sid + '-timestamps'));
     console.log('unload', unload);
 

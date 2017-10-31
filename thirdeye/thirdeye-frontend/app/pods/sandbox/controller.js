@@ -76,7 +76,8 @@ export default Ember.Controller.extend({
       const data = this.get('model.data');
 
       data['myrange'] = {
-        [sid]: generateRandomData(100, 0, 20000), "timestamp": generateSequentialData(100, 1508454000000, 1508543940000)
+        [sid]: generateRandomData(100, 0, 20000),
+        "timestamp": generateSequentialData(100, 1508454000000, 1508543940000)
       };
 
       console.log('data', data);
