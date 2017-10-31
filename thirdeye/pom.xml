@@ -20,7 +20,7 @@
     <pinot.version>0.016</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.7</jdk.version>
-    <dropwizard.version>0.8.4</dropwizard.version>
+    <dropwizard.version>0.9.2</dropwizard.version>
     <dropwizard-auth.version>0.9.2</dropwizard-auth.version>
     <dropwizard.redirect.bundle.version>1.0.5</dropwizard.redirect.bundle.version>
     <jackson.version>2.8.3</jackson.version>
@@ -54,6 +54,9 @@
     <guice-persist.version>4.1.0</guice-persist.version>
     <hibernate-jpa-2.1-api.version>1.0.0.Final</hibernate-jpa-2.1-api.version>
     <hibernate-entirymanager.version>4.3.10.Final</hibernate-entirymanager.version>
+    <!-- force bump up for LI usage -->
+    <glassfish.hk2.utils.version>2.5.0-b34</glassfish.hk2.utils.version>
+    <kafka.clients.version>0.10.2.1</kafka.clients.version>
   </properties>
 
   <build>
@@ -325,6 +328,24 @@
         <groupId>org.hibernate</groupId>
         <artifactId>hibernate-entitymanager</artifactId>
         <version>${hibernate-entirymanager.version}</version>
+      </dependency>
+
+      <!-- force bump up for LI usage -->
+      <dependency>
+        <groupId>org.glassfish.hk2</groupId>
+        <artifactId>hk2-utils</artifactId>
+        <version>${glassfish.hk2.utils.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.inject</groupId>
+            <artifactId>javax.inject</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka-clients</artifactId>
+        <version>${kafka.clients.version}</version>
       </dependency>
 
       <!-- test dependencies -->
