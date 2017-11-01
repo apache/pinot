@@ -39,6 +39,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -57,6 +58,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   private Semaphore _segmentBuildSemaphore;
 
   private static final String STATS_FILE_NAME = "stats.ser";
+  private static final String CONSUMERS_DIR = "consumers";
 
   @Override
   protected void doInit() {
@@ -86,6 +88,25 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         Utils.rethrowException(e2);
       }
     }
+
+    String consumerDirPath = getConsumerDir();
+    File consumerDir = new File(consumerDirPath);
+
+    if (consumerDir.exists()) {
+      File[] segmentFiles = consumerDir.listFiles(new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+          return !name.equals(STATS_FILE_NAME);
+        }
+      });
+      for (File file : segmentFiles) {
+        if (file.delete()) {
+          _logger.info("Deleted old file {}", file.getAbsolutePath());
+        } else {
+          _logger.error("Cannot delete file {}", file.getAbsolutePath());
+        }
+      }
+    }
   }
 
   @Override
@@ -109,7 +130,17 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   }
 
   public String getConsumerDir() {
-    File consumerDir = new File(_tableDataManagerConfig.getConsumerDir(), _tableName);
+    String consumerDirPath = _tableDataManagerConfig.getConsumerDir();
+    File consumerDir;
+    // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
+    // Otherwise, create a sub-dir under the table-specific data director and use it for consumer mmaps
+    if (consumerDirPath != null) {
+       consumerDir = new File(consumerDirPath, _tableName);
+    } else {
+      consumerDirPath = _tableDataDir + File.separator + CONSUMERS_DIR;
+      consumerDir = new File(consumerDirPath);
+    }
+
     if (!consumerDir.exists()) {
       if (!consumerDir.mkdirs()) {
         _logger.error("Failed to create consumer directory {}", consumerDir.getAbsolutePath());
