@@ -190,7 +190,8 @@ public class HadoopSegmentCreationMapReduceJob {
 
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setFormat(fileFormat);
-
+      segmentGeneratorConfig.setOnHeap(true);
+      
       if (null != _postfix) {
         segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
       } else {
