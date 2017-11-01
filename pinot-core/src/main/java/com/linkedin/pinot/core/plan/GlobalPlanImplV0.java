@@ -15,12 +15,11 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.operator.UResultOperator;
 import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -60,10 +59,6 @@ public class GlobalPlanImplV0 extends Plan {
       long endTime2 = System.currentTimeMillis();
       LOGGER.debug("UResultOperator took :{}", (endTime2 - endTime1));
       _instanceResponseDataTable = instanceResponseBlock.getInstanceResponseDataTable();
-      long endTime3 = System.currentTimeMillis();
-      LOGGER.debug("Converting to InstanceResponseBlock to DataTable took :{}", (endTime3 - endTime2));
-      long endTime = System.currentTimeMillis();
-      _instanceResponseDataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, "" + (endTime - startTime));
     } finally {
       operator.close();
     }
@@ -73,5 +68,4 @@ public class GlobalPlanImplV0 extends Plan {
   public DataTable getInstanceResponse() {
     return _instanceResponseDataTable;
   }
-
 }

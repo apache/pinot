@@ -135,34 +135,36 @@ public abstract class QueryScheduler {
   @Nullable
   protected byte[] processQueryAndSerialize(@Nonnull final ServerQueryRequest request,
       @Nonnull final ExecutorService executorService) {
-    DataTable result;
+    DataTable dataTable;
     try {
-      result = queryExecutor.processQuery(request, executorService);
+      dataTable = queryExecutor.processQuery(request, executorService);
     } catch (Exception e) {
       // For not handled exceptions
       serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-      result = new DataTableImplV2();
-      result.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+      dataTable = new DataTableImplV2();
+      dataTable.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
+    InstanceRequest instanceRequest = request.getInstanceRequest();
+    long requestId = instanceRequest.getRequestId();
+    Map<String, String> dataTableMetadata = dataTable.getMetadata();
+    dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
 
-    byte[] responseData = serializeDataTable(request, result);
+    byte[] responseData = serializeDataTable(request, dataTable);
 
     // Log the statistics
-    InstanceRequest instanceRequest = request.getInstanceRequest();
     TimerContext timerContext = request.getTimerContext();
-    Map<String, String> resultMeta = result.getMetadata();
     LOGGER.info(
         "Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
-        instanceRequest.getRequestId(),
+        requestId,
         request.getTableName(),
         instanceRequest.getSearchSegments().size(),
         request.getSegmentCountAfterPruning(),
         timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME),
         instanceRequest.getBrokerId(),
-        getMetadataValue(resultMeta, DataTable.NUM_DOCS_SCANNED_METADATA_KEY),
-        getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
-        getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
+        getMetadataValue(dataTableMetadata, DataTable.NUM_DOCS_SCANNED_METADATA_KEY),
+        getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
+        getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
         name());
     serverMetrics.setValueOfTableGauge(request.getTableName(), ServerGauge.NUM_SEGMENTS_SEARCHED, request.getSegmentCountAfterPruning());
 
