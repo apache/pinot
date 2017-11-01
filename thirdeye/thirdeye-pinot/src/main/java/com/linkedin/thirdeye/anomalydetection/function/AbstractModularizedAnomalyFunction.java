@@ -4,9 +4,15 @@ import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
+import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
+import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.NoPredictionMergeModel;
+import com.linkedin.thirdeye.anomalydetection.model.merge.NoopMergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
+import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -26,6 +32,7 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This class provides the default control logic to perform actions on an anomaly detection context
  * with the given anomaly detection module; the actions can be anomaly detection, information update
@@ -38,6 +45,13 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunction
     implements AnomalyDetectionFunction, ModularizedAnomalyFunctionModelProvider {
   protected final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
+
+  protected DataModel dataModel = new NoopDataModel();
+  protected List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
+  protected List<TransformationFunction> baselineTimeSeriesTransformationChain = new ArrayList<>();
+  protected PredictionModel predictionModel = new NoopPredictionModel();
+  protected DetectionModel detectionModel = new NoopDetectionModel();
+  protected MergeModel mergeModel = new NoopMergeModel();
 
   protected AnomalyFunctionDTO spec;
   protected Properties properties;
@@ -269,5 +283,40 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
 
     return this.getTimeSeriesView(anomalyDetectionContext, bucketMillis, metric, viewWindowStartTime, viewWindowEndTime,
         knownAnomalies);
+  }
+
+  @Override
+  public DataModel getDataModel() {
+    return this.dataModel;
+  }
+
+  @Override
+  public List<TransformationFunction> getCurrentTimeSeriesTransformationChain() {
+    return this.currentTimeSeriesTransformationChain;
+  }
+
+  @Override
+  public List<TransformationFunction> getBaselineTimeSeriesTransformationChain() {
+    return this.baselineTimeSeriesTransformationChain;
+  }
+
+  @Override
+  public PredictionModel getPredictionModel() {
+    return this.predictionModel;
+  }
+
+  @Override
+  public DetectionModel getDetectionModel() {
+    return this.detectionModel;
+  }
+
+  @Override
+  public MergeModel getMergeModel() {
+    return this.mergeModel;
+  }
+
+  @Override
+  public boolean useHistoryAnomaly() {
+    return true;
   }
 }
