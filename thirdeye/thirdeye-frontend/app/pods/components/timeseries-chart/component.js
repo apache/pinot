@@ -48,10 +48,10 @@ export default Ember.Component.extend({
     console.log('cache', cache);
     console.log('series', series);
 
-    const addedKeys = Object.keys(series).filter(sid => !(sid in cache));
-    const changedKeys = Object.keys(series).filter(sid => sid in cache && !_.isEqual(cache[sid], series[sid]));
-    const deletedKeys = Object.keys(cache).filter(sid => !(sid in series));
-    const regionKeys = Object.keys(series).filter(sid => series[sid].type == 'region');
+    const addedKeys = Object.keys(series).filter(sid => !cache[sid]);
+    const changedKeys = Object.keys(series).filter(sid => cache[sid] && !_.isEqual(cache[sid], series[sid]));
+    const deletedKeys = Object.keys(cache).filter(sid => !series[sid]);
+    const regionKeys = Object.keys(series).filter(sid => series[sid] && series[sid].type == 'region');
     console.log('addedKeys', addedKeys);
     console.log('changedKeys', changedKeys);
     console.log('deletedKeys', deletedKeys);
@@ -88,11 +88,11 @@ export default Ember.Component.extend({
     console.log('columns', columns);
 
     const colors = {};
-    loadKeys.forEach(sid => colors[sid] = series[sid].color);
+    loadKeys.filter(sid => series[sid].color).forEach(sid => colors[sid] = series[sid].color);
     console.log('colors', colors);
 
     const types = {};
-    loadKeys.forEach(sid => types[sid] = series[sid].type);
+    loadKeys.filter(sid => series[sid].type).forEach(sid => types[sid] = series[sid].type);
     console.log('types', types);
 
     const tooltip = this.get('tooltip');
