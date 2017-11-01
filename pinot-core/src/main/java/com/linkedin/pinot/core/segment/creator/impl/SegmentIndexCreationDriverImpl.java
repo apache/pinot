@@ -48,9 +48,9 @@ import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
 import com.linkedin.pinot.core.startree.StarTreeIndexNode;
 import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
 import com.linkedin.pinot.core.startree.StarTreeSerDe;
-import com.linkedin.pinot.startree.hll.HllConfig;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import com.linkedin.pinot.core.util.CrcUtils;
+import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -202,6 +202,23 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     } else {
       buildRaw();
     }
+  }
+
+  private boolean containsInvalidInvertedIndex() {
+    int numValues = segmentIndexCreationInfo.getTotalDocs();
+    for (String columnName : config.getInvertedIndexCreationColumns()) {
+      LOGGER.info("Evaluating inverted index size for column {} ", columnName);
+      long numBytes = numValues * V1Constants.Numbers.INTEGER_SIZE;
+      ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
+      int cardinality = indexCreationInfo.getDistinctValueCount();
+      LOGGER.info("Cardinality of column {} is {} ", columnName, String.valueOf(cardinality));
+      numBytes += cardinality * indexCreationInfoMap.get(columnName).getLegnthOfLongestEntry();
+      LOGGER.info("Estimated inverted index size for column {} is {}, should be < 2GB", columnName, numBytes);
+      if (numBytes >= 2147483648L) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void buildStarTree() throws Exception {
@@ -593,6 +610,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     segmentIndexCreationInfo.setTotalErrors(extractor.getTotalErrors());
     segmentIndexCreationInfo.setTotalNullCols(extractor.getTotalNullCols());
     segmentIndexCreationInfo.setTotalNulls(extractor.getTotalNulls());
+
+    if (containsInvalidInvertedIndex()) {
+      throw new RuntimeException("Inverted index is too large. Please generate smaller segments and try again");
+    }
   }
 
   /**
