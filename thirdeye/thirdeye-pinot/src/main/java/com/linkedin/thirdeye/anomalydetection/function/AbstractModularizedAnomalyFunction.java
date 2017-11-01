@@ -285,36 +285,65 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
         knownAnomalies);
   }
 
+  /**
+   * Get the data model that defines the time ranges of the input time series
+   * @return a data model of the anomaly function
+   */
   @Override
   public DataModel getDataModel() {
     return this.dataModel;
   }
 
+  /**
+   * Get the transformation models to transform the current/monitoring time series
+   * @return a list of transformation models
+   */
   @Override
   public List<TransformationFunction> getCurrentTimeSeriesTransformationChain() {
     return this.currentTimeSeriesTransformationChain;
   }
 
+  /**
+   * Get the transformation models to transform the baseline time series
+   * @return a list of transformation models
+   */
   @Override
   public List<TransformationFunction> getBaselineTimeSeriesTransformationChain() {
     return this.baselineTimeSeriesTransformationChain;
   }
 
+  /**
+   * Get the prediction model of the anomaly function
+   * @return the prediction model of the anomaly function
+   */
   @Override
   public PredictionModel getPredictionModel() {
     return this.predictionModel;
   }
 
+  /**
+   * Get the detection model of the anomaly function
+   * @return the detection model of the anomaly function
+   */
   @Override
   public DetectionModel getDetectionModel() {
     return this.detectionModel;
   }
 
+  /**
+   * Get the merge model of the anomaly function
+   * @return the merge model of the anomaly function
+   */
   @Override
   public MergeModel getMergeModel() {
     return this.mergeModel;
   }
 
+  /**
+   * Determine if the history anomalies are used in the anomaly function
+   * TODO: Remove this flag after the migration to modularized functions is done. The pipeline itself has the ability to determine if the history anomalies should be used.
+   * @return true if the history anomalies should be included in the context
+   */
   @Override
   public boolean useHistoryAnomaly() {
     return true;
