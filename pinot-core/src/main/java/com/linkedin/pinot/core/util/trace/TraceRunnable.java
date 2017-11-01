@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.util.trace;
 
 import com.linkedin.pinot.common.request.InstanceRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.annotation.Nullable;
+
 
 /**
  * Wrap a {@link Runnable} so that the thread executes this job
@@ -25,37 +25,34 @@ import org.slf4j.LoggerFactory;
  *
  */
 public abstract class TraceRunnable implements Runnable {
+  private final InstanceRequest _instanceRequest;
+  private final Trace _parent;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(TraceRunnable.class);
-
-  private final InstanceRequest request;
-  private final Trace parent;
-
-  private TraceRunnable(InstanceRequest request, Trace parent) {
-    if (request == null) {
-      LOGGER.warn("Passing null request to TraceRunnable, maybe forget to register the request in current thread.");
-    }
-    this.request = request;
-    this.parent = parent;
-  }
-
-  /**
-   * Only works when the calling thread has registered the requestId
-   */
   public TraceRunnable() {
     this(TraceContext.getRequestForCurrentThread(), TraceContext.getLocalTraceForCurrentThread());
   }
 
+  /**
+   * If trace is not enabled, both instanceRequest and parent will be null.
+   */
+  private TraceRunnable(@Nullable InstanceRequest instanceRequest, @Nullable Trace parent) {
+    _instanceRequest = instanceRequest;
+    _parent = parent;
+  }
+
   @Override
   public void run() {
-    if (request != null) TraceContext.registerThreadToRequest(request, parent);
+    if (_instanceRequest != null) {
+      TraceContext.registerThreadToRequest(_instanceRequest, _parent);
+    }
     try {
       runJob();
     } finally {
-      if (request != null) TraceContext.unregisterThreadFromRequest();
+      if (_instanceRequest != null) {
+        TraceContext.unregisterThreadFromRequest();
+      }
     }
   }
 
   public abstract void runJob();
-
 }
