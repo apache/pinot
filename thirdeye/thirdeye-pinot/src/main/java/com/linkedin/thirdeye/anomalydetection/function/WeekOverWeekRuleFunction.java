@@ -26,13 +26,6 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
   public static final String BASELINE = "baseline";
   public static final String ENABLE_SMOOTHING = "enableSmoothing";
 
-  private DataModel dataModel = new NoopDataModel();
-  private List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
-  private List<TransformationFunction> baselineTimeSeriesTransformationChain = new ArrayList<>();
-  private PredictionModel predictionModel = new NoopPredictionModel();
-  private DetectionModel detectionModel = new NoopDetectionModel();
-  private MergeModel mergeModel = new NoopMergeModel();
-
   public String[] getPropertyKeys() {
     return new String[] { BASELINE, ENABLE_SMOOTHING,
         MovingAverageSmoothingFunction.MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE,
@@ -157,27 +150,8 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
     return wowString.substring(head, tail);
   }
 
-  @Override public DataModel getDataModel() {
-    return dataModel;
-  }
-
-  @Override public List<TransformationFunction> getCurrentTimeSeriesTransformationChain() {
-    return currentTimeSeriesTransformationChain;
-  }
-
-  @Override public List<TransformationFunction> getBaselineTimeSeriesTransformationChain() {
-    return baselineTimeSeriesTransformationChain;
-  }
-
-  @Override public PredictionModel getPredictionModel() {
-    return predictionModel;
-  }
-
-  @Override public DetectionModel getDetectionModel() {
-    return detectionModel;
-  }
-
-  @Override public MergeModel getMergeModel() {
-    return mergeModel;
+  @Override
+  public boolean useHistoryAnomaly() {
+    return false;
   }
 }

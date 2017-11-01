@@ -26,13 +26,6 @@ public class MinMaxThresholdFunction extends AbstractModularizedAnomalyFunction 
   public static final String MIN_VAL = "min";
   public static final String MAX_VAL = "max";
 
-  private DataModel dataModel = new NoopDataModel();
-  private List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
-  private List<TransformationFunction> baselineTimeSeriesTransformationChain = new ArrayList<>();
-  private PredictionModel predictionModel = new NoopPredictionModel();
-  private DetectionModel detectionModel = new NoopDetectionModel();
-  private MergeModel mergeModel = new NoopMergeModel();
-
   public String[] getPropertyKeys() {
     return new String [] {MIN_VAL, MAX_VAL};
   }
@@ -85,27 +78,8 @@ public class MinMaxThresholdFunction extends AbstractModularizedAnomalyFunction 
     return anomalyTimelinesView;
   }
 
-  @Override public DataModel getDataModel() {
-    return dataModel;
-  }
-
-  @Override public List<TransformationFunction> getCurrentTimeSeriesTransformationChain() {
-    return currentTimeSeriesTransformationChain;
-  }
-
-  @Override public List<TransformationFunction> getBaselineTimeSeriesTransformationChain() {
-    return baselineTimeSeriesTransformationChain;
-  }
-
-  @Override public PredictionModel getPredictionModel() {
-    return predictionModel;
-  }
-
-  @Override public DetectionModel getDetectionModel() {
-    return detectionModel;
-  }
-
-  @Override public MergeModel getMergeModel() {
-    return mergeModel;
+  @Override
+  public boolean useHistoryAnomaly() {
+    return false;
   }
 }
