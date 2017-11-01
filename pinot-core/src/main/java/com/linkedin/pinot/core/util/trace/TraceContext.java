@@ -15,284 +15,184 @@
  */
 package com.linkedin.pinot.core.util.trace;
 
-import com.linkedin.pinot.common.request.InstanceRequest;
+import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import javax.annotation.Nullable;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 
 /**
  * The main entry point for servers to record the trace information.
- *
- * To enable tracing, the request handler thread should register the requestId by calling {@link #register(InstanceRequest)}.
- *
- * For any other {@link Runnable} jobs the request handler creates and will be executed in other threads,
- * They need to be changed to {@link TraceRunnable} interface which handles register/unregister automatically.
- *
- * At the end of tracing a request, the request handler thread should unregister by calling
- * {@link #unregister(InstanceRequest)} to avoid any resource leaks.
- *
- * For place where trace info needs to be recorded, just call {@link TraceContext#logInfo(CONSTANT, long)},
- * {@link TraceContext#logInfo(CONSTANT, InstanceRequest)}, {@link TraceContext#logException(String, String)} or
- * {@link TraceContext#logLatency(String, long)}.
+ * <p>
+ * To enable tracing, the request handler thread should register the requestId by calling
+ * {@link #register(long requestId)}.
+ * <p>
+ * To trace the {@link Runnable} or {@link java.util.concurrent.Callable} jobs the request handler creates and will be
+ * executed in other threads, use {@link TraceRunnable} or {@link TraceCallable} instead.
+ * <p>
+ * At the end of tracing a request, the request handler thread should call {@link #unregister()} to un-register the
+ * request from tracing to prevent resource leak.
  */
-public class TraceContext {
-
-  /**
-   * Only for tests
-   */
-  protected static class Info {
-    public CONSTANT message;
-    public Long requestId;
-
-    public Info(CONSTANT message, Long requestId) {
-      this.message = message;
-      this.requestId = requestId;
-    }
-
-    @Override
-    public String toString() {
-      return "[" + requestId + "] " + message;
-    }
+public final class TraceContext {
+  private TraceContext() {
   }
 
   /**
-   * Enum order matters!
+   * Trace represents the logs for a single thread.
    */
-  protected enum CONSTANT {
-    // control constants
-    REGISTER_REQUEST,
-    REGISTER_THREAD_TO_REQUEST,
-    UNREGISTER_THREAD_FROM_REQUEST,
-    UNREGISTER_REQUEST,
+  static class Trace {
+    static class LogEntry {
+      final String _key;
+      final Object _value;
 
-    // info constants
-    START_NEW_TRACE,
-
-    // failure constants
-    UNREGISTER_REQUEST_FAILURE,
-    REGISTER_THREAD_FAILURE,
-
-    // trace log failure constants
-    REQUEST_FOR_THREAD_NOT_FOUND,
-
-    // retrieve trace failure
-    RETRIEVE_TRACE_FAILURE;
-  }
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TraceContext.class);
-
-  public static boolean TEST_ENABLED = false; // whether to log test-related info for this class
-
-  private static final ThreadLocal<Trace> _localTrace = new ThreadLocal<Trace>() {
-    @Override
-    protected Trace initialValue() {
-      return null;
-    }
-  };
-  private static final ThreadLocal<Boolean> _isActive = new ThreadLocal<Boolean>() {
-    @Override
-    protected Boolean initialValue() {
-      return false;
-    }
-  };
-  private static final ThreadLocal<InstanceRequest> _request = new ThreadLocal<InstanceRequest>() {
-    @Override
-    protected InstanceRequest initialValue() {
-      return null;
-    }
-  };
-
-  /**
-   * Requests may arrive simultaneously, so we need a concurrent collection to manage these requests.
-   *
-   * Also, each requests may issue a number of concurrent {@link Runnable} jobs,
-   * so a thread-safe queue is needed for collecting trace info from threads.
-   */
-  private static ConcurrentHashMap<Long, ConcurrentLinkedDeque<Trace>> allTraceInfoMap;
-
-  /**
-   * Simple way to log all info into a same concurrent list, only used when {@link #TEST_ENABLED}
-   * Map a thread to all info it logged in a linked deque.
-   */
-  private static ConcurrentHashMap<Long, ConcurrentLinkedDeque<Info>> tidToTestInfoMap;
-
-  static {
-    reset();
-  }
-
-  /**
-   * This method is served for debugging purpose, no need to explicitly call it.
-   */
-  protected static void reset() {
-    allTraceInfoMap = new ConcurrentHashMap<Long, ConcurrentLinkedDeque<Trace>>();
-    if (TEST_ENABLED) {
-      tidToTestInfoMap = new ConcurrentHashMap<Long, ConcurrentLinkedDeque<Info>>();
-    }
-  }
-
-  /**
-   * call this method to log info for this class, requestId -1 means requestId is invalid.
-   *
-   * @param info
-   * @param requestId
-   */
-  private static void logInfo(CONSTANT info, long requestId) {
-    Long tid = Thread.currentThread().getId();
-    LOGGER.debug("[TID: {}] {} in Request: {}", tid, info, requestId);
-    if (TEST_ENABLED) {
-      tidToTestInfoMap.putIfAbsent(tid, new ConcurrentLinkedDeque<Info>());
-      tidToTestInfoMap.get(tid).offerLast(new Info(info, requestId));
-    }
-  }
-
-  private static void logInfo(CONSTANT info, InstanceRequest request) {
-    logInfo(info, (request == null) ? -1 : request.getRequestId());
-  }
-
-  /**
-   * Register current thread to a given requestId.
-   * It must be called as the first statement in any job if trace needed.
-   *
-   * @param request
-   * @param parent
-   */
-  protected static void registerThreadToRequest(InstanceRequest request, Trace parent) {
-    ConcurrentLinkedDeque<Trace> traceInfo = allTraceInfoMap.get(request.getRequestId());
-
-    if (traceInfo != null && _request.get() == null) {
-      logInfo(CONSTANT.REGISTER_THREAD_TO_REQUEST, request);
-      long threadId = Thread.currentThread().getId();
-      Trace trace = new Trace(threadId, parent);
-      _localTrace.set(trace);
-      _request.set(request);
-      traceInfo.offerLast(trace);
-    } else {
-      logInfo(CONSTANT.REGISTER_THREAD_FAILURE, request);
-    }
-  }
-
-  /**
-   * Threads are managed by {@link ExecutorService}, so that a thread may be reused and assigned to different requests.
-   * It is always necessary to call this method at the end of tracing so any ThreadLocal fields are clean.
-   *
-   */
-  protected static void unregisterThreadFromRequest() {
-    logInfo(CONSTANT.UNREGISTER_THREAD_FROM_REQUEST, _request.get());
-    _request.remove();
-    _isActive.remove();
-    _localTrace.remove();
-  }
-
-  protected static ConcurrentHashMap<Long, ConcurrentLinkedDeque<Info>> getTestInfoMap() {
-    return tidToTestInfoMap;
-  }
-
-  protected static ConcurrentHashMap<Long, ConcurrentLinkedDeque<Trace>> getAllTraceInfoMap() {
-    return allTraceInfoMap;
-  }
-
-  protected static InstanceRequest getRequestForCurrentThread() {
-    return _request.get();
-  }
-
-  protected static Trace getLocalTraceForCurrentThread() {
-    return _localTrace.get();
-  }
-
-  // ------ Public APIs ------
-
-  /**
-   * We do not want to mix one request with others, so each request should start the trace by calling this method.
-   *
-   * Test whether the requestId exists in the ConcurrentHashMap is meaningless since the return may not up-to-date.
-   * As a result, just make sure NOT to call this method for same requestId in the same request handler thread twice,
-   * we also register the calling thread to the request.
-   *
-   */
-  public static void register(InstanceRequest request) {
-    logInfo(CONSTANT.REGISTER_REQUEST, request);
-    allTraceInfoMap.put(request.getRequestId(), new ConcurrentLinkedDeque<Trace>());
-    registerThreadToRequest(request, null);
-  }
-
-  /**
-   * Call this method at the end of request processing to avoid resource leak!
-   * Remember to save trace info of current request before calling,
-   * we also unregister the calling thread from the request.
-   *
-   * @param request
-   */
-  public static void unregister(InstanceRequest request) {
-    unregisterThreadFromRequest();
-    logInfo(CONSTANT.UNREGISTER_REQUEST, request);
-    if (!TEST_ENABLED) {
-      ConcurrentLinkedDeque<Trace> traces = allTraceInfoMap.remove(request.getRequestId());
-      if (traces == null) {
-        logInfo(CONSTANT.UNREGISTER_REQUEST_FAILURE, request);
-        return;
+      LogEntry(String key, Object value) {
+        _key = key;
+        _value = value;
       }
-      traces.clear(); // release all references, this may be optional
+
+      JSONObject toJson() {
+        return new JSONObject(Collections.singletonMap(_key, _value));
+      }
+    }
+
+    final String _traceId;
+    final List<LogEntry> _logs = new ArrayList<>();
+    int _numChildren = 0;
+
+    Trace(@Nullable Trace parent) {
+      if (parent == null) {
+        _traceId = "0";
+      } else {
+        _traceId = parent.getChildTraceId();
+      }
+    }
+
+    void log(String key, Object value) {
+      _logs.add(new LogEntry(key, value));
+    }
+
+    String getChildTraceId() {
+      return _traceId + "_" + _numChildren++;
+    }
+
+    JSONObject toJson() {
+      JSONArray jsonLogs = new JSONArray();
+      for (LogEntry log : _logs) {
+        jsonLogs.put(log.toJson());
+      }
+      return new JSONObject(Collections.singletonMap(_traceId, jsonLogs));
     }
   }
 
   /**
-   * Thread-safe log operation, all fields referenced in this method should be ThreadLocal.
-   *
-   * @param operator
-   * @param latencyMs
+   * TraceEntry is a wrapper on the trace and the request Id it belongs to.
    */
-  public static void logLatency(String operator, long latencyMs) {
-    if (shouldTrace()) {
-      _localTrace.get().log(operator + "Time", latencyMs);
+  static class TraceEntry {
+    final long _requestId;
+    final Trace _trace;
+
+    TraceEntry(long requestId, Trace trace) {
+      _requestId = requestId;
+      _trace = trace;
     }
   }
 
-  public static void logException(String key, String value) {
-    if (shouldTrace()) {
-      _localTrace.get().log(key, value);
+  private static final ThreadLocal<TraceEntry> TRACE_ENTRY_THREAD_LOCAL = new ThreadLocal<TraceEntry>() {
+    @Override
+    protected TraceEntry initialValue() {
+      return null;
     }
-  }
+  };
 
-  private static boolean shouldTrace() {
-    if (_request.get() == null) {
-      logInfo(CONSTANT.REQUEST_FOR_THREAD_NOT_FOUND, null);
-      return false;
-    }
+  /**
+   * Map from request Id to traces associated with the request.
+   * <p>Requests may arrive simultaneously, so we need a concurrent map to manage these requests.
+   * <p>Each request may use multiple threads, so the queue should be thread-safe as well.
+   */
+  @VisibleForTesting
+  static final Map<Long, Queue<Trace>> REQUEST_TO_TRACES_MAP = new ConcurrentHashMap<>();
 
-    if (!_request.get().isEnableTrace()) {
-      return false;
-    }
-
-    if (!_isActive.get()) {
-      logInfo(CONSTANT.START_NEW_TRACE, _request.get());
-      _isActive.set(true);
-    }
-
-    return true;
+  /**
+   * Register a request to the trace.
+   * <p>Should be called before logging any trace information.
+   */
+  public static void register(long requestId) {
+    REQUEST_TO_TRACES_MAP.put(requestId, new ConcurrentLinkedQueue<Trace>());
+    registerThreadToRequest(new TraceEntry(requestId, null));
   }
 
   /**
-   * This method does not guarantee it returns the complete trace info.
-   * It is caller's responsibility to make sure all threads belong to requestId
-   * finish their work before this method is called.
-   *
-   * This method won't throw any exceptions, so feel free to use it safely.
-   *
-   * Eg. the caller could use a {@link CountDownLatch} to wait for all jobs finished.
-   *
-   * @param requestId
-   * @return
+   * Register a thread to the request.
    */
-  public static String getTraceInfoOfRequestId(Long requestId) {
-    try {
-      ConcurrentLinkedDeque<Trace> deque = allTraceInfoMap.get(requestId);
-      return (deque == null) ? "{ \"error\": \"trace for " + requestId + " not found\" }" : TraceUtils.getTraceString(deque);
-    } catch (Exception e) {
-      logInfo(CONSTANT.RETRIEVE_TRACE_FAILURE, requestId);
-      return "{ \"error\": \"retrieve trace for " + requestId + " failed\" }";
+  static void registerThreadToRequest(TraceEntry parentTraceEntry) {
+    Trace trace = new Trace(parentTraceEntry._trace);
+    TRACE_ENTRY_THREAD_LOCAL.set(new TraceEntry(parentTraceEntry._requestId, trace));
+    REQUEST_TO_TRACES_MAP.get(parentTraceEntry._requestId).add(trace);
+  }
+
+  /**
+   * Un-register a request from the trace.
+   * <p>Should be called after all trace information being saved.
+   */
+  public static void unregister() {
+    TraceEntry traceEntry = TRACE_ENTRY_THREAD_LOCAL.get();
+    REQUEST_TO_TRACES_MAP.remove(traceEntry._requestId);
+    unregisterThreadFromRequest();
+  }
+
+  /**
+   * Un-register a thread from the request.
+   */
+  static void unregisterThreadFromRequest() {
+    TRACE_ENTRY_THREAD_LOCAL.remove();
+  }
+
+  /**
+   * Return whether the trace is enabled.
+   */
+  public static boolean traceEnabled() {
+    return TRACE_ENTRY_THREAD_LOCAL.get() != null;
+  }
+
+  /**
+   * Log the time spent in a specific operator.
+   * <p>Should be called after calling {@link #traceEnabled()} and ensure trace is enabled.
+   */
+  public static void logTime(String operatorName, long timeMs) {
+    TRACE_ENTRY_THREAD_LOCAL.get()._trace.log(operatorName + " Time", timeMs);
+  }
+
+  /**
+   * Log a key-value pair trace information.
+   * <p>Should be called after calling {@link #traceEnabled()} and ensure trace is enabled.
+   */
+  public static void logInfo(String key, Object value) {
+    TRACE_ENTRY_THREAD_LOCAL.get()._trace.log(key, value);
+  }
+
+  /**
+   * Get the trace information added so far.
+   */
+  public static String getTraceInfo() {
+    JSONArray jsonTraces = new JSONArray();
+    for (Trace trace : REQUEST_TO_TRACES_MAP.get(TRACE_ENTRY_THREAD_LOCAL.get()._requestId)) {
+      jsonTraces.put(trace.toJson());
     }
+    return jsonTraces.toString();
+  }
+
+  /**
+   * Get the {@link TraceEntry} for the current thread.
+   */
+  @Nullable
+  static TraceEntry getTraceEntry() {
+    return TRACE_ENTRY_THREAD_LOCAL.get();
   }
 }
