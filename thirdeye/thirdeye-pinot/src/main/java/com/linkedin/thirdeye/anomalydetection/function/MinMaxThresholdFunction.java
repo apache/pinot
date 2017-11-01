@@ -77,4 +77,9 @@ public class MinMaxThresholdFunction extends AbstractModularizedAnomalyFunction 
 
     return anomalyTimelinesView;
   }
+
+  @Override
+  public boolean useHistoryAnomaly() {
+    return false;
+  }
 }

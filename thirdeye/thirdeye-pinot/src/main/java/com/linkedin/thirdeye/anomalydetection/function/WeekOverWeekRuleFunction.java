@@ -149,4 +149,9 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
     }
     return wowString.substring(head, tail);
   }
+
+  @Override
+  public boolean useHistoryAnomaly() {
+    return false;
+  }
 }
