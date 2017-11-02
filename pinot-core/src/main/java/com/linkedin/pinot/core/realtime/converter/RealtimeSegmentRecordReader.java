@@ -55,6 +55,7 @@ public class RealtimeSegmentRecordReader extends BaseRecordReader {
     columns.addAll(dataSchema.getDimensionNames());
     columns.addAll(dataSchema.getMetricNames());
     columns.add(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
+    columns.addAll(dataSchema.getDateTimeNames());
   }
 
   @Override
