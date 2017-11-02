@@ -178,6 +178,21 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpmime</artifactId>
+        <version>4.2.5</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>4.2.5</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpcore</artifactId>
+        <version>4.2.5</version>
+      </dependency>
+      <dependency>
         <groupId>com.linkedin.pinot</groupId>
         <artifactId>pinot-common</artifactId>
         <version>${project.version}</version>
