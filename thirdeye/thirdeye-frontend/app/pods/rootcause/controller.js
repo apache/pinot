@@ -1,45 +1,46 @@
 import Ember from 'ember';
 import _ from 'lodash';
 
-const extractTimeseries = (json) => {
-  const timeseries = {};
-  Object.keys(json).forEach(range =>
-    Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
-      const urn = `thirdeye:metric:${sid}`;
-      const jrng = json[range];
-      const jval = jrng[sid];
+//
+// Config
+//
 
-      const timestamps = [];
-      const values = [];
-      jrng.timestamp.forEach((t, i) => {
-        if (jval[i] != null) {
-          timestamps.push(t);
-          values.push(jval[i]);
-        }
-      });
-
-      timeseries[urn] = {
-        timestamps: timestamps,
-        values: values
-      };
-    })
-  );
-  return timeseries;
-};
-
-const isIterable = (obj) => {
-  if (obj == null || _.isString(obj)) {
-    return false;
+const EVENT_TABLE_COLUMNS = [
+  {
+    template: 'custom/checkbox',
+    useFilter: false,
+    mayBeHidden: false,
+    className: 'events-table__column--checkbox'
+  },
+  {
+    propertyName: 'label',
+    title: 'Event Name',
+    className: 'events-table__column'
+  },
+  {
+    propertyName: 'eventType',
+    title: 'Type',
+    filterWithSelect: true,
+    sortFilterOptions: true,
+    className: 'events-table__column--compact'
+  },
+  {
+    propertyName: 'start',
+    title: 'Start',
+    className: 'events-table__column--compact',
+    disableFiltering: true
+  },
+  {
+    propertyName: 'end',
+    title: 'End',
+    className: 'events-table__column--compact',
+    disableFiltering: true
   }
-  return typeof obj[Symbol.iterator] === 'function';
-};
+];
 
-const makeIterable = (obj) => {
-  if (obj == null) {
-    return [];
-  }
-  return isIterable(obj) ? [...obj] : [obj];
-};
+//
+// Controller
+//
 
 export default Ember.Controller.extend({
   selectedUrns: null, // Set
@@ -95,6 +96,17 @@ export default Ember.Controller.extend({
       return output;
     }
   ),
+
+  eventTableEntities: Ember.computed(
+    'entities',
+    function () {
+      console.log('eventTableEntities()');
+      const entities = this.get('entities') || {};
+      return Object.keys(entities).filter(urn => entities[urn].type == 'event').map(urn => entities[urn]);
+    }
+  ),
+
+  eventTableColumns: EVENT_TABLE_COLUMNS,
 
   _timeseriesLoader: Ember.computed(
     'entities',
@@ -244,3 +256,48 @@ export default Ember.Controller.extend({
     }
   }
 });
+
+//
+// Helpers
+//
+
+const extractTimeseries = (json) => {
+  const timeseries = {};
+  Object.keys(json).forEach(range =>
+    Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
+      const urn = `thirdeye:metric:${sid}`;
+      const jrng = json[range];
+      const jval = jrng[sid];
+
+      const timestamps = [];
+      const values = [];
+      jrng.timestamp.forEach((t, i) => {
+        if (jval[i] != null) {
+          timestamps.push(t);
+          values.push(jval[i]);
+        }
+      });
+
+      timeseries[urn] = {
+        timestamps: timestamps,
+        values: values
+      };
+    })
+  );
+  return timeseries;
+};
+
+const isIterable = (obj) => {
+  if (obj == null || _.isString(obj)) {
+    return false;
+  }
+  return typeof obj[Symbol.iterator] === 'function';
+};
+
+const makeIterable = (obj) => {
+  if (obj == null) {
+    return [];
+  }
+  return isIterable(obj) ? [...obj] : [obj];
+};
+
