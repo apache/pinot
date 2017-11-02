@@ -207,6 +207,27 @@ export default Ember.Controller.extend({
   },
 
   actions: {
+    tableOnSelect(tableEntities) {
+      console.log('tableOnSelect()');
+      const entities = this.get('entities');
+      const selectedUrns = this.get('selectedUrns');
+
+      console.log('tableOnSelect: tableEntities', tableEntities);
+      console.log('tableOnSelect: selectedUrns', selectedUrns);
+
+      const tableEventUrns = new Set(Object.values(tableEntities).map(e => e.urn));
+      const selectedEventUrns = new Set(makeIterable(selectedUrns).filter(urn => entities[urn] && entities[urn].type == 'event'));
+      console.log('tableOnSelect: tableEventUrns', tableEventUrns);
+      console.log('tableOnSelect: selectedEventUrns', selectedEventUrns);
+
+      makeIterable(selectedEventUrns).filter(urn => !tableEventUrns.has(urn)).forEach(urn => selectedUrns.delete(urn));
+      makeIterable(tableEventUrns).forEach(urn => selectedUrns.add(urn));
+      console.log('tableOnSelect: selectedUrns', selectedUrns);
+      
+      this.set('selectedUrns', selectedUrns);
+      this.notifyPropertyChange('selectedUrns');
+    },
+
     addSelectedUrns(urns) {
       console.log('addSelectedUrns()');
       const selectedUrns = this.get('selectedUrns');

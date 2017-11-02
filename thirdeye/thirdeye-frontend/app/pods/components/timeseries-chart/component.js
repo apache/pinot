@@ -49,17 +49,11 @@ export default Ember.Component.extend({
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
-    console.log('cache', cache);
-    console.log('series', series);
 
     const addedKeys = Object.keys(series).filter(sid => !cache[sid]);
     const changedKeys = Object.keys(series).filter(sid => cache[sid] && !_.isEqual(cache[sid], series[sid]));
     const deletedKeys = Object.keys(cache).filter(sid => !series[sid]);
     const regionKeys = Object.keys(series).filter(sid => series[sid] && series[sid].type == 'region');
-    console.log('addedKeys', addedKeys);
-    console.log('changedKeys', changedKeys);
-    console.log('deletedKeys', deletedKeys);
-    console.log('regionKeys', deletedKeys);
 
     const regions = regionKeys.map(sid => {
       const t = series[sid].timestamps;
@@ -68,46 +62,35 @@ export default Ember.Component.extend({
       if ('color' in series[sid]) {
         region.class = 'c3-region--' + series[sid].color;
       }
-
+      
       return region;
     });
-    console.log('regions', regions);
 
     const unloadKeys = deletedKeys.concat(regionKeys);
     const unload = unloadKeys.concat(unloadKeys.map(sid => sid + '-timestamps'));
-    console.log('unload', unload);
 
     const loadKeys = addedKeys.concat(changedKeys).filter(sid => !regionKeys.includes(sid));
     const xs = {};
     loadKeys.forEach(sid => xs[sid] = sid + '-timestamps');
-    console.log('xs', xs);
 
     const values = loadKeys.map(sid => [sid].concat(series[sid].values));
-    console.log('values', values);
 
     const timestamps = loadKeys.map(sid => [sid + '-timestamps'].concat(series[sid].timestamps));
-    console.log('timestamps', timestamps);
 
     const columns = values.concat(timestamps);
-    console.log('columns', columns);
 
     const colors = {};
     loadKeys.filter(sid => series[sid].color).forEach(sid => colors[sid] = series[sid].color);
-    console.log('colors', colors);
 
     const types = {};
     loadKeys.filter(sid => series[sid].type).forEach(sid => types[sid] = series[sid].type);
-    console.log('types', types);
 
     const tooltip = this.get('tooltip');
-    console.log('tooltip', tooltip);
 
     const axis = this.get('axis');
-    console.log('axis', axis);
 
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
-    console.log('axes', axes);
 
     const config = { unload, xs, columns, types, regions, tooltip, colors, axis, axes };
 
@@ -121,10 +104,9 @@ export default Ember.Component.extend({
 
   didUpdateAttrs() {
     this._super(...arguments);
-    console.log('didUpdateAttrs()');
 
     const diffConfig = this._makeDiffConfig();
-    console.log('diffConfig', diffConfig);
+    console.log('timeseries-chart: didUpdateAttrs(): diffConfig', diffConfig);
 
     const chart = this.get('_chart');
     chart.regions(diffConfig.regions);
@@ -135,10 +117,8 @@ export default Ember.Component.extend({
 
   didInsertElement() {
     this._super(...arguments);
-    console.log('didInsertElement()');
 
     const diffConfig = this._makeDiffConfig();
-
     const config = {};
     config.bindto = this.get('element');
     config.data = {
@@ -151,10 +131,10 @@ export default Ember.Component.extend({
     config.axis = diffConfig.axis;
     config.regions = diffConfig.regions;
     config.tooltip = diffConfig.tooltip;
-    console.log('config', config);
+
+    console.log('timeseries-chart: didInsertElement(): config', config);
 
     this.set('_chart', c3.generate(config));
-
     this._updateCache();
   }
 });

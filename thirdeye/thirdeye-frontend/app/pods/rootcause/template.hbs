@@ -9,11 +9,8 @@ This is the rootcause page.
 <a {{action "addFilteredUrns" "thirdeye:metric:17606338"}}>add filtered</a> |
 <a {{action "removeFilteredUrns" "thirdeye:metric:17606338"}}>remove filtered</a>
 
-{{models-table
+{{rootcause-table
   data=eventTableEntities
   columns=eventTableColumns
-  showColumnsDropdown=false
-  showGlobalFilter=false
-  filteringIgnoreCase=true
-  multipleExpand=true
+  onSelect=(action "tableOnSelect")
 }}
