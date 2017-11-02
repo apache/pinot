@@ -567,9 +567,10 @@ public class TimeSeriesResource {
       if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
-      if (s.size() <= 0)
+      DoubleSeries sDrop = s.dropNull();
+      if (sDrop.isEmpty())
         continue;
-      final double base = s.first().doubleValue();
+      final double base = sDrop.first().doubleValue();
       if (base != 0.0d) {
         data.addSeries(id, s.divide(base));
       } else {
@@ -590,9 +591,10 @@ public class TimeSeriesResource {
       if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
-      if (s.size() <= 0)
+      DoubleSeries sDrop = s.dropNull();
+      if (sDrop.isEmpty())
         continue;
-      final double base = s.first().doubleValue();
+      final double base = sDrop.first().doubleValue();
       data.addSeries(id, s.subtract(base));
     }
     return data;
