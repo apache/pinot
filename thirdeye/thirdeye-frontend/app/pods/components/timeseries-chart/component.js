@@ -38,7 +38,11 @@ export default Ember.Component.extend({
     },
     x: {
       type: 'timeseries',
-      show: true
+      show: true,
+      tick: {
+        count: 5,
+        format: '%Y-%m-%d'
+      }
     }
   },
 
