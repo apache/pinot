@@ -97,10 +97,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
     long requestId = instanceRequest.getRequestId();
-    boolean enableTrace = instanceRequest.isEnableTrace();
-    if (enableTrace) {
-      TraceContext.register(instanceRequest);
-    }
     BrokerRequest brokerRequest = instanceRequest.getQuery();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
     String tableName = brokerRequest.getQuerySource().getTableName();
@@ -108,8 +104,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: {}", tableName);
     List<SegmentDataManager> queryableSegmentDataManagerList =
         acquireQueryableSegments(tableDataManager, instanceRequest);
+    boolean enableTrace = instanceRequest.isEnableTrace();
+    if (enableTrace) {
+      TraceContext.register(requestId);
+    }
 
-    DataTable dataTable;
+    DataTable dataTable = null;
     try {
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
       long totalRawDocs = pruneSegments(tableDataManager, queryableSegmentDataManagerList, queryRequest);
@@ -143,7 +143,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         globalQueryPlan.execute();
         planExecTimer.stopAndRecord();
 
-
         dataTable = globalQueryPlan.getInstanceResponse();
         // Update the total docs in the metadata based on un-pruned segments.
         dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(totalRawDocs));
@@ -160,26 +159,23 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
       dataTable = new DataTableImplV2();
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
-      if (enableTrace) {
-        TraceContext.logException("ServerQueryExecutorV1Impl", "Exception occurs in processQuery");
-      }
     } finally {
       for (SegmentDataManager segmentDataManager : queryableSegmentDataManagerList) {
         tableDataManager.releaseSegment(segmentDataManager);
+      }
+      if (enableTrace) {
+        if (dataTable != null) {
+          dataTable.getMetadata().put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfo());
+        }
+        TraceContext.unregister();
       }
     }
 
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
-
-    Map<String, String> dataTableMetadata = dataTable.getMetadata();
-    dataTableMetadata.put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
-    if (enableTrace) {
-      dataTableMetadata.put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(requestId));
-      TraceContext.unregister(instanceRequest);
-    }
+    dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
-    LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable.toString());
+    LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
     return dataTable;
   }
 

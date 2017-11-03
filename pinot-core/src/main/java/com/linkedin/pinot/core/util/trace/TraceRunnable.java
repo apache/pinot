@@ -15,40 +15,28 @@
  */
 package com.linkedin.pinot.core.util.trace;
 
-import com.linkedin.pinot.common.request.InstanceRequest;
-import javax.annotation.Nullable;
-
-
 /**
- * Wrap a {@link Runnable} so that the thread executes this job
- * will be automatically registered/unregistered to/from a request.
- *
+ * Wrapper class for {@link Runnable} to automatically register/un-register itself to/from a request.
  */
 public abstract class TraceRunnable implements Runnable {
-  private final InstanceRequest _instanceRequest;
-  private final Trace _parent;
-
-  public TraceRunnable() {
-    this(TraceContext.getRequestForCurrentThread(), TraceContext.getLocalTraceForCurrentThread());
-  }
+  private final TraceContext.TraceEntry _parentTraceEntry;
 
   /**
-   * If trace is not enabled, both instanceRequest and parent will be null.
+   * If trace is not enabled, parent trace entry will be null.
    */
-  private TraceRunnable(@Nullable InstanceRequest instanceRequest, @Nullable Trace parent) {
-    _instanceRequest = instanceRequest;
-    _parent = parent;
+  public TraceRunnable() {
+    _parentTraceEntry = TraceContext.getTraceEntry();
   }
 
   @Override
   public void run() {
-    if (_instanceRequest != null) {
-      TraceContext.registerThreadToRequest(_instanceRequest, _parent);
+    if (_parentTraceEntry != null) {
+      TraceContext.registerThreadToRequest(_parentTraceEntry);
     }
     try {
       runJob();
     } finally {
-      if (_instanceRequest != null) {
+      if (_parentTraceEntry != null) {
         TraceContext.unregisterThreadFromRequest();
       }
     }

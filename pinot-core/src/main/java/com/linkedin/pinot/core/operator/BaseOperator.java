@@ -31,22 +31,32 @@ public abstract class BaseOperator implements Operator {
 
   @Override
   public final Block nextBlock() {
-    long start = System.currentTimeMillis();
-    Block ret = getNextBlock();
-    long end = System.currentTimeMillis();
-    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
-    TraceContext.logLatency(getOperatorName(), (end - start));
-    return ret;
+    if (TraceContext.traceEnabled()) {
+      long start = System.currentTimeMillis();
+      Block ret = getNextBlock();
+      long end = System.currentTimeMillis();
+      String operatorName = getOperatorName();
+      LOGGER.trace("Time spent in {}: {}", operatorName, (end - start));
+      TraceContext.logTime(operatorName, (end - start));
+      return ret;
+    } else {
+      return getNextBlock();
+    }
   }
 
   @Override
   public final Block nextBlock(BlockId blockId) {
-    long start = System.currentTimeMillis();
-    Block ret = getNextBlock(blockId);
-    long end = System.currentTimeMillis();
-    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
-    TraceContext.logLatency(getOperatorName(), (end - start));
-    return ret;
+    if (TraceContext.traceEnabled()) {
+      long start = System.currentTimeMillis();
+      Block ret = getNextBlock(blockId);
+      long end = System.currentTimeMillis();
+      String operatorName = getOperatorName();
+      LOGGER.trace("Time spent in {}: {}", operatorName, (end - start));
+      TraceContext.logTime(operatorName, (end - start));
+      return ret;
+    } else {
+      return getNextBlock(blockId);
+    }
   }
 
   public abstract Block getNextBlock();
