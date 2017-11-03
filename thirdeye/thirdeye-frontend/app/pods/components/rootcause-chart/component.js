@@ -17,10 +17,15 @@ export default Ember.Component.extend({
 
   analysisRange: null, // [2]
 
+  legend: {
+    show: false
+  },
+
   tooltip: Ember.computed(
     'onHover',
     function () {
-      const onHover = this.get('onHover');
+      const { onHover } = this.getProperties('onHover');
+
       return {
         format: {
           title: (d) => {
@@ -33,10 +38,6 @@ export default Ember.Component.extend({
     }
   ),
 
-  legend: {
-    show: false
-  },
-
   series: Ember.computed(
     'entities',
     'timeseries',
@@ -44,21 +45,16 @@ export default Ember.Component.extend({
     'anomalyRange',
     'baselineRange',
     function () {
-      const entities = this.get('entities');
-      const timeseries = this.get('timeseries');
-      const selectedUrns = this.get('selectedUrns');
+      const { entities, selectedUrns, anomalyRange, baselineRange } =
+        this.getProperties('entities', 'selectedUrns', 'anomalyRange', 'baselineRange');
 
       const series = {};
-      [...selectedUrns]
-        .filter(urn => urn in entities)
-        .filter(urn => ['metric', 'event'].includes(entities[urn].type))
-        .filter(urn => entities[urn].type != 'metric' || urn in timeseries)
+      this._filterDisplayable(selectedUrns)
         .forEach(urn => {
           const e = entities[urn];
           series[this._entityToLabel(e)] = this._entityToSeries(e);
         });
 
-      const anomalyRange = this.get('anomalyRange');
       series['anomalyRange'] = {
         timestamps: anomalyRange,
         values: [0, 0],
@@ -66,15 +62,12 @@ export default Ember.Component.extend({
         color: 'orange'
       };
 
-      const baselineRange = this.get('baselineRange');
       series['baselineRange'] = {
         timestamps: baselineRange,
         values: [0, 0],
         type: 'region',
         color: 'blue'
       };
-
-      console.log('rootcause-chart: series: series', series);
 
       return series;
     }
@@ -83,7 +76,8 @@ export default Ember.Component.extend({
   axis: Ember.computed(
     'analysisRange',
     function () {
-      const analysisRange = this.get('analysisRange');
+      const { analysisRange } = this.getProperties('analysisRange');
+
       return {
         y: {
           show: true
@@ -93,10 +87,11 @@ export default Ember.Component.extend({
         },
         x: {
           type: 'timeseries',
-          show: true,
+          show: true, // TODO false prevents function call, other option?
           min: analysisRange[0],
           max: analysisRange[1],
           tick: {
+            count: Math.ceil(moment.duration(analysisRange[1] - analysisRange[0]).asDays()),
             format: '%Y-%m-%d'
           }
         }
@@ -109,15 +104,10 @@ export default Ember.Component.extend({
     'timeseries',
     'selectedUrns',
     function () {
-      const entities = this.get('entities');
-      const timeseries = this.get('timeseries');
-      const selectedUrns = this.get('selectedUrns');
+      const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
 
       const bounds = {};
-      [...selectedUrns]
-        .filter(urn => urn in entities)
-        .filter(urn => ['metric', 'event'].includes(entities[urn].type))
-        .filter(urn => entities[urn].type != 'metric' || urn in timeseries)
+      this._filterDisplayable(selectedUrns)
         .forEach(urn => {
           const e = entities[urn];
           const timestamps = this._entityToSeries(e).timestamps;
@@ -128,14 +118,23 @@ export default Ember.Component.extend({
     }
   ),
 
+  _filterDisplayable(urns) {
+    const { entities, timeseries } = this.getProperties('entities', 'timeseries');
+
+    return [...urns]
+      .filter(urn => entities[urn])
+      .filter(urn => ['metric', 'event'].includes(entities[urn].type))
+      .filter(urn => entities[urn].type != 'metric' || timeseries[urn]);
+  },
+
   _entityToLabel(entity) {
     return entity.urn;
   },
 
   _entityToSeries(entity) {
     if (entity.type == 'metric') {
-      const timeseries = this.get('timeseries');
-      // console.log(entity.urn, 'timestamps', timeseries[entity.urn].timestamps.length, 'values', timeseries[entity.urn].values.length);
+      const { timeseries } = this.getProperties('timeseries');
+
       return {
         timestamps: timeseries[entity.urn].timestamps,
         values: timeseries[entity.urn].values,
@@ -159,25 +158,12 @@ export default Ember.Component.extend({
   },
 
   _onHover(d) {
-    const bounds = this.get('_hoverBounds');
-    const selectedUrns = this.get('selectedUrns');
-    const onHover = this.get('onHover');
+    const { _hoverBounds: bounds, selectedUrns, onHover } =
+      this.getProperties('_hoverBounds', 'selectedUrns', 'onHover');
+
     if (onHover != null) {
-      console.log('rootcause-chart: _onHover: bounds', bounds);
       const urns = [...selectedUrns].filter(urn => bounds[urn] && bounds[urn][0] <= d && d <= bounds[urn][1]);
       onHover(urns);
     }
-  },
-
-  actions: {
-    // NOTE: not passed through yet
-    onMouseOut() {
-      const onHover = this.get('onHover');
-      if (onHover != null) {
-        console.log('rootcause-chart: onMouseOut()');
-        onHover([]);
-      }
-    }
   }
-
 });

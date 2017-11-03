@@ -7,8 +7,7 @@ export default Ember.Component.extend({
 
   actions: {
     selectEventType(eventType) {
-      const entities = this.get('entities');
-      const onSelect = this.get('onSelect');
+      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
       if (onSelect != null) {
         const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event').filter(urn => entities[urn].eventType == eventType)
         onSelect(urns);
@@ -16,8 +15,7 @@ export default Ember.Component.extend({
     },
 
     resetEventType() {
-      const entities = this.get('entities');
-      const onSelect = this.get('onSelect');
+      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
       if (onSelect != null) {
         const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event');
         onSelect(urns);

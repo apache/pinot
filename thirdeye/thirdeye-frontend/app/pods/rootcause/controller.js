@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import _ from 'lodash';
+import { makeIterable, filterObject } from '../../helpers/utils';
 
 //
 // Config
@@ -89,14 +89,9 @@ export default Ember.Controller.extend({
     'invisibleUrns',
     function () {
       console.log('chartSelectedUrns()');
-      const selectedUrns = this.get('selectedUrns');
-      const invisibleUrns = this.get('invisibleUrns');
-      const primaryMetricUrn = this.get('model.primaryMetricUrn');
+      const { selectedUrns, invisibleUrns, 'model.primaryMetricUrn': primaryMetricUrn } =
+        this.getProperties('selectedUrns', 'invisibleUrns', 'model.primaryMetricUrn');
 
-      // console.log('chartSelectedUrns: selectedUrns', selectedUrns);
-      // console.log('chartSelectedUrns: invisibleUrns', invisibleUrns);
-      // console.log('chartSelectedUrns: primaryMetricUrn', primaryMetricUrn);
-      //
       const output = new Set(selectedUrns);
       output.add(primaryMetricUrn);
       invisibleUrns.forEach(urn => output.delete(urn));
@@ -112,7 +107,7 @@ export default Ember.Controller.extend({
       console.log('eventTableEntities()');
       const entities = this.get('entities') || {};
       const filteredUrns = this.get('filteredUrns');
-      return filterEntities(entities, (e) => filteredUrns.has(e.urn));
+      return filterObject(entities, (e) => filteredUrns.has(e.urn));
     }
   ),
 
@@ -123,7 +118,7 @@ export default Ember.Controller.extend({
     function () {
       console.log('eventFilterEntities()');
       const entities = this.get('entities') || {};
-      return filterEntities(entities, (e) => e.type == 'event');
+      return filterObject(entities, (e) => e.type == 'event');
     }
   ),
 
@@ -136,9 +131,9 @@ export default Ember.Controller.extend({
       const invisibleUrns = this.get('invisibleUrns');
       const hoverUrns = this.get('hoverUrns');
 
-      const visibleUrns = makeIterable(hoverUrns).filter(urn => !invisibleUrns.has(urn));
+      const visibleUrns = [...hoverUrns].filter(urn => !invisibleUrns.has(urn));
 
-      return filterEntities(entities, (e) => visibleUrns.has(e.urn));
+      return filterObject(entities, (e) => visibleUrns.has(e.urn));
     }
   ),
 
@@ -165,10 +160,6 @@ export default Ember.Controller.extend({
       const dimensionEntities = this.get('model.dimensionEntities') || [];
       const metricEntities = this.get('model.metricEntities') || [];
 
-      // console.log('_entitiesLoader: eventEntities', eventEntities);
-      // console.log('_entitiesLoader: dimensionEntities', dimensionEntities);
-      // console.log('_entitiesLoader: metricEntities', metricEntities);
-      //
       const entities = {};
       eventEntities.forEach(e => entities[e.urn] = e);
       dimensionEntities.forEach(e => entities[e.urn] = e);
@@ -222,7 +213,7 @@ export default Ember.Controller.extend({
 
     fetch(url)
       .then(res => res.json())
-      .then(extractTimeseries)
+      .then(this._extractTimeseries)
       .then(incoming => this._completeRequestMissingTimeseries(this, incoming));
 
     return cache; // return current state, without new metrics
@@ -242,7 +233,7 @@ export default Ember.Controller.extend({
 
   actions: {
     toggleInvisible(urn) {
-      const invisibleUrns = this.get('invisibleUrns');
+      const { invisibleUrns } = this.getProperties('invisibleUrns');
       if (invisibleUrns.has(urn)) {
         invisibleUrns.delete(urn);
       } else {
@@ -254,14 +245,11 @@ export default Ember.Controller.extend({
 
     tableOnSelect(tableUrns) {
       console.log('tableOnSelect()');
-      const entities = this.get('entities');
-      const filteredUrns = this.get('filteredUrns');
-      const selectedUrns = this.get('selectedUrns');
+      const { entities, filteredUrns, selectedUrns } =
+        this.getProperties('entities', 'filteredUrns', 'selectedUrns');
 
       const tableEventUrns = new Set(tableUrns);
       const selectedEventUrns = new Set(makeIterable(selectedUrns).filter(urn => entities[urn] && entities[urn].type == 'event'));
-      console.log('tableOnSelect: tableEventUrns', tableEventUrns);
-      console.log('tableOnSelect: selectedEventUrns', selectedEventUrns);
 
       makeIterable(selectedEventUrns).filter(urn => filteredUrns.has(urn) && !tableEventUrns.has(urn)).forEach(urn => selectedUrns.delete(urn));
       makeIterable(tableEventUrns).forEach(urn => selectedUrns.add(urn));
@@ -278,21 +266,20 @@ export default Ember.Controller.extend({
 
     chartOnHover(urns) {
       console.log('chartOnHover()');
-      console.log('chartOnHover: urns', urns);
       this.set('hoverUrns', new Set(urns));
       this.notifyPropertyChange('hoverUrns');
     },
 
     loadtestSelectedUrns() {
       console.log('loadtestSelected()');
-      const entities = this.get('entities');
+      const { entities } = this.getProperties('entities');
       this.set('selectedUrns', new Set(Object.keys(entities)));
       this.notifyPropertyChange('selectedUrns');
     },
 
     addSelectedUrns(urns) {
       console.log('addSelectedUrns()');
-      const selectedUrns = this.get('selectedUrns');
+      const { selectedUrns } = this.getProperties('selectedUrns');
       makeIterable(urns).forEach(urn => selectedUrns.add(urn));
       this.set('selectedUrns', selectedUrns);
       this.notifyPropertyChange('selectedUrns');
@@ -300,7 +287,7 @@ export default Ember.Controller.extend({
 
     removeSelectedUrns(urns) {
       console.log('removeSelectedUrns()');
-      const selectedUrns = this.get('selectedUrns');
+      const { selectedUrns } = this.getProperties('selectedUrns');
       makeIterable(urns).forEach(urn => selectedUrns.delete(urn));
       this.set('selectedUrns', selectedUrns);
       this.notifyPropertyChange('selectedUrns');
@@ -308,7 +295,7 @@ export default Ember.Controller.extend({
 
     addFilteredUrns(urns) {
       console.log('addFilteredUrns()');
-      const filteredUrns = this.get('filteredUrns');
+      const { filteredUrns } = this.getProperties('filteredUrns');
       makeIterable(urns).forEach(urn => filteredUrns.add(urn));
       this.set('filteredUrns', filteredUrns);
       this.notifyPropertyChange('filteredUrns');
@@ -316,7 +303,7 @@ export default Ember.Controller.extend({
 
     removeFilteredUrns(urns) {
       console.log('removeFilteredUrns()');
-      const filteredUrns = this.get('filteredUrns');
+      const { filteredUrns } = this.getProperties('filteredUrns');
       makeIterable(urns).forEach(urn => filteredUrns.delete(urn));
       this.set('filteredUrns', filteredUrns);
       this.notifyPropertyChange('filteredUrns');
@@ -324,7 +311,7 @@ export default Ember.Controller.extend({
 
     addInvisibleUrns(urns) {
       console.log('addInvisibleUrns()');
-      const invisibleUrns = this.get('invisibleUrns');
+      const { invisibleUrns } = this.getProperties('invisibleUrns');
       makeIterable(urns).forEach(urn => invisibleUrns.add(urn));
       this.set('invisibleUrns', invisibleUrns);
       this.notifyPropertyChange('invisibleUrns');
@@ -332,60 +319,40 @@ export default Ember.Controller.extend({
 
     removeInvisibleUrns(urns) {
       console.log('removeInvisibleUrns()');
-      const invisibleUrns = this.get('invisibleUrns');
+      const { invisibleUrns } = this.getProperties('invisibleUrns');
       makeIterable(urns).forEach(urn => invisibleUrns.delete(urn));
       this.set('invisibleUrns', invisibleUrns);
       this.notifyPropertyChange('invisibleUrns');
     }
+  },
+
+  //
+  // Helpers
+  //
+  _extractTimeseries: function(json) {
+    const timeseries = {};
+    Object.keys(json).forEach(range =>
+      Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
+        const urn = `thirdeye:metric:${sid}`;
+        const jrng = json[range];
+        const jval = jrng[sid];
+
+        const timestamps = [];
+        const values = [];
+        jrng.timestamp.forEach((t, i) => {
+          if (jval[i] != null) {
+            timestamps.push(t);
+            values.push(jval[i]);
+          }
+        });
+
+        timeseries[urn] = {
+          timestamps: timestamps,
+          values: values
+        };
+      })
+    );
+    return timeseries;
   }
 });
 
-//
-// Helpers
-//
-
-const extractTimeseries = (json) => {
-  const timeseries = {};
-  Object.keys(json).forEach(range =>
-    Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
-      const urn = `thirdeye:metric:${sid}`;
-      const jrng = json[range];
-      const jval = jrng[sid];
-
-      const timestamps = [];
-      const values = [];
-      jrng.timestamp.forEach((t, i) => {
-        if (jval[i] != null) {
-          timestamps.push(t);
-          values.push(jval[i]);
-        }
-      });
-
-      timeseries[urn] = {
-        timestamps: timestamps,
-        values: values
-      };
-    })
-  );
-  return timeseries;
-};
-
-const isIterable = (obj) => {
-  if (obj == null || _.isString(obj)) {
-    return false;
-  }
-  return typeof obj[Symbol.iterator] === 'function';
-};
-
-const makeIterable = (obj) => {
-  if (obj == null) {
-    return [];
-  }
-  return isIterable(obj) ? [...obj] : [obj];
-};
-
-const filterEntities = (obj, func) => {
-  const out = {};
-  Object.keys(obj).filter(key => func(obj[key])).forEach(key => out[key] = obj[key]);
-  return out;
-};

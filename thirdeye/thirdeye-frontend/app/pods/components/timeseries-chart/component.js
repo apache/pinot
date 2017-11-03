@@ -29,9 +29,7 @@ export default Ember.Component.extend({
     }
   },
 
-  legend: {
-
-  },
+  legend: {},
 
   axis: {
     y: {
@@ -53,6 +51,7 @@ export default Ember.Component.extend({
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
+    const { axis, legend, tooltip } = this.getProperties('axis', 'legend', 'tooltip');
 
     const addedKeys = Object.keys(series).filter(sid => !cache[sid]);
     const changedKeys = Object.keys(series).filter(sid => cache[sid] && !_.isEqual(cache[sid], series[sid]));
@@ -64,22 +63,22 @@ export default Ember.Component.extend({
       let region = { start: t[0], end: t[t.length - 1] };
 
       if ('color' in series[sid]) {
-        region.class = 'c3-region--' + series[sid].color;
+        region.class = `c3-region--${series[sid].color}`;
       }
 
       return region;
     });
 
     const unloadKeys = deletedKeys.concat(regionKeys);
-    const unload = unloadKeys.concat(unloadKeys.map(sid => sid + '-timestamps'));
+    const unload = unloadKeys.concat(unloadKeys.map(sid => `${sid}-timestamps`));
 
     const loadKeys = addedKeys.concat(changedKeys).filter(sid => !regionKeys.includes(sid));
     const xs = {};
-    loadKeys.forEach(sid => xs[sid] = sid + '-timestamps');
+    loadKeys.forEach(sid => xs[sid] = `${sid}-timestamps`);
 
     const values = loadKeys.map(sid => [sid].concat(series[sid].values));
 
-    const timestamps = loadKeys.map(sid => [sid + '-timestamps'].concat(series[sid].timestamps));
+    const timestamps = loadKeys.map(sid => [`${sid}-timestamps`].concat(series[sid].timestamps));
 
     const columns = values.concat(timestamps);
 
@@ -89,14 +88,8 @@ export default Ember.Component.extend({
     const types = {};
     loadKeys.filter(sid => series[sid].type).forEach(sid => types[sid] = series[sid].type);
 
-    const tooltip = this.get('tooltip');
-
-    const axis = this.get('axis');
-
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
-
-    const legend = this.get('legend');
 
     const config = { unload, xs, columns, types, regions, tooltip, colors, axis, axes, legend };
 

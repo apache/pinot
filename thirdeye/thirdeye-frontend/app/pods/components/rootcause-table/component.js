@@ -12,7 +12,7 @@ export default Ember.Component.extend({
   data: Ember.computed(
     'entities',
     function () {
-      const entities = this.get('entities');
+      const { entities } = this.getProperties('entities');
       return Object.values(entities);
     }
   ),
@@ -24,8 +24,7 @@ export default Ember.Component.extend({
     'entities',
     'selectedUrns',
     function () {
-      const entities = this.get('entities');
-      const selectedUrns = this.get('selectedUrns');
+      const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
       const selectedEntities = [...selectedUrns].filter(urn => entities[urn]).map(urn => entities[urn]);
       return selectedEntities;
     }
@@ -33,7 +32,7 @@ export default Ember.Component.extend({
 
   actions: {
     displayDataChanged (e) {
-      const onSelect = this.get('onSelect');
+      const { onSelect } = this.getProperties('onSelect');
       if (onSelect != null) {
         onSelect(e.selectedItems.map(e => e.urn));
       }

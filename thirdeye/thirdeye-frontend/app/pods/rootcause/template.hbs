@@ -10,7 +10,11 @@
 <h3>This is the legend.</h3>
 urns
 {{#each selectedUrns as |urn|}}
-  | {{input type="checkbox" checked=(set-has-not invisibleUrns urn) click=(action "toggleInvisible" urn)}}
+  |
+  {{input
+    type="checkbox"
+    checked=(set-has-not invisibleUrns urn)
+    click=(action "toggleInvisible" urn)}}
   {{urn}}
   <a {{action "removeSelectedUrns" urn}}>[X]</a>
 {{/each}}
@@ -32,7 +36,7 @@ urns
   onHover=(action "chartOnHover")
 }}
 
-<h3>This is the hover tooltip.</h3>
+<h3>This is the hover section.</h3>
 urns
 {{#each hoverUrns as |urn|}}
   | {{urn}}

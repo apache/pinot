@@ -7,7 +7,6 @@ import Ember from 'ember';
  * @return {Boolean} !set.has(value)
  */
 export function setHasNot([set = new Set(), value = null]) {
-  console.log('helper: setHasNot: set', set);
   return !set.has(value);
 }
 
