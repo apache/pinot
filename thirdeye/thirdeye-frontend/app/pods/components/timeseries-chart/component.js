@@ -62,7 +62,7 @@ export default Ember.Component.extend({
       if ('color' in series[sid]) {
         region.class = 'c3-region--' + series[sid].color;
       }
-      
+
       return region;
     });
 
@@ -97,22 +97,32 @@ export default Ember.Component.extend({
     return config;
   },
 
+  _hasDiff() {
+    const cache = this.get('_seriesCache') || {};
+    const series = this.get('series') || {};
+    return !_.isEqual(cache, series);
+  },
+
   _updateCache() {
     const series = this.get('series');
     this.set('_seriesCache', _.cloneDeep(series));
   },
 
-  didUpdateAttrs() {
-    this._super(...arguments);
-
+  _updateChart() {
     const diffConfig = this._makeDiffConfig();
-    console.log('timeseries-chart: didUpdateAttrs(): diffConfig', diffConfig);
+    console.log('timeseries-chart: _updateChart(): diffConfig', diffConfig);
 
     const chart = this.get('_chart');
     chart.regions(diffConfig.regions);
     chart.load(diffConfig);
-
     this._updateCache();
+  },
+
+  didUpdateAttrs() {
+    this._super(...arguments);
+    if (this._hasDiff()) {
+      Ember.run.debounce(this, this._updateChart, 250);
+    }
   },
 
   didInsertElement() {

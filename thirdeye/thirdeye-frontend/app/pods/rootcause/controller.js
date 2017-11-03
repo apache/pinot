@@ -102,7 +102,7 @@ export default Ember.Controller.extend({
     function () {
       console.log('eventTableEntities()');
       const entities = this.get('entities') || {};
-      return Object.keys(entities).filter(urn => entities[urn].type == 'event').map(urn => entities[urn]);
+      return filterEntities(entities, (e) => e.type == 'event');
     }
   ),
 
@@ -207,13 +207,21 @@ export default Ember.Controller.extend({
   },
 
   actions: {
+    toggleInvisible(urn) {
+      const invisibleUrns = this.get('invisibleUrns');
+      if (invisibleUrns.has(urn)) {
+        invisibleUrns.delete(urn);
+      } else {
+        invisibleUrns.add(urn);
+      }
+      this.set('invisibleUrns', invisibleUrns);
+      this.notifyPropertyChange('invisibleUrns');
+    },
+
     tableOnSelect(tableEntities) {
       console.log('tableOnSelect()');
       const entities = this.get('entities');
       const selectedUrns = this.get('selectedUrns');
-
-      console.log('tableOnSelect: tableEntities', tableEntities);
-      console.log('tableOnSelect: selectedUrns', selectedUrns);
 
       const tableEventUrns = new Set(Object.values(tableEntities).map(e => e.urn));
       const selectedEventUrns = new Set(makeIterable(selectedUrns).filter(urn => entities[urn] && entities[urn].type == 'event'));
@@ -222,8 +230,7 @@ export default Ember.Controller.extend({
 
       makeIterable(selectedEventUrns).filter(urn => !tableEventUrns.has(urn)).forEach(urn => selectedUrns.delete(urn));
       makeIterable(tableEventUrns).forEach(urn => selectedUrns.add(urn));
-      console.log('tableOnSelect: selectedUrns', selectedUrns);
-      
+
       this.set('selectedUrns', selectedUrns);
       this.notifyPropertyChange('selectedUrns');
     },
@@ -322,3 +329,8 @@ const makeIterable = (obj) => {
   return isIterable(obj) ? [...obj] : [obj];
 };
 
+const filterEntities = (obj, func) => {
+  const out = {};
+  Object.keys(obj).filter(key => func(obj[key])).forEach(key => out[key] = obj[key]);
+  return out;
+};

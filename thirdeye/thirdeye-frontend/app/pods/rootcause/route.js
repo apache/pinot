@@ -41,7 +41,7 @@ export default Ember.Route.extend({
 
   setupController: function (controller, model) {
     this._super(...arguments);
-    controller.set('selectedUrns', new Set(['thirdeye:metric:194592', 'thirdeye:event:lix:1710858', 'thirdeye:event:holiday:2712391']));
+    controller.set('selectedUrns', new Set(['thirdeye:metric:194592', 'thirdeye:event:holiday:2712391']));
     controller.set('invisibleUrns', new Set());
     controller.set('filteredUrns', new Set());
   }

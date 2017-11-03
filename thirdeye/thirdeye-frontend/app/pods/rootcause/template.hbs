@@ -1,7 +1,4 @@
-This is the rootcause page.
-
-{{rootcause-chart entities=entities selectedUrns=chartSelectedUrns timeseries=timeseries}}
-
+<h3>This manipulates the controller state.</h3>
 <a {{action "addSelectedUrns" "thirdeye:metric:17606338"}}>add selected</a> |
 <a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove selected</a> |
 <a {{action "addInvisibleUrns" "thirdeye:metric:17606338"}}>add invisible</a> |
@@ -9,8 +6,23 @@ This is the rootcause page.
 <a {{action "addFilteredUrns" "thirdeye:metric:17606338"}}>add filtered</a> |
 <a {{action "removeFilteredUrns" "thirdeye:metric:17606338"}}>remove filtered</a>
 
+<h3>This is the rootcause legend.</h3>
+<ul>
+  {{#each selectedUrns as |urn|}}
+    <li>
+      {{input type="checkbox" checked=(set-has-not invisibleUrns urn) click=(action 'toggleInvisible' urn)}}
+      {{urn}}
+    </li>
+  {{/each}}
+</ul>
+
+<h3>This is the rootcause graph.</h3>
+{{rootcause-chart entities=entities selectedUrns=chartSelectedUrns timeseries=timeseries}}
+
+<h3>This is the rootcause table.</h3>
 {{rootcause-table
-  data=eventTableEntities
+  entities=eventTableEntities
   columns=eventTableColumns
+  selectedUrns=selectedUrns
   onSelect=(action "tableOnSelect")
 }}
