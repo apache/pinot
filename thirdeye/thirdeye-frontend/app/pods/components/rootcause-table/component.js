@@ -35,7 +35,7 @@ export default Ember.Component.extend({
     displayDataChanged (e) {
       const onSelect = this.get('onSelect');
       if (onSelect != null) {
-        onSelect(e.selectedItems);
+        onSelect(e.selectedItems.map(e => e.urn));
       }
     }
   }

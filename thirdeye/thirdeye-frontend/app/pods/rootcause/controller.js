@@ -99,14 +99,25 @@ export default Ember.Controller.extend({
 
   eventTableEntities: Ember.computed(
     'entities',
+    'filteredUrns',
     function () {
       console.log('eventTableEntities()');
       const entities = this.get('entities') || {};
-      return filterEntities(entities, (e) => e.type == 'event');
+      const filteredUrns = this.get('filteredUrns');
+      return filterEntities(entities, (e) => filteredUrns.has(e.urn));
     }
   ),
 
   eventTableColumns: EVENT_TABLE_COLUMNS,
+
+  eventFilterEntities: Ember.computed(
+    'entities',
+    function () {
+      console.log('eventFilterEntities()');
+      const entities = this.get('entities') || {};
+      return filterEntities(entities, (e) => e.type == 'event');
+    }
+  ),
 
   _timeseriesLoader: Ember.computed(
     'entities',
@@ -218,21 +229,28 @@ export default Ember.Controller.extend({
       this.notifyPropertyChange('invisibleUrns');
     },
 
-    tableOnSelect(tableEntities) {
+    tableOnSelect(tableUrns) {
       console.log('tableOnSelect()');
       const entities = this.get('entities');
+      const filteredUrns = this.get('filteredUrns');
       const selectedUrns = this.get('selectedUrns');
 
-      const tableEventUrns = new Set(Object.values(tableEntities).map(e => e.urn));
+      const tableEventUrns = new Set(tableUrns);
       const selectedEventUrns = new Set(makeIterable(selectedUrns).filter(urn => entities[urn] && entities[urn].type == 'event'));
       console.log('tableOnSelect: tableEventUrns', tableEventUrns);
       console.log('tableOnSelect: selectedEventUrns', selectedEventUrns);
 
-      makeIterable(selectedEventUrns).filter(urn => !tableEventUrns.has(urn)).forEach(urn => selectedUrns.delete(urn));
+      makeIterable(selectedEventUrns).filter(urn => filteredUrns.has(urn) && !tableEventUrns.has(urn)).forEach(urn => selectedUrns.delete(urn));
       makeIterable(tableEventUrns).forEach(urn => selectedUrns.add(urn));
 
       this.set('selectedUrns', selectedUrns);
       this.notifyPropertyChange('selectedUrns');
+    },
+
+    filterOnSelect(urns) {
+      console.log('filterOnSelect()');
+      this.set('filteredUrns', new Set(urns));
+      this.notifyPropertyChange('filteredUrns');
     },
 
     addSelectedUrns(urns) {

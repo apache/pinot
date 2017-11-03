@@ -6,7 +6,7 @@
 <a {{action "addFilteredUrns" "thirdeye:metric:17606338"}}>add filtered</a> |
 <a {{action "removeFilteredUrns" "thirdeye:metric:17606338"}}>remove filtered</a>
 
-<h3>This is the rootcause legend.</h3>
+<h3>This is the legend.</h3>
 <ul>
   {{#each selectedUrns as |urn|}}
     <li>
@@ -17,10 +17,18 @@
   {{/each}}
 </ul>
 
-<h3>This is the rootcause graph.</h3>
-{{rootcause-chart entities=entities selectedUrns=chartSelectedUrns timeseries=timeseries}}
+<h3>This is the filter bar.</h3>
+{{rootcause-filter
+  entities=eventFilterEntities
+  onSelect=(action "filterOnSelect")}}
 
-<h3>This is the rootcause table.</h3>
+<h3>This is the graph.</h3>
+{{rootcause-chart
+  entities=entities
+  selectedUrns=chartSelectedUrns
+  timeseries=timeseries}}
+
+<h3>This is the table.</h3>
 {{rootcause-table
   entities=eventTableEntities
   columns=eventTableColumns
