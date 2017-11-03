@@ -27,20 +27,18 @@ export default Ember.Component.extend({
   actions: {
     /**
      * Handles selection of filter items.
-     * TODO: Write logic to handle filter selection
      * @method onFilterSelection
      */
     onFilterSelection() {
-      console.log("on change");
+      // TODO: Write logic to handle filter selection
     },
 
     /**
      * Expands/collapses a filter block
      * @param {Object} clickedBlock - selected filter block object
-     * TODO: Write logic to toggle isHidden property
      */
     toggleDisplay(clickedBlock) {
-      console.log(`toggle this block: ${clickedBlock}`);
+      // TODO: Write logic to toggle isHidden property
     }
   }
 });
