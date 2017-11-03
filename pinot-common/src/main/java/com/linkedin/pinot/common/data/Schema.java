@@ -36,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -303,7 +302,7 @@ public final class Schema {
   @JsonIgnore
   @Nonnull
   public List<String> getDateTimeNames() {
-    return CollectionUtils.isEmpty(_dateTimeList) ? null : _dateTimeList;
+    return _dateTimeList;
   }
 
   @JsonIgnore

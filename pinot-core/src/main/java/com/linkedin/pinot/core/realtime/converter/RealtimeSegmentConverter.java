@@ -66,7 +66,9 @@ public class RealtimeSegmentConverter {
     for (String metric : schema.getMetricNames()) {
       newSchema.addField(schema.getFieldSpecFor(metric));
     }
-
+    for (String dateTime : schema.getDateTimeNames()) {
+      newSchema.addField(schema.getFieldSpecFor(dateTime));
+    }
     newSchema.addField(newTimeSpec);
     this.realtimeSegmentImpl = realtimeSegment;
     this.outputPath = outputPath;

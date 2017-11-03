@@ -206,6 +206,17 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
     }
 
+    for (String dateTime : dataSchema.getDateTimeNames()) {
+      Object value = row.getValue(dateTime);
+      if (value == null) {
+        if (invalidColumns == null) {
+          invalidColumns = new StringBuilder(dateTime);
+        } else {
+          invalidColumns.append(", ").append(dateTime);
+        }
+      }
+    }
+
     {
       Object value = row.getValue(outgoingTimeColumnName);
       if (value == null) {
@@ -241,6 +252,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     for (String metric : dataSchema.getMetricNames()) {
       if (!consumingNoDictionaryColumns.contains(metric)) {
         dictionaryMap.get(metric).index(row.getValue(metric));
+      }
+    }
+
+    for (String dateTime : dataSchema.getDateTimeNames()) {
+      if (!consumingNoDictionaryColumns.contains(dateTime)) {
+        dictionaryMap.get(dateTime).index(row.getValue(dateTime));
       }
     }
 
@@ -292,6 +309,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       storeIncomingColumnValue(row, rawRowToDicIdMap, docId, metric);
     }
 
+    for (String dateTime : dataSchema.getDateTimeNames()) {
+      storeIncomingColumnValue(row, rawRowToDicIdMap, docId, dateTime);
+    }
+
     int timeDicId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
 
     ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(outgoingTimeColumnName)).setInt(
@@ -299,6 +320,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     rawRowToDicIdMap.put(outgoingTimeColumnName, timeDicId);
 
     // lets update the inverted index now
+
+    // dateTime
+    for (String dateTime : dataSchema.getDateTimeNames()) {
+      if (invertedIndexMap.containsKey(dateTime)) {
+        invertedIndexMap.get(dateTime).add((Integer) rawRowToDicIdMap.get(dateTime), docId);
+      }
+    }
+
     // metrics
     for (String metric : dataSchema.getMetricNames()) {
       if (invertedIndexMap.containsKey(metric)) {
@@ -347,6 +376,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         case DOUBLE:
           readerWriter.setDouble(docId, (double)row.getValue(columnName));
           break;
+        case STRING:
+          readerWriter.setString(docId, (String)row.getValue(columnName));
+          break;
       }
     } else {
       int dicId = dictionaryMap.get(columnName).indexOf(row.getValue(columnName));
@@ -354,6 +386,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       rawRowToDicIdMap.put(columnName, dicId);
     }
   }
+
 
   @Override
   public IndexType getIndexType() {
@@ -685,6 +718,32 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         }
       }
     }
+
+    for (String dateTime : dataSchema.getDateTimeNames()) {
+      final FieldSpec.DataType dataType = dataSchema.getFieldSpecFor(dateTime).getDataType();
+      if (consumingNoDictionaryColumns.contains(dateTime)) {
+        copyValueIntoGenericRow(docId, row, dateTime, dataType);
+      } else {
+        final int dicId = ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(dateTime)).getInt(docId);
+        switch (dataType) {
+          case INT:
+            int intValue = dictionaryMap.get(dateTime).getIntValue(dicId);
+            row.putField(dateTime, intValue);
+            break;
+          case LONG:
+            long longValue = dictionaryMap.get(dateTime).getLongValue(dicId);
+            row.putField(dateTime, longValue);
+            break;
+          case STRING:
+            String stringValue = dictionaryMap.get(dateTime).getStringValue(dicId);
+            row.putField(dateTime, stringValue);
+            break;
+          default:
+            throw new UnsupportedOperationException("unsupported datetime data type");
+        }
+      }
+    }
+
 
     row.putField(outgoingTimeColumnName, dictionaryMap.get(outgoingTimeColumnName)
         .get(((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(
