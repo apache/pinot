@@ -55,12 +55,12 @@ public class TestDatasetConfigManager extends AbstractManagerTestBase {
   public void testUpdate() {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findById(datasetConfigId1);
     Assert.assertNotNull(datasetConfig);
-    Assert.assertFalse(datasetConfig.isMetricAsDimension());
-    datasetConfig.setMetricAsDimension(true);
+    Assert.assertFalse(datasetConfig.isRealtime());
+    datasetConfig.setRealtime(true);
     datasetConfigDAO.update(datasetConfig);
     datasetConfig = datasetConfigDAO.findById(datasetConfigId1);
     Assert.assertNotNull(datasetConfig);
-    Assert.assertTrue(datasetConfig.isMetricAsDimension());
+    Assert.assertTrue(datasetConfig.isRealtime());
   }
 
   @Test(dependsOnMethods = { "testUpdate" })

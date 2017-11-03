@@ -9,6 +9,7 @@ import com.google.common.cache.Weigher;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,8 +21,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -41,6 +42,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
@@ -153,8 +155,9 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         // By default, query only offline, unless dataset has been marked as realtime
         String tableName = ThirdEyeUtils.computeTableName(dataset);
         String pql = null;
-        if (datasetConfig.isMetricAsDimension()) {
-          pql = PqlUtils.getMetricAsDimensionPql(request, metricFunction, decoratedFilterSet, dataTimeSpec, datasetConfig);
+        MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
+        if (metricConfig != null && metricConfig.isDimensionAsMetric()) {
+          pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, dataTimeSpec, datasetConfig);
         } else {
           pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
         }

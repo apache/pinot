@@ -39,7 +39,7 @@ function listDatasetConfigs() {
       },
       dimensionsHaveNoPreAggregation : {
         title : 'dimensionsHaveNoPreAggregation',
-        visibility : 'hidden'  
+        visibility : 'hidden'
       },
       active : {
         title : 'Active',
@@ -50,19 +50,6 @@ function listDatasetConfigs() {
         title : 'Additive',
         defaultValue : true,
         options : [ false, true ]
-      },
-      metricAsDimension : {
-        title : 'metricAsDimension',
-        defaultValue : true,
-        options : [ false, true ]
-      },
-      metricNamesColumn : {
-        title : 'metricNamesColumn',
-        visibility: 'hidden'
-      },
-      metricValuesColumn : {
-        title : 'metricValuesColumn',
-        visibility: 'hidden'
       },
       nonAdditiveBucketSize : {
         title : 'nonAdditiveBucketSize',
@@ -92,7 +79,7 @@ function listDatasetConfigs() {
         title : 'timezone',
         visibility: 'hidden'
       },
-    
+
     }
   });
   $("#dataset-config-place-holder" ).jtable('load');

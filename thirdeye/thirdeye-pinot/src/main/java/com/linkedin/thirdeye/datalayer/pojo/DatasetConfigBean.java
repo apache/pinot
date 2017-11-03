@@ -37,15 +37,6 @@ public class DatasetConfigBean extends AbstractBean {
   /** Introduce this as a dataset property because count* queries will have no metric information **/
   private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;
 
-  private boolean metricAsDimension = false;
-
-  private String metricNamesColumn;
-
-  private String metricValuesColumn;
-
-  /** Autodiscover metrics in case of metricAsDimension */
-  private boolean autoDiscoverMetrics = false;
-
   private boolean active = true;
 
   /** Configuration for non-additive dataset **/
@@ -163,39 +154,6 @@ public class DatasetConfigBean extends AbstractBean {
     this.dataSource = dataSource;
   }
 
-  public boolean isMetricAsDimension() {
-    return metricAsDimension;
-  }
-
-  public void setMetricAsDimension(boolean metricAsDimension) {
-    this.metricAsDimension = metricAsDimension;
-  }
-
-  public String getMetricNamesColumn() {
-    return metricNamesColumn;
-  }
-
-  public void setMetricNamesColumn(String metricNamesColumn) {
-    this.metricNamesColumn = metricNamesColumn;
-  }
-
-  public String getMetricValuesColumn() {
-    return metricValuesColumn;
-  }
-
-  public void setMetricValuesColumn(String metricValuesColumn) {
-    this.metricValuesColumn = metricValuesColumn;
-  }
-
-
-  public boolean isAutoDiscoverMetrics() {
-    return autoDiscoverMetrics;
-  }
-
-  public void setAutoDiscoverMetrics(boolean autoDiscoverMetrics) {
-    this.autoDiscoverMetrics = autoDiscoverMetrics;
-  }
-
   public boolean isActive() {
     return active;
   }
@@ -303,10 +261,6 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(timeFormat, dc.getTimeFormat())
         && Objects.equals(timezone, dc.getTimezone())
         && Objects.equals(dataSource, dc.getDataSource())
-        && Objects.equals(metricAsDimension, dc.isMetricAsDimension())
-        && Objects.equals(metricNamesColumn, dc.getMetricNamesColumn())
-        && Objects.equals(metricValuesColumn, dc.getMetricValuesColumn())
-        && Objects.equals(autoDiscoverMetrics, dc.isAutoDiscoverMetrics())
         && Objects.equals(active, dc.isActive())
         && Objects.equals(additive, dc.isAdditive())
         && Objects.equals(dimensionsHaveNoPreAggregation, dc.getDimensionsHaveNoPreAggregation())
@@ -323,10 +277,10 @@ public class DatasetConfigBean extends AbstractBean {
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone, dataSource,
-        metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
-        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime,
-        requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithm, expectedCompleteness, dataSource);
+    return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
+        dataSource, active, additive, dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize,
+        nonAdditiveBucketUnit, realtime, requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithm,
+        expectedCompleteness, dataSource);
   }
 
 }

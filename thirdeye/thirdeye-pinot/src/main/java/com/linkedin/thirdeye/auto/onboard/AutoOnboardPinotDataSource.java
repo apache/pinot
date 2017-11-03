@@ -1,30 +1,30 @@
 package com.linkedin.thirdeye.auto.onboard;
 
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.client.ResultSet;
-import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
@@ -121,14 +121,8 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
    * @param schema
    */
   private void refreshOldDataset(String dataset, DatasetConfigDTO datasetConfig, Schema schema) throws Exception {
-
-    if (datasetConfig.isMetricAsDimension()) {
-      LOG.info("Checking refresh for metricAsDimension dataset {}", dataset);
-      checkMetricAsDimensionDataset(datasetConfig, schema);
-    } else {
-      checkDimensionChanges(dataset, datasetConfig, schema);
-      checkMetricChanges(dataset, datasetConfig, schema);
-    }
+    checkDimensionChanges(dataset, datasetConfig, schema);
+    checkMetricChanges(dataset, datasetConfig, schema);
   }
 
 
@@ -138,16 +132,31 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     LOG.info("Checking for dimensions changes in {}", dataset);
     List<String> schemaDimensions = schema.getDimensionNames();
     List<String> datasetDimensions = datasetConfig.getDimensions();
+
+    // in dimensionAsMetric case, the dimension name will be used in the METRIC_NAMES_COLUMNS property of the metric
+    List<String> dimensionsAsMetrics = new ArrayList<>();
+    List<MetricConfigDTO> metricConfigs = DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset);
+    for (MetricConfigDTO metricConfig : metricConfigs) {
+      if (metricConfig.isDimensionAsMetric()) {
+        Map<String, String> metricProperties = metricConfig.getMetricProperties();
+        if (MapUtils.isNotEmpty(metricProperties)) {
+          String metricNames = metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES_COLUMNS.toString());
+          if (StringUtils.isNotBlank(metricNames)) {
+            dimensionsAsMetrics.addAll(Lists.newArrayList(metricNames.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR)));
+          }
+        }
+      }
+    }
     List<String> dimensionsToAdd = new ArrayList<>();
     List<String> dimensionsToRemove = new ArrayList<>();
 
     // dimensions which are new in the pinot schema
     for (String dimensionName : schemaDimensions) {
-      if (!datasetDimensions.contains(dimensionName)) {
+      if (!datasetDimensions.contains(dimensionName) && !dimensionsAsMetrics.contains(dimensionName)) {
         dimensionsToAdd.add(dimensionName);
       }
     }
-    // dimensions which are removed form pinot schema
+    // dimensions which are removed from pinot schema
     for (String dimensionName : datasetDimensions) {
       if (!schemaDimensions.contains(dimensionName)) {
         dimensionsToRemove.add(dimensionName);
@@ -174,9 +183,18 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     LOG.info("Checking for metric changes in {}", dataset);
     List<MetricFieldSpec> schemaMetricSpecs = schema.getMetricFieldSpecs();
     List<MetricConfigDTO> datasetMetricConfigs = DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset);
-    List<String> datasetMetricNames = new ArrayList<>();
+    Set<String> datasetMetricNames = new HashSet<>();
     for (MetricConfigDTO metricConfig : datasetMetricConfigs) {
-      datasetMetricNames.add(metricConfig.getName());
+      // In dimensionAsMetric case, the metric name will be used in the METRIC_VALUES_COLUMN property of the metric
+      if (metricConfig.isDimensionAsMetric()) {
+        Map<String, String> metricProperties = metricConfig.getMetricProperties();
+        if (MapUtils.isNotEmpty(metricProperties)) {
+          String metricValuesColumn = metricProperties.get(DimensionAsMetricProperties.METRIC_VALUES_COLUMN.toString());
+          datasetMetricNames.add(metricValuesColumn);
+        }
+      } else {
+        datasetMetricNames.add(metricConfig.getName());
+      }
     }
     List<Long> metricsToAdd = new ArrayList<>();
 
@@ -234,86 +252,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     }
   }
 
-
-  private List<String> fetchMetricAsADimensionMetrics(String dataset, String metricNamesColumn) {
-    List<String> distinctMetricNames = new ArrayList<>();
-    ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
-    String sql = String.format("select count(*) from %s group by %s top 10", dataset, metricNamesColumn);
-    try {
-      PinotThirdEyeDataSource pinotThirdEyeDataSource = (PinotThirdEyeDataSource) CACHE_REGISTRY.getQueryCache()
-          .getDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
-      ResultSetGroup result = pinotThirdEyeDataSource.executePQL(new PinotQuery(sql, dataset));
-      ResultSet resultSet = result.getResultSet(0);
-      int rowCount = resultSet.getRowCount();
-      for (int i = 0; i < rowCount; i++) {
-        String dimensionName = resultSet.getGroupKeyString(i, 0);
-        distinctMetricNames.add(dimensionName);
-      }
-
-      LOG.info("Distinct Metrics {}", distinctMetricNames);
-    } catch (Exception e) {
-      LOG.error("Exception in fetching metrics from pinot", e);
-    }
-    return distinctMetricNames;
-  }
-
-  private void checkMetricAsDimensionDataset(DatasetConfigDTO datasetConfigDTO, Schema schema) {
-    String dataset = datasetConfigDTO.getDataset();
-    String metricNamesColumn = datasetConfigDTO.getMetricNamesColumn();
-    String metricValuesColumn = datasetConfigDTO.getMetricValuesColumn();
-    FieldSpec metricValuesColumnFieldSpec = schema.getFieldSpecFor(metricValuesColumn);
-    String dashboardName = ThirdEyeUtils.getDefaultDashboardName(dataset);
-
-    // remove metricNamesColumn from dimensions if exists
-    List<String> dimensions = datasetConfigDTO.getDimensions();
-    if (dimensions.contains(metricNamesColumn)) {
-      dimensions.removeAll(Lists.newArrayList(metricNamesColumn));
-      datasetConfigDTO.setDimensions(dimensions);
-      DAO_REGISTRY.getDatasetConfigDAO().update(datasetConfigDTO);
-    }
-
-    // remove metricValuesColumn from metrics if exists
-    MetricConfigDTO metricConfigDTO = DAO_REGISTRY.getMetricConfigDAO().findByMetricAndDataset(metricValuesColumn, dataset);
-
-    if (metricConfigDTO != null) {
-      Long metricId = metricConfigDTO.getId();
-      DAO_REGISTRY.getMetricConfigDAO().delete(metricConfigDTO);
-
-      // remove metricValuesColumn id from default dashboard
-      DashboardConfigDTO dashboardConfig = DAO_REGISTRY.getDashboardConfigDAO().findByName(dashboardName);
-      List<Long> dashboardMetricIds = dashboardConfig.getMetricIds();
-      dashboardMetricIds.removeAll(Lists.newArrayList(metricId));
-      LOG.info("Updating dashboard config for {}", dashboardName);
-      DAO_REGISTRY.getDashboardConfigDAO().update(dashboardConfig);
-    }
-
-    if (datasetConfigDTO.isAutoDiscoverMetrics()) {
-
-      // query pinot to fetch distinct metricNamesColumn
-      List<String> allDistinctMetricNames = fetchMetricAsADimensionMetrics(dataset, metricNamesColumn);
-
-      // create metrics for these metric names, if they dont exist
-      List<MetricConfigDTO> existingMetricConfigs = DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset);
-      List<String> existingMetricNames = Lists.newArrayList();
-      for (MetricConfigDTO existingMetricConfig : existingMetricConfigs) {
-        existingMetricNames.add(existingMetricConfig.getName());
-      }
-      allDistinctMetricNames.removeAll(existingMetricNames);
-      for (String metricName : allDistinctMetricNames) {
-        LOG.info("Creating metric config for {}", metricName);
-        MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, metricValuesColumnFieldSpec.getDataType());
-        MetricConfigDTO metricConfig = ConfigGenerator.generateMetricConfig(metricFieldSpec, dataset);
-        DAO_REGISTRY.getMetricConfigDAO().save(metricConfig);
-      }
-
-      // Add metrics to default dashboard
-      List<Long> allMetricIds = ConfigGenerator.getMetricIdsFromMetricConfigs(DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset));
-      DashboardConfigDTO dashboardConfig = DAO_REGISTRY.getDashboardConfigDAO().findByName(dashboardName);
-      dashboardConfig.setMetricIds(allMetricIds);
-      LOG.info("Creating dashboard config for {}", dashboardName);
-      DAO_REGISTRY.getDashboardConfigDAO().update(dashboardConfig);
-    }
-  }
 
   @Override
   public void runAdhoc() {
