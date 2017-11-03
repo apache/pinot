@@ -61,7 +61,11 @@ export default Ember.Controller.extend({
 
   _entitiesCache: null, // {}
 
-  _pendingRequests: null, // {}
+  _pendingTimeseriesRequests: null, // {}
+
+  //
+  // Public properties (computed)
+  //
 
   entities: Ember.computed(
     '_entitiesLoader',
@@ -137,18 +141,9 @@ export default Ember.Controller.extend({
     }
   ),
 
-  _timeseriesLoader: Ember.computed(
-    'entities',
-    function() {
-      console.log('_timeseriesLoader()');
-      const entities = this.get('entities');
-      console.log('_timeseriesLoader: entities', entities);
-      const metricUrns = Object.keys(entities).filter(urn => entities[urn] && entities[urn].type == 'metric');
-
-      console.log('_timeseriesLoader: metricUrns', metricUrns);
-      return this._startRequestMissingTimeseries(metricUrns); // current state, without new metrics
-    }
-  ),
+  //
+  // Entities loading
+  //
 
   _entitiesLoader: Ember.computed(
     'model.eventEntities',
@@ -178,6 +173,21 @@ export default Ember.Controller.extend({
     return cache;
   },
 
+  // Timeseries loading
+
+  _timeseriesLoader: Ember.computed(
+    'entities',
+    function() {
+      console.log('_timeseriesLoader()');
+      const entities = this.get('entities');
+      console.log('_timeseriesLoader: entities', entities);
+      const metricUrns = Object.keys(entities).filter(urn => entities[urn] && entities[urn].type == 'metric');
+
+      console.log('_timeseriesLoader: metricUrns', metricUrns);
+      return this._startRequestMissingTimeseries(metricUrns); // current state, without new metrics
+    }
+  ),
+
   _updateTimeseriesCache(incoming) {
     console.log('_updateTimeseriesCache()');
     const cache = this.get('_timeseriesCache') || {};
@@ -188,7 +198,7 @@ export default Ember.Controller.extend({
 
   _startRequestMissingTimeseries(urns) {
     console.log('_startRequestMissingTimeseries()');
-    const pending = this.get('_pendingRequests') || new Set();
+    const pending = this.get('_pendingTimeseriesRequests') || new Set();
     const cache = this.get('_timeseriesCache') || {};
 
     const missing = new Set(urns);
@@ -204,7 +214,7 @@ export default Ember.Controller.extend({
 
     // NOTE: potential race condition?
     missing.forEach(urn => pending.add(urn));
-    this.set('_pendingRequests', pending);
+    this.set('_pendingTimeseriesRequests', pending);
 
     const idString = metricIds.join(',');
     const analysisRange = this.get('model.analysisRange');
@@ -221,15 +231,45 @@ export default Ember.Controller.extend({
 
   _completeRequestMissingTimeseries(that, incoming) {
     console.log('_completeRequestMissingTimeseries()');
-    const pending = that.get('_pendingRequests') || new Set();
+    const pending = that.get('_pendingTimeseriesRequests') || new Set();
 
     // NOTE: potential race condition?
     Object.keys(incoming).forEach(urn => pending.delete(urn));
-    that.set('_pendingRequests', pending);
+    that.set('_pendingTimeseriesRequests', pending);
 
     console.log('_completeRequestMissingTimeseries: merging cache');
     return that._updateTimeseriesCache(incoming); // return new state, including new metrics
   },
+
+  _extractTimeseries: function(json) {
+    const timeseries = {};
+    Object.keys(json).forEach(range =>
+      Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
+        const urn = `thirdeye:metric:${sid}`;
+        const jrng = json[range];
+        const jval = jrng[sid];
+
+        const timestamps = [];
+        const values = [];
+        jrng.timestamp.forEach((t, i) => {
+          if (jval[i] != null) {
+            timestamps.push(t);
+            values.push(jval[i]);
+          }
+        });
+
+        timeseries[urn] = {
+          timestamps: timestamps,
+          values: values
+        };
+      })
+    );
+    return timeseries;
+  },
+
+  //
+  // Actions
+  //
 
   actions: {
     toggleInvisible(urn) {
@@ -324,35 +364,6 @@ export default Ember.Controller.extend({
       this.set('invisibleUrns', invisibleUrns);
       this.notifyPropertyChange('invisibleUrns');
     }
-  },
-
-  //
-  // Helpers
-  //
-  _extractTimeseries: function(json) {
-    const timeseries = {};
-    Object.keys(json).forEach(range =>
-      Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
-        const urn = `thirdeye:metric:${sid}`;
-        const jrng = json[range];
-        const jval = jrng[sid];
-
-        const timestamps = [];
-        const values = [];
-        jrng.timestamp.forEach((t, i) => {
-          if (jval[i] != null) {
-            timestamps.push(t);
-            values.push(jval[i]);
-          }
-        });
-
-        timeseries[urn] = {
-          timestamps: timestamps,
-          values: values
-        };
-      })
-    );
-    return timeseries;
   }
 });
 
