@@ -1,0 +1,28 @@
+{{!-- TODO: Create separate styling for filter-bar component --}}
+<div class="entity-filter">
+
+  {{#each config as |block|}}
+    <section class="entity-filter__group">
+      <h5 class="entity-filter__group-title">{{block.header}}
+        <i class="glyphicon"></i>
+      </h5>
+      <ul class="entity-filter__group-list {{if block.isHidden " entity-filter__group-list--hidden "}}">
+        {{#each block.inputs as |filter|}}
+          <li class="entity-filter__group-filter">
+            <label class="entity-filter__group-label">
+              {{filter.label}}
+            </label>
+            {{#if (eq filter.type 'dropdown')}}
+              {{#power-select
+                options=options
+                onchange=(action 'onFilterSelection')
+                as |option|}}
+                {{option}}
+              {{/power-select}}
+            {{/if}}
+          </li>
+        {{/each}}
+      </ul>
+    </section>
+  {{/each}}
+</div>
