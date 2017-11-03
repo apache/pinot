@@ -32,11 +32,10 @@
 }}
 
 <h3>This is the hover tooltip.</h3>
-<ul>
-  {{#each hoverUrns as |urn|}}
-    <li>{{urn}}</li>
-  {{/each}}
-</ul>
+hovering
+{{#each hoverUrns as |urn|}}
+  | {{urn}}
+{{/each}}
 
 <h3>This is the table.</h3>
 {{rootcause-table
