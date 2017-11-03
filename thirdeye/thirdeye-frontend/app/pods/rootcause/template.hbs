@@ -10,8 +10,9 @@
 <ul>
   {{#each selectedUrns as |urn|}}
     <li>
-      {{input type="checkbox" checked=(set-has-not invisibleUrns urn) click=(action 'toggleInvisible' urn)}}
+      {{input type="checkbox" checked=(set-has-not invisibleUrns urn) click=(action "toggleInvisible" urn)}}
       {{urn}}
+      <a {{action "removeSelectedUrns" urn}}>[X]</a>
     </li>
   {{/each}}
 </ul>
