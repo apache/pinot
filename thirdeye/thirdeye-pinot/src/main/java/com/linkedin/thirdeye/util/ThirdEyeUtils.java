@@ -235,7 +235,7 @@ public abstract class ThirdEyeUtils {
 
   private static String getSDFPatternFromTimeFormat(String timeFormat) {
     String pattern = timeFormat;
-    String[] tokens = timeFormat.split(":");
+    String[] tokens = timeFormat.split(":", 2);
     if (tokens.length == 2) {
       pattern = tokens[1];
     }
@@ -280,7 +280,7 @@ public abstract class ThirdEyeUtils {
     } else {
       derivedMetricExpression = MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId();
     }
-    
+
     return derivedMetricExpression;
   }
 

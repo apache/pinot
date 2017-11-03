@@ -48,13 +48,19 @@ public class DatasetConfigResource {
 
   @GET
   @Path("/create")
-  public String createDatasetConfig(@QueryParam("dataset") String dataset, @QueryParam("dimensions") String dimensions,
-      @QueryParam("dimensionsHaveNoPreAggregation") String dimensionsHaveNoPreAggregation, @QueryParam("active") boolean active,
-      @QueryParam("additive") boolean additive, @QueryParam("metricAsDimension") boolean metricAsDimension,
-      @QueryParam("metricValuesColumn") String metricValuesColumn, @QueryParam("metricNamesColumn") String metricNamesColumn,
-      @QueryParam("nonAdditiveBucketSize") Integer nonAdditiveBucketSize, @QueryParam("nonAdditiveBucketUnit") String nonAdditiveBucketUnit,
-      @QueryParam("preAggregatedKeyword") String preAggregatedKeyword, @QueryParam("timeColumn") String timeColumn,
-      @QueryParam("timeDuration") Integer timeDuration, @QueryParam("timeFormat") String timeFormat, @QueryParam("timezone") TimeUnit timeUnit,
+  public String createDatasetConfig(
+      @QueryParam("dataset") String dataset,
+      @QueryParam("dimensions") String dimensions,
+      @QueryParam("dimensionsHaveNoPreAggregation") String dimensionsHaveNoPreAggregation,
+      @QueryParam("active") boolean active,
+      @QueryParam("additive") boolean additive,
+      @QueryParam("nonAdditiveBucketSize") Integer nonAdditiveBucketSize,
+      @QueryParam("nonAdditiveBucketUnit") String nonAdditiveBucketUnit,
+      @QueryParam("preAggregatedKeyword") String preAggregatedKeyword,
+      @QueryParam("timeColumn") String timeColumn,
+      @QueryParam("timeDuration") Integer timeDuration,
+      @QueryParam("timeFormat") String timeFormat,
+      @QueryParam("timezone") TimeUnit timeUnit,
       @QueryParam("timezone") String timezone) {
     try {
       DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
@@ -65,9 +71,6 @@ public class DatasetConfigResource {
       }
       datasetConfigDTO.setActive(active);
       datasetConfigDTO.setAdditive(additive);
-      datasetConfigDTO.setMetricAsDimension(metricAsDimension);
-      datasetConfigDTO.setMetricNamesColumn(metricNamesColumn);
-      datasetConfigDTO.setMetricValuesColumn(metricValuesColumn);
       datasetConfigDTO.setNonAdditiveBucketSize(nonAdditiveBucketSize);
       datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.valueOf(nonAdditiveBucketUnit));
       datasetConfigDTO.setPreAggregatedKeyword(preAggregatedKeyword);
@@ -95,13 +98,20 @@ public class DatasetConfigResource {
 
   @GET
   @Path("/update")
-  public String updateDatasetConfig(@NotNull @QueryParam("id") long datasetConfigId, @QueryParam("dataset") String dataset,
-      @QueryParam("dimensions") String dimensions, @QueryParam("dimensionsHaveNoPreAggregation") String dimensionsHaveNoPreAggregation,
-      @QueryParam("active") boolean active, @QueryParam("additive") boolean additive, @QueryParam("metricAsDimension") boolean metricAsDimension,
-      @QueryParam("metricValuesColumn") String metricValuesColumn, @QueryParam("metricNamesColumn") String metricNamesColumn,
-      @QueryParam("nonAdditiveBucketSize") Integer nonAdditiveBucketSize, @QueryParam("nonAdditiveBucketUnit") String nonAdditiveBucketUnit,
-      @QueryParam("preAggregatedKeyword") String preAggregatedKeyword, @QueryParam("timeColumn") String timeColumn,
-      @QueryParam("timeDuration") Integer timeDuration, @QueryParam("timeFormat") String timeFormat, @QueryParam("timezone") TimeUnit timeUnit,
+  public String updateDatasetConfig(
+      @NotNull @QueryParam("id") long datasetConfigId,
+      @QueryParam("dataset") String dataset,
+      @QueryParam("dimensions") String dimensions,
+      @QueryParam("dimensionsHaveNoPreAggregation") String dimensionsHaveNoPreAggregation,
+      @QueryParam("active") boolean active,
+      @QueryParam("additive") boolean additive,
+      @QueryParam("nonAdditiveBucketSize") Integer nonAdditiveBucketSize,
+      @QueryParam("nonAdditiveBucketUnit") String nonAdditiveBucketUnit,
+      @QueryParam("preAggregatedKeyword") String preAggregatedKeyword,
+      @QueryParam("timeColumn") String timeColumn,
+      @QueryParam("timeDuration") Integer timeDuration,
+      @QueryParam("timeFormat") String timeFormat,
+      @QueryParam("timezone") TimeUnit timeUnit,
       @QueryParam("timezone") String timezone) {
     try {
       DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findById(datasetConfigId);
@@ -110,8 +120,6 @@ public class DatasetConfigResource {
       datasetConfigDTO.setDimensionsHaveNoPreAggregation(toList(dimensionsHaveNoPreAggregation));
       datasetConfigDTO.setActive(active);
       datasetConfigDTO.setAdditive(additive);
-      datasetConfigDTO.setMetricAsDimension(metricAsDimension);
-      datasetConfigDTO.setMetricValuesColumn(metricValuesColumn);
       datasetConfigDTO.setNonAdditiveBucketSize(nonAdditiveBucketSize);
       datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.valueOf(nonAdditiveBucketUnit));
       datasetConfigDTO.setPreAggregatedKeyword(preAggregatedKeyword);

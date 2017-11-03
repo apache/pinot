@@ -15,12 +15,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -102,33 +105,54 @@ public class PqlUtils {
    * @return
    * @throws Exception
    */
-  public static String getMetricAsDimensionPql(ThirdEyeRequest request, MetricFunction metricFunction,
+  public static String getDimensionAsMetricPql(ThirdEyeRequest request, MetricFunction metricFunction,
       Multimap<String, String> filterSet, TimeSpec dataTimeSpec, DatasetConfigDTO datasetConfig) throws Exception {
 
     // select sum(metric_values_column) from collection
-    // where time_clause and metric_names_column=function.getMetricName
-    String metricValuesColumn = datasetConfig.getMetricValuesColumn();
-    String metricNamesColumn = datasetConfig.getMetricNamesColumn();
+    // where time_clause and metric_names_column=metric_name
+    MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
+    Map<String, String> metricProperties = metricConfig.getMetricProperties();
+    if (metricProperties == null || metricProperties.isEmpty()) {
+      throw new RuntimeException("Metric properties must have properties " + DimensionAsMetricProperties.values());
+    }
+    String metricNames =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES.toString());
+    String metricNamesColumns =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES_COLUMNS.toString());
+    String metricValuesColumn =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_VALUES_COLUMN.toString());
+    if (StringUtils.isBlank(metricNames) || StringUtils.isBlank(metricNamesColumns) || StringUtils.isBlank(metricValuesColumn)) {
+      throw new RuntimeException("Metric properties must have properties " + DimensionAsMetricProperties.values());
+    }
+    List<String> metricNamesList =
+        Lists.newArrayList(metricNames.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR));
+    List<String> metricNamesColumnsList =
+        Lists.newArrayList(metricNamesColumns.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR));
+    if (metricNamesList.size() != metricNamesColumnsList.size()) {
+      throw new RuntimeException("Must provide same number of metricNames in " + metricNames
+          + " as metricNamesColumns in " + metricNamesColumns);
+    }
 
-    String metricAsDimensionPql = getMetricAsDimensionPql(metricFunction,
+    String dimensionAsMetricPql = getDimensionAsMetricPql(metricFunction,
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
-        metricValuesColumn, metricNamesColumn);
+        metricNamesList, metricNamesColumnsList, metricValuesColumn);
 
-    return metricAsDimensionPql;
+    return dimensionAsMetricPql;
   }
 
 
-  private static String getMetricAsDimensionPql(MetricFunction metricFunction, DateTime startTime,
+  private static String getDimensionAsMetricPql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
-      String metricNamesColumn) throws ExecutionException {
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec,
+      List<String> metricNames, List<String> metricNamesColumns, String metricValuesColumn)
+          throws ExecutionException {
 
-    MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricFunction.getMetricId());
+    MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
     String dataset = metricFunction.getDataset();
 
     StringBuilder sb = new StringBuilder();
-    String selectionClause = getMetricAsDimensionSelectionClause(metricFunction, metricValuesColumn);
+    String selectionClause = getDimensionAsMetricSelectionClause(metricFunction, metricValuesColumn);
 
     String tableName = ThirdEyeUtils.computeTableName(dataset);
 
@@ -136,7 +160,7 @@ public class PqlUtils {
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
     sb.append(" WHERE ").append(betweenClause);
 
-    String metricWhereClause = getMetricWhereClause(metricConfig, metricFunction, metricNamesColumn);
+    String metricWhereClause = getMetricWhereClause(metricConfig, metricFunction, metricNames, metricNamesColumns);
     sb.append(metricWhereClause);
 
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
@@ -154,17 +178,22 @@ public class PqlUtils {
   }
 
 
-  private static String getMetricWhereClause(MetricConfigDTO metricConfig, MetricFunction metricFunction, String metricNameColumn) {
+  private static String getMetricWhereClause(MetricConfigDTO metricConfig, MetricFunction metricFunction,
+      List<String> metricNames, List<String> metricNamesColumns) {
     StringBuilder builder = new StringBuilder();
     if (!metricFunction.getMetricName().equals("*")) {
-      builder.append(" AND ");
-      builder.append(String.format("%s='%s'", metricNameColumn, metricConfig.getName()));
+      for (int i = 0; i < metricNamesColumns.size(); i++) {
+        String metricName = metricNames.get(i);
+        String metricNamesColumn = metricNamesColumns.get(i);
+        builder.append(" AND ");
+        builder.append(String.format("%s='%s'", metricNamesColumn, metricName));
+      }
     }
     return builder.toString();
   }
 
 
-  private static String getMetricAsDimensionSelectionClause(MetricFunction metricFunction, String metricValueColumn) {
+  private static String getDimensionAsMetricSelectionClause(MetricFunction metricFunction, String metricValueColumn) {
     StringBuilder builder = new StringBuilder();
     String metricName = metricValueColumn;
     if (metricFunction.getMetricName().equals("*")) {

@@ -90,6 +90,11 @@ function updateMetricConfigTable(dataset, metrics) {
         defaultValue : false,
         options : [ false, true ]
       },
+      metricAsDimension : {
+        title : 'MetricAsDimension',
+        defaultValue : false,
+        options : [ false, true ]
+      },
       derived : {
         title : 'Derived',
         defaultValue : false,
