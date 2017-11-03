@@ -4,18 +4,16 @@
 <a {{action "addInvisibleUrns" "thirdeye:metric:17606338"}}>add invisible</a> |
 <a {{action "removeInvisibleUrns" "thirdeye:metric:17606338"}}>remove invisible</a> |
 <a {{action "addFilteredUrns" "thirdeye:metric:17606338"}}>add filtered</a> |
-<a {{action "removeFilteredUrns" "thirdeye:metric:17606338"}}>remove filtered</a>
+<a {{action "removeFilteredUrns" "thirdeye:metric:17606338"}}>remove filtered</a> |
+<a {{action "loadtestSelectedUrns"}}>select all (loadtest)</a>
 
 <h3>This is the legend.</h3>
-<ul>
-  {{#each selectedUrns as |urn|}}
-    <li>
-      {{input type="checkbox" checked=(set-has-not invisibleUrns urn) click=(action "toggleInvisible" urn)}}
-      {{urn}}
-      <a {{action "removeSelectedUrns" urn}}>[X]</a>
-    </li>
-  {{/each}}
-</ul>
+urns
+{{#each selectedUrns as |urn|}}
+  | {{input type="checkbox" checked=(set-has-not invisibleUrns urn) click=(action "toggleInvisible" urn)}}
+  {{urn}}
+  <a {{action "removeSelectedUrns" urn}}>[X]</a>
+{{/each}}
 
 <h3>This is the filter bar.</h3>
 {{rootcause-filter
@@ -28,11 +26,14 @@
   entities=entities
   selectedUrns=chartSelectedUrns
   timeseries=timeseries
+  anomalyRange=anomalyRange
+  baselineRange=baselineRange
+  analysisRange=analysisRange
   onHover=(action "chartOnHover")
 }}
 
 <h3>This is the hover tooltip.</h3>
-hovering
+urns
 {{#each hoverUrns as |urn|}}
   | {{urn}}
 {{/each}}

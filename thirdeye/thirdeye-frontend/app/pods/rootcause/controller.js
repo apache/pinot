@@ -51,6 +51,12 @@ export default Ember.Controller.extend({
 
   hoverUrns: null, // Set
 
+  anomalyRange: null, // [2]
+
+  baselineRange: null, // [2]
+
+  analysisRange: null, // [2]
+
   _timeseriesCache: null, // {}
 
   _entitiesCache: null, // {}
@@ -275,6 +281,13 @@ export default Ember.Controller.extend({
       console.log('chartOnHover: urns', urns);
       this.set('hoverUrns', new Set(urns));
       this.notifyPropertyChange('hoverUrns');
+    },
+
+    loadtestSelectedUrns() {
+      console.log('loadtestSelected()');
+      const entities = this.get('entities');
+      this.set('selectedUrns', new Set(Object.keys(entities)));
+      this.notifyPropertyChange('selectedUrns');
     },
 
     addSelectedUrns(urns) {

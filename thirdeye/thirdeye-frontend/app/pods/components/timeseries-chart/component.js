@@ -29,6 +29,10 @@ export default Ember.Component.extend({
     }
   },
 
+  legend: {
+
+  },
+
   axis: {
     y: {
       show: true
@@ -91,8 +95,10 @@ export default Ember.Component.extend({
 
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
-  
-    const config = { unload, xs, columns, types, regions, tooltip, colors, axis, axes };
+
+    const legend = this.get('legend');
+
+    const config = { unload, xs, columns, types, regions, tooltip, colors, axis, axes, legend };
 
     return config;
   },
@@ -141,6 +147,7 @@ export default Ember.Component.extend({
     config.axis = diffConfig.axis;
     config.regions = diffConfig.regions;
     config.tooltip = diffConfig.tooltip;
+    config.legend = diffConfig.legend;
 
     console.log('timeseries-chart: didInsertElement(): config', config);
 

@@ -11,6 +11,12 @@ export default Ember.Component.extend({
 
   onHover: null, // function (urns)
 
+  anomalyRange: null, // [2]
+
+  baselineRange: null, // [2]
+
+  analysisRange: null, // [2]
+
   tooltip: Ember.computed(
     'onHover',
     function () {
@@ -27,10 +33,16 @@ export default Ember.Component.extend({
     }
   ),
 
+  legend: {
+    show: false
+  },
+
   series: Ember.computed(
     'entities',
     'timeseries',
     'selectedUrns',
+    'anomalyRange',
+    'baselineRange',
     function () {
       const entities = this.get('entities');
       const timeseries = this.get('timeseries');
@@ -39,15 +51,56 @@ export default Ember.Component.extend({
       const series = {};
       [...selectedUrns]
         .filter(urn => urn in entities)
+        .filter(urn => ['metric', 'event'].includes(entities[urn].type))
         .filter(urn => entities[urn].type != 'metric' || urn in timeseries)
         .forEach(urn => {
           const e = entities[urn];
           series[this._entityToLabel(e)] = this._entityToSeries(e);
         });
 
+      const anomalyRange = this.get('anomalyRange');
+      series['anomalyRange'] = {
+        timestamps: anomalyRange,
+        values: [0, 0],
+        type: 'region',
+        color: 'orange'
+      };
+
+      const baselineRange = this.get('baselineRange');
+      series['baselineRange'] = {
+        timestamps: baselineRange,
+        values: [0, 0],
+        type: 'region',
+        color: 'blue'
+      };
+
       console.log('rootcause-chart: series: series', series);
 
       return series;
+    }
+  ),
+
+  axis: Ember.computed(
+    'analysisRange',
+    function () {
+      const analysisRange = this.get('analysisRange');
+      return {
+        y: {
+          show: true
+        },
+        y2: {
+          show: false
+        },
+        x: {
+          type: 'timeseries',
+          show: true,
+          min: analysisRange[0],
+          max: analysisRange[1],
+          tick: {
+            format: '%Y-%m-%d'
+          }
+        }
+      };
     }
   ),
 
@@ -63,6 +116,7 @@ export default Ember.Component.extend({
       const bounds = {};
       [...selectedUrns]
         .filter(urn => urn in entities)
+        .filter(urn => ['metric', 'event'].includes(entities[urn].type))
         .filter(urn => entities[urn].type != 'metric' || urn in timeseries)
         .forEach(urn => {
           const e = entities[urn];
@@ -75,12 +129,13 @@ export default Ember.Component.extend({
   ),
 
   _entityToLabel(entity) {
-    return entity.label;
+    return entity.urn;
   },
 
   _entityToSeries(entity) {
     if (entity.type == 'metric') {
       const timeseries = this.get('timeseries');
+      // console.log(entity.urn, 'timestamps', timeseries[entity.urn].timestamps.length, 'values', timeseries[entity.urn].values.length);
       return {
         timestamps: timeseries[entity.urn].timestamps,
         values: timeseries[entity.urn].values,
@@ -93,8 +148,9 @@ export default Ember.Component.extend({
       return {};
 
     } else if (entity.type == 'event') {
+      // console.log(entity.urn, 'timestamps', entity.start, entity.end);
       return {
-        timestamps: [entity.start, entity.end],
+        timestamps: [entity.start, entity.end || entity.start],
         values: [1, 1],
         type: 'line',
         axis: 'y2'
