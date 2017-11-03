@@ -115,14 +115,19 @@ public class PqlUtils {
     if (metricProperties == null || metricProperties.isEmpty()) {
       throw new RuntimeException("Metric properties must have properties " + DimensionAsMetricProperties.values());
     }
-    String metricNames = metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES.toString());
-    String metricNamesColumns = metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES_COLUMNS.toString());
-    String metricValuesColumn = metricProperties.get(DimensionAsMetricProperties.METRIC_VALUES_COLUMN.toString());
+    String metricNames =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES.toString());
+    String metricNamesColumns =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES_COLUMNS.toString());
+    String metricValuesColumn =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_VALUES_COLUMN.toString());
     if (StringUtils.isBlank(metricNames) || StringUtils.isBlank(metricNamesColumns) || StringUtils.isBlank(metricValuesColumn)) {
       throw new RuntimeException("Metric properties must have properties " + DimensionAsMetricProperties.values());
     }
-    List<String> metricNamesList = Lists.newArrayList(metricNames.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR));
-    List<String> metricNamesColumnsList = Lists.newArrayList(metricNamesColumns.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR));
+    List<String> metricNamesList =
+        Lists.newArrayList(metricNames.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR));
+    List<String> metricNamesColumnsList =
+        Lists.newArrayList(metricNamesColumns.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR));
     if (metricNamesList.size() != metricNamesColumnsList.size()) {
       throw new RuntimeException("Must provide same number of metricNames in " + metricNames
           + " as metricNamesColumns in " + metricNamesColumns);
