@@ -1,4 +1,6 @@
 import Ember from 'ember';
+import d3 from 'd3';
+import moment from 'moment';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -6,6 +8,24 @@ export default Ember.Component.extend({
   selectedUrns: null, // Set
 
   timeseries: null, // {}
+
+  onHover: null, // function (urns)
+
+  tooltip: Ember.computed(
+    'onHover',
+    function () {
+      const onHover = this.get('onHover');
+      return {
+        format: {
+          title: (d) => {
+            this._onHover(d);
+            return moment(d).format('MM/DD hh:mm a');
+          },
+          value: (val, ratio, id) => d3.format('.3s')(val)
+        }
+      };
+    }
+  ),
 
   series: Ember.computed(
     'entities',
@@ -16,29 +36,49 @@ export default Ember.Component.extend({
       const timeseries = this.get('timeseries');
       const selectedUrns = this.get('selectedUrns');
 
-      console.log('series: entities', entities);
-      console.log('series: timeseries', timeseries);
-      console.log('series: selectedUrns', selectedUrns);
-
       const series = {};
       [...selectedUrns]
         .filter(urn => urn in entities)
         .filter(urn => entities[urn].type != 'metric' || urn in timeseries)
         .forEach(urn => {
           const e = entities[urn];
-          series[this.entityToLabel(e)] = this.entityToSeries(e);
+          series[this._entityToLabel(e)] = this._entityToSeries(e);
         });
-      console.log('series: series', series);
+
+      console.log('rootcause-chart: series: series', series);
 
       return series;
     }
   ),
 
-  entityToLabel (entity) {
+  _hoverBounds: Ember.computed(
+    'entities',
+    'timeseries',
+    'selectedUrns',
+    function () {
+      const entities = this.get('entities');
+      const timeseries = this.get('timeseries');
+      const selectedUrns = this.get('selectedUrns');
+
+      const bounds = {};
+      [...selectedUrns]
+        .filter(urn => urn in entities)
+        .filter(urn => entities[urn].type != 'metric' || urn in timeseries)
+        .forEach(urn => {
+          const e = entities[urn];
+          const timestamps = this._entityToSeries(e).timestamps;
+          bounds[urn] = [timestamps[0], timestamps[timestamps.length-1]];
+        });
+
+      return bounds;
+    }
+  ),
+
+  _entityToLabel(entity) {
     return entity.label;
   },
 
-  entityToSeries (entity) {
+  _entityToSeries(entity) {
     if (entity.type == 'metric') {
       const timeseries = this.get('timeseries');
       return {
@@ -60,6 +100,28 @@ export default Ember.Component.extend({
         axis: 'y2'
       };
     }
+  },
 
+  _onHover(d) {
+    const bounds = this.get('_hoverBounds');
+    const selectedUrns = this.get('selectedUrns');
+    const onHover = this.get('onHover');
+    if (onHover != null) {
+      console.log('rootcause-chart: _onHover: bounds', bounds);
+      const urns = [...selectedUrns].filter(urn => bounds[urn] && bounds[urn][0] <= d && d <= bounds[urn][1]);
+      onHover(urns);
+    }
+  },
+
+  actions: {
+    // NOTE: not passed through yet
+    onMouseOut() {
+      const onHover = this.get('onHover');
+      if (onHover != null) {
+        console.log('rootcause-chart: onMouseOut()');
+        onHover([]);
+      }
+    }
   }
+
 });

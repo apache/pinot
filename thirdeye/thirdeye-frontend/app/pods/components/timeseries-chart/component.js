@@ -91,7 +91,7 @@ export default Ember.Component.extend({
 
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
-
+  
     const config = { unload, xs, columns, types, regions, tooltip, colors, axis, axes };
 
     return config;

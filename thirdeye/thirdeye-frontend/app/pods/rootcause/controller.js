@@ -49,6 +49,8 @@ export default Ember.Controller.extend({
 
   invisibleUrns: null, // Set
 
+  hoverUrns: null, // Set
+
   _timeseriesCache: null, // {}
 
   _entitiesCache: null, // {}
@@ -116,6 +118,21 @@ export default Ember.Controller.extend({
       console.log('eventFilterEntities()');
       const entities = this.get('entities') || {};
       return filterEntities(entities, (e) => e.type == 'event');
+    }
+  ),
+
+  tooltipEntities: Ember.computed(
+    'entities',
+    'invisibleUrns',
+    'hoverUrns',
+    function () {
+      const entities = this.get('entities') || {};
+      const invisibleUrns = this.get('invisibleUrns');
+      const hoverUrns = this.get('hoverUrns');
+
+      const visibleUrns = makeIterable(hoverUrns).filter(urn => !invisibleUrns.has(urn));
+
+      return filterEntities(entities, (e) => visibleUrns.has(e.urn));
     }
   ),
 
@@ -251,6 +268,13 @@ export default Ember.Controller.extend({
       console.log('filterOnSelect()');
       this.set('filteredUrns', new Set(urns));
       this.notifyPropertyChange('filteredUrns');
+    },
+
+    chartOnHover(urns) {
+      console.log('chartOnHover()');
+      console.log('chartOnHover: urns', urns);
+      this.set('hoverUrns', new Set(urns));
+      this.notifyPropertyChange('hoverUrns');
     },
 
     addSelectedUrns(urns) {

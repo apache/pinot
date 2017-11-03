@@ -44,5 +44,6 @@ export default Ember.Route.extend({
     controller.set('selectedUrns', new Set(['thirdeye:metric:194592', 'thirdeye:event:holiday:2712391']));
     controller.set('invisibleUrns', new Set());
     controller.set('filteredUrns', new Set());
+    controller.set('hoverUrns', new Set());
   }
 });
