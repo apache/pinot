@@ -96,12 +96,6 @@ export default Ember.Component.extend({
     return config;
   },
 
-  _hasDiff() {
-    const cache = this.get('_seriesCache') || {};
-    const series = this.get('series') || {};
-    return !_.isEqual(cache, series);
-  },
-
   _updateCache() {
     const series = this.get('series');
     this.set('_seriesCache', _.cloneDeep(series));
@@ -119,9 +113,7 @@ export default Ember.Component.extend({
 
   didUpdateAttrs() {
     this._super(...arguments);
-    if (this._hasDiff()) {
-      Ember.run.debounce(this, this._updateChart, 250);
-    }
+    this._updateChart();
   },
 
   didInsertElement() {
