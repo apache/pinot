@@ -146,6 +146,24 @@ export default Ember.Controller.extend({
     }
   ),
 
+  isLoadingEntities: Ember.computed(
+    'entities',
+    '_pendingEntitiesRequests',
+    function () {
+      this.get('entities'); // force entities computation first
+      return this.get('_pendingEntitiesRequests').size > 0;
+    }
+  ),
+
+  isLoadingTimeseries: Ember.computed(
+    'timeseries',
+    '_pendingTimeseriesRequests',
+    function () {
+      this.get('timeseries'); // force timeseries computation first
+      return this.get('_pendingTimeseriesRequests').size > 0;
+    }
+  ),
+
   //
   // Entities loading
   //

@@ -1,3 +1,12 @@
+<h3>This is the loading indicator.</h3>
+loading
+{{#if isLoadingEntities}}
+  | ENTITIES
+{{/if}}
+{{#if isLoadingTimeseries}}
+  | TIMESERIES
+{{/if}}
+
 <h3>This manipulates the controller state.</h3>
 <a {{action "addSelectedUrns" "thirdeye:metric:17606338"}}>add selected</a> |
 <a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove selected</a> |
