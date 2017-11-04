@@ -32,7 +32,6 @@ Router.map(function() {
   });
   this.route('screenshot', { path: 'screenshot/:anomalyId' });
   this.route('rca-poc');
-  this.route('sandbox');
   this.route('rootcause');
 });
 

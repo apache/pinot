@@ -1,5 +1,5 @@
 <h3>This is the loading indicator.</h3>
-loading
+type
 {{#if isLoadingEntities}}
   | ENTITIES
 {{/if}}
@@ -8,13 +8,9 @@ loading
 {{/if}}
 
 <h3>This manipulates the controller state.</h3>
-<a {{action "addSelectedUrns" "thirdeye:metric:17606338"}}>add selected</a> |
-<a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove selected</a> |
-<a {{action "addInvisibleUrns" "thirdeye:metric:17606338"}}>add invisible</a> |
-<a {{action "removeInvisibleUrns" "thirdeye:metric:17606338"}}>remove invisible</a> |
-<a {{action "addFilteredUrns" "thirdeye:metric:17606338"}}>add filtered</a> |
-<a {{action "removeFilteredUrns" "thirdeye:metric:17606338"}}>remove filtered</a> |
-<a {{action "loadtestSelectedUrns"}}>select all (loadtest)</a>
+<a {{action "addSelectedUrns" "thirdeye:metric:17606338"}}>add test metric</a> |
+<a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove test metric</a> |
+<a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a>
 
 <h3>This is the legend.</h3>
 urns
