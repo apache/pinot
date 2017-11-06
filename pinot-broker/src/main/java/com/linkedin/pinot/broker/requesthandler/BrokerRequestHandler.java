@@ -16,6 +16,8 @@
 package com.linkedin.pinot.broker.requesthandler;
 
 import com.google.common.base.Splitter;
+import com.linkedin.pinot.broker.api.RequesterIdentity;
+import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import com.linkedin.pinot.broker.routing.RoutingTable;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
@@ -81,6 +83,7 @@ public class BrokerRequestHandler {
   private static final String BROKER_QUERY_RESPONSE_LIMIT_CONFIG = "pinot.broker.query.response.limit";
   private static final String BROKER_QUERY_SPLIT_IN_CLAUSE = "pinot.broker.query.split.in.clause";
   private static final String BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
+  private static final String BROKER_ACCESS_CONTROL_PREFIX = "pinot.broker.access.control";
   public static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
   private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
   private static final String DEFAULT_BROKER_ID;
@@ -91,6 +94,7 @@ public class BrokerRequestHandler {
   private final SegmentZKMetadataPrunerService _segmentPrunerService;
   private final boolean _splitInClause;
   private final int _queryLogLength;
+  private final AccessControlFactory _accessControlFactory;
 
   static {
     String defaultBrokerId = "";
@@ -129,6 +133,7 @@ public class BrokerRequestHandler {
     _brokerTimeOutMs = config.getLong(BROKER_TIME_OUT_CONFIG, DEFAULT_BROKER_TIME_OUT_MS);
     _brokerId = config.getString(BROKER_ID_CONFIG_KEY, DEFAULT_BROKER_ID);
     _segmentPrunerService = segmentPrunerService;
+    _accessControlFactory = AccessControlFactory.loadFactory(config.subset(BROKER_ACCESS_CONTROL_PREFIX));
 
     LOGGER.info("Broker response limit is: " + _queryResponseLimit);
     LOGGER.info("Broker timeout is - " + _brokerTimeOutMs + " ms");
@@ -139,11 +144,12 @@ public class BrokerRequestHandler {
    * Process a JSON format request.
    *
    * @param request JSON format request to be processed.
+   * @param requesterIdentity
    * @return broker response.
    * @throws Exception
    */
   @Nonnull
-  public BrokerResponse handleRequest(@Nonnull JSONObject request) throws Exception {
+  public BrokerResponse handleRequest(@Nonnull JSONObject request, RequesterIdentity requesterIdentity) throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     String pql = request.getString("pql");
     LOGGER.debug("Query string for requestId {}: {}", requestId, pql);
@@ -172,6 +178,12 @@ public class BrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1L);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
+    }
+    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
+    if (!hasAccess) {
+      _brokerMetrics.addMeteredTableValue(brokerRequest.getQuerySource().getTableName(),
+          BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE, QueryException.ACCESS_DENIED_ERROR);
     }
 
     // Get the resources hit by the request

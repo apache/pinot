@@ -66,7 +66,7 @@ public class PinotClientRequest {
       if (traceEnabled != null) {
         requestJson.put("trace", traceEnabled);
       }
-      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson);
+      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null);
       return brokerResponse.toJsonString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -86,7 +86,7 @@ public class PinotClientRequest {
   public String processQueryPost(String query) {
     try {
       JSONObject requestJson = new JSONObject(query);
-      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson);
+      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null);
       return brokerResponse.toJsonString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
