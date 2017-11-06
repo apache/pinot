@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.startree;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
@@ -27,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -52,9 +52,8 @@ public class StarTreeSerDe {
 
   public static final long MAGIC_MARKER = 0xBADDA55B00DAD00DL;
   public static final int MAGIC_MARKER_SIZE_IN_BYTES = 8;
-
-  private static final String UTF8 = "UTF-8";
-  private static byte version = 1;
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
+  private static final int VERSION = 1;
 
   /**
    * De-serializes a StarTree structure.
@@ -119,12 +118,14 @@ public class StarTreeSerDe {
     byte[] magicBytes = new byte[MAGIC_MARKER_SIZE_IN_BYTES];
 
     bufferedInputStream.mark(MAGIC_MARKER_SIZE_IN_BYTES);
-    bufferedInputStream.read(magicBytes, 0, MAGIC_MARKER_SIZE_IN_BYTES);
+    Preconditions.checkState(
+        bufferedInputStream.read(magicBytes, 0, MAGIC_MARKER_SIZE_IN_BYTES) == MAGIC_MARKER_SIZE_IN_BYTES);
     bufferedInputStream.reset();
 
     LBufferAPI lBuffer = new LBuffer(MAGIC_MARKER_SIZE_IN_BYTES);
     lBuffer.readFrom(magicBytes, 0);
     long magicMarker = lBuffer.getLong(0);
+    lBuffer.release();
 
     if (magicMarker == MAGIC_MARKER) {
       return StarTreeFormatVersion.OFF_HEAP;
@@ -224,30 +225,31 @@ public class StarTreeSerDe {
     mappedByteBuffer.putLong(offset, MAGIC_MARKER);
     offset += V1Constants.Numbers.LONG_SIZE;
 
-    mappedByteBuffer.putInt(offset, version);
+    mappedByteBuffer.putInt(offset, VERSION);
     offset += V1Constants.Numbers.INTEGER_SIZE;
 
     mappedByteBuffer.putInt(offset, headerSizeInBytes);
     offset += V1Constants.Numbers.INTEGER_SIZE;
 
-    HashBiMap<String, Integer> dimensionNameToIndexMap = starTree.getDimensionNameToIndexMap();
+    List<String> dimensionNames = starTree.getDimensionNames();
+    int numDimensions = dimensionNames.size();
 
-    mappedByteBuffer.putInt(offset, dimensionNameToIndexMap.size());
+    mappedByteBuffer.putInt(offset, numDimensions);
     offset += V1Constants.Numbers.INTEGER_SIZE;
 
     // Write the dimensionName to Index map
-    for (Map.Entry<String, Integer> entry : dimensionNameToIndexMap.entrySet()) {
-      String dimension = entry.getKey();
-      int index = entry.getValue();
+    for (int i = 0; i < numDimensions; i++) {
+      String dimensionName = dimensionNames.get(i);
 
-      mappedByteBuffer.putInt(offset, index);
+      mappedByteBuffer.putInt(offset, i);
       offset += V1Constants.Numbers.INTEGER_SIZE;
 
-      int dimensionLength = dimension.length();
+      byte[] dimensionBytes = dimensionName.getBytes(UTF_8);
+      int dimensionLength = dimensionBytes.length;
       mappedByteBuffer.putInt(offset, dimensionLength);
       offset += V1Constants.Numbers.INTEGER_SIZE;
 
-      mappedByteBuffer.readFrom(dimension.getBytes(UTF8), offset);
+      mappedByteBuffer.readFrom(dimensionBytes, offset);
       offset += dimensionLength;
     }
 
@@ -343,11 +345,11 @@ public class StarTreeSerDe {
   private static int computeOffHeapHeaderSizeInBytes(StarTreeInterf starTree) {
     int size = 20; // magic marker, version, size of header and number of dimensions
 
-    HashBiMap<String, Integer> dimensionNameToIndexMap = starTree.getDimensionNameToIndexMap();
-    for (String dimension : dimensionNameToIndexMap.keySet()) {
+    List<String> dimensionNames = starTree.getDimensionNames();
+    for (String dimension : dimensionNames) {
       size += V1Constants.Numbers.INTEGER_SIZE; // For dimension index
       size += V1Constants.Numbers.INTEGER_SIZE; // For length of dimension name
-      size += dimension.length(); // For dimension name
+      size += dimension.getBytes(UTF_8).length; // For dimension name
     }
 
     size += V1Constants.Numbers.INTEGER_SIZE; // For number of nodes.

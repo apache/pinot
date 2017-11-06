@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.common.base.Objects;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -39,9 +37,11 @@ public class StarTreeIndexSpec {
   private Set<String> _skipMaterializationForDimensions;
   private int skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
+  private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
   private boolean enableOffHeapFormat = true;
 
-  public StarTreeIndexSpec() {}
+  public StarTreeIndexSpec() {
+  }
 
   public Integer getMaxLeafRecords() {
     return maxLeafRecords;
@@ -83,27 +83,13 @@ public class StarTreeIndexSpec {
     this.skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
   }
 
-  @Override
-  public boolean equals(Object o) {
-    if (!(o instanceof StarTreeIndexSpec)) {
-      return false;
-    }
-    StarTreeIndexSpec s = (StarTreeIndexSpec) o;
-    return Objects.equal(maxLeafRecords, s.getMaxLeafRecords())
-        && Objects.equal(dimensionsSplitOrder, s.getDimensionsSplitOrder());
+  public boolean isExcludeSkipMaterializationDimensionsForStarTreeIndex() {
+    return _excludeSkipMaterializationDimensionsForStarTreeIndex;
   }
 
-  @Override
-  public int hashCode() {
-    return Objects.hashCode(maxLeafRecords, dimensionsSplitOrder);
-  }
-
-  @Override
-  public String toString() {
-    return Objects.toStringHelper(this)
-        .add("maxLeafRecords", maxLeafRecords)
-        .add("dimensionsSplitOrder", dimensionsSplitOrder)
-        .toString();
+  public void setExcludeSkipMaterializationDimensionsForStarTreeIndex(
+      boolean excludeSkipMaterializationDimensionsForStarTreeIndex) {
+    _excludeSkipMaterializationDimensionsForStarTreeIndex = excludeSkipMaterializationDimensionsForStarTreeIndex;
   }
 
   /**

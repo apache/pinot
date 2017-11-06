@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
@@ -24,7 +23,6 @@ import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
@@ -386,8 +384,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
   private Queue<SearchEntry> findMatchingLeafNodes() {
     Queue<SearchEntry> matchedEntries = new LinkedList<>();
     Queue<SearchEntry> searchQueue = new LinkedList<>();
-    HashBiMap<String, Integer> dimensionIndexToNameMapping =
-        segment.getStarTree().getDimensionNameToIndexMap();
+    List<String> dimensionNames = segment.getStarTree().getDimensionNames();
 
     SearchEntry startEntry = new SearchEntry();
     startEntry.starTreeIndexnode = segment.getStarTree().getRoot();
@@ -408,8 +405,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
         continue;
       }
       // Find next set of nodes to search
-      String nextDimension =
-          dimensionIndexToNameMapping.inverse().get(current.getChildDimensionName());
+      String nextDimension = dimensionNames.get(current.getChildDimensionName());
 
       HashSet<String> newRemainingPredicateColumns = new HashSet<>();
       newRemainingPredicateColumns.addAll(remainingPredicateColumns);

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.tools;
 
-import com.google.common.collect.HashBiMap;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
@@ -63,7 +62,7 @@ public class StarTreeIndexViewer {
    * MAX num children to show in the UI
    */
   static int MAX_CHILDREN = 100;
-  private HashBiMap<String, Integer> dimensionNameToIndexMap;
+  private List<String> _dimensionNames;
   private Map<String, Dictionary> dictionaries;
   private Map<String, BlockSingleValIterator> valueIterators;
 
@@ -85,7 +84,7 @@ public class StarTreeIndexViewer {
     }
     File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(segmentDir);
     StarTreeInterf tree = StarTreeSerDe.fromFile(starTreeFile, ReadMode.mmap);
-    dimensionNameToIndexMap = tree.getDimensionNameToIndexMap();
+    _dimensionNames = tree.getDimensionNames();
     StarTreeJsonNode jsonRoot = new StarTreeJsonNode("ROOT");
     build(tree.getRoot(), jsonRoot);
     ObjectMapper objectMapper = new ObjectMapper();
@@ -102,7 +101,7 @@ public class StarTreeIndexViewer {
       return 0;
     }
     int childDimensionId = indexNode.getChildDimensionName();
-    String childDimensionName = dimensionNameToIndexMap.inverse().get(childDimensionId);
+    String childDimensionName = _dimensionNames.get(childDimensionId);
     Dictionary dictionary = dictionaries.get(childDimensionName);
     int totalChildNodes = indexNode.getNumChildren();
 

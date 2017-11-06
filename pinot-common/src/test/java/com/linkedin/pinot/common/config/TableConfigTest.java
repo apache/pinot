@@ -178,8 +178,6 @@ public class TableConfigTest {
     // Check that the segment assignment configuration does exist.
     Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
     Assert.assertNotNull(tableConfigToCompare.getValidationConfig().getStarTreeConfig());
-    Assert.assertEquals(tableConfigToCompare.getValidationConfig().getStarTreeConfig(),
-        tableConfig.getValidationConfig().getStarTreeConfig());
 
     // Check that the configurations are correct.
     StarTreeIndexSpec starTreeIndexSpec =

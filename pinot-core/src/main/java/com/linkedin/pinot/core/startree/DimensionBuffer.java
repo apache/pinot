@@ -15,38 +15,47 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 
 
 public class DimensionBuffer {
+  private static final ByteOrder NATIVE_ORDER = ByteOrder.nativeOrder();
 
-  IntBuffer buffer;
-  private int numDimensions;
+  private final int _numDimensions;
+  private final IntBuffer _intBuffer;
 
   public DimensionBuffer(int numDimensions) {
-    this(numDimensions, ByteBuffer.wrap(new byte[numDimensions * 4]).asIntBuffer());
-    this.numDimensions = numDimensions;
+    _numDimensions = numDimensions;
+    _intBuffer = ByteBuffer.wrap(new byte[numDimensions * V1Constants.Numbers.INTEGER_SIZE]).asIntBuffer();
   }
 
-  public DimensionBuffer(int numDimensions, IntBuffer intBuffer) {
-    this.numDimensions = numDimensions;
-    buffer = intBuffer;
+  public DimensionBuffer(byte[] bytes) {
+    _numDimensions = bytes.length / V1Constants.Numbers.INTEGER_SIZE;
+    // NOTE: the byte array is returned from Unsafe which uses native order
+    _intBuffer = ByteBuffer.wrap(bytes).order(NATIVE_ORDER).asIntBuffer();
   }
 
-  static DimensionBuffer fromBytes(byte[] byteArray) {
-    return new DimensionBuffer(byteArray.length / 4, ByteBuffer.wrap(byteArray).asIntBuffer());
+  public static DimensionBuffer fromBytes(byte[] bytes) {
+    return new DimensionBuffer(bytes);
   }
 
   public int getDimension(int index) {
-    return buffer.get(index);
+    return _intBuffer.get(index);
   }
 
+  public void setDimension(int index, int value) {
+    _intBuffer.put(index, value);
+  }
+
+  @SuppressWarnings({"EqualsWhichDoesntCheckParameterClass", "CheckStyle"})
   @Override
   public boolean equals(Object obj) {
     DimensionBuffer that = (DimensionBuffer) obj;
-    for (int i = 0; i < numDimensions; i++) {
-      if (buffer.get(i) != that.getDimension(i)) {
+    for (int i = 0; i < _numDimensions; i++) {
+      if (_intBuffer.get(i) != that._intBuffer.get(i)) {
         return false;
       }
     }
@@ -55,17 +64,13 @@ public class DimensionBuffer {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder("[");
-    String delim = "";
-    for (int i = 0; i < numDimensions; i++) {
-      sb.append(delim).append(buffer.get(i));
-      delim = ", ";
+    StringBuilder builder = new StringBuilder("[");
+    String delimiter = "";
+    for (int i = 0; i < _numDimensions; i++) {
+      builder.append(delimiter).append(_intBuffer.get(i));
+      delimiter = ", ";
     }
-    sb.append("]");
-    return sb.toString();
-  }
-
-  public void setDimension(int index, int value) {
-    buffer.put(index, value);
+    builder.append("]");
+    return builder.toString();
   }
 }

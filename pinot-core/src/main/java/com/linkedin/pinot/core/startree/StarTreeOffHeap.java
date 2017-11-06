@@ -16,15 +16,16 @@
 package com.linkedin.pinot.core.startree;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.List;
 import xerial.larray.buffer.LBuffer;
 import xerial.larray.buffer.LBufferAPI;
 import xerial.larray.mmap.MMapBuffer;
@@ -35,194 +36,122 @@ import xerial.larray.mmap.MMapMode;
  * LBuffer based implementation of star tree interface.
  */
 public class StarTreeOffHeap implements StarTreeInterf {
-  private static final long serialVersionUID = 1L;
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DIMENSION_NAME_MAX_LENGTH = 4096;
-  private static final String UTF8 = "UTF-8";
+  private static final int LOAD_FILE_BUFFER_SIZE = 10 * 1024 * 1024;
 
-  // Buffer size for buffered reading of on-disk file into byte buffer.
-  private static final int BUFFER_SIZE = 10 * 1024 * 1024;
-
-  // Off heap buffer were the star tree is loaded.
-  LBufferAPI dataBuffer;
-
-  StarTreeIndexNodeOffHeap root;
-
-  // Offset of the root node in the file.
-  private int rootNodeOffset;
-
-  // Initial size of buffer to be allocated to read the star tree header.
-  private static final long STAR_TREE_HEADER_READER_SIZE = 10 * 1024;
-
-  int numNodes = 0;
-  private HashBiMap<String, Integer> dimensionNameToIndexMap;
-  private int version;
+  private final LBufferAPI _dataBuffer;
+  private final StarTreeIndexNodeOffHeap _root;
+  private final List<String> _dimensionNames;
+  private final int _numNodes;
 
   /**
    * Constructor for the class.
    * - Reads in the header
    * - Loads/MMap's the StarTreeIndexNodeOffHeap array.
-   *
-   * @param starTreeFile
-   * @param readMode
-   * @throws IOException
    */
-  public StarTreeOffHeap(File starTreeFile, ReadMode readMode)
-      throws IOException {
-    int rootOffset = readHeader(starTreeFile);
-    long size = starTreeFile.length() - rootOffset;
-
+  public StarTreeOffHeap(File starTreeFile, ReadMode readMode) throws IOException {
     if (readMode.equals(ReadMode.mmap)) {
-      dataBuffer = new MMapBuffer(starTreeFile, rootOffset, size, MMapMode.READ_ONLY);
+      _dataBuffer = new MMapBuffer(starTreeFile, MMapMode.READ_ONLY);
     } else {
-      dataBuffer = loadFromFile(starTreeFile, rootOffset);
+      _dataBuffer = loadFrom(starTreeFile);
     }
 
-    // Root node is the first one.
-    root = new StarTreeIndexNodeOffHeap(dataBuffer, 0);
-  }
-
-  /**
-   * Read the header information from the star tree file, and populate the
-   * following info:
-   * - Version
-   * - Dimension name to index map.
-   * - Number of nodes
-   * - Root offset.
-   *
-   * @throws UnsupportedEncodingException
-   * @param starTreeFile
-   */
-  private int readHeader(File starTreeFile)
-      throws IOException {
     int offset = 0;
-
-    int size = (int) Math.min(starTreeFile.length(), STAR_TREE_HEADER_READER_SIZE);
-    MMapBuffer dataBuffer = new MMapBuffer(starTreeFile, offset, size, MMapMode.READ_ONLY);
-
-    Preconditions.checkState(StarTreeSerDe.MAGIC_MARKER == dataBuffer.getLong(offset),
+    Preconditions.checkState(StarTreeSerDe.MAGIC_MARKER == _dataBuffer.getLong(offset),
         "Invalid magic marker in Star Tree file");
     offset += StarTreeSerDe.MAGIC_MARKER_SIZE_IN_BYTES;
 
-    version = dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    int version = _dataBuffer.getInt(offset);
     Preconditions.checkState(version == 1);
-
-    rootNodeOffset = dataBuffer.getInt(offset);
     offset += V1Constants.Numbers.INTEGER_SIZE;
 
-    // If header size turns out to be larger than initially thought, then re-map with the correct size.
-    if (rootNodeOffset > size) {
-      dataBuffer.close();
-      dataBuffer = new MMapBuffer(starTreeFile, 0, rootNodeOffset, MMapMode.READ_ONLY);
-    }
-
-    int numDimensions = dataBuffer.getInt(offset);
+    int rootNodeOffset = _dataBuffer.getInt(offset);
     offset += V1Constants.Numbers.INTEGER_SIZE;
 
-    dimensionNameToIndexMap = HashBiMap.create(numDimensions);
+    int numDimensions = _dataBuffer.getInt(offset);
+    offset += V1Constants.Numbers.INTEGER_SIZE;
+
+    String[] dimensionNames = new String[numDimensions];
     byte[] dimensionNameBytes = new byte[DIMENSION_NAME_MAX_LENGTH];
-
     for (int i = 0; i < numDimensions; i++) {
-      int index = dataBuffer.getInt(offset);
+      // NOTE: In old version, index might not be stored in order
+      int dimensionId = _dataBuffer.getInt(offset);
       offset += V1Constants.Numbers.INTEGER_SIZE;
 
-      int dimensionLength = dataBuffer.getInt(offset);
-      offset += V1Constants.Numbers.INTEGER_SIZE;
-
-      // Since we are re-using the same bytes for reading strings, assert we have allocated enough.
+      int dimensionLength = _dataBuffer.getInt(offset);
       Preconditions.checkState(dimensionLength < DIMENSION_NAME_MAX_LENGTH);
+      offset += V1Constants.Numbers.INTEGER_SIZE;
 
-      // Ok to cast offset to int, as its value is too small at this point in the file.
-      dataBuffer.copyTo((int) offset, dimensionNameBytes, 0, dimensionLength);
+      _dataBuffer.copyTo(offset, dimensionNameBytes, 0, dimensionLength);
       offset += dimensionLength;
 
-      String dimensionName = new String(dimensionNameBytes, 0, dimensionLength, UTF8);
-      dimensionNameToIndexMap.put(dimensionName, index);
+      String dimensionName = new String(dimensionNameBytes, 0, dimensionLength, UTF_8);
+      dimensionNames[dimensionId] = dimensionName;
     }
+    _dimensionNames = Arrays.asList(dimensionNames);
 
-    numNodes = dataBuffer.getInt(offset);
+    _numNodes = _dataBuffer.getInt(offset);
     offset += V1Constants.Numbers.INTEGER_SIZE;
+    Preconditions.checkState(offset == rootNodeOffset, "Error reading Star Tree file, header length mis-match");
 
-    Preconditions.checkState((offset == rootNodeOffset), "Error reading Star Tree file, header length mis-match");
-
-    dataBuffer.close();
-    return offset;
+    _root = new StarTreeIndexNodeOffHeap(_dataBuffer.view(rootNodeOffset, starTreeFile.length()), 0);
   }
 
   /**
-   * Helper method that loads the star tree into a LBuffer, from
-   * the given file.
-   *
-   * @param starTreeFile
-   * @param rootOffset
-   * @return
-   * @throws IOException
+   * Helper method to create an LBuffer from a given file.
    */
-  private static LBufferAPI loadFromFile(File starTreeFile, long rootOffset)
-      throws IOException {
-    FileChannel fileChannel = new FileInputStream(starTreeFile).getChannel();
-    ByteBuffer byteBuffer = ByteBuffer.allocate(BUFFER_SIZE);
+  private static LBuffer loadFrom(File file) throws IOException {
+    try (FileChannel fileChannel = new FileInputStream(file).getChannel()) {
+      ByteBuffer byteBuffer = ByteBuffer.allocate(LOAD_FILE_BUFFER_SIZE);
+      LBuffer lBuffer = new LBuffer(file.length());
 
-    long start = rootOffset;
-    long end = starTreeFile.length();
-    long destOffset = 0;
-    LBufferAPI lBuffer = new LBuffer(end - start);
-
-    int bytesRead = 0;
-    while ((bytesRead = fileChannel.read(byteBuffer, start)) > 0) {
-      lBuffer.readFrom(byteBuffer.array(), 0, destOffset, bytesRead);
-      start += bytesRead;
-      destOffset += bytesRead;
-      byteBuffer.clear();
+      long offset = 0;
+      int numBytesRead;
+      while ((numBytesRead = fileChannel.read(byteBuffer, offset)) > 0) {
+        lBuffer.readFrom(byteBuffer.array(), 0, offset, numBytesRead);
+        offset += numBytesRead;
+      }
+      return lBuffer;
     }
-    fileChannel.close();
-    return lBuffer;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
   @Override
   public StarTreeIndexNodeInterf getRoot() {
-    return root;
+    return _root;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Override
   public StarTreeFormatVersion getVersion() {
     return StarTreeFormatVersion.OFF_HEAP;
   }
 
   @Override
   public int getNumNodes() {
-    return numNodes;
+    return _numNodes;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
   @Override
-  public HashBiMap<String, Integer> getDimensionNameToIndexMap() {
-    return dimensionNameToIndexMap;
+  public List<String> getDimensionNames() {
+    return _dimensionNames;
   }
 
-  /**
-   * {@inheritDoc}
-   * @param outputFile
-   * @throws IOException
-   */
   @Override
-  public void writeTree(File outputFile)
-      throws IOException {
+  public void writeTree(File outputFile) throws IOException {
     throw new RuntimeException("Method 'writeTree' not implemented for class " + getClass().getName());
   }
 
   @Override
   public void printTree() {
     throw new RuntimeException("Method 'printTree' not implemented for class " + getClass().getName());
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (_dataBuffer instanceof MMapBuffer) {
+      ((MMapBuffer) _dataBuffer).close();
+    } else {
+      _dataBuffer.release();
+    }
   }
 }
