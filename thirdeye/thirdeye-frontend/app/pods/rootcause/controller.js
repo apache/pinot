@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import { makeIterable, filterObject } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
+import fetch from 'fetch';
 
 //
 // Controller
@@ -64,11 +65,13 @@ export default Ember.Controller.extend({
       const { entities, selectedUrns, invisibleUrns, context } =
         this.getProperties('entities', 'selectedUrns', 'invisibleUrns', 'context');
 
-      const output = new Set(selectedUrns);
-      [...invisibleUrns].forEach(urn => output.delete(urn));
-      [...context.urns].filter(urn => entities[urn] && entities[urn].type == 'metric').forEach(urn => output.add(urn));
+      const selectedMetricUrns = new Set(selectedUrns);
+      [...invisibleUrns].forEach(urn => selectedMetricUrns.delete(urn));
+      [...context.urns].filter(urn => entities[urn] && entities[urn].type == 'metric').forEach(urn => selectedMetricUrns.add(urn));
 
-      return output;
+      const selectedBaselineUrns = [...selectedMetricUrns].filter(urn => entities[urn] && entities[urn].type == 'metric').map(urn => this._makeMetricBaselineUrn(urn));
+
+      return new Set([...selectedMetricUrns].concat(selectedBaselineUrns));
     }
   ),
 
@@ -162,6 +165,7 @@ export default Ember.Controller.extend({
       const url = this._makeFrameworkUrl(framework, context);
       fetch(url)
         .then(res => res.json())
+        .then(res => this._resultToEntities(res))
         .then(json => this._completeRequestEntities(this, json, framework));
     });
 
@@ -173,20 +177,27 @@ export default Ember.Controller.extend({
       this.getProperties('selectedUrns', '_pendingEntitiesRequests', '_entitiesCache', '_timeseriesCache');
 
     // NOTE: potential race condition?
+    console.log('_completeRequestEntities: incoming', incoming);
 
     // update pending requests
     pending.delete(framework);
 
     // timeseries eviction
     // TODO optimize for same time range reload
-    incoming.forEach(e => delete timeseriesCache[e.urn]);
+    Object.keys(incoming).forEach(urn => delete timeseriesCache[urn]);
+    Object.keys(incoming).forEach(urn => delete timeseriesCache[that._makeMetricBaselineUrn(urn)]);
 
     // entities eviction
     const candidates = that._entitiesEvictionUrns(entitiesCache, framework);
     [...candidates].filter(urn => !selectedUrns.has(urn)).forEach(urn => delete entitiesCache[urn]);
 
+    // augmentation
+    const augmented = Object.assign({}, incoming, that._entitiesMetricsAugmentation(incoming));
+
+    console.log('_completeRequestEntities: augmented', augmented);
+
     // update entities cache
-    incoming.forEach(e => entitiesCache[e.urn] = e);
+    Object.keys(augmented).forEach(urn => entitiesCache[urn] = augmented[urn]);
 
     that.setProperties({ _entitiesCache: entitiesCache, _timeseriesCache: timeseriesCache, _pendingEntitiesRequests: pending });
     that.notifyPropertyChange('_timeseriesCache');
@@ -206,6 +217,20 @@ export default Ember.Controller.extend({
     }
   },
 
+  _entitiesMetricsAugmentation(incoming) {
+    console.log('_entitiesMetricsAugmentation()');
+    const entities = {};
+    Object.keys(incoming).filter(urn => incoming[urn].type == 'metric').forEach(urn => {
+      const baselineUrn = this._makeMetricBaselineUrn(urn);
+      entities[baselineUrn] = {
+        urn: baselineUrn,
+        type: 'frontend:baseline:metric',
+        label: incoming[urn].label + ' (baseline)'
+      };
+    });
+    return entities;
+  },
+
   _makeFrameworkUrl(framework, context) {
     const urnString = [...context.urns].join(',');
     return `/rootcause/query?framework=${framework}` +
@@ -213,6 +238,12 @@ export default Ember.Controller.extend({
       `&baselineStart=${context.baselineRange[0]}&baselineEnd=${context.baselineRange[1]}` +
       `&analysisStart=${context.analysisRange[0]}&analysisEnd=${context.analysisRange[1]}` +
       `&urns=${urnString}`;
+  },
+
+  _resultToEntities(res) {
+    const entities = {};
+    res.forEach(e => entities[e.urn] = e);
+    return entities;
   },
 
   //
@@ -226,8 +257,9 @@ export default Ember.Controller.extend({
       const { entities, cache } = this.getProperties('entities', '_timeseriesCache');
 
       const metricUrns = Object.keys(entities).filter(urn => entities[urn] && entities[urn].type == 'metric');
+      const baselineUrns = metricUrns.map(urn => this._makeMetricBaselineUrn(urn));
 
-      this._startRequestMissingTimeseries(metricUrns);
+      this._startRequestMissingTimeseries(metricUrns.concat(baselineUrns));
 
       return cache;
     }
@@ -252,17 +284,32 @@ export default Ember.Controller.extend({
     this.setProperties({_pendingTimeseriesRequests: pending});
     this.notifyPropertyChange('_pendingTimeseriesRequests');
 
-    console.log('_startRequestMissingTimeseries: set pending', pending);
+    // metrics
+    const metricUrns = [...missing].filter(urn => urn.startsWith('thirdeye:metric:'));
+    console.log('_startRequestMissingTimeseries: metricUrns', metricUrns);
+    const metricIdString = metricUrns.map(urn => urn.split(":")[2]).join(',');
+    const metricUrl = `/timeseries/query?metricIds=${metricIdString}&ranges=${context.analysisRange[0]}:${context.analysisRange[1]}&granularity=15_MINUTES&transformations=timestamp`;
 
-    const metricIds = [...missing].map(urn => urn.split(":")[2]);
-
-    const idString = metricIds.join(',');
-    const url = `/timeseries/query?metricIds=${idString}&ranges=${context.analysisRange[0]}:${context.analysisRange[1]}&granularity=15_MINUTES&transformations=timestamp,relative`;
-
-    fetch(url)
+    fetch(metricUrl)
       .then(res => res.json())
       .then(this._extractTimeseries)
-      .then(incoming => this._completeRequestMissingTimeseries(this, incoming));
+      .then(timeseries => this._completeRequestMissingTimeseries(this, timeseries));
+
+    // baselines
+    const baselineOffset = context.anomalyRange[0] - context.baselineRange[0];
+    const baselineDisplayStart = context.analysisRange[0] - baselineOffset;
+    const baselineDisplayEnd = context.analysisRange[1] - baselineOffset;
+
+    const baselineUrns = [...missing].filter(urn => urn.startsWith('frontend:baseline:metric:'));
+    console.log('_startRequestMissingTimeseries: baselineUrns', baselineUrns);
+    const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
+    const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineDisplayStart}:${baselineDisplayEnd}&granularity=15_MINUTES&transformations=timestamp`;
+
+    fetch(baselineUrl)
+      .then(res => res.json())
+      .then(res => this._extractTimeseries(res))
+      .then(timeseries => this._convertMetricToBaseline(timeseries, baselineOffset))
+      .then(timeseries => this._completeRequestMissingTimeseries(this, timeseries));
 
   },
 
@@ -282,7 +329,7 @@ export default Ember.Controller.extend({
     that.notifyPropertyChange('_pendingTimeseriesRequests');
   },
 
-  _extractTimeseries: function(json) {
+  _extractTimeseries(json) {
     const timeseries = {};
     Object.keys(json).forEach(range =>
       Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
@@ -306,6 +353,23 @@ export default Ember.Controller.extend({
       })
     );
     return timeseries;
+  },
+
+  _convertMetricToBaseline(timeseries, offset) {
+    const baseline = {};
+    Object.keys(timeseries).forEach(urn => {
+      const baselineUrn = this._makeMetricBaselineUrn(urn);
+      baseline[baselineUrn] = {
+        values: timeseries[urn].values,
+        timestamps: timeseries[urn].timestamps.map(t => t + offset)
+      };
+    });
+    return baseline;
+  },
+
+  _makeMetricBaselineUrn(urn) {
+    const mid = urn.split(':')[2];
+    return `frontend:baseline:metric:${mid}`;
   },
 
   //

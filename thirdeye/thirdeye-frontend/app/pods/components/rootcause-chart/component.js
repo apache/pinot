@@ -125,8 +125,8 @@ export default Ember.Component.extend({
 
     return [...urns]
       .filter(urn => entities[urn])
-      .filter(urn => ['metric', 'event'].includes(entities[urn].type))
-      .filter(urn => entities[urn].type != 'metric' || timeseries[urn]);
+      .filter(urn => ['metric', 'event', 'frontend:baseline:metric'].includes(entities[urn].type))
+      .filter(urn => (entities[urn].type != 'metric' && entities[urn].type != 'frontend:baseline:metric') || timeseries[urn]);
   },
 
   _entityToLabel(entity) {
@@ -141,6 +141,16 @@ export default Ember.Component.extend({
         timestamps: timeseries[entity.urn].timestamps,
         values: timeseries[entity.urn].values,
         type: 'line',
+        axis: 'y'
+      };
+
+    } else if (entity.type == 'frontend:baseline:metric') {
+      const { timeseries } = this.getProperties('timeseries');
+
+      return {
+        timestamps: timeseries[entity.urn].timestamps,
+        values: timeseries[entity.urn].values,
+        type: 'scatter',
         axis: 'y'
       };
 
