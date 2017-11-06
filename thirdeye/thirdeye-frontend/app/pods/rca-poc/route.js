@@ -10,5 +10,13 @@ export default Ember.Route.extend({
       events,
       filterBarConfig
     };
+  },
+
+  setupController(controller, model) {
+    const filterBlocks = model.filterBarConfig;
+    controller.setProperties({
+      model,
+      filterBlocks
+    });
   }
 });
