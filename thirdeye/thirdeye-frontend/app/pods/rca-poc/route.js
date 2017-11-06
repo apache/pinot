@@ -7,8 +7,7 @@ export default Ember.Route.extend({
   model() {
     return {
       primaryMetric,
-      events,
-      filterBarConfig
+      events
     };
   },
 
@@ -19,10 +18,9 @@ export default Ember.Route.extend({
    * @param {Object} model
    */
   setupController(controller, model) {
-    const filterBlocks = model.filterBarConfig;
     controller.setProperties({
       model,
-      filterBlocks
+      filterBlocks: filterBarConfig
     });
   }
 });
