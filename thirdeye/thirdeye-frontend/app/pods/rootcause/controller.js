@@ -51,13 +51,7 @@ export default Ember.Controller.extend({
 
   hoverUrns: null, // Set
 
-  contextUrns: null, // Set
-
-  anomalyRange: null, // [2]
-
-  baselineRange: null, // [2]
-
-  analysisRange: null, // [2]
+  context: null, // { urns, anomalyRange, baselineRange, analysisRange }
 
   _timeseriesCache: null, // {}
 
@@ -98,17 +92,17 @@ export default Ember.Controller.extend({
 
   chartSelectedUrns: Ember.computed(
     'entities',
-    'contextUrns',
+    'context',
     'selectedUrns',
     'invisibleUrns',
     function () {
       console.log('chartSelectedUrns()');
-      const { entities, selectedUrns, invisibleUrns, contextUrns } =
-        this.getProperties('entities', 'selectedUrns', 'invisibleUrns', 'contextUrns');
+      const { entities, selectedUrns, invisibleUrns, context } =
+        this.getProperties('entities', 'selectedUrns', 'invisibleUrns', 'context');
 
       const output = new Set(selectedUrns);
       [...invisibleUrns].forEach(urn => output.delete(urn));
-      [...contextUrns].filter(urn => entities[urn] && entities[urn].type == 'metric').forEach(urn => output.add(urn));
+      [...context.urns].filter(urn => entities[urn] && entities[urn].type == 'metric').forEach(urn => output.add(urn));
 
       return output;
     }
@@ -169,7 +163,7 @@ export default Ember.Controller.extend({
   //
 
   _entitiesLoader: Ember.computed(
-    'contextUrns',
+    'context',
     'anomalyRegion',
     'baselineRegion',
     'analysisRegion',
@@ -183,14 +177,14 @@ export default Ember.Controller.extend({
 
   _startRequestEntities() {
     console.log('_startRequestEntities()');
-    const { contextUrns, anomalyRange, baselineRange, analysisRange, _pendingEntitiesRequests: pending } =
-      this.getProperties('contextUrns', 'anomalyRange', 'baselineRange', 'analysisRange', '_pendingEntitiesRequests');
+    const { context, _pendingEntitiesRequests: pending } =
+      this.getProperties('context', '_pendingEntitiesRequests');
 
     const frameworks = ['relatedEvents', 'relatedDimensions', 'relatedMetrics'];
 
     frameworks.forEach(framework => {
       pending.add(framework);
-      const url = this._makeFrameworkUrl(framework, anomalyRange, baselineRange, analysisRange, contextUrns);
+      const url = this._makeFrameworkUrl(framework, context);
       fetch(url)
         .then(res => res.json())
         .then(json => this._completeRequestEntities(this, json, framework));
@@ -239,9 +233,13 @@ export default Ember.Controller.extend({
     }
   },
 
-  _makeFrameworkUrl(framework, anomaly, baseline, analysis, urns) {
-    const urnString = [...urns].join(',');
-    return `/rootcause/query?framework=${framework}&anomalyStart=${anomaly[0]}&anomalyEnd=${anomaly[1]}&baselineStart=${baseline[0]}&baselineEnd=${baseline[1]}&analysisStart=${analysis[0]}&analysisEnd=${analysis[1]}&urns=${urnString}`;
+  _makeFrameworkUrl(framework, context) {
+    const urnString = [...context.urns].join(',');
+    return `/rootcause/query?framework=${framework}` +
+      `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
+      `&baselineStart=${context.baselineRange[0]}&baselineEnd=${context.baselineRange[1]}` +
+      `&analysisStart=${context.analysisRange[0]}&analysisEnd=${context.analysisRange[1]}` +
+      `&urns=${urnString}`;
   },
 
   //
@@ -255,6 +253,7 @@ export default Ember.Controller.extend({
       const { entities, cache } = this.getProperties('entities', '_timeseriesCache');
 
       const metricUrns = Object.keys(entities).filter(urn => entities[urn] && entities[urn].type == 'metric');
+
       this._startRequestMissingTimeseries(metricUrns);
 
       return cache;
@@ -263,8 +262,8 @@ export default Ember.Controller.extend({
 
   _startRequestMissingTimeseries(urns) {
     console.log('_startRequestMissingTimeseries()');
-    const { _pendingTimeseriesRequests: pending, _timeseriesCache: cache, analysisRange } =
-      this.getProperties('_pendingTimeseriesRequests', '_timeseriesCache', 'analysisRange');
+    const { _pendingTimeseriesRequests: pending, _timeseriesCache: cache, context } =
+      this.getProperties('_pendingTimeseriesRequests', '_timeseriesCache', 'context');
 
     const missing = new Set(urns);
     Object.keys(pending).forEach(urn => missing.delete(urn));
@@ -280,7 +279,7 @@ export default Ember.Controller.extend({
     const metricIds = [...missing].map(urn => urn.split(":")[2]);
 
     const idString = metricIds.join(',');
-    const url = `/timeseries/query?metricIds=${idString}&ranges=${analysisRange[0]}:${analysisRange[1]}&granularity=15_MINUTES&transformations=timestamp,relative`;
+    const url = `/timeseries/query?metricIds=${idString}&ranges=${context.analysisRange[0]}:${context.analysisRange[1]}&granularity=15_MINUTES&transformations=timestamp,relative`;
 
     fetch(url)
       .then(res => res.json())
