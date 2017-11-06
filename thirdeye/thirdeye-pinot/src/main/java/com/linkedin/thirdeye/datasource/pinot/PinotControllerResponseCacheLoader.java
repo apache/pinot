@@ -103,7 +103,7 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
   }
 
   @Override
-  public ResultSetGroup load(PinotQuery pinotQuery) throws Exception {
+  public PinotThirdEyeResultSetGroup load(PinotQuery pinotQuery) throws Exception {
     try {
       Connection connection = getConnection();
       synchronized (connection) {
@@ -117,7 +117,9 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
         long end = System.currentTimeMillis();
         LOG.info("Query:{}  took:{} ms", pinotQuery.getPql(), (end - start));
 
-        return resultSetGroup;
+        PinotThirdEyeResultSetGroup pinotThirdEyeResultSetGroup =
+            PinotThirdEyeResultSetGroup.fromResultSetGroup(resultSetGroup);
+        return pinotThirdEyeResultSetGroup;
       }
     } catch (PinotClientException cause) {
       LOG.error("Error when running pql:" + pinotQuery.getPql(), cause);

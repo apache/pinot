@@ -60,7 +60,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
   private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
   private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
-  protected LoadingCache<PinotQuery, ResultSetGroup> pinotResponseCache;
+  protected LoadingCache<PinotQuery, PinotThirdEyeResultSetGroup> pinotResponseCache;
 
   protected PinotDataSourceMaxTime pinotDataSourceMaxTime;
   protected PinotDataSourceDimensionFilters pinotDataSourceDimensionFilters;
@@ -161,8 +161,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         } else {
           pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
         }
-        ResultSetGroup resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
-        metricFunctionToResultSetList.put(metricFunction, getResultSetList(resultSetGroup));
+        PinotThirdEyeResultSetGroup resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
+        metricFunctionToResultSetList.put(metricFunction, resultSetGroup.getResultSets());
       }
 
       List<String[]> resultRows = parseResultSets(request, metricFunctionToResultSetList);
@@ -235,7 +235,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws ExecutionException is thrown if failed to connect to Pinot or gets results from Pinot.
    */
-  public ResultSetGroup executePQL(PinotQuery pinotQuery) throws ExecutionException {
+  public PinotThirdEyeResultSetGroup executePQL(PinotQuery pinotQuery) throws ExecutionException {
     Preconditions
         .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
@@ -250,21 +250,13 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws ExecutionException is thrown if failed to connect to Pinot or gets results from Pinot.
    */
-  public ResultSetGroup refreshPQL(PinotQuery pinotQuery) throws ExecutionException {
+  public PinotThirdEyeResultSetGroup refreshPQL(PinotQuery pinotQuery) throws ExecutionException {
     Preconditions
         .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
     pinotResponseCache.refresh(pinotQuery);
 
     return pinotResponseCache.get(pinotQuery);
-  }
-
-  private static List<ResultSet> getResultSetList(ResultSetGroup resultSetGroup) {
-    List<ResultSet> resultSets = new ArrayList<>();
-    for (int i = 0; i < resultSetGroup.getResultSetCount(); i++) {
-        resultSets.add(resultSetGroup.getResultSet(i));
-    }
-    return resultSets;
   }
 
   private List<String[]> parseResultSets(ThirdEyeRequest request,
@@ -406,26 +398,27 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   /**
    * Initialzes the cache and cache loader for the response of this data source.
    *
-   * @param pinotThirdeyeDataSourceConfig the properties to initialize this cache.
+   * @param pinotResponseCacheLoader the cache loader that directly gets query results from data source if the results
+   *                                 are not in its cache.
    *
    * @throws Exception is thrown when Pinot brokers are unable to be reached.
    */
-  private static LoadingCache<PinotQuery, ResultSetGroup> buildResponseCache(
+  private static LoadingCache<PinotQuery, PinotThirdEyeResultSetGroup> buildResponseCache(
       PinotResponseCacheLoader pinotResponseCacheLoader) throws Exception {
     Preconditions.checkNotNull(pinotResponseCacheLoader, "A loader that sends query to Pinot is required.");
 
     // Initializes listener that prints expired entries in debuggin mode.
-    RemovalListener<PinotQuery, ResultSetGroup> listener;
+    RemovalListener<PinotQuery, PinotThirdEyeResultSetGroup> listener;
     if (LOG.isDebugEnabled()) {
-      listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
+      listener = new RemovalListener<PinotQuery, PinotThirdEyeResultSetGroup>() {
         @Override
-        public void onRemoval(RemovalNotification<PinotQuery, ResultSetGroup> notification) {
+        public void onRemoval(RemovalNotification<PinotQuery, PinotThirdEyeResultSetGroup> notification) {
           LOG.debug("Expired {}", notification.getKey().getPql());
         }
       };
     } else {
-      listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
-        @Override public void onRemoval(RemovalNotification<PinotQuery, ResultSetGroup> notification) { }
+      listener = new RemovalListener<PinotQuery, PinotThirdEyeResultSetGroup>() {
+        @Override public void onRemoval(RemovalNotification<PinotQuery, PinotThirdEyeResultSetGroup> notification) { }
       };
     }
 
@@ -439,12 +432,12 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         .removalListener(listener)
         .expireAfterWrite(ThirdEyeCacheRegistry.CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
         .maximumWeight(maxBucketNumber)
-        .weigher(new Weigher<PinotQuery, ResultSetGroup>() {
-          @Override public int weigh(PinotQuery pinotQuery, ResultSetGroup resultSetGroup) {
-            int resultSetCount = resultSetGroup.getResultSetCount();
+        .weigher(new Weigher<PinotQuery, PinotThirdEyeResultSetGroup>() {
+          @Override public int weigh(PinotQuery pinotQuery, PinotThirdEyeResultSetGroup resultSetGroup) {
+            int resultSetCount = resultSetGroup.size();
             int weight = 0;
             for (int idx = 0; idx < resultSetCount; ++idx) {
-              ResultSet resultSet = resultSetGroup.getResultSet(idx);
+              ResultSet resultSet = resultSetGroup.get(idx);
               weight += (resultSet.getColumnCount() * resultSet.getRowCount());
             }
             return weight;
