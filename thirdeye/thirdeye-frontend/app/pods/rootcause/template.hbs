@@ -1,0 +1,62 @@
+<h3>This is the loading indicator.</h3>
+type
+{{#if isLoadingEntities}}
+  | ENTITIES
+{{/if}}
+{{#if isLoadingTimeseries}}
+  | TIMESERIES
+{{/if}}
+
+<h3>This manipulates the controller state.</h3>
+<a {{action "addSelectedUrns" "thirdeye:metric:17606338"}}>add test metric</a> |
+<a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove test metric</a> |
+<a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a>
+
+<h3>This is the settings bar.</h3>
+{{rootcause-settings
+  context=context
+  onChange=(action "settingsOnChange")
+}}
+
+<h3>This is the legend.</h3>
+urns
+{{#each selectedUrns as |urn|}}
+  |
+  {{input
+    type="checkbox"
+    checked=(set-has-not invisibleUrns urn)
+    click=(action "toggleInvisible" urn)}}
+  {{urn}}
+  <a {{action "removeSelectedUrns" urn}}>[X]</a>
+{{/each}}
+
+<h3>This is the filter bar.</h3>
+{{rootcause-filter
+  entities=eventFilterEntities
+  onSelect=(action "filterOnSelect")
+}}
+
+<h3>This is the graph.</h3>
+{{rootcause-chart
+  entities=entities
+  selectedUrns=chartSelectedUrns
+  timeseries=timeseries
+  anomalyRange=context.anomalyRange
+  baselineRange=context.baselineRange
+  analysisRange=context.analysisRange
+  onHover=(action "chartOnHover")
+}}
+
+<h3>This is the hover section.</h3>
+urns
+{{#each hoverUrns as |urn|}}
+  | {{urn}}
+{{/each}}
+
+<h3>This is the table.</h3>
+{{rootcause-table
+  entities=eventTableEntities
+  columns=eventTableColumns
+  selectedUrns=selectedUrns
+  onSelect=(action "tableOnSelect")
+}}

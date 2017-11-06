@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import _ from 'lodash';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -27,4 +28,24 @@ export function checkStatus(response, mode = 'get', recoverBlank = false) {
   }
 }
 
-export default Ember.Helper.helper(checkStatus);
+export function isIterable(obj) {
+  if (obj == null || _.isString(obj)) {
+    return false;
+  }
+  return typeof obj[Symbol.iterator] === 'function';
+}
+
+export function makeIterable(obj) {
+  if (obj == null) {
+    return [];
+  }
+  return isIterable(obj) ? [...obj] : [obj];
+}
+
+export function filterObject(obj, func) {
+  const out = {};
+  Object.keys(obj).filter(key => func(obj[key])).forEach(key => out[key] = obj[key]);
+  return out;
+}
+
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject });
