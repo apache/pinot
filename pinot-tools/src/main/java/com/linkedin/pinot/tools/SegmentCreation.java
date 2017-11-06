@@ -112,7 +112,7 @@ public class SegmentCreation {
         adder.execute();
     }
 
-    
+
     public static void main(String[] args) throws Exception {
         SegmentCreation seg = new SegmentCreation();
 

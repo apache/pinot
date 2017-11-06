@@ -20,20 +20,36 @@ import static com.linkedin.pinot.tools.SchemaInfo.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Timer;
+import java.util.TimerTask;
+
 public class SegmentUploader {
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentUploader.class);
 
-    public void uploadSegments(String segDir) throws Exception {
+    public static void uploadSegments(String segDir) throws Exception {
         UploadSegmentCommand uploader = new UploadSegmentCommand();
         uploader.setControllerPort(DEFAULT_CONTROLLER_PORT)
                 .setSegmentDir(segDir);
         uploader.execute();
     }
 
+
     public static void main(String[] args) throws Exception {
-        SegmentUploader uploader = new SegmentUploader();
-        for (int i = 0; i < SCHEMAS.size(); i++) {
-            uploader.uploadSegments("segment/" + SchemaInfo.DATA_DIRS.get(i));
-        }
+        final Timer timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            private int index = 0;
+            @Override
+            public void run() {
+                try {
+                    uploadSegments("segment/" + SchemaInfo.DATA_DIRS.get(index));
+                }
+                catch (Exception e) {
+                    e.getMessage();
+                }
+                if (++index == SCHEMAS.size())
+                    timer.cancel();
+
+            }
+        }, 0, 10000);
     }
 }

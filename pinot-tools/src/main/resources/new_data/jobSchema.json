@@ -2,44 +2,74 @@
   "metricFieldSpecs": [
     {
       "dataType" : "INT",
-      "name" : "SecondsEpoch"
+      "name" : "jobPostTime"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "pto"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "baseSalary"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "signOnBonus"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "stock"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "annualBonus"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "experience"
     }
   ],
   "dimensionFieldSpecs": [
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "Title"
+      "name": "title"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "Company"
+      "name": "company"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "Location"
+      "name": "location"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "Description"
+      "name": "description"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "Industry"
+      "name": "industry"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "EmploymentType"
+      "name": "employmentType"
     },
     {
       "singleValueField" : false,
       "dataType": "STRING",
-      "name": "Skills"
+      "name": "skills"
     }
   ],
   "schemaName": "JobSchema"

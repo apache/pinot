@@ -38,7 +38,7 @@ public final class SchemaInfo {
             "new_data/articlesSchema.json", "new_data/viewsSchema.json");
     public static final List<String> SCHEMAS_ANNOTATIONS = Arrays.asList("new_data/jobSchemaAnnotation.json",
             "new_data/adsSchemaAnnotation.json", "new_data/articlesSchemaAnnotation.json", "new_data/viewsSchemaAnnotation.json");
-    public static final List<Integer> NUM_RECORDS = Arrays.asList(30, 30, 30, 30);
+    public static final List<Integer> NUM_RECORDS = Arrays.asList(1000000, 30, 30, 30);
     public static final List<Integer> NUM_SEGMENTS = Arrays.asList(4, 4, 4, 4);
     public static final List<String> DATA_DIRS = Arrays.asList("jobs", "ads", "articles", "views");
     public static final String SEGMENT_NAME = "segment";
