@@ -76,7 +76,9 @@ export default Ember.Component.extend({
   axis: Ember.computed(
     'analysisRange',
     function () {
+      console.log('rootcause-chart: axis');
       const { analysisRange } = this.getProperties('analysisRange');
+      console.log('rootcause-chart: axis: analysisRange', analysisRange);
 
       return {
         y: {

@@ -12,6 +12,12 @@ type
 <a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove test metric</a> |
 <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a>
 
+<h3>This is the settings bar.</h3>
+{{rootcause-settings
+  context=context
+  onChange=(action "settingsOnChange")
+}}
+
 <h3>This is the legend.</h3>
 urns
 {{#each selectedUrns as |urn|}}

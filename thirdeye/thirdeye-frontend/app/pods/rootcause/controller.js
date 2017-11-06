@@ -51,7 +51,7 @@ export default Ember.Controller.extend({
 
   hoverUrns: null, // Set
 
-  context: null, // { urns, anomalyRange, baselineRange, analysisRange }
+  context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
 
   _timeseriesCache: null, // {}
 
@@ -378,6 +378,12 @@ export default Ember.Controller.extend({
       const { entities } = this.getProperties('entities');
       this.set('selectedUrns', new Set(Object.keys(entities)));
       this.notifyPropertyChange('selectedUrns');
+    },
+
+    settingsOnChange(context) {
+      console.log('settingsOnChange()');
+      console.log('settingsOnChange: context', context);
+      this.set('context', context);
     },
 
     addSelectedUrns(urns) {

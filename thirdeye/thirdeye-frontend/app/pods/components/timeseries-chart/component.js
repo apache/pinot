@@ -96,6 +96,13 @@ export default Ember.Component.extend({
     return config;
   },
 
+  _makeAxisRange(axis) {
+    const range = { min: {}, max: {}};
+    Object.keys(axis).filter(key => 'min' in axis[key]).forEach(key => range['min'][key] = axis[key]['min']);
+    Object.keys(axis).filter(key => 'max' in axis[key]).forEach(key => range['max'][key] = axis[key]['max']);
+    return range;
+  },
+
   _updateCache() {
     const series = this.get('series');
     this.set('_seriesCache', _.cloneDeep(series));
@@ -107,6 +114,7 @@ export default Ember.Component.extend({
 
     const chart = this.get('_chart');
     chart.regions(diffConfig.regions);
+    chart.axis.range(this._makeAxisRange(diffConfig.axis));
     chart.load(diffConfig);
     this._updateCache();
   },
