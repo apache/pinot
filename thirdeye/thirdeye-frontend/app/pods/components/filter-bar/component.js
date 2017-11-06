@@ -2,7 +2,6 @@
  * Filter Bar Component
  * Constructs a filter bar based on a config file
  * @module components/filter-bar
- * @property {object} config              - [required] array of objects retrieved via API call to construct filter bar
  * @property {object} filterBlocks        - [required] a list of objects set in the route to set up the sub-filters
  * @property {number} maxStrLen           - number of characters for filter name truncation
  * @property {array}  onFilterSelection   - [required] closure action to bubble to controller on filter selection change
@@ -31,12 +30,6 @@ export default Ember.Component.extend({
    * Initializes values of the filter blocks
    * Example of a filter block:
    * {
-   *  filterKeys: [
-   *    {
-   *      label: 'country',
-   *      type: 'dropdown
-   *    }
-   *  ],
    *  filtersArray: [
    *    {
    *      isActive: false,
@@ -62,13 +55,11 @@ export default Ember.Component.extend({
     // Set up filter block object
     filterBlocks.forEach((block, index) => {
       // Show first sub-filter by default but hide the rest
-      let isHidden = index === 0 ? false : true;
+      let isHidden = Boolean(index);
       let filtersArray = [];
-      let filterKeys = [];
-      // Dedupe and remove null or empty values
-      filterKeys = Array.from(new Set(block.inputs.filter(value => Ember.isPresent(value))));
-      // Generate a name and Id for each one based on provided filter keys
-      filterKeys.forEach((filter) => {
+
+      // Generate a name and id for each one based on provided filter keys
+      block.inputs.forEach((filter) => {
         filtersArray.push({
           isActive: false,
           name: filter.label,
@@ -77,7 +68,7 @@ export default Ember.Component.extend({
       });
 
       // Now add new initialized props to block item
-      Object.assign(block, { filtersArray, filterKeys, isHidden });
+      Object.assign(block, { filtersArray, isHidden });
     });
   },
 
@@ -95,9 +86,15 @@ export default Ember.Component.extend({
      * @param {Object} clickedBlock - selected filter block object
      */
     toggleDisplay(clickedBlock) {
+      // Hide all other blocks when one is clicked
+      let filterBlocks = this.get('filterBlocks');
+      filterBlocks.forEach(block => {
+        Ember.set(block, 'isHidden', true);
+      });
+
       // Note: toggleProperty will not be able to find 'filterBlocks', as it is not an observed property
+      // Show clickedBlock
       Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
-      // TODO: Hide all other blocks when one is clicked
     }
   }
 });
