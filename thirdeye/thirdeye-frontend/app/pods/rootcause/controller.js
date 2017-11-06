@@ -1,42 +1,6 @@
 import Ember from 'ember';
-import { makeIterable, filterObject } from '../../helpers/utils';
-
-//
-// Config
-//
-
-const EVENT_TABLE_COLUMNS = [
-  {
-    template: 'custom/checkbox',
-    useFilter: false,
-    mayBeHidden: false,
-    className: 'events-table__column--checkbox'
-  },
-  {
-    propertyName: 'label',
-    title: 'Event Name',
-    className: 'events-table__column'
-  },
-  {
-    propertyName: 'eventType',
-    title: 'Type',
-    filterWithSelect: true,
-    sortFilterOptions: true,
-    className: 'events-table__column--compact'
-  },
-  {
-    propertyName: 'start',
-    title: 'Start',
-    className: 'events-table__column--compact',
-    disableFiltering: true
-  },
-  {
-    propertyName: 'end',
-    title: 'End',
-    className: 'events-table__column--compact',
-    disableFiltering: true
-  }
-];
+import { makeIterable, filterObject } from 'thirdeye-frontend/helpers/utils';
+import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 
 //
 // Controller
@@ -57,9 +21,9 @@ export default Ember.Controller.extend({
 
   _entitiesCache: null, // {}
 
-  _pendingTimeseriesRequests: null, // {}
+  _pendingTimeseriesRequests: null, // Set
 
-  _pendingEntitiesRequests: null, // {}
+  _pendingEntitiesRequests: null, // Set
 
   init() {
     this.setProperties({ _timeseriesCache: {}, _entitiesCache: {},
@@ -180,18 +144,27 @@ export default Ember.Controller.extend({
     const { context, _pendingEntitiesRequests: pending } =
       this.getProperties('context', '_pendingEntitiesRequests');
 
-    const frameworks = ['relatedEvents', 'relatedDimensions', 'relatedMetrics'];
+    const frameworks = new Set(['relatedEvents', 'relatedDimensions', 'relatedMetrics']);
+
+    // TODO prevent skipping overlapping changes to context
+    [...pending].forEach(framework => frameworks.delete(framework));
+
+    if (frameworks.size <= 0) {
+      return;
+    }
+
+    [...frameworks].forEach(framework => pending.add(framework));
+
+    this.setProperties({ _pendingEntitiesRequests: pending });
+    this.notifyPropertyChange('_pendingEntitiesRequests');
 
     frameworks.forEach(framework => {
-      pending.add(framework);
       const url = this._makeFrameworkUrl(framework, context);
       fetch(url)
         .then(res => res.json())
         .then(json => this._completeRequestEntities(this, json, framework));
     });
 
-    this.setProperties({ _pendingEntitiesRequests: pending });
-    this.notifyPropertyChange('_pendingEntitiesRequests');
   },
 
   _completeRequestEntities(that, incoming, framework) {
@@ -266,7 +239,7 @@ export default Ember.Controller.extend({
       this.getProperties('_pendingTimeseriesRequests', '_timeseriesCache', 'context');
 
     const missing = new Set(urns);
-    Object.keys(pending).forEach(urn => missing.delete(urn));
+    [...pending].forEach(urn => missing.delete(urn));
     Object.keys(cache).forEach(urn => missing.delete(urn));
 
     if (missing.size <= 0) {
@@ -275,6 +248,11 @@ export default Ember.Controller.extend({
 
     // NOTE: potential race condition?
     [...missing].forEach(urn => pending.add(urn));
+
+    this.setProperties({_pendingTimeseriesRequests: pending});
+    this.notifyPropertyChange('_pendingTimeseriesRequests');
+
+    console.log('_startRequestMissingTimeseries: set pending', pending);
 
     const metricIds = [...missing].map(urn => urn.split(":")[2]);
 
@@ -286,13 +264,13 @@ export default Ember.Controller.extend({
       .then(this._extractTimeseries)
       .then(incoming => this._completeRequestMissingTimeseries(this, incoming));
 
-    this.setProperties({_pendingTimeseriesRequests: pending});
-    this.notifyPropertyChange('_pendingTimeseriesRequests');
   },
 
   _completeRequestMissingTimeseries(that, incoming) {
     console.log('_completeRequestMissingTimeseries()');
     const { _pendingTimeseriesRequests: pending, _timeseriesCache: cache } = that.getProperties('_pendingTimeseriesRequests', '_timeseriesCache');
+
+    console.log('_completeRequestMissingTimeseries: incoming', Object.keys(incoming));
 
     // NOTE: potential race condition?
     Object.keys(incoming).forEach(urn => pending.delete(urn));

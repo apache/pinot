@@ -69,7 +69,7 @@ export default Ember.Component.extend({
       return region;
     });
 
-    const unloadKeys = deletedKeys.concat(regionKeys);
+    const unloadKeys = changedKeys.concat(deletedKeys).concat(regionKeys);
     const unload = unloadKeys.concat(unloadKeys.map(sid => `${sid}-timestamps`));
 
     const loadKeys = addedKeys.concat(changedKeys).filter(sid => !regionKeys.includes(sid));
@@ -104,7 +104,7 @@ export default Ember.Component.extend({
   },
 
   _updateCache() {
-    const series = this.get('series');
+    const series = this.get('series') || {};
     this.set('_seriesCache', _.cloneDeep(series));
   },
 
@@ -121,7 +121,12 @@ export default Ember.Component.extend({
 
   didUpdateAttrs() {
     this._super(...arguments);
-    this._updateChart();
+    const series = this.get('series') || {};
+    const cache = this.get('cache') || {};
+    
+    if (!_.isEqual(series, cache)) {
+      this._updateChart();
+    }
   },
 
   didInsertElement() {
