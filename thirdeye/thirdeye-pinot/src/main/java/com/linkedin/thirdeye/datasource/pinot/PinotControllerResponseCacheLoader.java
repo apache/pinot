@@ -5,7 +5,7 @@ import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyePinotResultSetGroup;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -104,7 +104,7 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
   }
 
   @Override
-  public ThirdEyePinotResultSetGroup load(PinotQuery pinotQuery) throws Exception {
+  public ThirdEyeResultSetGroup load(PinotQuery pinotQuery) throws Exception {
     try {
       Connection connection = getConnection();
       synchronized (connection) {
@@ -118,9 +118,9 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
         long end = System.currentTimeMillis();
         LOG.info("Query:{}  took:{} ms", pinotQuery.getPql(), (end - start));
 
-        ThirdEyePinotResultSetGroup thirdEyePinotResultSetGroup =
-            ThirdEyePinotResultSetGroup.fromPinotResultSetGroup(resultSetGroup);
-        return thirdEyePinotResultSetGroup;
+        ThirdEyeResultSetGroup thirdEyeResultSetGroup =
+            ThirdEyeResultSetGroup.fromPinotResultSetGroup(resultSetGroup);
+        return thirdEyeResultSetGroup;
       }
     } catch (PinotClientException cause) {
       LOG.error("Error when running pql:" + pinotQuery.getPql(), cause);

@@ -9,7 +9,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-public class ThirdEyeDataFrameResultSet extends AbstractThirdEyePinotResultSet {
+/**
+ * An unified container that store Select, Aggregation, and Group-By {@link ResultSet} in a data frame.
+ */
+public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
   private ThirdEyeResultSetMetaData thirdEyeResultSetMetaData;
   private DataFrame dataFrame;
 
@@ -65,6 +68,13 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyePinotResultSet {
     return dataFrame.get(thirdEyeResultSetMetaData.getGroupKeyColumnNames().get(columnIdx)).getString(rowIdx);
   }
 
+  /**
+   * Constructs a {@link ThirdEyeDataFrameResultSet} from any Pinot's {@link ResultSet}.
+   *
+   * @param resultSet A result set from Pinot.
+   *
+   * @return an unified {@link ThirdEyeDataFrameResultSet}.
+   */
   public static ThirdEyeDataFrameResultSet fromPinotResultSet(ResultSet resultSet) {
     // Build the meta data of this result set
     List<String> groupKeyColumnNames = new ArrayList<>();
@@ -138,8 +148,8 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyePinotResultSet {
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder("ThirdEyeDataFrameResultSet{");
-    sb.append("thirdEyeResultSetMetaData=").append(thirdEyeResultSetMetaData);
-    sb.append(", dataFrame=").append(dataFrame);
+    sb.append("metaData=").append(thirdEyeResultSetMetaData);
+    sb.append(", data=").append(dataFrame);
     sb.append('}');
     return sb.toString();
   }

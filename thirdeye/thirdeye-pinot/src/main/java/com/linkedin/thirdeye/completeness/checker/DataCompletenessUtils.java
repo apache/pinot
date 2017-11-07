@@ -6,8 +6,8 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyePinotResultSet;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyePinotResultSetGroup;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -209,11 +209,11 @@ public class DataCompletenessUtils {
     try {
       PinotThirdEyeDataSource pinotThirdEyeDataSource = (PinotThirdEyeDataSource) CACHE_REGISTRY.getQueryCache()
           .getDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
-      ThirdEyePinotResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(new PinotQuery(pql, dataset));
+      ThirdEyeResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(new PinotQuery(pql, dataset));
       if (resultSetGroup == null || resultSetGroup.size() <= 0) {
         return bucketNameToCountStar;
       }
-      ThirdEyePinotResultSet resultSet = resultSetGroup.get(0);
+      ThirdEyeResultSet resultSet = resultSetGroup.get(0);
       for (int i = 0; i < resultSet.getRowCount(); i++) {
         Long timeValue = Long.valueOf(resultSet.getGroupKeyColumnValue(i, 0));
         Long count = resultSet.getLong(i, 0);

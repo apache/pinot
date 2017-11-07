@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datasource.pinot.resultset;
 
-public abstract class AbstractThirdEyePinotResultSet implements ThirdEyePinotResultSet {
+public abstract class AbstractThirdEyeResultSet implements ThirdEyeResultSet {
 
   public long getLong(int rowIndex) {
     return this.getLong(rowIndex, 0);
