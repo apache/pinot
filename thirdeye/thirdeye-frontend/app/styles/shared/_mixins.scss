@@ -54,3 +54,13 @@
   -ms-transform: translateY(-50%);
   transform: translateY(-50%);
 }
+
+/* Loading animation for alert page */
+@keyframes loading {
+    from {left: -200px; width: 30%;}
+    50% {width: 30%;}
+    70% {width: 70%;}
+    80% { left: 50%;}
+    95% {left: 120%;}
+    to {left: 100%;}
+}

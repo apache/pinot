@@ -50,6 +50,11 @@ export default Ember.Controller.extend({
   },
 
   /**
+   * Change this to activate new alert anomaly page redirect
+   */
+  redirectToAlertPage: false,
+
+  /**
    * Component property initial settings
    */
   filters: {},
@@ -1126,6 +1131,7 @@ export default Ember.Controller.extend({
         alertGroupNewRecipient: newEmails
       } = this.getProperties('newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
 
+      const redirectToAlertPage = this.get('redirectToAlertPage');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
@@ -1183,8 +1189,10 @@ export default Ember.Controller.extend({
           this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
             this.set('selectedGroupFunctions', functionData);
           });
-          // Trigger alert replay.
-          this.triggerReplay(newFunctionId);
+          // Trigger alert replay here if alert page redirect not active
+          if (!redirectToAlertPage) {
+            this.triggerReplay(newFunctionId);
+          }
           // Now, disable form
           this.setProperties({
             isFormDisabled: true,
@@ -1195,7 +1203,13 @@ export default Ember.Controller.extend({
         })
         // Redirects to manage alerts
         .then((id) => {
-          this.transitionToRoute('manage.alerts.edit', id);
+          if (redirectToAlertPage) {
+            // Redirect to onboarding page to trigger wrapper
+            this.transitionToRoute('manage.alert', id, { queryParams: { replay: true }});
+          } else {
+            // Navigate to alerts search view
+            this.transitionToRoute('manage.alerts.edit', id);
+          }
         })
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         .catch((error) => {

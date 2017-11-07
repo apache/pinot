@@ -12,6 +12,7 @@ Router.map(function() {
   this.route('logout');
 
   this.route('manage', function() {
+    this.route('alert', { path: 'alert/:alertId' });
     this.route('alerts', function() {
       this.route('edit', { path: '/:alertId' });
     });
