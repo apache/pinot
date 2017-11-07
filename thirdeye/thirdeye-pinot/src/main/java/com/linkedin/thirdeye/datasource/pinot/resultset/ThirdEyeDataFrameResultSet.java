@@ -6,22 +6,23 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class ThirdEyeDataFrameResultSet extends AbstractThirdEyePinotResultSet {
-  private ResultSetMetaData resultSetMetaData;
+  private ThirdEyeResultSetMetaData thirdEyeResultSetMetaData;
   private DataFrame dataFrame;
 
-  public ThirdEyeDataFrameResultSet(ResultSetMetaData resultSetMetaData, DataFrame dataFrame) {
-    Preconditions.checkState(isMetaDataAndDataHaveSameColumns(resultSetMetaData, dataFrame),
+  public ThirdEyeDataFrameResultSet(ThirdEyeResultSetMetaData thirdEyeResultSetMetaData, DataFrame dataFrame) {
+    Preconditions.checkState(isMetaDataAndDataHaveSameColumns(thirdEyeResultSetMetaData, dataFrame),
         "Meta data and data's columns do not match.");
 
-    this.resultSetMetaData = resultSetMetaData;
+    this.thirdEyeResultSetMetaData = thirdEyeResultSetMetaData;
     this.dataFrame = dataFrame;
   }
 
-  private boolean isMetaDataAndDataHaveSameColumns(ResultSetMetaData resultSetMetaData, DataFrame dataFrame) {
-    Set<String> metaDataAllColumns = new HashSet<>(resultSetMetaData.getAllColumnNames());
+  private boolean isMetaDataAndDataHaveSameColumns(ThirdEyeResultSetMetaData thirdEyeResultSetMetaData, DataFrame dataFrame) {
+    Set<String> metaDataAllColumns = new HashSet<>(thirdEyeResultSetMetaData.getAllColumnNames());
     return metaDataAllColumns.equals(dataFrame.getSeries().keySet());
   }
 
@@ -37,31 +38,31 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyePinotResultSet {
 
   @Override
   public String getColumnName(int columnIdx) {
-    Preconditions.checkPositionIndexes(0, columnIdx, resultSetMetaData.getMetricColumnNames().size() - 1);
-    return resultSetMetaData.getMetricColumnNames().get(columnIdx);
+    Preconditions.checkPositionIndexes(0, columnIdx, thirdEyeResultSetMetaData.getMetricColumnNames().size() - 1);
+    return thirdEyeResultSetMetaData.getMetricColumnNames().get(columnIdx);
   }
 
   @Override
   public String getString(int rowIdx, int columnIdx) {
-    Preconditions.checkPositionIndexes(0, columnIdx, resultSetMetaData.getMetricColumnNames().size() - 1);
-    return dataFrame.get(resultSetMetaData.getMetricColumnNames().get(columnIdx)).getString(rowIdx);
+    Preconditions.checkPositionIndexes(0, columnIdx, thirdEyeResultSetMetaData.getMetricColumnNames().size() - 1);
+    return dataFrame.get(thirdEyeResultSetMetaData.getMetricColumnNames().get(columnIdx)).getString(rowIdx);
   }
 
   @Override
   public int getGroupKeyLength() {
-    return resultSetMetaData.getGroupKeyColumnNames().size();
+    return thirdEyeResultSetMetaData.getGroupKeyColumnNames().size();
   }
 
   @Override
   public String getGroupKeyColumnName(int columnIdx) {
     Preconditions.checkPositionIndexes(0, columnIdx, getGroupKeyLength() - 1);
-    return resultSetMetaData.getGroupKeyColumnNames().get(columnIdx);
+    return thirdEyeResultSetMetaData.getGroupKeyColumnNames().get(columnIdx);
   }
 
   @Override
   public String getGroupKeyColumnValue(int rowIdx, int columnIdx) {
     Preconditions.checkPositionIndexes(0, columnIdx, getGroupKeyLength() - 1);
-    return dataFrame.get(resultSetMetaData.getGroupKeyColumnNames().get(columnIdx)).getString(rowIdx);
+    return dataFrame.get(thirdEyeResultSetMetaData.getGroupKeyColumnNames().get(columnIdx)).getString(rowIdx);
   }
 
   public static ThirdEyeDataFrameResultSet fromPinotResultSet(ResultSet resultSet) {
@@ -74,10 +75,11 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyePinotResultSet {
     for (int columnIdx = 0; columnIdx < resultSet.getColumnCount(); columnIdx++) {
       metricColumnNames.add(resultSet.getColumnName(columnIdx));
     }
-    ResultSetMetaData resultSetMetaData = new ResultSetMetaData(groupKeyColumnNames, metricColumnNames);
+    ThirdEyeResultSetMetaData
+        thirdEyeResultSetMetaData = new ThirdEyeResultSetMetaData(groupKeyColumnNames, metricColumnNames);
 
     // Build the DataFrame
-    DataFrame.Builder dfBuilder = DataFrame.builder(resultSetMetaData.getAllColumnNames());
+    DataFrame.Builder dfBuilder = DataFrame.builder(thirdEyeResultSetMetaData.getAllColumnNames());
     int rowCount = resultSet.getRowCount();
     int groupByColumnCount = resultSet.getGroupKeyLength();
     int metricColumnCount = resultSet.getColumnCount();
@@ -110,8 +112,35 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyePinotResultSet {
     DataFrame dataFrame = dfBuilder.build();
     // Build ThirdEye's result set
     ThirdEyeDataFrameResultSet thirdEyeDataFrameResultSet =
-        new ThirdEyeDataFrameResultSet(resultSetMetaData, dataFrame);
+        new ThirdEyeDataFrameResultSet(thirdEyeResultSetMetaData, dataFrame);
 
     return thirdEyeDataFrameResultSet;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ThirdEyeDataFrameResultSet that = (ThirdEyeDataFrameResultSet) o;
+    return Objects.equals(thirdEyeResultSetMetaData, that.thirdEyeResultSetMetaData) && Objects.equals(dataFrame,
+        that.dataFrame);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(thirdEyeResultSetMetaData, dataFrame);
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder("ThirdEyeDataFrameResultSet{");
+    sb.append("thirdEyeResultSetMetaData=").append(thirdEyeResultSetMetaData);
+    sb.append(", dataFrame=").append(dataFrame);
+    sb.append('}');
+    return sb.toString();
   }
 }
