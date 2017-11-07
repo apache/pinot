@@ -1,3 +1,18 @@
+/**
+ * Select Filter component. A wrapper around power select
+ * to display large numbers of items
+ * @module components/filter-select
+ * @property {Number}  maxNumFilters   - Maximum items to show per filter group
+ * @property {Number}  maxTotalFilters - Maximum items to show in aggregate
+ * @property {Object}  options         - Object containing all filters
+ * @property {Boolean} disabled        - Indicates if the input field should be
+ *                                       disabled
+ * @property {Object}  onChangeHandler - Closure action to bubble up to parent
+ *                                       when a filter was (de)selected
+ * @exports filter-select
+ * @author yyuen
+ */
+
 import Ember from 'ember';
 import { task, timeout } from 'ember-concurrency';
 
