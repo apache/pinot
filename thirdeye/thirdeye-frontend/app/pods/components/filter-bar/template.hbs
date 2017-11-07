@@ -1,10 +1,13 @@
 {{!-- TODO: Create separate styling for filter-bar component --}}
 <div class="entity-filter filter-bar">
 
-  {{#each config as |block|}}
+  {{#each filterBlocks as |block|}}
     <section class="entity-filter__group">
-      <h5 class="entity-filter__group-title">{{block.header}}
-        <i class="glyphicon"></i>
+      <h5 class="entity-filter__group-title">
+        {{block.header}}
+        <a class="entity-filter__group-toggle" {{action "toggleDisplay" block}}>
+          <i class="glyphicon {{if block.isHidden " glyphicon-menu-up " "glyphicon-menu-down "}}"></i>
+        </a>
       </h5>
       <ul class="entity-filter__group-list {{if block.isHidden " entity-filter__group-list--hidden "}}">
         {{#each block.inputs as |filter|}}

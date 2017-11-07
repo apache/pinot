@@ -3,7 +3,7 @@
  */
 export default [
   {
-    header: "holiday",
+    header: "Holiday",
     inputs: [
       {
         label: "country",
@@ -12,10 +12,19 @@ export default [
     ]
   },
   {
-    header: "deployment",
+    header: "Deployment",
     inputs: [
       {
         label: "services",
+        type: "dropdown"
+      }
+    ]
+  },
+  {
+    header: "Other Anomalies",
+    inputs: [
+      {
+        label: "resolution",
         type: "dropdown"
       }
     ]
