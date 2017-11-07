@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import com.linkedin.pinot.core.startree.StarTreeInterf;
+import com.linkedin.pinot.core.startree.StarTree;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -45,10 +45,10 @@ public class IndexSegmentImpl implements IndexSegment {
   private SegmentDirectory segmentDirectory;
   private final SegmentMetadataImpl segmentMetadata;
   private final Map<String, ColumnIndexContainer> indexContainerMap;
-  private final StarTreeInterf starTree;
+  private final StarTree starTree;
 
   public IndexSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
-      Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTreeInterf starTree) throws Exception {
+      Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTree starTree) throws Exception {
     this.segmentDirectory = segmentDirectory;
     this.segmentMetadata = segmentMetadata;
     this.indexContainerMap = columnIndexContainerMap;
@@ -146,7 +146,7 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public StarTreeInterf getStarTree() {
+  public StarTree getStarTree() {
     return starTree;
   }
 

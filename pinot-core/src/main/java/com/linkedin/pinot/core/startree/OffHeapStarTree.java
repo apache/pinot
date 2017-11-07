@@ -15,9 +15,11 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -25,7 +27,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import xerial.larray.buffer.LBuffer;
 import xerial.larray.buffer.LBufferAPI;
 import xerial.larray.mmap.MMapBuffer;
@@ -33,37 +37,37 @@ import xerial.larray.mmap.MMapMode;
 
 
 /**
- * LBuffer based implementation of star tree interface.
+ * LBuffer based implementation of star tree.
  */
-public class StarTreeOffHeap implements StarTreeInterf {
+public class OffHeapStarTree implements StarTree {
+  public static final long MAGIC_MARKER = 0xBADDA55B00DAD00DL;
+  public static final int VERSION = 1;
+
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DIMENSION_NAME_MAX_LENGTH = 4096;
   private static final int LOAD_FILE_BUFFER_SIZE = 10 * 1024 * 1024;
 
   private final LBufferAPI _dataBuffer;
-  private final StarTreeIndexNodeOffHeap _root;
+  private final OffHeapStarTreeNode _root;
   private final List<String> _dimensionNames;
-  private final int _numNodes;
 
   /**
    * Constructor for the class.
    * - Reads in the header
-   * - Loads/MMap's the StarTreeIndexNodeOffHeap array.
+   * - Loads/MMap's the OffHeapStarTreeNode array.
    */
-  public StarTreeOffHeap(File starTreeFile, ReadMode readMode) throws IOException {
+  public OffHeapStarTree(File starTreeFile, ReadMode readMode) throws IOException {
     if (readMode.equals(ReadMode.mmap)) {
       _dataBuffer = new MMapBuffer(starTreeFile, MMapMode.READ_ONLY);
     } else {
       _dataBuffer = loadFrom(starTreeFile);
     }
 
-    int offset = 0;
-    Preconditions.checkState(StarTreeSerDe.MAGIC_MARKER == _dataBuffer.getLong(offset),
-        "Invalid magic marker in Star Tree file");
-    offset += StarTreeSerDe.MAGIC_MARKER_SIZE_IN_BYTES;
+    long offset = 0L;
+    Preconditions.checkState(MAGIC_MARKER == _dataBuffer.getLong(offset), "Invalid magic marker in Star Tree file");
+    offset += V1Constants.Numbers.LONG_SIZE;
 
-    int version = _dataBuffer.getInt(offset);
-    Preconditions.checkState(version == 1);
+    Preconditions.checkState(VERSION == _dataBuffer.getInt(offset), "Invalid version in Star Tree file");
     offset += V1Constants.Numbers.INTEGER_SIZE;
 
     int rootNodeOffset = _dataBuffer.getInt(offset);
@@ -83,7 +87,7 @@ public class StarTreeOffHeap implements StarTreeInterf {
       Preconditions.checkState(dimensionLength < DIMENSION_NAME_MAX_LENGTH);
       offset += V1Constants.Numbers.INTEGER_SIZE;
 
-      _dataBuffer.copyTo(offset, dimensionNameBytes, 0, dimensionLength);
+      _dataBuffer.copyTo((int) offset, dimensionNameBytes, 0, dimensionLength);
       offset += dimensionLength;
 
       String dimensionName = new String(dimensionNameBytes, 0, dimensionLength, UTF_8);
@@ -91,11 +95,14 @@ public class StarTreeOffHeap implements StarTreeInterf {
     }
     _dimensionNames = Arrays.asList(dimensionNames);
 
-    _numNodes = _dataBuffer.getInt(offset);
+    int numNodes = _dataBuffer.getInt(offset);
     offset += V1Constants.Numbers.INTEGER_SIZE;
     Preconditions.checkState(offset == rootNodeOffset, "Error reading Star Tree file, header length mis-match");
+    long fileLength = starTreeFile.length();
+    Preconditions.checkState(offset + numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES == fileLength,
+        "Error reading Star Tree file, file length mis-match");
 
-    _root = new StarTreeIndexNodeOffHeap(_dataBuffer.view(rootNodeOffset, starTreeFile.length()), 0);
+    _root = new OffHeapStarTreeNode(_dataBuffer.view(rootNodeOffset, fileLength), 0);
   }
 
   /**
@@ -117,18 +124,8 @@ public class StarTreeOffHeap implements StarTreeInterf {
   }
 
   @Override
-  public StarTreeIndexNodeInterf getRoot() {
+  public StarTreeNode getRoot() {
     return _root;
-  }
-
-  @Override
-  public StarTreeFormatVersion getVersion() {
-    return StarTreeFormatVersion.OFF_HEAP;
-  }
-
-  @Override
-  public int getNumNodes() {
-    return _numNodes;
   }
 
   @Override
@@ -137,13 +134,55 @@ public class StarTreeOffHeap implements StarTreeInterf {
   }
 
   @Override
-  public void writeTree(File outputFile) throws IOException {
-    throw new RuntimeException("Method 'writeTree' not implemented for class " + getClass().getName());
+  public void printTree(Map<String, Dictionary> dictionaryMap) {
+    printTreeHelper(dictionaryMap, _root, 0);
   }
 
-  @Override
-  public void printTree() {
-    throw new RuntimeException("Method 'printTree' not implemented for class " + getClass().getName());
+  /**
+   * Helper method to print the tree.
+   */
+  private void printTreeHelper(Map<String, Dictionary> dictionaryMap, OffHeapStarTreeNode node, int level) {
+    StringBuilder stringBuilder = new StringBuilder();
+    for (int i = 0; i < level; i++) {
+      stringBuilder.append("  ");
+    }
+    String dimensionName = "ALL";
+    int dimensionId = node.getDimensionId();
+    if (dimensionId != StarTreeNode.ALL) {
+      dimensionName = _dimensionNames.get(dimensionId);
+    }
+    String dimensionValueString = "ALL";
+    int dimensionValue = node.getDimensionValue();
+    if (dimensionValue != StarTreeNode.ALL) {
+      dimensionValueString = dictionaryMap.get(dimensionName).get(dimensionValue).toString();
+    }
+
+    // For leaf node, child dimension id is -1
+    String childDimensionName = "null";
+    int childDimensionId = node.getChildDimensionId();
+    if (childDimensionId != -1) {
+      childDimensionName = _dimensionNames.get(childDimensionId);
+    }
+
+    String formattedOutput = MoreObjects.toStringHelper(node)
+        .add("level", level)
+        .add("dimensionName", dimensionName)
+        .add("dimensionValue", dimensionValueString)
+        .add("childDimensionName", childDimensionName)
+        .add("startDocId", node.getStartDocId())
+        .add("endDocId", node.getEndDocId())
+        .add("aggregatedDocId", node.getAggregatedDocId())
+        .add("numChildren", node.getNumChildren())
+        .toString();
+    stringBuilder.append(formattedOutput);
+    System.out.println(stringBuilder.toString());
+
+    if (!node.isLeaf()) {
+      Iterator<OffHeapStarTreeNode> childrenIterator = node.getChildrenIterator();
+      while (childrenIterator.hasNext()) {
+        printTreeHelper(dictionaryMap, childrenIterator.next(), level + 1);
+      }
+    }
   }
 
   @Override

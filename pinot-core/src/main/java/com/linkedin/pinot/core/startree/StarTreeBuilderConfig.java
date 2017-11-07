@@ -16,97 +16,95 @@
 package com.linkedin.pinot.core.startree;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
 
 
 public class StarTreeBuilderConfig {
-
-  public Schema schema;
-
-  public List<String> dimensionsSplitOrder;
-
-  public int maxLeafRecords;
-
-  File outDir;
-
-  private Set<String> skipStarNodeCreationForDimensions;
-  private Set<String> skipMaterializationForDimensions;
-  private int skipMaterializationCardinalityThreshold =
-      StarTreeIndexSpec.DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
+  private File _outDir;
+  private Schema _schema;
+  private List<String> _dimensionsSplitOrder;
+  private Set<String> _skipStarNodeCreationDimensions;
+  private Set<String> _skipMaterializationDimensions;
+  private int _maxNumLeafRecords;
+  private int _skipMaterializationCardinalityThreshold;
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
-  private boolean _enableOffHeapFormat;
 
   public StarTreeBuilderConfig() {
   }
 
   public File getOutDir() {
-    return outDir;
+    return _outDir;
   }
 
   public void setOutDir(File outDir) {
-    this.outDir = outDir;
+    _outDir = outDir;
   }
 
   public Schema getSchema() {
-    return schema;
+    return _schema;
   }
 
   public void setSchema(Schema schema) {
-    this.schema = schema;
+    _schema = schema;
   }
 
+  /**
+   * Get the split order of the dimensions.
+   */
   public List<String> getDimensionsSplitOrder() {
-    return dimensionsSplitOrder;
+    return _dimensionsSplitOrder;
   }
 
   public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
-    this.dimensionsSplitOrder = dimensionsSplitOrder;
+    _dimensionsSplitOrder = dimensionsSplitOrder;
   }
 
-  public int getMaxLeafRecords() {
-    return maxLeafRecords;
+  /**
+   * Get of dimensions for which not to create star nodes at split.
+   */
+  public Set<String> getSkipStarNodeCreationDimensions() {
+    return _skipStarNodeCreationDimensions;
   }
 
-  public void setMaxLeafRecords(int maxLeafRecords) {
-    this.maxLeafRecords = maxLeafRecords;
+  public void setSkipStarNodeCreationDimensions(Set<String> excludedStarDimensions) {
+    _skipStarNodeCreationDimensions = excludedStarDimensions;
   }
 
-  public void setSkipStarNodeCreationForDimensions(Set<String> excludedStarDimensions) {
-    this.skipStarNodeCreationForDimensions = excludedStarDimensions;
+  /**
+   * Get the dimensions that should be skipped from materialization.
+   */
+  public Set<String> getSkipMaterializationDimensions() {
+    return _skipMaterializationDimensions;
   }
 
+  public void setSkipMaterializationDimensions(Set<String> skipMaterializationDimensions) {
+    _skipMaterializationDimensions = skipMaterializationDimensions;
+  }
+
+  /**
+   * Get the threshold of the cardinality to determine whether to skip dimensions from materialization. This value will
+   * be used when skip materialization dimensions are not specified.
+   */
   public int getSkipMaterializationCardinalityThreshold() {
-    return skipMaterializationCardinalityThreshold;
+    return _skipMaterializationCardinalityThreshold;
   }
 
   public void setSkipMaterializationCardinalityThreshold(int skipMaterializationCardinalityThreshold) {
-    this.skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
+    _skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
   }
 
   /**
-   * Get of dimension names for which not to create star nodes at split.
+   * Get the maximum number of records (documents) in a leaf node. If the number of records inside a node exceeds this
+   * value, the node will be split.
    */
-  public Set<String> getSkipStarNodeCreationForDimensions() {
-    return skipStarNodeCreationForDimensions;
+  public int getMaxNumLeafRecords() {
+    return _maxNumLeafRecords;
   }
 
-  /**
-   * Get the set of dimension names that should be skipped from materialization.
-   * @return
-   */
-  public Set<String> getSkipMaterializationForDimensions() {
-    return skipMaterializationForDimensions;
-  }
-
-  /**
-   * Set the set of dimensions for which to skip materialization
-   * @param skipMaterializationForDimensions
-   */
-  public void setSkipMaterializationForDimensions(Set<String> skipMaterializationForDimensions) {
-    this.skipMaterializationForDimensions = skipMaterializationForDimensions;
+  public void setMaxNumLeafRecords(int maxNumLeafRecords) {
+    _maxNumLeafRecords = maxNumLeafRecords;
   }
 
   /**
@@ -120,21 +118,5 @@ public class StarTreeBuilderConfig {
   public void setExcludeSkipMaterializationDimensionsForStarTreeIndex(
       boolean excludeSkipMaterializationDimensionsForStarTreeIndex) {
     _excludeSkipMaterializationDimensionsForStarTreeIndex = excludeSkipMaterializationDimensionsForStarTreeIndex;
-  }
-
-  /**
-   * Returns True if StarTreeOffHeap is enabled, false otherwise.
-   * @return
-   */
-  public boolean isEnableOffHeapFormat() {
-    return _enableOffHeapFormat;
-  }
-
-  /**
-   * Enable/Disable StarTreeOffHeap
-   * @param enableOffHeapFormat
-   */
-  public void setEnableOffHeapFormat(boolean enableOffHeapFormat) {
-    _enableOffHeapFormat = enableOffHeapFormat;
   }
 }

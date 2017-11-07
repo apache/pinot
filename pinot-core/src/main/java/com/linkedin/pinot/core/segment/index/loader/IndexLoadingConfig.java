@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import com.linkedin.pinot.core.startree.StarTreeFormatVersion;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -42,7 +41,6 @@ public class IndexLoadingConfig {
   private Set<String> _noDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private SegmentVersion _segmentVersion;
-  private StarTreeFormatVersion _starTreeVersion = StarTreeFormatVersion.DEFAULT_VERSION;
   // This value will remain true only when the empty constructor is invoked.
   private boolean _enableDefaultColumns = true;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
@@ -87,11 +85,6 @@ public class IndexLoadingConfig {
     String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
     if (tableSegmentVersion != null) {
       _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
-    }
-
-    String starTreeFormat = indexingConfig.getStarTreeFormat();
-    if (starTreeFormat != null) {
-      _starTreeVersion = StarTreeFormatVersion.valueOf(starTreeFormat.toUpperCase());
     }
 
     String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
@@ -180,18 +173,6 @@ public class IndexLoadingConfig {
    */
   public void setSegmentVersion(@Nonnull SegmentVersion segmentVersion) {
     _segmentVersion = segmentVersion;
-  }
-
-  @Nonnull
-  public StarTreeFormatVersion getStarTreeVersion() {
-    return _starTreeVersion;
-  }
-
-  /**
-   * For tests only.
-   */
-  public void setStarTreeVersion(@Nonnull StarTreeFormatVersion starTreeVersion) {
-    _starTreeVersion = starTreeVersion;
   }
 
   public boolean isEnableDefaultColumns() {

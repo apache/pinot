@@ -116,7 +116,6 @@ public class TableConfigTest {
       Set<String> dims = new HashSet<>();
       dims.add("dims");
       starTreeIndexSpec.setDimensionsSplitOrder(Collections.singletonList("dim"));
-      starTreeIndexSpec.setEnableOffHeapFormat(true);
       starTreeIndexSpec.setMaxLeafRecords(5);
       starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(1);
       starTreeIndexSpec.setSkipMaterializationForDimensions(dims);
@@ -187,7 +186,6 @@ public class TableConfigTest {
     dims.add("dims");
 
     Assert.assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
-    Assert.assertEquals(starTreeIndexSpec.isEnableOffHeapFormat(), true);
     Assert.assertEquals(starTreeIndexSpec.getMaxLeafRecords(), new Integer(5));
     Assert.assertEquals(starTreeIndexSpec.getskipMaterializationCardinalityThreshold(), 1);
     Assert.assertEquals(starTreeIndexSpec.getskipMaterializationForDimensions(), dims);

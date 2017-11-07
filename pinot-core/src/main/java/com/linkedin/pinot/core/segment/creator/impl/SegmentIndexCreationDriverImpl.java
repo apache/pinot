@@ -216,15 +216,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
     starTreeBuilderConfig.setSchema(dataSchema);
     starTreeBuilderConfig.setDimensionsSplitOrder(starTreeIndexSpec.getDimensionsSplitOrder());
-    starTreeBuilderConfig.setSkipStarNodeCreationForDimensions(
+    starTreeBuilderConfig.setSkipStarNodeCreationDimensions(
         starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
-    starTreeBuilderConfig.setSkipMaterializationForDimensions(starTreeIndexSpec.getskipMaterializationForDimensions());
+    starTreeBuilderConfig.setSkipMaterializationDimensions(starTreeIndexSpec.getskipMaterializationForDimensions());
     starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(
         starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
-    starTreeBuilderConfig.setMaxLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
+    starTreeBuilderConfig.setMaxNumLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
     starTreeBuilderConfig.setExcludeSkipMaterializationDimensionsForStarTreeIndex(
         starTreeIndexSpec.isExcludeSkipMaterializationDimensionsForStarTreeIndex());
-    starTreeBuilderConfig.setEnableOffHeapFormat(starTreeIndexSpec.isEnableOffHeapFormat());
 
     //initialize star tree builder
     try (StarTreeBuilder starTreeBuilder = new OffHeapStarTreeBuilder()) {
