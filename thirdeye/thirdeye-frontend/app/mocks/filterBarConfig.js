@@ -1,9 +1,14 @@
 /**
  * Config file to generate filter bar on rca-poc
+ * Each objects contains the following properties:
+ *  1. header {string} - displayed event type on the filter bar header
+ *  2. eventType {string} - type of event to filter by
+ *  3. inputs {array} - array of objects, each specifying the sub-filters of an eventType
  */
 export default [
   {
     header: "Holiday",
+    eventType: "holiday",
     inputs: [
       {
         label: "country",
@@ -13,6 +18,7 @@ export default [
   },
   {
     header: "Deployment",
+    eventType: "deployment",
     inputs: [
       {
         label: "services",
@@ -22,6 +28,7 @@ export default [
   },
   {
     header: "Other Anomalies",
+    eventType: "other anomalies",
     inputs: [
       {
         label: "resolution",
