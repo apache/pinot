@@ -169,6 +169,10 @@ public class PinotSchemaRestletResource {
 
     try {
       _pinotHelixResourceManager.addOrUpdateSchema(schema);
+
+      LOGGER.info("Emitting events for schema {}", schema);
+      new EventEmitAction().emit();
+
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
