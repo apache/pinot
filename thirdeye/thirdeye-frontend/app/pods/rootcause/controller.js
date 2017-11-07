@@ -165,13 +165,13 @@ export default Ember.Controller.extend({
       const url = this._makeFrameworkUrl(framework, context);
       fetch(url)
         .then(checkStatus)
-        .then(res => this._resultToEntities(res))
-        .then(json => this._completeRequestEntities(this, json, framework));
+        .then(this._resultToEntities)
+        .then(json => this._completeRequestEntities(json, framework));
     });
 
   },
 
-  _completeRequestEntities(that, incoming, framework) {
+  _completeRequestEntities(incoming, framework) {
     console.log('_completeRequestEntities()');
     const { selectedUrns, _pendingEntitiesRequests: pending, _entitiesCache: entitiesCache, _timeseriesCache: timeseriesCache } =
       this.getProperties('selectedUrns', '_pendingEntitiesRequests', '_entitiesCache', '_timeseriesCache');
@@ -182,22 +182,22 @@ export default Ember.Controller.extend({
     // timeseries eviction
     // TODO optimize for same time range reload
     Object.keys(incoming).forEach(urn => delete timeseriesCache[urn]);
-    Object.keys(incoming).forEach(urn => delete timeseriesCache[that._makeMetricBaselineUrn(urn)]);
+    Object.keys(incoming).forEach(urn => delete timeseriesCache[this._makeMetricBaselineUrn(urn)]);
 
     // entities eviction
-    const candidates = that._entitiesEvictionUrns(entitiesCache, framework);
+    const candidates = this._entitiesEvictionUrns(entitiesCache, framework);
     [...candidates].filter(urn => !selectedUrns.has(urn)).forEach(urn => delete entitiesCache[urn]);
 
     // augmentation
-    const augmented = Object.assign({}, incoming, that._entitiesMetricsAugmentation(incoming));
+    const augmented = Object.assign({}, incoming, this._entitiesMetricsAugmentation(incoming));
 
     // update entities cache
     Object.keys(augmented).forEach(urn => entitiesCache[urn] = augmented[urn]);
 
-    that.setProperties({ _entitiesCache: entitiesCache, _timeseriesCache: timeseriesCache, _pendingEntitiesRequests: pending });
-    that.notifyPropertyChange('_timeseriesCache');
-    that.notifyPropertyChange('_entitiesCache');
-    that.notifyPropertyChange('_pendingEntitiesRequests');
+    this.setProperties({ _entitiesCache: entitiesCache, _timeseriesCache: timeseriesCache, _pendingEntitiesRequests: pending });
+    this.notifyPropertyChange('_timeseriesCache');
+    this.notifyPropertyChange('_entitiesCache');
+    this.notifyPropertyChange('_pendingEntitiesRequests');
   },
 
   _entitiesEvictionUrns(cache, framework) {
@@ -299,7 +299,7 @@ export default Ember.Controller.extend({
 
     fetch(baselineUrl)
       .then(checkStatus)
-      .then(res => this._extractTimeseries(res))
+      .then(this._extractTimeseries)
       .then(timeseries => this._convertMetricToBaseline(timeseries, baselineOffset))
       .then(timeseries => this._completeRequestMissingTimeseries(this, timeseries));
 
@@ -307,7 +307,8 @@ export default Ember.Controller.extend({
 
   _completeRequestMissingTimeseries(that, incoming) {
     console.log('_completeRequestMissingTimeseries()');
-    const { _pendingTimeseriesRequests: pending, _timeseriesCache: cache } = that.getProperties('_pendingTimeseriesRequests', '_timeseriesCache');
+    const { _pendingTimeseriesRequests: pending, _timeseriesCache: cache } =
+      that.getProperties('_pendingTimeseriesRequests', '_timeseriesCache');
 
     Object.keys(incoming).forEach(urn => pending.delete(urn));
     Object.keys(incoming).forEach(urn => cache[urn] = incoming[urn]);
