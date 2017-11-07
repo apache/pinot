@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.alert.commons;
 
-import com.linkedin.thirdeye.alert.fetcher.BaseAnomalyFetcher;
 import com.linkedin.thirdeye.datalayer.util.StringUtils;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
