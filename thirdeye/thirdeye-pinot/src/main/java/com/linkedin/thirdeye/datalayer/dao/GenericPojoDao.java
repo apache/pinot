@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.AlertSnapshotIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import com.linkedin.thirdeye.datalayer.entity.ApplicationIndex;
@@ -33,6 +34,7 @@ import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.AlertSnapshotBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.ApplicationBean;
@@ -126,7 +128,8 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, ConfigIndex.class));
     pojoInfoMap.put(ApplicationBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, ApplicationIndex.class));
-
+    pojoInfoMap.put(AlertSnapshotBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AlertSnapshotIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,

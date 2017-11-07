@@ -472,4 +472,13 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return mergedAnomalyResultDTOList;
   }
 
+  @Override
+  public List<MergedAnomalyResultDTO> findByPredicate(Predicate predicate) {
+    List<MergedAnomalyResultDTO> dtoList = super.findByPredicate(predicate);
+    List<MergedAnomalyResultBean> beanList = new ArrayList<>();
+    for (MergedAnomalyResultDTO mergedAnomalyResultDTO :  dtoList) {
+      beanList.add(mergedAnomalyResultDTO);
+    }
+    return convertMergedAnomalyBean2DTO(beanList, true);
+  }
 }

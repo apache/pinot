@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,9 +13,11 @@ public class AlertConfigBean extends AbstractBean {
   String application;
   String cronExpression;
   boolean active;
+  AnomalyFeedConfig anomalyFeedConfig;
   EmailConfig emailConfig;
   ReportConfigCollection reportConfigCollection;
   AlertGroupConfig alertGroupConfig;
+  String emailFormatterType;
   String recipients;
   String fromAddress;
 
@@ -48,6 +51,14 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setCronExpression(String cronExpression) {
     this.cronExpression = cronExpression;
+  }
+
+  public AnomalyFeedConfig getAnomalyFeedConfig() {
+    return anomalyFeedConfig;
+  }
+
+  public void setAnomalyFeedConfig(AnomalyFeedConfig anomalyFeedConfig) {
+    this.anomalyFeedConfig = anomalyFeedConfig;
   }
 
   public EmailConfig getEmailConfig() {
@@ -88,6 +99,14 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setAlertGroupConfig(AlertGroupConfig alertGroupConfig) {
     this.alertGroupConfig = alertGroupConfig;
+  }
+
+  public String getEmailFormatterType() {
+    return emailFormatterType;
+  }
+
+  public void setEmailFormatterType(String emailFormatterType) {
+    this.emailFormatterType = emailFormatterType;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
