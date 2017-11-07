@@ -123,9 +123,9 @@ export default Ember.Component.extend({
     this._super(...arguments);
     const series = this.get('series') || {};
     const cache = this.get('cache') || {};
-    
+
     if (!_.isEqual(series, cache)) {
-      this._updateChart();
+      Ember.run.debounce(this, this._updateChart, 250);
     }
   },
 

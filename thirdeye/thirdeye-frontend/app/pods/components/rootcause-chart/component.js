@@ -85,7 +85,9 @@ export default Ember.Component.extend({
           show: true
         },
         y2: {
-          show: false
+          show: false,
+          min: 0,
+          max: 1
         },
         x: {
           type: 'timeseries',
@@ -120,13 +122,59 @@ export default Ember.Component.extend({
     }
   ),
 
+  _eventValues: Ember.computed(
+    'entities',
+    'selectedUrns',
+    'analysisRange',
+    function () {
+      const { entities, selectedUrns, analysisRange } =
+        this.getProperties('entities', 'selectedUrns', 'analysisRange');
+
+      const selectedEvents = [...selectedUrns].filter(urn => entities[urn] && entities[urn].type == 'event').map(urn => entities[urn]);
+
+      const starts = selectedEvents.map(e => [e.start, e.urn]);
+      const ends = selectedEvents.map(e => [e.end + 1, e.urn]); // no overlap
+      const sorted = starts.concat(ends).sort();
+
+      //
+      // automated layouting for event time ranges based on 'swimlanes'.
+      // events are assigned to different lanes such that their time ranges do not overlap visually
+      // the swimlanes are then converted to y values between [0.0, 1.0]
+      //
+      const lanes = {};
+      const urn2lane = {};
+      let max = 10; // default value
+      sorted.forEach(t => {
+        const urn = t[1];
+
+        if (!(urn in urn2lane)) {
+          // add
+          let i;
+          for (i = 0; (i in lanes); i++);
+          lanes[i] = urn;
+          urn2lane[urn] = i;
+          max = i > max ? i : max;
+
+        } else {
+          // remove
+          delete lanes[urn2lane[urn]];
+
+        }
+      });
+
+      const normalized = {};
+      Object.keys(urn2lane).forEach(urn => normalized[urn] = 1 - 1.0 * urn2lane[urn] / max);
+
+      return normalized;
+    }
+  ),
+
   _filterDisplayable(urns) {
     const { entities, timeseries } = this.getProperties('entities', 'timeseries');
 
     return [...urns]
-      .filter(urn => entities[urn])
-      .filter(urn => ['metric', 'event'].includes(entities[urn].type))
-      .filter(urn => entities[urn].type != 'metric' || timeseries[urn]);
+      .filter(urn => entities[urn] && ['metric', 'event', 'frontend:baseline:metric'].includes(entities[urn].type))
+      .filter(urn => (entities[urn].type != 'metric' && entities[urn].type != 'frontend:baseline:metric') || timeseries[urn]);
   },
 
   _entityToLabel(entity) {
@@ -144,15 +192,27 @@ export default Ember.Component.extend({
         axis: 'y'
       };
 
+    } else if (entity.type == 'frontend:baseline:metric') {
+      const { timeseries } = this.getProperties('timeseries');
+
+      return {
+        timestamps: timeseries[entity.urn].timestamps,
+        values: timeseries[entity.urn].values,
+        type: 'scatter',
+        axis: 'y'
+      };
+
     } else if (entity.type == 'dimension') {
       // TODO requires support for urn with metric id + filter
       return {};
 
     } else if (entity.type == 'event') {
+      const { _eventValues } = this.getProperties('_eventValues');
       // console.log(entity.urn, 'timestamps', entity.start, entity.end);
+      const val = _eventValues[entity.urn];
       return {
         timestamps: [entity.start, entity.end || entity.start],
-        values: [1, 1],
+        values: [val, val],
         type: 'line',
         axis: 'y2'
       };
