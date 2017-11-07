@@ -169,7 +169,7 @@ public class BrokerRequestHandler {
     }
 
     // Compile the request
-    long compilationStartTime = System.nanoTime();
+    final long compilationStartTime = System.nanoTime();
     BrokerRequest brokerRequest;
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql, _splitInClause);
@@ -179,15 +179,24 @@ public class BrokerRequestHandler {
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
-    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
-    if (!hasAccess) {
-      _brokerMetrics.addMeteredTableValue(brokerRequest.getQuerySource().getTableName(),
-          BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE, QueryException.ACCESS_DENIED_ERROR);
+    final String tableName = brokerRequest.getQuerySource().getTableName();
+    final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
+        System.nanoTime() - compilationStartTime);
+
+    final long authStartTime = System.nanoTime();
+    try {
+      boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
+      if (!hasAccess) {
+        _brokerMetrics.addMeteredTableValue(brokerRequest.getQuerySource().getTableName(), BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+        return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE, QueryException.ACCESS_DENIED_ERROR);
+      }
+    } finally {
+      _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
+          System.nanoTime() - authStartTime);
     }
 
     // Get the resources hit by the request
-    String tableName = brokerRequest.getQuerySource().getTableName();
     String offlineTableName = null;
     String realtimeTableName = null;
     CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -220,7 +229,6 @@ public class BrokerRequestHandler {
     }
 
     // Validate the request
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     try {
       validateRequest(brokerRequest);
     } catch (Exception e) {
@@ -237,8 +245,6 @@ public class BrokerRequestHandler {
       brokerRequest.setDebugOptions(debugOptions);
     }
     brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name());
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
-        System.nanoTime() - compilationStartTime);
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1L);
 
     // Execute the query.
