@@ -15,15 +15,11 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-
-import org.codehaus.jackson.JsonGenerationException;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
 
 
 public class CSVRecordReaderConfig implements RecordReaderConfig {
@@ -93,5 +89,10 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
 
   public boolean columnIsDate(String column) {
     return ((_csvDateColumns != null) && (_csvDateColumns.contains(column)));
+  }
+
+  @Override
+  public String toString() {
+    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 }

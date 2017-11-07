@@ -79,33 +79,17 @@ public class BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
 
-  private static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
-  private static final String BROKER_QUERY_RESPONSE_LIMIT_CONFIG = "pinot.broker.query.response.limit";
   private static final String BROKER_QUERY_SPLIT_IN_CLAUSE = "pinot.broker.query.split.in.clause";
   private static final String BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
   private static final String BROKER_ACCESS_CONTROL_PREFIX = "pinot.broker.access.control";
-  public static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
-  private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
-  private static final String DEFAULT_BROKER_ID;
-  public static final String BROKER_ID_CONFIG_KEY = "pinot.broker.id";
   private static final ResponseType DEFAULT_BROKER_RESPONSE_TYPE = ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
   private static final boolean DEFAULT_BROKER_QUERY_SPLIT_IN_CLAUSE = false;
   private static final int DEFAULT_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
+
   private final SegmentZKMetadataPrunerService _segmentPrunerService;
   private final boolean _splitInClause;
   private final int _queryLogLength;
   private final AccessControlFactory _accessControlFactory;
-
-  static {
-    String defaultBrokerId = "";
-    try {
-      defaultBrokerId = InetAddress.getLocalHost().getHostName();
-    } catch (UnknownHostException e) {
-      LOGGER.error("Failed to read default broker id.", e);
-    }
-    DEFAULT_BROKER_ID = defaultBrokerId;
-  }
-
   private final RoutingTable _routingTable;
   private final ScatterGather _scatterGatherer;
   private final ReduceServiceRegistry _reduceServiceRegistry;
@@ -127,17 +111,29 @@ public class BrokerRequestHandler {
     _brokerMetrics = brokerMetrics;
     _optimizer = new BrokerRequestOptimizer();
     _requestIdGenerator = new AtomicLong(0);
-    _queryResponseLimit = config.getInt(BROKER_QUERY_RESPONSE_LIMIT_CONFIG, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    _queryResponseLimit = config.getInt(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _splitInClause = config.getBoolean(BROKER_QUERY_SPLIT_IN_CLAUSE, DEFAULT_BROKER_QUERY_SPLIT_IN_CLAUSE);
     _queryLogLength = config.getInt(BROKER_QUERY_LOG_LENGTH, DEFAULT_QUERY_LOG_LENGTH);
-    _brokerTimeOutMs = config.getLong(BROKER_TIME_OUT_CONFIG, DEFAULT_BROKER_TIME_OUT_MS);
-    _brokerId = config.getString(BROKER_ID_CONFIG_KEY, DEFAULT_BROKER_ID);
+    _brokerTimeOutMs = config.getLong(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
+        CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    _brokerId = config.getString(CommonConstants.Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _segmentPrunerService = segmentPrunerService;
     _accessControlFactory = AccessControlFactory.loadFactory(config.subset(BROKER_ACCESS_CONTROL_PREFIX));
 
     LOGGER.info("Broker response limit is: " + _queryResponseLimit);
     LOGGER.info("Broker timeout is - " + _brokerTimeOutMs + " ms");
     LOGGER.info("Broker id: " + _brokerId);
+  }
+
+  private String getDefaultBrokerId() {
+    String defaultBrokerId = "";
+    try {
+      defaultBrokerId = InetAddress.getLocalHost().getHostName();
+    } catch (UnknownHostException e) {
+      LOGGER.error("Caught exception while getting default broker id", e);
+    }
+    return defaultBrokerId;
   }
 
   /**
