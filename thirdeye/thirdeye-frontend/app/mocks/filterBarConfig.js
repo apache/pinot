@@ -3,7 +3,7 @@
  */
 export default [
   {
-    header: "Holiday",
+    eventType: "Holiday",
     inputs: [
       {
         label: "country",
@@ -12,7 +12,7 @@ export default [
     ]
   },
   {
-    header: "Deployment",
+    eventType: "Deployment",
     inputs: [
       {
         label: "services",
@@ -21,7 +21,7 @@ export default [
     ]
   },
   {
-    header: "Other Anomalies",
+    eventType: "Other Anomalies",
     inputs: [
       {
         label: "resolution",

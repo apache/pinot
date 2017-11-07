@@ -83,9 +83,10 @@ export default Ember.Component.extend({
 
     /**
      * Expands/collapses a filter block
+     * @method filterByEvent
      * @param {Object} clickedBlock - selected filter block object
      */
-    toggleDisplay(clickedBlock) {
+    filterByEvent(clickedBlock) {
       // Hide all other blocks when one is clicked
       let filterBlocks = this.get('filterBlocks');
       filterBlocks.forEach(block => {
