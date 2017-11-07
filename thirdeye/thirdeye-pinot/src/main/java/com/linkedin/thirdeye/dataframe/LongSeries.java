@@ -185,9 +185,13 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public static LongSeries sequence(long from, int count) {
+    return sequence(from, count, 1);
+  }
+
+  public static LongSeries sequence(long from, int count, long interval) {
     long[] values = new long[count];
     for(int i=0; i<count; i++) {
-      values[i] = from + i;
+      values[i] = from + i * interval;
     }
     return buildFrom(values);
   }

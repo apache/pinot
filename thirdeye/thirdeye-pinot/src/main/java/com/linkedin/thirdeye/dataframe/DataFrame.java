@@ -382,6 +382,17 @@ public class DataFrame {
   }
 
   /**
+   * Creates a new DataFrame with a column {@code indexName} referencing the Series {@code index}.
+   *
+   * @param indexName index series column name
+   * @param index index series
+   */
+  public DataFrame(String indexName, Series index) {
+    this.addSeries(indexName, index);
+    this.indexNames.add(indexName);
+  }
+
+  /**
    * Creates a new DataFrame that copies the properties of {@code df}.
    *
    * <br/><b>NOTE:</b> the copy is shallow, i.e. the contained series are not copied but referenced.
