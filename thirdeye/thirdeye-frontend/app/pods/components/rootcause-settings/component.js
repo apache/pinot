@@ -2,33 +2,14 @@
  * Rootcause settings component. It contains the logic needed for displaying
  * the rca settings box
  * @module components/rootcause-settings
- * @property {Boolean} isEditingIterationSegment - Indicates if user is editing
- *                                                 an iteration
- * @property {Boolean} isDisableInput  - Indicates if segment inputs should
- *                                       be disabled
- * @property {Object}  selectorSpec    - An object containing selectorSpec info
- * @property {Number}  segmentIndex    - Segment position in array
- * @property {Array}   segmentsList    - "Target" dropdown select options
- * @property {String}  segmentType     - Segment type
- * @property {Object}  test            - An object containing test info
- * @property {Array}   customSelectors - An array of objects containing custom
- *                                       selectors info
- * @property {Object}  onDeleteSegment - Closure action to bubble up to parent
- *                                       when a segment is deleted
- * @property {Object}  onMoveSegment   - Closure action to bubble up to parent
- *                                       when a segment index is changed
+ * @property {Object} context   - { urns, anomalyRange, baselineRange, analaysisRange }
+ * @property {Object} onChange  - Closure action to bubble up to parent
+ *                                when the settings change
  * @example
- * {{test/iterations/setup/segments/iteration-segment
- *   isEditingIterationSegment=isEditingIterationSegment
- *   isDisableInput=isDisableInput
- *   selectorSpec=selectorSpec
- *   segmentIndex=segmentIndex
- *   segmentsList=segmentsList
- *   segmentType=segment.type
- *   test=test
- *   customSelectors=customSelectors
- *   onDeleteSegment=(action "onDeleteSegment")
- *   onMoveSegment=(action "onMoveSegment")}}
+  {{rootcause-settings
+    context=context
+    onChange=(action "settingsOnChange")
+  }}
  * @exports rootcause-settings
  * @author apucher, yyuen
  */
@@ -61,31 +42,55 @@ export default Ember.Component.extend({
   datePickerAnalysisRangeStart: Ember.computed.reads('analysisRangeStart'),
   datePickerAnalysisRangeEnd: Ember.computed.reads('analysisRangeEnd'),
 
-  // selected Granularity
+  /**
+   * Selected Granularity
+   * @type {String}
+   */
   granularity: null,
 
-  // granularities: Ember.computed.reads('model.granularities'),
+  /**
+   * Granularities Options
+   * @type {String[]}
+   */
   granularities: ['MINUTES', 'HOURS', 'DAYS'],
 
-  // selected Compare Mode
+  /**
+   * Selected Compare Mode
+   * @type {String}
+   */
   compareMode: 'WoW',
-  // compare mode options
+  /**
+   * Compare Mode Options
+   * @type {String[]}
+   */
   compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
 
-  // predefined ranges for display window
+  /**
+   * Predefined Custom Ranges for
+   * the display region
+   * @type {Object}
+   */
   predefinedAnalysisRanges: {
     'Last 2 days': [
       moment().subtract(3, 'days').startOf('day'), 
       moment().subtract(1, 'days').endOf('day')
     ],
-    'last 7 Days': [
+    'last 7 Dgit sattuays': [
       moment().subtract(7, 'days').startOf('day'),
       moment().subtract(1, 'days').endOf('day')
     ]
   },
 
-  // metricFilters: Ember.computed.reads('model.metricFilters'),
+  /**
+   * filter options
+   * @type {Object}
+   */
   metricFilters: {},
+
+  /**
+   * Selected filters
+   * @type {String} - a JSON string
+   */
   filters: JSON.stringify({}),
 
   /**
@@ -155,7 +160,14 @@ export default Ember.Component.extend({
         onChange(newContext);
       }
     },
-    // date picker actions
+
+    /**
+     * Sets the new anomaly region date in ms
+     * @method setAnomalyDateRange
+     * @param {String} start  - stringified start date
+     * @param {String} end    - stringified end date
+     * @return {undefined}
+     */
     setAnomalyDateRange(start, end) {
       const anomalyRangeStart = moment(start).valueOf();
       const anomalyRangeEnd = moment(end).valueOf();
@@ -165,7 +177,14 @@ export default Ember.Component.extend({
         anomalyRangeEnd
       });
     },
-    // date picker actions
+    
+    /**
+     * Sets the new display date in ms
+     * @method setDisplayDateRange
+     * @param {String} start  - stringified start date
+     * @param {String} end    - stringified end date
+     * @return {undefined}
+     */
     setDisplayDateRange(start, end) {
       const analysisRangeStart = moment(start).valueOf();
       const analysisRangeEnd = moment(end).valueOf();
@@ -176,6 +195,12 @@ export default Ember.Component.extend({
       });
     },
 
+    /**
+     * Changes the compare mode
+     * @method onModeChange
+     * @param {String} compareMode baseline compare mode
+     * @return {undefined}
+     */
     onModeChange(compareMode) {
       const {
         analysisRangeStart,
@@ -196,17 +221,6 @@ export default Ember.Component.extend({
         baselineRangeStart,
         baselineRangeEnd
       });
-    },
-
-    onGranularityChange() {
-      debugger;
-    },
-    
-    hideDatePicker() {
-      // alert('hiding date picker');
-    },
-    cancelDatePicker() {
-      // alert('cancelDatePicker');
     }
   }
 });
