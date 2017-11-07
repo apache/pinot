@@ -1,0 +1,13 @@
+<ol>
+  {{#each-in values as |dimName dimValues|}}
+    <li>{{dimName}}
+        {{#each-in dimValues as |dimValue value|}}
+          | {{dimValue}} ({{value}})
+        {{else}}
+          | No values
+        {{/each-in}}
+    </li>
+  {{else}}
+    <li>No dimensions</li>
+  {{/each-in}}
+</ol>
