@@ -94,7 +94,7 @@ public class AggregationResource {
    * @param rangesString time ranges with end exclusive "[start]:[end]" separated by ","
    * @param filterString (optional) metric filters
    * @param rollupCount (optional) max number of values per dimensions for rollup
-   * @return Map (keyed by range) of maps (keyed by metric id) of maps (keyed by dimension name) of maps (keyed by dimension value) of values
+   * @return Map (keyed by time range) of maps (keyed by metric id) of maps (keyed by dimension name) of maps (keyed by dimension value) of values
    * @throws Exception
    */
   @GET
@@ -177,9 +177,9 @@ public class AggregationResource {
    * Helper to roll up dimension values to a fixed count per dimension name. The rolled up column
    * carries the dimension value {@code COL_DIMENSION_VALUE_OTHER}.
    *
-   * @param df
-   * @param numValues
-   * @return
+   * @param df dimension breakdown dataframe
+   * @param numValues max number of dimension values
+   * @return dataframe with max {@code numValues} dimension values
    */
   private static DataFrame rollupTail(DataFrame df, int numValues) {
     if (df.isEmpty()) {
@@ -213,8 +213,8 @@ public class AggregationResource {
   /**
    * Helper to convert dimension aggregation dataframe to a map of values
    *
-   * @param df
-   * @return
+   * @param df dimension breakdown dataframe
+   * @return Map (keyed by dimension name) of maps (keyed by dimension value) of values
    */
   private static Map<String, Map<String, Double>> dataframeToMap(DataFrame df) {
     Map<String, Map<String, Double>> output = new HashMap<>();
@@ -234,9 +234,9 @@ public class AggregationResource {
   /**
    * Helper to extract slices for a given jodatime utc interval
    *
-   * @param slices
-   * @param range
-   * @return
+   * @param slices all metric slices
+   * @param range time range to extract
+   * @return List of metric slices
    */
   private static List<MetricSlice> filterSlices(Iterable<MetricSlice> slices, Interval range) {
     List<MetricSlice> output = new ArrayList<>();
