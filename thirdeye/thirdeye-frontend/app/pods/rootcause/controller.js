@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { makeIterable, filterObject } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, makeIterable, filterObject } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import fetch from 'fetch';
 
@@ -164,7 +164,7 @@ export default Ember.Controller.extend({
     frameworks.forEach(framework => {
       const url = this._makeFrameworkUrl(framework, context);
       fetch(url)
-        .then(res => res.json())
+        .then(checkStatus)
         .then(res => this._resultToEntities(res))
         .then(json => this._completeRequestEntities(this, json, framework));
     });
@@ -284,7 +284,7 @@ export default Ember.Controller.extend({
     const metricUrl = `/timeseries/query?metricIds=${metricIdString}&ranges=${context.analysisRange[0]}:${context.analysisRange[1]}&granularity=15_MINUTES&transformations=timestamp`;
 
     fetch(metricUrl)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(this._extractTimeseries)
       .then(timeseries => this._completeRequestMissingTimeseries(this, timeseries));
 
@@ -298,7 +298,7 @@ export default Ember.Controller.extend({
     const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineDisplayStart}:${baselineDisplayEnd}&granularity=15_MINUTES&transformations=timestamp`;
 
     fetch(baselineUrl)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => this._extractTimeseries(res))
       .then(timeseries => this._convertMetricToBaseline(timeseries, baselineOffset))
       .then(timeseries => this._completeRequestMissingTimeseries(this, timeseries));

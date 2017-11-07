@@ -67,15 +67,15 @@ export default Ember.Component.extend({
   ),
 
   _makeTransformation(mode) {
-    if (mode == 'change') {
-      return (curr, base, currTotal, baseTotal) => curr / base - 1;
-    } else if (mode == 'contributionDiff') {
-      return (curr, base, currTotal, baseTotal) => curr / currTotal - base / baseTotal;
-    } else if (mode == 'contributionToDiff') {
-      return (curr, base, currTotal, baseTotal) => (curr - base) / (currTotal - baseTotal);
-    } else {
-      return (curr, base, currTotal, baseTotal) => 0;
+    switch (mode) {
+      case 'change':
+        return (curr, base, currTotal, baseTotal) => curr / base - 1;
+      case 'contributionDiff':
+        return (curr, base, currTotal, baseTotal) => curr / currTotal - base / baseTotal;
+      case 'contributionToDiff':
+        return (curr, base, currTotal, baseTotal) => (curr - base) / (currTotal - baseTotal);
     }
+    return (curr, base, currTotal, baseTotal) => 0;
   },
 
   _makeSum(dimNameObj) {

@@ -136,6 +136,11 @@ export default Ember.Component.extend({
       const ends = selectedEvents.map(e => [e.end + 1, e.urn]); // no overlap
       const sorted = starts.concat(ends).sort();
 
+      //
+      // automated layouting for event time ranges based on 'swimlanes'.
+      // events are assigned to different lanes such that their time ranges do not overlap visually
+      // the swimlanes are then converted to y values between [0.0, 1.0]
+      //
       const lanes = {};
       const urn2lane = {};
       let max = 10; // default value
@@ -168,8 +173,7 @@ export default Ember.Component.extend({
     const { entities, timeseries } = this.getProperties('entities', 'timeseries');
 
     return [...urns]
-      .filter(urn => entities[urn])
-      .filter(urn => ['metric', 'event', 'frontend:baseline:metric'].includes(entities[urn].type))
+      .filter(urn => entities[urn] && ['metric', 'event', 'frontend:baseline:metric'].includes(entities[urn].type))
       .filter(urn => (entities[urn].type != 'metric' && entities[urn].type != 'frontend:baseline:metric') || timeseries[urn]);
   },
 
