@@ -286,7 +286,7 @@ export default Ember.Controller.extend({
     fetch(metricUrl)
       .then(checkStatus)
       .then(this._extractTimeseries)
-      .then(timeseries => this._completeRequestMissingTimeseries(this, timeseries));
+      .then(timeseries => this._completeRequestMissingTimeseries(timeseries));
 
     // baselines
     const baselineOffset = context.anomalyRange[0] - context.baselineRange[0];
@@ -301,21 +301,21 @@ export default Ember.Controller.extend({
       .then(checkStatus)
       .then(this._extractTimeseries)
       .then(timeseries => this._convertMetricToBaseline(timeseries, baselineOffset))
-      .then(timeseries => this._completeRequestMissingTimeseries(this, timeseries));
+      .then(timeseries => this._completeRequestMissingTimeseries(timeseries));
 
   },
 
-  _completeRequestMissingTimeseries(that, incoming) {
+  _completeRequestMissingTimeseries(incoming) {
     console.log('_completeRequestMissingTimeseries()');
     const { _pendingTimeseriesRequests: pending, _timeseriesCache: cache } =
-      that.getProperties('_pendingTimeseriesRequests', '_timeseriesCache');
+      this.getProperties('_pendingTimeseriesRequests', '_timeseriesCache');
 
     Object.keys(incoming).forEach(urn => pending.delete(urn));
     Object.keys(incoming).forEach(urn => cache[urn] = incoming[urn]);
 
-    that.setProperties({ _pendingTimeseriesRequests: pending, _timeseriesCache: cache });
-    that.notifyPropertyChange('_timeseriesCache');
-    that.notifyPropertyChange('_pendingTimeseriesRequests');
+    this.setProperties({ _pendingTimeseriesRequests: pending, _timeseriesCache: cache });
+    this.notifyPropertyChange('_timeseriesCache');
+    this.notifyPropertyChange('_pendingTimeseriesRequests');
   },
 
   _extractTimeseries(json) {
