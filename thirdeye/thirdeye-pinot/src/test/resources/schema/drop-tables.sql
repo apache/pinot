@@ -22,4 +22,5 @@ DROP TABLE IF EXISTS grouped_anomaly_results_index;
 DROP TABLE IF EXISTS onboard_dataset_metric_index;
 DROP TABLE IF EXISTS config_index;
 DROP TABLE IF EXISTS application_index;
+DROP TABLE IF EXISTS alert_snapshot_index;
 SET FOREIGN_KEY_CHECKS = 1;
