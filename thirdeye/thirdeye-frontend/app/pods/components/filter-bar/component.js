@@ -96,7 +96,7 @@ export default Ember.Component.extend({
       // Note: toggleProperty will not be able to find 'filterBlocks', as it is not an observed property
       // Show clickedBlock
       Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
-      this.attrs.onTabChange(clickedBlock.eventType.toLowerCase());
+      this.attrs.onTabChange(clickedBlock.eventType);
     }
   }
 });

@@ -108,7 +108,6 @@ export default Ember.Component.extend({
      * @param {String} tab String of the new selected tab
      */
     onTabChange(tab) {
-      debugger;
       const currentTab = this.get('selectedTab');
 
       if (currentTab !== tab) {
