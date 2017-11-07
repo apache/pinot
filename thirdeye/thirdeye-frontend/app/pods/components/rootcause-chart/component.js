@@ -85,7 +85,9 @@ export default Ember.Component.extend({
           show: true
         },
         y2: {
-          show: false
+          show: false,
+          min: 0,
+          max: 1
         },
         x: {
           type: 'timeseries',
@@ -117,6 +119,48 @@ export default Ember.Component.extend({
         });
 
       return bounds;
+    }
+  ),
+
+  _eventValues: Ember.computed(
+    'entities',
+    'selectedUrns',
+    'analysisRange',
+    function () {
+      const { entities, selectedUrns, analysisRange } =
+        this.getProperties('entities', 'selectedUrns', 'analysisRange');
+
+      const selectedEvents = [...selectedUrns].filter(urn => entities[urn] && entities[urn].type == 'event').map(urn => entities[urn]);
+
+      const starts = selectedEvents.map(e => [e.start, e.urn]);
+      const ends = selectedEvents.map(e => [e.end + 1, e.urn]); // no overlap
+      const sorted = starts.concat(ends).sort();
+
+      const lanes = {};
+      const urn2lane = {};
+      let max = 10; // default value
+      sorted.forEach(t => {
+        const urn = t[1];
+
+        if (!(urn in urn2lane)) {
+          // add
+          let i;
+          for (i = 0; (i in lanes); i++);
+          lanes[i] = urn;
+          urn2lane[urn] = i;
+          max = i > max ? i : max;
+
+        } else {
+          // remove
+          delete lanes[urn2lane[urn]];
+
+        }
+      });
+
+      const normalized = {};
+      Object.keys(urn2lane).forEach(urn => normalized[urn] = 1 - 1.0 * urn2lane[urn] / max);
+
+      return normalized;
     }
   ),
 
@@ -159,10 +203,12 @@ export default Ember.Component.extend({
       return {};
 
     } else if (entity.type == 'event') {
+      const { _eventValues } = this.getProperties('_eventValues');
       // console.log(entity.urn, 'timestamps', entity.start, entity.end);
+      const val = _eventValues[entity.urn];
       return {
         timestamps: [entity.start, entity.end || entity.start],
-        values: [1, 1],
+        values: [val, val],
         type: 'line',
         axis: 'y2'
       };
