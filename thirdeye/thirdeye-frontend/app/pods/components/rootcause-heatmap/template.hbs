@@ -1,3 +1,7 @@
+<button {{action "setMode" "change"}}>change</button> |
+<button {{action "setMode" "contributionDiff"}}>contribution diff</button> |
+<button {{action "setMode" "contributionToDiff"}}>contribution to diff</button>
+
 <ol>
   {{#each-in values as |dimName dimValues|}}
     <li>{{dimName}}

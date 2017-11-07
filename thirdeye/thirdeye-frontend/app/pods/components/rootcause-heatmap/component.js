@@ -27,7 +27,7 @@ export default Ember.Component.extend({
     }
   },
 
-  mode: null, // 'change', 'contributionDiff', 'contributionToChange'
+  mode: null, // 'change', 'contributionDiff', 'contributionToDiff'
 
   values: Ember.computed(
     'current',
@@ -71,7 +71,7 @@ export default Ember.Component.extend({
       return (curr, base, currTotal, baseTotal) => curr / base - 1;
     } else if (mode == 'contributionDiff') {
       return (curr, base, currTotal, baseTotal) => curr / currTotal - base / baseTotal;
-    } else if (mode == 'contributionToChange') {
+    } else if (mode == 'contributionToDiff') {
       return (curr, base, currTotal, baseTotal) => (curr - base) / (currTotal - baseTotal);
     } else {
       return (curr, base, currTotal, baseTotal) => 0;
@@ -83,6 +83,12 @@ export default Ember.Component.extend({
       return 0;
     }
     return Object.values(dimNameObj).reduce((agg, x) => agg + x, 0);
+  },
+
+  actions: {
+    setMode(mode) {
+      this.set('mode', mode);
+    }
   }
 
 });
