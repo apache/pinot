@@ -1,4 +1,7 @@
-{{yield}}
+{{filter-bar
+  filterBlocks=filterBlocks
+  onTabChange=(action "onTabChange")
+  activeTab=selectedTab}}
 {{models-table
   data=filteredEvents
   columns=columns
