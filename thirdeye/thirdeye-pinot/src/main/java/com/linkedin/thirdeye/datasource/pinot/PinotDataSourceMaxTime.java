@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyePinotResultSetGroup;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,7 +50,7 @@ public class PinotDataSourceMaxTime {
           timeSpec.getColumnName(), prevMaxDataTime);
       PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, tableName);
       pinotThirdEyeDataSource.refreshPQL(maxTimePinotQuery);
-      PinotThirdEyeResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
+      ThirdEyePinotResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
       if (resultSetGroup.size() == 0 || resultSetGroup.get(0).getRowCount() == 0) {
         LOGGER.warn("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
         this.collectionToPrevMaxDataTimeMap.remove(dataset);

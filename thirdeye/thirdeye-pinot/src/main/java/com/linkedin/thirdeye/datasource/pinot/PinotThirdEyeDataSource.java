@@ -9,7 +9,19 @@ import com.google.common.cache.Weigher;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.TimeRangeUtils;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyePinotResultSet;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyePinotResultSetGroup;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,7 +34,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -36,20 +47,6 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.client.ResultSet;
-import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.TimeRangeUtils;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
 public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeDataSource.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -60,7 +57,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
   private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
   private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
-  protected LoadingCache<PinotQuery, PinotThirdEyeResultSetGroup> pinotResponseCache;
+  protected LoadingCache<PinotQuery, ThirdEyePinotResultSetGroup> pinotResponseCache;
 
   protected PinotDataSourceMaxTime pinotDataSourceMaxTime;
   protected PinotDataSourceDimensionFilters pinotDataSourceDimensionFilters;
@@ -79,6 +76,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     pinotDataSourceMaxTime = new PinotDataSourceMaxTime(this);
     pinotDataSourceDimensionFilters = new PinotDataSourceDimensionFilters(this);
   }
+
 
   /**
    * This constructor is invoked by Java Reflection for initialize a ThirdEyeDataSource.
@@ -130,7 +128,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
     long tStart = System.nanoTime();
     try {
-      LinkedHashMap<MetricFunction, List<ResultSet>> metricFunctionToResultSetList = new LinkedHashMap<>();
+      LinkedHashMap<MetricFunction, List<ThirdEyePinotResultSet>> metricFunctionToResultSetList = new LinkedHashMap<>();
 
       TimeSpec timeSpec = null;
       for (MetricFunction metricFunction : request.getMetricFunctions()) {
@@ -161,7 +159,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         } else {
           pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
         }
-        PinotThirdEyeResultSetGroup resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
+        ThirdEyePinotResultSetGroup resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
         metricFunctionToResultSetList.put(metricFunction, resultSetGroup.getResultSets());
       }
 
@@ -235,7 +233,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws ExecutionException is thrown if failed to connect to Pinot or gets results from Pinot.
    */
-  public PinotThirdEyeResultSetGroup executePQL(PinotQuery pinotQuery) throws ExecutionException {
+  public ThirdEyePinotResultSetGroup executePQL(PinotQuery pinotQuery) throws ExecutionException {
     Preconditions
         .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
@@ -250,7 +248,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws ExecutionException is thrown if failed to connect to Pinot or gets results from Pinot.
    */
-  public PinotThirdEyeResultSetGroup refreshPQL(PinotQuery pinotQuery) throws ExecutionException {
+  public ThirdEyePinotResultSetGroup refreshPQL(PinotQuery pinotQuery) throws ExecutionException {
     Preconditions
         .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
@@ -260,7 +258,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   }
 
   private List<String[]> parseResultSets(ThirdEyeRequest request,
-      Map<MetricFunction, List<ResultSet>> metricFunctionToResultSetList) throws ExecutionException {
+      Map<MetricFunction, List<ThirdEyePinotResultSet>> metricFunctionToResultSetList) throws ExecutionException {
 
     int numGroupByKeys = 0;
     boolean hasGroupBy = false;
@@ -282,7 +280,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
     int position = 0;
     LinkedHashMap<String, String[]> dataMap = new LinkedHashMap<>();
-    for (Entry<MetricFunction, List<ResultSet>> entry : metricFunctionToResultSetList.entrySet()) {
+    for (Entry<MetricFunction, List<ThirdEyePinotResultSet>> entry : metricFunctionToResultSetList.entrySet()) {
 
       MetricFunction metricFunction = entry.getKey();
 
@@ -303,9 +301,9 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dateTimeZone);
       }
 
-      List<ResultSet> resultSets = entry.getValue();
+      List<ThirdEyePinotResultSet> resultSets = entry.getValue();
       for (int i = 0; i < resultSets.size(); i++) {
-        ResultSet resultSet = resultSets.get(i);
+        ThirdEyePinotResultSet resultSet = resultSets.get(i);
         int numRows = resultSet.getRowCount();
         for (int r = 0; r < numRows; r++) {
           boolean skipRowDueToError = false;
@@ -315,7 +313,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
             for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
               String groupKeyVal = "";
               try {
-                groupKeyVal = resultSet.getGroupKeyString(r, grpKeyIdx);
+                groupKeyVal = resultSet.getGroupKeyColumnValue(r, grpKeyIdx);
               } catch (Exception e) {
                 // IGNORE FOR NOW, workaround for Pinot Bug
               }
@@ -403,22 +401,22 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws Exception is thrown when Pinot brokers are unable to be reached.
    */
-  private static LoadingCache<PinotQuery, PinotThirdEyeResultSetGroup> buildResponseCache(
+  private static LoadingCache<PinotQuery, ThirdEyePinotResultSetGroup> buildResponseCache(
       PinotResponseCacheLoader pinotResponseCacheLoader) throws Exception {
     Preconditions.checkNotNull(pinotResponseCacheLoader, "A loader that sends query to Pinot is required.");
 
     // Initializes listener that prints expired entries in debuggin mode.
-    RemovalListener<PinotQuery, PinotThirdEyeResultSetGroup> listener;
+    RemovalListener<PinotQuery, ThirdEyePinotResultSetGroup> listener;
     if (LOG.isDebugEnabled()) {
-      listener = new RemovalListener<PinotQuery, PinotThirdEyeResultSetGroup>() {
+      listener = new RemovalListener<PinotQuery, ThirdEyePinotResultSetGroup>() {
         @Override
-        public void onRemoval(RemovalNotification<PinotQuery, PinotThirdEyeResultSetGroup> notification) {
+        public void onRemoval(RemovalNotification<PinotQuery, ThirdEyePinotResultSetGroup> notification) {
           LOG.debug("Expired {}", notification.getKey().getPql());
         }
       };
     } else {
-      listener = new RemovalListener<PinotQuery, PinotThirdEyeResultSetGroup>() {
-        @Override public void onRemoval(RemovalNotification<PinotQuery, PinotThirdEyeResultSetGroup> notification) { }
+      listener = new RemovalListener<PinotQuery, ThirdEyePinotResultSetGroup>() {
+        @Override public void onRemoval(RemovalNotification<PinotQuery, ThirdEyePinotResultSetGroup> notification) { }
       };
     }
 
@@ -432,12 +430,12 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         .removalListener(listener)
         .expireAfterWrite(ThirdEyeCacheRegistry.CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
         .maximumWeight(maxBucketNumber)
-        .weigher(new Weigher<PinotQuery, PinotThirdEyeResultSetGroup>() {
-          @Override public int weigh(PinotQuery pinotQuery, PinotThirdEyeResultSetGroup resultSetGroup) {
+        .weigher(new Weigher<PinotQuery, ThirdEyePinotResultSetGroup>() {
+          @Override public int weigh(PinotQuery pinotQuery, ThirdEyePinotResultSetGroup resultSetGroup) {
             int resultSetCount = resultSetGroup.size();
             int weight = 0;
             for (int idx = 0; idx < resultSetCount; ++idx) {
-              ResultSet resultSet = resultSetGroup.get(idx);
+              ThirdEyePinotResultSet resultSet = resultSetGroup.get(idx);
               weight += (resultSet.getColumnCount() * resultSet.getRowCount());
             }
             return weight;

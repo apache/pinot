@@ -1,10 +1,10 @@
 package com.linkedin.thirdeye.datasource.pinot;
 
 import com.google.common.cache.CacheLoader;
-import com.linkedin.pinot.client.ResultSetGroup;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyePinotResultSetGroup;
 import java.util.Map;
 
-public abstract class PinotResponseCacheLoader extends CacheLoader<PinotQuery, PinotThirdEyeResultSetGroup> {
+public abstract class PinotResponseCacheLoader extends CacheLoader<PinotQuery, ThirdEyePinotResultSetGroup> {
   /**
    * Initializes the cache loader using the given property map.
    *
