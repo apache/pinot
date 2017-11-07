@@ -132,12 +132,13 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
   @BeforeClass
   void setUp() throws Exception {
     StarTreeIndexTestSegmentHelper.buildSegmentWithHll(DATA_DIR, SEGMENT_NAME, HLL_CONFIG);
-    _segment = ColumnarSegmentLoader.load(new File(DATA_DIR, SEGMENT_NAME), ReadMode.mmap);
   }
 
   @Test
   public void testQueries() throws Exception {
+    _segment = ColumnarSegmentLoader.load(new File(DATA_DIR, SEGMENT_NAME), ReadMode.mmap);
     testHardCodedQueries();
+    _segment.destroy();
   }
 
   @AfterClass

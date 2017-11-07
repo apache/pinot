@@ -43,9 +43,9 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class OffheapStarTreeBuilderWithHllFieldTest {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(OffheapStarTreeBuilderWithHllFieldTest.class);
+public class OffHeapStarTreeBuilderWithHllFieldTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapStarTreeBuilderWithHllFieldTest.class);
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "OffHeapStarTreeBuilderWithHllFieldTest");
   private static final long randomSeed = 31; // a fixed value
 
   private final String memberIdFieldName = "id";
@@ -54,105 +54,99 @@ public class OffheapStarTreeBuilderWithHllFieldTest {
 
   private void testSimpleCore(int numDimensions, int numMetrics, int numSkipMaterializationDimensions,
       int[] memberIdColumnValues, long preciseCardinality) throws Exception {
-    StarTreeBuilderConfig builderConfig = null;
-    try {
-      builderConfig = new StarTreeBuilderConfig();
-      Schema schema = new Schema();
-      builderConfig.dimensionsSplitOrder = new ArrayList<>();
-      builderConfig.setSkipMaterializationForDimensions(new HashSet<String>());
-      Set<String> skipMaterializationForDimensions = builderConfig.getSkipMaterializationForDimensions();
+    Schema schema = new Schema();
+    List<String> dimensionsSplitOrder = new ArrayList<>();
+    Set<String> skipMaterializationDimensions = new HashSet<>();
 
-      // add member id dimension spec
-      String dimName = memberIdFieldName;
-      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.INT, true);
+    // add member id dimension spec
+    String dimName = memberIdFieldName;
+    DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.INT, true);
+    schema.addField(dimensionFieldSpec);
+    // add other dimension specs
+    for (int i = 1; i < numDimensions; i++) {
+      dimName = "d" + (i + 1);
+      dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.STRING, true);
       schema.addField(dimensionFieldSpec);
-      // add other dimension specs
-      for (int i = 1; i < numDimensions; i++) {
-        dimName = "d" + (i + 1);
-        dimensionFieldSpec = new DimensionFieldSpec(dimName, DataType.STRING, true);
-        schema.addField(dimensionFieldSpec);
 
-        if (i < (numDimensions - numSkipMaterializationDimensions)) {
-          builderConfig.dimensionsSplitOrder.add(dimName);
-        } else {
-          builderConfig.getSkipMaterializationForDimensions().add(dimName);
-        }
-      }
-
-      schema.setTimeFieldSpec(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
-      // add other metric specs
-      for (int i = 0; i < numMetrics - 1; i++) {
-        String metricName = "m" + (i + 1);
-        MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.INT);
-        schema.addField(metricFieldSpec);
-      }
-      // add hll metric
-      String hllMetricName = memberIdFieldName + hllDeriveFieldSuffix;
-      MetricFieldSpec hllDerivedFieldSpec = new MetricFieldSpec(hllMetricName, FieldSpec.DataType.STRING,
-          HllSizeUtils.getHllFieldSizeFromLog2m(log2m), MetricFieldSpec.DerivedMetricType.HLL);
-      schema.addField(hllDerivedFieldSpec);
-      //
-      builderConfig.maxLeafRecords = 10;
-      builderConfig.schema = schema;
-      builderConfig.setOutDir(new File("/tmp/startree"));
-      //
-      OffHeapStarTreeBuilder builder = new OffHeapStarTreeBuilder();
-      builder.init(builderConfig);
-      // fill values
-      HashMap<String, Object> map = new HashMap<>();
-      for (int row = 0; row < memberIdColumnValues.length; row++) {
-        // add member id column
-        dimName = memberIdFieldName;
-        map.put(dimName, memberIdColumnValues[row]);
-        // add other dimensions
-        for (int i = 1; i < numDimensions; i++) {
-          dimName = schema.getDimensionFieldSpecs().get(i).getName();
-          map.put(dimName, dimName + "-v" + row % (numDimensions - i));
-        }
-        // add time column
-        map.put("daysSinceEpoch", 1);
-        // add other metrics
-        for (int i = 0; i < numMetrics - 1; i++) {
-          String metName = schema.getMetricFieldSpecs().get(i).getName();
-          map.put(metName, 1);
-        }
-        // add hll column value
-        map.put(hllMetricName, HllUtil.singleValueHllAsString(log2m, memberIdColumnValues[row]));
-        //
-        GenericRow genericRow = new GenericRow();
-        genericRow.init(map);
-        builder.append(genericRow);
-      }
-      builder.build();
-
-      int totalDocs = builder.getTotalRawDocumentCount() + builder.getTotalAggregateDocumentCount();
-      Iterator<GenericRow> iterator = builder.iterator(0, totalDocs);
-      while (iterator.hasNext()) {
-        GenericRow row = iterator.next();
-        LOGGER.info(HllUtil.inspectGenericRow(row, hllDeriveFieldSuffix));
-      }
-
-      iterator = builder.iterator(builder.getTotalRawDocumentCount(), totalDocs);
-      GenericRow lastRow = null;
-      while (iterator.hasNext()) {
-        GenericRow row = iterator.next();
-        for (String skipDimension : skipMaterializationForDimensions) {
-          String rowValue = (String) row.getValue(skipDimension);
-          Assert.assertEquals(rowValue, "null");
-        }
-        lastRow = row;
-      }
-
-      assertApproximation(
-          HllUtil.convertStringToHll((String) lastRow.getValue(hllMetricName)).cardinality(),
-          preciseCardinality,
-          0.1
-      );
-    } finally {
-      if (builderConfig != null) {
-        FileUtils.deleteDirectory(builderConfig.getOutDir());
+      if (i < (numDimensions - numSkipMaterializationDimensions)) {
+        dimensionsSplitOrder.add(dimName);
+      } else {
+        skipMaterializationDimensions.add(dimName);
       }
     }
+
+    schema.addField(new TimeFieldSpec("daysSinceEpoch", DataType.INT, TimeUnit.DAYS));
+    // add other metric specs
+    for (int i = 0; i < numMetrics - 1; i++) {
+      String metricName = "m" + (i + 1);
+      MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, DataType.INT);
+      schema.addField(metricFieldSpec);
+    }
+    // add hll metric
+    String hllMetricName = memberIdFieldName + hllDeriveFieldSuffix;
+    MetricFieldSpec hllDerivedFieldSpec =
+        new MetricFieldSpec(hllMetricName, FieldSpec.DataType.STRING, HllSizeUtils.getHllFieldSizeFromLog2m(log2m),
+            MetricFieldSpec.DerivedMetricType.HLL);
+    schema.addField(hllDerivedFieldSpec);
+
+    StarTreeBuilderConfig builderConfig = new StarTreeBuilderConfig();
+    builderConfig.setOutDir(TEMP_DIR);
+    builderConfig.setSchema(schema);
+    builderConfig.setDimensionsSplitOrder(dimensionsSplitOrder);
+    builderConfig.setSkipMaterializationDimensions(skipMaterializationDimensions);
+    builderConfig.setMaxNumLeafRecords(10);
+
+    OffHeapStarTreeBuilder builder = new OffHeapStarTreeBuilder();
+    builder.init(builderConfig);
+    // fill values
+    HashMap<String, Object> map = new HashMap<>();
+    for (int row = 0; row < memberIdColumnValues.length; row++) {
+      // add member id column
+      dimName = memberIdFieldName;
+      map.put(dimName, memberIdColumnValues[row]);
+      // add other dimensions
+      for (int i = 1; i < numDimensions; i++) {
+        dimName = schema.getDimensionFieldSpecs().get(i).getName();
+        map.put(dimName, dimName + "-v" + row % (numDimensions - i));
+      }
+      // add time column
+      map.put("daysSinceEpoch", 1);
+      // add other metrics
+      for (int i = 0; i < numMetrics - 1; i++) {
+        String metName = schema.getMetricFieldSpecs().get(i).getName();
+        map.put(metName, 1);
+      }
+      // add hll column value
+      map.put(hllMetricName, HllUtil.singleValueHllAsString(log2m, memberIdColumnValues[row]));
+      //
+      GenericRow genericRow = new GenericRow();
+      genericRow.init(map);
+      builder.append(genericRow);
+    }
+    builder.build();
+
+    int totalDocs = builder.getTotalRawDocumentCount() + builder.getTotalAggregateDocumentCount();
+    Iterator<GenericRow> iterator = builder.iterator(0, totalDocs);
+    while (iterator.hasNext()) {
+      GenericRow row = iterator.next();
+      LOGGER.info(HllUtil.inspectGenericRow(row, hllDeriveFieldSuffix));
+    }
+
+    iterator = builder.iterator(builder.getTotalRawDocumentCount(), totalDocs);
+    GenericRow lastRow = null;
+    while (iterator.hasNext()) {
+      GenericRow row = iterator.next();
+      for (String skipMaterializationDimension : skipMaterializationDimensions) {
+        String rowValue = (String) row.getValue(skipMaterializationDimension);
+        Assert.assertEquals(rowValue, "null");
+      }
+      lastRow = row;
+    }
+
+    assertApproximation(HllUtil.convertStringToHll((String) lastRow.getValue(hllMetricName)).cardinality(),
+        preciseCardinality, 0.1);
+
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   private static void assertApproximation(double estimate, double actual, double precision) {
@@ -180,7 +174,7 @@ public class OffheapStarTreeBuilderWithHllFieldTest {
      */
     RandomNumberArray(int size, int duplicationPerItem) {
       List<Integer> lst = new ArrayList<Integer>();
-      for (int i = 0; i < size/duplicationPerItem; i++) {
+      for (int i = 0; i < size / duplicationPerItem; i++) {
         Integer item = _rnd.nextInt(size);
         for (int j = 0; j < duplicationPerItem; j++) {
           lst.add(item); // add duplicates
@@ -203,10 +197,11 @@ public class OffheapStarTreeBuilderWithHllFieldTest {
       }
     }
 
-    private int[] convertToIntArray(List<Integer> list){
+    private int[] convertToIntArray(List<Integer> list) {
       int[] ret = new int[list.size()];
-      for(int i = 0;i < ret.length;i++)
+      for (int i = 0; i < ret.length; i++) {
         ret[i] = list.get(i);
+      }
       return ret;
     }
 
@@ -246,5 +241,4 @@ public class OffheapStarTreeBuilderWithHllFieldTest {
     RandomNumberArray rand = new RandomNumberArray(250, 3);
     testSimpleCore(6, 4, 2, rand.toIntArray(), rand.getPreciseCardinality());
   }
-
 }

@@ -39,36 +39,24 @@ import org.slf4j.LoggerFactory;
 
 
 public class StarTreeIndexTestSegmentHelper {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexTestSegmentHelper.class);
+  private static final Random RANDOM = new Random();
 
   private static final String TIME_COLUMN_NAME = "daysSinceEpoch";
   private static final int NUM_DIMENSIONS = 4;
   private static final int NUM_METRICS = 2;
   private static final int METRIC_MAX_VALUE = 10000;
 
-  private static final long RANDOM_SEED = System.nanoTime();
-
-  /**
-   * Helper method to build the segment.
-   *
-   * @param segmentDirName
-   * @param segmentName
-   * @throws Exception
-   */
-  public static Schema buildSegment(String segmentDirName, String segmentName, boolean enableOffHeapFormat)
-      throws Exception {
-    return buildSegment(segmentDirName, segmentName, null, enableOffHeapFormat);
+  public static Schema buildSegment(String segmentDirName, String segmentName) throws Exception {
+    return buildSegment(segmentDirName, segmentName, null);
   }
 
   public static Schema buildSegmentWithHll(String segmentDirName, String segmentName, HllConfig hllConfig)
       throws Exception {
-    return buildSegment(segmentDirName, segmentName, hllConfig, false);
+    return buildSegment(segmentDirName, segmentName, hllConfig);
   }
 
-  private static Schema buildSegment(String segmentDirName, String segmentName, HllConfig hllConfig,
-      boolean enableOffHeapFormat)
-      throws Exception {
+  private static Schema buildSegment(String segmentDirName, String segmentName, HllConfig hllConfig) throws Exception {
     final int rows = (int) MathUtils.factorial(NUM_DIMENSIONS) * 100;
     Schema schema = new Schema();
 
@@ -78,7 +66,7 @@ public class StarTreeIndexTestSegmentHelper {
       schema.addField(dimensionFieldSpec);
     }
 
-    schema.setTimeFieldSpec(new TimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.INT, TimeUnit.DAYS));
+    schema.addField(new TimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.INT, TimeUnit.DAYS));
     for (int i = 0; i < NUM_METRICS; i++) {
       String metricName = "m" + (i + 1);
       MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.INT);
@@ -86,14 +74,15 @@ public class StarTreeIndexTestSegmentHelper {
     }
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
+    starTreeIndexSpec.setMaxLeafRecords(10);
     config.setEnableStarTreeIndex(true);
+    config.setStarTreeIndexSpec(starTreeIndexSpec);
     config.setOutDir(segmentDirName);
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);
     config.setHllConfig(hllConfig);
-    config.setStarTreeIndexSpec(buildStarTreeIndexSpec(enableOffHeapFormat));
 
-    Random random = new Random(RANDOM_SEED);
     final List<GenericRow> data = new ArrayList<>();
     for (int row = 0; row < rows; row++) {
       HashMap<String, Object> map = new HashMap<>();
@@ -105,13 +94,13 @@ public class StarTreeIndexTestSegmentHelper {
       // Random values make cardinality of d3, d4 column values larger to better test hll
       for (int i = NUM_DIMENSIONS / 2; i < NUM_DIMENSIONS; i++) {
         String dimName = schema.getDimensionFieldSpecs().get(i).getName();
-        map.put(dimName, dimName + "-v" + random.nextInt(i * 100));
+        map.put(dimName, dimName + "-v" + RANDOM.nextInt(i * 100));
       }
 
       // Metric columns.
       for (int i = 0; i < NUM_METRICS; i++) {
         String metName = schema.getMetricFieldSpecs().get(i).getName();
-        map.put(metName, random.nextInt(METRIC_MAX_VALUE));
+        map.put(metName, RANDOM.nextInt(METRIC_MAX_VALUE));
       }
 
       // Time column.
@@ -129,15 +118,5 @@ public class StarTreeIndexTestSegmentHelper {
 
     LOGGER.info("Built segment {} at {}", segmentName, segmentDirName);
     return schema;
-  }
-
-  /**
-   * Builds a star tree index spec for the test.
-   */
-  private static StarTreeIndexSpec buildStarTreeIndexSpec(boolean enableOffHeapFormat) {
-    StarTreeIndexSpec spec = new StarTreeIndexSpec();
-    spec.setMaxLeafRecords(10);
-    spec.setEnableOffHeapFormat(enableOffHeapFormat);
-    return spec;
   }
 }

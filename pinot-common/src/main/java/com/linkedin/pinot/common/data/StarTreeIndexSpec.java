@@ -38,7 +38,6 @@ public class StarTreeIndexSpec {
   private int skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
-  private boolean enableOffHeapFormat = true;
 
   public StarTreeIndexSpec() {
   }
@@ -90,21 +89,5 @@ public class StarTreeIndexSpec {
   public void setExcludeSkipMaterializationDimensionsForStarTreeIndex(
       boolean excludeSkipMaterializationDimensionsForStarTreeIndex) {
     _excludeSkipMaterializationDimensionsForStarTreeIndex = excludeSkipMaterializationDimensionsForStarTreeIndex;
-  }
-
-  /**
-   * Returns True if StarTreeOffHeap is enabled, False otherwise.
-   * @return
-   */
-  public boolean isEnableOffHeapFormat() {
-    return enableOffHeapFormat;
-  }
-
-  /**
-   * Enable/Disable StarTreeOffHeapFormat.
-   * @param enableOffHeapFormat
-   */
-  public void setEnableOffHeapFormat(boolean enableOffHeapFormat) {
-    this.enableOffHeapFormat = enableOffHeapFormat;
   }
 }

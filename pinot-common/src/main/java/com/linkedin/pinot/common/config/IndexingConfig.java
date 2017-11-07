@@ -36,7 +36,6 @@ public class IndexingConfig {
   private String _loadMode;
   private Map<String, String> _streamConfigs = new HashMap<>();
   private String _segmentFormatVersion;
-  private String _starTreeFormat;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns;
   private List<String> _onHeapDictionaryColumns;
@@ -89,14 +88,6 @@ public class IndexingConfig {
 
   public void setSegmentFormatVersion(String segmentFormatVersion) {
     _segmentFormatVersion = segmentFormatVersion;
-  }
-
-  public String getStarTreeFormat() {
-    return _starTreeFormat;
-  }
-
-  public void setStarTreeFormat(String starTreeFormat) {
-    this._starTreeFormat = starTreeFormat;
   }
 
   public String getColumnMinMaxValueGeneratorMode() {

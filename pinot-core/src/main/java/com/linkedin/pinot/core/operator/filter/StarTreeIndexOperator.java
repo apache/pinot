@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
+import com.linkedin.pinot.core.startree.StarTreeNode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -172,15 +172,15 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     List<BaseFilterOperator> matchingLeafOperators = new ArrayList<>();
     for (SearchEntry matchedEntry : matchedEntries) {
       BaseFilterOperator matchingLeafOperator = null;
-      StarTreeIndexNodeInterf matchedLeafNode = matchedEntry.starTreeIndexnode;
+      StarTreeNode matchedLeafNode = matchedEntry.starTreeIndexnode;
 
-      int startDocId = matchedLeafNode.getStartDocumentId();
-      int endDocId = matchedLeafNode.getEndDocumentId();
+      int startDocId = matchedLeafNode.getStartDocId();
+      int endDocId = matchedLeafNode.getEndDocId();
 
       if (matchedEntry.remainingPredicateColumns.isEmpty()) {
         // No more filters to apply
         // Use aggregated doc for this leaf node if possible.
-        int aggregatedDocumentId = matchedLeafNode.getAggregatedDocumentId();
+        int aggregatedDocumentId = matchedLeafNode.getAggregatedDocId();
         if (isValidAggregatedDocId(aggregatedDocumentId) && matchedEntry.remainingGroupByColumns.isEmpty()) {
           exactlyMatchedDocsBitmap.add(aggregatedDocumentId);
           numExactlyMatched = numExactlyMatched + 1;
@@ -279,8 +279,8 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
    */
   private List<BaseFilterOperator> createFilterOperatorsForRemainingPredicates(SearchEntry matchedEntry,
       Map<String, PredicateEntry> remainingPredicatesMap) {
-    int startDocId = matchedEntry.starTreeIndexnode.getStartDocumentId();
-    int endDocId = matchedEntry.starTreeIndexnode.getEndDocumentId();
+    int startDocId = matchedEntry.starTreeIndexnode.getStartDocId();
+    int endDocId = matchedEntry.starTreeIndexnode.getEndDocId();
 
     List<BaseFilterOperator> childOperators = new ArrayList<>();
     for (String column : remainingPredicatesMap.keySet()) {
@@ -394,18 +394,18 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
     while (!searchQueue.isEmpty()) {
       SearchEntry searchEntry = searchQueue.remove();
-      StarTreeIndexNodeInterf current = searchEntry.starTreeIndexnode;
+      StarTreeNode current = searchEntry.starTreeIndexnode;
       HashSet<String> remainingPredicateColumns = searchEntry.remainingPredicateColumns;
       HashSet<String> remainingGroupByColumns = searchEntry.remainingGroupByColumns;
       // Check if its leaf, or if there are no remaining predicates/groupbycolumns, and node has valid aggregated docId
       if (current.isLeaf() || (remainingPredicateColumns.isEmpty() && remainingGroupByColumns.isEmpty()) &&
-          isValidAggregatedDocId(current.getAggregatedDocumentId())) {
+          isValidAggregatedDocId(current.getAggregatedDocId())) {
         // reached leaf
         matchedEntries.add(searchEntry);
         continue;
       }
       // Find next set of nodes to search
-      String nextDimension = dimensionNames.get(current.getChildDimensionName());
+      String nextDimension = dimensionNames.get(current.getChildDimensionId());
 
       HashSet<String> newRemainingPredicateColumns = new HashSet<>();
       newRemainingPredicateColumns.addAll(remainingPredicateColumns);
@@ -431,7 +431,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
    * @param remainingPredicateColumns
    * @param remainingGroupByColumns
    */
-  private void addMatchingChildrenToQueue(Queue<SearchEntry> searchQueue, StarTreeIndexNodeInterf node,
+  private void addMatchingChildrenToQueue(Queue<SearchEntry> searchQueue, StarTreeNode node,
       String column, HashSet<String> remainingPredicateColumns,
       HashSet<String> remainingGroupByColumns) {
 
@@ -444,7 +444,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
       int[] matchingDictionaryIds = predicateEntry.predicateEvaluator.getMatchingDictionaryIds();
       for (int matchingDictionaryId : matchingDictionaryIds) {
-        StarTreeIndexNodeInterf child = node.getChildForDimensionValue(matchingDictionaryId);
+        StarTreeNode child = node.getChildForDimensionValue(matchingDictionaryId);
         if (child != null) {
           addNodeToSearchQueue(searchQueue, child, remainingPredicateColumns, remainingGroupByColumns);
         }
@@ -452,12 +452,12 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     } else {
       int nextValueId;
       if (groupByColumns.contains(column) || predicatesMap.containsKey(column)
-          || (node.getChildForDimensionValue(StarTreeIndexNodeInterf.ALL) == null)) {
-        Iterator<? extends StarTreeIndexNodeInterf> childrenIterator = node.getChildrenIterator();
+          || (node.getChildForDimensionValue(StarTreeNode.ALL) == null)) {
+        Iterator<? extends StarTreeNode> childrenIterator = node.getChildrenIterator();
 
         while (childrenIterator.hasNext()) {
-          StarTreeIndexNodeInterf child = childrenIterator.next();
-          if (child.getDimensionValue() != StarTreeIndexNodeInterf.ALL) {
+          StarTreeNode child = childrenIterator.next();
+          if (child.getDimensionValue() != StarTreeNode.ALL) {
             remainingPredicateColumns.remove(column);
             remainingGroupByColumns.remove(column);
             addNodeToSearchQueue(searchQueue, child, remainingPredicateColumns,
@@ -467,7 +467,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
       } else {
         // Since we have a star node and no group by on this column we can take lose this dimension
         // by taking star node path
-        nextValueId = StarTreeIndexNodeInterf.ALL;
+        nextValueId = StarTreeNode.ALL;
         addNodeToSearchQueue(searchQueue, node.getChildForDimensionValue(nextValueId), remainingPredicateColumns,
             remainingGroupByColumns);
       }
@@ -481,7 +481,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
    * @param predicateColumns
    * @param groupByColumns
    */
-  private void addNodeToSearchQueue(Queue<SearchEntry> searchQueue, StarTreeIndexNodeInterf node,
+  private void addNodeToSearchQueue(Queue<SearchEntry> searchQueue, StarTreeNode node,
       HashSet<String> predicateColumns, HashSet<String> groupByColumns) {
     SearchEntry newEntry = new SearchEntry();
     newEntry.starTreeIndexnode = node;
@@ -496,7 +496,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
   }
 
   class SearchEntry {
-    StarTreeIndexNodeInterf starTreeIndexnode;
+    StarTreeNode starTreeIndexnode;
     HashSet<String> remainingPredicateColumns;
     HashSet<String> remainingGroupByColumns;
 
