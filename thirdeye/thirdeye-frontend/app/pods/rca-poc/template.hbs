@@ -11,10 +11,11 @@
     showSubchart=true
   }}
 
-  {{events-table
-    events=model.events
-  }}
+  {{#rca-poc-table
+    events=model.events}}
+    {{filter-bar filterBlocks=model.filterBarConfig}}
+  {{/rca-poc-table}}
 
-  {{filter-bar
-    filterBlocks=model.filterBarConfig}}
+
+  {{!-- {{events-table events=model.events}} --}}
 </div>

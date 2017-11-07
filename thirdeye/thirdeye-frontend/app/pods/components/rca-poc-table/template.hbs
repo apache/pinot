@@ -1,0 +1,10 @@
+{{yield}}
+{{models-table
+  data=filteredEvents
+  columns=columns
+  showColumnsDropdown=false
+  showGlobalFilter=false
+  filteringIgnoreCase=true
+  multipleExpand=true
+  expandedRowTemplate='custom/expanded-row'
+  onSelection='onSelection' }}
