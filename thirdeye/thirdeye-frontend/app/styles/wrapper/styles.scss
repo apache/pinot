@@ -193,20 +193,23 @@ body {
 }
 
 .te-alert-page-cards {
-  @include group-clearfix;
   font-family: $source-sans-pro;
   margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 
   &__card {
     list-style: none;
-    float: left;
-    width: 23.5%;
-    border: 2px solid app-shade(black, 1);
-    padding: 20px;
-    height: 170px;
     background-color: white;
     margin-right: 22px;
     border-radius: 5px;
+    border: 2px solid app-shade(black, 1);
+    padding: 20px;
+    flex-basis: 25%;
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    justify-content: space-between;
 
     &:last-child {
       margin-right: 0;
@@ -223,9 +226,10 @@ body {
   }
 
   &__card-value {
-    text-align: center;
     font-size: 45px;
     font-weight: 300;
+    display: flex;
+    justify-content: center;
   }
 }
 

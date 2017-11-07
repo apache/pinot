@@ -65,6 +65,7 @@ export default Ember.Controller.extend({
    * @return {String}
    */
   renderDate: function(range) {
+    // TODO: enable single day range
     const newDate = moment().subtract(range, 'days').endOf('day').utc().format("DD MM YYY");
     return `Last ${range} Days (${newDate} to Today)`;
   },
@@ -138,11 +139,7 @@ export default Ember.Controller.extend({
   rangeOptionsExample: Ember.computed(
     'dateRangeToRender',
     function() {
-      let dateRanges = [];
-      this.get('dateRangeToRender').forEach(date => {
-        dateRanges.push(this.renderDate(date))
-      });
-      return dateRanges;
+      return this.get('dateRangeToRender').map(this.renderDate);
     }
   ),
 
@@ -155,7 +152,6 @@ export default Ember.Controller.extend({
    * @return {fetch promise}
    */
   checkReplayStatus(jobId) {
-    const that = this;
     const checkStatusUrl = `/thirdeye-admin/job-info/job/${jobId}/status`;
     const timerStart = moment();
 
@@ -165,9 +161,9 @@ export default Ember.Controller.extend({
       if (status.toLowerCase() === 'completed') {
         this.set('isReplayPending', false);
       } else if (this.get('requestCanContinue')) {
-        Ember.run.later((function() {
-          that.checkReplayStatus(jobId);
-        }), 5000);
+        Ember.run.later(this, function() {
+          this.checkReplayStatus(jobId);
+        }, 5000);
       }
     });
   },
