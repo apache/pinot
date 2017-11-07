@@ -2039,6 +2039,19 @@ public class DataFrame {
    * @return copy of the DataFrame with appended data
    */
   public DataFrame append(DataFrame... others) {
+    return this.append(Arrays.asList(others));
+  }
+
+  /**
+   * Returns a copy of the DataFrame with data from {@code others} appended at the end. Matches
+   * series by names and uses the native type of the original (this) DataFrame. If {@code others}
+   * do not contain series with matching names, a sequence of {@code nulls} is appended. Any series
+   * in {@code other} that are not matched by name are discarded.
+   *
+   * @param others DataFrames to append in sequence
+   * @return copy of the DataFrame with appended data
+   */
+  public DataFrame append(List<DataFrame> others) {
     DataFrame df = new DataFrame(this);
     df.series.clear();
 
