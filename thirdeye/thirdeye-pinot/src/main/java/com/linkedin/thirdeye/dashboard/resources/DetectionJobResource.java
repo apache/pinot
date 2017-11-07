@@ -253,7 +253,7 @@ public class DetectionJobResource {
       Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
       jobId = entity.get(id);
     } catch (Exception e) {
-      return Response.ok("Failed to start replay!").build();
+      return Response.status(Status.BAD_REQUEST).entity("Failed to start replay!").build();
     }
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
@@ -268,7 +268,7 @@ public class DetectionJobResource {
       String replayFailureText = new StringBuilder("Failed on Function: " + id + "with Job Id: " + jobId).toString();
       emailResource.sendEmailWithText(null, null, replayFailureSubject, replayFailureText,
           smtpHost, smtpPort);
-      return Response.ok("Replay job error with job status: {}" + jobStatus).build();
+      return Response.status(Status.BAD_REQUEST).entity("Replay job error with job status: {}" + jobStatus).build();
     } else {
       numReplayedAnomalies =
           mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id, false).size();
@@ -285,13 +285,12 @@ public class DetectionJobResource {
       LOG.info("AutoTune doesn't applied");
     }
 
-
     // send out email
     String subject = new StringBuilder(
         "Replay results for " + anomalyFunctionDAO.findById(id).getFunctionName() + " is ready for review!").toString();
 
     emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject,
-        true, true, teHost, smtpHost, smtpPort, phantomJsPath);
+        false, true, teHost, smtpHost, smtpPort, phantomJsPath);
     LOG.info("Sent out email");
 
     return Response.ok("Replay, Tuning and Notification finished!").build();
