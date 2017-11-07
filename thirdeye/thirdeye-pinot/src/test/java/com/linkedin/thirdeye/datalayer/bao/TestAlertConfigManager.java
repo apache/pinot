@@ -36,7 +36,7 @@ public class TestAlertConfigManager{
     Assert.assertTrue(alertConfigid > 0);
   }
 
-  @Test
+  @Test (dependsOnMethods = {"testDeleteAlertConfig"})
   public void testCreateAlertConfigWithAnomalyFeedConfig() {
     AlertConfigDTO dto = new AlertConfigDTO();
     dto.setActive(true);
