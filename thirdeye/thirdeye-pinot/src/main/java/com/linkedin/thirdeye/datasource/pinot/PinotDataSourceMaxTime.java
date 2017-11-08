@@ -1,8 +1,13 @@
 package com.linkedin.thirdeye.datasource.pinot;
 
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
@@ -10,13 +15,6 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * This class contains methods to return max date time for datasets in pinot
@@ -52,12 +50,12 @@ public class PinotDataSourceMaxTime {
           timeSpec.getColumnName(), prevMaxDataTime);
       PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, tableName);
       pinotThirdEyeDataSource.refreshPQL(maxTimePinotQuery);
-      ResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
-      if (resultSetGroup.getResultSetCount() == 0 || resultSetGroup.getResultSet(0).getRowCount() == 0) {
+      ThirdEyeResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
+      if (resultSetGroup.size() == 0 || resultSetGroup.get(0).getRowCount() == 0) {
         LOGGER.warn("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
         this.collectionToPrevMaxDataTimeMap.remove(dataset);
       } else {
-        long endTime = new Double(resultSetGroup.getResultSet(0).getDouble(0)).longValue();
+        long endTime = new Double(resultSetGroup.get(0).getDouble(0)).longValue();
         this.collectionToPrevMaxDataTimeMap.put(dataset, endTime);
         // endTime + 1 to make sure we cover the time range of that time value.
         String timeFormat = timeSpec.getFormat();
