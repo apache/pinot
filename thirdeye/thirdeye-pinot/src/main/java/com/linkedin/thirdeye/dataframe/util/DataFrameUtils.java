@@ -21,6 +21,8 @@ import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -388,4 +390,115 @@ public class DataFrameUtils {
 
   }
 
+  /**
+   * Reads in a ThirdEyeResultSetGroup and returns it as a DataFrame.
+   * <br/><b>NOTE:</b> This code duplicates DataFrame.fromPinotResult() due to lack of interfaces in pinot
+   *
+   * @param resultSetGroup pinot query result
+   * @return Pinot query result as DataFrame
+   * @throws IllegalArgumentException if the result cannot be parsed
+   */
+  public static DataFrame fromThirdEyeResult(ThirdEyeResultSetGroup resultSetGroup) {
+    if (resultSetGroup.size() <= 0)
+      throw new IllegalArgumentException("Query did not return any results");
+
+    if (resultSetGroup.size() == 1) {
+      ThirdEyeResultSet resultSet = resultSetGroup.getResultSets().get(0);
+
+      if (resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 0) {
+        // empty result
+        return new DataFrame();
+
+      } else if (resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 1 && resultSet.getGroupKeyLength() == 0) {
+        // aggregation result
+
+        DataFrame df = new DataFrame();
+        String function = resultSet.getColumnName(0);
+        String value = resultSet.getString(0, 0);
+        df.addSeries(function, DataFrame.toSeries(value));
+        return df;
+
+      } else if (resultSet.getColumnCount() >= 1 && resultSet.getGroupKeyLength() == 0) {
+        // selection result
+
+        DataFrame df = new DataFrame();
+        for (int i = 0; i < resultSet.getColumnCount(); i++) {
+          df.addSeries(resultSet.getColumnName(i), makeSelectionSeries(resultSet, i));
+        }
+        return df;
+
+      }
+    }
+
+    // group by result
+    ThirdEyeResultSet firstResultSet = resultSetGroup.getResultSets().get(0);
+    String[] groupKeyNames = new String[firstResultSet.getGroupKeyLength()];
+    for(int i=0; i<firstResultSet.getGroupKeyLength(); i++) {
+      groupKeyNames[i] = firstResultSet.getGroupKeyColumnName(i);
+    }
+
+    DataFrame df = new DataFrame();
+    for (String groupKeyName : groupKeyNames) {
+      df.addSeries(groupKeyName, StringSeries.empty());
+    }
+    df.setIndex(groupKeyNames);
+
+    for(int i=0; i<resultSetGroup.size(); i++) {
+      ThirdEyeResultSet resultSet = resultSetGroup.getResultSets().get(i);
+      String function = resultSet.getColumnName(0);
+
+      // group keys
+      DataFrame dfColumn = new DataFrame();
+      for(int j=0; j<resultSet.getGroupKeyLength(); j++) {
+        dfColumn.addSeries(groupKeyNames[j], makeGroupByGroupSeries(resultSet, j));
+      }
+      dfColumn.setIndex(groupKeyNames);
+
+      // values
+      dfColumn.addSeries(function, makeGroupByValueSeries(resultSet));
+
+      df = df.joinOuter(dfColumn);
+    }
+
+    return df;
+  }
+
+  private static Series makeSelectionSeries(ThirdEyeResultSet resultSet, int colIndex) {
+    int rowCount = resultSet.getRowCount();
+    if(rowCount <= 0)
+      return StringSeries.empty();
+
+    String[] values = new String[rowCount];
+    for(int i=0; i<rowCount; i++) {
+      values[i] = resultSet.getString(i, colIndex);
+    }
+
+    return DataFrame.toSeries(values);
+  }
+
+  private static Series makeGroupByValueSeries(ThirdEyeResultSet resultSet) {
+    int rowCount = resultSet.getRowCount();
+    if(rowCount <= 0)
+      return StringSeries.empty();
+
+    String[] values = new String[rowCount];
+    for(int i=0; i<rowCount; i++) {
+      values[i] = resultSet.getString(i, 0);
+    }
+
+    return DataFrame.toSeries(values);
+  }
+
+  private static Series makeGroupByGroupSeries(ThirdEyeResultSet resultSet, int keyIndex) {
+    int rowCount = resultSet.getRowCount();
+    if(rowCount <= 0)
+      return StringSeries.empty();
+
+    String[] values = new String[rowCount];
+    for(int i=0; i<rowCount; i++) {
+      values[i] = resultSet.getGroupKeyColumnValue(i, keyIndex);
+    }
+
+    return DataFrame.toSeries(values);
+  }
 }

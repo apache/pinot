@@ -2313,8 +2313,6 @@ public class DataFrame {
   /**
    * Reads in a Pinot ResultSetGroup and returns it as a DataFrame.
    *
-   * <br/><b>NOTE:</b> cannot parse a query result with multiple group aggregations
-   *
    * @param resultSetGroup pinot query result
    * @return Pinot query result as DataFrame
    * @throws IllegalArgumentException if the result cannot be parsed
@@ -2323,7 +2321,6 @@ public class DataFrame {
     if (resultSetGroup.getResultSetCount() <= 0)
       throw new IllegalArgumentException("Query did not return any results");
 
-    // TODO conditions not necessarily safe
     if (resultSetGroup.getResultSetCount() == 1) {
       ResultSet resultSet = resultSetGroup.getResultSet(0);
 
@@ -2337,7 +2334,7 @@ public class DataFrame {
         DataFrame df = new DataFrame();
         String function = resultSet.getColumnName(0);
         String value = resultSet.getString(0, 0);
-        df.addSeries(function, DataFrame.toSeries(new String[]{value}));
+        df.addSeries(function, DataFrame.toSeries(value));
         return df;
 
       } else if (resultSet.getColumnCount() >= 1 && resultSet.getGroupKeyLength() == 0) {
@@ -2353,56 +2350,34 @@ public class DataFrame {
     }
 
     // group by result
-    // TODO use join on multiple columns when available
-    DataFrame df = new DataFrame();
-    df.addSeries(COLUMN_JOIN_KEY, ObjectSeries.empty());
-    df.setIndex(COLUMN_JOIN_KEY);
-
     ResultSet firstResultSet = resultSetGroup.getResultSet(0);
     String[] groupKeyNames = new String[firstResultSet.getGroupKeyLength()];
     for(int i=0; i<firstResultSet.getGroupKeyLength(); i++) {
       groupKeyNames[i] = firstResultSet.getGroupKeyColumnName(i);
     }
 
+    DataFrame df = new DataFrame();
+    for (String groupKeyName : groupKeyNames) {
+      df.addSeries(groupKeyName, StringSeries.empty());
+    }
+    df.setIndex(groupKeyNames);
+
     for(int i=0; i<resultSetGroup.getResultSetCount(); i++) {
       ResultSet resultSet = resultSetGroup.getResultSet(i);
       String function = resultSet.getColumnName(0);
 
-      // pack group by keys into key tuple
+      // group keys
       DataFrame dfColumn = new DataFrame();
       for(int j=0; j<resultSet.getGroupKeyLength(); j++) {
         dfColumn.addSeries(groupKeyNames[j], makeGroupByGroupSeries(resultSet, j));
       }
+      dfColumn.setIndex(groupKeyNames);
 
-      ObjectSeries jointKey = dfColumn.map(new Series.ObjectFunction() {
-        @Override
-        public Object apply(Object... values) {
-          return Tuple.copyFrom(values);
-        }
-      }, groupKeyNames);
+      // values
+      dfColumn.addSeries(function, makeGroupByValueSeries(resultSet));
 
-      // join on key tuple
-      DataFrame dfJoin = new DataFrame();
-      dfJoin.addSeries(COLUMN_JOIN_KEY, jointKey);
-      dfJoin.addSeries(function, makeGroupByValueSeries(resultSet));
-      dfJoin.setIndex(COLUMN_JOIN_KEY);
-
-      df = df.joinOuter(dfJoin);
+      df = df.joinOuter(dfColumn);
     }
-
-    // unpack key tuple
-    for(int i=0; i<groupKeyNames.length; i++) {
-      final int fi = i;
-      df.addSeries(groupKeyNames[i], df.map(new Series.ObjectFunction() {
-        @Override
-        public Object apply(Object... values) {
-          return ((Tuple) values[0]).values[fi];
-        }
-      }, COLUMN_JOIN_KEY));
-    }
-
-    // remove key tuple series
-    df.dropSeries(COLUMN_JOIN_KEY);
 
     return df;
   }
@@ -2411,8 +2386,6 @@ public class DataFrame {
     int rowCount = resultSet.getRowCount();
     if(rowCount <= 0)
       return StringSeries.empty();
-
-    //DataFrame.SeriesType type = inferType(resultSet.getString(0, colIndex));
 
     String[] values = new String[rowCount];
     for(int i=0; i<rowCount; i++) {
