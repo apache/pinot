@@ -252,6 +252,18 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
+  public List<MergedAnomalyResultDTO> findNotifiedByTime(long startTime, long endTime, boolean loadRawAnomalies) {
+    List<MergedAnomalyResultDTO> anomaliesByTime = findByTime(startTime, endTime, loadRawAnomalies);
+    List<MergedAnomalyResultDTO> notifiedAnomalies = new ArrayList<>();
+    for (MergedAnomalyResultDTO anomaly : anomaliesByTime) {
+      if (anomaly.isNotified()) {
+        notifiedAnomalies.add(anomaly);
+      }
+    }
+    return notifiedAnomalies;
+  }
+
+  @Override
   public MergedAnomalyResultDTO findLatestOverlapByFunctionIdDimensions(Long functionId, String dimensions,
       long conflictWindowStart, long conflictWindowEnd, boolean loadRawAnomalies) {
     Map<String, Object> filterParams = new HashMap<>();

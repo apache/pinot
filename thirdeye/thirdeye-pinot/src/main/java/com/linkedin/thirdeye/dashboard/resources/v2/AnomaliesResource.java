@@ -281,14 +281,7 @@ public class AnomaliesResource {
       @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly
       ) throws Exception {
 
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime, false);
-    try {
-      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies, alertFilterFactory);
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to apply alert filters on anomalies in start:{}, end:{}, exception:{}",
-          new DateTime(startTime), new DateTime(endTime), e);
-    }
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findNotifiedByTime(startTime, endTime, false);
     AnomaliesWrapper
         anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
