@@ -170,15 +170,5 @@ export default Ember.Component.extend({
     const tuples = Object.keys(dimNameObj).map(v => [-dimNameObj[v], v]).sort();
     const dimValues = _.slice(tuples, 0, k).map(t => t[1]);
     return dimValues;
-  },
-
-  actions: {
-    setMode(mode) {
-      this.set('mode', mode);
-    },
-
-    setRollup(rollup) {
-      this.set('rollup', rollup);
-    }
   }
 });
