@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
-import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 
 import java.io.ByteArrayOutputStream;
@@ -194,7 +193,7 @@ public class AnomalyReportGenerator {
         }
       }
 
-      PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(new DummyAlertFilter(), anomalies);
+      PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(anomalies);
 
       HtmlEmail email = new HtmlEmail();
 
@@ -207,11 +206,11 @@ public class AnomalyReportGenerator {
       templateData.put("endTime", getDateString(endTime, timeZone));
       templateData.put("anomalyCount", anomalies.size());
       templateData.put("metricsCount", metrics.size());
-      templateData.put("notifiedCount", precisionRecallEvaluator.getTotalReports());
+      templateData.put("notifiedCount", precisionRecallEvaluator.getTotalAlerts());
       templateData.put("feedbackCount", precisionRecallEvaluator.getTotalResponses());
-      templateData.put("trueAlertCount", precisionRecallEvaluator.getQualifiedTrueAnomaly());
+      templateData.put("trueAnomalyCount", precisionRecallEvaluator.getTrueAnomalies());
       templateData.put("falseAlertCount", precisionRecallEvaluator.getFalseAlarm());
-      templateData.put("newTrendCount", precisionRecallEvaluator.getQualifiedTrueAnomalyNewTrend());
+      templateData.put("newTrendCount", precisionRecallEvaluator.getTrueAnomalyNewTrend());
       templateData.put("anomalyDetails", anomalyReportDTOList);
       templateData.put("alertConfigName", alertConfigName);
       templateData.put("includeSummary", includeSummary);
