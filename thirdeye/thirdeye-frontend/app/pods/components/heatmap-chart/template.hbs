@@ -1,0 +1,21 @@
+<button {{action (mut mode) "change"}}>change</button> |
+<button {{action (mut mode) "contributionDiff"}}>contribution diff</button> |
+<button {{action (mut mode) "contributionToDiff"}}>contribution to diff</button>
+
+<button {{action (mut rollup) "5"}}>top 5</button> |
+<button {{action (mut rollup) "10"}}>top 10</button> |
+<button {{action (mut rollup) "20"}}>top 20</button>
+
+<ol>
+  {{#each-in scores as |dimName dimValues|}}
+    <li>{{dimName}}
+        {{#each-in dimValues as |dimValue value|}}
+          | {{dimValue}} ({{value}})
+        {{else}}
+          | No values
+        {{/each-in}}
+    </li>
+  {{else}}
+    <li>No dimensions</li>
+  {{/each-in}}
+</ol>

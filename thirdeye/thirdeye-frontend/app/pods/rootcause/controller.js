@@ -22,13 +22,17 @@ export default Ember.Controller.extend({
 
   _entitiesCache: null, // {}
 
+  _aggregatesCache: null, // {}
+
   _pendingTimeseriesRequests: null, // Set
 
   _pendingEntitiesRequests: null, // Set
 
+  _pendingAggregatesRequests: null, // Set
+
   init() {
-    this.setProperties({ _timeseriesCache: {}, _entitiesCache: {},
-      _pendingTimeseriesRequests: new Set(), _pendingEntitiesRequests: new Set() });
+    this.setProperties({ _timeseriesCache: {}, _entitiesCache: {}, _aggregatesCache: {},
+      _pendingTimeseriesRequests: new Set(), _pendingEntitiesRequests: new Set(), _pendingAggregatesRequests: new Set() });
   },
 
   //
@@ -52,6 +56,16 @@ export default Ember.Controller.extend({
       console.log('timeseries()');
       this.get('_timeseriesLoader'); // trigger loader. hacky
       return Object.assign({}, this.get('_timeseriesCache'));
+    }
+  ),
+
+  aggregates: Ember.computed(
+    '_aggregatesLoader',
+    '_aggregatesCache',
+    function () {
+      console.log('aggregates()');
+      this.get('_aggregatesLoader'); // trigger loader. hacky
+      return Object.assign({}, this.get('_aggregatesCache'));
     }
   ),
 
@@ -107,6 +121,24 @@ export default Ember.Controller.extend({
     }
   ),
 
+  heatmapCurrentUrns: Ember.computed(
+    'context',
+    function () {
+      const { context } = this.getProperties('context');
+      return new Set([...context.urns].filter(urn => urn.startsWith('thirdeye:metric:')));
+    }
+  ),
+
+  heatmapCurrent2Baseline: Ember.computed(
+    'context',
+    function () {
+      const { heatmapCurrentUrns } = this.getProperties('heatmapCurrentUrns');
+      const current2baseline = {};
+      [...heatmapCurrentUrns].forEach(urn => current2baseline[urn] = this._makeMetricBaselineUrn(urn));
+      return current2baseline;
+    }
+  ),
+
   isLoadingEntities: Ember.computed(
     'entities',
     '_pendingEntitiesRequests',
@@ -136,9 +168,7 @@ export default Ember.Controller.extend({
     'analysisRegion',
     function () {
       console.log('_entitiesLoader()');
-      const { cache } = this.getProperties('_entitiesCache');
       this._startRequestEntities();
-      return cache;
     }
   ),
 
@@ -249,14 +279,12 @@ export default Ember.Controller.extend({
     'entities',
     function() {
       console.log('_timeseriesLoader()');
-      const { entities, cache } = this.getProperties('entities', '_timeseriesCache');
+      const { entities } = this.getProperties('entities');
 
       const metricUrns = Object.keys(entities).filter(urn => entities[urn] && entities[urn].type == 'metric');
       const baselineUrns = metricUrns.map(urn => this._makeMetricBaselineUrn(urn));
 
       this._startRequestMissingTimeseries(metricUrns.concat(baselineUrns));
-
-      return cache;
     }
   ),
 
@@ -290,12 +318,12 @@ export default Ember.Controller.extend({
 
     // baselines
     const baselineOffset = context.anomalyRange[0] - context.baselineRange[0];
-    const baselineDisplayStart = context.analysisRange[0] - baselineOffset;
-    const baselineDisplayEnd = context.analysisRange[1] - baselineOffset;
+    const baselineAnalysisStart = context.analysisRange[0] - baselineOffset;
+    const baselineAnalysisEnd = context.analysisRange[1] - baselineOffset;
 
     const baselineUrns = [...missing].filter(urn => urn.startsWith('frontend:baseline:metric:'));
     const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
-    const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineDisplayStart}:${baselineDisplayEnd}&granularity=15_MINUTES&transformations=timestamp`;
+    const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&granularity=15_MINUTES&transformations=timestamp`;
 
     fetch(baselineUrl)
       .then(checkStatus)
@@ -359,6 +387,93 @@ export default Ember.Controller.extend({
   _makeMetricBaselineUrn(urn) {
     const mid = urn.split(':')[2];
     return `frontend:baseline:metric:${mid}`;
+  },
+
+  //
+  // Aggregates loading
+  //
+
+  _aggregatesLoader: Ember.computed(
+    'entities',
+    'context',
+    function() {
+      console.log('_aggregatesLoader()');
+      const { context } = this.getProperties('context');
+
+      const currentUrns = [...context.urns].filter(urn => urn.startsWith('thirdeye:metric:'));
+      if (currentUrns.length <= 0) {
+        return;
+      }
+      const baselineUrns = currentUrns.map(urn => this._makeMetricBaselineUrn(urn));
+
+      this._startRequestMissingAggregates(currentUrns.concat(baselineUrns));
+    }
+  ),
+
+  _startRequestMissingAggregates(urns) {
+    console.log('_startRequestMissingAggregates()');
+    const { _pendingAggregatesRequests: pending, _aggregatesCache: cache, context } =
+      this.getProperties('_pendingAggregatesRequests', '_aggregatesCache', 'context');
+
+    const missing = new Set(urns);
+    [...pending].forEach(urn => missing.delete(urn));
+    Object.keys(cache).forEach(urn => missing.delete(urn));
+
+    if (missing.size <= 0) {
+      return;
+    }
+
+    [...missing].forEach(urn => pending.add(urn));
+
+    this.setProperties({_pendingAggregatesRequests: pending});
+    this.notifyPropertyChange('_pendingAggregatesRequests');
+
+    // currents
+    const metricUrns = [...missing].filter(urn => urn.startsWith('thirdeye:metric:'));
+    const metricIdString = metricUrns.map(urn => urn.split(":")[2]).join(',');
+    const metricUrl = `/aggregation/query?metricIds=${metricIdString}&ranges=${context.anomalyRange[0]}:${context.anomalyRange[1]}&granularity=15_MINUTES&transformations=timestamp`;
+
+    fetch(metricUrl)
+      .then(checkStatus)
+      .then(res => this._extractAggregates(res, (mid) => `thirdeye:metric:${mid}`))
+      .then(aggregates => this._completeRequestMissingAggregates(aggregates));
+
+    // baseline
+    const baselineUrns = [...missing].filter(urn => urn.startsWith('frontend:baseline:metric:'));
+    const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
+    const baselineUrl = `/aggregation/query?metricIds=${baselineIdString}&ranges=${context.baselineRange[0]}:${context.baselineRange[1]}&granularity=15_MINUTES&transformations=timestamp`;
+
+    fetch(baselineUrl)
+      .then(checkStatus)
+      .then(res => this._extractAggregates(res, (mid) => `frontend:baseline:metric:${mid}`))
+      .then(aggregates => this._completeRequestMissingAggregates(aggregates));
+
+  },
+
+  _completeRequestMissingAggregates(incoming) {
+    console.log('_completeRequestMissingAggregates()');
+    const { _pendingAggregatesRequests: pending, _aggregatesCache: cache } =
+      this.getProperties('_pendingAggregatesRequests', '_aggregatesCache');
+
+    Object.keys(incoming).forEach(urn => pending.delete(urn));
+    Object.keys(incoming).forEach(urn => cache[urn] = incoming[urn]);
+
+    this.setProperties({ _pendingAggregatesRequests: pending, _aggregatesCache: cache });
+    this.notifyPropertyChange('_aggregatesCache');
+    this.notifyPropertyChange('_pendingAggregatesRequests');
+  },
+
+  _extractAggregates(incoming, urnFunc) {
+    // NOTE: only supports single time range
+    const aggregates = {};
+    Object.keys(incoming).forEach(range => {
+      Object.keys(incoming[range]).forEach(mid => {
+        const aggregate = incoming[range][mid];
+        const urn = urnFunc(mid);
+        aggregates[urn] = aggregate;
+      });
+    });
+    return aggregates;
   },
 
   //
