@@ -22,9 +22,9 @@ import org.slf4j.LoggerFactory;
 
 public abstract class MetadataChangeNotifierFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(MetadataChangeNotifierFactory.class);
-  public static final String METADATA_CHANGE_CLASS_CONFIG = "metadata.change.notifier.factory.class";
+  public static final String METADATA_CHANGE_CLASS_CONFIG = "factory.class";
 
-  public abstract void init(Configuration confguration);
+  public abstract void init(Configuration configuration);
 
   public abstract MetadataChangeNotifier create();
 

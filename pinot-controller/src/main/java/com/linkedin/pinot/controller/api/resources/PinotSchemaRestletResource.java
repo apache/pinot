@@ -42,7 +42,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.configuration.Configuration;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -64,7 +63,7 @@ public class PinotSchemaRestletResource {
   ControllerMetrics _controllerMetrics;
 
   @Inject
-  Configuration _metadataChangeNotifierConfig;
+  MetadataChangeNotifierFactory _metadataChangeNotifierFactory;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -183,7 +182,7 @@ public class PinotSchemaRestletResource {
       _pinotHelixResourceManager.addOrUpdateSchema(schema);
 
       LOGGER.info("Metadata change notification from old schema {} to new schema {}", oldSchema, schema);
-      MetadataChangeNotifierFactory.loadFactory(_metadataChangeNotifierConfig).create().notifyOnSchemaEvents(oldSchema, schema);
+      _metadataChangeNotifierFactory.create().notifyOnSchemaEvents(oldSchema, schema);
 
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
     } catch (Exception e) {

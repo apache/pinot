@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import com.linkedin.pinot.controller.api.access.AccessControlFactory;
+import com.linkedin.pinot.controller.api.events.MetadataChangeNotifierFactory;
 import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -155,6 +156,11 @@ public class ControllerStarter {
           (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
 
       final Configuration metadataChangeNotifierFactoryConfig = config.subset(METADATA_CHANGE_NOTIFIER_PREFIX);
+      String metadataChangeNotifierClass = config.getMetadataChangeNotifierFactory();
+      LOGGER.info("Use class: {} as the metadata change notifier factory", metadataChangeNotifierClass);
+      final MetadataChangeNotifierFactory metadataChangeNotifierFactory =
+          (MetadataChangeNotifierFactory) Class.forName(metadataChangeNotifierClass).newInstance();
+      metadataChangeNotifierFactory.loadFactory(metadataChangeNotifierFactoryConfig);
 
       int jerseyPort = Integer.parseInt(config.getControllerPort());
 
@@ -174,7 +180,7 @@ public class ControllerStarter {
           bind(executorService).to(Executor.class);
           bind(controllerMetrics).to(ControllerMetrics.class);
           bind(accessControlFactory).to(AccessControlFactory.class);
-          bind(metadataChangeNotifierFactoryConfig).to(Configuration.class);
+          bind(metadataChangeNotifierFactory).to(MetadataChangeNotifierFactory.class);
         }
       });
 

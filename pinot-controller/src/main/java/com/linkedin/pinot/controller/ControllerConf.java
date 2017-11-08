@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller;
 
+import com.linkedin.pinot.controller.api.events.DefaultMetadataChangeNotifierFactory;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -66,8 +67,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "com.linkedin.pinot.controller.api.access.AllowAllAccessFactory";
-  private static final String DEFAULT_METADATA_CHANGE_NOTIFIER_FACTORY_CLASS =
-      "com.linkedin.pinot.controller.api.events.DefaultMetadataChangeNotifierFactory";
+  private static final String DEFAULT_METADATA_CHANGE_NOTIFIER_FACTORY_CLASS = DefaultMetadataChangeNotifierFactory.class.getName();
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
