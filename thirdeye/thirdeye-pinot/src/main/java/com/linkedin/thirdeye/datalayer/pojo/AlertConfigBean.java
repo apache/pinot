@@ -15,6 +15,7 @@ public class AlertConfigBean extends AbstractBean {
   String name;
   String application;
   String cronExpression;
+  String holidayCronExpression;
   boolean active;
   AnomalyFeedConfig anomalyFeedConfig;
   EmailConfig emailConfig;
@@ -62,6 +63,14 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setAnomalyFeedConfig(AnomalyFeedConfig anomalyFeedConfig) {
     this.anomalyFeedConfig = anomalyFeedConfig;
+  }
+
+  public String getHolidayCronExpression() {
+    return holidayCronExpression;
+  }
+
+  public void setHolidayCronExpression(String holidayCronExpression) {
+    this.holidayCronExpression = holidayCronExpression;
   }
 
   public EmailConfig getEmailConfig() {
@@ -229,6 +238,7 @@ public class AlertConfigBean extends AbstractBean {
     public boolean isEnabled() {
       return enabled;
     }
+
     public void setEnabled(boolean enabled) {
       this.enabled = enabled;
     }
