@@ -15,7 +15,11 @@
  */
 package com.linkedin.pinot.controller.api.events;
 
-public interface EventEmitter {
+import com.linkedin.pinot.common.data.Schema;
 
-  void emitEvents();
+
+public interface MetadataChangeNotifier {
+  void notifyOnSchemaEvents(Schema oldSchema, Schema newSchema);
+
+  void notifyOnSegmentFlush();
 }

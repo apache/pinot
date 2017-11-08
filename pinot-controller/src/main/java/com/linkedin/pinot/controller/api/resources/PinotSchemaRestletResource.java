@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.api.events.MetadataChangeNotifierFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -41,6 +42,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.configuration.Configuration;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -60,6 +62,9 @@ public class PinotSchemaRestletResource {
 
   @Inject
   ControllerMetrics _controllerMetrics;
+
+  @Inject
+  Configuration _metadataChangeNotifierConfig;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -168,10 +173,17 @@ public class PinotSchemaRestletResource {
     }
 
     try {
+      Schema oldSchema;
+      if (schemaName == null) {
+        // New schema posted
+        oldSchema = null;
+      } else {
+        oldSchema = Schema.fromString(getSchema(schema.getSchemaName()));
+      }
       _pinotHelixResourceManager.addOrUpdateSchema(schema);
 
-      LOGGER.info("Emitting events for schema {}", schema);
-      new EventEmitAction().emit();
+      LOGGER.info("Metadata change notification from old schema {} to new schema {}", oldSchema, schema);
+      MetadataChangeNotifierFactory.loadFactory(_metadataChangeNotifierConfig).create().notifyOnSchemaEvents(oldSchema, schema);
 
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
     } catch (Exception e) {

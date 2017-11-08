@@ -15,10 +15,15 @@
  */
 package com.linkedin.pinot.controller.api.events;
 
-public class DefaultEventEmitterFactory implements EventEmitterFactory {
+import com.linkedin.pinot.common.data.Schema;
 
-  @Override
-  public EventEmitter create() {
-    return new DefaultEventEmitter();
+
+public class DefaultMetadataChangeNotifier implements MetadataChangeNotifier {
+  public void notifyOnSchemaEvents(Schema oldSchema, Schema newSchema) {
+
+  }
+
+  public void notifyOnSegmentFlush() {
+
   }
 }

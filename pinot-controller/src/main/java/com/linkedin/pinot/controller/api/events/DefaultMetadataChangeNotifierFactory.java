@@ -15,6 +15,17 @@
  */
 package com.linkedin.pinot.controller.api.events;
 
-public interface EventEmitterFactory {
-  EventEmitter create();
+import org.apache.commons.configuration.Configuration;
+
+
+public class DefaultMetadataChangeNotifierFactory extends MetadataChangeNotifierFactory {
+
+  public MetadataChangeNotifier create() {
+    return new DefaultMetadataChangeNotifier();
+  }
+
+  public void init(Configuration configuration) {
+
+  }
+
 }

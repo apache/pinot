@@ -35,6 +35,14 @@ import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentMan
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
@@ -43,20 +51,13 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
 
   private static final String METRICS_REGISTRY_NAME = "pinot.controller.metrics";
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
+  private static final String METADATA_CHANGE_NOTIFIER_PREFIX = "metadata.change.notifier";
 
   private final ControllerConf config;
   private final ControllerAdminApiApplication adminApp;
@@ -153,6 +154,8 @@ public class ControllerStarter {
       final AccessControlFactory accessControlFactory =
           (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
 
+      final Configuration metadataChangeNotifierFactoryConfig = config.subset(METADATA_CHANGE_NOTIFIER_PREFIX);
+
       int jerseyPort = Integer.parseInt(config.getControllerPort());
 
       LOGGER.info("Controller download url base: {}", config.generateVipUrl());
@@ -171,6 +174,7 @@ public class ControllerStarter {
           bind(executorService).to(Executor.class);
           bind(controllerMetrics).to(ControllerMetrics.class);
           bind(accessControlFactory).to(AccessControlFactory.class);
+          bind(metadataChangeNotifierFactoryConfig).to(Configuration.class);
         }
       });
 
