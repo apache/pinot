@@ -1,17 +1,9 @@
-<button {{action "setMode" "change"}}>change</button> |
-<button {{action "setMode" "contributionDiff"}}>contribution diff</button> |
-<button {{action "setMode" "contributionToDiff"}}>contribution to diff</button>
+urns
+{{#each currentUrns as |urn|}}
+  | <button {{action "setCurrentUrn" urn}}>{{urn}}</button>
+{{/each}}
 
-<ol>
-  {{#each-in values as |dimName dimValues|}}
-    <li>{{dimName}}
-        {{#each-in dimValues as |dimValue value|}}
-          | {{dimValue}} ({{value}})
-        {{else}}
-          | No values
-        {{/each-in}}
-    </li>
-  {{else}}
-    <li>No dimensions</li>
-  {{/each-in}}
-</ol>
+{{heatmap-chart
+  current=current
+  baseline=baseline
+}}
