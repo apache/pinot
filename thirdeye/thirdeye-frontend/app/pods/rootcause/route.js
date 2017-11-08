@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import config from 'thirdeye-frontend/mocks/filterBarConfig';
 
 const anomalyRange = [1509044400000, 1509422400000];
 const baselineRange = [1508439600000, 1508817600000];
@@ -15,7 +16,8 @@ export default Ember.Route.extend({
       invisibleUrns: new Set(),
       filteredUrns: new Set(),
       hoverUrns: new Set(),
-      context: { urns, anomalyRange, baselineRange, analysisRange }
+      context: { urns, anomalyRange, baselineRange, analysisRange },
+      config
     });
   }
 });
