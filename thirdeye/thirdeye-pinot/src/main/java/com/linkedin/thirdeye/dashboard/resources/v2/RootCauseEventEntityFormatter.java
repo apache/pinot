@@ -31,7 +31,7 @@ public abstract class RootCauseEventEntityFormatter extends RootCauseEntityForma
   public static RootCauseEventEntity makeRootCauseEventEntity(EventEntity entity, String label, String link, long start, long end, String details) {
     RootCauseEventEntity out = new RootCauseEventEntity();
     out.setUrn(entity.getUrn());
-    out.setScore(Math.round(entity.getScore() * 1000) / 1000.0);
+    out.setScore(entity.getScore());
     out.setType("event");
     out.setLabel(label);
     out.setLink(link);

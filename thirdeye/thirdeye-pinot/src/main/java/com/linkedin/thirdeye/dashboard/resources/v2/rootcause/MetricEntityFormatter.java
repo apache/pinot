@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -11,6 +13,8 @@ import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 
 public class MetricEntityFormatter extends RootCauseEntityFormatter {
   public static final String TYPE_METRIC = "metric";
+
+  public static final String ATTR_DATASET = "dataset";
 
   private final MetricConfigManager metricDAO;
 
@@ -32,8 +36,15 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
     MetricEntity e = (MetricEntity) entity;
 
     MetricConfigDTO dto = this.metricDAO.findById(e.getId());
+
+    Multimap<String, String> attributes = ArrayListMultimap.create();
+    attributes.put(ATTR_DATASET, dto.getDataset());
+
     String label = String.format("%s::%s", dto.getDataset(), dto.getName());
 
-    return makeRootCauseEntity(entity, TYPE_METRIC, label, null);
+    RootCauseEntity out = makeRootCauseEntity(entity, TYPE_METRIC, label, null);
+    out.setAttributes(attributes);
+
+    return out;
   }
 }
