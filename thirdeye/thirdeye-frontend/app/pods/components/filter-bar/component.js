@@ -2,7 +2,8 @@
  * Filter Bar Component
  * Constructs a filter bar based on a config file
  * @module components/filter-bar
- * @property {object} filterBlocks        - [required] a list of objects set in the route to set up the sub-filters
+ * @property {object[]} config            - [required] array of objects (config file) passed in from the route that sets
+ *                                          up the filter bar sub-filters
  * @property {number} maxStrLen           - number of characters for filter name truncation
  * @property {array}  onFilterSelection   - [required] closure action to bubble to controller on filter selection change
  *
@@ -50,7 +51,7 @@ export default Ember.Component.extend({
   init() {
     this._super(...arguments);
     // Fetch the config file to create sub-filters
-    const filterBlocks = this.get('filterBlocks');
+    const filterBlocks = this.get('config');
 
     // Set up filter block object
     filterBlocks.forEach((block, index) => {
@@ -88,7 +89,7 @@ export default Ember.Component.extend({
      */
     filterByEvent(clickedBlock) {
       // Hide all other blocks when one is clicked
-      let filterBlocks = this.get('filterBlocks');
+      let filterBlocks = this.get('config');
       filterBlocks.forEach(block => {
         Ember.set(block, 'isHidden', true);
       });

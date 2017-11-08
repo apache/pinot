@@ -30,8 +30,38 @@ export default [
     humanRelStart: '13 hours after',
     humanDuration: 'ongoing',
     "attributes": {
-      "country": ["ca", "ca"],
-      "region": ["north america"]
+      "country": ["Canada"]
+    }
+  }, {
+    "urn": "thirdeye:event:holiday:234567890",
+    "score": 0.05,
+    "label": "Christmas",
+    "type": "event",
+    "link": "http://google.com",
+    "relatedEntities": [
+    ],
+    "start": 1509580800000,
+    "end": 1509667200000,
+    "eventType": "holiday",
+    "details": "",
+    duration: 86400000,
+    relStart: 46800000,
+    relEnd: null,
+    relDuration: null,
+    isBaseline: false,
+    isFuture: true,
+    isOngoing: false,
+    displayStart: 1509476399999,
+    displayEnd: 1509479999999,
+    displayLabel: 'Christmas',
+    color: 'green',
+    displayColor: 'green',
+    displayScore: 0.175,
+    humanRelStart: '13 hours after',
+    humanDuration: 'ongoing',
+    "attributes": {
+      "country": ["Canada", "Mexico", "USA"],
+      "region": ['North America']
     }
   }, {
     "urn": "thirdeye:event:deployment:123456789",
