@@ -3,7 +3,19 @@ import { makeIterable, filterObject, toBaselineUrn, filterPrefix } from 'thirdey
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 
+const { getProperties } = Ember;
+
 export default Ember.Controller.extend({
+  queryParams: [
+    'granularity',
+    'filters',
+    'baselineStart',
+    'baselineEnd',
+    'anomalyStart',
+    'anomalyEnd',
+    'analysisStart',
+    'analysisEnd'
+  ],
   entitiesService: Ember.inject.service('rootcause-entities-cache'), // service
 
   timeseriesService: Ember.inject.service('rootcause-timeseries-cache'), // service
@@ -11,6 +23,7 @@ export default Ember.Controller.extend({
   aggregatesService: Ember.inject.service('rootcause-aggregates-cache'), // service
 
   breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'), // service
+
 
   selectedUrns: null, // Set
 
@@ -53,6 +66,11 @@ export default Ember.Controller.extend({
   //
   // Public properties (computed)
   //
+
+  options: Ember.computed('model', function() {
+    const model = this.get('model');
+    return getProperties(model, ['granularities', 'filters', 'maxTime']);
+  }),
 
   entities: Ember.computed(
     'entitiesService.entities',

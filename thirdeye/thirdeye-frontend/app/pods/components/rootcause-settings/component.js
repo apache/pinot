@@ -52,7 +52,7 @@ export default Ember.Component.extend({
    * Granularities Options
    * @type {String[]}
    */
-  granularities: ['MINUTES', 'HOURS', 'DAYS'],
+  granularities: Ember.computed.reads('options.granularities'),
 
   /**
    * Selected Compare Mode
@@ -85,13 +85,13 @@ export default Ember.Component.extend({
    * filter options
    * @type {Object}
    */
-  metricFilters: {},
+  filters: Ember.computed.reads('options.filters'),
 
   /**
    * Selected filters
    * @type {String} - a JSON string
    */
-  filters: JSON.stringify({}),
+  selectedFilters: JSON.stringify({}),
 
   /**
    * Indicates the date format to be used based on granularity
