@@ -2,10 +2,13 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
+import com.linkedin.thirdeye.datalayer.util.StringUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.eclipse.jetty.util.StringUtil;
+
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertConfigBean extends AbstractBean {
@@ -17,7 +20,7 @@ public class AlertConfigBean extends AbstractBean {
   EmailConfig emailConfig;
   ReportConfigCollection reportConfigCollection;
   AlertGroupConfig alertGroupConfig;
-  String emailFormatterType;
+  EmailFormatterConfig emailFormatterConfig;
   String recipients;
   String fromAddress;
 
@@ -101,12 +104,12 @@ public class AlertConfigBean extends AbstractBean {
     this.alertGroupConfig = alertGroupConfig;
   }
 
-  public String getEmailFormatterType() {
-    return emailFormatterType;
+  public EmailFormatterConfig getEmailFormatterConfig() {
+    return emailFormatterConfig;
   }
 
-  public void setEmailFormatterType(String emailFormatterType) {
-    this.emailFormatterType = emailFormatterType;
+  public void setEmailFormatterConfig(EmailFormatterConfig emailFormatterConfig) {
+    this.emailFormatterConfig = emailFormatterConfig;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -136,6 +139,34 @@ public class AlertConfigBean extends AbstractBean {
           "functionIds=" + functionIds +
           ", anomalyWatermark=" + anomalyWatermark +
           '}';
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class EmailFormatterConfig {
+    String type;
+    String properties;
+
+    public String getType() {
+      if (StringUtil.isBlank(type)) {
+        return "";
+      }
+      return type;
+    }
+
+    public void setType(String type) {
+      this.type = type;
+    }
+
+    public String getProperties() {
+      if (StringUtil.isBlank(properties)) {
+        return "";
+      }
+      return properties;
+    }
+
+    public void setProperties(String properties) {
+      this.properties = properties;
     }
   }
 
