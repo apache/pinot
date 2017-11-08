@@ -40,11 +40,5 @@ export default Ember.Component.extend({
       }
       return aggregate;
     }
-  ),
-
-  actions: {
-    setCurrentUrn(urn) {
-      this.set('currentUrn', urn);
-    }
-  }
+  )
 });

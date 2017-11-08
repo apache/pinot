@@ -1,6 +1,6 @@
 urns
 {{#each currentUrns as |urn|}}
-  | <button {{action "setCurrentUrn" urn}}>{{urn}}</button>
+  | <button {{action (mut currentUrn) urn}}>{{urn}}</button>
 {{/each}}
 
 {{heatmap-chart

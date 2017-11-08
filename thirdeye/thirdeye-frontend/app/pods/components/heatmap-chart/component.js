@@ -2,9 +2,9 @@ import Ember from 'ember';
 import _ from 'lodash';
 
 export default Ember.Component.extend({
-  current: {
-    country: {
-      us: 100,
+  current: { // dimensions
+    country: { // dimension namespace (dimNameObj)
+      us: 100, // dimension value
       cn: 100,
       ca: 150
     },
@@ -63,7 +63,7 @@ export default Ember.Component.extend({
           const topk = new Set(this._makeTopK(curr, rollup - 1));
           curr = this._makeRollup(curr, topk, 'OTHER');
           base = this._makeRollup(base, topk, 'OTHER');
-          dimVals = new Set(['OTHER', ...topk])
+          dimVals = new Set(['OTHER', ...topk]);
         }
 
         values[n] = {};
@@ -71,7 +71,7 @@ export default Ember.Component.extend({
           values[n][v] = {
             current: curr[v] || 0,
             baseline: base[v] || 0
-          }
+          };
         });
       });
 
@@ -97,7 +97,7 @@ export default Ember.Component.extend({
           const baseTotal = this._makeSum(data[n], (d) => d.baseline);
 
           scores[n][v] = Math.round(transformation(curr, base, currTotal, baseTotal) * 10000) / 100.0; // percent, 2 commas
-        })
+        });
       });
 
       return scores;
@@ -111,13 +111,13 @@ export default Ember.Component.extend({
 
       const contributions = {};
       Object.keys(data).forEach(n => {
-        scores[n] = {};
+        contributions[n] = {};
         Object.keys(data[n]).forEach(v => {
           const curr = data[n][v].current;
           const currTotal = this._makeSum(data[n], (d) => d.current);
 
-          sizes[n][v] = Math.round(1.0 * curr / currTotal * 10000) / 100.0; // percent, 2 commas
-        })
+          contributions[n][v] = Math.round(1.0 * curr / currTotal * 10000) / 100.0; // percent, 2 commas
+        });
       });
 
       return contributions;
