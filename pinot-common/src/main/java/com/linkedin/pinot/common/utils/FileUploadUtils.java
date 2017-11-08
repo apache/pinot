@@ -16,7 +16,7 @@ package com.linkedin.pinot.common.utils;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.PermanentDownloadException;
-import com.linkedin.pinot.hadoop.job.PermanentPushFailureException;
+import com.linkedin.pinot.common.exception.PermanentPushFailureException;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;

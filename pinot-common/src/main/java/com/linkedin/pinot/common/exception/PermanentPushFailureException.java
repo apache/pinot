@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.hadoop.job;
+package com.linkedin.pinot.common.exception;
 
 /**
  * Custom exception thrown to escape from retries.
