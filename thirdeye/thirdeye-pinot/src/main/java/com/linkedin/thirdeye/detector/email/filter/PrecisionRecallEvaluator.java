@@ -15,7 +15,7 @@ import java.util.Properties;
  * Precision and Recall Evaluator with two constructor
  * 1) Anomaly Detection System evaluation: calculate on-going performance using "notified" flag
  * 2) Alert Filter evaluation: calculate performance of alert filter on a list of anomalies
-*/
+ */
 public class PrecisionRecallEvaluator {
 
   /**
@@ -23,7 +23,7 @@ public class PrecisionRecallEvaluator {
    * in order to get the performance of whole anomaly detection system
    * @param anomalies The list of anomalies to be evaluated
    */
-  public PrecisionRecallEvaluator(List<MergedAnomalyResultDTO> anomalies){
+  public PrecisionRecallEvaluator(List<MergedAnomalyResultDTO> anomalies) {
     init(anomalies);
   }
 
@@ -33,7 +33,7 @@ public class PrecisionRecallEvaluator {
    * @param alertFilter the alert filter to be evaluated
    * @param anomalies the list of anomalies as data for alert filter
    */
-  public PrecisionRecallEvaluator(AlertFilter alertFilter, List<MergedAnomalyResultDTO> anomalies){
+  public PrecisionRecallEvaluator(AlertFilter alertFilter, List<MergedAnomalyResultDTO> anomalies) {
     this.alertFilter = alertFilter;
     init(anomalies);
   }
@@ -58,7 +58,8 @@ public class PrecisionRecallEvaluator {
   public static final String NEWTREND = "newTrend";
   public static final String USER_REPORT = "userReportAnomaly";
 
-  public static final Double WEIGHT_OF_NULL_LABEL = 0.5; // the weight used for NA labeled data point when calculating precision
+  public static final Double WEIGHT_OF_NULL_LABEL = 0.5;
+      // the weight used for NA labeled data point when calculating precision
 
   public double getPrecision() {
     if (getTotalAlerts() == 0) {
@@ -66,31 +67,35 @@ public class PrecisionRecallEvaluator {
     }
     return 1.0 * getTrueAlerts() / getTotalAlerts();
   }
+
   public double getPrecisionInResponse() {
     if (getTotalResponses() == 0) {
       return Double.NaN;
     }
     return 1.0 * getTrueAlerts() / getTotalResponses();
   }
+
   public double getWeightedPrecision() {
     if (getTotalAlerts() == 0) {
       return Double.NaN;
     }
-    return 1.0 * getTrueAlerts() /
-        (getTotalResponses() + WEIGHT_OF_NULL_LABEL * notifiedNotLabeled);
+    return 1.0 * getTrueAlerts() / (getTotalResponses() + WEIGHT_OF_NULL_LABEL * notifiedNotLabeled);
   }
+
   public double getRecall() {
     if (getTrueAnomalies() == 0) {
-      return  Double.NaN;
+      return Double.NaN;
     }
-    return 1.0 * getTrueAlerts() / (getTrueAnomalies());
+    return 1.0 * getTrueAlerts() / (getTrueAnomalies() + getTrueAnomalyNewTrend());
   }
+
   public double getFalseNegativeRate() {
     if (getTrueAnomalies() == 0) {
-      return  Double.NaN;
+      return Double.NaN;
     }
-    return 1.0 * getUserReportAnomaly() / (getTrueAnomalies());
+    return 1.0 * getUserReportAnomaly() / (getTrueAnomalies() + getTrueAnomalyNewTrend());
   }
+
   public double getResponseRate() {
     return 1.0 * getTotalResponses() / getTotalAlerts();
   }
@@ -98,31 +103,36 @@ public class PrecisionRecallEvaluator {
   public int getTotalResponses() {
     return notifiedFalseAlarm + notifiedTrueAnomaly + notifiedTrueAnomalyNewTrend;
   }
+
   public int getTotalAlerts() {
     return getTotalResponses() + notifiedNotLabeled;
   }
+
+  // number of true anomalies in global set
   public int getTrueAnomalies() {
-    return notifiedTrueAnomaly + notifiedTrueAnomalyNewTrend + userReportTrueAnomaly + userReportTrueAnomalyNewTrend;
+    return notifiedTrueAnomaly + userReportTrueAnomaly;
   }
-  public int getUserReportAnomaly() {
-    return userReportTrueAnomaly + userReportTrueAnomalyNewTrend;
-  }
-  public int getFalseAlarm() {
-    return notifiedFalseAlarm;
-  }
-  public int getTrueAlerts() {
-    return notifiedTrueAnomaly + notifiedTrueAnomalyNewTrend;
-  }
-  public int getNotifiedTrueAnomaly() {
-    return notifiedTrueAnomaly;
-  }
-  public int getNotifiedTrueAnomalyNewTrend() {
+
+  // number of true anomalies new trend in global set
+  public int getTrueAnomalyNewTrend() {
     return notifiedTrueAnomalyNewTrend + userReportTrueAnomalyNewTrend;
   }
 
+  // number of true anomalies and true_new_trend anomalies that "NOTIFIED"
+  public int getTrueAlerts() {
+    return notifiedTrueAnomaly + notifiedTrueAnomalyNewTrend;
+  }
+
+  public int getUserReportAnomaly() {
+    return userReportTrueAnomaly + userReportTrueAnomalyNewTrend;
+  }
+
+  public int getFalseAlarm() {
+    return notifiedFalseAlarm;
+  }
 
   public void init(List<MergedAnomalyResultDTO> anomalies) {
-    if(anomalies == null || anomalies.isEmpty()) {
+    if (anomalies == null || anomalies.isEmpty()) {
       return;
     }
 
@@ -131,18 +141,21 @@ public class PrecisionRecallEvaluator {
     this.notifiedNotLabeled = 0;
     this.notifiedFalseAlarm = 0;
     this.userReportTrueAnomaly = 0;
+    this.userReportTrueAnomalyNewTrend = 0;
 
-    if(anomalies == null || anomalies.isEmpty()) {
+    if (anomalies == null || anomalies.isEmpty()) {
       return;
     }
 
-    for(MergedAnomalyResultDTO anomaly : anomalies) {
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
       AnomalyFeedback feedback = anomaly.getFeedback();
       boolean isLabeledTrueAnomaly = false;
       boolean isLabeledTrueAnomalyNewTrend = false;
-      if(feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
+      if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType()
+          .equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
         isLabeledTrueAnomalyNewTrend = true;
-      } else if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
+      } else if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType()
+          .equals(AnomalyFeedbackType.ANOMALY)) {
         isLabeledTrueAnomaly = true;
       }
 
@@ -152,8 +165,8 @@ public class PrecisionRecallEvaluator {
         isNotified = alertFilter.isQualified(anomaly);
       }
 
-      if(isNotified) {
-        if(feedback == null || feedback.getFeedbackType() == null) {
+      if (isNotified) {
+        if (feedback == null || feedback.getFeedbackType() == null) {
           this.notifiedNotLabeled++;
         } else if (isLabeledTrueAnomaly) {
           notifiedTrueAnomaly++;
@@ -163,24 +176,13 @@ public class PrecisionRecallEvaluator {
           notifiedFalseAlarm++;
         }
       } else {
-        if(isLabeledTrueAnomaly) {
+        if (isLabeledTrueAnomaly) {
           userReportTrueAnomaly++;
         } else if (isLabeledTrueAnomalyNewTrend) {
           userReportTrueAnomalyNewTrend++;
         }
       }
     }
-  }
-
-
-
-  /**
-   * Provide feedback summary give a list of merged anomalies
-   * @param anomalies
-   */
-  @Deprecated
-  public void updateFeedbackSummary(List<MergedAnomalyResultDTO> anomalies){
-    init(anomalies);
   }
 
   public Properties toProperties() {
@@ -193,14 +195,14 @@ public class PrecisionRecallEvaluator {
     evals.put(TOTALRESPONSES, getTotalResponses());
     evals.put(TRUEANOMALIES, getTrueAnomalies());
     evals.put(FALSEALARM, getFalseAlarm());
-    evals.put(NEWTREND, getNotifiedTrueAnomalyNewTrend());
+    evals.put(NEWTREND, getTrueAnomalyNewTrend());
     evals.put(USER_REPORT, getUserReportAnomaly());
     return evals;
   }
 
   public static List<String> getPropertyNames() {
-    return Collections.unmodifiableList(
-        new ArrayList<>(Arrays.asList(RESPONSE_RATE, PRECISION, WEIGHTED_PRECISION, RECALL, TOTALALERTS,
-            TOTALRESPONSES, TRUEANOMALIES, FALSEALARM, NEWTREND, USER_REPORT)));
+    return Collections.unmodifiableList(new ArrayList<>(
+        Arrays.asList(RESPONSE_RATE, PRECISION, WEIGHTED_PRECISION, RECALL, TOTALALERTS, TOTALRESPONSES, TRUEANOMALIES,
+            FALSEALARM, NEWTREND, USER_REPORT)));
   }
 }
