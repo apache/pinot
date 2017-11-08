@@ -63,7 +63,7 @@ export default Ember.Component.extend({
    * Compare Mode Options
    * @type {String[]}
    */
-  compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
+  compareModes: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
 
   /**
    * Predefined Custom Ranges for
@@ -75,7 +75,7 @@ export default Ember.Component.extend({
       moment().subtract(3, 'days').startOf('day'), 
       moment().subtract(1, 'days').endOf('day')
     ],
-    'last 7 Dgit sattuays': [
+    'Last 7 days': [
       moment().subtract(7, 'days').startOf('day'),
       moment().subtract(1, 'days').endOf('day')
     ]
@@ -213,8 +213,8 @@ export default Ember.Component.extend({
         Wo4W: 4
       }[compareMode];
 
-      const baselineRangeStart = moment(analysisRangeStart).subtract(offset, 'days').valueOf();
-      const baselineRangeEnd = moment(analysisRangeEnd).subtract(offset, 'days').valueOf();
+      const baselineRangeStart = moment(analysisRangeStart).subtract(offset, 'weeks').valueOf();
+      const baselineRangeEnd = moment(analysisRangeEnd).subtract(offset, 'weeks').valueOf();
 
       this.setProperties({
         compareMode,
