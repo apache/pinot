@@ -6,4 +6,99 @@ baselineRangeStart: {{input value=baselineRangeStart}} |
 baselineRangeEnd: {{input value=baselineRangeEnd}} |
 analysisRangeStart: {{input value=analysisRangeStart}} |
 analysisRangeEnd: {{input value=analysisRangeEnd}} |
+granularity: {{input value=granularity}} |
 <button {{action "updateContext"}}>update</button>
+
+<div class="paper-container">
+  <div class="paper-container__body">
+    <section class="rca-summary">
+      <div class="row">
+        <div class="col-xs-4">
+          <label class="te-label" for="select-anomaly-region">Anomaly Range:
+            <span>
+              <i class="glyphicon glyphicon-question-sign"></i>
+              {{#tooltip-on-element}}
+                Typically, this is your anomaly region. It's highlighted in orange in the graph below.
+              {{/tooltip-on-element}}
+            </span>
+          </label>
+          {{date-range-picker
+            class="te-range-picker"
+            timePicker=showTimePicker
+            timePicker24Hour=true
+            timePickerIncrement=timePickerIncrement
+            minDate=minDate
+            maxDate=maxDate
+            start=datePickerAnomalyRangeStart
+            end=datePickerAnomalyRangeEnd
+            ranges=anomalyRanges
+            showCustomRangeLabel=false
+            format=uiDateFormat
+            serverFormat="YYYY-MM-DD HH:mm"
+            applyAction=(action "setAnomalyDateRange")
+          }}
+        </div>
+        <div class="col-xs-4">
+          <label class="te-label" for="select-granularity">Granularity: </label>
+          {{#power-select
+            selected=granularity
+            options=granularities
+            triggerId="select-granularity"
+            searchEnabled=false
+            onchange=(action (mut granularity))
+            as |granularity|
+          }}
+            {{granularity}}
+          {{/power-select}}
+        </div>
+        <div class="col-xs-4">
+          <label class="te-label" for="select-mode">Comparing By: </label>
+          {{#power-select
+            selected=compareMode
+            options=compareModes
+            triggerId="select-mode"
+            searchEnabled=false
+            onchange=(action "onModeChange")
+            as |mode|
+          }}
+            {{mode}}
+          {{/power-select}}
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-xs-4">
+          <label class="te-label" for="select-view-region">Display Window:
+            <span>
+              <i class="glyphicon glyphicon-question-sign"></i>
+              {{#tooltip-on-element}}
+                This is the whole period that you'd like to view. This sets the boundaries for your subchart.
+              {{/tooltip-on-element}}
+            </span>
+          </label>
+          {{date-range-picker
+            class="te-range-picker"
+            timePicker=showTimePicker
+            timePicker24Hour=true
+            timePickerIncrement=timePickerIncrement
+            maxDate=maxTime
+            start=viewRegionStart
+            end=viewRegionEnd
+            ranges=predefinedAnalysisRanges
+            showCustomRangeLabel=false
+            format=uiDateFormat
+            serverFormat="YYYY-MM-DD HH:mm"
+            applyAction=(action "setDisplayDateRange")
+          }}
+        </div>
+        <div class="form-group col-xs-8">
+          <label class="te-label" for="select-filters">Filters: </label>
+          {{filter-select
+            selected=filters
+            triggerId="select-filter"
+            options=metricFilters
+          }}
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
