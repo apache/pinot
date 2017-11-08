@@ -296,6 +296,11 @@ public class SegmentCompletionManager {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
       _fsmMap.remove(segmentNameStr);
     }
+
+    // TODO: Get the kafka topic + window & emit mle for realtime segments
+    LOGGER.info("Emitting metadata change notification for Kafka topic {}, table name {}, offset {}, time window {} to {}",
+         /* topic */ null, segmentName.getTableName(), offset, null, null);
+    
     return response;
   }
 
