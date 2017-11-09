@@ -1,0 +1,10 @@
+urns
+{{#each-in labels as |urn label|}}
+  |
+  {{input
+    type="checkbox"
+    checked=(set-has-not invisibleUrns urn)
+    click=(action "toggleVisibility" urn)}}
+  {{label}}
+  <a {{action "removeUrn" urn}}>[X]</a>
+{{/each-in}}
