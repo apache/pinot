@@ -309,7 +309,6 @@ public class Pql2AstListener extends PQL2BaseListener {
     String literalWithoutQuotes = text.substring(1, textLength - 1);
     if (text.charAt(0) == '\'') {
       if (literalWithoutQuotes.contains("''")) {
-        System.out.println(literalWithoutQuotes);
         literalWithoutQuotes = literalWithoutQuotes.replaceAll("''", "'");
       }
 
