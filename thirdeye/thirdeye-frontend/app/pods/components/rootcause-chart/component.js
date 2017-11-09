@@ -2,6 +2,10 @@ import Ember from 'ember';
 import d3 from 'd3';
 import moment from 'moment';
 
+const TIMESERIES_MODE_ABSOLUTE = 'absolute';
+const TIMESERIES_MODE_RELATIVE = 'relative';
+const TIMESERIES_MODE_LOG = 'log';
+
 export default Ember.Component.extend({
   entities: null, // {}
 
@@ -21,7 +25,7 @@ export default Ember.Component.extend({
 
   init() {
     this._super(...arguments);
-    this.set('timeseriesMode', 'absolute');
+    this.set('timeseriesMode', TIMESERIES_MODE_ABSOLUTE);
   },
 
   legend: {
@@ -133,7 +137,6 @@ export default Ember.Component.extend({
   _eventValues: Ember.computed(
     'entities',
     'selectedUrns',
-    'analysisRange',
     function () {
       const { entities, selectedUrns } =
         this.getProperties('entities', 'selectedUrns');
@@ -233,11 +236,11 @@ export default Ember.Component.extend({
 
   _transformSeries(mode, series) {
     switch(mode) {
-      case 'absolute':
+      case TIMESERIES_MODE_ABSOLUTE:
         return series; // raw data
-      case 'relative':
+      case TIMESERIES_MODE_RELATIVE:
         return this._transformSeriesRelative(series);
-      case 'log':
+      case TIMESERIES_MODE_LOG:
         return this._transformSeriesLog(series);
     }
     return series;
