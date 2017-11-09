@@ -100,9 +100,9 @@ export default Ember.Component.extend({
       Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
 
       const { entities, onSelect } = this.getProperties('entities', 'onSelect');
-      if (onSelect != null) {
-        const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event')
-                                          .filter(urn => entities[urn].eventType == clickedBlock.eventType);
+      if (onSelect) {
+        const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
+                                                  && entities[urn].eventType == clickedBlock.eventType);
         onSelect(urns);
       }
     }
