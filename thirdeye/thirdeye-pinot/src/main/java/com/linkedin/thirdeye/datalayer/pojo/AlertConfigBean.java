@@ -20,7 +20,6 @@ public class AlertConfigBean extends AbstractBean {
   ReportConfigCollection reportConfigCollection;
   AlertGroupConfig alertGroupConfig;
   EmailFormatterConfig emailFormatterConfig;
-  String emailFormatterType;
   String recipients;
   String fromAddress;
 
