@@ -15,8 +15,11 @@ public class StringUtils {
   private static Joiner SEMICOLON = Joiner.on(";");
   private static Joiner EQUALS = Joiner.on("=");
 
-  // the following two functions encode and decode properties are moved from class
-  // com.linkedin.thirdeye.controller.mp.function.ThirdEyeAnomalyFunctionUtil
+  /**
+   * Encode the properties into String, which is in the format of field1=value1;field2=value2 and so on
+   * @param props the properties instance
+   * @return a String representation of the given properties
+   */
   public static String encodeCompactedProperties(Properties props) {
     List<String> parts = new ArrayList<>();
     for (Map.Entry<Object, Object> entry : props.entrySet()) {
@@ -25,6 +28,11 @@ public class StringUtils {
     return SEMICOLON.join(parts);
   }
 
+  /**
+   * Decode the properties string (e.g. field1=value1;field2=value2) to a properties instance
+   * @param propStr a properties string in the format of field1=value1;field2=value2
+   * @return a properties instance
+   */
   public static Properties decodeCompactedProperties(String propStr) {
     Properties props = new Properties();
     for (String part : SEMICOLON_SPLITTER.split(propStr)) {

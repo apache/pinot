@@ -338,5 +338,6 @@ create table application_index (
 create table if not exists alert_snapshot_index (
     base_id bigint(20) not null,
     create_time timestamp,
-    update_time timestamp default current_timestamp
+    update_time timestamp default current_timestamp,
+    version int(10)
 ) ENGINE=InnoDB;

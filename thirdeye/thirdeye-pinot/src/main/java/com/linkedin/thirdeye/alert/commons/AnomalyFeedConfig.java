@@ -41,7 +41,7 @@ public class AnomalyFeedConfig {
 
   public List<AnomalyFetcherConfig> getAnomalyFetcherConfigs() {
     if (anomalyFetcherConfigs == null) {
-      anomalyFetcherConfigs = Collections.EMPTY_LIST;
+      anomalyFetcherConfigs = Collections.emptyList();
     }
     for (AnomalyFetcherConfig anomalyFetcherConfig : anomalyFetcherConfigs) {
       Properties properties = StringUtils.decodeCompactedProperties(anomalyFetcherConfig.getProperties());
@@ -58,7 +58,7 @@ public class AnomalyFeedConfig {
 
   public List<Map<String, String>> getAlertFilterConfigs() {
     if (alertFilterConfigs == null) {
-      alertFilterConfigs = Collections.EMPTY_LIST;
+      alertFilterConfigs = Collections.emptyList();
     }
     return alertFilterConfigs;
   }
