@@ -1,6 +1,12 @@
 package com.linkedin.thirdeye.datalayer;
 
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
+import com.linkedin.thirdeye.alert.commons.AnomalyFetcherConfig;
+import com.linkedin.thirdeye.alert.commons.AnomalyNotifiedStatus;
+import com.linkedin.thirdeye.alert.commons.AnomalySource;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
@@ -9,6 +15,7 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
@@ -18,6 +25,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
@@ -26,6 +34,7 @@ import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -235,5 +244,62 @@ public class DaoTestUtils {
     dto.setName(name);
     dto.setValue(value);
     return dto;
+  }
+
+  public static AlertSnapshotDTO getTestAlertSnapshot(){
+    AlertSnapshotDTO alertSnapshot = new AlertSnapshotDTO();
+    alertSnapshot.setLastNotifyTime(0);
+    Multimap<String, AnomalyNotifiedStatus> snapshot = HashMultimap.create();
+    snapshot.put("test::{dimension=[test]}", new AnomalyNotifiedStatus(0,-0.1));
+    snapshot.put("test::{dimension=[test]}", new AnomalyNotifiedStatus(2,-0.2));
+    snapshot.put("test::{dimension=[test2]}", new AnomalyNotifiedStatus(4,-0.4));
+    alertSnapshot.setSnapshot(snapshot);
+    return alertSnapshot;
+  }
+
+  public static AnomalyFeedConfig getTestAnomalyFeedConfig() {
+    AnomalyFeedConfig anomalyFeedConfig = new AnomalyFeedConfig();
+    anomalyFeedConfig.setAnomalyFeedType("UnionAnomalyFeed");
+    anomalyFeedConfig.setAnomalySourceType(AnomalySource.METRIC);
+    anomalyFeedConfig.setAnomalySource("test");
+    anomalyFeedConfig.setAlertSnapshotId(1l);
+
+    AnomalyFetcherConfig anomalyFetcherConfig = getTestAnomalyFetcherConfig();
+    List<AnomalyFetcherConfig> fetcherConfigs = new ArrayList<>();
+    fetcherConfigs.add(anomalyFetcherConfig);
+    anomalyFeedConfig.setAnomalyFetcherConfigs(fetcherConfigs);
+
+    Map<String, String> alertFilterConfig = new HashMap<>();
+    alertFilterConfig.put(AlphaBetaAlertFilter.TYPE, "DUMMY");
+    alertFilterConfig.put("properties", "");
+    List<Map<String, String>> filterConfigs = new ArrayList<>();
+    filterConfigs.add(alertFilterConfig);
+    anomalyFeedConfig.setAlertFilterConfigs(filterConfigs);
+
+    return anomalyFeedConfig;
+  }
+
+  public static AnomalyFetcherConfig getTestAnomalyFetcherConfig(){
+    AnomalyFetcherConfig anomalyFetcherConfig = new AnomalyFetcherConfig();
+    anomalyFetcherConfig.setType("UnnotifiedAnomalyFetcher");
+    anomalyFetcherConfig.setProperties("");
+    anomalyFetcherConfig.setAnomalySourceType(AnomalySource.METRIC);
+    anomalyFetcherConfig.setAnomalySource("test");
+    return anomalyFetcherConfig;
+  }
+
+  public static MergedAnomalyResultDTO getTestMergedAnomalyResult(long startTime, long endTime, String collection,
+      String metric, double weight, long functionId, long createdTime) {
+    // Add mock anomalies
+    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
+    anomaly.setStartTime(startTime);
+    anomaly.setEndTime(endTime);
+    anomaly.setCollection(collection);
+    anomaly.setMetric(metric);
+    anomaly.setWeight(weight);
+    anomaly.setFunctionId(functionId);
+    anomaly.setCreatedTime(createdTime);
+
+    return anomaly;
   }
 }
