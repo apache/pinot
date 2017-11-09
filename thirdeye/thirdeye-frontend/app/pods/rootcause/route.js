@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import RSVP from 'rsvp';
 import fetch from 'fetch';
+import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 
@@ -11,21 +12,32 @@ const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:
 const granularity = '30_MINUTES';
 
 const queryParamsConfig = {
-  refreshModel: true,
+  refreshModel: false,
   replace: false
 };
 
+const isValid = (key, value) => { 
+  switch(key) {
+    case 'granularity':
+      return ['MINUTES', 'HOURS', 'DAYS'].includes(value);
+    case 'filters':
+      return value && value.length;
+    default:
+      return moment(+value);
+  }
+};
+
+
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
-  // queryParams: {
-  //   granularity: queryParamsConfig,
-  //   filters: queryParamsConfig,
-  //   baselineStart: queryParamsConfig,
-  //   baselineEnd: queryParamsConfig,
-  //   analysisStart: queryParamsConfig,
-  //   analysisEnd: queryParamsConfig,
-  //   anomalyStart: queryParamsConfig,
-  //   anomalyEnd: queryParamsConfig
-  // },
+  queryParams: {
+    granularity: queryParamsConfig,
+    filters: queryParamsConfig,
+    compareMode: queryParamsConfig,
+    analysisRangeStart: queryParamsConfig,
+    analysisRangeEnd: queryParamsConfig,
+    anomalyRangeStart: queryParamsConfig,
+    anomalyRangeEnd: queryParamsConfig
+  },
 
   model(params) {
     const { rootcauseId: id } = params;
@@ -34,17 +46,44 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     if (!id) { return; }
 
     return RSVP.hash({
-      granularities: fetch(`/data/agg/granularity/metric/${id}`).then(res => res.json()),
-      filters: fetch(`/data/autocomplete/filters/metric/${id}`).then(res => res.json()),
+      granularityOptions: fetch(`/data/agg/granularity/metric/${id}`).then(res => res.json()),
+      filterOptions: fetch(`/data/autocomplete/filters/metric/${id}`).then(res => res.json()),
       maxTime: fetch(`/data/maxDataTime/metricId/${id}`).then(res => res.json()),
+      compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
       id
     });
   },
 
-  setupController: function (controller, model) {
+  afterModel(model, transition) {
+
+    const defaultParams = {
+      filters: JSON.stringify({}),
+      granularity: model.granularityOptions[0],
+      anomalyRangeStart: moment().subtract(1, 'day').valueOf(),
+      anomalyRangeEnd: model.maxTime,
+      analysisRangeStart: moment().subtract(1, 'week').valueOf(), 
+      analysisRangeEnd: model.maxTime,
+      compareMode: 'WoW'
+    };
+    let { queryParams } = transition;
+    // TODO: write utils functions that checks key values in queryParams
+    //       so only valid strings are authorized
+    const validParams = Object.keys(queryParams)
+      .filter((param) => {
+        const value = queryParams[param];
+        return value && isValid(param, value);
+      })
+      .reduce((hash, key) => {
+        hash[key] = queryParams[key];
+        return hash;
+      }, {});
+      Object.assign(model, { queryParams: { ...defaultParams, ...validParams }});
+      debugger;
+  },
+
+  setupController(controller, model) {
     this._super(...arguments);
     console.log('route: setupController()');
-
     // TODO get initial attributes from query params
     controller.setProperties({
       selectedUrns: new Set([
@@ -55,6 +94,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       hoverUrns: new Set(),
       filteredUrns: new Set(),
       context: { urns, anomalyRange, baselineRange, analysisRange, granularity },
+      // context: { urns, anomalyRange, baselineRange, analysisRange, granularity },
+      ...model.queryParams
     });
   }
 });

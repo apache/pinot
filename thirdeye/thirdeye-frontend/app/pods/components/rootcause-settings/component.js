@@ -17,6 +17,9 @@
 import Ember from 'ember';
 import moment from 'moment';
 
+const { setProperties } = Ember;
+const serverDateFormat = 'YYYY-MM-DD HH:mm';
+
 export default Ember.Component.extend({
   context: null, // { urns, anomalyRange, baselineRange, analaysisRange }
 
@@ -28,19 +31,51 @@ export default Ember.Component.extend({
 
   anomalyRangeEnd: null,
 
-  baselineRangeStart: null,
-
-  baselineRangeEnd: null,
-
   analysisRangeStart: null,
 
   analysisRangeEnd: null,
 
-  // datepicker range
-  datePickerAnomalyRangeStart: Ember.computed.reads('anomalyRangeStart'),
-  datePickerAnomalyRangeEnd: Ember.computed.reads('anomalyRangeEnd'),
-  datePickerAnalysisRangeStart: Ember.computed.reads('analysisRangeStart'),
-  datePickerAnalysisRangeEnd: Ember.computed.reads('analysisRangeEnd'),
+
+  datePickerAnomalyRangeStart: Ember.computed('anomalyRangeStart', {
+    get() {
+      const start = this.get('anomalyRangeStart');
+
+      return start ? moment(+start).format(serverDateFormat) : moment().format(serverDateFormat);
+    }
+  }),
+
+  datePickerAnomalyRangeEnd: Ember.computed('anomalyRangeEnd', {
+    get() {
+      const end = this.get('anomalyRangeEnd');
+
+      return end ? moment(+end).format(serverDateFormat) : moment().format(serverDateFormat);
+    }
+  }),
+
+  datePickerAnalysisRangeStart: Ember.computed('analysisRangeStart', {
+    get() {
+      const start = this.get('analysisRangeStart');
+
+      return start ? moment(+start).format(serverDateFormat) : moment().format(serverDateFormat);
+    }
+  }),
+
+  datePickerAnalysisRangeEnd: Ember.computed('analysisRangeEnd', {
+    get() {
+      const end = this.get('analysisRangeEnd');
+
+      return end ? moment(+end).format(serverDateFormat) : moment().format(serverDateFormat);
+    }
+  }),
+
+  // _baselineRangeStart: Ember.computed('baselineRangeStart', {
+  //   get() {
+
+  //   },
+  //   set() {
+
+  //   }
+  // })
 
   /**
    * Selected Granularity
@@ -52,18 +87,20 @@ export default Ember.Component.extend({
    * Granularities Options
    * @type {String[]}
    */
-  granularities: Ember.computed.reads('options.granularities'),
+  granularityOptions: Ember.computed.reads('options.granularityOptions'),
+  /**
+   * Compare Mode Options
+   * @type {String[]}
+   */
+  compareModeOptions: Ember.computed.reads('options.compareModeOptions'),
 
   /**
    * Selected Compare Mode
    * @type {String}
    */
   compareMode: 'WoW',
-  /**
-   * Compare Mode Options
-   * @type {String[]}
-   */
-  compareModes: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
+
+  // compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
 
   /**
    * Predefined Custom Ranges for
@@ -85,13 +122,15 @@ export default Ember.Component.extend({
    * filter options
    * @type {Object}
    */
-  filters: Ember.computed.reads('options.filters'),
+  filterOptions: Ember.computed.reads('options.filterOptions'),
 
   /**
    * Selected filters
    * @type {String} - a JSON string
    */
   selectedFilters: JSON.stringify({}),
+  filters: JSON.stringify({}),
+
 
   /**
    * Indicates the date format to be used based on granularity
@@ -137,18 +176,36 @@ export default Ember.Component.extend({
     });
   },
 
-  didUpdateAttrs() {
+  init() {
     this._super(...arguments);
-    this._updateFromContext();
+
+    const selectedOptions = this.get('selectedOptions');
+    setProperties(this, selectedOptions);
   },
+
+  didReceiveAttrs() {
+    this._super(...arguments);
+
+    const selectedOptions = this.get('selectedOptions');
+    setProperties(this, selectedOptions);
+  },
+
+  // didUpdateAttrs() {
+  //   this._super(...arguments);
+  //   this._updateFromContext();
+  // },
 
   didInsertElement() {
     this._super(...arguments);
-    this._updateFromContext();
+    // this._updateFromContext();
+
+    const selectedOptions = this.get('selectedOptions');
+    setProperties(this, selectedOptions);
   },
 
   actions: {
     updateContext() {
+<<<<<<< HEAD
       const { urnString, anomalyRangeStart, anomalyRangeEnd, baselineRangeStart, baselineRangeEnd, analysisRangeStart, analysisRangeEnd, granularity } =
         this.getProperties('urnString', 'anomalyRangeStart', 'anomalyRangeEnd', 'baselineRangeStart', 'baselineRangeEnd', 'analysisRangeStart', 'analysisRangeEnd', 'granularity');
       const onChange = this.get('onChange');
@@ -161,7 +218,56 @@ export default Ember.Component.extend({
         onChange(newContext);
       }
     },
+=======
+      // const {
+      //   urnString,
+      //   anomalyRangeStart,
+      //   anomalyRangeEnd,
+      //   baselineRangeStart,
+      //   baselineRangeEnd,
+      //   analysisRangeStart,
+      //   analysisRangeEnd,
+      //   granularity,
+      //   filters
+      // } = this.getProperties(
+      //   'urnString',
+      //   'granularity',
+      //   'filters',
+      //   'anomalyRangeStart',
+      //   'anomalyRangeEnd',
+      //   'baselineRangeStart',
+      //   'baselineRangeEnd',
+      //   'analysisRangeStart',
+      //   'analysisRangeEnd');
+      const onChange = this.get('onChange');
+      if (!onChange) return;
+>>>>>>> props linked to controller's
 
+      // if (onChange != null) {
+      //   const urns = urnString ? new Set(urnString.split(',')) : new Set();
+      //   const anomalyRange = [parseInt(anomalyRangeStart), parseInt(anomalyRangeEnd)];
+      //   const baselineRange = [parseInt(baselineRangeStart), parseInt(baselineRangeEnd)];
+      //   const analysisRange = [parseInt(analysisRangeStart), parseInt(analysisRangeEnd)];
+      //   const newContext = { 
+      //     granularity,
+      //     filters,
+      //     urns,
+      //     anomalyRange,
+      //     baselineRange,
+      //     analysisRange};
+      onChange(this.getProperties(
+        'urnString',
+        'granularity',
+        'filters',
+        'compareMode',
+        'anomalyRangeStart',
+        'anomalyRangeEnd',
+        'baselineRangeStart',
+        'baselineRangeEnd',
+        'analysisRangeStart',
+        'analysisRangeEnd'));
+      // }
+    },
     /**
      * Sets the new anomaly region date in ms
      * @method setAnomalyDateRange
@@ -177,6 +283,7 @@ export default Ember.Component.extend({
         anomalyRangeStart,
         anomalyRangeEnd
       });
+      this.send('updateContext');
     },
 
     /**
@@ -194,6 +301,7 @@ export default Ember.Component.extend({
         analysisRangeStart,
         analysisRangeEnd
       });
+      this.send('updateContext');
     },
 
     /**
@@ -222,6 +330,18 @@ export default Ember.Component.extend({
         baselineRangeStart,
         baselineRangeEnd
       });
+      this.send('updateContext');
+    },
+
+    onGranularityChange(granularity) {
+      this.set('granularity', granularity);
+
+      this.send('updateContext');
+    },
+
+    onFiltersChange(filters) {
+      this.set('filters', filters);
+      this.send('updateContext');
     }
   }
 });

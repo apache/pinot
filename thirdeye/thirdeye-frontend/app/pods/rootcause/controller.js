@@ -2,19 +2,23 @@ import Ember from 'ember';
 import { makeIterable, filterObject, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
+import moment from 'moment';
 
-const { getProperties } = Ember;
+const {
+  getProperties,
+  get,
+  setProperties
+} = Ember;
 
 export default Ember.Controller.extend({
   queryParams: [
     'granularity',
     'filters',
-    'baselineStart',
-    'baselineEnd',
-    'anomalyStart',
-    'anomalyEnd',
-    'analysisStart',
-    'analysisEnd'
+    'compareMode',
+    'anomalyRangeStart',
+    'anomalyRangeEnd',
+    'analysisRangeStart',
+    'analysisRangeEnd'
   ],
   entitiesService: Ember.inject.service('rootcause-entities-cache'), // service
 
@@ -69,8 +73,35 @@ export default Ember.Controller.extend({
 
   options: Ember.computed('model', function() {
     const model = this.get('model');
-    return getProperties(model, ['granularities', 'filters', 'maxTime']);
+    return getProperties(model, ['granularityOptions', 'filterOptions', 'maxTime', 'compareModeOptions']);
   }),
+
+  selectedOptions: Ember.computed(function() {
+    const queryParams = get(this, 'queryParams');
+
+    return queryParams.reduce((hash, param) => {
+      const value = this.queryToOption(param, get(this, param));
+      
+      hash[param] = value;
+      return hash;
+    }, {});
+  }),
+
+  queryToOption(key, value) {
+    switch(key) {
+      case 'baselineRangeStart':
+      case 'baselineRangeEnd':
+      case 'anomalyRangeStart':
+      case 'anomalyRangeEnd':
+      case 'analysisRangeStart':
+      case 'analysisRangeEnd':
+        return moment(+value).isValid ? parseInt(value) : undefined;
+      case 'granularity':
+      case 'filters':
+      case 'compareMode':
+        return value;
+    }
+  },
 
   entities: Ember.computed(
     'entitiesService.entities',
@@ -235,9 +266,40 @@ export default Ember.Controller.extend({
       this.set('selectedUrns', new Set(Object.keys(entities)));
     },
 
-    settingsOnChange(context) {
+    settingsOnChange(newParams) {
       console.log('settingsOnChange()');
-      this.set('context', context);
+      console.log('settingsOnChange: context', newParams);
+      
+      const queryParams = get(this, 'queryParams');
+      
+      const paramsToUpdate = queryParams
+      .filter(param => newParams[param])
+      .reduce((hash, param) => {
+        hash[param] = newParams[param]; 
+        return hash;
+      }, {});
+      
+      const analysisRangeStart = paramsToUpdate.analysisRangeStart || this.get('analysisRangeStart');
+      const analysisRangeEnd = paramsToUpdate.analysisRangeEnd || this.get('analysisRangeEnd');
+      const compareMode = paramsToUpdate.compareMode || this.get('compareMode');
+
+      //set baselineStart and End
+
+      const offset = {
+        WoW: 1,
+        Wo2W: 2,
+        Wo3W: 3,
+        Wo4W: 4
+      }[compareMode];
+
+      const baselineRangeStart = moment(analysisRangeStart).subtract(offset, 'weeks').valueOf();
+      const baselineRangeEnd = moment(analysisRangeEnd).subtract(offset, 'weeks').valueOf();
+
+      setProperties(this, {
+        ...paramsToUpdate,
+        baselineRangeStart,
+        baselineRangeEnd
+      });
     },
 
     addSelectedUrns(urns) {

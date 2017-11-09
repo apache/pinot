@@ -1,8 +1,17 @@
 <p>testing | <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a></p>
 
+<h3>Controller properties:</h3>
+Settings | urns: {{input value=urnString}} | anomalyRangeStart: {{input value=anomalyRangeStart}} | anomalyRangeEnd: {{input
+value=anomalyRangeEnd}} | baselineRangeStart: {{input value=baselineRangeStart}} | baselineRangeEnd: {{input value=baselineRangeEnd}}
+| analysisRangeStart: {{input value=analysisRangeStart}} | analysisRangeEnd: {{input value=analysisRangeEnd}} | granularity:
+{{input value=granularity}} |
+{{!-- <button {{action "updateContext"}}>update</button> --}}
+
+<h3>This is the settings bar.</h3>
 {{rootcause-settings
   context=context
   options=options
+  selectedOptions=selectedOptions
   onChange=(action "settingsOnChange")
 }}
 
