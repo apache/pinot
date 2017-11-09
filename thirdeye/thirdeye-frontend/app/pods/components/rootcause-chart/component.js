@@ -2,6 +2,10 @@ import Ember from 'ember';
 import d3 from 'd3';
 import moment from 'moment';
 
+const TIMESERIES_MODE_ABSOLUTE = 'absolute';
+const TIMESERIES_MODE_RELATIVE = 'relative';
+const TIMESERIES_MODE_LOG = 'log';
+
 export default Ember.Component.extend({
   entities: null, // {}
 
@@ -16,6 +20,13 @@ export default Ember.Component.extend({
   baselineRange: null, // [2]
 
   analysisRange: null, // [2]
+
+  timeseriesMode: null, // 'absolute', 'relative', 'log'
+
+  init() {
+    this._super(...arguments);
+    this.set('timeseriesMode', TIMESERIES_MODE_ABSOLUTE);
+  },
 
   legend: {
     show: false
@@ -44,6 +55,7 @@ export default Ember.Component.extend({
     'selectedUrns',
     'anomalyRange',
     'baselineRange',
+    'timeseriesMode',
     function () {
       const { entities, selectedUrns, anomalyRange, baselineRange } =
         this.getProperties('entities', 'selectedUrns', 'anomalyRange', 'baselineRange');
@@ -125,10 +137,9 @@ export default Ember.Component.extend({
   _eventValues: Ember.computed(
     'entities',
     'selectedUrns',
-    'analysisRange',
     function () {
-      const { entities, selectedUrns, analysisRange } =
-        this.getProperties('entities', 'selectedUrns', 'analysisRange');
+      const { entities, selectedUrns } =
+        this.getProperties('entities', 'selectedUrns');
 
       const selectedEvents = [...selectedUrns].filter(urn => entities[urn] && entities[urn].type == 'event').map(urn => entities[urn]);
 
@@ -183,24 +194,28 @@ export default Ember.Component.extend({
 
   _entityToSeries(entity) {
     if (entity.type == 'metric') {
-      const { timeseries } = this.getProperties('timeseries');
+      const { timeseries, timeseriesMode } = this.getProperties('timeseries', 'timeseriesMode');
 
-      return {
+      const series = {
         timestamps: timeseries[entity.urn].timestamps,
         values: timeseries[entity.urn].values,
         type: 'line',
         axis: 'y'
       };
 
-    } else if (entity.type == 'frontend:baseline:metric') {
-      const { timeseries } = this.getProperties('timeseries');
+      return this._transformSeries(timeseriesMode, series);
 
-      return {
+    } else if (entity.type == 'frontend:baseline:metric') {
+      const { timeseries, timeseriesMode } = this.getProperties('timeseries', 'timeseriesMode');
+
+      const series = {
         timestamps: timeseries[entity.urn].timestamps,
         values: timeseries[entity.urn].values,
         type: 'scatter',
         axis: 'y'
       };
+
+      return this._transformSeries(timeseriesMode, series);
 
     } else if (entity.type == 'dimension') {
       // TODO requires support for urn with metric id + filter
@@ -217,6 +232,31 @@ export default Ember.Component.extend({
         axis: 'y2'
       };
     }
+  },
+
+  _transformSeries(mode, series) {
+    switch(mode) {
+      case TIMESERIES_MODE_ABSOLUTE:
+        return series; // raw data
+      case TIMESERIES_MODE_RELATIVE:
+        return this._transformSeriesRelative(series);
+      case TIMESERIES_MODE_LOG:
+        return this._transformSeriesLog(series);
+    }
+    return series;
+  },
+
+  _transformSeriesRelative(series) {
+    const first = series.values.filter(v => v)[0];
+    const output = Object.assign({}, series);
+    output.values = series.values.map(v => 1.0 * v / first);
+    return output;
+  },
+
+  _transformSeriesLog(series) {
+    const output = Object.assign({}, series);
+    output.values = series.values.map(v => Math.log(v));
+    return output;
   },
 
   _onHover(d) {
