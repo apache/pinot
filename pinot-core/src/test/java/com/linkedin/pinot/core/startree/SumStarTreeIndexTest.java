@@ -41,8 +41,8 @@ public class SumStarTreeIndexTest extends BaseStarTreeIndexTest {
   private static final String[] HARD_CODED_QUERIES = new String[]{
       "SELECT SUM(m1) FROM T",
       "SELECT SUM(m1) FROM T WHERE d1 = 'd1-v1'",
-      "SELECT SUM(m1) FROM T WHERE d1 <> 'd1-v1'",
-      "SELECT SUM(m1) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3'",
+      "SELECT SUM(m1) FROM T WHERE d1 <> 'd1-v1' AND d1 >= 'd1-v2'",
+      "SELECT SUM(m1) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' AND d1 <> 'd1-v2'",
       "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2')",
       "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1')",
       "SELECT SUM(m1) FROM T GROUP BY d1",
@@ -53,7 +53,7 @@ public class SumStarTreeIndexTest extends BaseStarTreeIndexTest {
       "SELECT SUM(m1) FROM T WHERE d1 <> 'd1-v1' GROUP BY d2",
       "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') GROUP BY d2",
       "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3",
-      "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3, d4"
+      "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') AND d2 > 'd2-v2' GROUP BY d3, d4"
   };
 
   @Override

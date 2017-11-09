@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -29,11 +28,12 @@ import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.EmptyFilterOperator;
+import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
-import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
+import com.linkedin.pinot.core.operator.filter.StarTreeIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import java.util.ArrayList;
@@ -60,12 +60,11 @@ public class FilterPlanNode implements PlanNode {
   public Operator run() {
     long start = System.currentTimeMillis();
     Operator operator;
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    if (_segment.getSegmentMetadata().hasStarTree() && RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(),
-        filterQueryTree, _brokerRequest)) {
-      operator = new StarTreeIndexOperator(_segment, _brokerRequest);
+    FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
+    if (RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), _brokerRequest, rootFilterNode)) {
+      operator = new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode);
     } else {
-      operator = constructPhysicalOperator(filterQueryTree, _segment);
+      operator = constructPhysicalOperator(rootFilterNode, _segment);
     }
     long end = System.currentTimeMillis();
     LOGGER.debug("FilterPlanNode.run took:{}", (end - start));
@@ -97,7 +96,7 @@ public class FilterPlanNode implements PlanNode {
           }
           childFilterOperators.add(childFilterOperator);
         }
-        reorder(childFilterOperators);
+        FilterOperatorUtils.reOrderFilterOperators(childFilterOperators);
         return new AndOperator(childFilterOperators);
       } else {
         for (FilterQueryTree childFilter : childFilters) {
@@ -111,69 +110,19 @@ public class FilterPlanNode implements PlanNode {
         } else if (childFilterOperators.size() == 1) {
           return childFilterOperators.get(0);
         } else {
-          reorder(childFilterOperators);
           return new OrOperator(childFilterOperators);
         }
       }
     } else {
       Predicate predicate = Predicate.newPredicate(filterQueryTree);
       DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
-      PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource);
-      if (predicateEvaluator.isAlwaysFalse()) {
-        return EmptyFilterOperator.getInstance();
-      }
-
-      DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+      PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource);
       int startDocId = 0;
       // TODO: make it exclusive
       // NOTE: end is inclusive
       int endDocId = segment.getSegmentMetadata().getTotalRawDocs() - 1;
-
-      // Use inverted index if the filter type is not RANGE or REGEXP_LIKE for efficiency
-      if (dataSourceMetadata.hasInvertedIndex() && (filterType != FilterOperator.RANGE) && (filterType
-          != FilterOperator.REGEXP_LIKE)) {
-        if (dataSourceMetadata.isSorted()) {
-          return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
-        } else {
-          return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
-        }
-      } else {
-        return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
-      }
+      return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
     }
-  }
-
-  /**
-   * Re orders operators, puts Sorted -> Inverted and then Raw scan. TODO: With Inverted, we can
-   * further optimize based on cardinality
-   * @param operators
-   */
-  private static void reorder(List<BaseFilterOperator> operators) {
-
-    final Map<Operator, Integer> operatorPriorityMap = new HashMap<>();
-    for (Operator operator : operators) {
-      Integer priority = Integer.MAX_VALUE;
-      if (operator instanceof SortedInvertedIndexBasedFilterOperator) {
-        priority = 0;
-      } else if (operator instanceof AndOperator) {
-        priority = 1;
-      } else if (operator instanceof BitmapBasedFilterOperator) {
-        priority = 2;
-      } else if (operator instanceof ScanBasedFilterOperator) {
-        priority = 3;
-      } else if (operator instanceof OrOperator) {
-        priority = 4;
-      }
-      operatorPriorityMap.put(operator, priority);
-    }
-
-    Comparator<? super Operator> comparator = new Comparator<Operator>() {
-      @Override
-      public int compare(Operator o1, Operator o2) {
-        return Integer.compare(operatorPriorityMap.get(o1), operatorPriorityMap.get(o2));
-      }
-    };
-    Collections.sort(operators, comparator);
   }
 
   @Override
