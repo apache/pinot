@@ -3,6 +3,7 @@ import { checkStatus, makeIterable, filterObject } from 'thirdeye-frontend/helpe
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import fetch from 'fetch';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
+import _ from 'lodash';
 
 //
 // Controller
@@ -109,6 +110,7 @@ export default Ember.Controller.extend({
     function () {
       console.log('eventFilterEntities()');
       const { entities } = this.getProperties('entities');
+      console.log("printing entities: ", entities);
       return filterObject(entities, (e) => e.type == 'event');
     }
   ),
@@ -486,6 +488,70 @@ export default Ember.Controller.extend({
       });
     });
     return aggregates;
+  },
+
+  /**
+   * Returns object that represents mapping between attributes in events and input values in config
+   * Example:
+   * {
+   *  holiday: {
+   *    countryCode: ['US', 'IN', 'MX'],
+   *    region: ['North America', 'Antarctica']
+   *  },
+   *  deployment: {
+   *    fabric: ['prod', 'local']
+   *  }
+   * }
+   * @type {Object}
+   */
+  attributes: Ember.computed(
+    'eventFilterEntities',
+    function() {
+      let filteredEvents = this.get('eventFilterEntities');
+      let map = {};
+      if (!_.isEmpty(filteredEvents)) {
+        // Iterate through each event
+        Object.keys(filteredEvents).forEach(key => {
+          const event = filteredEvents[key];
+          const eventType = event.eventType;
+          // Iterate through each property of event's attributes object
+          Object.keys(event.attributes).forEach(attr => {
+            // Check if the attribute is in the config file
+            if (this.isInConfig(attr)) {
+              // If map has a key of eventType (i.e. holidays, GCN, Lix)
+              if (map.hasOwnProperty(eventType)) {
+                // If eventType object in map doesn't have this attribute, add values to existing value set
+                if (map[eventType].hasOwnProperty(attr)) {
+                  let attrSet = map[eventType][attr];
+                  let values = event.attributes[attr];
+                  values.forEach(val => attrSet.add(val));
+                }
+                // If eventType object in map does have this attribute, create a set with those values
+                else {
+                  // Create set and add values there
+                  map[eventType][attr] = new Set(event.attr);
+                }
+              }
+              // If map doesn't have a key of eventType (i.e. holidays, GCN, Lix)
+              else {
+                let obj = {[attr]: new Set(event.attributes.countryCode)};
+                map[eventType] = obj;
+              }
+            }
+          });
+        });
+      }
+
+      console.log("map: ", map);
+    }
+  ),
+
+  /**
+   * @method isInConfig
+   * @param {String} attribute - name of attribute to check against config's input's labelMapping
+   */
+  isInConfig(attribute) {
+    return config.some(filterBlock => filterBlock.inputs.some(input => attribute === input.labelMapping));
   },
 
   //
