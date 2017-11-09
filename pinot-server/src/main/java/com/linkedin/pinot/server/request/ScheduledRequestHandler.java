@@ -127,7 +127,7 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
     ListenableFuture<byte[]> queryResponse = queryScheduler.submit(queryRequest);
     requestProcessingLatency.stop();
     long latency = requestProcessingLatency.getLatencyMs();
-    final ServerLatencyMetric metric = new ServerLatencyMetric(queryStartTimeMs, requestProcessingLatency.getLatencyMs()*1.0, 1.0*instanceRequest.getSearchSegmentsSize());
+    ServerLatencyMetric metric = new ServerLatencyMetric(queryStartTimeMs, requestProcessingLatency.getLatencyMs()*1.0, 1.0*instanceRequest.getSearchSegmentsSize());
     workload.addWorkLoad(instanceRequest.getQuery().getQuerySource().getTableName(), metric);
     return queryResponse;
   }
