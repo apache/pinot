@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.linkedin.pinot.controller.api.events.DefaultMetadataChangeNotifierFactory;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.StringUtil;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -23,8 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.StringUtil;
 
 public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
@@ -52,7 +51,6 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
   private static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
-  private static final String METADATA_CHANGE_NOTIFIER_FACTORY_CLASS = "metadata.change.notifier.factory.class";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -67,7 +65,6 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "com.linkedin.pinot.controller.api.access.AllowAllAccessFactory";
-  private static final String DEFAULT_METADATA_CHANGE_NOTIFIER_FACTORY_CLASS = DefaultMetadataChangeNotifierFactory.class.getName();
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -340,13 +337,5 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setAccessControlFactoryClass(String accessControlFactoryClass) {
     setProperty(ACCESS_CONTROL_FACTORY_CLASS, accessControlFactoryClass);
-  }
-
-  public String getMetadataChangeNotifierFactory() {
-    return getString(METADATA_CHANGE_NOTIFIER_FACTORY_CLASS, DEFAULT_METADATA_CHANGE_NOTIFIER_FACTORY_CLASS);
-  }
-
-  public void setMetadataChangeNotifierFactory(String metadataChangeNotifierFactoryClass) {
-    setProperty(METADATA_CHANGE_NOTIFIER_FACTORY_CLASS, metadataChangeNotifierFactoryClass);
   }
 }

@@ -23,7 +23,7 @@ public class DefaultMetadataChangeNotifier implements MetadataChangeNotifier {
 
   }
 
-  public void notifyOnSegmentFlush() {
+  public void notifyOnSegmentFlush(String kafkaTopic, String tableName, long offset) {
 
   }
 }

@@ -43,7 +43,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
@@ -155,12 +154,8 @@ public class ControllerStarter {
       final AccessControlFactory accessControlFactory =
           (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
 
-      final Configuration metadataChangeNotifierFactoryConfig = config.subset(METADATA_CHANGE_NOTIFIER_PREFIX);
-      String metadataChangeNotifierClass = config.getMetadataChangeNotifierFactory();
-      LOGGER.info("Use class: {} as the metadata change notifier factory", metadataChangeNotifierClass);
-      final MetadataChangeNotifierFactory metadataChangeNotifierFactory =
-          (MetadataChangeNotifierFactory) Class.forName(metadataChangeNotifierClass).newInstance();
-      metadataChangeNotifierFactory.loadFactory(metadataChangeNotifierFactoryConfig);
+      final MetadataChangeNotifierFactory metadataChangeNotifierFactory = MetadataChangeNotifierFactory.loadFactory(
+          config.subset(METADATA_CHANGE_NOTIFIER_PREFIX));
 
       int jerseyPort = Integer.parseInt(config.getControllerPort());
 

@@ -177,7 +177,7 @@ public class PinotSchemaRestletResource {
         // New schema posted
         oldSchema = null;
       } else {
-        oldSchema = Schema.fromString(getSchema(schema.getSchemaName()));
+        oldSchema = _pinotHelixResourceManager.getSchema(schemaName);
       }
       _pinotHelixResourceManager.addOrUpdateSchema(schema);
 

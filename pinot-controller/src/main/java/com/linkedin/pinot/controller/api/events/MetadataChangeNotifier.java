@@ -21,5 +21,5 @@ import com.linkedin.pinot.common.data.Schema;
 public interface MetadataChangeNotifier {
   void notifyOnSchemaEvents(Schema oldSchema, Schema newSchema);
 
-  void notifyOnSegmentFlush();
+  void notifyOnSegmentFlush(String kafkaTopic, String tableName, long offset);
 }

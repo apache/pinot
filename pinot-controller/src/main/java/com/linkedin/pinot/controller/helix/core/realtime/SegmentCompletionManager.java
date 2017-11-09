@@ -297,9 +297,9 @@ public class SegmentCompletionManager {
       _fsmMap.remove(segmentNameStr);
     }
 
-    // TODO: Get the kafka topic + window & emit mle for realtime segments
-    LOGGER.info("Emitting metadata change notification for Kafka topic {}, table name {}, offset {}, time window {} to {}",
-         /* topic */ null, segmentName.getTableName(), offset, null, null);
+    // TODO: Get the kafka topic emit mle for realtime segments
+    LOGGER.info("Emitting metadata change notification for Kafka topic {}, table name {}, offset {}",
+         /* topic */ null, segmentName.getTableName(), offset);
     
     return response;
   }
