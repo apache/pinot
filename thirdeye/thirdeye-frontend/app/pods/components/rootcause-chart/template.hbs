@@ -1,3 +1,8 @@
+mode
+| <button {{action (mut timeseriesMode) "absolute"}}>absolute</button>
+| <button {{action (mut timeseriesMode) "relative"}}>relative</button>
+| <button {{action (mut timeseriesMode) "log"}}>log</button>
+
 {{timeseries-chart
   series=series
   tooltip=tooltip
