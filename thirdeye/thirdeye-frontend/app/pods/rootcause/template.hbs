@@ -23,8 +23,8 @@ type
   entities=entities
   selectedUrns=selectedUrns
   invisibleUrns=invisibleUrns
-  onVisibility=(action "legendOnVisibility")
-  onSelection=(action "legendOnSelection")
+  onVisibility=(action "onVisibility")
+  onSelection=(action "onSelection")
 }}
 
 <h3>This is the graph.</h3>
@@ -64,10 +64,17 @@ urns
       entities=eventTableEntities
       columns=eventTableColumns
       selectedUrns=selectedUrns
-      onSelect=(action "tableOnSelect")
+      onSelection=(action "onSelection")
     }}
   </div>
 </div>
+
+<h3>This is the metric tab.</h3>
+{{rootcause-metrics
+  entities=metricEntities
+  selectedUrns=selectedUrns
+  onSelection=(action "onSelection")
+}}
 
 <h3>This is the heatmap.</h3>
 {{rootcause-heatmap

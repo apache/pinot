@@ -27,13 +27,16 @@ export default Ember.Component.extend({
       const { onVisibility, invisibleUrns } = this.getProperties('onVisibility', 'invisibleUrns');
       if (onVisibility) {
         const state = invisibleUrns.has(urn);
-        onVisibility(urn, state);
+        const updates = { [urn]: state };
+        onVisibility(updates);
       }
     },
+    
     removeUrn(urn) {
       const { onSelection } = this.getProperties('onSelection');
       if (onSelection) {
-        onSelection(urn, false);
+        const updates = { [urn]: false };
+        onSelection(updates);
       }
     }
   }

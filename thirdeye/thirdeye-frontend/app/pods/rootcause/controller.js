@@ -142,6 +142,15 @@ export default Ember.Controller.extend({
     }
   ),
 
+  metricEntities: Ember.computed(
+    'entities',
+    function () {
+      console.log('metricEntities()');
+      const { entities } = this.getProperties('entities');
+      return filterObject(entities, (e) => e.type == 'metric');
+    }
+  ),
+
   isLoadingEntities: Ember.computed(
     'entities',
     '_pendingEntitiesRequests',
@@ -484,44 +493,25 @@ export default Ember.Controller.extend({
   //
 
   actions: {
-    legendOnVisibility(urns, state) {
-      console.log('legendOnVisibility()');
+    onSelection(updates) {
+      console.log('onSelection()');
+      console.log('onSelection: updates', updates);
+      const { selectedUrns } = this.getProperties('selectedUrns');
+      Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
+      Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
+      this.set('selectedUrns', new Set(selectedUrns));
+    },
+
+    onVisibility(updates) {
+      console.log('onVisibility()');
+      console.log('onVisibility: updates', updates);
       const { invisibleUrns } = this.getProperties('invisibleUrns');
-      if (state) {
-        makeIterable(urns).forEach(urn => invisibleUrns.delete(urn));
-      } else {
-        makeIterable(urns).forEach(urn => invisibleUrns.add(urn));
-      }
-      console.log('legendOnVisibility: invisibleUrns', invisibleUrns);
+      Object.keys(updates).filter(urn => updates[urn]).forEach(urn => invisibleUrns.delete(urn));
+      Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => invisibleUrns.add(urn));
       this.set('invisibleUrns', new Set(invisibleUrns));
     },
 
-    legendOnSelection(urns, state) {
-      console.log('legendOnSelection()');
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      if (state) {
-        makeIterable(urns).forEach(urn => selectedUrns.add(urn));
-      } else {
-        makeIterable(urns).forEach(urn => selectedUrns.delete(urn));
-      }
-      console.log('legendOnVisibility: selectedUrns', selectedUrns);
-      this.set('selectedUrns', new Set(selectedUrns));
-    },
-
-    tableOnSelect(tableUrns) {
-      console.log('tableOnSelect()');
-      const { entities, filteredUrns, selectedUrns } =
-        this.getProperties('entities', 'filteredUrns', 'selectedUrns');
-
-      const tableEventUrns = new Set(tableUrns);
-      const selectedEventUrns = new Set(makeIterable(selectedUrns).filter(urn => entities[urn] && entities[urn].type == 'event'));
-
-      makeIterable(selectedEventUrns).filter(urn => filteredUrns.has(urn) && !tableEventUrns.has(urn)).forEach(urn => selectedUrns.delete(urn));
-      makeIterable(tableEventUrns).forEach(urn => selectedUrns.add(urn));
-
-      this.set('selectedUrns', new Set(selectedUrns));
-    },
-
+    // TODO refactor filter to match onSelection()
     filterOnSelect(urns) {
       console.log('filterOnSelect()');
       this.set('filteredUrns', new Set(urns));
