@@ -24,8 +24,8 @@ public class NettyServerWorkload {
     protected int threads = THREADS;
     protected ExecutorService threadPool = Executors.newFixedThreadPool(THREADS);
     protected AsynchronousFileChannel log;
-    public static final long CAPTURE_WINDOW = 10000;
-    public static final long FLUSH_WINDOW = 1000000;
+    public static final long CAPTURE_WINDOW = 1;
+    public static final long FLUSH_WINDOW = 1;
     private final Map<String, ServerLoadMetrics> avgLoadMap;
 
     public NettyServerWorkload(){
@@ -44,15 +44,14 @@ public class NettyServerWorkload {
                 list.add(load);
             }
         }else{
-            ArrayList<ServerLatencyMetric> list = new ArrayList<>();
-            load._numRequests = 1;
-            list.add(load);
             ServerLoadMetrics loadMetrics = new ServerLoadMetrics();
-            loadMetrics.set_latencies(list);
+            loadMetrics.set_latencies(new ArrayList<ServerLatencyMetric>());
+            load._numRequests = 1;
+            loadMetrics.get_latencies().add(load);
             avgLoadMap.put(tableName, loadMetrics);
         }
 
-        //flushRecords(tableName);
+        flushRecords(tableName);
     }
 
     private void updateLastWindow(String tableName, ServerLatencyMetric load) {
@@ -81,7 +80,7 @@ public class NettyServerWorkload {
             return;
         }
 
-        String filePath = "../../../../../../../../../workloadData/" + tableName + ".log";
+        String filePath = "target/workloadData/" + tableName + ".log";
         Path path = Paths.get(filePath);
         Path parentDir = path.getParent();
 
@@ -120,17 +119,21 @@ public class NettyServerWorkload {
 
     private String getRecordsToWrite(String tableName) {
         List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
-        if(list.size()*ServerLatencyMetric.OBJ_SIZE > FLUSH_WINDOW){
-            long size = list.size()*ServerLatencyMetric.OBJ_SIZE;
+        if(list.size() >= FLUSH_WINDOW){
+            long size = list.size();
             String msg = "";
             StringBuilder builder = new StringBuilder(msg);
-            while(size > FLUSH_WINDOW){
+            while(size >= FLUSH_WINDOW){
                 ServerLatencyMetric record = list.get(0);
                 builder.append(record.toString());
                 list.remove(0);
-                size = size - ServerLatencyMetric.OBJ_SIZE;
+                size = size - 1;
             }
-            return msg;
+
+            if(list.size() == 0){
+                avgLoadMap.remove(tableName);
+            }
+            return builder.toString();
         }else{
             return null;
         }
