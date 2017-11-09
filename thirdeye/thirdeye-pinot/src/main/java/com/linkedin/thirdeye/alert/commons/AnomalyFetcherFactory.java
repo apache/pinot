@@ -11,5 +11,6 @@ public class AnomalyFetcherFactory extends BaseFactory<AnomalyFetcher>{
       throws ClassNotFoundException, IllegalAccessException, InstantiationException{
     String classPath = PACKAGE_PATH + "." + className;
     return (new BaseFactory<AnomalyFetcher>()).getInstance(classPath);
+
   }
 }
