@@ -75,7 +75,7 @@ export default Ember.Component.extend({
 
   actions: {
     /**
-     * Handles selection of filter items.
+     * Handles selection of filter items within an event type.
      * @method onFilterSelection
      */
     onFilterSelection() {
@@ -87,9 +87,10 @@ export default Ember.Component.extend({
      * @method filterByEvent
      * @param {Object} clickedBlock - selected filter block object
      */
-    filterByEvent(clickedBlock) {
+    selectEventType(clickedBlock) {
       // Hide all other blocks when one is clicked
       let filterBlocks = this.get('config');
+
       filterBlocks.forEach(block => {
         Ember.set(block, 'isHidden', true);
       });
@@ -97,7 +98,13 @@ export default Ember.Component.extend({
       // Note: toggleProperty will not be able to find 'filterBlocks', as it is not an observed property
       // Show clickedBlock
       Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
-      this.attrs.onTabChange(clickedBlock.eventType);
+
+      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
+      if (onSelect != null) {
+        const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event')
+                                          .filter(urn => entities[urn].eventType == clickedBlock.eventType);
+        onSelect(urns);
+      }
     }
   }
 });
