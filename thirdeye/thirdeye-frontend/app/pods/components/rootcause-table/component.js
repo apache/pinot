@@ -7,7 +7,7 @@ export default Ember.Component.extend({
 
   selectedUrns: null, // Set
 
-  onSelect: null, // function (e)
+  onSelection: null, // function (e)
 
   data: Ember.computed(
     'entities',
@@ -32,9 +32,17 @@ export default Ember.Component.extend({
 
   actions: {
     displayDataChanged (e) {
-      const { onSelect } = this.getProperties('onSelect');
-      if (onSelect != null) {
-        onSelect(e.selectedItems.map(e => e.urn));
+      const { entities, selectedUrns, onSelection } = this.getProperties('entities', 'selectedUrns', 'onSelection');
+      if (onSelection) {
+        const table = new Set(e.selectedItems.map(e => e.urn));
+        const added = [...table].filter(urn => !selectedUrns.has(urn));
+        const removed = [...selectedUrns].filter(urn => entities[urn] && !table.has(urn));
+
+        const updates = {};
+        added.forEach(urn => updates[urn] = true);
+        removed.forEach(urn => updates[urn] = false);
+
+        onSelection(updates);
       }
     }
   }
