@@ -28,7 +28,6 @@ export default Ember.Service.extend({
 
     frameworks.forEach(framework => {
       const url = this._makeUrl(framework, requestContext);
-      console.log('rootcauseEntitiesCache: request: fetching url', url);
       fetch(url)
         // .then(checkStatus) // TODO why doesn't this return parsed json here?
         .then(res => res.json())
@@ -99,7 +98,6 @@ export default Ember.Service.extend({
   },
 
   _jsonToEntities(res) {
-    console.log('rootcauseEntitiesCache: _jsonToEntities()', res);
     const entities = {};
     res.forEach(e => entities[e.urn] = e);
     return entities;

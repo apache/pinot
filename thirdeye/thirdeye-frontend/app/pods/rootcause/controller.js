@@ -63,18 +63,6 @@ export default Ember.Controller.extend({
   // Public properties (computed)
   //
 
-  // entities: Ember.computed(
-  //   '_entitiesLoader',
-  //   '_entitiesCache',
-  //   'context',
-  //   'selectedUrns',
-  //   function () {
-  //     console.log('entities()');
-  //     this.get('_entitiesLoader'); // trigger loader. hacky
-  //     return Object.assign({}, this.get('_entitiesCache'));
-  //   }
-  // ),
-
   entities: Ember.computed(
     'entitiesService.entities',
     function () {
@@ -184,11 +172,10 @@ export default Ember.Controller.extend({
   ),
 
   isLoadingEntities: Ember.computed(
-    'entities',
-    '_pendingEntitiesRequests',
+    'entitiesService.entities',
     function () {
-      this.get('entities'); // force entities computation first
-      return this.get('_pendingEntitiesRequests').size > 0;
+      console.log('isLoadingEntities()');
+      return this.get('entitiesService.pending').size > 0;
     }
   ),
 
@@ -200,120 +187,6 @@ export default Ember.Controller.extend({
       return this.get('_pendingTimeseriesRequests').size > 0;
     }
   ),
-
-  //
-  // Entities loading
-  //
-
-  _entitiesLoader: Ember.computed(
-    'context',
-    'anomalyRegion',
-    'baselineRegion',
-    'analysisRegion',
-    function () {
-      console.log('_entitiesLoader()');
-      this._startRequestEntities();
-    }
-  ),
-
-  _startRequestEntities() {
-    console.log('_startRequestEntities()');
-    const { context, _pendingEntitiesRequests: pending } =
-      this.getProperties('context', '_pendingEntitiesRequests');
-
-    const frameworks = new Set(['relatedEvents', 'relatedDimensions', 'relatedMetrics']);
-
-    // TODO prevent skipping overlapping changes to context
-    [...pending].forEach(framework => frameworks.delete(framework));
-
-    if (frameworks.size <= 0) {
-      return;
-    }
-
-    [...frameworks].forEach(framework => pending.add(framework));
-
-    this.setProperties({ _pendingEntitiesRequests: pending });
-    this.notifyPropertyChange('_pendingEntitiesRequests');
-
-    frameworks.forEach(framework => {
-      const url = this._makeFrameworkUrl(framework, context);
-      fetch(url)
-        .then(checkStatus)
-        .then(this._resultToEntities)
-        .then(json => this._completeRequestEntities(json, framework));
-    });
-
-  },
-
-  _completeRequestEntities(incoming, framework) {
-    console.log('_completeRequestEntities()');
-    const { selectedUrns, _pendingEntitiesRequests: pending, _entitiesCache: entitiesCache, _timeseriesCache: timeseriesCache } =
-      this.getProperties('selectedUrns', '_pendingEntitiesRequests', '_entitiesCache', '_timeseriesCache');
-
-    // update pending requests
-    pending.delete(framework);
-
-    // timeseries eviction
-    // TODO optimize for same time range reload
-    Object.keys(incoming).forEach(urn => delete timeseriesCache[urn]);
-    Object.keys(incoming).forEach(urn => delete timeseriesCache[this._makeMetricBaselineUrn(urn)]);
-
-    // entities eviction
-    const candidates = this._entitiesEvictionUrns(entitiesCache, framework);
-    [...candidates].filter(urn => !selectedUrns.has(urn)).forEach(urn => delete entitiesCache[urn]);
-
-    // augmentation
-    const augmented = Object.assign({}, incoming, this._entitiesMetricsAugmentation(incoming));
-
-    // update entities cache
-    Object.keys(augmented).forEach(urn => entitiesCache[urn] = augmented[urn]);
-
-    this.setProperties({ _entitiesCache: entitiesCache, _timeseriesCache: timeseriesCache, _pendingEntitiesRequests: pending });
-    this.notifyPropertyChange('_timeseriesCache');
-    this.notifyPropertyChange('_entitiesCache');
-    this.notifyPropertyChange('_pendingEntitiesRequests');
-  },
-
-  _entitiesEvictionUrns(cache, framework) {
-    if (framework == 'relatedEvents') {
-      return new Set(Object.keys(cache).filter(urn => cache[urn].type == 'event'));
-    }
-    if (framework == 'relatedDimensions') {
-      return new Set(Object.keys(cache).filter(urn => cache[urn].type == 'dimension'));
-    }
-    if (framework == 'relatedMetrics') {
-      return new Set(Object.keys(cache).filter(urn => cache[urn].type == 'metric'));
-    }
-  },
-
-  _entitiesMetricsAugmentation(incoming) {
-    console.log('_entitiesMetricsAugmentation()');
-    const entities = {};
-    Object.keys(incoming).filter(urn => incoming[urn].type == 'metric').forEach(urn => {
-      const baselineUrn = this._makeMetricBaselineUrn(urn);
-      entities[baselineUrn] = {
-        urn: baselineUrn,
-        type: 'frontend:baseline:metric',
-        label: incoming[urn].label + ' (baseline)'
-      };
-    });
-    return entities;
-  },
-
-  _makeFrameworkUrl(framework, context) {
-    const urnString = [...context.urns].join(',');
-    return `/rootcause/query?framework=${framework}` +
-      `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
-      `&baselineStart=${context.baselineRange[0]}&baselineEnd=${context.baselineRange[1]}` +
-      `&analysisStart=${context.analysisRange[0]}&analysisEnd=${context.analysisRange[1]}` +
-      `&urns=${urnString}`;
-  },
-
-  _resultToEntities(res) {
-    const entities = {};
-    res.forEach(e => entities[e.urn] = e);
-    return entities;
-  },
 
   //
   // Timeseries loading
