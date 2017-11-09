@@ -34,15 +34,17 @@ import org.testng.annotations.Test;
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
   public static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
-  public static final long seed = System.currentTimeMillis();
-  public static final Random RANDOM = new Random(seed);
-  public static final boolean isDirectAlloc = RANDOM.nextDouble() < 0.5;
+  public static final long RANDOM_SEED = System.currentTimeMillis();
+  public static final Random RANDOM = new Random(RANDOM_SEED);
+
+  public final boolean _isDirectAlloc = RANDOM.nextBoolean();
+  public final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
 
   @BeforeClass
   @Override
   public void setUp() throws Exception {
     // TODO Avoid printing to stdout. Instead, we need to add the seed to every assert in this (and super-classes)
-    System.out.println("========== Using random seed value " + seed);
+    System.out.println("========== Using random seed value " + RANDOM_SEED);
     // Remove the consumer directory
     File consumerDirectory = new File(CONSUMER_DIRECTORY);
     if (consumerDirectory.exists()) {
@@ -65,9 +67,9 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @Override
   protected void overrideServerConf(Configuration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, "true");
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, Boolean.toString(isDirectAlloc));
-    if (RANDOM.nextDouble() < 0.5) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
+    if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
     }
   }
@@ -75,9 +77,8 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   @Test
   public void testConsumerDirectoryExists() {
     File consumerDirectory = new File(CONSUMER_DIRECTORY, "mytable_REALTIME");
-    if (!isDirectAlloc) {
-      Assert.assertTrue(consumerDirectory.exists(), "The off heap consumer directory does not exist");
-    }
+    Assert.assertEquals(consumerDirectory.exists(), _isConsumerDirConfigured,
+        "The off heap consumer directory does not exist");
   }
 
   @Test
