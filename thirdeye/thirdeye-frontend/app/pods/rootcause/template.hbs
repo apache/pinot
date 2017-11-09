@@ -19,16 +19,13 @@ type
 }}
 
 <h3>This is the legend.</h3>
-urns
-{{#each selectedUrns as |urn|}}
-  |
-  {{input
-    type="checkbox"
-    checked=(set-has-not invisibleUrns urn)
-    click=(action "toggleInvisible" urn)}}
-  {{urn}}
-  <a {{action "removeSelectedUrns" urn}}>[X]</a>
-{{/each}}
+{{rootcause-legend
+  entities=entities
+  selectedUrns=selectedUrns
+  invisibleUrns=invisibleUrns
+  onVisibility=(action "legendOnVisibility")
+  onSelection=(action "legendOnSelection")
+}}
 
 <h3>This is the graph.</h3>
 {{rootcause-chart

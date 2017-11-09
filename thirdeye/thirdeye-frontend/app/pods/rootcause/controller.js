@@ -484,15 +484,28 @@ export default Ember.Controller.extend({
   //
 
   actions: {
-    toggleInvisible(urn) {
+    legendOnVisibility(urns, state) {
+      console.log('legendOnVisibility()');
       const { invisibleUrns } = this.getProperties('invisibleUrns');
-      if (invisibleUrns.has(urn)) {
-        invisibleUrns.delete(urn);
+      if (state) {
+        makeIterable(urns).forEach(urn => invisibleUrns.delete(urn));
       } else {
-        invisibleUrns.add(urn);
+        makeIterable(urns).forEach(urn => invisibleUrns.add(urn));
       }
-      this.set('invisibleUrns', invisibleUrns);
-      this.notifyPropertyChange('invisibleUrns');
+      console.log('legendOnVisibility: invisibleUrns', invisibleUrns);
+      this.set('invisibleUrns', new Set(invisibleUrns));
+    },
+
+    legendOnSelection(urns, state) {
+      console.log('legendOnSelection()');
+      const { selectedUrns } = this.getProperties('selectedUrns');
+      if (state) {
+        makeIterable(urns).forEach(urn => selectedUrns.add(urn));
+      } else {
+        makeIterable(urns).forEach(urn => selectedUrns.delete(urn));
+      }
+      console.log('legendOnVisibility: selectedUrns', selectedUrns);
+      this.set('selectedUrns', new Set(selectedUrns));
     },
 
     tableOnSelect(tableUrns) {
@@ -506,8 +519,7 @@ export default Ember.Controller.extend({
       makeIterable(selectedEventUrns).filter(urn => filteredUrns.has(urn) && !tableEventUrns.has(urn)).forEach(urn => selectedUrns.delete(urn));
       makeIterable(tableEventUrns).forEach(urn => selectedUrns.add(urn));
 
-      this.set('selectedUrns', selectedUrns);
-      this.notifyPropertyChange('selectedUrns');
+      this.set('selectedUrns', new Set(selectedUrns));
     },
 
     filterOnSelect(urns) {
@@ -528,7 +540,6 @@ export default Ember.Controller.extend({
 
     settingsOnChange(context) {
       console.log('settingsOnChange()');
-      console.log('settingsOnChange: context', context);
       this.set('context', context);
     },
 
@@ -536,48 +547,42 @@ export default Ember.Controller.extend({
       console.log('addSelectedUrns()');
       const { selectedUrns } = this.getProperties('selectedUrns');
       makeIterable(urns).forEach(urn => selectedUrns.add(urn));
-      this.set('selectedUrns', selectedUrns);
-      this.notifyPropertyChange('selectedUrns');
+      this.set('selectedUrns', new Set(selectedUrns));
     },
 
     removeSelectedUrns(urns) {
       console.log('removeSelectedUrns()');
       const { selectedUrns } = this.getProperties('selectedUrns');
       makeIterable(urns).forEach(urn => selectedUrns.delete(urn));
-      this.set('selectedUrns', selectedUrns);
-      this.notifyPropertyChange('selectedUrns');
+      this.set('selectedUrns', new Set(selectedUrns));
     },
 
     addFilteredUrns(urns) {
       console.log('addFilteredUrns()');
       const { filteredUrns } = this.getProperties('filteredUrns');
       makeIterable(urns).forEach(urn => filteredUrns.add(urn));
-      this.set('filteredUrns', filteredUrns);
-      this.notifyPropertyChange('filteredUrns');
+      this.set('filteredUrns', new Set(filteredUrns));
     },
 
     removeFilteredUrns(urns) {
       console.log('removeFilteredUrns()');
       const { filteredUrns } = this.getProperties('filteredUrns');
       makeIterable(urns).forEach(urn => filteredUrns.delete(urn));
-      this.set('filteredUrns', filteredUrns);
-      this.notifyPropertyChange('filteredUrns');
+      this.set('filteredUrns', new Set(filteredUrns));
     },
 
     addInvisibleUrns(urns) {
       console.log('addInvisibleUrns()');
       const { invisibleUrns } = this.getProperties('invisibleUrns');
       makeIterable(urns).forEach(urn => invisibleUrns.add(urn));
-      this.set('invisibleUrns', invisibleUrns);
-      this.notifyPropertyChange('invisibleUrns');
+      this.set('invisibleUrns', new Set(invisibleUrns));
     },
 
     removeInvisibleUrns(urns) {
       console.log('removeInvisibleUrns()');
       const { invisibleUrns } = this.getProperties('invisibleUrns');
       makeIterable(urns).forEach(urn => invisibleUrns.delete(urn));
-      this.set('invisibleUrns', invisibleUrns);
-      this.notifyPropertyChange('invisibleUrns');
+      this.set('invisibleUrns', new Set(invisibleUrns));
     }
   }
 });
