@@ -9,6 +9,8 @@ import config from 'thirdeye-frontend/mocks/filterBarConfig';
 //
 
 export default Ember.Controller.extend({
+  entitiesService: Ember.inject.service("rootcause-entities-cache"), // service
+
   selectedUrns: null, // Set
 
   filteredUrns: null, // Set
@@ -18,6 +20,8 @@ export default Ember.Controller.extend({
   hoverUrns: null, // Set
 
   context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
+
+  config: config, // {}
 
   _timeseriesCache: null, // {}
 
@@ -31,9 +35,26 @@ export default Ember.Controller.extend({
 
   _pendingAggregatesRequests: null, // Set
 
-  config: config,
+  _contextObserver: Ember.observer(
+    'context',
+    'selectedUrns',
+    'entitiesService',
+    function () {
+      console.log('_contextObserver()');
+      const { context, selectedUrns, entitiesService } =
+        this.getProperties('context', 'selectedUrns', 'entitiesService');
+      if (!context || !selectedUrns) {
+        return;
+      }
+
+      if (entitiesService) {
+        entitiesService.request(context, selectedUrns);
+      }
+    }
+  ),
 
   init() {
+    console.log('controller: init()');
     this.setProperties({ _timeseriesCache: {}, _entitiesCache: {}, _aggregatesCache: {},
       _pendingTimeseriesRequests: new Set(), _pendingEntitiesRequests: new Set(), _pendingAggregatesRequests: new Set() });
   },
@@ -42,13 +63,23 @@ export default Ember.Controller.extend({
   // Public properties (computed)
   //
 
+  // entities: Ember.computed(
+  //   '_entitiesLoader',
+  //   '_entitiesCache',
+  //   'context',
+  //   'selectedUrns',
+  //   function () {
+  //     console.log('entities()');
+  //     this.get('_entitiesLoader'); // trigger loader. hacky
+  //     return Object.assign({}, this.get('_entitiesCache'));
+  //   }
+  // ),
+
   entities: Ember.computed(
-    '_entitiesLoader',
-    '_entitiesCache',
+    'entitiesService.entities',
     function () {
       console.log('entities()');
-      this.get('_entitiesLoader'); // trigger loader. hacky
-      return Object.assign({}, this.get('_entitiesCache'));
+      return this.get('entitiesService.entities');
     }
   ),
 

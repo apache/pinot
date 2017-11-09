@@ -8,6 +8,7 @@ const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:
 export default Ember.Route.extend({
   setupController: function (controller, model) {
     this._super(...arguments);
+    console.log('route: setupController()');
 
     // TODO get initial attributes from query params
     controller.setProperties({
