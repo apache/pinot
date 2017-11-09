@@ -2,7 +2,8 @@
  * Filter Bar Component
  * Constructs a filter bar based on a config file
  * @module components/filter-bar
- * @property {object} filterBlocks        - [required] a list of objects set in the route to set up the sub-filters
+ * @property {object[]} config            - [required] array of objects (config file) passed in from the route that sets
+ *                                          up the filter bar sub-filters
  * @property {number} maxStrLen           - number of characters for filter name truncation
  * @property {array}  onFilterSelection   - [required] closure action to bubble to controller on filter selection change
  *
@@ -50,7 +51,7 @@ export default Ember.Component.extend({
   init() {
     this._super(...arguments);
     // Fetch the config file to create sub-filters
-    const filterBlocks = this.get('filterBlocks');
+    const filterBlocks = this.get('config');
 
     // Set up filter block object
     filterBlocks.forEach((block, index) => {
@@ -74,7 +75,7 @@ export default Ember.Component.extend({
 
   actions: {
     /**
-     * Handles selection of filter items.
+     * Handles selection of filter items within an event type.
      * @method onFilterSelection
      */
     onFilterSelection() {
@@ -86,9 +87,10 @@ export default Ember.Component.extend({
      * @method filterByEvent
      * @param {Object} clickedBlock - selected filter block object
      */
-    filterByEvent(clickedBlock) {
+    selectEventType(clickedBlock) {
       // Hide all other blocks when one is clicked
-      let filterBlocks = this.get('filterBlocks');
+      let filterBlocks = this.get('config');
+
       filterBlocks.forEach(block => {
         Ember.set(block, 'isHidden', true);
       });
@@ -96,7 +98,13 @@ export default Ember.Component.extend({
       // Note: toggleProperty will not be able to find 'filterBlocks', as it is not an observed property
       // Show clickedBlock
       Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
-      this.attrs.onTabChange(clickedBlock.eventType);
+
+      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
+      if (onSelect) {
+        const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
+                                                  && entities[urn].eventType == clickedBlock.eventType);
+        onSelect(urns);
+      }
     }
   }
 });

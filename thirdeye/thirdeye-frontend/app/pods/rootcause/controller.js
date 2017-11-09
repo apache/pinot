@@ -2,6 +2,7 @@ import Ember from 'ember';
 import { checkStatus, makeIterable, filterObject } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import fetch from 'fetch';
+import config from 'thirdeye-frontend/mocks/filterBarConfig';
 
 //
 // Controller
@@ -29,6 +30,8 @@ export default Ember.Controller.extend({
   _pendingEntitiesRequests: null, // Set
 
   _pendingAggregatesRequests: null, // Set
+
+  config: config,
 
   init() {
     this.setProperties({ _timeseriesCache: {}, _entitiesCache: {}, _aggregatesCache: {},

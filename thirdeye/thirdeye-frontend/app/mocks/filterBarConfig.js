@@ -13,6 +13,9 @@ export default [
       {
         label: "country",
         type: "dropdown"
+      }, {
+        label: "region",
+        type: "dropdown"
       }
     ]
   },
@@ -21,7 +24,7 @@ export default [
     eventType: "deployment",
     inputs: [
       {
-        label: "services",
+        label: "fabric",
         type: "dropdown"
       }
     ]

@@ -30,12 +30,6 @@ urns
   <a {{action "removeSelectedUrns" urn}}>[X]</a>
 {{/each}}
 
-<h3>This is the filter bar.</h3>
-{{rootcause-filter
-  entities=eventFilterEntities
-  onSelect=(action "filterOnSelect")
-}}
-
 <h3>This is the graph.</h3>
 {{rootcause-chart
   entities=entities
@@ -44,8 +38,7 @@ urns
   anomalyRange=context.anomalyRange
   baselineRange=context.baselineRange
   analysisRange=context.analysisRange
-  onHover=(action "chartOnHover")
-}}
+  onHover=(action "chartOnHover")}}
 
 <h3>This is the hover section.</h3>
 urns
@@ -53,13 +46,31 @@ urns
   | {{urn}}
 {{/each}}
 
-<h3>This is the table.</h3>
-{{rootcause-table
-  entities=eventTableEntities
-  columns=eventTableColumns
-  selectedUrns=selectedUrns
-  onSelect=(action "tableOnSelect")
+<h3>This is the filter bar.</h3>
+{{rootcause-filter
+  entities=eventFilterEntities
+  onSelect=(action "filterOnSelect")
 }}
+
+<div class="row">
+  <div class="col-xs-3">
+    <h3>This is the filter bar.</h3>
+    {{filter-bar
+      config=config
+      activeTab=selectedTab
+      entities=eventFilterEntities
+      onSelect=(action "filterOnSelect")}}
+  </div>
+  <div class="col-xs-8">
+    <h3>This is the table.</h3>
+    {{rootcause-table
+      entities=eventTableEntities
+      columns=eventTableColumns
+      selectedUrns=selectedUrns
+      onSelect=(action "tableOnSelect")
+    }}
+  </div>
+</div>
 
 <h3>This is the heatmap.</h3>
 {{rootcause-heatmap
