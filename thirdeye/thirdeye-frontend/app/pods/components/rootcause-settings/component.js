@@ -2,9 +2,10 @@
  * Rootcause settings component. It contains the logic needed for displaying
  * the rca settings box
  * @module components/rootcause-settings
- * @property {Object} context   - { urns, anomalyRange, baselineRange, analaysisRange }
- * @property {Object} onChange  - Closure action to bubble up to parent
- *                                when the settings change
+ * @property {Object} options         - { urns, anomalyRange, baselineRange, analaysisRange }
+ * @property {Object} selectedOptions - { urns, anomalyRange, baselineRange, analaysisRange }
+ * @property {Object} onChange        - Closure action to bubble up to parent
+ *                                      when the settings change
  * @example
   {{rootcause-settings
     context=context
@@ -21,8 +22,6 @@ const { setProperties } = Ember;
 const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
 export default Ember.Component.extend({
-  context: null, // { urns, anomalyRange, baselineRange, analaysisRange }
-
   onChange: null, // function (context)
 
   urnString: null,
@@ -311,25 +310,7 @@ export default Ember.Component.extend({
      * @return {undefined}
      */
     onModeChange(compareMode) {
-      const {
-        analysisRangeStart,
-        analysisRangeEnd
-      } = this.getProperties('analysisRangeStart', 'analysisRangeEnd');
-      const offset = {
-        WoW: 1,
-        Wo2W: 2,
-        Wo3W: 3,
-        Wo4W: 4
-      }[compareMode];
-
-      const baselineRangeStart = moment(analysisRangeStart).subtract(offset, 'weeks').valueOf();
-      const baselineRangeEnd = moment(analysisRangeEnd).subtract(offset, 'weeks').valueOf();
-
-      this.setProperties({
-        compareMode,
-        baselineRangeStart,
-        baselineRangeEnd
-      });
+      this.set('compareMode', compareMode);
       this.send('updateContext');
     },
 
