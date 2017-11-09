@@ -11,6 +11,10 @@ const {
 } = Ember;
 
 export default Ember.Controller.extend({
+
+  /**
+   * QueryParams that needs to update the url
+   */
   queryParams: [
     'granularity',
     'filters',
@@ -71,11 +75,19 @@ export default Ember.Controller.extend({
   // Public properties (computed)
   //
 
+  /**
+   * Hash containing all possible option values
+   * @type {Object}
+   */
   options: Ember.computed('model', function() {
     const model = this.get('model');
     return getProperties(model, ['granularityOptions', 'filterOptions', 'maxTime', 'compareModeOptions']);
   }),
 
+  /**
+   * hash containing user selected values
+   * @type {Object}
+   */
   selectedOptions: Ember.computed(function() {
     const queryParams = get(this, 'queryParams');
 
@@ -87,6 +99,11 @@ export default Ember.Controller.extend({
     }, {});
   }),
 
+  /**
+   * Convert a  query value into option vlaue
+   * @param {String} key          - query param key
+   * @param {String|Object} value - query param value
+   */
   queryToOption(key, value) {
     switch(key) {
       case 'baselineRangeStart':
@@ -445,11 +462,13 @@ export default Ember.Controller.extend({
     return `frontend:baseline:metric:${mid}`;
   },
 
+  /**
+   * Calculates the baseline start and end
+   * based on the current compare mode
+   * @param {Object} paramsToUpdate
+   * @return {Object}
+   */
   _calculateBaselineRange(paramsToUpdate) {
-    // const analysisRangeStart = paramsToUpdate.analysisRangeStart || this.get('analysisRangeStart');
-    // const analysisRangeEnd = paramsToUpdate.analysisRangeEnd || this.get('analysisRangeEnd');
-    // const compareMode = paramsToUpdate.compareMode || this.get('compareMode');
-    debugger;
     const {
       analysisRangeStart = this.get('analysisRangeStart'),
       analysisRangeEnd = this.get('analysisRangeEnd'),
@@ -471,6 +490,10 @@ export default Ember.Controller.extend({
     };
   },
 
+
+  /**
+   * Builds the context object based on new params
+   */
   _buildContext(newParams, { baselineRangeStart, baselineRangeEnd}) {
     const oldParams = getProperties(this, this.get('queryParams'));
     const params = { ...oldParams, ...newParams};
@@ -616,19 +639,22 @@ export default Ember.Controller.extend({
       this.set('selectedUrns', new Set(Object.keys(entities)));
     },
 
+    /**
+     * Handles the rootcause_setting change event
+     * and updates query params and context
+     * @param {Object} newParams new parameters to update
+     */
     settingsOnChange(newParams) {
       console.log('settingsOnChange()');
       console.log('settingsOnChange: context', newParams);
       
       const queryParams = get(this, 'queryParams');
-      
       const paramsToUpdate = queryParams
       .filter(param => newParams[param])
       .reduce((hash, param) => {
         hash[param] = newParams[param];
         return hash;
       }, {});
-      debugger;
       const baselineRanges = this._calculateBaselineRange(paramsToUpdate);
       const context = this._buildContext(paramsToUpdate, baselineRanges);
 

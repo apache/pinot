@@ -16,6 +16,13 @@ const queryParamsConfig = {
   replace: false
 };
 
+/**
+ * Helper function that checks if a query param 
+ * key/value pair is valid
+ * @param {*} key   - query param key
+ * @param {*} value - query param value
+ * @return {Boolean}
+ */
 const isValid = (key, value) => { 
   switch(key) {
     case 'granularity':
@@ -23,7 +30,7 @@ const isValid = (key, value) => {
     case 'filters':
       return value && value.length;
     default:
-      return moment(+value);
+      return moment(+value).isValid();
   }
 };
 
@@ -77,14 +84,17 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         hash[key] = queryParams[key];
         return hash;
       }, {});
-      Object.assign(model, { queryParams: { ...defaultParams, ...validParams }});
-      debugger;
+    Object.assign(
+      model, 
+      { queryParams: { ...defaultParams, ...validParams }}
+    );
   },
 
   setupController(controller, model) {
     this._super(...arguments);
     console.log('route: setupController()');
     // TODO get initial attributes from query params
+    
     controller.setProperties({
       selectedUrns: new Set([
         'thirdeye:metric:194591', 'frontend:baseline:metric:194591',

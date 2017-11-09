@@ -2,13 +2,14 @@
  * Rootcause settings component. It contains the logic needed for displaying
  * the rca settings box
  * @module components/rootcause-settings
- * @property {Object} options         - { urns, anomalyRange, baselineRange, analaysisRange }
- * @property {Object} selectedOptions - { urns, anomalyRange, baselineRange, analaysisRange }
+ * @property {Object} options         - contains dropdown and filters values
+ * @property {Object} selectedOptions - contains user selected options from query params
  * @property {Object} onChange        - Closure action to bubble up to parent
  *                                      when the settings change
  * @example
   {{rootcause-settings
-    context=context
+    options=options
+    selectedOptions=params
     onChange=(action "settingsOnChange")
   }}
  * @exports rootcause-settings
@@ -18,23 +19,31 @@
 import Ember from 'ember';
 import moment from 'moment';
 
-const { setProperties } = Ember;
+const { 
+  setProperties,
+  getProperties
+} = Ember;
+
+/**
+ * Date formate the date picker component expects
+ * @type String
+ * 
+ */
 const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
 export default Ember.Component.extend({
-  onChange: null, // function (context)
-
+  onChange: null,
   urnString: null,
-
   anomalyRangeStart: null,
-
   anomalyRangeEnd: null,
-
   analysisRangeStart: null,
-
   analysisRangeEnd: null,
 
 
+  /**
+   * Formatted anomaly start date
+   * @return {String}
+   */
   datePickerAnomalyRangeStart: Ember.computed('anomalyRangeStart', {
     get() {
       const start = this.get('anomalyRangeStart');
@@ -43,6 +52,10 @@ export default Ember.Component.extend({
     }
   }),
 
+  /**
+   * Formatted anomaly end date
+   * @return {String}
+   */
   datePickerAnomalyRangeEnd: Ember.computed('anomalyRangeEnd', {
     get() {
       const end = this.get('anomalyRangeEnd');
@@ -51,6 +64,10 @@ export default Ember.Component.extend({
     }
   }),
 
+  /**
+   * Formatted analysis start date
+   * @return {String}
+   */
   datePickerAnalysisRangeStart: Ember.computed('analysisRangeStart', {
     get() {
       const start = this.get('analysisRangeStart');
@@ -59,6 +76,10 @@ export default Ember.Component.extend({
     }
   }),
 
+  /**
+   * Formatted analysis end date
+   * @return {String}
+   */
   datePickerAnalysisRangeEnd: Ember.computed('analysisRangeEnd', {
     get() {
       const end = this.get('analysisRangeEnd');
@@ -66,15 +87,6 @@ export default Ember.Component.extend({
       return end ? moment(+end).format(serverDateFormat) : moment().format(serverDateFormat);
     }
   }),
-
-  // _baselineRangeStart: Ember.computed('baselineRangeStart', {
-  //   get() {
-
-  //   },
-  //   set() {
-
-  //   }
-  // })
 
   /**
    * Selected Granularity
@@ -189,22 +201,20 @@ export default Ember.Component.extend({
     setProperties(this, selectedOptions);
   },
 
-  // didUpdateAttrs() {
-  //   this._super(...arguments);
-  //   this._updateFromContext();
-  // },
-
   didInsertElement() {
     this._super(...arguments);
-    // this._updateFromContext();
 
     const selectedOptions = this.get('selectedOptions');
     setProperties(this, selectedOptions);
   },
 
   actions: {
+    /**
+     * Grabs Properties and sends them to the parent via an action
+     * @method updateContext
+     * @return {undefined}
+     */
     updateContext() {
-<<<<<<< HEAD
       const { urnString, anomalyRangeStart, anomalyRangeEnd, baselineRangeStart, baselineRangeEnd, analysisRangeStart, analysisRangeEnd, granularity } =
         this.getProperties('urnString', 'anomalyRangeStart', 'anomalyRangeEnd', 'baselineRangeStart', 'baselineRangeEnd', 'analysisRangeStart', 'analysisRangeEnd', 'granularity');
       const onChange = this.get('onChange');
@@ -217,7 +227,6 @@ export default Ember.Component.extend({
         onChange(newContext);
       }
     },
-=======
       // const {
       //   urnString,
       //   anomalyRangeStart,
@@ -238,35 +247,27 @@ export default Ember.Component.extend({
       //   'baselineRangeEnd',
       //   'analysisRangeStart',
       //   'analysisRangeEnd');
-      const onChange = this.get('onChange');
-      if (!onChange) return;
->>>>>>> props linked to controller's
 
-      // if (onChange != null) {
-      //   const urns = urnString ? new Set(urnString.split(',')) : new Set();
-      //   const anomalyRange = [parseInt(anomalyRangeStart), parseInt(anomalyRangeEnd)];
-      //   const baselineRange = [parseInt(baselineRangeStart), parseInt(baselineRangeEnd)];
-      //   const analysisRange = [parseInt(analysisRangeStart), parseInt(analysisRangeEnd)];
-      //   const newContext = { 
-      //     granularity,
-      //     filters,
-      //     urns,
-      //     anomalyRange,
-      //     baselineRange,
-      //     analysisRange};
-      onChange(this.getProperties(
-        'urnString',
-        'granularity',
-        'filters',
-        'compareMode',
-        'anomalyRangeStart',
-        'anomalyRangeEnd',
-        'baselineRangeStart',
-        'baselineRangeEnd',
-        'analysisRangeStart',
-        'analysisRangeEnd'));
-      // }
-    },
+    //   const onChange = this.get('onChange');
+    //   if (!onChange) return;
+
+    //   onChange(getProperties(
+    //     this,
+    //     [
+    //       'urnString',
+    //       'granularity',
+    //       'filters',
+    //       'compareMode',
+    //       'anomalyRangeStart',
+    //       'anomalyRangeEnd',
+    //       'baselineRangeStart',
+    //       'baselineRangeEnd',
+    //       'analysisRangeStart',
+    //       'analysisRangeEnd'
+    //     ]
+    //   ));
+    // },
+    
     /**
      * Sets the new anomaly region date in ms
      * @method setAnomalyDateRange
@@ -304,7 +305,7 @@ export default Ember.Component.extend({
     },
 
     /**
-     * Changes the compare mode
+     * Updates the compare mode
      * @method onModeChange
      * @param {String} compareMode baseline compare mode
      * @return {undefined}
@@ -314,12 +315,23 @@ export default Ember.Component.extend({
       this.send('updateContext');
     },
 
+    /**
+     * Updates the granularity
+     * @method onGranularityChange
+     * @param {String} granularity the selected granularity
+     * @return {undefined}
+     */
     onGranularityChange(granularity) {
       this.set('granularity', granularity);
-
       this.send('updateContext');
     },
 
+    /**
+     * Updates the filters
+     * @method onFiltersChange
+     * @param {Object} filters currently selected filters
+     * @return {undefined}
+     */
     onFiltersChange(filters) {
       this.set('filters', filters);
       this.send('updateContext');
