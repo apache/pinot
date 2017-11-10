@@ -48,18 +48,34 @@ export function filterObject(obj, func) {
   return out;
 }
 
+export function toBaselineUrn(urn) {
+  if (!urn.startsWith('thirdeye:metric:')) {
+    throw new Error(`Requires metric urn, but found ${urn}`);
+  }
+  const mid = urn.split(':')[2];
+  return `frontend:baseline:metric:${mid}`;
+}
+
+export function hasPrefix(urn, prefixes) {
+  return !_.isEmpty(makeIterable(prefixes).filter(pre => urn.startsWith(pre)));
+}
+
+export function filterPrefix(urns, prefixes) {
+  return makeIterable(urns).filter(urn => hasPrefix(urn, prefixes));
+}
+
 /**
-   * finds the corresponding labelMapping field given a label in the filterBarConfig
-   * This is only a placeholder since the filterBarConfig is not finalized
-   */
+ * finds the corresponding labelMapping field given a label in the filterBarConfig
+ * This is only a placeholder since the filterBarConfig is not finalized
+ */
 export function findLabelMapping(label, config) {
   let labelMapping = '';
   config.some(filterBlock => filterBlock.inputs.some(input => {
     if (input.label === label) {
-      labelMapping = input.labelMapping;
-    }
-  }));
+    labelMapping = input.labelMapping;
+  }
+}));
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, findLabelMapping });
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toBaselineUrn, hasPrefix, filterPrefix, findLabelMapping });

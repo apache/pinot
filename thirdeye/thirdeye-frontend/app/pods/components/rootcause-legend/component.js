@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import { toBaselineUrn, hasPrefix } from '../../../helpers/utils';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -17,7 +18,7 @@ export default Ember.Component.extend({
     function () {
       const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
       const labels = {};
-      [...selectedUrns].filter(urn => urn in entities).forEach(urn => labels[urn] = entities[urn].label);
+      [...selectedUrns].filter(urn => hasPrefix(urn, 'thirdeye:')).filter(urn => entities[urn]).forEach(urn => labels[urn] = entities[urn].label);
       return labels;
     }
   ),
@@ -28,14 +29,20 @@ export default Ember.Component.extend({
       if (onVisibility) {
         const state = invisibleUrns.has(urn);
         const updates = { [urn]: state };
+        if (hasPrefix(urn, 'thirdeye:metric:')) {
+          updates[toBaselineUrn(urn)] = state;
+        }
         onVisibility(updates);
       }
     },
-    
+
     removeUrn(urn) {
       const { onSelection } = this.getProperties('onSelection');
       if (onSelection) {
         const updates = { [urn]: false };
+        if (hasPrefix(urn, 'thirdeye:metric:')) {
+          updates[toBaselineUrn(urn)] = false;
+        }
         onSelection(updates);
       }
     }

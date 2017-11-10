@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import checkStatus from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, toBaselineUrn } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -85,7 +85,7 @@ export default Ember.Service.extend({
   _augment(incoming) {
     const entities = {};
     Object.keys(incoming).filter(urn => incoming[urn].type == 'metric').forEach(urn => {
-      const baselineUrn = this._makeBaselineUrn(urn);
+      const baselineUrn = toBaselineUrn(urn);
       entities[baselineUrn] = {
         urn: baselineUrn,
         type: 'frontend:baseline:metric',
@@ -108,11 +108,5 @@ export default Ember.Service.extend({
     const entities = {};
     res.forEach(e => entities[e.urn] = e);
     return entities;
-  },
-
-  _makeBaselineUrn(urn) {
-    const mid = urn.split(':')[2];
-    return `frontend:baseline:metric:${mid}`;
   }
-
 });

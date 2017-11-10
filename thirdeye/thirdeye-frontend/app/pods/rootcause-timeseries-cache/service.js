@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import checkStatus from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, toBaselineUrn } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -16,28 +16,35 @@ export default Ember.Service.extend({
 
   request(requestContext, urns) {
     console.log('rootcauseTimeseriesService: request()', requestContext, urns);
-    const { context, timeseries: currTimeseries } = this.getProperties('context', 'timeseries');
+    const { context, timeseries } = this.getProperties('context', 'timeseries');
 
-    // TODO retain stale timeseries until request completion
+    const metrics = [...urns].filter(urn => (urn.startsWith('thirdeye:metric:') || urn.startsWith('frontend:baseline:metric:')));
 
-    let timeseries = currTimeseries;
+    // TODO eviction on cache size limit
+
+    let missing;
+    let newTimeseries;
     if(!_.isEqual(context.analysisRange, requestContext.analysisRange)) {
-      // new analysis range: evict all, leave stale copy of requested
-      timeseries = [...urns]
-        .filter(urn => timeseries[urn])
-        .reduce((agg, urn) => agg[urn] = timeseries[urn], {});
+      // new analysis range: evict all, reload
+      missing = metrics;
+      newTimeseries = metrics.filter(urn => timeseries[urn]).reduce((agg, urn) => agg[urn] = timeseries[urn], {});
+      
     } else if((context.anomalyRange[0] - context.baselineRange[0]) !=
               (requestContext.anomalyRange[0] - requestContext.baselineRange[0])) {
-      // new baseline: evict baselines, leave current
-      timeseries = Object.keys(currTimeseries)
-        .filter(urn => !urn.startsWith('frontend:baseline:metric:'))
-        .reduce((agg, urn) => agg[urn] = currTimeseries[urn], {});
+      // new baseline: reload baselines, load missing
+      missing = metrics.filter(urn => !timeseries[urn] || urn.startsWith('frontend:baseline:metric:'));
+      newTimeseries = Object.keys(timeseries)
+        .filter(urn => urns.has(urn) || !urn.startsWith('frontend:baseline:metric:'))
+        .reduce((agg, urn) => agg[urn] = timeseries[urn], {});
+      
+    } else {
+      // same context: load missing
+      missing = metrics.filter(urn => !timeseries[urn]);
+      newTimeseries = timeseries;
     }
 
-    const missing = [...urns].filter(urn => (urn.startsWith('thirdeye:metric:') || urn.startsWith('frontend:baseline:metric:')) && !timeseries[urn]);
-
     const newPending = new Set(missing);
-    this.setProperties({ context: _.cloneDeep(requestContext), timeseries, pending: newPending });
+    this.setProperties({ context: _.cloneDeep(requestContext), timeseries: newTimeseries, pending: newPending });
 
     // metrics
     const metricUrns = missing.filter(urn => urn.startsWith('thirdeye:metric:'));
@@ -117,18 +124,12 @@ export default Ember.Service.extend({
   _convertToBaseline(timeseries, offset) {
     const baseline = {};
     Object.keys(timeseries).forEach(urn => {
-      const baselineUrn = this._makeBaselineUrn(urn);
+      const baselineUrn = toBaselineUrn(urn);
       baseline[baselineUrn] = {
         values: timeseries[urn].values,
         timestamps: timeseries[urn].timestamps.map(t => t + offset)
       };
     });
     return baseline;
-  },
-
-  _makeBaselineUrn(urn) {
-    const mid = urn.split(':')[2];
-    return `frontend:baseline:metric:${mid}`;
   }
-
 });
