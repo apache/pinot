@@ -18,6 +18,15 @@
   onSelection=(action "onSelection")
 }}
 
+<h3>This is the loading indicator.</h3>
+type
+{{#if isLoadingEntities}}
+  | ENTITIES
+{{/if}}
+{{#if isLoadingTimeseries}}
+  | TIMESERIES
+{{/if}}
+
 <h3>This is the graph.</h3>
 {{rootcause-chart
   entities=entities
@@ -27,15 +36,6 @@
   baselineRange=context.baselineRange
   analysisRange=context.analysisRange
   onHover=(action "chartOnHover")}}
-
-<h3>This is the loading indicator.</h3>
-type
-{{#if isLoadingEntities}}
-  | ENTITIES
-{{/if}}
-{{#if isLoadingTimeseries}}
-  | TIMESERIES
-{{/if}}
 
 <h3>This is the hover section.</h3>
 urns
