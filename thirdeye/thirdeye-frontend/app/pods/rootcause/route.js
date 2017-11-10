@@ -4,6 +4,7 @@ const anomalyRange = [1509044400000, 1509422400000];
 const baselineRange = [1508439600000, 1508817600000];
 const analysisRange = [1508785200000, 1509422400000];
 const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:in:provided']);
+const granularity = '30_MINUTES';
 
 export default Ember.Route.extend({
   setupController: function (controller, model) {
@@ -19,7 +20,7 @@ export default Ember.Route.extend({
       invisibleUrns: new Set(),
       filteredUrns: new Set(),
       hoverUrns: new Set(),
-      context: { urns, anomalyRange, baselineRange, analysisRange }
+      context: { urns, anomalyRange, baselineRange, analysisRange, granularity },
     });
   }
 });

@@ -35,7 +35,7 @@ export default Ember.Component.extend({
         onVisibility(updates);
       }
     },
-
+    
     removeUrn(urn) {
       const { onSelection } = this.getProperties('onSelection');
       if (onSelection) {

@@ -24,11 +24,12 @@ export default Ember.Service.extend({
 
     let missing;
     let newTimeseries;
-    if(!_.isEqual(context.analysisRange, requestContext.analysisRange)) {
+    if(!_.isEqual(context.analysisRange, requestContext.analysisRange) ||
+       !_.isEqual(context.granularity, requestContext.granularity)) {
       // new analysis range: evict all, reload
       missing = metrics;
       newTimeseries = metrics.filter(urn => timeseries[urn]).reduce((agg, urn) => agg[urn] = timeseries[urn], {});
-      
+
     } else if((context.anomalyRange[0] - context.baselineRange[0]) !=
               (requestContext.anomalyRange[0] - requestContext.baselineRange[0])) {
       // new baseline: reload baselines, load missing
@@ -36,7 +37,7 @@ export default Ember.Service.extend({
       newTimeseries = Object.keys(timeseries)
         .filter(urn => urns.has(urn) || !urn.startsWith('frontend:baseline:metric:'))
         .reduce((agg, urn) => agg[urn] = timeseries[urn], {});
-      
+
     } else {
       // same context: load missing
       missing = metrics.filter(urn => !timeseries[urn]);
@@ -50,7 +51,7 @@ export default Ember.Service.extend({
     const metricUrns = missing.filter(urn => urn.startsWith('thirdeye:metric:'));
     if (!_.isEmpty(metricUrns)) {
       const metricIdString = metricUrns.map(urn => urn.split(":")[2]).join(',');
-      const metricUrl = `/timeseries/query?metricIds=${metricIdString}&ranges=${requestContext.analysisRange[0]}:${requestContext.analysisRange[1]}&granularity=15_MINUTES&transformations=timestamp`;
+      const metricUrl = `/timeseries/query?metricIds=${metricIdString}&ranges=${requestContext.analysisRange[0]}:${requestContext.analysisRange[1]}&granularity=${requestContext.granularity}&transformations=timestamp`;
 
       fetch(metricUrl)
         // .then(checkStatus)
@@ -67,7 +68,7 @@ export default Ember.Service.extend({
     const baselineUrns = missing.filter(urn => urn.startsWith('frontend:baseline:metric:'));
     if (!_.isEmpty(baselineUrns)) {
       const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
-      const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&granularity=15_MINUTES&transformations=timestamp`;
+      const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&granularity=${requestContext.granularity}&transformations=timestamp`;
 
       fetch(baselineUrl)
         // .then(checkStatus)
@@ -85,6 +86,11 @@ export default Ember.Service.extend({
     // only accept latest result
     if (!_.isEqual(context, requestContext)) {
       console.log('rootcauseTimeseriesService: received stale result. ignoring.');
+      return;
+    }
+
+    if (_.isEmpty(incoming)) {
+      console.log('rootcauseTimeseriesService: received empty result.');
       return;
     }
 

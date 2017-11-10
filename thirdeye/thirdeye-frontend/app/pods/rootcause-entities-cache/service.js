@@ -46,6 +46,11 @@ export default Ember.Service.extend({
       return;
     }
 
+    if (_.isEmpty(incoming)) {
+      console.log('rootcauseEntitiesCache: received empty result.');
+      return;
+    }
+
     // evict unselected
     const { entities, pending } = this.getProperties('entities', 'pending');
     const stale = new Set(this._evictionCandidates(entities, framework));
@@ -105,8 +110,9 @@ export default Ember.Service.extend({
   },
 
   _jsonToEntities(res) {
-    const entities = {};
-    res.forEach(e => entities[e.urn] = e);
-    return entities;
+    if (_.isEmpty(res)) {
+      return {};
+    }
+    return res.reduce((agg, e) => { agg[e.urn] = e; return agg; }, {});
   }
 });
