@@ -15,8 +15,8 @@ export default Ember.Service.extend({
     this.setProperties({ entities: {}, context: {}, pending: new Set() });
   },
 
-  request(requestContext, selectedUrns) {
-    console.log('rootcauseEntitiesCache: request()', requestContext, selectedUrns);
+  request(requestContext, urns) {
+    console.log('rootcauseEntitiesCache: request()', requestContext, urns);
     const { context } = this.getProperties('context');
     if (_.isEqual(context, requestContext)) {
       return;
@@ -32,18 +32,25 @@ export default Ember.Service.extend({
         // .then(checkStatus) // TODO why doesn't this return parsed json here?
         .then(res => res.json())
         .then(this._jsonToEntities)
-        .then(incoming => this._complete(requestContext, selectedUrns, incoming, framework));
+        .then(incoming => this._complete(requestContext, urns, incoming, framework));
     });
   },
 
-  _complete(requestContext, selectedUrns, incoming, framework) {
-    console.log('rootcauseEntitiesCache: complete()', requestContext, selectedUrns, incoming, framework);
+  _complete(requestContext, pinnedUrns, incoming, framework) {
+    console.log('rootcauseEntitiesCache: complete()', requestContext, pinnedUrns, incoming, framework);
+
+    // only accept latest result
+    const { context } = this.getProperties('context');
+    if (!_.isEqual(context, requestContext)) {
+      console.log('rootcauseEntitiesCache: received stale result. ignoring.');
+      return;
+    }
 
     // evict unselected
     const { entities, pending } = this.getProperties('entities', 'pending');
     const stale = new Set(this._evictionCandidates(entities, framework));
-    const staleSelected = new Set([...stale].filter(urn => selectedUrns.has(urn)));
-    const staleUnselected = new Set([...stale].filter(urn => !selectedUrns.has(urn)));
+    const staleSelected = new Set([...stale].filter(urn => pinnedUrns.has(urn)));
+    const staleUnselected = new Set([...stale].filter(urn => !pinnedUrns.has(urn)));
 
     // rebuild remaining cache
     const remaining = {};
@@ -78,7 +85,7 @@ export default Ember.Service.extend({
   _augment(incoming) {
     const entities = {};
     Object.keys(incoming).filter(urn => incoming[urn].type == 'metric').forEach(urn => {
-      const baselineUrn = this._makeMetricBaselineUrn(urn);
+      const baselineUrn = this._makeBaselineUrn(urn);
       entities[baselineUrn] = {
         urn: baselineUrn,
         type: 'frontend:baseline:metric',
@@ -103,7 +110,7 @@ export default Ember.Service.extend({
     return entities;
   },
 
-  _makeMetricBaselineUrn(urn) {
+  _makeBaselineUrn(urn) {
     const mid = urn.split(':')[2];
     return `frontend:baseline:metric:${mid}`;
   }

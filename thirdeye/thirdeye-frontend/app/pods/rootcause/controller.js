@@ -11,6 +11,8 @@ import config from 'thirdeye-frontend/mocks/filterBarConfig';
 export default Ember.Controller.extend({
   entitiesService: Ember.inject.service("rootcause-entities-cache"), // service
 
+  timeseriesService: Ember.inject.service("rootcause-timeseries-cache"), // service
+
   selectedUrns: null, // Set
 
   filteredUrns: null, // Set
@@ -39,16 +41,21 @@ export default Ember.Controller.extend({
     'context',
     'selectedUrns',
     'entitiesService',
+    'timeseriesService',
     function () {
       console.log('_contextObserver()');
-      const { context, selectedUrns, entitiesService } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService');
+      const { context, selectedUrns, entitiesService, timeseriesService } =
+        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService');
       if (!context || !selectedUrns) {
         return;
       }
 
       if (entitiesService) {
         entitiesService.request(context, selectedUrns);
+      }
+
+      if (timeseriesService) {
+        timeseriesService.request(context, selectedUrns);
       }
     }
   ),
@@ -72,12 +79,14 @@ export default Ember.Controller.extend({
   ),
 
   timeseries: Ember.computed(
-    '_timeseriesLoader',
-    '_timeseriesCache',
+    // '_timeseriesLoader',
+    // '_timeseriesCache',
+    'timeseriesService.timeseries',
     function () {
       console.log('timeseries()');
-      this.get('_timeseriesLoader'); // trigger loader. hacky
-      return Object.assign({}, this.get('_timeseriesCache'));
+      // this.get('_timeseriesLoader'); // trigger loader. hacky
+      return this.get('timeseriesService.timeseries');
+      // return Object.assign({}, this.get('_timeseriesCache'));
     }
   ),
 
@@ -105,7 +114,7 @@ export default Ember.Controller.extend({
       [...invisibleUrns].forEach(urn => selectedMetricUrns.delete(urn));
       [...context.urns].filter(urn => entities[urn] && entities[urn].type == 'metric').forEach(urn => selectedMetricUrns.add(urn));
 
-      const selectedBaselineUrns = [...selectedMetricUrns].filter(urn => entities[urn] && entities[urn].type == 'metric').map(urn => this._makeMetricBaselineUrn(urn));
+      const selectedBaselineUrns = [...selectedMetricUrns].filter(urn => entities[urn] && entities[urn].type == 'metric').map(urn => this._makeBaselineUrn(urn));
 
       return new Set([...selectedMetricUrns].concat(selectedBaselineUrns));
     }
@@ -157,7 +166,7 @@ export default Ember.Controller.extend({
     function () {
       const { heatmapCurrentUrns } = this.getProperties('heatmapCurrentUrns');
       const current2baseline = {};
-      [...heatmapCurrentUrns].forEach(urn => current2baseline[urn] = this._makeMetricBaselineUrn(urn));
+      [...heatmapCurrentUrns].forEach(urn => current2baseline[urn] = this._makeBaselineUrn(urn));
       return current2baseline;
     }
   ),
@@ -189,124 +198,6 @@ export default Ember.Controller.extend({
   ),
 
   //
-  // Timeseries loading
-  //
-
-  _timeseriesLoader: Ember.computed(
-    'entities',
-    function() {
-      console.log('_timeseriesLoader()');
-      const { entities } = this.getProperties('entities');
-
-      const metricUrns = Object.keys(entities).filter(urn => entities[urn] && entities[urn].type == 'metric');
-      const baselineUrns = metricUrns.map(urn => this._makeMetricBaselineUrn(urn));
-
-      this._startRequestMissingTimeseries(metricUrns.concat(baselineUrns));
-    }
-  ),
-
-  _startRequestMissingTimeseries(urns) {
-    console.log('_startRequestMissingTimeseries()');
-    const { _pendingTimeseriesRequests: pending, _timeseriesCache: cache, context } =
-      this.getProperties('_pendingTimeseriesRequests', '_timeseriesCache', 'context');
-
-    const missing = new Set(urns);
-    [...pending].forEach(urn => missing.delete(urn));
-    Object.keys(cache).forEach(urn => missing.delete(urn));
-
-    if (missing.size <= 0) {
-      return;
-    }
-
-    [...missing].forEach(urn => pending.add(urn));
-
-    this.setProperties({_pendingTimeseriesRequests: pending});
-    this.notifyPropertyChange('_pendingTimeseriesRequests');
-
-    // metrics
-    const metricUrns = [...missing].filter(urn => urn.startsWith('thirdeye:metric:'));
-    const metricIdString = metricUrns.map(urn => urn.split(":")[2]).join(',');
-    const metricUrl = `/timeseries/query?metricIds=${metricIdString}&ranges=${context.analysisRange[0]}:${context.analysisRange[1]}&granularity=15_MINUTES&transformations=timestamp`;
-
-    fetch(metricUrl)
-      .then(checkStatus)
-      .then(this._extractTimeseries)
-      .then(timeseries => this._completeRequestMissingTimeseries(timeseries));
-
-    // baselines
-    const baselineOffset = context.anomalyRange[0] - context.baselineRange[0];
-    const baselineAnalysisStart = context.analysisRange[0] - baselineOffset;
-    const baselineAnalysisEnd = context.analysisRange[1] - baselineOffset;
-
-    const baselineUrns = [...missing].filter(urn => urn.startsWith('frontend:baseline:metric:'));
-    const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
-    const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&granularity=15_MINUTES&transformations=timestamp`;
-
-    fetch(baselineUrl)
-      .then(checkStatus)
-      .then(this._extractTimeseries)
-      .then(timeseries => this._convertMetricToBaseline(timeseries, baselineOffset))
-      .then(timeseries => this._completeRequestMissingTimeseries(timeseries));
-
-  },
-
-  _completeRequestMissingTimeseries(incoming) {
-    console.log('_completeRequestMissingTimeseries()');
-    const { _pendingTimeseriesRequests: pending, _timeseriesCache: cache } =
-      this.getProperties('_pendingTimeseriesRequests', '_timeseriesCache');
-
-    Object.keys(incoming).forEach(urn => pending.delete(urn));
-    Object.keys(incoming).forEach(urn => cache[urn] = incoming[urn]);
-
-    this.setProperties({ _pendingTimeseriesRequests: pending, _timeseriesCache: cache });
-    this.notifyPropertyChange('_timeseriesCache');
-    this.notifyPropertyChange('_pendingTimeseriesRequests');
-  },
-
-  _extractTimeseries(json) {
-    const timeseries = {};
-    Object.keys(json).forEach(range =>
-      Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
-        const urn = `thirdeye:metric:${sid}`;
-        const jrng = json[range];
-        const jval = jrng[sid];
-
-        const timestamps = [];
-        const values = [];
-        jrng.timestamp.forEach((t, i) => {
-          if (jval[i] != null) {
-            timestamps.push(t);
-            values.push(jval[i]);
-          }
-        });
-
-        timeseries[urn] = {
-          timestamps: timestamps,
-          values: values
-        };
-      })
-    );
-    return timeseries;
-  },
-
-  _convertMetricToBaseline(timeseries, offset) {
-    const baseline = {};
-    Object.keys(timeseries).forEach(urn => {
-      const baselineUrn = this._makeMetricBaselineUrn(urn);
-      baseline[baselineUrn] = {
-        values: timeseries[urn].values,
-        timestamps: timeseries[urn].timestamps.map(t => t + offset)
-      };
-    });
-    return baseline;
-  },
-
-  _makeMetricBaselineUrn(urn) {
-    const mid = urn.split(':')[2];
-    return `frontend:baseline:metric:${mid}`;
-  },
-
-  //
   // Aggregates loading
   //
 
@@ -321,7 +212,7 @@ export default Ember.Controller.extend({
       if (currentUrns.length <= 0) {
         return;
       }
-      const baselineUrns = currentUrns.map(urn => this._makeMetricBaselineUrn(urn));
+      const baselineUrns = currentUrns.map(urn => this._makeBaselineUrn(urn));
 
       this._startRequestMissingAggregates(currentUrns.concat(baselineUrns));
     }
@@ -391,6 +282,11 @@ export default Ember.Controller.extend({
       });
     });
     return aggregates;
+  },
+
+  _makeBaselineUrn(urn) {
+    const mid = urn.split(':')[2];
+    return `frontend:baseline:metric:${mid}`;
   },
 
   //
