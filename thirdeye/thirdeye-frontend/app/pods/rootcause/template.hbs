@@ -1,12 +1,3 @@
-<h3>This is the loading indicator.</h3>
-type
-{{#if isLoadingEntities}}
-  | ENTITIES
-{{/if}}
-{{#if isLoadingTimeseries}}
-  | TIMESERIES
-{{/if}}
-
 <h3>This manipulates the controller state.</h3>
 <a {{action "addSelectedUrns" "thirdeye:metric:17606338"}}>add test metric</a> |
 <a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove test metric</a> |
@@ -36,6 +27,15 @@ type
   baselineRange=context.baselineRange
   analysisRange=context.analysisRange
   onHover=(action "chartOnHover")}}
+
+<h3>This is the loading indicator.</h3>
+type
+{{#if isLoadingEntities}}
+  | ENTITIES
+{{/if}}
+{{#if isLoadingTimeseries}}
+  | TIMESERIES
+{{/if}}
 
 <h3>This is the hover section.</h3>
 urns

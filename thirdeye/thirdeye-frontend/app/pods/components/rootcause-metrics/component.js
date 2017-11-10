@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import { toBaselineUrn, hasPrefix } from '../../../helpers/utils';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -24,6 +25,9 @@ export default Ember.Component.extend({
       if (onSelection) {
         const state = !selectedUrns.has(urn);
         const updates = { [urn]: state };
+        if (hasPrefix(urn, 'thirdeye:metric:')) {
+          updates[toBaselineUrn(urn)] = state;
+        }
         onSelection(updates);
       }
     }

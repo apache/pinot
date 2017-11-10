@@ -1,11 +1,7 @@
 import Ember from 'ember';
-import { makeIterable, filterObject, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { makeIterable, filterObject, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
-
-//
-// Controller
-//
 
 export default Ember.Controller.extend({
   entitiesService: Ember.inject.service("rootcause-entities-cache"), // service
@@ -137,7 +133,7 @@ export default Ember.Controller.extend({
     function () {
       const { selectedUrns } = this.getProperties('selectedUrns');
       const baselineUrns = {};
-      filterPrefix(selectedUrns, 'thirdeye:metric:').forEach(urn => baselineUrns[urn] = this._makeBaselineUrn(urn));
+      filterPrefix(selectedUrns, 'thirdeye:metric:').forEach(urn => baselineUrns[urn] = toBaselineUrn(urn));
       return baselineUrns;
     }
   ),
@@ -174,12 +170,7 @@ export default Ember.Controller.extend({
       return this.get('aggregatesService.aggregates').size > 0;
     }
   ),
-
-  _makeBaselineUrn(urn) {
-    const mid = urn.split(':')[2];
-    return `frontend:baseline:metric:${mid}`;
-  },
-
+  
   //
   // Actions
   //
