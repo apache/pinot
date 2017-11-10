@@ -181,6 +181,7 @@ public class PinotSchemaRestletResource {
       }
       _pinotHelixResourceManager.addOrUpdateSchema(schema);
 
+      // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Metadata change notification from old schema {} to new schema {}", oldSchema, schema);
       _metadataChangeNotifierFactory.create().notifyOnSchemaEvents(oldSchema, schema);
 
