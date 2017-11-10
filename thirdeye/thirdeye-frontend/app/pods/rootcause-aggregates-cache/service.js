@@ -24,13 +24,12 @@ export default Ember.Service.extend({
 
     let missing;
     let newAggregates;
-    if(!_.isEqual(context.analysisRange, requestContext.analysisRange)) {
+    if(!_.isEqual(context.anomalyRange, requestContext.anomalyRange)) {
       // new analysis range: evict all, reload
       missing = metrics;
       newAggregates = metrics.filter(urn => aggregates[urn]).reduce((agg, urn) => agg[urn] = aggregates[urn], {});
 
-    } else if((context.anomalyRange[0] - context.baselineRange[0]) !=
-      (requestContext.anomalyRange[0] - requestContext.baselineRange[0])) {
+    } else if(!_.isEqual(context.baselineRange, requestContext.baselineRange)) {
       // new baseline: reload baselines, load missing
       missing = metrics.filter(urn => !aggregates[urn] || urn.startsWith('frontend:baseline:metric:'));
       newAggregates = Object.keys(aggregates)
