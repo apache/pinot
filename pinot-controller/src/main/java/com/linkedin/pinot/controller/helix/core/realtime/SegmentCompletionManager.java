@@ -296,6 +296,7 @@ public class SegmentCompletionManager {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
       _fsmMap.remove(segmentNameStr);
     }
+
     return response;
   }
 

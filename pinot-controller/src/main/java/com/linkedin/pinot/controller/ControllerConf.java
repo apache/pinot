@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller;
 
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.StringUtil;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -22,8 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.StringUtil;
 
 public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
