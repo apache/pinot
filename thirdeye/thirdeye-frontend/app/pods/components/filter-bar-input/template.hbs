@@ -1,0 +1,13 @@
+<li class="entity-filter__group-filter">
+  <label class="entity-filter__group-label">
+    {{label}}
+  </label>
+  {{#if (eq type 'dropdown')}}
+    {{#power-select
+      options=options
+      onchange=onchange
+      as |option|}}
+      {{option}}
+    {{/power-select}}
+  {{/if}}
+</li>

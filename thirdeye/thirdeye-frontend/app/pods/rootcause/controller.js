@@ -504,7 +504,7 @@ export default Ember.Controller.extend({
    * }
    * @type {Object}
    */
-  attributes: Ember.computed(
+  attributesMap: Ember.computed(
     'eventFilterEntities',
     function() {
       let filteredEvents = this.get('eventFilterEntities');
@@ -542,7 +542,7 @@ export default Ember.Controller.extend({
         });
       }
 
-      console.log("map: ", map);
+      return map;
     }
   ),
 
