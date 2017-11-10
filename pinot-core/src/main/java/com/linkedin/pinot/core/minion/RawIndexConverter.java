@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * </ul>
  * <p>After the conversion, add "rawIndex" into the segment metadata "optimizations" field.
  */
-public class RawIndexConverter {
+public class RawIndexConverter implements Converter {
   private static final Logger LOGGER = LoggerFactory.getLogger(RawIndexConverter.class);
 
   // Threshold for the ratio of uncompressed raw index size and dictionary-based index size to trigger conversion
