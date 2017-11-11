@@ -55,7 +55,7 @@ export default Ember.Service.extend({
     const metricUrns = filterPrefix(missing, 'thirdeye:metric:');
     if (!_.isEmpty(metricUrns)) {
       const metricIdString = metricUrns.map(urn => urn.split(":")[2]).join(',');
-      const metricUrl = `/timeseries/query?metricIds=${metricIdString}&ranges=${requestContext.analysisRange[0]}:${requestContext.analysisRange[1]}&filters=${filtersString}&granularity=${requestContext.granularity}&transformations=timestamp`;
+      const metricUrl = `/timeseries/query?metricIds=${metricIdString}&ranges=${requestContext.analysisRange[0]}:${requestContext.analysisRange[1]}&filters=${filtersString}&granularity=${requestContext.granularity}`;
 
       fetch(metricUrl)
         // .then(checkStatus)
@@ -72,7 +72,7 @@ export default Ember.Service.extend({
     const baselineUrns = filterPrefix(missing, 'frontend:baseline:metric:');
     if (!_.isEmpty(baselineUrns)) {
       const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
-      const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&filters=${filtersString}&granularity=${requestContext.granularity}&transformations=timestamp`;
+      const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&filters=${filtersString}&granularity=${requestContext.granularity}`;
 
       fetch(baselineUrl)
         // .then(checkStatus)

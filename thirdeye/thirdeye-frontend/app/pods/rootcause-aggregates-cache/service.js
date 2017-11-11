@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import checkStatus from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -45,11 +45,14 @@ export default Ember.Service.extend({
     const newPending = new Set(missing);
     this.setProperties({ context: _.cloneDeep(requestContext), aggregates: newAggregates, pending: newPending });
 
+    const filtersMap = this._makeFiltersMap(requestContext.urns);
+    const filtersString = encodeURIComponent(JSON.stringify(filtersMap));
+
     // metrics
     const metricUrns = missing.filter(urn => urn.startsWith('thirdeye:metric:'));
     if (!_.isEmpty(metricUrns)) {
       const metricIdString = metricUrns.map(urn => urn.split(":")[2]).join(',');
-      const metricUrl = `/aggregation/query?metricIds=${metricIdString}&ranges=${requestContext.anomalyRange[0]}:${requestContext.anomalyRange[1]}`;
+      const metricUrl = `/aggregation/query?metricIds=${metricIdString}&ranges=${requestContext.anomalyRange[0]}:${requestContext.anomalyRange[1]}&filters=${filtersString}`;
 
       fetch(metricUrl)
         // .then(checkStatus)
@@ -62,7 +65,7 @@ export default Ember.Service.extend({
     const baselineUrns = missing.filter(urn => urn.startsWith('frontend:baseline:metric:'));
     if (!_.isEmpty(baselineUrns)) {
       const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
-      const baselineUrl = `/aggregation/query?metricIds=${baselineIdString}&ranges=${requestContext.baselineRange[0]}:${requestContext.baselineRange[1]}`;
+      const baselineUrl = `/aggregation/query?metricIds=${baselineIdString}&ranges=${requestContext.baselineRange[0]}:${requestContext.baselineRange[1]}&filters=${filtersString}`;
 
       fetch(baselineUrl)
          // .then(checkStatus)
@@ -104,5 +107,10 @@ export default Ember.Service.extend({
       });
     });
     return aggregates;
+  },
+
+  _makeFiltersMap(urns) {
+    const filters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => { const t = urn.split(':'); return [t[2], t[3]]; });
+    return filters.reduce((agg, t) => { if (!agg[t[0]]) { agg[t[0]] = [t[1]]; } else { agg[t[0]] = agg[t[0]].concat(t[1]); } return agg; }, {});
   }
 });

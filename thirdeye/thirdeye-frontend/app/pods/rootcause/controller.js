@@ -170,7 +170,7 @@ export default Ember.Controller.extend({
       return this.get('aggregatesService.aggregates').size > 0;
     }
   ),
-  
+
   //
   // Actions
   //
