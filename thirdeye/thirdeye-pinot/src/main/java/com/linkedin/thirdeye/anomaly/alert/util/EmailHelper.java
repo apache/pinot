@@ -151,11 +151,6 @@ public abstract class EmailHelper {
     return handler.process(request);
   }
 
-  public static ContributorViewResponse getContributorDataForDataReport(String collection, String metric, List<String> dimensions)
-      throws Exception {
-    return getContributorDataForDataReport(collection, metric, dimensions, AlertConfigBean.COMPARE_MODE.WoW, 2 * 36_00_000, false); // add 2 hours delay
-  }
-
   public static long getBaselineOffset(AlertConfigBean.COMPARE_MODE compareMode) {
     switch (compareMode) {
     case Wo2W:
