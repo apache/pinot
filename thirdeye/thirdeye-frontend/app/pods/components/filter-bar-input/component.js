@@ -8,7 +8,7 @@ export default Ember.Component.extend({
   /**
    * Default value for filter bar input
    */
-  selected: '',
+  selected: [],
 
   /**
    * options to populate dropdown (required by power-select addon)
@@ -33,19 +33,18 @@ export default Ember.Component.extend({
     /**
      * Handles selection of filter items within an event type.
      * @method onFilterSelection
-     * @param {String} filterLabel - label of the selected subfilter (i.e. country, region, etc.)
-     * @param {String} selectedValue - selected value in the input
+     * @param {Array} selectedValue - selected value in the input
      */
-    onSubfilterSelection(filterLabel, selectedValue) {
-      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
-      const labelMapping = findLabelMapping(filterLabel, this.get('config'));
+    onSubfilterSelection(selectedValue) {
+      const { label, entities, onSelect } = this.getProperties('label', 'entities', 'onSelect');
+      const labelMapping = findLabelMapping(label, this.get('config'));
 
       this.set('selected', selectedValue);
 
       if (onSelect) {
         const urns = Object.keys(entities).filter(urn => {
           if (entities[urn].attributes[labelMapping]) {
-            return entities[urn].attributes[labelMapping].includes(selectedValue);
+            return selectedValue.some(value => entities[urn].attributes[labelMapping].includes(value));
           }
         });
         onSelect(urns);

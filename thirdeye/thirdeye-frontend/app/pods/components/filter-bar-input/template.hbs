@@ -3,12 +3,12 @@
     {{label}}
   </label>
   {{#if (eq type 'dropdown')}}
-    {{#power-select
+    {{#power-select-multiple
       selected=selected
       options=options
-      onchange=(action 'onSubfilterSelection' label)
+      onchange=(action 'onSubfilterSelection')
       as |option|}}
       {{option}}
-    {{/power-select}}
+    {{/power-select-multiple}}
   {{/if}}
 </li>
