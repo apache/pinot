@@ -10,5 +10,7 @@ public interface AggregationLoader {
   String COL_DIMENSION_VALUE = "dimValue";
   String COL_VALUE = DataFrameUtils.COL_VALUE;
 
-  DataFrame load(MetricSlice slice) throws Exception;
+  DataFrame loadBreakdown(MetricSlice slice) throws Exception;
+
+  double loadAggregate(MetricSlice slice) throws Exception;
 }

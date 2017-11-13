@@ -32,7 +32,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
   }
 
   @Override
-  public DataFrame load(MetricSlice slice) throws Exception {
+  public DataFrame loadBreakdown(MetricSlice slice) throws Exception {
     final long metricId = slice.getMetricId();
 
     // fetch meta data
@@ -68,5 +68,29 @@ public class DefaultAggregationLoader implements AggregationLoader {
     }
 
     return dfAll.append(results);
+  }
+
+  @Override
+  public double loadAggregate(MetricSlice slice) throws Exception {
+    final long metricId = slice.getMetricId();
+
+    // fetch meta data
+    MetricConfigDTO metric = this.metricDAO.findById(metricId);
+    if (metric == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", metricId));
+    }
+
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    if (dataset == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s'", metric.getDataset()));
+    }
+
+    LOG.info("Summarizing metric id {} with {} filters", metricId, slice.getFilters().size());
+
+    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.<String>emptyList(), "ref", this.metricDAO, this.datasetDAO);
+    ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
+    DataFrame df = DataFrameUtils.evaluateResponse(res, rc);
+
+    return df.getDoubles(COL_VALUE).fillNull().doubleValue();
   }
 }
