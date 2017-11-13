@@ -48,4 +48,18 @@ export function filterObject(obj, func) {
   return out;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject });
+/**
+   * finds the corresponding labelMapping field given a label in the filterBarConfig
+   * This is only a placeholder since the filterBarConfig is not finalized
+   */
+export function findLabelMapping(label, config) {
+  let labelMapping = '';
+  config.some(filterBlock => filterBlock.inputs.some(input => {
+    if (input.label === label) {
+      labelMapping = input.labelMapping;
+    }
+  }));
+  return labelMapping;
+}
+
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, findLabelMapping });

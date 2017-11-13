@@ -4,8 +4,9 @@
   </label>
   {{#if (eq type 'dropdown')}}
     {{#power-select
+      selected=selected
       options=options
-      onchange=onchange
+      onchange=(action 'onSubfilterSelection' label)
       as |option|}}
       {{option}}
     {{/power-select}}

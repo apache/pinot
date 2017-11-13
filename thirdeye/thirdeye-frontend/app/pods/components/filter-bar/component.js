@@ -18,6 +18,7 @@
  */
 import Ember from 'ember';
 import _ from 'lodash';
+import { findLabelMapping } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Component.extend({
 
@@ -26,8 +27,6 @@ export default Ember.Component.extend({
    * This will be an API call
    */
   options: ['All', 'None'],
-
-  entities: null,
 
   /**
    * Overwrite the init function
@@ -142,13 +141,6 @@ export default Ember.Component.extend({
   },
 
   actions: {
-    /**
-     * Handles selection of filter items within an event type.
-     * @method onFilterSelection
-     */
-    onFilterSelection() {
-      // TODO: Write logic to handle filter selection
-    },
 
     /**
      * Expands/collapses a filter block
