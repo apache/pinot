@@ -10,19 +10,14 @@
       </h5>
       <ul class="entity-filter__group-list {{if block.isHidden " entity-filter__group-list--hidden "}}">
         {{#each block.inputs as |filter|}}
-          <li class="entity-filter__group-filter">
-            <label class="entity-filter__group-label">
-              {{filter.label}}
-            </label>
-            {{#if (eq filter.type 'dropdown')}}
-              {{#power-select
-                options=options
-                onchange=(action 'onFilterSelection')
-                as |option|}}
-                {{option}}
-              {{/power-select}}
-            {{/if}}
-          </li>
+          {{filter-bar-input
+            header=block.header
+            config=config
+            label=filter.label
+            type=filter.type
+            attributesMap=attributesMap
+            entities=entities
+            onSelect=onSelect}}
         {{/each}}
       </ul>
     </section>

@@ -17,6 +17,8 @@
  * @exports filter-bar
  */
 import Ember from 'ember';
+import _ from 'lodash';
+import { findLabelMapping } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Component.extend({
 
@@ -73,14 +75,72 @@ export default Ember.Component.extend({
     });
   },
 
+  /**
+   * Returns object that represents mapping between attributes in events and input values in config
+   * Example:
+   * {
+   *  holiday: {
+   *    countryCode: ['US', 'IN', 'MX'],
+   *    region: ['North America', 'Antarctica']
+   *  },
+   *  deployment: {
+   *    fabric: ['prod', 'local']
+   *  }
+   * }
+   * @type {Object}
+   */
+  attributesMap: Ember.computed(
+    'entities',
+    function () {
+      let filteredEvents = this.get('entities');
+      let map = {};
+      if (!_.isEmpty(filteredEvents)) {
+        // Iterate through each event
+        Object.keys(filteredEvents).forEach(key => {
+          const event = filteredEvents[key];
+          const eventType = event.eventType;
+          // Iterate through each property of event's attributes object
+          Object.keys(event.attributes).forEach(attr => {
+            // Check if the attribute is in the config file
+            if (this.isInConfig(attr)) {
+              // If map has a key of eventType (i.e. holidays, GCN, Lix)
+              if (map.hasOwnProperty(eventType)) {
+                // If eventType object in map doesn't have this attribute, add values to existing value set
+                if (map[eventType].hasOwnProperty(attr)) {
+                  let attrSet = map[eventType][attr];
+                  let values = event.attributes[attr];
+                  values.forEach(val => attrSet.add(val));
+                }
+                // If eventType object in map does have this attribute, create a set with those values
+                else {
+                  // Create set and add values there
+                  map[eventType][attr] = new Set(event.attr);
+                }
+              }
+              // If map doesn't have a key of eventType (i.e. holidays, GCN, Lix)
+              else {
+                let obj = { [attr]: new Set(event.attributes.countryCode) };
+                map[eventType] = obj;
+              }
+            }
+          });
+        });
+      }
+
+      return map;
+    }
+  ),
+
+  /**
+   * Helper method to check whether an attribute is in the config
+   * @method isInConfig
+   * @param {String} attribute - name of attribute to check against config's input's labelMapping
+   */
+  isInConfig(attribute) {
+    return this.get('config').some(filterBlock => filterBlock.inputs.some(input => attribute === input.labelMapping));
+  },
+
   actions: {
-    /**
-     * Handles selection of filter items within an event type.
-     * @method onFilterSelection
-     */
-    onFilterSelection() {
-      // TODO: Write logic to handle filter selection
-    },
 
     /**
      * Expands/collapses a filter block

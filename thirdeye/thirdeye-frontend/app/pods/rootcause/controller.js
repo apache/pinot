@@ -109,6 +109,7 @@ export default Ember.Controller.extend({
     function () {
       console.log('eventFilterEntities()');
       const { entities } = this.getProperties('entities');
+      console.log("printing entities: ", entities);
       return filterObject(entities, (e) => e.type == 'event');
     }
   ),
