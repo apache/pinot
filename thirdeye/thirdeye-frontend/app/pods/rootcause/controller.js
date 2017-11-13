@@ -4,13 +4,13 @@ import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 
 export default Ember.Controller.extend({
-  entitiesService: Ember.inject.service("rootcause-entities-cache"), // service
+  entitiesService: Ember.inject.service('rootcause-entities-cache'), // service
 
-  timeseriesService: Ember.inject.service("rootcause-timeseries-cache"), // service
+  timeseriesService: Ember.inject.service('rootcause-timeseries-cache'), // service
 
-  aggregatesService: Ember.inject.service("rootcause-aggregates-cache"), // service
+  aggregatesService: Ember.inject.service('rootcause-aggregates-cache'), // service
 
-  breakdownsService: Ember.inject.service("rootcause-breakdowns-cache"), // service
+  breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'), // service
 
   selectedUrns: null, // Set
 
