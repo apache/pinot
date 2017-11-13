@@ -62,9 +62,9 @@ public class ServerLatencyMetricReaderTest {
             _endpointList.add("localhost:" + (_serverPortStart + i));
         }
         ServerLatencyMetric metric = new ServerLatencyMetric();
-        metric.set_avglatency(20.0);
-        metric.set_avgSegments(35.0);
-        metric.set_numRequests(40);
+        metric.setLatency((long)20);
+        metric.setSegmentSize((long)35);
+        metric.setNumRequests(40);
         _server1latencies.add(metric);
 
         _server1LoadInfo = createSegmentsInfo(_server1latencies);

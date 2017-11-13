@@ -2,13 +2,13 @@ package com.linkedin.pinot.transport.metrics;
 
 import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
 import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
-import org.apache.log4j.spi.ErrorCode;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -29,46 +29,49 @@ public class NettyServerWorkload {
     private final Map<String, ServerLoadMetrics> avgLoadMap;
 
     public NettyServerWorkload(){
-        avgLoadMap = new HashMap<>();
+        avgLoadMap = new ConcurrentHashMap<>();
     }
 
     public void addWorkLoad(String tableName, ServerLatencyMetric load){
         if(avgLoadMap.containsKey(tableName)){
+            //If already contains tableName get the load list for that table
             List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
+            //Get the last entry in the list
             ServerLatencyMetric l = list.get(list.size()-1);
-            if(l._timestamp + CAPTURE_WINDOW >= load._timestamp){
-                //if incoming load within last window -> update window
+            if(l.getTimestamp() + CAPTURE_WINDOW >= load.getTimestamp()){
+                //if incoming load within last window then update window
                 updateLastWindow(tableName, load);
             }else{
-                load._numRequests = 1;
+                //else add new entry
                 list.add(load);
             }
         }else{
+            //if tableName doesn't exist till now
             ServerLoadMetrics loadMetrics = new ServerLoadMetrics();
             loadMetrics.set_latencies(new ArrayList<ServerLatencyMetric>());
-            load._numRequests = 1;
             loadMetrics.get_latencies().add(load);
             avgLoadMap.put(tableName, loadMetrics);
         }
 
+        //flush records to file, flushRecords will take care weather window has maxed out or not
         flushRecords(tableName);
     }
 
     private void updateLastWindow(String tableName, ServerLatencyMetric load) {
+        //Updating last entry in list with current load
         List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
         ServerLatencyMetric lastLoad = list.get(list.size()-1);
-        Double currAvgLatency = lastLoad._avglatency;
-        Double CurrAvgSegments = lastLoad._avgSegments;
-        long n = lastLoad._numRequests;
-        lastLoad._avglatency = (currAvgLatency*n + load._avglatency)/(n+1);
-        lastLoad._avgSegments = (CurrAvgSegments*n + load._avgSegments)/(n+1);
-        lastLoad._numRequests = n+1;
+        lastLoad.setLatency(lastLoad.getLatency() + load.getLatency());
+        lastLoad.setSegmentSize(lastLoad.getSegmentSize() + load.getSegmentSize());
+        lastLoad.setNumRequests(lastLoad.getNumRequests() + 1);
+        lastLoad.setDocuments(lastLoad.getDocuments() + load.getDocuments());
+        //update the same index in list now
         list.set(list.size()-1, lastLoad);
     }
 
-    public ServerLoadMetrics getAvgLoad(String tablename){
-        if(avgLoadMap.containsKey(tablename)){
-            return avgLoadMap.get(tablename);
+    public ServerLoadMetrics getAvgLoad(String tableName){
+        if(avgLoadMap.containsKey(tableName)){
+            return avgLoadMap.get(tableName);
         }else{
             return null;
         }

@@ -59,9 +59,9 @@ public class ServerMetricsInfoTest {
     public void testServerPerfResource() {
         ServerLoadMetrics serverLatencyInfo = target.path(CommonConstants.Helix.ServerMetricUris.SERVER_METRICS_INFO_URI+"table_0/LatencyInfo").request().get(ServerLoadMetrics.class);
         ServerLatencyMetric metric = new ServerLatencyMetric();
-        metric.set_avgSegments(100.0);
-        metric.set_avglatency(203.0);
-        metric.set_timestamp(100);
+        metric.setSegmentSize((long)100);
+        metric.setLatency((long)203);
+        metric.setTimestamp(100);
         List<ServerLatencyMetric> server1latencies = new ArrayList<>();
         server1latencies.add(metric);
         Assert.assertNotNull(server1latencies);

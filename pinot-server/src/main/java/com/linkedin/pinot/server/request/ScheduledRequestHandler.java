@@ -19,10 +19,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.metrics.ServerQueryPhase;
+import com.linkedin.pinot.common.metrics.*;
 import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.InstanceRequest;
@@ -127,8 +124,9 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
     ListenableFuture<byte[]> queryResponse = queryScheduler.submit(queryRequest);
     requestProcessingLatency.stop();
     long latency = requestProcessingLatency.getLatencyMs();
-    final ServerLatencyMetric metric = new ServerLatencyMetric(queryStartTimeMs, requestProcessingLatency.getLatencyMs()*1.0, 1.0*instanceRequest.getSearchSegmentsSize());
-    workload.addWorkLoad(instanceRequest.getQuery().getQuerySource().getTableName(), metric);
+    String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
+    final ServerLatencyMetric metric = new ServerLatencyMetric(queryStartTimeMs, requestProcessingLatency.getLatencyMs(), serverMetrics.getValueOfTableGauge(tableName, ServerGauge.SEGMENT_COUNT), serverMetrics.getValueOfTableGauge(tableName, ServerGauge.DOCUMENT_COUNT));
+    workload.addWorkLoad(tableName, metric);
     return queryResponse;
   }
 
