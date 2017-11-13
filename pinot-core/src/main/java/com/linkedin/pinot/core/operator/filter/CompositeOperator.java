@@ -15,13 +15,11 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.CompositeBaseFilterBlock;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CompositeOperator extends BaseFilterOperator{
   private static final String OPERATOR_NAME = "CompositeOperator";
@@ -42,7 +40,7 @@ public class CompositeOperator extends BaseFilterOperator{
   }
 
   @Override
-  public BaseFilterBlock nextFilterBlock(BlockId blockId) {
+  protected BaseFilterBlock getNextBlock() {
     List<BaseFilterBlock> blocks = new ArrayList<>();
     for(Operator operator:operators){
       blocks.add((BaseFilterBlock) operator.nextBlock());

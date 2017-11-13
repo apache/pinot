@@ -15,17 +15,13 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import java.util.List;
-
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 public class BitmapBlock extends BaseFilterBlock {
 
@@ -48,11 +44,6 @@ public class BitmapBlock extends BaseFilterBlock {
     this.endDocId = endDocId;
     this.bitmaps = bitmaps;
     this.exclusion = exclusion;
-  }
-
-  @Override
-  public BlockId getId() {
-    return new BlockId(0);
   }
 
   @Override

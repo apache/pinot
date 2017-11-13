@@ -36,11 +36,9 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
   private String _column;
 
   /**
-
-
    * Constructor for the class.
    * The dataBlockCache argument is initialized in {@link com.linkedin.pinot.core.operator.MProjectionOperator},
-   * so that it can be reused across multiple calls to {@link MProjectionOperator#getNextBlock()}.
+   * so that it can be reused across multiple calls to {@link MProjectionOperator#nextBlock()}.
    *
    * @param dataBlockCache data block cache
    * @param column Projection column.

@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator.query;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
@@ -33,8 +32,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,8 +40,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class MSelectionOnlyOperator extends BaseOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOnlyOperator.class);
+public class MSelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "MSelectionOnlyOperator";
 
   private final IndexSegment _indexSegment;
@@ -73,11 +69,11 @@ public class MSelectionOnlyOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock() {
+  protected IntermediateResultsBlock getNextBlock() {
     int numDocsScanned = 0;
 
     ProjectionBlock projectionBlock;
-    while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
+    while ((projectionBlock = _projectionOperator.nextBlock()) != null) {
       for (int i = 0; i < _dataSchema.size(); i++) {
         _blocks[i] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
       }
@@ -103,11 +99,6 @@ public class MSelectionOnlyOperator extends BaseOperator {
             numTotalRawDocs);
 
     return new IntermediateResultsBlock(_dataSchema, _rowEvents);
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

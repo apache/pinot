@@ -16,8 +16,6 @@
 package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -32,7 +30,7 @@ import javax.annotation.Nonnull;
 /**
  * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
  */
-public class AggregationGroupByOperator extends BaseOperator {
+public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOperator";
 
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
@@ -61,7 +59,7 @@ public class AggregationGroupByOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock() {
+  protected IntermediateResultsBlock getNextBlock() {
     int numDocsScanned = 0;
 
     // Perform aggregation group-by on all the blocks.
@@ -70,7 +68,7 @@ public class AggregationGroupByOperator extends BaseOperator {
             _numGroupsLimit);
     groupByExecutor.init();
     TransformBlock transformBlock;
-    while ((transformBlock = (TransformBlock) _transformOperator.nextBlock()) != null) {
+    while ((transformBlock = _transformOperator.nextBlock()) != null) {
       numDocsScanned += transformBlock.getNumDocs();
       groupByExecutor.process(transformBlock);
     }
@@ -85,11 +83,6 @@ public class AggregationGroupByOperator extends BaseOperator {
 
     // Build intermediate result block based on aggregation group-by result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctionContexts, groupByExecutor.getResult());
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

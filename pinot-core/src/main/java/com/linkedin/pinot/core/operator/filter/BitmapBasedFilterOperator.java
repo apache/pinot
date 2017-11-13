@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
@@ -65,7 +64,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
+  protected BaseFilterBlock getNextBlock() {
     InvertedIndexReader invertedIndex = dataSource.getInvertedIndex();
     Block dataSourceBlock = dataSource.nextBlock();
     int[] dictionaryIds;

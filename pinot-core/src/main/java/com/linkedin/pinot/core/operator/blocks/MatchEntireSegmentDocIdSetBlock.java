@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.SizeBasedDocIdSet;
 
@@ -31,10 +30,5 @@ public class MatchEntireSegmentDocIdSetBlock extends BaseFilterBlock {
   public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
     int maxDocId = _totalDocs - 1;
     return new SizeBasedDocIdSet(maxDocId);
-  }
-
-  @Override
-  public BlockId getId() {
-    return null;
   }
 }

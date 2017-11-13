@@ -161,7 +161,7 @@ public class IndexSegmentImpl implements IndexSegment {
     final Map<String, BlockMultiValIterator> multiValIteratorMap = new HashMap<>();
     for (String column : getColumnNames()) {
       DataSource dataSource = getDataSource(column);
-      BlockValIterator iterator = dataSource.getNextBlock().getBlockValueSet().iterator();
+      BlockValIterator iterator = dataSource.nextBlock().getBlockValueSet().iterator();
       if (dataSource.getDataSourceMetadata().isSingleValue()) {
         singleValIteratorMap.put(column, (BlockSingleValIterator) iterator);
       } else {

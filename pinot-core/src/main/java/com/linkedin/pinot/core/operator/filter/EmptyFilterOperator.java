@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
@@ -29,7 +28,7 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "EmptyFilterOperator";
 
   @Override
-  public BaseFilterBlock nextFilterBlock(BlockId blockId) {
+  protected BaseFilterBlock getNextBlock() {
     return new ExcludeEntireSegmentDocIdSetBlock();
   }
 
@@ -57,11 +56,6 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
     @Override
     public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
       return new EmptyDocIdSet();
-    }
-
-    @Override
-    public BlockId getId() {
-      return null;
     }
   }
 

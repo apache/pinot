@@ -17,8 +17,6 @@ package com.linkedin.pinot.core.operator.transform;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
@@ -32,7 +30,7 @@ import java.util.Map;
 /**
  * Class for evaluating transform expressions.
  */
-public class TransformExpressionOperator extends BaseOperator {
+public class TransformExpressionOperator extends BaseOperator<TransformBlock> {
   private static final String OPERATOR_NAME = "TransformExpressionOperator";
 
   private final MProjectionOperator _projectionOperator;
@@ -53,8 +51,8 @@ public class TransformExpressionOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock() {
-    ProjectionBlock projectionBlock = _projectionOperator.getNextBlock();
+  protected TransformBlock getNextBlock() {
+    ProjectionBlock projectionBlock = _projectionOperator.nextBlock();
     if (projectionBlock == null) {
       return null;
     }
@@ -63,11 +61,6 @@ public class TransformExpressionOperator extends BaseOperator {
         (_expressionEvaluator != null) ? _expressionEvaluator.evaluate(projectionBlock) : null;
 
     return new TransformBlock(projectionBlock, expressionResults);
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

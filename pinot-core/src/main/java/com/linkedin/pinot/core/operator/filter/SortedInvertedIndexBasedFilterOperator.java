@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
@@ -70,7 +69,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
+  protected BaseFilterBlock getNextBlock() {
     SortedIndexReader invertedIndex = (SortedIndexReader) dataSource.getInvertedIndex();
     List<IntPair> pairs = new ArrayList<>();
 
@@ -215,11 +214,6 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     public SortedBlock(String datasourceName, List<IntPair> pairs) {
       this.datasourceName = datasourceName;
       this.pairs = pairs;
-    }
-
-    @Override
-    public BlockId getId() {
-      return new BlockId(0);
     }
 
     @Override

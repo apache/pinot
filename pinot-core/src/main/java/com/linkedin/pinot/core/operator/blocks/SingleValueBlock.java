@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
@@ -43,11 +42,6 @@ public final class SingleValueBlock implements Block {
 
   public SingleColumnSingleValueReader<? extends ReaderContext> getReader() {
     return _reader;
-  }
-
-  @Override
-  public BlockId getId() {
-    throw new UnsupportedOperationException();
   }
 
   @Override
