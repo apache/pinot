@@ -13,7 +13,7 @@
             "name": "d2",
             "type": [
                 "null",
-                "string"
+                "long"
             ]
         },
         {
@@ -21,7 +21,7 @@
             "name": "d2_topk",
             "type": [
                 "null",
-                "string"
+                "long"
             ]
         },
         {

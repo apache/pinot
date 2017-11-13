@@ -22,13 +22,15 @@ import java.util.Map;
  * Config class to define topk and whitelist
  * @param threshold - dimension values which do not satisfy metric thresholds will be ignored
  * @param topKDimensionToMetricsSpec - list of dimension and a map of metric to topk value for that dimension
- * @param whitelist - values to whitelist for given dimension
+ * @param whitelist - values to whitelist for given dimension (dimension:whitelist values)
+ * @param other values - value to be put for a non topk dimenison value (dimension:otherValue)
  */
 public class TopkWhitelistSpec {
 
   Map<String, Double> threshold;
   List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec;
-  Map<String, String> whitelist;
+  Map<String, List<String>> whitelist;
+  Map<String, String> otherValues;
 
   public TopkWhitelistSpec() {
 
@@ -50,14 +52,19 @@ public class TopkWhitelistSpec {
     this.topKDimensionToMetricsSpec = topKDimensionToMetricsSpec;
   }
 
-  public Map<String, String> getWhitelist() {
+  public Map<String, List<String>> getWhitelist() {
     return whitelist;
   }
 
-  public void setWhitelist(Map<String, String> whitelist) {
+  public void setWhitelist(Map<String, List<String>> whitelist) {
     this.whitelist = whitelist;
   }
 
+  public Map<String, String> getOtherValues() {
+    return otherValues;
+  }
 
-
+  public void setOtherValues(Map<String, String> otherValues) {
+    this.otherValues = otherValues;
+  }
 }

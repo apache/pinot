@@ -63,6 +63,7 @@ public class AggregationPhaseTest {
   private String outputPath;
   private Schema inputSchema;
   private ThirdEyeConfig thirdeyeConfig;
+  private AggregationPhaseConfig aggPhaseConfig;
   Properties props = new Properties();
 
   private MapDriver<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> mapDriver;
@@ -87,7 +88,7 @@ public class AggregationPhaseTest {
     // 2016-04-27T190000
     GenericRecord input = new GenericData.Record(inputSchema);
     input.put("d1", "abc1");
-    input.put("d2", "pqr1");
+    input.put("d2", 501L);
     input.put("d3", "xyz1");
     input.put("hoursSinceEpoch", 1461808800000L);
     input.put("m1", 100);
@@ -97,7 +98,7 @@ public class AggregationPhaseTest {
     // 2016-04-27T191000
     input = new GenericData.Record(inputSchema);
     input.put("d1", "abc1");
-    input.put("d2", "pqr1");
+    input.put("d2", 501L);
     input.put("d3", "xyz1");
     input.put("hoursSinceEpoch", 1461809400000L);
     input.put("m1", 100);
@@ -107,7 +108,7 @@ public class AggregationPhaseTest {
     // 2016-04-27T20
     input = new GenericData.Record(inputSchema);
     input.put("d1", "abc2");
-    input.put("d2", "pqr2");
+    input.put("d2", 502L);
     input.put("d3", "xyz2");
     input.put("hoursSinceEpoch", 1461812400000L);
     input.put("m1", 10);
@@ -140,6 +141,7 @@ public class AggregationPhaseTest {
 
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString(), "STRING,LONG,STRING");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
@@ -148,6 +150,7 @@ public class AggregationPhaseTest {
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_INPUT_TIMECOLUMN_SIZE.toString(), "1");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_INPUT_TIMECOLUMN_TYPE.toString(), TimeUnit.MILLISECONDS.toString());
     thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
+    aggPhaseConfig = AggregationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
 
     // Mapper config
     AggregationMapper mapper = new AggregationMapper();
@@ -169,8 +172,8 @@ public class AggregationPhaseTest {
     configuration.set("io.serializations", "org.apache.hadoop.io.serializer.JavaSerialization,"
         + "org.apache.hadoop.io.serializer.WritableSerialization");
 
-    Schema avroSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
-    configuration.set(AggregationPhaseConstants.AGG_PHASE_AVRO_SCHEMA.toString(), avroSchema.toString());
+    Schema reducerSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
+    configuration.set(AggregationPhaseConstants.AGG_PHASE_AVRO_SCHEMA.toString(), reducerSchema.toString());
 
     configuration.set(AggregationPhaseConstants.AGG_PHASE_THIRDEYE_CONFIG.toString(),
         OBJECT_MAPPER.writeValueAsString(thirdeyeConfig));
@@ -178,7 +181,7 @@ public class AggregationPhaseTest {
     TemporaryPath tmpPath = new TemporaryPath();
     outputPath = tmpPath.toString();
     configuration.set(AggregationPhaseConstants.AGG_PHASE_OUTPUT_PATH.toString(), outputPath);
-    setUpAvroSerialization(reduceDriver.getConfiguration(), inputSchema);
+    setUpAvroSerialization(reduceDriver.getConfiguration(), reducerSchema);
 
   }
 
@@ -197,11 +200,12 @@ public class AggregationPhaseTest {
     List<Pair<BytesWritable, BytesWritable>> mapResult = mapDriver.run();
     Assert.assertEquals("Incorrect number of records emitted by mapper", recordCount, mapResult.size());
 
-    AggregationPhaseMapOutputKey keyWrapper = AggregationPhaseMapOutputKey.fromBytes(mapResult.get(0).getFirst().getBytes());
+    AggregationPhaseMapOutputKey keyWrapper =
+        AggregationPhaseMapOutputKey.fromBytes(mapResult.get(0).getFirst().getBytes(), aggPhaseConfig.getDimensionTypes());
     Assert.assertEquals(406058, keyWrapper.getTime());
-    keyWrapper = AggregationPhaseMapOutputKey.fromBytes(mapResult.get(1).getFirst().getBytes());
+    keyWrapper = AggregationPhaseMapOutputKey.fromBytes(mapResult.get(1).getFirst().getBytes(), aggPhaseConfig.getDimensionTypes());
     Assert.assertEquals(406058, keyWrapper.getTime());
-    keyWrapper = AggregationPhaseMapOutputKey.fromBytes(mapResult.get(2).getFirst().getBytes());
+    keyWrapper = AggregationPhaseMapOutputKey.fromBytes(mapResult.get(2).getFirst().getBytes(), aggPhaseConfig.getDimensionTypes());
     Assert.assertEquals(406059, keyWrapper.getTime());
 
     List<Pair<BytesWritable, List<BytesWritable>>> reduceInput = generateTestReduceData(mapResult);
@@ -211,8 +215,11 @@ public class AggregationPhaseTest {
     Assert.assertEquals("Incorrect number of records returned by aggregation reducer", 2, reduceResult.size());
 
     GenericRecord record = reduceResult.get(0).getFirst().datum();
-    List<String> dimensionsExpected = Lists.newArrayList("abc1", "pqr1", "xyz1");
-    List<String> dimensionsActual = getDimensionsFromRecord(record);
+    List<Object> dimensionsExpected = Lists.newArrayList();
+    dimensionsExpected.add("abc1");
+    dimensionsExpected.add(501L);
+    dimensionsExpected.add("xyz1");
+    List<Object> dimensionsActual = getDimensionsFromRecord(record);
     Assert.assertEquals(dimensionsExpected, dimensionsActual);
     List<Integer> metricsExpected = Lists.newArrayList(200, 40);
     List<Integer> metricsActual = getMetricsFromRecord(record);
@@ -221,7 +228,10 @@ public class AggregationPhaseTest {
 
 
     record = reduceResult.get(1).getFirst().datum();
-    dimensionsExpected = Lists.newArrayList("abc2", "pqr2", "xyz2");
+    dimensionsExpected = Lists.newArrayList();
+    dimensionsExpected.add("abc2");
+    dimensionsExpected.add(502L);
+    dimensionsExpected.add("xyz2");
     dimensionsActual = getDimensionsFromRecord(record);
     Assert.assertEquals(dimensionsExpected, dimensionsActual);
     metricsExpected = Lists.newArrayList(10, 2);
@@ -230,11 +240,11 @@ public class AggregationPhaseTest {
     Assert.assertEquals(406059, (long) record.get("hoursSinceEpoch"));
   }
 
-  private List<String> getDimensionsFromRecord(GenericRecord record) {
-    List<String> dimensionsActual = new ArrayList<>();
-    dimensionsActual.add((String) record.get("d1"));
-    dimensionsActual.add((String) record.get("d2"));
-    dimensionsActual.add((String) record.get("d3"));
+  private List<Object> getDimensionsFromRecord(GenericRecord record) {
+    List<Object> dimensionsActual = new ArrayList<>();
+    dimensionsActual.add(record.get("d1"));
+    dimensionsActual.add(record.get("d2"));
+    dimensionsActual.add(record.get("d3"));
     return dimensionsActual;
   }
 

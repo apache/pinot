@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.hadoop.config;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -24,6 +26,7 @@ public class ThirdEyeConfigTest {
     props = new Properties();
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString(), "STRING,LONG,STRING");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2,m3");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "LONG,FLOAT,INT");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "t1");
@@ -43,7 +46,7 @@ public class ThirdEyeConfigTest {
 
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), "d1,d2");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d1", "x,y");
-    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d2", "a");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + ".d2", "500");
 
     thirdeyeConfig = ThirdEyeConfig.fromProperties(props);
 
@@ -156,6 +159,22 @@ public class ThirdEyeConfigTest {
   public void testTopKWhitelistConfig() throws IllegalArgumentException {
     boolean failed = false;
     TopkWhitelistSpec topKWhitelistSpec = thirdeyeConfig.getTopKWhitelist();
+    // others values
+    Map<String, String> otherValues = topKWhitelistSpec.getOtherValues();
+    Map<String, String> expectedOther = new HashMap<>();
+    expectedOther.put("d1", ThirdEyeConstants.OTHER);
+    expectedOther.put("d2","0");
+    expectedOther.put("d3", ThirdEyeConstants.OTHER);
+    Assert.assertEquals(otherValues, expectedOther);
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_OTHER_VALUE.toString(), "dummy,-1,dummy");
+    config = ThirdEyeConfig.fromProperties(props);
+    topKWhitelistSpec = config.getTopKWhitelist();
+    otherValues = topKWhitelistSpec.getOtherValues();
+    expectedOther = new HashMap<>();
+    expectedOther.put("d1", "dummy");
+    expectedOther.put("d2", "-1");
+    expectedOther.put("d3", "dummy");
+    Assert.assertEquals(otherValues, expectedOther);
 
     // thresholds
     Map<String, Double> threshold = topKWhitelistSpec.getThreshold();
@@ -174,10 +193,14 @@ public class ThirdEyeConfigTest {
     Assert.assertEquals(config.getTopKWhitelist().getThreshold(), null, "Default threshold config should be null");
 
     // whitelist
-    Map<String, String> whitelist = topKWhitelistSpec.getWhitelist();
+    Map<String, List<String>> whitelist = topKWhitelistSpec.getWhitelist();
     Assert.assertEquals(whitelist.size(), 2, "Incorrect size of whitelist dimensions");
-    Assert.assertEquals(whitelist.get("d1"), "x,y", "Incorrect whitelist config");
-    Assert.assertEquals(whitelist.get("d2"), "a", "Incorrect whitelist config");
+    List<String> expectedWhitelistValues = new ArrayList<>();
+    expectedWhitelistValues.add("x"); expectedWhitelistValues.add("y");
+    Assert.assertEquals(whitelist.get("d1"), expectedWhitelistValues, "Incorrect whitelist config");
+    expectedWhitelistValues = new ArrayList<>();
+    expectedWhitelistValues.add("500");
+    Assert.assertEquals(whitelist.get("d2"), expectedWhitelistValues, "Incorrect whitelist config");
     props.remove(ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString());
     config = ThirdEyeConfig.fromProperties(props);
     Assert.assertEquals(config.getTopKWhitelist().getWhitelist(), null, "Default whitelist config should be null");

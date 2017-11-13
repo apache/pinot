@@ -15,6 +15,8 @@
  */
 package com.linkedin.thirdeye.hadoop.config;
 
+import java.util.Objects;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -23,13 +25,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class DimensionSpec {
   private String name;
+  private DimensionType dimensionType;
 
   public DimensionSpec() {
   }
 
 
-  public DimensionSpec(String name) {
+  public DimensionSpec(String name, DimensionType dimensionType) {
     this.name = name;
+    this.dimensionType = dimensionType;
   }
 
   @JsonProperty
@@ -37,14 +41,18 @@ public class DimensionSpec {
     return name;
   }
 
+  @JsonProperty
+  public DimensionType getDimensionType() {
+    return dimensionType;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DimensionSpec)) {
       return false;
     }
-
     DimensionSpec d = (DimensionSpec) o;
 
-    return name.equals(d.getName());
+    return Objects.equals(d.getName(), name) && Objects.equals(d.getDimensionType(), dimensionType);
   }
 }

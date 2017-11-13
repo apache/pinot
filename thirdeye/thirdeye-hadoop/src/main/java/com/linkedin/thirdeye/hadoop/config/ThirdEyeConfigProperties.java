@@ -26,6 +26,13 @@ public enum ThirdEyeConfigProperties {
   /** Comma Separated dimension names */
   THIRDEYE_DIMENSION_NAMES("thirdeye.dimension.names"),
 
+  /** Comma Separated dimension types */
+  THIRDEYE_DIMENSION_TYPES("thirdeye.dimension.types"),
+
+  /** Comma Separated value, to be used as "other" for this dimension
+   * Relevant when topk/whitelisting is done, where we replace all non selected values with "other" */
+  THIRDEYE_DIMENSION_OTHER_VALUE("thirdeye.dimension.other.value"),
+
   /** Comma separated metric names */
   THIRDEYE_METRIC_NAMES("thirdeye.metric.names"),
 

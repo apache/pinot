@@ -42,6 +42,7 @@ import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
@@ -157,6 +158,22 @@ public class ThirdeyeAvroUtils {
   }
 
   /**
+   * Constructs dimensionTypes property string from the dimension names with the help of the avro schema
+   * @param metricNamesProperty
+   * @param avroSchema
+   * @return
+   */
+  public static String getDimensionTypesProperty(String dimensionNamesProperty, Schema avroSchema) {
+    List<String> dimensionTypesFromSchema = new ArrayList<>();
+    List<String> dimensionNamesFromConfig = Lists.newArrayList(dimensionNamesProperty.split(ThirdEyeConstants.FIELD_SEPARATOR));
+    for (String dimensionName : dimensionNamesFromConfig) {
+      dimensionTypesFromSchema.add(ThirdeyeAvroUtils.getDataTypeForField(dimensionName, avroSchema));
+    }
+    return Joiner.on(ThirdEyeConstants.FIELD_SEPARATOR).join(dimensionTypesFromSchema);
+  }
+
+
+  /**
    * Constructs metricTypes property string from the metric names with the help of the avro schema
    * @param metricNamesProperty
    * @param avroSchema
@@ -191,10 +208,25 @@ public class ThirdeyeAvroUtils {
     return validatedMetricTypesProperty;
   }
 
-  public static String getDimensionFromRecord(GenericRecord record, String dimensionName) {
-    String dimensionValue = (String) record.get(dimensionName);
+  public static Object getDimensionFromRecord(GenericRecord record, String dimensionName) {
+    Object dimensionValue = record.get(dimensionName);
     if (dimensionValue == null) {
-      dimensionValue = ThirdEyeConstants.EMPTY_STRING;
+      String dataType = getDataTypeForField(dimensionName, record.getSchema());
+      DimensionType dimensionType = DimensionType.valueOf(dataType);
+      switch (dimensionType) {
+      case DOUBLE:
+        return ThirdEyeConstants.EMPTY_DOUBLE;
+      case FLOAT:
+        return ThirdEyeConstants.EMPTY_FLOAT;
+      case INT:
+        return ThirdEyeConstants.EMPTY_INT;
+      case LONG:
+        return ThirdEyeConstants.EMPTY_LONG;
+      case SHORT:
+        return ThirdEyeConstants.EMPTY_SHORT;
+      case STRING:
+        return ThirdEyeConstants.EMPTY_STRING;
+      }
     }
     return dimensionValue;
   }
@@ -228,5 +260,6 @@ public class ThirdeyeAvroUtils {
     }
     return metricValue;
   }
+
 
 }
