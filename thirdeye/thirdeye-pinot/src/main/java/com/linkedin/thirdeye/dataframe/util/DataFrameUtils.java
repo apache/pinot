@@ -282,14 +282,19 @@ public class DataFrameUtils {
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
         metric.getDefaultAggFunction(), metric.getDataset());
 
-    long timeGranularity = dataset.bucketTimeGranularity().toMillis();
+    TimeGranularity granularity = dataset.bucketTimeGranularity();
+    if (!MetricSlice.NATIVE_GRANULARITY.equals(slice.granularity)) {
+      granularity = slice.granularity;
+    }
+
+    long timeGranularity = granularity.toMillis();
     long start = (slice.start / timeGranularity) * timeGranularity;
     long end = ((slice.end + timeGranularity - 1) / timeGranularity) * timeGranularity;
 
-    MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start, end, slice.filters);
+    MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start, end, slice.filters, slice.granularity);
 
     ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, metric, dataset, expressions)
-        .setGroupByTimeGranularity(dataset.bucketTimeGranularity())
+        .setGroupByTimeGranularity(granularity)
         .build(reference);
 
     return new TimeSeriesRequestContainer(request, expressions, start, end, timeGranularity);
@@ -318,13 +323,16 @@ public class DataFrameUtils {
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
         metric.getDefaultAggFunction(), metric.getDataset());
 
+    TimeGranularity granularity = dataset.bucketTimeGranularity();
+    if (!MetricSlice.NATIVE_GRANULARITY.equals(slice.granularity)) {
+      granularity = slice.granularity;
+    }
+
     ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions)
-        .setGroupByTimeGranularity(dataset.bucketTimeGranularity())
+        .setGroupByTimeGranularity(granularity)
         .build(reference);
 
-    long timeGranularity = dataset.bucketTimeGranularity().toMillis();
-
-    return new TimeSeriesRequestContainer(request, expressions, slice.start, slice.end, timeGranularity);
+    return new TimeSeriesRequestContainer(request, expressions, slice.start, slice.end, granularity.toMillis());
   }
 
   /**

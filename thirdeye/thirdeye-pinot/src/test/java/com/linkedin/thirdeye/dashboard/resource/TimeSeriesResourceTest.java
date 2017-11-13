@@ -23,7 +23,7 @@ public class TimeSeriesResourceTest {
 
   private static class MockTimeSeriesLoader implements TimeSeriesLoader {
     @Override
-    public DataFrame load(MetricSlice slice, TimeGranularity granularity) throws Exception {
+    public DataFrame load(MetricSlice slice) throws Exception {
       final long mid = slice.getMetricId();
 
       return new DataFrame()
@@ -96,18 +96,6 @@ public class TimeSeriesResourceTest {
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
     assertEquals(ts.get("0"), Arrays.asList(1d, 0d, -1d, 0d, 1d, 0d));
-  }
-
-  @Test
-  public void testTranformationTimestamp() throws Exception {
-    Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0", RANGE, null, "10_MILLISECONDS", "timestamp", null);
-    Map<String, List<? extends Number>> ts = out.get(RANGE);
-
-    // NOTE: assumes output from loader to be in granularity rather than millis
-
-    Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(10L, 110L, 210L, 310L, 410L, 510L));
-    assertEquals(ts.get("0"), Arrays.asList(1d, 0d, -1d, 0d, 1d, null));
   }
 
   @Test

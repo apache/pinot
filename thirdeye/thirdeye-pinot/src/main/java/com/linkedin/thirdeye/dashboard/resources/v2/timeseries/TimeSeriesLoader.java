@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.timeseries;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 
@@ -19,8 +18,7 @@ public interface TimeSeriesLoader {
    * resolution, it is aligned with the nearest lower time stamp.
    *
    * @param slice metric slice to fetch
-   * @param granularity time granularity
    * @return dataframe with aligned timestamps and values
    */
-  DataFrame load(MetricSlice slice, TimeGranularity granularity) throws Exception;
+  DataFrame load(MetricSlice slice) throws Exception;
 }
