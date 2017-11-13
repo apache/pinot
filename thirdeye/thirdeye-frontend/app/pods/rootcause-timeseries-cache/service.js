@@ -16,36 +16,28 @@ export default Ember.Service.extend({
 
   request(requestContext, urns) {
     console.log('rootcauseTimeseriesService: request()', requestContext, urns);
-    const { context, timeseries } = this.getProperties('context', 'timeseries');
+    const { context, timeseries, pending } = this.getProperties('context', 'timeseries', 'pending');
 
     const metrics = [...urns].filter(urn => (urn.startsWith('thirdeye:metric:') || urn.startsWith('frontend:baseline:metric:')));
 
     // TODO eviction on cache size limit
 
     let missing;
+    let newPending;
     let newTimeseries;
-    if(!_.isEqual(context.analysisRange, requestContext.analysisRange) ||
-       !_.isEqual(context.urns, requestContext.urns) ||
-       !_.isEqual(context.granularity, requestContext.granularity)) {
-      // new analysis range: evict all, reload
+    if(!_.isEqual(context, requestContext)) {
+      // new analysis range: evict all, reload, keep stale copy of incoming
       missing = metrics;
-      newTimeseries = metrics.filter(urn => timeseries[urn]).reduce((agg, urn) => agg[urn] = timeseries[urn], {});
-
-    } else if((context.anomalyRange[0] - context.baselineRange[0]) !=
-              (requestContext.anomalyRange[0] - requestContext.baselineRange[0])) {
-      // new baseline: reload baselines, load missing
-      missing = metrics.filter(urn => !timeseries[urn] || urn.startsWith('frontend:baseline:metric:'));
-      newTimeseries = Object.keys(timeseries)
-        .filter(urn => urns.has(urn) || !urn.startsWith('frontend:baseline:metric:'))
-        .reduce((agg, urn) => agg[urn] = timeseries[urn], {});
+      newPending = new Set(metrics);
+      newTimeseries = metrics.filter(urn => timeseries[urn]).reduce((agg, urn) => { agg[urn] = timeseries[urn]; return agg; }, {});
 
     } else {
       // same context: load missing
-      missing = metrics.filter(urn => !timeseries[urn]);
+      missing = metrics.filter(urn => !timeseries[urn] && !pending.has(urn));
+      newPending = new Set([...pending].concat(missing));
       newTimeseries = timeseries;
     }
 
-    const newPending = new Set(missing);
     this.setProperties({ context: _.cloneDeep(requestContext), timeseries: newTimeseries, pending: newPending });
 
     const filtersMap = this._makeFiltersMap(requestContext.urns);

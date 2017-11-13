@@ -71,14 +71,15 @@ urns
 
 <h3>This is the metric tab.</h3>
 {{rootcause-metrics
-  entities=metricEntities
+  entities=entities
+  aggregates=aggregates
   selectedUrns=selectedUrns
   onSelection=(action "onSelection")
 }}
 
 <h3>This is the heatmap.</h3>
 {{rootcause-heatmap
-  aggregates=aggregates
+  breakdowns=breakdowns
   currentUrns=heatmapCurrentUrns
   current2baseline=heatmapCurrent2Baseline
 }}

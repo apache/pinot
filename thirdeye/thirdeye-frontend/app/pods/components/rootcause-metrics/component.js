@@ -1,8 +1,10 @@
 import Ember from 'ember';
-import { toBaselineUrn, hasPrefix } from '../../../helpers/utils';
+import { toBaselineUrn, hasPrefix, filterPrefix } from '../../../helpers/utils';
 
 export default Ember.Component.extend({
   entities: null, // {}
+
+  aggregates: null, // {}
 
   selectedUrns: null, // Set
 
@@ -13,9 +15,22 @@ export default Ember.Component.extend({
     function () {
       const { entities } = this.getProperties('entities');
 
-      const labels = {};
-      Object.keys(entities).forEach(urn => labels[urn] = entities[urn].label);
-      return labels;
+      const metricUrns = filterPrefix(Object.keys(entities), ['thirdeye:metric:']);
+      return metricUrns.reduce((agg, urn) => { agg[urn] = entities[urn].label; return agg; }, {});
+    }
+  ),
+
+  changes: Ember.computed(
+    'aggregates',
+    function () {
+      const { aggregates } = this.getProperties('aggregates');
+
+      console.log('rootcauseMetrics: changes: aggregates', aggregates);
+      const metricUrns = filterPrefix(Object.keys(aggregates), ['thirdeye:metric:']);
+
+      return metricUrns
+        .filter(urn => aggregates[toBaselineUrn(urn)])
+        .reduce((agg, urn) => { agg[urn] = aggregates[urn] / aggregates[toBaselineUrn(urn)] - 1; return agg; }, {});
     }
   ),
 

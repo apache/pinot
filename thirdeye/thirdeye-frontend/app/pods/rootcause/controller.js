@@ -10,6 +10,8 @@ export default Ember.Controller.extend({
 
   aggregatesService: Ember.inject.service("rootcause-aggregates-cache"), // service
 
+  breakdownsService: Ember.inject.service("rootcause-breakdowns-cache"), // service
+
   selectedUrns: null, // Set
 
   filteredUrns: null, // Set
@@ -24,14 +26,16 @@ export default Ember.Controller.extend({
 
   _contextObserver: Ember.observer(
     'context',
+    'entities',
     'selectedUrns',
     'entitiesService',
     'timeseriesService',
     'aggregatesService',
+    'breakdownsService',
     function () {
       console.log('_contextObserver()');
-      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService');
+      const { context, entities, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService } =
+        this.getProperties('context', 'entities', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
 
       if (!context || !selectedUrns) {
         return;
@@ -39,7 +43,10 @@ export default Ember.Controller.extend({
 
       entitiesService.request(context, selectedUrns);
       timeseriesService.request(context, selectedUrns);
-      aggregatesService.request(context, selectedUrns);
+      breakdownsService.request(context, selectedUrns);
+
+      const allUrns = new Set(Object.keys(entities));
+      aggregatesService.request(context, allUrns);
     }
   ),
 
@@ -68,6 +75,14 @@ export default Ember.Controller.extend({
     function () {
       console.log('aggregates()');
       return this.get('aggregatesService.aggregates');
+    }
+  ),
+
+  breakdowns: Ember.computed(
+    'breakdownsService.breakdowns',
+    function () {
+      console.log('breakdowns()');
+      return this.get('breakdownsService.breakdowns');
     }
   ),
 
@@ -135,15 +150,6 @@ export default Ember.Controller.extend({
       const baselineUrns = {};
       filterPrefix(selectedUrns, 'thirdeye:metric:').forEach(urn => baselineUrns[urn] = toBaselineUrn(urn));
       return baselineUrns;
-    }
-  ),
-
-  metricEntities: Ember.computed(
-    'entities',
-    function () {
-      console.log('metricEntities()');
-      const { entities } = this.getProperties('entities');
-      return filterObject(entities, (e) => e.type == 'metric');
     }
   ),
 
