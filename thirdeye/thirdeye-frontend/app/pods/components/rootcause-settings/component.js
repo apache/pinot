@@ -72,7 +72,7 @@ export default Ember.Component.extend({
    */
   predefinedAnalysisRanges: {
     'Last 2 days': [
-      moment().subtract(3, 'days').startOf('day'), 
+      moment().subtract(3, 'days').startOf('day'),
       moment().subtract(1, 'days').endOf('day')
     ],
     'Last 7 days': [
@@ -128,11 +128,12 @@ export default Ember.Component.extend({
   }),
 
   _updateFromContext() {
-    const { urns, anomalyRange, baselineRange, analysisRange } = this.get('context');
+    const { urns, anomalyRange, baselineRange, analysisRange, granularity } = this.get('context');
     this.setProperties({ urnString: [...urns].join(','),
       anomalyRangeStart: anomalyRange[0], anomalyRangeEnd: anomalyRange[1],
       baselineRangeStart: baselineRange[0], baselineRangeEnd: baselineRange[1],
-      analysisRangeStart: analysisRange[0], analysisRangeEnd: analysisRange[1]
+      analysisRangeStart: analysisRange[0], analysisRangeEnd: analysisRange[1],
+      granularity
     });
   },
 
@@ -148,15 +149,15 @@ export default Ember.Component.extend({
 
   actions: {
     updateContext() {
-      const { urnString, anomalyRangeStart, anomalyRangeEnd, baselineRangeStart, baselineRangeEnd, analysisRangeStart, analysisRangeEnd } =
-        this.getProperties('urnString', 'anomalyRangeStart', 'anomalyRangeEnd', 'baselineRangeStart', 'baselineRangeEnd', 'analysisRangeStart', 'analysisRangeEnd');
+      const { urnString, anomalyRangeStart, anomalyRangeEnd, baselineRangeStart, baselineRangeEnd, analysisRangeStart, analysisRangeEnd, granularity } =
+        this.getProperties('urnString', 'anomalyRangeStart', 'anomalyRangeEnd', 'baselineRangeStart', 'baselineRangeEnd', 'analysisRangeStart', 'analysisRangeEnd', 'granularity');
       const onChange = this.get('onChange');
       if (onChange != null) {
         const urns = new Set(urnString.split(','));
         const anomalyRange = [parseInt(anomalyRangeStart), parseInt(anomalyRangeEnd)];
         const baselineRange = [parseInt(baselineRangeStart), parseInt(baselineRangeEnd)];
         const analysisRange = [parseInt(analysisRangeStart), parseInt(analysisRangeEnd)];
-        const newContext = { urns, anomalyRange, baselineRange, analysisRange };
+        const newContext = { urns, anomalyRange, baselineRange, analysisRange, granularity };
         onChange(newContext);
       }
     },
@@ -177,7 +178,7 @@ export default Ember.Component.extend({
         anomalyRangeEnd
       });
     },
-    
+
     /**
      * Sets the new display date in ms
      * @method setDisplayDateRange

@@ -1,7 +1,7 @@
 import Ember from 'ember';
 
 export default Ember.Component.extend({
-  aggregates: null, // {}
+  breakdowns: null, // {}
 
   currentUrns: null, // Set
 
@@ -10,35 +10,35 @@ export default Ember.Component.extend({
   currentUrn: null, // ""
 
   current: Ember.computed(
-    'aggregates',
+    'breakdowns',
     'currentUrn',
     function () {
-      const { aggregates, currentUrn } = this.getProperties('aggregates', 'currentUrn');
+      const { breakdowns, currentUrn } = this.getProperties('breakdowns', 'currentUrn');
 
-      const aggregate = aggregates[currentUrn];
+      const breakdown = breakdowns[currentUrn];
 
-      if (!currentUrn || !aggregate) {
+      if (!currentUrn || !breakdown) {
         return {};
       }
-      return aggregate;
+      return breakdown;
     }
   ),
 
   baseline: Ember.computed(
-    'aggregates',
+    'breakdowns',
     'current2baseline',
     'currentUrn',
     function () {
-      const { aggregates, current2baseline, currentUrn } =
-        this.getProperties('aggregates', 'current2baseline', 'currentUrn');
+      const { breakdowns, current2baseline, currentUrn } =
+        this.getProperties('breakdowns', 'current2baseline', 'currentUrn');
 
       const baselineUrn = current2baseline[currentUrn];
-      const aggregate = aggregates[baselineUrn];
+      const breakdown = breakdowns[baselineUrn];
 
-      if (!currentUrn || !baselineUrn || !aggregate) {
+      if (!currentUrn || !baselineUrn || !breakdown) {
         return {};
       }
-      return aggregate;
+      return breakdown;
     }
   )
 });

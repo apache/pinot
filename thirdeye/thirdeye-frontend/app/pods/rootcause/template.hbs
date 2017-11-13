@@ -1,12 +1,3 @@
-<h3>This is the loading indicator.</h3>
-type
-{{#if isLoadingEntities}}
-  | ENTITIES
-{{/if}}
-{{#if isLoadingTimeseries}}
-  | TIMESERIES
-{{/if}}
-
 <h3>This manipulates the controller state.</h3>
 <a {{action "addSelectedUrns" "thirdeye:metric:17606338"}}>add test metric</a> |
 <a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove test metric</a> |
@@ -26,6 +17,15 @@ type
   onVisibility=(action "onVisibility")
   onSelection=(action "onSelection")
 }}
+
+<h3>This is the loading indicator.</h3>
+type
+{{#if isLoadingEntities}}
+  | ENTITIES
+{{/if}}
+{{#if isLoadingTimeseries}}
+  | TIMESERIES
+{{/if}}
 
 <h3>This is the graph.</h3>
 {{rootcause-chart
@@ -71,14 +71,15 @@ urns
 
 <h3>This is the metric tab.</h3>
 {{rootcause-metrics
-  entities=metricEntities
+  entities=entities
+  aggregates=aggregates
   selectedUrns=selectedUrns
   onSelection=(action "onSelection")
 }}
 
 <h3>This is the heatmap.</h3>
 {{rootcause-heatmap
-  aggregates=aggregates
+  breakdowns=breakdowns
   currentUrns=heatmapCurrentUrns
   current2baseline=heatmapCurrent2Baseline
 }}
