@@ -207,7 +207,7 @@ public class AggregationPhaseJob extends Configured {
       outputRecord.put(time.getColumnName(), timeValue);
 
       // dimensions
-      List<Object> dimensionValues = keyWrapper.getDimensions();
+      List<Object> dimensionValues = keyWrapper.getDimensionValues();
       for (int i = 0; i < dimensionsNames.size(); i++) {
         String dimensionName = dimensionsNames.get(i);
         Object dimensionValue = dimensionValues.get(i);

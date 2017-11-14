@@ -15,6 +15,10 @@
  */
 package com.linkedin.thirdeye.hadoop.config;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
 /**
  * Represents the various data types supported for a dimension<br/>
  * Currently we support INT, SHORT, LONG, FLOAT, DOUBLE, STRING, BOOLEAN
@@ -30,6 +34,11 @@ public enum DimensionType {
     public Object getDefaultOtherValue() {
       return ThirdEyeConstants.EMPTY_INT;
     }
+
+    @Override
+    public Object getDefaultNullvalue() {
+      return ThirdEyeConstants.EMPTY_INT;
+    }
   },
   SHORT {
     @Override
@@ -39,6 +48,11 @@ public enum DimensionType {
 
     @Override
     public Object getDefaultOtherValue() {
+      return ThirdEyeConstants.EMPTY_SHORT;
+    }
+
+    @Override
+    public Object getDefaultNullvalue() {
       return ThirdEyeConstants.EMPTY_SHORT;
     }
   },
@@ -52,6 +66,11 @@ public enum DimensionType {
     public Object getDefaultOtherValue() {
       return ThirdEyeConstants.EMPTY_LONG;
     }
+
+    @Override
+    public Object getDefaultNullvalue() {
+      return ThirdEyeConstants.EMPTY_LONG;
+    }
   },
   FLOAT {
     @Override
@@ -61,6 +80,11 @@ public enum DimensionType {
 
     @Override
     public Object getDefaultOtherValue() {
+      return ThirdEyeConstants.EMPTY_FLOAT;
+    }
+
+    @Override
+    public Object getDefaultNullvalue() {
       return ThirdEyeConstants.EMPTY_FLOAT;
     }
   },
@@ -74,6 +98,11 @@ public enum DimensionType {
     public Object getDefaultOtherValue() {
       return ThirdEyeConstants.EMPTY_DOUBLE;
     }
+
+    @Override
+    public Object getDefaultNullvalue() {
+      return ThirdEyeConstants.EMPTY_DOUBLE;
+    }
   },
   STRING {
     @Override
@@ -85,10 +114,91 @@ public enum DimensionType {
     public Object getDefaultOtherValue() {
       return ThirdEyeConstants.OTHER;
     }
+
+    @Override
+    public Object getDefaultNullvalue() {
+      return ThirdEyeConstants.EMPTY_STRING;
+    }
   };
 
 
   public abstract Object getValueFromString(String strVal);
 
+  public abstract Object getDefaultNullvalue();
+
   public abstract Object getDefaultOtherValue();
+
+  /**
+   * Writes the dimension value to a data outputstream
+   * @param dos DataOutputStream
+   * @param dimensionValue
+   * @param dimensionType
+   * @throws IOException
+   */
+  public static void writeDimensionValueToOutputStream(DataOutputStream dos, Object dimensionValue,
+      DimensionType dimensionType) throws IOException {
+    switch (dimensionType) {
+    case DOUBLE:
+      dos.writeDouble((double) dimensionValue);
+      break;
+    case FLOAT:
+      dos.writeFloat((float) dimensionValue);
+      break;
+    case INT:
+      dos.writeInt((int) dimensionValue);
+      break;
+    case LONG:
+      dos.writeLong((long) dimensionValue);
+      break;
+    case SHORT:
+      dos.writeShort((short) dimensionValue);
+      break;
+    case STRING:
+      String stringVal = (String) dimensionValue;
+      byte[] bytes = stringVal.getBytes();
+      dos.writeInt(bytes.length);
+      dos.write(bytes);
+      break;
+    default:
+      throw new IllegalArgumentException("Unsupported dimensionType " + dimensionType);
+    }
+  }
+
+  /**
+   * Reads the dimension value from a given data input stream
+   * @param dis DataInputStream
+   * @param dimensionType
+   * @return
+   * @throws IOException
+   */
+  public static Object readDimensionValueFromDataInputStream(DataInputStream dis, DimensionType dimensionType) throws IOException {
+    Object dimensionValue = null;
+    switch (dimensionType) {
+    case DOUBLE:
+      dimensionValue = dis.readDouble();
+      break;
+    case FLOAT:
+      dimensionValue = dis.readFloat();
+      break;
+    case INT:
+      dimensionValue = dis.readInt();
+      break;
+    case SHORT:
+      dimensionValue = dis.readShort();
+      break;
+    case LONG:
+      dimensionValue = dis.readLong();
+      break;
+    case STRING:
+      int length = dis.readInt();
+      byte[] bytes = new byte[length];
+      dis.read(bytes);
+      dimensionValue = new String(bytes);
+      break;
+    default:
+      throw new IllegalArgumentException("Unsupported dimensionType " + dimensionType);
+    }
+    return dimensionValue;
+  }
+
 }

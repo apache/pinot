@@ -31,12 +31,12 @@ import com.linkedin.thirdeye.hadoop.config.DimensionType;
 public class AggregationPhaseMapOutputKey {
 
   private long time;
-  private List<Object> dimensions;
+  private List<Object> dimensionValues;
   private List<DimensionType> dimensionTypes;
 
-  public AggregationPhaseMapOutputKey(long time, List<Object> dimensions, List<DimensionType> dimensionTypes) {
+  public AggregationPhaseMapOutputKey(long time, List<Object> dimensionValues, List<DimensionType> dimensionTypes) {
     this.time = time;
-    this.dimensions = dimensions;
+    this.dimensionValues = dimensionValues;
     this.dimensionTypes = dimensionTypes;
   }
 
@@ -44,53 +44,34 @@ public class AggregationPhaseMapOutputKey {
     return time;
   }
 
-  public List<Object> getDimensions() {
-    return dimensions;
+  public List<Object> getDimensionValues() {
+    return dimensionValues;
   }
 
   public List<DimensionType> getDimensionTypes() {
     return dimensionTypes;
   }
 
+  /**
+   * Converts AggregationPhaseMapOutputKey to bytes buffer
+   * @return
+   * @throws IOException
+   */
   public byte[] toBytes() throws IOException {
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(baos);
-    byte[] bytes;
 
     // time
     dos.writeLong(time);
 
     // dimensions size
-    dos.writeInt(dimensions.size());
+    dos.writeInt(dimensionValues.size());
     // dimension values
-    for (int i = 0; i < dimensions.size(); i++) {
-      Object dimension = dimensions.get(i);
+    for (int i = 0; i < dimensionValues.size(); i++) {
+      Object dimensionValue = dimensionValues.get(i);
       DimensionType dimensionType = dimensionTypes.get(i);
-
-      switch (dimensionType) {
-      case DOUBLE:
-        dos.writeDouble((double) dimension) ;
-        break;
-      case FLOAT:
-        dos.writeFloat((float) dimension);
-        break;
-      case INT:
-        dos.writeInt((int) dimension);
-        break;
-      case SHORT:
-        dos.writeShort((short) dimension);
-        break;
-      case LONG:
-        dos.writeLong((long) dimension);
-        break;
-      case STRING:
-        String val = (String) dimension;
-        bytes = val.getBytes();
-        dos.writeInt(bytes.length);
-        dos.write(bytes);
-        break;
-      }
+      DimensionType.writeDimensionValueToOutputStream(dos, dimensionValue, dimensionType);
     }
 
     baos.close();
@@ -98,49 +79,32 @@ public class AggregationPhaseMapOutputKey {
     return baos.toByteArray();
   }
 
+  /**
+   * Constructs AggregationPhaseMapOutputKey from bytes buffer
+   * @param buffer
+   * @param dimensionTypes
+   * @return
+   * @throws IOException
+   */
   public static AggregationPhaseMapOutputKey fromBytes(byte[] buffer, List<DimensionType> dimensionTypes) throws IOException {
     DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buffer));
-    int length;
-    int size;
-    List<Object> dimensions = new ArrayList<>();
-    byte[] bytes;
 
     // time
     long time = dis.readLong();
 
     // dimensions size
-    size = dis.readInt();
+    int size = dis.readInt();
 
     // dimension value
+    List<Object> dimensionValues = new ArrayList<>();
     for (int i = 0; i < size; i++) {
       DimensionType dimensionType = dimensionTypes.get(i);
-      switch (dimensionType) {
-      case DOUBLE:
-        dimensions.add(dis.readDouble());
-        break;
-      case FLOAT:
-        dimensions.add(dis.readFloat());
-        break;
-      case INT:
-        dimensions.add(dis.readInt());
-        break;
-      case SHORT:
-        dimensions.add(dis.readShort());
-        break;
-      case LONG:
-        dimensions.add(dis.readLong());
-        break;
-      case STRING:
-        length = dis.readInt();
-        bytes = new byte[length];
-        dis.read(bytes);
-        dimensions.add(new String(bytes));
-        break;
-      }
+      Object dimensionValue = DimensionType.readDimensionValueFromDataInputStream(dis, dimensionType);
+      dimensionValues.add(dimensionValue);
     }
 
     AggregationPhaseMapOutputKey wrapper;
-    wrapper = new AggregationPhaseMapOutputKey(time, dimensions, dimensionTypes);
+    wrapper = new AggregationPhaseMapOutputKey(time, dimensionValues, dimensionTypes);
     return wrapper;
   }
 

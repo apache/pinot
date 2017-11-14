@@ -50,6 +50,11 @@ public class TopKPhaseMapOutputKey {
     return dimensionType;
   }
 
+  /**
+   * Converts a TopKPhaseMapOutputKey to a bytes buffer
+   * @return
+   * @throws IOException
+   */
   public byte[] toBytes() throws IOException {
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -66,34 +71,18 @@ public class TopKPhaseMapOutputKey {
     dos.write(bytes);
 
     // dimension value
-    switch (dimensionType) {
-    case DOUBLE:
-      dos.writeDouble((double) dimensionValue);
-      break;
-    case FLOAT:
-      dos.writeFloat((float) dimensionValue);
-      break;
-    case INT:
-      dos.writeInt((int) dimensionValue);
-      break;
-    case LONG:
-      dos.writeLong((long) dimensionValue);
-      break;
-    case SHORT:
-      dos.writeShort((short) dimensionValue);
-      break;
-    case STRING:
-      String stringVal = (String) dimensionValue;
-      bytes = stringVal.getBytes();
-      dos.writeInt(bytes.length);
-      dos.write(bytes);
-      break;
-    }
+    DimensionType.writeDimensionValueToOutputStream(dos, dimensionValue, dimensionType);
     baos.close();
     dos.close();
     return baos.toByteArray();
   }
 
+  /**
+   * Constructs a TopKPhaseMapOutputKey from a bytes buffer
+   * @param buffer
+   * @return
+   * @throws IOException
+   */
   public static TopKPhaseMapOutputKey fromBytes(byte[] buffer) throws IOException {
     DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buffer));
     int length;
@@ -113,30 +102,7 @@ public class TopKPhaseMapOutputKey {
     DimensionType dimensionType = DimensionType.valueOf(dimensionTypeString);
 
     // dimension value
-    Object dimensionValue = null;
-    switch (dimensionType) {
-    case DOUBLE:
-      dimensionValue = dis.readDouble();
-      break;
-    case FLOAT:
-      dimensionValue = dis.readFloat();
-      break;
-    case INT:
-      dimensionValue = dis.readInt();
-      break;
-    case SHORT:
-      dimensionValue = dis.readShort();
-      break;
-    case LONG:
-      dimensionValue = dis.readLong();
-      break;
-    case STRING:
-      length = dis.readInt();
-      bytes = new byte[length];
-      dis.read(bytes);
-      dimensionValue = new String(bytes);
-      break;
-    }
+    Object dimensionValue = DimensionType.readDimensionValueFromDataInputStream(dis, dimensionType);
 
     TopKPhaseMapOutputKey wrapper;
     wrapper = new TopKPhaseMapOutputKey(dimensionName, dimensionValue, dimensionType);

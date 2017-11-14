@@ -347,6 +347,8 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
           fieldAssembler = fieldAssembler.name(dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
         }
         break;
+      default:
+        throw new IllegalArgumentException("Unsupported dimensionType " + dimensionType);
       }
     }
 

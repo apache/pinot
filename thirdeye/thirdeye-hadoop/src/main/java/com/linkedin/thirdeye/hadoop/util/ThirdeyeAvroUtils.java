@@ -213,20 +213,7 @@ public class ThirdeyeAvroUtils {
     if (dimensionValue == null) {
       String dataType = getDataTypeForField(dimensionName, record.getSchema());
       DimensionType dimensionType = DimensionType.valueOf(dataType);
-      switch (dimensionType) {
-      case DOUBLE:
-        return ThirdEyeConstants.EMPTY_DOUBLE;
-      case FLOAT:
-        return ThirdEyeConstants.EMPTY_FLOAT;
-      case INT:
-        return ThirdEyeConstants.EMPTY_INT;
-      case LONG:
-        return ThirdEyeConstants.EMPTY_LONG;
-      case SHORT:
-        return ThirdEyeConstants.EMPTY_SHORT;
-      case STRING:
-        return ThirdEyeConstants.EMPTY_STRING;
-      }
+      dimensionValue = dimensionType.getDefaultNullvalue();
     }
     return dimensionValue;
   }
@@ -242,21 +229,7 @@ public class ThirdeyeAvroUtils {
   public static Number getMetricFromRecord(GenericRecord record, String metricName, MetricType metricType) {
     Number metricValue = (Number) record.get(metricName);
     if (metricValue == null) {
-      switch (metricType) {
-      case DOUBLE:
-        metricValue = 0d;
-        break;
-      case FLOAT:
-        metricValue = 0f;
-        break;
-      case LONG:
-        metricValue = 0L;
-        break;
-      case INT:
-      case SHORT:
-      default:
-        metricValue = 0;
-      }
+      metricValue = metricType.getDefaultNullValue();
     }
     return metricValue;
   }
