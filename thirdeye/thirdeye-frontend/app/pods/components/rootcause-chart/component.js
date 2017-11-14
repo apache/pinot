@@ -1,10 +1,12 @@
 import Ember from 'ember';
 import d3 from 'd3';
 import moment from 'moment';
+import { toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
 const TIMESERIES_MODE_LOG = 'log';
+const TIMESERIES_MODE_SPLIT = 'split';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -49,42 +51,6 @@ export default Ember.Component.extend({
     }
   ),
 
-  series: Ember.computed(
-    'entities',
-    'timeseries',
-    'selectedUrns',
-    'anomalyRange',
-    'baselineRange',
-    'timeseriesMode',
-    function () {
-      const { entities, selectedUrns, anomalyRange, baselineRange } =
-        this.getProperties('entities', 'selectedUrns', 'anomalyRange', 'baselineRange');
-
-      const series = {};
-      this._filterDisplayable(selectedUrns)
-        .forEach(urn => {
-          const e = entities[urn];
-          series[this._entityToLabel(e)] = this._entityToSeries(e);
-        });
-
-      series['anomalyRange'] = {
-        timestamps: anomalyRange,
-        values: [0, 0],
-        type: 'region',
-        color: 'orange'
-      };
-
-      series['baselineRange'] = {
-        timestamps: baselineRange,
-        values: [0, 0],
-        type: 'region',
-        color: 'blue'
-      };
-
-      return series;
-    }
-  ),
-
   axis: Ember.computed(
     'analysisRange',
     function () {
@@ -114,6 +80,142 @@ export default Ember.Component.extend({
       };
     }
   ),
+
+  series: Ember.computed(
+    'entities',
+    'timeseries',
+    'selectedUrns',
+    'anomalyRange',
+    'baselineRange',
+    'timeseriesMode',
+    function () {
+      const { selectedUrns } = this.getProperties('selectedUrns');
+      return this._makeSeries(selectedUrns);
+    }
+  ),
+
+  //
+  // split view logic
+  //
+
+  splitSeries: Ember.computed(
+    'entities',
+    'timeseries',
+    'selectedUrns',
+    'anomalyRange',
+    'baselineRange',
+    'timeseriesMode',
+    function () {
+      console.log('rootcauseChart: splitSeries()');
+      const { selectedUrns, timeseriesMode } = this.getProperties('selectedUrns', 'timeseriesMode');
+
+      if (timeseriesMode != TIMESERIES_MODE_SPLIT) {
+        return {};
+      }
+
+      console.log('rootcauseChart: splitLabels: generating series');
+      const splitSeries = {};
+      const metricUrns = new Set(filterPrefix(selectedUrns, ['thirdeye:metric:', 'frontend:baseline:metric:']));
+      const otherUrns = new Set([...selectedUrns].filter(urn => !metricUrns.has(urn)));
+
+      filterPrefix(metricUrns, 'thirdeye:metric:').forEach(urn => {
+        const splitMetricUrns = [urn];
+        const baselineUrn = toBaselineUrn(urn);
+        if (metricUrns.has(baselineUrn)) {
+          splitMetricUrns.push(baselineUrn);
+        }
+
+        const splitUrns = new Set(splitMetricUrns.concat([...otherUrns]));
+
+        splitSeries[urn] = this._makeSeries(splitUrns);
+      });
+
+      return splitSeries;
+    }
+  ),
+
+  splitUrns: Ember.computed(
+    'entities',
+    'selectedUrns',
+    'timeseriesMode',
+    function () {
+      console.log('rootcauseChart: splitUrns()');
+      const { entities, selectedUrns, timeseriesMode } =
+        this.getProperties('entities', 'selectedUrns', 'timeseriesMode');
+
+      if (timeseriesMode != TIMESERIES_MODE_SPLIT) {
+        return {};
+      }
+
+      console.log('rootcauseChart: splitLabels: generating urns');
+      return filterPrefix(selectedUrns, 'thirdeye:metric:')
+        .map(urn => [entities[urn].label.split("::")[1], urn])
+        .sort()
+        .map(t => t[1]);
+    }
+  ),
+
+  splitLabels: Ember.computed(
+    'entities',
+    'selectedUrns',
+    'timeseriesMode',
+    function () {
+      console.log('rootcauseChart: splitLabels()');
+      const { entities, selectedUrns, timeseriesMode } =
+        this.getProperties('entities', 'selectedUrns', 'timeseriesMode');
+
+      if (timeseriesMode != TIMESERIES_MODE_SPLIT) {
+        return {};
+      }
+
+      console.log('rootcauseChart: splitLabels: generating labels');
+      return filterPrefix(selectedUrns, 'thirdeye:metric:')
+        .reduce((agg, urn) => {
+          agg[urn] = entities[urn].label.split("::")[1];
+          return agg;
+        }, {});
+    }
+  ),
+
+  isSplit: Ember.computed(
+    'timeseriesMode',
+    function () {
+      console.log('rootcauseChart: isSplit()');
+      return this.get('timeseriesMode') == TIMESERIES_MODE_SPLIT;
+    }
+  ),
+
+  //
+  // helpers
+  //
+
+  _makeSeries(urns) {
+    const { entities, anomalyRange, baselineRange } =
+      this.getProperties('entities', 'anomalyRange', 'baselineRange');
+
+    const series = {};
+    this._filterDisplayable(urns)
+      .forEach(urn => {
+        const e = entities[urn];
+        series[this._entityToLabel(e)] = this._entityToSeries(e);
+      });
+
+    series['anomalyRange'] = {
+      timestamps: anomalyRange,
+      values: [0, 0],
+      type: 'region',
+      color: 'orange'
+    };
+
+    series['baselineRange'] = {
+      timestamps: baselineRange,
+      values: [0, 0],
+      type: 'region',
+      color: 'blue'
+    };
+
+    return series;
+  },
 
   _hoverBounds: Ember.computed(
     'entities',
@@ -242,6 +344,8 @@ export default Ember.Component.extend({
         return this._transformSeriesRelative(series);
       case TIMESERIES_MODE_LOG:
         return this._transformSeriesLog(series);
+      case TIMESERIES_MODE_SPLIT:
+        return series; // raw data
     }
     return series;
   },
