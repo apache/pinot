@@ -23,15 +23,12 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
-import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -72,8 +69,7 @@ public class FilterTreeOptimizationTest {
   private Pql2Compiler _compiler;
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     Schema schema = buildSchema(DIMENSIONS);
     buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, schema);
     _indexSegment = Loaders.IndexSegment.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), ReadMode.heap);
@@ -81,8 +77,7 @@ public class FilterTreeOptimizationTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
   }
 
@@ -100,13 +95,12 @@ public class FilterTreeOptimizationTest {
 
     // (alwaysFalse OR (alwaysFalse OR alwaysFalse))
     testQuery(
-        String.format("select count(*) from %s where (%s = 'x' OR (%s ='y' OR %s = 'z'))", TABLE_NAME,
-            DIMENSIONS[0], DIMENSIONS[1], DIMENSIONS[2]));
+        String.format("select count(*) from %s where (%s = 'x' OR (%s ='y' OR %s = 'z'))", TABLE_NAME, DIMENSIONS[0],
+            DIMENSIONS[1], DIMENSIONS[2]));
 
     // ((alwaysFalse AND nonAlwaysFalse) OR AlwaysFalse)
-    testQuery(
-        String.format("select count(*) from %s where ((%s = 'x' AND %s ='dim_1_5') OR %s = 'z')", TABLE_NAME,
-            DIMENSIONS[0], DIMENSIONS[1], DIMENSIONS[2]));
+    testQuery(String.format("select count(*) from %s where ((%s = 'x' AND %s ='dim_1_5') OR %s = 'z')", TABLE_NAME,
+        DIMENSIONS[0], DIMENSIONS[1], DIMENSIONS[2]));
   }
 
   /**
@@ -121,31 +115,21 @@ public class FilterTreeOptimizationTest {
     BrokerRequest brokerRequest = _compiler.compileToBrokerRequest(query);
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
 
-    BaseFilterOperator expectedOperator =
-        FilterPlanNode.constructPhysicalOperator(filterQueryTree, _indexSegment, false);
+    BlockDocIdIterator actualIterator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _indexSegment, true)
+        .nextBlock()
+        .getBlockDocIdSet()
+        .iterator();
+    BlockDocIdIterator expectedIterator =
+        FilterPlanNode.constructPhysicalOperator(filterQueryTree, _indexSegment, false)
+            .nextBlock()
+            .getBlockDocIdSet()
+            .iterator();
 
-    BaseFilterOperator actualOperator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _indexSegment, true);
-
-    BaseFilterBlock expectedBlock;
-    while ((expectedBlock = expectedOperator.getNextBlock()) != null) {
-      BaseFilterBlock actualBlock = actualOperator.getNextBlock();
-      Assert.assertNotNull(actualBlock);
-
-      final BlockDocIdSet expectedDocIdSet = expectedBlock.getBlockDocIdSet();
-      final BlockDocIdIterator expectedIterator = expectedDocIdSet.iterator();
-      final BlockDocIdSet actualDocIdSet = actualBlock.getBlockDocIdSet();
-      final BlockDocIdIterator actualIterator = actualDocIdSet.iterator();
-
-      int expectedDocId;
-      int actualDocId;
-      while (((expectedDocId = expectedIterator.next()) != Constants.EOF) && ((actualDocId = actualIterator.next())
-          != Constants.EOF)) {
-        Assert.assertEquals(actualDocId, expectedDocId);
-      }
-
-      Assert.assertTrue(expectedIterator.next() == Constants.EOF);
-      Assert.assertTrue(actualIterator.next() == Constants.EOF);
+    int expectedDocId;
+    while ((expectedDocId = expectedIterator.next()) != Constants.EOF) {
+      Assert.assertEquals(actualIterator.next(), expectedDocId);
     }
+    Assert.assertTrue(actualIterator.next() == Constants.EOF);
   }
 
   /**
@@ -157,8 +141,7 @@ public class FilterTreeOptimizationTest {
    * @return Schema built for the segment
    * @throws Exception
    */
-  private RecordReader buildSegment(String segmentDirName, String segmentName, Schema schema)
-      throws Exception {
+  private RecordReader buildSegment(String segmentDirName, String segmentName, Schema schema) throws Exception {
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setOutDir(segmentDirName);

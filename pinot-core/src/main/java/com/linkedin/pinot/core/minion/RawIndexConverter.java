@@ -193,8 +193,7 @@ public class RawIndexConverter {
     int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getStringColumnMaxLength();
     try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(
         _convertedIndexDir, columnName, dataType, _originalSegmentMetadata.getTotalDocs(), lengthOfLongestEntry)) {
-      BlockSingleValIterator iterator =
-          (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+      BlockSingleValIterator iterator = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
       int docId = 0;
       while (iterator.hasNext()) {
         int dictId = iterator.nextIntVal();

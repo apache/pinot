@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
@@ -130,7 +129,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
   }
 
   @Override
-  public BaseFilterBlock nextFilterBlock(BlockId blockId) {
+  protected BaseFilterBlock getNextBlock() {
     MutableRoaringBitmap finalResult = null;
     if (emptyResult) {
       finalResult = new MutableRoaringBitmap();
@@ -141,11 +140,11 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
     List<BaseFilterOperator> matchingLeafOperators = buildMatchingLeafOperators();
     if (matchingLeafOperators.size() == 1) {
-      BaseFilterOperator baseFilterOperator = (BaseFilterOperator) matchingLeafOperators.get(0);
-      return baseFilterOperator.nextFilterBlock(blockId);
+      BaseFilterOperator baseFilterOperator = matchingLeafOperators.get(0);
+      return baseFilterOperator.nextBlock();
     } else {
       CompositeOperator compositeOperator = new CompositeOperator(matchingLeafOperators);
-      return compositeOperator.nextFilterBlock(blockId);
+      return compositeOperator.nextBlock();
     }
   }
 
@@ -259,7 +258,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
       }
 
       @Override
-      public BaseFilterBlock nextFilterBlock(BlockId blockId) {
+      protected BaseFilterBlock getNextBlock() {
         return createBaseFilterBlock(new BitmapDocIdIterator(answer.getIntIterator()));
       }
 
@@ -372,11 +371,6 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
             return segment.getSegmentMetadata().getTotalDocs() - 1;
           }
         };
-      }
-
-      @Override
-      public BlockId getId() {
-        return new BlockId(0);
       }
     };
   }

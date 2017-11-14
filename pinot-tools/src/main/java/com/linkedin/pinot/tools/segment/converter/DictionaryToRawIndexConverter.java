@@ -292,7 +292,7 @@ public class DictionaryToRawIndexConverter {
     }
 
     int totalDocs = segment.getSegmentMetadata().getTotalDocs();
-    BlockSingleValIterator bvIter = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+    BlockSingleValIterator bvIter = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
 
     FieldSpec.DataType dataType = dataSourceMetadata.getDataType();
     int lengthOfLongestEntry =

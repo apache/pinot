@@ -53,7 +53,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
     _dictionaryReader = (MutableDictionary) dataSource.getDictionary();
-    _block = dataSource.getNextBlock();
+    _block = dataSource.nextBlock();
     if (columnPartitionConfig != null) {
       String functionName = columnPartitionConfig.getFunctionName();
       numPartitions = columnPartitionConfig.getNumPartitions();

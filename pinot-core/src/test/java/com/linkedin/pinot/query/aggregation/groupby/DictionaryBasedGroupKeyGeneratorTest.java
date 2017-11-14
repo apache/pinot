@@ -130,7 +130,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     for (String column : indexSegment.getColumnNames()) {
       DataSource dataSource = indexSegment.getDataSource(column);
       dataSourceMap.put(column, dataSource);
-      blockMap.put(column, dataSource.getNextBlock());
+      blockMap.put(column, dataSource.nextBlock());
     }
 
     // Generate a random test doc id set.

@@ -15,13 +15,10 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.docidsets.CompositeFilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CompositeBaseFilterBlock extends BaseFilterBlock {
   private final List<BaseFilterBlock> blocks;
@@ -37,10 +34,5 @@ public class CompositeBaseFilterBlock extends BaseFilterBlock {
       filteredDocIdSets.add(block.getFilteredBlockDocIdSet());
     }
     return new CompositeFilterBlockDocIdSet(filteredDocIdSets);
-  }
-
-  @Override
-  public BlockId getId() {
-    return new BlockId(0);
   }
 }

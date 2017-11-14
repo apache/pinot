@@ -134,7 +134,7 @@ public class TransformExpressionOperatorTest {
     TransformExpressionOperator transformOperator =
         new TransformExpressionOperator(projectionOperator, expressionTrees);
     transformOperator.open();
-    TransformBlock transformBlock = (TransformBlock) transformOperator.getNextBlock();
+    TransformBlock transformBlock = transformOperator.nextBlock();
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(expression);
     double[] actual = blockValueSet.getDoubleValuesSV();
     transformOperator.close();

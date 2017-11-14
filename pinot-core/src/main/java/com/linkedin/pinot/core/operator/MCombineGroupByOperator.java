@@ -19,8 +19,6 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
@@ -48,7 +46,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>MCombineGroupByOperator</code> class is the operator to combine aggregation group-by results.
  */
-public class MCombineGroupByOperator extends BaseOperator {
+public class MCombineGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineGroupByOperator.class);
   private static final String OPERATOR_NAME = "MCombineGroupByOperator";
 
@@ -113,7 +111,7 @@ public class MCombineGroupByOperator extends BaseOperator {
    *   that is returned.
    */
   @Override
-  public Block getNextBlock() {
+  protected IntermediateResultsBlock getNextBlock() {
     return combineBlocks();
   }
 
@@ -253,11 +251,6 @@ public class MCombineGroupByOperator extends BaseOperator {
         }
       }
     }
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

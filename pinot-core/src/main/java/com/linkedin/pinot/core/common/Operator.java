@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.common;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 
 
-public interface Operator {
+public interface Operator<T extends Block> {
   /*
    * allows the operator to set up/initialize processing
    */
@@ -31,17 +31,7 @@ public interface Operator {
    *
    * @return
    */
-  Block nextBlock();
-
-  /**
-   * Same as nextBlock but the caller specifies the BlockId to start from
-   * TODO: Better to specify the docId and let the operator decide the block
-   * to return. This may not be a problem now but when we add join, blockId
-   * may not mean anything across different tables
-   * @param blockId
-   * @return
-   */
-  Block nextBlock(BlockId blockId);
+  T nextBlock();
 
   boolean close();
 

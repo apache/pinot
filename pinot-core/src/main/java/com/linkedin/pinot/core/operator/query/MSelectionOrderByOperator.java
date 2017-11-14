@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
@@ -32,8 +31,6 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,8 +39,7 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class MSelectionOrderByOperator extends BaseOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOrderByOperator.class);
+public class MSelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "MSelectionOrderByOperator";
 
   private final IndexSegment _indexSegment;
@@ -86,11 +82,11 @@ public class MSelectionOrderByOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock() {
+  protected IntermediateResultsBlock getNextBlock() {
     int numDocsScanned = 0;
 
     ProjectionBlock projectionBlock;
-    while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
+    while ((projectionBlock = _projectionOperator.nextBlock()) != null) {
       for (int i = 0; i < _dataSchema.size(); i++) {
         _blocks[i] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
       }
@@ -108,11 +104,6 @@ public class MSelectionOrderByOperator extends BaseOperator {
             numTotalRawDocs);
 
     return new IntermediateResultsBlock(_selectionOperatorService.getDataSchema(), _selectionOperatorService.getRows());
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

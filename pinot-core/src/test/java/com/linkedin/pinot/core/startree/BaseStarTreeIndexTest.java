@@ -62,7 +62,7 @@ public abstract class BaseStarTreeIndexTest {
     for (int i = 0; i < _numMetricColumns; i++) {
       DataSource dataSource = _segment.getDataSource(metricColumns.get(i));
       _metricDictionaries[i] = dataSource.getDictionary();
-      _metricValIterators[i] = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+      _metricValIterators[i] = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
     }
 
     for (String query : getHardCodedQueries()) {
@@ -78,7 +78,7 @@ public abstract class BaseStarTreeIndexTest {
       _groupByValIterators = new BlockSingleValIterator[_numGroupByColumns];
       for (int i = 0; i < _numGroupByColumns; i++) {
         DataSource dataSource = _segment.getDataSource(groupByColumns.get(i));
-        _groupByValIterators[i] = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+        _groupByValIterators[i] = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
       }
 
       Assert.assertEquals(computeUsingAggregatedDocs(), computeUsingRawDocs(), "Comparison failed for query: " + query);

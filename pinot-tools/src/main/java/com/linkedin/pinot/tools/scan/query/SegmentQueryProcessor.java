@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -40,6 +30,16 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class SegmentQueryProcessor {
@@ -274,7 +274,7 @@ class SegmentQueryProcessor {
     List<Integer> result = new ArrayList<>();
     if (!_mvColumns.contains(column)) {
       BlockSingleValIterator bvIter =
-          (BlockSingleValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
+          (BlockSingleValIterator) _indexSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
 
       int i = 0;
       while (bvIter.hasNext() && (inputDocIds == null || i < inputDocIds.size())) {
@@ -286,7 +286,7 @@ class SegmentQueryProcessor {
       }
     } else {
       BlockMultiValIterator bvIter =
-          (BlockMultiValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
+          (BlockMultiValIterator) _indexSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
 
       int i = 0;
       while (bvIter.hasNext() && (inputDocIds == null || i < inputDocIds.size())) {

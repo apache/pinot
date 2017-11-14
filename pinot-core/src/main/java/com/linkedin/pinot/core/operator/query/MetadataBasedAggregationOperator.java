@@ -16,9 +16,6 @@
 package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -35,7 +32,9 @@ import java.util.Map;
 /**
  * Aggregation operator that utilizes metadata for serving aggregation queries.
  */
-public class MetadataBasedAggregationOperator implements Operator {
+public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final String OPERATOR_NAME = "MetadataBasedAggregationOperator";
+
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final Map<String, BaseOperator> _dataSourceMap;
   private final SegmentMetadata _segmentMetadata;
@@ -67,7 +66,7 @@ public class MetadataBasedAggregationOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock() {
+  protected IntermediateResultsBlock getNextBlock() {
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
     int totalRawDocs = _segmentMetadata.getTotalRawDocs();
@@ -101,8 +100,8 @@ public class MetadataBasedAggregationOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override

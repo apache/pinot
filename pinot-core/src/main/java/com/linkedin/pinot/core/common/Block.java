@@ -24,13 +24,6 @@ package com.linkedin.pinot.core.common;
 public interface Block {
 
   /**
-   * returns the blockid, a segment will
-   *
-   * @return
-   */
-  BlockId getId();
-
-  /**
    * Allows one to push down the predicates
    *
    * @param predicate
@@ -68,6 +61,4 @@ public interface Block {
    * @return
    */
   BlockMetadata getMetadata();
-
-
 }
