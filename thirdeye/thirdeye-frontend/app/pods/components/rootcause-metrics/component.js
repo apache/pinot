@@ -1,9 +1,12 @@
 import Ember from 'ember';
 import { toBaselineUrn, hasPrefix, filterPrefix } from '../../../helpers/utils';
 
-const ROOTCAUSE_METRICS_SORT_METRIC = 'metric';
-const ROOTCAUSE_METRICS_SORT_DATASET = 'dataset';
-const ROOTCAUSE_METRICS_SORT_CHANGE = 'change';
+const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
+const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
+const ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE = 'change';
+
+const ROOTCAUSE_METRICS_SORT_MODE_ASC = 'asc';
+const ROOTCAUSE_METRICS_SORT_MODE_DESC = 'desc';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -14,11 +17,13 @@ export default Ember.Component.extend({
 
   onSelection: null, // function (Set, state)
 
+  sortProperty: null, // ""
+
   sortMode: null, // ""
 
   init() {
     this._super(...arguments);
-    this.setProperties({ sortMode: ROOTCAUSE_METRICS_SORT_CHANGE });
+    this.setProperties({ sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
   },
 
   urns: Ember.computed(
@@ -26,18 +31,32 @@ export default Ember.Component.extend({
     'metrics',
     'datasets',
     'changes',
+    'sortProperty',
     'sortMode',
     function () {
-      const { entities, metrics, datasets, changes, sortMode } =
-        this.getProperties('entities', 'metrics', 'datasets', 'changes', 'sortMode');
+      const { entities, metrics, datasets, changes, sortProperty, sortMode } =
+        this.getProperties('entities', 'metrics', 'datasets', 'changes', 'sortProperty', 'sortMode');
 
-      const funcScore = this._makeScoreFunc(sortMode);
       const metricUrns = filterPrefix(Object.keys(entities), ['thirdeye:metric:']);
-      return metricUrns
-        .map(urn => [funcScore(metrics[urn], datasets[urn], changes[urn]), urn])
-        // .sort((a, b) => { if (parseFloat(a) < parseFloat(b)) { return -1; } else if (parseFloat(a) > parseFloat(b)) { return 1; } else { return 0; }})
-        .sort()
-        .map(t => t[1]);
+      let output = [];
+
+      if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC) {
+        output = metricUrns.map(urn => [metrics[urn], urn]).sort().map(t => t[1]);
+      }
+
+      if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET) {
+        output = metricUrns.map(urn => [datasets[urn], urn]).sort().map(t => t[1]);
+      }
+
+      if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE) {
+        output = metricUrns.map(urn => [changes[urn], urn]).sort((a, b) => parseFloat(a) - parseFloat(b)).map(t => t[1]);
+      }
+
+      if (sortMode == ROOTCAUSE_METRICS_SORT_MODE_DESC) {
+        output = output.reverse();
+      }
+
+      return output;
     }
   ),
 
@@ -45,11 +64,11 @@ export default Ember.Component.extend({
     'entities',
     function () {
       const { entities } = this.getProperties('entities');
-      const metricUrns = filterPrefix(Object.keys(entities), ['thirdeye:metric:']);
-      return metricUrns.reduce((agg, urn) => {
-        agg[urn] = entities[urn].label.split('::')[1].split("_").join(' ');
-        return agg;
-      }, {});
+      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
+        .reduce((agg, urn) => {
+          agg[urn] = entities[urn].label.split('::')[1].split("_").join(' ');
+          return agg;
+        }, {});
     }
   ),
 
@@ -57,11 +76,11 @@ export default Ember.Component.extend({
     'entities',
     function () {
       const { entities } = this.getProperties('entities');
-      const metricUrns = filterPrefix(Object.keys(entities), ['thirdeye:metric:']);
-      return metricUrns.reduce((agg, urn) => {
-        agg[urn] = entities[urn].label.split('::')[0].split("_").join(' ');
-        return agg;
-      }, {});
+      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
+        .reduce((agg, urn) => {
+          agg[urn] = entities[urn].label.split('::')[0].split("_").join(' ');
+          return agg;
+        }, {});
     }
   ),
 
@@ -69,11 +88,7 @@ export default Ember.Component.extend({
     'aggregates',
     function () {
       const { aggregates } = this.getProperties('aggregates');
-
-      console.log('rootcauseMetrics: changes: aggregates', aggregates);
-      const metricUrns = filterPrefix(Object.keys(aggregates), ['thirdeye:metric:']);
-
-      return metricUrns
+      return filterPrefix(Object.keys(aggregates), ['thirdeye:metric:'])
         .filter(urn => aggregates[toBaselineUrn(urn)])
         .reduce((agg, urn) => {
           agg[urn] = aggregates[urn] / aggregates[toBaselineUrn(urn)] - 1;
@@ -94,18 +109,6 @@ export default Ember.Component.extend({
     }
   ),
 
-  _makeScoreFunc(sortMode) {
-    switch (sortMode) {
-      case ROOTCAUSE_METRICS_SORT_METRIC:
-        return (m, d, c) => m;
-      case ROOTCAUSE_METRICS_SORT_DATASET:
-        return (m, d, c) => d;
-      case ROOTCAUSE_METRICS_SORT_CHANGE:
-        return (m, d, c) => c;
-    }
-    return (m, d, c) => 1;
-  },
-
   actions: {
     toggleSelection(urn) {
       const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
@@ -116,6 +119,17 @@ export default Ember.Component.extend({
           updates[toBaselineUrn(urn)] = state;
         }
         onSelection(updates);
+      }
+    },
+
+    toggleSort(property) {
+      const { sortProperty, sortMode } = this.getProperties('sortProperty', 'sortMode');
+      if (property != sortProperty) {
+        this.setProperties({ sortProperty: property, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
+      } else {
+        const newSortMode = sortMode == ROOTCAUSE_METRICS_SORT_MODE_ASC ?
+          ROOTCAUSE_METRICS_SORT_MODE_DESC : ROOTCAUSE_METRICS_SORT_MODE_ASC;
+        this.setProperties({ sortMode: newSortMode });
       }
     }
   }
