@@ -31,9 +31,11 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.SelectionPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,9 +129,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   /**
    * Helper method to identify if query is fit to be be served purely based on metadata.
-   * Currently only count(*) queries without any filters are supported.
-   *
-   * TODO: Add support for queries other than count(*)
+   * Currently count, min, max, minmaxrange queries without any filters are supported.
    *
    * @param brokerRequest Broker request
    * @return True if query can be served using metadata, false otherwise.
@@ -141,13 +141,17 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
 
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
-    if (aggregationsInfo != null && aggregationsInfo.size() == 1 && !brokerRequest.isSetGroupBy()) {
-      if (aggregationsInfo.get(0)
-          .getAggregationType()
-          .equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-        return true;
+    if (aggregationsInfo != null && !brokerRequest.isSetGroupBy()) {
+      for (int i = 0; i < aggregationsInfo.size(); i++) {
+        String aggregationType = aggregationsInfo.get(i).getAggregationType();
+        if (!aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())
+            && !aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MAX.getName())
+            && !aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MIN.getName())
+            && !aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGE.getName())) {
+          return false;
+        }
       }
     }
-    return false;
+    return true;
   }
 }
