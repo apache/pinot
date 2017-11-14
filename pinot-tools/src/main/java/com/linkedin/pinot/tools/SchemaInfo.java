@@ -34,16 +34,34 @@ public final class SchemaInfo {
     public static String DATA_DIR = "/tmp/data";
     public static String SEGMENT_DIR = "/tmp/segment";
 
+    /* Schema Files for tables */
     public static final List<String> SCHEMAS = Arrays.asList("new_data/jobSchema.json", "new_data/adsSchema.json",
             "new_data/articlesSchema.json", "new_data/viewsSchema.json");
+
+    /* Schema Annotation files for each schema file */
     public static final List<String> SCHEMAS_ANNOTATIONS = Arrays.asList("new_data/jobSchemaAnnotation.json",
             "new_data/adsSchemaAnnotation.json", "new_data/articlesSchemaAnnotation.json", "new_data/viewsSchemaAnnotation.json");
-    public static final List<Integer> NUM_RECORDS = Arrays.asList(1000000, 30, 30, 30);
+
+    /* Number of records to generate for each table */
+    public static final List<Integer> NUM_RECORDS = Arrays.asList(1000000, 1000, 1000, 1000);
+
+    /* Number of segments to generate using NUM_RECORDS for each table */
     public static final List<Integer> NUM_SEGMENTS = Arrays.asList(4, 4, 4, 4);
+
+    /* Names of directory to store the AVRO data for each table */
     public static final List<String> DATA_DIRS = Arrays.asList("jobs", "ads", "articles", "views");
+
+    /* Names of segments for each table - will be appended by segment number for each table */
     public static final String SEGMENT_NAME = "segment";
+
+    /* Table names */
     public static final List<String> TABLE_NAMES = Arrays.asList("Job", "Ads", "Articles", "Views");
+
+    /* Table configuration files */
     public static final List<String> TABLE_DEFINITIONS = Arrays.asList("new_data/jobTable.json",
             "new_data/adsTable.json", "new_data/articlesTable.json", "new_data/viewsTable.json");
+
+    /* Upload intervals for each table (in minutes) */
+    public static final List<Integer> UPLOAD_DURATION = Arrays.asList(1, 2, 3, 4);
 
 }
