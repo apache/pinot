@@ -20,36 +20,47 @@ import static com.linkedin.pinot.tools.SchemaInfo.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Timer;
-import java.util.TimerTask;
-
-public class SegmentUploader {
+public class SegmentUploader implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentUploader.class);
 
-    public static void uploadSegments(String segDir) throws Exception {
+    private String segDir;
+    private int uploadPeriod;
+
+    public SegmentUploader(String segDir, int uploadPeriod) {
+        this.segDir = segDir;
+        this.uploadPeriod = uploadPeriod;
+    }
+
+    public void uploadSegments() throws Exception {
         UploadSegmentCommand uploader = new UploadSegmentCommand();
         uploader.setControllerPort(DEFAULT_CONTROLLER_PORT)
                 .setSegmentDir(segDir);
-        uploader.execute();
+        uploader.execute(uploadPeriod);
     }
 
+    public void run() {
+        try {
+            uploadSegments();
+        }
+        catch (Exception e) {
+            LOGGER.error(e.getMessage());
+        }
+    }
 
     public static void main(String[] args) throws Exception {
-        final Timer timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
-            private int index = 0;
-            @Override
-            public void run() {
-                try {
-                    uploadSegments("segment/" + SchemaInfo.DATA_DIRS.get(index));
-                }
-                catch (Exception e) {
-                    e.getMessage();
-                }
-                if (++index == SCHEMAS.size())
-                    timer.cancel();
 
-            }
-        }, 0, 10000);
+        for (int i = 0; i < SchemaInfo.TABLE_NAMES.size(); i++) {
+            /* Converting entire duration to seconds */
+            int fullUploadPeriod = SchemaInfo.UPLOAD_DURATION.get(i) * 60;
+
+            /* computing wait period for uploading each segment */
+            int segmentUploadPeriod = fullUploadPeriod / SchemaInfo.NUM_SEGMENTS.get(i);
+
+            /* Spawning thread for the table */
+            Thread t = new Thread(new SegmentUploader("segment/" + SchemaInfo.DATA_DIRS.get(i),
+                    segmentUploadPeriod));
+            t.start();
+        }
+
     }
 }
