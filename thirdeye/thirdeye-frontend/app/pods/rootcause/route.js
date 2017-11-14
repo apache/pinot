@@ -19,6 +19,7 @@ export default Ember.Route.extend({
         'thirdeye:event:holiday:2712391']),
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
+      filteredUrns: new Set(),
       context: { urns, anomalyRange, baselineRange, analysisRange, granularity },
     });
   }

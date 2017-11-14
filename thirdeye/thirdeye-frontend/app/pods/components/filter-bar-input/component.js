@@ -68,7 +68,7 @@ export default Ember.Component.extend({
       if (onSelect) {
         let urns;
         // If there are no filters, show all entities under that event type
-        if (selectedValue.length == 0) {
+        if (!selectedValue.length) {
           urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
                                                     && entities[urn].eventType == header.toLowerCase());
         } else {

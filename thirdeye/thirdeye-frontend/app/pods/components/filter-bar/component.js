@@ -86,6 +86,18 @@ export default Ember.Component.extend({
   },
 
   /**
+   * observer on entities to set default event type when entities is loaded
+   * @type {undefined}
+   */
+  entitiesObserver: Ember.observer(
+    'entities',
+    function() {
+      const filterBlocks = this.get('config');
+      this.send('selectEventType', filterBlocks[0]);
+    }
+  ),
+
+  /**
    * Returns object that represents mapping between attributes in events and input values in config
    * Example:
    * {

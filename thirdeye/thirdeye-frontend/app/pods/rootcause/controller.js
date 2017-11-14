@@ -22,6 +22,8 @@ export default Ember.Controller.extend({
 
   config: config, // {}
 
+  filteredUrns: null,
+
   _contextObserver: Ember.observer(
     'context',
     'entities',
@@ -57,16 +59,6 @@ export default Ember.Controller.extend({
     function () {
       console.log('entities()');
       return this.get('entitiesService.entities');
-    }
-  ),
-
-  filteredUrns: Ember.computed(
-    'entities',
-    function () {
-      const { entities } = this.getProperties('entities');
-      console.log("entities in filtered urns: ", entities);
-      return new Set(Object.keys(entities).filter(urn => entities[urn].type == 'event'
-        && entities[urn].eventType == 'holiday'));
     }
   ),
 
