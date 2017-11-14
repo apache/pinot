@@ -3,13 +3,13 @@
  * the rca settings box
  * @module components/rootcause-settings
  * @property {Object} config          - contains dropdown and filters values
- * @property {Object} selectedOptions - contains user selected options from query params
+ * @property {Object} context         - contains user selected options from query params
  * @property {Object} onChange        - Closure action to bubble up to parent
  *                                      when the settings change
  * @example
   {{rootcause-settings
-    options=options
-    selectedOptions=params
+    config=config
+    context=context
     onChange=(action "settingsOnChange")
   }}
  * @exports rootcause-settings
@@ -66,11 +66,6 @@ const _filterToUrn = (filters) => {
 
   return urns;
 };
-
-const { 
-  setProperties,
-  getProperties
-} = Ember;
 
 /**
  * Date formate the date picker component expects
@@ -222,6 +217,10 @@ export default Ember.Component.extend({
     }
   }),
 
+
+  /**
+   * Parses the context and sets component's props
+   */
   _updateFromContext() {
     const {
       urns,
@@ -252,25 +251,18 @@ export default Ember.Component.extend({
     this._super(...arguments);
 
     this._updateFromContext();
-
-    // const selectedOptions = this.get('selectedOptions');
-    // setProperties(this, selectedOptions);
   },
 
   didReceiveAttrs() {
     this._super(...arguments);
 
     this._updateFromContext();
-    // const selectedOptions = this.get('selectedOptions');
-    // setProperties(this, selectedOptions);
   },
 
   didInsertElement() {
     this._super(...arguments);
 
     this._updateFromContext();
-    // const selectedOptions = this.get('selectedOptions');
-    // setProperties(this, selectedOptions);
   },
 
   actions: {
