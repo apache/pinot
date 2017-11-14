@@ -14,8 +14,6 @@ export default Ember.Controller.extend({
 
   selectedUrns: null, // Set
 
-  filteredUrns: null, // Set
-
   invisibleUrns: null, // Set
 
   hoverUrns: null, // Set
@@ -23,6 +21,8 @@ export default Ember.Controller.extend({
   context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
 
   config: config, // {}
+
+  filteredUrns: null,
 
   _contextObserver: Ember.observer(
     'context',
