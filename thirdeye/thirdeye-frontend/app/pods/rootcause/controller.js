@@ -3,6 +3,10 @@ import { makeIterable, filterObject, toBaselineUrn, filterPrefix } from 'thirdey
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 
+const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
+const ROOTCAUSE_TAB_METRICS = "metrics";
+const ROOTCAUSE_TAB_EVENTS = "events";
+
 export default Ember.Controller.extend({
   entitiesService: Ember.inject.service('rootcause-entities-cache'), // service
 
@@ -23,6 +27,13 @@ export default Ember.Controller.extend({
   context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
 
   config: config, // {}
+  
+  activeTab: null, // ""
+  
+  init() {
+    this._super(...arguments);
+    this.setProperties({ activeTab: ROOTCAUSE_TAB_DIMENSIONS });
+  },
 
   _contextObserver: Ember.observer(
     'context',

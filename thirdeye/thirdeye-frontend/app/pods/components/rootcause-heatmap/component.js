@@ -12,12 +12,14 @@ export default Ember.Component.extend({
   current: Ember.computed(
     'breakdowns',
     'currentUrn',
+    'currentUrns',
     function () {
-      const { breakdowns, currentUrn } = this.getProperties('breakdowns', 'currentUrn');
+      const { breakdowns, currentUrn, currentUrns } =
+        this.getProperties('breakdowns', 'currentUrn', 'currentUrns');
 
       const breakdown = breakdowns[currentUrn];
 
-      if (!currentUrn || !breakdown) {
+      if (!currentUrn || !breakdown || !currentUrns.has(currentUrn)) {
         return {};
       }
       return breakdown;
