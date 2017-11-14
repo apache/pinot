@@ -1,7 +1,7 @@
 import Ember from 'ember';
 import d3 from 'd3';
 import moment from 'moment';
-import { toBaselineUrn, filterPrefix } from '../../../helpers/utils';
+import { toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -170,7 +170,10 @@ export default Ember.Component.extend({
 
       console.log('rootcauseChart: splitLabels: generating labels');
       return filterPrefix(selectedUrns, 'thirdeye:metric:')
-        .reduce((agg, urn) => { agg[urn] = entities[urn].label.split("::")[1]; return agg; }, {});
+        .reduce((agg, urn) => {
+          agg[urn] = entities[urn].label.split("::")[1];
+          return agg;
+        }, {});
     }
   ),
 
