@@ -28,6 +28,17 @@ export default Ember.Component.extend({
   options: ['All', 'None'],
 
   /**
+   * Cache for urns, filtered by search criteria
+   * @type {Object}
+   * @example
+   * {
+   *  Holiday: {urns1, urns2},
+   *  Region: {urns3, urns4}
+   * }
+   */
+  urnsCache: {},
+
+  /**
    * Overwrite the init function
    * Initializes values of the filter blocks
    * Example of a filter block:
@@ -147,9 +158,11 @@ export default Ember.Component.extend({
      * @param {Object} clickedBlock - selected filter block object
      */
     selectEventType(clickedBlock) {
-      // Hide all other blocks when one is clicked
+      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
+      const cachedHeader = this.urnsCache[clickedBlock.header];
       let filterBlocks = this.get('config');
 
+      // Hide all other blocks when one is clicked
       filterBlocks.forEach(block => {
         Ember.set(block, 'isHidden', true);
       });
@@ -158,12 +171,30 @@ export default Ember.Component.extend({
       // Show clickedBlock
       Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
 
-      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
-      if (onSelect) {
+      /*
+      * If results were already previously filtered for this filter block (i.e. "Holiday", "Deployment"),
+      * call onSelect on the cached urns
+      */
+      if (cachedHeader) {
+        onSelect(cachedHeader);
+      }
+      // If this is the first time results are computed, cache them
+      else {
         const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
                                                   && entities[urn].eventType == clickedBlock.eventType);
+        this.urnsCache[clickedBlock.header] = urns;
         onSelect(urns);
       }
+    },
+
+    /**
+     * Bubbled up action, called by the child component, filter-bar-input component, to update the urns cache
+     * @method updateCache
+     * @param {String} header - name of filter block (i.e. "Holiday", "Deployment")
+     * @param {Array} urns - list of urns that are filtered based on subfilters (i.e. country, region)
+     */
+    updateCache(header, urns) {
+      this.urnsCache[header] = urns;
     }
   }
 });
