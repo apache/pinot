@@ -2,7 +2,7 @@
  * Rootcause settings component. It contains the logic needed for displaying
  * the rca settings box
  * @module components/rootcause-settings
- * @property {Object} options         - contains dropdown and filters values
+ * @property {Object} config          - contains dropdown and filters values
  * @property {Object} selectedOptions - contains user selected options from query params
  * @property {Object} onChange        - Closure action to bubble up to parent
  *                                      when the settings change
@@ -98,12 +98,18 @@ export default Ember.Component.extend({
    * Granularities Options
    * @type {String[]}
    */
-  granularityOptions: Ember.computed.reads('options.granularityOptions'),
+  granularityOptions: Ember.computed.reads('config.granularityOptions'),
   /**
    * Compare Mode Options
    * @type {String[]}
    */
-  compareModeOptions: Ember.computed.reads('options.compareModeOptions'),
+  compareModeOptions: Ember.computed.reads('config.compareModeOptions'),
+
+  /**
+   * filter options
+   * @type {Object}
+   */
+  filterOptions: Ember.computed.reads('config.filterOptions'),
 
   /**
    * Selected Compare Mode
@@ -128,12 +134,6 @@ export default Ember.Component.extend({
       moment().subtract(1, 'days').endOf('day')
     ]
   },
-
-  /**
-   * filter options
-   * @type {Object}
-   */
-  filterOptions: Ember.computed.reads('options.filterOptions'),
 
   /**
    * Selected filters
@@ -178,8 +178,15 @@ export default Ember.Component.extend({
   }),
 
   _updateFromContext() {
-    const { urns, anomalyRange, baselineRange, analysisRange, granularity } = this.get('context');
-    this.setProperties({ urnString: [...urns].join(','),
+    const {
+      urns,
+      anomalyRange,
+      baselineRange,
+      analysisRange,
+      granularity
+    } = this.get('context');
+    this.setProperties({ 
+      urnString: [...urns].join(','),
       anomalyRangeStart: anomalyRange[0], anomalyRangeEnd: anomalyRange[1],
       baselineRangeStart: baselineRange[0], baselineRangeEnd: baselineRange[1],
       analysisRangeStart: analysisRange[0], analysisRangeEnd: analysisRange[1],
@@ -190,22 +197,26 @@ export default Ember.Component.extend({
   init() {
     this._super(...arguments);
 
-    const selectedOptions = this.get('selectedOptions');
-    setProperties(this, selectedOptions);
+    this._updateFromContext();
+
+    // const selectedOptions = this.get('selectedOptions');
+    // setProperties(this, selectedOptions);
   },
 
   didReceiveAttrs() {
     this._super(...arguments);
 
-    const selectedOptions = this.get('selectedOptions');
-    setProperties(this, selectedOptions);
+    this._updateFromContext();
+    // const selectedOptions = this.get('selectedOptions');
+    // setProperties(this, selectedOptions);
   },
 
   didInsertElement() {
     this._super(...arguments);
 
-    const selectedOptions = this.get('selectedOptions');
-    setProperties(this, selectedOptions);
+    this._updateFromContext();
+    // const selectedOptions = this.get('selectedOptions');
+    // setProperties(this, selectedOptions);
   },
 
   actions: {

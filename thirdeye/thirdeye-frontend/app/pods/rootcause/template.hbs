@@ -10,8 +10,9 @@ value=anomalyRangeEnd}} | baselineRangeStart: {{input value=baselineRangeStart}}
 
 <h3>This is the settings bar.</h3>
 {{rootcause-settings
-  options=options
   selectedOptions=selectedOptions
+  context=context
+  config=settingsConfig
   onChange=(action "settingsOnChange")
 }}
 

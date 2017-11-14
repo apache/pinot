@@ -7,7 +7,8 @@ import moment from 'moment';
 const {
   getProperties,
   get,
-  setProperties
+  setProperties,
+  computed
 } = Ember;
 
 export default Ember.Controller.extend({
@@ -68,6 +69,19 @@ export default Ember.Controller.extend({
 
       const allUrns = new Set(Object.keys(entities));
       aggregatesService.request(context, allUrns);
+    }
+  ),
+
+  /**
+   * Configuration for the Settings component
+   */
+  settingsConfig: computed(
+    'model.{granularityOptions,filterOptions,compareModeOptions}',
+    function() {
+      const model = get(this, 'model');
+      const settingsOptions = ['granularityOptions', 'filterOptions', 'compareModeOptions'];
+      // debugger;
+      return getProperties(model, settingsOptions);
     }
   ),
 
@@ -243,8 +257,6 @@ export default Ember.Controller.extend({
     }
   ),
 
-<<<<<<< HEAD
-=======
   _startRequestEntities() {
     console.log('_startRequestEntities()');
     const { context, _pendingEntitiesRequests: pending } =
@@ -598,7 +610,6 @@ export default Ember.Controller.extend({
     return aggregates;
   },
 
->>>>>>> finalized logic
   //
   // Actions
   //
@@ -644,24 +655,24 @@ export default Ember.Controller.extend({
      * and updates query params and context
      * @param {Object} newParams new parameters to update
      */
-    settingsOnChange(newParams) {
+    settingsOnChange(context) {
       console.log('settingsOnChange()');
-      console.log('settingsOnChange: context', newParams);
+      console.log('settingsOnChange: context', context);
       
-      const queryParams = get(this, 'queryParams');
-      const paramsToUpdate = queryParams
-      .filter(param => newParams[param])
-      .reduce((hash, param) => {
-        hash[param] = newParams[param];
-        return hash;
-      }, {});
-      const baselineRanges = this._calculateBaselineRange(paramsToUpdate);
-      const context = this._buildContext(paramsToUpdate, baselineRanges);
+      // const queryParams = get(this, 'queryParams');
+      // const paramsToUpdate = queryParams
+      // .filter(param => newParams[param])
+      // .reduce((hash, param) => {
+      //   hash[param] = newParams[param];
+      //   return hash;
+      // }, {});
+      // const baselineRanges = this._calculateBaselineRange(paramsToUpdate);
+      // const context = this._buildContext(paramsToUpdate, baselineRanges);
 
       setProperties(this, {
-        context,
-        ...paramsToUpdate,
-        ...baselineRanges
+        context
+        // ...paramsToUpdate,
+        // ...baselineRanges
       });
     },
 

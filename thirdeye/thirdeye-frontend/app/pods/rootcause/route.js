@@ -34,6 +34,40 @@ const isValid = (key, value) => {
   }
 };
 
+// TODO: move into utils
+const _calculateBaselineRange = (analysisRange, compareMode) => {
+  const {
+    analysisRangeStart,
+    analysisRangeEnd
+  } = analysisRange;
+  const offset = {
+    WoW: 1,
+    Wo2W: 2,
+    Wo3W: 3,
+    Wo4W: 4
+  }[compareMode];
+
+  const baselineRangeStart = moment(analysisRangeStart).subtract(offset, 'weeks').valueOf();
+  const baselineRangeEnd = moment(analysisRangeEnd).subtract(offset, 'weeks').valueOf();
+
+  return [ baselineRangeStart, baselineRangeEnd ];
+};
+
+
+// {"continent":["Europe","Africa","Asia"],"osName_topk":["net bsd","android"]}
+const _filterToUrn = (filters) => {
+  const urns = [];
+  const filterObject = JSON.parse(filters);
+  Object.keys(filterObject)
+    .forEach((key) => {
+      const filterUrns = filterObject[key]
+        .map(dimension => `te:dim:${key}:${dimension}`);
+      urns.push(...filterUrns);
+    });
+
+  return urns;
+};
+
 
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
   queryParams: {
@@ -62,19 +96,17 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   },
 
   afterModel(model, transition) {
-
     const defaultParams = {
       filters: JSON.stringify({}),
       granularity: model.granularityOptions[0],
       anomalyRangeStart: moment().subtract(1, 'day').valueOf(),
-      anomalyRangeEnd: model.maxTime,
+      anomalyRangeEnd: model.maxTime || moment().valueOf(),
       analysisRangeStart: moment().subtract(1, 'week').valueOf(), 
       analysisRangeEnd: model.maxTime,
       compareMode: 'WoW'
     };
     let { queryParams } = transition;
-    // TODO: write utils functions that checks key values in queryParams
-    //       so only valid strings are authorized
+
     const validParams = Object.keys(queryParams)
       .filter((param) => {
         const value = queryParams[param];
@@ -85,7 +117,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         return hash;
       }, {});
     Object.assign(
-      model, 
+      model,
       { queryParams: { ...defaultParams, ...validParams }}
     );
   },
@@ -93,8 +125,22 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   setupController(controller, model) {
     this._super(...arguments);
     console.log('route: setupController()');
-    // TODO get initial attributes from query params
-    
+
+    const {
+      filters,
+      granularity,
+      analysisRangeStart,
+      analysisRangeEnd,
+      compareMode,
+      anomalyRangeStart,
+      anomalyRangeEnd
+    } = model.queryParams;
+
+    const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
+    const analysisRange = [analysisRangeStart, analysisRangeEnd];
+    const baselineRange = _calculateBaselineRange(analysisRange, compareMode);
+    const urns = [`te:metric:${model.id}`, ..._filterToUrn(filters)];
+
     controller.setProperties({
       selectedUrns: new Set([
         'thirdeye:metric:194591', 'frontend:baseline:metric:194591',
