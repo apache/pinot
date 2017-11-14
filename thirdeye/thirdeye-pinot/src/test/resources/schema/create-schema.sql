@@ -159,20 +159,6 @@ create index metric_config_dataset_idx on metric_config_index(dataset);
 create index metric_config_alias_idx on metric_config_index(alias);
 create index metric_config_active_idx on metric_config_index(active);
 
-create table if not exists dashboard_config_index (
-    name varchar(200) not null,
-    dataset varchar(200) not null,
-    active boolean,
-    base_id bigint(20) not null,
-    create_time timestamp,
-    update_time timestamp default current_timestamp,
-    version int(10),
-    CONSTRAINT uc_dashboard_name unique(name)
-) ENGINE=InnoDB;
-create index dashboard_config_name_idx on dashboard_config_index(name);
-create index dashboard_config_dataset_idx on dashboard_config_index(dataset);
-create index dashboard_config_active_idx on dashboard_config_index(active);
-
 create table if not exists override_config_index (
     start_time bigint(20) NOT NULL,
     end_time bigint(20) NOT NULL,

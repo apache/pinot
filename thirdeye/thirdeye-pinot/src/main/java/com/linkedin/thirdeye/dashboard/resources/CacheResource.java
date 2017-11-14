@@ -12,7 +12,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -42,7 +41,6 @@ public class CacheResource {
 
     refreshDatasetConfigCache();
     refreshMetricConfigCache();
-    refreshDashoardConfigsCache();
 
     refreshMaxDataTimeCache();
     refreshDimensionFiltersCache();
@@ -100,23 +98,6 @@ public class CacheResource {
             cache.refresh(new MetricDataset(metricConfig.getName(), metricConfig.getDataset()));
           }
 
-        }
-      });
-    }
-    return Response.ok().build();
-  }
-
-  @POST
-  @Path("/refresh/dashboardConfigs")
-  public Response refreshDashoardConfigsCache() {
-    List<String> datasets = CACHE_INSTANCE.getDatasetsCache().getDatasets();
-    final LoadingCache<String,List<DashboardConfigDTO>> cache = CACHE_INSTANCE.getDashboardConfigsCache();
-    for (final String dataset : datasets) {
-      EXECUTOR_SERVICE.submit(new Runnable() {
-
-        @Override
-        public void run() {
-          cache.refresh(dataset);
         }
       });
     }

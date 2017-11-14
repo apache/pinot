@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.datasource;
 
 import com.google.common.base.Preconditions;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -12,25 +11,20 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
-import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
-import com.linkedin.thirdeye.datasource.cache.DashboardConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DimensionFiltersCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.MetricConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
 
 public class ThirdEyeCacheRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
@@ -42,7 +36,6 @@ public class ThirdEyeCacheRegistry {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static DatasetConfigManager datasetConfigDAO;
   private static MetricConfigManager metricConfigDAO;
-  private static DashboardConfigManager dashboardConfigDAO;
   private static AnomalyFunctionManager anomalyFunctionDAO;
 
   // Data sources to time series databases.
@@ -53,7 +46,6 @@ public class ThirdEyeCacheRegistry {
   // Meta-data caches
   private LoadingCache<String, DatasetConfigDTO> datasetConfigCache;
   private LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache;
-  private LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache;
   private LoadingCache<String, Long> datasetMaxDataTimeCache;
   private LoadingCache<String, String> dimensionFiltersCache;
   private DatasetListCache datasetsCache;
@@ -92,7 +84,6 @@ public class ThirdEyeCacheRegistry {
       // Initialize connection to ThirdEye's anomaly and meta-data storage.
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
       metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-      dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
       anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
@@ -120,11 +111,6 @@ public class ThirdEyeCacheRegistry {
         .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new MetricConfigCacheLoader(metricConfigDAO));
     cacheRegistry.registerMetricConfigCache(metricConfigCache);
 
-    // DashboardConfigs cache
-    LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new DashboardConfigCacheLoader(dashboardConfigDAO));
-    cacheRegistry.registerDashboardConfigsCache(dashboardConfigsCache);
-
     // DatasetMaxDataTime Cache
     LoadingCache<String, Long> datasetMaxDataTimeCache = CacheBuilder.newBuilder()
         .refreshAfterWrite(5, TimeUnit.MINUTES)
@@ -137,7 +123,7 @@ public class ThirdEyeCacheRegistry {
             .build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
-    // Collections cache
+    // Datasets list cache
     DatasetListCache datasetsCache = new DatasetListCache(anomalyFunctionDAO, datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerDatasetsCache(datasetsCache);
   }
@@ -156,8 +142,6 @@ public class ThirdEyeCacheRegistry {
         cacheResource.refreshDatasets();
         LOGGER.info("Refreshing dataset configs cache");
         cacheResource.refreshDatasetConfigCache();
-        LOGGER.info("Refreshing dashboard configs cache");
-        cacheResource.refreshDashoardConfigsCache();
         LOGGER.info("Refreshing metrics config cache");
         cacheResource.refreshMetricConfigCache();
         LOGGER.info("Refreshing max data dime cache");
@@ -255,11 +239,4 @@ public class ThirdEyeCacheRegistry {
     this.metricConfigCache = metricConfigCache;
   }
 
-  public LoadingCache<String, List<DashboardConfigDTO>> getDashboardConfigsCache() {
-    return dashboardConfigsCache;
-  }
-
-  public void registerDashboardConfigsCache(LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache) {
-    this.dashboardConfigsCache = dashboardConfigsCache;
-  }
 }

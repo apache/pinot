@@ -27,7 +27,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
-import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
@@ -121,8 +120,6 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(DatasetConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, MetricConfigIndex.class,
             convertCamelCaseToUnderscore(MetricConfigIndex.class.getSimpleName()));
-        entityMappingHolder.register(conn, DashboardConfigIndex.class,
-            convertCamelCaseToUnderscore(DashboardConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, OverrideConfigIndex.class,
             convertCamelCaseToUnderscore(OverrideConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, AlertConfigIndex.class,
