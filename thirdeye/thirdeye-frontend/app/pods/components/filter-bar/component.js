@@ -18,7 +18,6 @@
  */
 import Ember from 'ember';
 import _ from 'lodash';
-import { findLabelMapping } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Component.extend({
 

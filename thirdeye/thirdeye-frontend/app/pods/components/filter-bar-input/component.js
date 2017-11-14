@@ -36,17 +36,25 @@ export default Ember.Component.extend({
      * @param {Array} selectedValue - selected value in the input
      */
     onSubfilterSelection(selectedValue) {
-      const { label, entities, onSelect } = this.getProperties('label', 'entities', 'onSelect');
+      const { label, entities, onSelect, header } = this.getProperties('label', 'entities', 'onSelect', 'header');
       const labelMapping = findLabelMapping(label, this.get('config'));
 
       this.set('selected', selectedValue);
 
       if (onSelect) {
-        const urns = Object.keys(entities).filter(urn => {
-          if (entities[urn].attributes[labelMapping]) {
-            return selectedValue.some(value => entities[urn].attributes[labelMapping].includes(value));
-          }
-        });
+        let urns;
+        // If there are no filters, show all events under that event type
+        if (selectedValue.length == 0) {
+          urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
+                                                    && entities[urn].eventType == header.toLowerCase());
+        } else {
+          urns = Object.keys(entities).filter(urn => {
+            if (entities[urn].attributes[labelMapping]) {
+              return selectedValue.some(value => entities[urn].attributes[labelMapping].includes(value));
+            }
+          });
+        }
+
         onSelect(urns);
       }
     }
