@@ -1,14 +1,3 @@
-Settings |
-urns: {{input value=urnString}} |
-anomalyRangeStart: {{input value=anomalyRangeStart}} |
-anomalyRangeEnd: {{input value=anomalyRangeEnd}} |
-baselineRangeStart: {{input value=baselineRangeStart}} |
-baselineRangeEnd: {{input value=baselineRangeEnd}} |
-analysisRangeStart: {{input value=analysisRangeStart}} |
-analysisRangeEnd: {{input value=analysisRangeEnd}} |
-granularity: {{input value=granularity}} |
-<button {{action "updateContext"}}>update</button>
-
 <div class="paper-container">
   <div class="paper-container__body">
     <section class="rca-summary">
@@ -42,10 +31,10 @@ granularity: {{input value=granularity}} |
           <label class="te-label" for="select-granularity">Granularity: </label>
           {{#power-select
             selected=granularity
-            options=granularities
+            options=granularityOptions
             triggerId="select-granularity"
             searchEnabled=false
-            onchange=(action (mut granularity))
+            onchange=(action "onGranularityChange")
             as |granularity|
           }}
             {{granularity}}
@@ -55,7 +44,7 @@ granularity: {{input value=granularity}} |
           <label class="te-label" for="select-mode">Comparing By: </label>
           {{#power-select
             selected=compareMode
-            options=compareModes
+            options=compareModeOptions
             triggerId="select-mode"
             searchEnabled=false
             onchange=(action "onModeChange")
@@ -95,7 +84,8 @@ granularity: {{input value=granularity}} |
           {{filter-select
             selected=filters
             triggerId="select-filter"
-            options=metricFilters
+            options=filterOptions
+            onChange=(action "onFiltersChange")
           }}
         </div>
       </div>

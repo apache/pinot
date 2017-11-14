@@ -2,11 +2,13 @@
  * Rootcause settings component. It contains the logic needed for displaying
  * the rca settings box
  * @module components/rootcause-settings
- * @property {Object} context   - { urns, anomalyRange, baselineRange, analaysisRange }
- * @property {Object} onChange  - Closure action to bubble up to parent
- *                                when the settings change
+ * @property {Object} config          - contains dropdown and filters values
+ * @property {Object} context         - contains user selected options from query params
+ * @property {Object} onChange        - Closure action to bubble up to parent
+ *                                      when the settings change
  * @example
   {{rootcause-settings
+    config=config
     context=context
     onChange=(action "settingsOnChange")
   }}
@@ -17,30 +19,117 @@
 import Ember from 'ember';
 import moment from 'moment';
 
+
+// TODO: move this to a utils file (DRYER)
+const _calculateBaselineRange = (range, compareMode) => {
+  const [
+    start,
+    end
+  ] = range;
+  const offset = {
+    WoW: 1,
+    Wo2W: 2,
+    Wo3W: 3,
+    Wo4W: 4
+  }[compareMode];
+
+  const baselineRangeStart = moment(start).subtract(offset, 'weeks').valueOf();
+  const baselineRangeEnd = moment(end).subtract(offset, 'weeks').valueOf();
+
+  return [baselineRangeStart, baselineRangeEnd];
+};
+
+// TODO: move this to a utils file (DRYER)
+const _urnsToFilter = (urns) => {
+  return Array.from(urns).reduce((hash, urn) => {
+    const [_te, type, ...filter] = urn.split(':');
+    if (type === 'dimension') {
+      const [key, value, _provided] = filter;
+      if (!hash[key]) {
+        hash[key] = [];
+      }
+      hash[key].push(value);
+    }
+    return hash;
+  }, {});
+};
+// TODO: move this to a utils file (DRYER)
+const _filterToUrn = (filters) => {
+  const urns = [];
+  const filterObject = JSON.parse(filters);
+  Object.keys(filterObject)
+    .forEach((key) => {
+      const filterUrns = filterObject[key]
+        .map(dimension => `thirdeye:dimension:${key}:${dimension}:provided`);
+      urns.push(...filterUrns);
+    });
+
+  return urns;
+};
+
+/**
+ * Date formate the date picker component expects
+ * @type String
+ * 
+ */
+const serverDateFormat = 'YYYY-MM-DD HH:mm';
+
 export default Ember.Component.extend({
-  context: null, // { urns, anomalyRange, baselineRange, analaysisRange }
-
-  onChange: null, // function (context)
-
+  onChange: null,
   urnString: null,
-
   anomalyRangeStart: null,
-
   anomalyRangeEnd: null,
-
-  baselineRangeStart: null,
-
-  baselineRangeEnd: null,
-
   analysisRangeStart: null,
-
   analysisRangeEnd: null,
 
-  // datepicker range
-  datePickerAnomalyRangeStart: Ember.computed.reads('anomalyRangeStart'),
-  datePickerAnomalyRangeEnd: Ember.computed.reads('anomalyRangeEnd'),
-  datePickerAnalysisRangeStart: Ember.computed.reads('analysisRangeStart'),
-  datePickerAnalysisRangeEnd: Ember.computed.reads('analysisRangeEnd'),
+
+  /**
+   * Formatted anomaly start date
+   * @return {String}
+   */
+  datePickerAnomalyRangeStart: Ember.computed('anomalyRangeStart', {
+    get() {
+      const start = this.get('anomalyRangeStart');
+
+      return start ? moment(+start).format(serverDateFormat) : moment().format(serverDateFormat);
+    }
+  }),
+
+  /**
+   * Formatted anomaly end date
+   * @return {String}
+   */
+  datePickerAnomalyRangeEnd: Ember.computed('anomalyRangeEnd', {
+    get() {
+      const end = this.get('anomalyRangeEnd');
+
+      return end ? moment(+end).format(serverDateFormat) : moment().format(serverDateFormat);
+    }
+  }),
+
+  /**
+   * Formatted analysis start date
+   * @return {String}
+   */
+  datePickerAnalysisRangeStart: Ember.computed('analysisRangeStart', {
+    get() {
+      const start = this.get('analysisRangeStart');
+
+      return start ? moment(+start).format(serverDateFormat) : moment().format(serverDateFormat);
+    }
+  }),
+
+  /**
+   * Formatted analysis end date
+   * @return {String}
+   */
+  datePickerAnalysisRangeEnd: Ember.computed('analysisRangeEnd', {
+    get() {
+      const end = this.get('analysisRangeEnd');
+
+      return end ? moment(+end).format(serverDateFormat) : moment().format(serverDateFormat);
+    }
+  }),
 
   /**
    * Selected Granularity
@@ -52,18 +141,24 @@ export default Ember.Component.extend({
    * Granularities Options
    * @type {String[]}
    */
-  granularities: ['MINUTES', 'HOURS', 'DAYS'],
+  granularityOptions: Ember.computed.reads('config.granularityOptions'),
+  /**
+   * Compare Mode Options
+   * @type {String[]}
+   */
+  compareModeOptions: Ember.computed.reads('config.compareModeOptions'),
+
+  /**
+   * filter options
+   * @type {Object}
+   */
+  filterOptions: Ember.computed.reads('config.filterOptions'),
 
   /**
    * Selected Compare Mode
    * @type {String}
    */
   compareMode: 'WoW',
-  /**
-   * Compare Mode Options
-   * @type {String[]}
-   */
-  compareModes: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
 
   /**
    * Predefined Custom Ranges for
@@ -82,16 +177,11 @@ export default Ember.Component.extend({
   },
 
   /**
-   * filter options
-   * @type {Object}
-   */
-  metricFilters: {},
-
-  /**
    * Selected filters
    * @type {String} - a JSON string
    */
   filters: JSON.stringify({}),
+
 
   /**
    * Indicates the date format to be used based on granularity
@@ -127,37 +217,90 @@ export default Ember.Component.extend({
     }
   }),
 
+
+  /**
+   * Parses the context and sets component's props
+   */
   _updateFromContext() {
-    const { urns, anomalyRange, baselineRange, analysisRange, granularity } = this.get('context');
-    this.setProperties({ urnString: [...urns].join(','),
+    const {
+      urns,
+      anomalyRange,
+      baselineRange,
+      analysisRange,
+      granularity,
+      compareMode
+    } = this.get('context');
+    
+    const filterUrns = Array.from(urns).filter(urn => urn.includes(':dimension:'));
+    const otherUrns = Array.from(urns).filter(urn => !urn.includes(':dimension:'));
+    const filters = JSON.stringify(_urnsToFilter(filterUrns));
+
+
+    this.setProperties({ 
+      otherUrns,
       anomalyRangeStart: anomalyRange[0], anomalyRangeEnd: anomalyRange[1],
       baselineRangeStart: baselineRange[0], baselineRangeEnd: baselineRange[1],
       analysisRangeStart: analysisRange[0], analysisRangeEnd: analysisRange[1],
-      granularity
+      granularity,
+      compareMode,
+      filters
     });
   },
 
-  didUpdateAttrs() {
+  init() {
     this._super(...arguments);
+
+    this._updateFromContext();
+  },
+
+  didReceiveAttrs() {
+    this._super(...arguments);
+
     this._updateFromContext();
   },
 
   didInsertElement() {
     this._super(...arguments);
+
     this._updateFromContext();
   },
 
   actions: {
+    /**
+     * Grabs Properties and sends them to the parent via an action
+     * @method updateContext
+     * @return {undefined}
+     */
     updateContext() {
-      const { urnString, anomalyRangeStart, anomalyRangeEnd, baselineRangeStart, baselineRangeEnd, analysisRangeStart, analysisRangeEnd, granularity } =
-        this.getProperties('urnString', 'anomalyRangeStart', 'anomalyRangeEnd', 'baselineRangeStart', 'baselineRangeEnd', 'analysisRangeStart', 'analysisRangeEnd', 'granularity');
+      const {
+        anomalyRangeStart,
+        anomalyRangeEnd,
+        analysisRangeStart,
+        analysisRangeEnd,
+        granularity,
+        filters,
+        compareMode,
+        otherUrns
+      } = this.getProperties(
+        'otherUrns',
+        'granularity',
+        'filters',
+        'anomalyRangeStart',
+        'anomalyRangeEnd',
+        'compareMode',
+        'analysisRangeStart',
+        'analysisRangeEnd');
       const onChange = this.get('onChange');
+
+      
       if (onChange != null) {
-        const urns = new Set(urnString.split(','));
+        const filterUrns = _filterToUrn(filters);
+        const urns = new Set([...otherUrns, ...filterUrns]);
         const anomalyRange = [parseInt(anomalyRangeStart), parseInt(anomalyRangeEnd)];
-        const baselineRange = [parseInt(baselineRangeStart), parseInt(baselineRangeEnd)];
         const analysisRange = [parseInt(analysisRangeStart), parseInt(analysisRangeEnd)];
-        const newContext = { urns, anomalyRange, baselineRange, analysisRange, granularity };
+        const [baselineRangeStart, baselineRangeEnd] = _calculateBaselineRange(anomalyRange, compareMode);
+        const baselineRange = [parseInt(baselineRangeStart), parseInt(baselineRangeEnd)];
+        const newContext = { urns, anomalyRange, baselineRange, analysisRange, granularity, compareMode };
         onChange(newContext);
       }
     },
@@ -177,6 +320,7 @@ export default Ember.Component.extend({
         anomalyRangeStart,
         anomalyRangeEnd
       });
+      this.send('updateContext');
     },
 
     /**
@@ -194,34 +338,41 @@ export default Ember.Component.extend({
         analysisRangeStart,
         analysisRangeEnd
       });
+      this.send('updateContext');
     },
+  
 
     /**
-     * Changes the compare mode
+     * Updates the compare mode
      * @method onModeChange
      * @param {String} compareMode baseline compare mode
      * @return {undefined}
      */
     onModeChange(compareMode) {
-      const {
-        analysisRangeStart,
-        analysisRangeEnd
-      } = this.getProperties('analysisRangeStart', 'analysisRangeEnd');
-      const offset = {
-        WoW: 1,
-        Wo2W: 2,
-        Wo3W: 3,
-        Wo4W: 4
-      }[compareMode];
+      this.set('compareMode', compareMode);
+      this.send('updateContext');
+    },
 
-      const baselineRangeStart = moment(analysisRangeStart).subtract(offset, 'weeks').valueOf();
-      const baselineRangeEnd = moment(analysisRangeEnd).subtract(offset, 'weeks').valueOf();
+    /**
+     * Updates the granularity
+     * @method onGranularityChange
+     * @param {String} granularity the selected granularity
+     * @return {undefined}
+     */
+    onGranularityChange(granularity) {
+      this.set('granularity', granularity);
+      this.send('updateContext');
+    },
 
-      this.setProperties({
-        compareMode,
-        baselineRangeStart,
-        baselineRangeEnd
-      });
+    /**
+     * Updates the filters
+     * @method onFiltersChange
+     * @param {Object} filters currently selected filters
+     * @return {undefined}
+     */
+    onFiltersChange(filters) {
+      this.set('filters', filters);
+      this.send('updateContext');
     }
   }
 });
