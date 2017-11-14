@@ -1,17 +1,5 @@
 package com.linkedin.thirdeye.auto.onboard;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,11 +7,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.DataSourceConfig;
 
 /**
  * This is a service to onboard datasets automatically to thirdeye from pinot
@@ -103,12 +103,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
       LOG.info("Creating metric {} for {}", metricConfigDTO.getName(), dataset);
       DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO);
     }
-
-    // Create Default DashboardConfig
-    List<Long> metricIds = ConfigGenerator.getMetricIdsFromMetricConfigs(DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset));
-    DashboardConfigDTO dashboardConfigDTO = ConfigGenerator.generateDefaultDashboardConfig(dataset, metricIds);
-    LOG.info("Creating default dashboard for dataset {}", dataset);
-    DAO_REGISTRY.getDashboardConfigDAO().save(dashboardConfigDTO);
   }
 
   /**
@@ -122,7 +116,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     checkDimensionChanges(dataset, datasetConfig, schema);
     checkMetricChanges(dataset, datasetConfig, schema);
   }
-
 
 
   private void checkDimensionChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
@@ -204,16 +197,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
         LOG.info("Creating metric {} for {}", metricName, dataset);
         metricsToAdd.add(DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO));
       }
-    }
-
-    // add new metricIds to default dashboard
-    if (CollectionUtils.isNotEmpty(metricsToAdd)) {
-      LOG.info("Metrics to add {}", metricsToAdd);
-      String dashboardName = ThirdEyeUtils.getDefaultDashboardName(dataset);
-      DashboardConfigDTO dashboardConfig = DAO_REGISTRY.getDashboardConfigDAO().findByName(dashboardName);
-      List<Long> metricIds = dashboardConfig.getMetricIds();
-      metricIds.addAll(metricsToAdd);
-      DAO_REGISTRY.getDashboardConfigDAO().update(dashboardConfig);
     }
 
     // TODO: write a tool, which given a metric id, erases all traces of that metric from the database

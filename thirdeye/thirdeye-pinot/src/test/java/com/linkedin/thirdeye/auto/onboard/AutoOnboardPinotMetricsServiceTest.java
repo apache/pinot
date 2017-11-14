@@ -7,14 +7,10 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
-
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +30,6 @@ public class AutoOnboardPinotMetricsServiceTest {
   private DAOTestBase testDAOProvider;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
-  private DashboardConfigManager dashboardConfigDAO;
 
   @BeforeMethod
   void beforeMethod() throws Exception {
@@ -42,7 +37,6 @@ public class AutoOnboardPinotMetricsServiceTest {
     DAORegistry daoRegistry = DAORegistry.getInstance();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
-    dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
     testAutoLoadPinotMetricsService = new AutoOnboardPinotDataSource(null, null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, null);
@@ -75,10 +69,6 @@ public class AutoOnboardPinotMetricsServiceTest {
       Assert.assertTrue(schemaMetricNames.contains(metricConfig.getName()));
       metricIds.add(metricConfig.getId());
     }
-
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.
-        findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset);
-    Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
   }
 
   @Test
@@ -105,9 +95,5 @@ public class AutoOnboardPinotMetricsServiceTest {
       Assert.assertTrue(schemaMetricNames.contains(metricConfig.getName()));
       metricIds.add(metricConfig.getId());
     }
-
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.
-        findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset);
-    Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
   }
 }

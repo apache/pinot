@@ -7,7 +7,6 @@
         <div class="search-select">
           <select id="anomalies-search-mode" style="width:100%">
             <option value="metric">Metric(s)</option>
-            <option value="dashboard">Dashboard</option>
             <option value="id">Anomaly ID</option>
             <option value="time" selected>Time</option>
             <option value="groupId">Group ID</option>

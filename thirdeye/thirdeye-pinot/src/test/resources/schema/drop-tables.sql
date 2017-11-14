@@ -13,7 +13,6 @@ DROP TABLE IF EXISTS override_config_index;
 DROP TABLE IF EXISTS alert_config_index;
 DROP TABLE IF EXISTS data_completeness_config_index;
 DROP TABLE IF EXISTS dataset_config_index;
-DROP TABLE IF EXISTS dashboard_config_index;
 DROP TABLE IF EXISTS event_index;
 DROP TABLE IF EXISTS detection_status_index;
 DROP TABLE IF EXISTS autotune_config_index;

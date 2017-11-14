@@ -1,8 +1,50 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.text.StrSubstitutor;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Joiner;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
@@ -26,14 +68,12 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -49,46 +89,6 @@ import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.AnomalyOffset;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang3.text.StrSubstitutor;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.Period;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 @Path(value = "/anomalies")
@@ -115,7 +115,6 @@ public class AnomaliesResource {
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
-  private final DashboardConfigManager dashboardConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
   private ExecutorService threadPool;
   private AlertFilterFactory alertFilterFactory;
@@ -126,7 +125,6 @@ public class AnomaliesResource {
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     groupedAnomalyResultsDAO = DAO_REGISTRY.getGroupedAnomalyResultsDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
     datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     threadPool = Executors.newFixedThreadPool(NUM_EXECS);
     this.alertFilterFactory = alertFilterFactory;
@@ -328,30 +326,6 @@ public class AnomaliesResource {
     return anomaliesWrapper;
   }
 
-  /**
-   * Find anomalies by dashboard id
-   * @param startTime
-   * @param endTime
-   * @param dashboardId
-   * @param functionName
-   * @return
-   * @throws Exception
-   */
-  @GET
-  @Path("search/dashboardId/{startTime}/{endTime}/{pageNumber}")
-  public AnomaliesWrapper getAnomaliesByDashboardId(
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime,
-      @PathParam("pageNumber") int pageNumber,
-      @QueryParam("dashboardId") String dashboardId,
-      @QueryParam("functionName") String functionName,
-      @QueryParam("searchFilters") String searchFiltersJSON,
-      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
-
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findById(Long.valueOf(dashboardId));
-    String metricIdsString = Joiner.on(COMMA_SEPARATOR).join(dashboardConfig.getMetricIds());
-    return getAnomaliesByMetricIds(startTime, endTime, pageNumber, metricIdsString, functionName, searchFiltersJSON, filterOnly);
-  }
 
   /**
    * Find anomalies by metric ids

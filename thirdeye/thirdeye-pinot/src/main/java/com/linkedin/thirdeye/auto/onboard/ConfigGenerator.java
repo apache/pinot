@@ -10,10 +10,8 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -72,15 +70,6 @@ public class ConfigGenerator {
   }
 
 
-  public static DashboardConfigDTO generateDefaultDashboardConfig(String dataset, List<Long> metricIds) {
-    DashboardConfigDTO dashboardConfigDTO = new DashboardConfigDTO();
-    String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
-    dashboardConfigDTO.setName(dashboardName);
-    dashboardConfigDTO.setDataset(dataset);
-    dashboardConfigDTO.setMetricIds(metricIds);
-    return dashboardConfigDTO;
-  }
-
   public static List<Long> getMetricIdsFromMetricConfigs(List<MetricConfigDTO> metricConfigs) {
     List<Long> metricIds = new ArrayList<>();
     for (MetricConfigDTO metricConfig : metricConfigs) {
@@ -88,7 +77,5 @@ public class ConfigGenerator {
     }
     return metricIds;
   }
-
-
 
 }

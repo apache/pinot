@@ -18,7 +18,6 @@ import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.AutoOnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
-import com.linkedin.thirdeye.dashboard.resources.DashboardConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.dashboard.resources.DataCompletenessResource;
 import com.linkedin.thirdeye.dashboard.resources.DatasetConfigResource;
@@ -132,7 +131,6 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new EntityManagerResource(config));
     env.jersey().register(new MetricConfigResource());
     env.jersey().register(new DatasetConfigResource());
-    env.jersey().register(new DashboardConfigResource());
     env.jersey().register(new JobResource());
     env.jersey().register(new AdminResource());
     env.jersey().register(new SummaryResource());
