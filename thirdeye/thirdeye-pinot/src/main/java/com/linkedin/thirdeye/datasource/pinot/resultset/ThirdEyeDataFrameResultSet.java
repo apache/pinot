@@ -100,11 +100,21 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
     for (int columnIdx = 0; columnIdx < resultSet.getColumnCount(); columnIdx++) {
       metricColumnNames.add(resultSet.getColumnName(columnIdx));
     }
-    ThirdEyeResultSetMetaData
-        thirdEyeResultSetMetaData = new ThirdEyeResultSetMetaData(groupKeyColumnNames, metricColumnNames);
+    ThirdEyeResultSetMetaData thirdEyeResultSetMetaData =
+        new ThirdEyeResultSetMetaData(groupKeyColumnNames, metricColumnNames);
 
     // Build the DataFrame
-    DataFrame.Builder dfBuilder = DataFrame.builder(thirdEyeResultSetMetaData.getAllColumnNames());
+    List<String> allColumnNames = thirdEyeResultSetMetaData.getAllColumnNames();
+    List<String> columnNameWithDataType = new ArrayList<>(allColumnNames.size());
+    for (int index = 0; index < allColumnNames.size(); ++index) {
+      if (index < groupByColumnCount) {
+        // Always cast dimension values to STRING type
+        columnNameWithDataType.add(allColumnNames.get(index) + ":STRING");
+      } else {
+        columnNameWithDataType.add(allColumnNames.get(index));
+      }
+    }
+    DataFrame.Builder dfBuilder = DataFrame.builder(columnNameWithDataType);
     int rowCount = resultSet.getRowCount();
     int metricColumnCount = resultSet.getColumnCount();
     int totalColumnCount = groupByColumnCount + metricColumnCount;
