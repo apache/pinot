@@ -193,9 +193,10 @@ create table if not exists alert_config_index (
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
-    version int(10)
+    version int(10),
+    CONSTRAINT uc_alert_name UNIQUE (name)
 ) ENGINE=InnoDB;
-
+create index alert_confix_name_idx on alert_config_index(name);
 
 create table if not exists data_completeness_config_index (
     dataset varchar(200) not null,
