@@ -77,6 +77,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * This phase will add a new column for every column that has topk config
  * The new column added will be called "column_topk" (containing only topk values plus any whitelist)
  * and "column" will contain all values with whitelist applied
+ * For all non topk values, the dimension value will be replaced by "other"
+ * For all non-whitelist values, the dimension value will be replaced by the defaultOtherValue specified in DimensionType
+ * This default other value can be configured, using config like thirdeye.nonwhitelist.value.dimension.d1=x
  */
 public class DerivedColumnTransformationPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(DerivedColumnTransformationPhaseJob.class);

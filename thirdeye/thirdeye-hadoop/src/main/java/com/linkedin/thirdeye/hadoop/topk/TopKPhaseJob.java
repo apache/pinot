@@ -79,7 +79,7 @@ import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
  * We strictly use just 1 reducer.
  * Reduce phase receives Key=(DimensionName, DimensionValue)
  * and aggregates the metric values
- * The very first key received is (ALL, ALL) with total metric sum
+ * The very first key received is (ALL, ALL) with helps us compute total metric sum
  * These metric sums are used to check metric thresholds of other
  * (dimensionName, dimensionValue) pairs. If none of the metric
  * thresholds pass, the pair is discarded.
