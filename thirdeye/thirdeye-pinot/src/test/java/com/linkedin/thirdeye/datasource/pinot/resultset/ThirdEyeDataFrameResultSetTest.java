@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
