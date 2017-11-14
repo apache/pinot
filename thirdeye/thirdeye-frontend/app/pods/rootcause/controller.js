@@ -14,8 +14,6 @@ export default Ember.Controller.extend({
 
   selectedUrns: null, // Set
 
-  // filteredUrns: null, // Set
-
   invisibleUrns: null, // Set
 
   hoverUrns: null, // Set
