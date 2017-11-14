@@ -263,14 +263,14 @@ public final class ThirdEyeConfig {
     Map<String, Double> threshold = getThresholdFromProperties(props);
     List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec = getTopKDimensionToMetricsSpecFromProperties(props);
     Map<String, List<String>> whitelist = getWhitelistFromProperties(props);
-    Map<String, String> othersValues = getOthersValueFromProperties(props);
+    Map<String, String> nonWhitelistValue = getNonWhitelistValueFromProperties(props);
 
     if (threshold != null || topKDimensionToMetricsSpec != null || whitelist != null) {
       topKWhitelist = new TopkWhitelistSpec();
       topKWhitelist.setThreshold(threshold);
       topKWhitelist.setTopKDimensionToMetricsSpec(topKDimensionToMetricsSpec);
       topKWhitelist.setWhitelist(whitelist);
-      topKWhitelist.setOtherValues(othersValues);
+      topKWhitelist.setNonWhitelistValue(nonWhitelistValue);
     }
     return topKWhitelist;
   }
@@ -280,49 +280,35 @@ public final class ThirdEyeConfig {
    * @param props
    * @return
    */
-  private static Map<String, String> getOthersValueFromProperties(Properties props) {
-    Map<String, String> dimensionToOthersValueMap = null;
+  private static Map<String, String> getNonWhitelistValueFromProperties(Properties props) {
+    Map<String, String> dimensionToNonWhitelistValueMap = null;
 
     // create dimension to type map
     List<DimensionSpec> dimensions = getDimensionFromProperties(props);
     Map<String, DimensionType> dimensionToType = new HashMap<>();
-    Map<String, Integer> dimensionToIndex = new HashMap<>();
     for (int i = 0; i < dimensions.size(); i ++) {
       DimensionSpec spec = dimensions.get(i);
       dimensionToType.put(spec.getName(), spec.getDimensionType());
-      dimensionToIndex.put(spec.getName(), i);
     }
 
-    // dimensions with topk or whitelist
-    String topkDimensionsStr = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_TOPK_DIMENSION_NAMES.toString(), null);
+    // dimensions with  whitelist
     String whitelistDimensionsStr = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), null);
-    List<String> topkWhitelistDimensions = new ArrayList<>();
-    if (StringUtils.isNotBlank(topkDimensionsStr)) {
-      topkWhitelistDimensions.addAll(Lists.newArrayList(topkDimensionsStr.split(FIELD_SEPARATOR)));
-    }
+    List<String> whitelistDimensions = new ArrayList<>();
     if (StringUtils.isNotBlank(whitelistDimensionsStr)) {
-      topkWhitelistDimensions.addAll(Lists.newArrayList(whitelistDimensionsStr.split(FIELD_SEPARATOR)));
+      dimensionToNonWhitelistValueMap = new HashMap<>();
+      whitelistDimensions.addAll(Lists.newArrayList(whitelistDimensionsStr.split(FIELD_SEPARATOR)));
     }
 
-    if (!topkWhitelistDimensions.isEmpty()) {
-      dimensionToOthersValueMap = new HashMap<>();
-      // fill others values from config if available, else put defaults
-      String otherValuesStr = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_DIMENSION_OTHER_VALUE.toString(), null);
-      if (StringUtils.isNotBlank(otherValuesStr) && otherValuesStr.split(FIELD_SEPARATOR).length == dimensions.size()) {
-        String[] othersValues = otherValuesStr.split(FIELD_SEPARATOR);
-        for (String dimension : topkWhitelistDimensions) {
-          String otherValue = othersValues[dimensionToIndex.get(dimension)];
-          dimensionToOthersValueMap.put(dimension, otherValue);
-        }
+    for (String whitelistDimension : whitelistDimensions) {
+      String nonWhitelistValue = getAndCheck(props,
+          ThirdEyeConfigProperties.THIRDEYE_NONWHITELIST_VALUE_DIMENSION.toString() + CONFIG_JOINER + whitelistDimension, null);
+      if (StringUtils.isNotBlank(nonWhitelistValue)) {
+        dimensionToNonWhitelistValueMap.put(whitelistDimension, nonWhitelistValue);
       } else {
-        for (String dimension : topkWhitelistDimensions) {
-          String otherValue = String.valueOf(dimensionToType.get(dimension).getDefaultOtherValue());
-          dimensionToOthersValueMap.put(dimension, otherValue);
-        }
+        dimensionToNonWhitelistValueMap.put(whitelistDimension, String.valueOf(dimensionToType.get(whitelistDimension).getDefaultOtherValue()));
       }
     }
-
-    return dimensionToOthersValueMap;
+    return dimensionToNonWhitelistValueMap;
   }
 
 

@@ -69,7 +69,7 @@ public class ThirdeyePinotSchemaUtils {
         fieldSpec = new DimensionFieldSpec();
         dimensionName = dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX;
         fieldSpec.setName(dimensionName);
-        fieldSpec.setDataType(DataType.valueOf(dimensionSpec.getDimensionType().toString()));
+        fieldSpec.setDataType(DataType.STRING);
         fieldSpec.setSingleValueField(true);
         schema.addField(fieldSpec);
       }

@@ -200,8 +200,8 @@ public class DerivedColumnTransformationTest {
       Assert.assertEquals("TopKTransformationJob did not add new column for topk column",
           datum.getSchema().getField("d2_topk") != null, true);
       Long d2 =  (Long) datum.get("d2");
-      Long d2_topk =  (Long) datum.get("d2_topk");
-      Assert.assertEquals("Incorrect topk column transformation", (d2_topk == 0l && d2 == 501l) || (d2_topk == 502l && d2 == 502l), true);
+      String d2_topk =  (String) datum.get("d2_topk");
+      Assert.assertEquals("Incorrect topk column transformation", (d2_topk.equals("other") && d2 == 501l) || (d2_topk.equals("502") && d2 == 502l), true);
     }
   }
 
@@ -220,7 +220,7 @@ public class DerivedColumnTransformationTest {
     private DerivedColumnTransformationPhaseConfig config;
     private List<String> dimensionsNames;
     private List<DimensionType> dimensionTypes;
-    private Map<String, String> otherValues;
+    private Map<String, String> nonWhitelistValueMap;
     private List<String> metricNames;
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
@@ -236,7 +236,7 @@ public class DerivedColumnTransformationTest {
       config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
       dimensionsNames = config.getDimensionNames();
       dimensionTypes = config.getDimensionTypes();
-      otherValues = config.getOtherValues();
+      nonWhitelistValueMap = config.getNonWhitelistValue();
       metricNames = config.getMetricNames();
       timeColumnName = config.getTimeColumnName();
       whitelist = config.getWhitelist();
@@ -279,7 +279,7 @@ public class DerivedColumnTransformationTest {
           if (CollectionUtils.isNotEmpty(whitelistDimensions)) {
             // whitelist config exists for this dimension but value not present in whitelist
             if (!whitelistDimensions.contains(dimensionValueStr)) {
-              whitelistDimensionValue = dimensionType.getValueFromString(otherValues.get(dimensionName));
+              whitelistDimensionValue = dimensionType.getValueFromString(nonWhitelistValueMap.get(dimensionName));
             }
           }
         }
@@ -295,9 +295,9 @@ public class DerivedColumnTransformationTest {
             // topk config exists for this dimension, but value not present in topk
             if (!topKDimensionValues.contains(dimensionValueStr) &&
                 (whitelist == null || whitelist.get(dimensionName) == null || !whitelist.get(dimensionName).contains(dimensionValueStr))) {
-              topkDimensionValue = dimensionType.getValueFromString(otherValues.get(dimensionName));
+              topkDimensionValue = ThirdEyeConstants.OTHER;
             }
-            outputRecord.put(topkDimensionName, topkDimensionValue);
+            outputRecord.put(topkDimensionName, String.valueOf(topkDimensionValue));
           }
         }
       }

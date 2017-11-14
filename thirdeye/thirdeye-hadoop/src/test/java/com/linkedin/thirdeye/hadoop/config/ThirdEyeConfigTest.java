@@ -160,21 +160,20 @@ public class ThirdEyeConfigTest {
     boolean failed = false;
     TopkWhitelistSpec topKWhitelistSpec = thirdeyeConfig.getTopKWhitelist();
     // others values
-    Map<String, String> otherValues = topKWhitelistSpec.getOtherValues();
-    Map<String, String> expectedOther = new HashMap<>();
-    expectedOther.put("d1", ThirdEyeConstants.OTHER);
-    expectedOther.put("d2","0");
-    expectedOther.put("d3", ThirdEyeConstants.OTHER);
-    Assert.assertEquals(otherValues, expectedOther);
-    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_OTHER_VALUE.toString(), "dummy,-1,dummy");
+    Map<String, String> nonWhitelistValueMap = topKWhitelistSpec.getNonWhitelistValue();
+    Map<String, String> expectedNonWhitelistMap = new HashMap<>();
+    expectedNonWhitelistMap.put("d1", "other");
+    expectedNonWhitelistMap.put("d2","0");
+    Assert.assertEquals(nonWhitelistValueMap, expectedNonWhitelistMap);
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_NONWHITELIST_VALUE_DIMENSION.toString() + ".d1", "dummy");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_NONWHITELIST_VALUE_DIMENSION.toString() + ".d2", "-1");
     config = ThirdEyeConfig.fromProperties(props);
     topKWhitelistSpec = config.getTopKWhitelist();
-    otherValues = topKWhitelistSpec.getOtherValues();
-    expectedOther = new HashMap<>();
-    expectedOther.put("d1", "dummy");
-    expectedOther.put("d2", "-1");
-    expectedOther.put("d3", "dummy");
-    Assert.assertEquals(otherValues, expectedOther);
+    nonWhitelistValueMap = topKWhitelistSpec.getNonWhitelistValue();
+    expectedNonWhitelistMap = new HashMap<>();
+    expectedNonWhitelistMap.put("d1", "dummy");
+    expectedNonWhitelistMap.put("d2", "-1");
+    Assert.assertEquals(nonWhitelistValueMap, expectedNonWhitelistMap);
 
     // thresholds
     Map<String, Double> threshold = topKWhitelistSpec.getThreshold();

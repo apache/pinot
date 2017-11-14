@@ -224,7 +224,7 @@ public class DerivedColumnNoTransformationTest {
     private String timeColumnName;
     private List<MetricType> metricTypes;
     private Map<String, List<String>> whitelist;
-    private Map<String, String> otherValues;
+    private Map<String, String> nonWhitelistValueMap;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -239,7 +239,7 @@ public class DerivedColumnNoTransformationTest {
       metricTypes = config.getMetricTypes();
       timeColumnName = config.getTimeColumnName();
       whitelist = config.getWhitelist();
-      otherValues = config.getOtherValues();
+      nonWhitelistValueMap = config.getNonWhitelistValue();
 
       outputSchema = new Schema.Parser().parse(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
 
@@ -279,7 +279,7 @@ public class DerivedColumnNoTransformationTest {
           if (CollectionUtils.isNotEmpty(whitelistDimensions)) {
             // whitelist config exists for this dimension but value not present in whitelist
             if (!whitelistDimensions.contains(dimensionValueStr)) {
-              whitelistDimensionValue = dimensionType.getValueFromString(otherValues.get(dimensionName));
+              whitelistDimensionValue = dimensionType.getValueFromString(nonWhitelistValueMap.get(dimensionName));
             }
           }
         }
@@ -295,7 +295,7 @@ public class DerivedColumnNoTransformationTest {
             // topk config exists for this dimension, but value not present in topk
             if (!topKDimensionValues.contains(dimensionValueStr) &&
                 (whitelist == null || whitelist.get(dimensionName) == null || !whitelist.get(dimensionName).contains(dimensionValueStr))) {
-              topkDimensionValue = dimensionType.getValueFromString(otherValues.get(dimensionName));
+              topkDimensionValue = ThirdEyeConstants.OTHER;
             }
             outputRecord.put(topkDimensionName, topkDimensionValue);
           }

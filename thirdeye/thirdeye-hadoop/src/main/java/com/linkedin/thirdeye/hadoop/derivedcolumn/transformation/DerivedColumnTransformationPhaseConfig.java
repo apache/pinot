@@ -38,7 +38,7 @@ public class DerivedColumnTransformationPhaseConfig {
   private List<MetricType> metricTypes;
   private String timeColumnName;
   private Map<String, List<String>> whitelist;
-  private Map<String, String> otherValues;
+  private Map<String, String> nonWhitelistValue;
 
 
   public DerivedColumnTransformationPhaseConfig() {
@@ -55,7 +55,7 @@ public class DerivedColumnTransformationPhaseConfig {
    */
   public DerivedColumnTransformationPhaseConfig(List<String> dimensionNames, List<DimensionType> dimensionTypes,
       List<String> metricNames, List<MetricType> metricTypes, String timeColumnName,
-      Map<String, List<String>> whitelist, Map<String, String> otherValues) {
+      Map<String, List<String>> whitelist, Map<String, String> nonWhitelistValue) {
     super();
     this.dimensionNames = dimensionNames;
     this.dimensionTypes = dimensionTypes;
@@ -63,7 +63,7 @@ public class DerivedColumnTransformationPhaseConfig {
     this.metricTypes = metricTypes;
     this.timeColumnName = timeColumnName;
     this.whitelist = whitelist;
-    this.otherValues = otherValues;
+    this.nonWhitelistValue = nonWhitelistValue;
   }
 
   public List<String> getDimensionNames() {
@@ -90,8 +90,8 @@ public class DerivedColumnTransformationPhaseConfig {
     return whitelist;
   }
 
-  public Map<String, String> getOtherValues() {
-    return otherValues;
+  public Map<String, String> getNonWhitelistValue() {
+    return nonWhitelistValue;
   }
 
   public static DerivedColumnTransformationPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
@@ -123,13 +123,13 @@ public class DerivedColumnTransformationPhaseConfig {
       whitelist.putAll(topKWhitelist.getWhitelist());
     }
 
-    Map<String, String> otherValues = new HashMap<>();
-    if (topKWhitelist != null && topKWhitelist.getOtherValues() != null) {
-      otherValues.putAll(topKWhitelist.getOtherValues());
+    Map<String, String> nonWhitelistValueMap = new HashMap<>();
+    if (topKWhitelist != null && topKWhitelist.getNonWhitelistValue() != null) {
+      nonWhitelistValueMap.putAll(topKWhitelist.getNonWhitelistValue());
     }
 
     return new DerivedColumnTransformationPhaseConfig(dimensionNames, dimensionTypes, metricNames, metricTypes,
-        timeColumnName, whitelist, otherValues);
+        timeColumnName, whitelist, nonWhitelistValueMap);
   }
 
 }

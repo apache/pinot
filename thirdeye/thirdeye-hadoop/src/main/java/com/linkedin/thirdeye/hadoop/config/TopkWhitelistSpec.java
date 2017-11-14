@@ -30,7 +30,7 @@ public class TopkWhitelistSpec {
   Map<String, Double> threshold;
   List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec;
   Map<String, List<String>> whitelist;
-  Map<String, String> otherValues;
+  Map<String, String> nonWhitelistValue;
 
   public TopkWhitelistSpec() {
 
@@ -60,11 +60,12 @@ public class TopkWhitelistSpec {
     this.whitelist = whitelist;
   }
 
-  public Map<String, String> getOtherValues() {
-    return otherValues;
+  public Map<String, String> getNonWhitelistValue() {
+    return nonWhitelistValue;
   }
 
-  public void setOtherValues(Map<String, String> otherValues) {
-    this.otherValues = otherValues;
+  public void setNonWhitelistValue(Map<String, String> nonWhitelistValue) {
+    this.nonWhitelistValue = nonWhitelistValue;
   }
+
 }

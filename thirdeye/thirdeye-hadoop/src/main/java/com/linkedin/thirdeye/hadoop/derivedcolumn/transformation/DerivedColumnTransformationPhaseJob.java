@@ -109,7 +109,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
     private Map<String, List<String>> whitelist;
-    private Map<String, String> otherValues;
+    private Map<String, String> nonWhitelistValueMap;
     private String timeColumnName;
 
     private AvroMultipleOutputs avroMultipleOutputs;
@@ -134,7 +134,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       metricTypes = config.getMetricTypes();
       timeColumnName = config.getTimeColumnName();
       whitelist = config.getWhitelist();
-      otherValues = config.getOtherValues();
+      nonWhitelistValueMap = config.getNonWhitelistValue();
 
       outputSchema = new Schema.Parser().parse(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
 
@@ -178,7 +178,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
           if (CollectionUtils.isNotEmpty(whitelistDimensions)) {
             // whitelist config exists for this dimension but value not present in whitelist
             if (!whitelistDimensions.contains(dimensionValueStr)) {
-              whitelistDimensionValue = dimensionType.getValueFromString(otherValues.get(dimensionName));
+              whitelistDimensionValue = dimensionType.getValueFromString(nonWhitelistValueMap.get(dimensionName));
             }
           }
         }
@@ -195,9 +195,9 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
             if (!topKDimensionValues.contains(dimensionValueStr) &&
                 (whitelist == null || whitelist.get(dimensionName) == null
                 || !whitelist.get(dimensionName).contains(dimensionValueStr))) {
-              topkDimensionValue = dimensionType.getValueFromString(otherValues.get(dimensionName));
+              topkDimensionValue = ThirdEyeConstants.OTHER;
             }
-            outputRecord.put(topkDimensionName, topkDimensionValue);
+            outputRecord.put(topkDimensionName, String.valueOf(topkDimensionValue));
           }
         }
       }
@@ -318,37 +318,25 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       switch (dimensionType) {
       case DOUBLE:
         fieldAssembler = baseFieldTypeBuilder.doubleType().noDefault();
-        if (topKTransformDimensionSet.contains(dimensionName)) {
-          fieldAssembler = fieldAssembler.name(dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().doubleType().noDefault();
-        }
         break;
       case FLOAT:
         fieldAssembler = baseFieldTypeBuilder.floatType().noDefault();
-        if (topKTransformDimensionSet.contains(dimensionName)) {
-          fieldAssembler = fieldAssembler.name(dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().floatType().noDefault();
-        }
         break;
       case INT:
       case SHORT:
         fieldAssembler = baseFieldTypeBuilder.intType().noDefault();
-        if (topKTransformDimensionSet.contains(dimensionName)) {
-          fieldAssembler = fieldAssembler.name(dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().intType().noDefault();
-        }
         break;
       case LONG:
         fieldAssembler = baseFieldTypeBuilder.longType().noDefault();
-        if (topKTransformDimensionSet.contains(dimensionName)) {
-          fieldAssembler = fieldAssembler.name(dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().longType().noDefault();
-        }
         break;
       case STRING:
         fieldAssembler = baseFieldTypeBuilder.stringType().noDefault();
-        if (topKTransformDimensionSet.contains(dimensionName)) {
-          fieldAssembler = fieldAssembler.name(dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
-        }
         break;
       default:
         throw new IllegalArgumentException("Unsupported dimensionType " + dimensionType);
+      }
+      if (topKTransformDimensionSet.contains(dimensionName)) {
+        fieldAssembler = fieldAssembler.name(dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
       }
     }
 

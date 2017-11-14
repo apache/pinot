@@ -31,12 +31,12 @@ public enum DimensionType {
     }
 
     @Override
-    public Object getDefaultOtherValue() {
+    public Object getDefaultNullvalue() {
       return ThirdEyeConstants.EMPTY_INT;
     }
 
     @Override
-    public Object getDefaultNullvalue() {
+    public Object getDefaultOtherValue() {
       return ThirdEyeConstants.EMPTY_INT;
     }
   },
@@ -47,12 +47,12 @@ public enum DimensionType {
     }
 
     @Override
-    public Object getDefaultOtherValue() {
+    public Object getDefaultNullvalue() {
       return ThirdEyeConstants.EMPTY_SHORT;
     }
 
     @Override
-    public Object getDefaultNullvalue() {
+    public Object getDefaultOtherValue() {
       return ThirdEyeConstants.EMPTY_SHORT;
     }
   },
@@ -63,12 +63,12 @@ public enum DimensionType {
     }
 
     @Override
-    public Object getDefaultOtherValue() {
+    public Object getDefaultNullvalue() {
       return ThirdEyeConstants.EMPTY_LONG;
     }
 
     @Override
-    public Object getDefaultNullvalue() {
+    public Object getDefaultOtherValue() {
       return ThirdEyeConstants.EMPTY_LONG;
     }
   },
@@ -79,12 +79,12 @@ public enum DimensionType {
     }
 
     @Override
-    public Object getDefaultOtherValue() {
+    public Object getDefaultNullvalue() {
       return ThirdEyeConstants.EMPTY_FLOAT;
     }
 
     @Override
-    public Object getDefaultNullvalue() {
+    public Object getDefaultOtherValue() {
       return ThirdEyeConstants.EMPTY_FLOAT;
     }
   },
@@ -95,12 +95,12 @@ public enum DimensionType {
     }
 
     @Override
-    public Object getDefaultOtherValue() {
+    public Object getDefaultNullvalue() {
       return ThirdEyeConstants.EMPTY_DOUBLE;
     }
 
     @Override
-    public Object getDefaultNullvalue() {
+    public Object getDefaultOtherValue() {
       return ThirdEyeConstants.EMPTY_DOUBLE;
     }
   },
@@ -111,13 +111,13 @@ public enum DimensionType {
     }
 
     @Override
-    public Object getDefaultOtherValue() {
-      return ThirdEyeConstants.OTHER;
+    public Object getDefaultNullvalue() {
+      return ThirdEyeConstants.EMPTY_STRING;
     }
 
     @Override
-    public Object getDefaultNullvalue() {
-      return ThirdEyeConstants.EMPTY_STRING;
+    public Object getDefaultOtherValue() {
+      return ThirdEyeConstants.OTHER;
     }
   };
 
@@ -127,6 +127,7 @@ public enum DimensionType {
   public abstract Object getDefaultNullvalue();
 
   public abstract Object getDefaultOtherValue();
+
 
   /**
    * Writes the dimension value to a data outputstream

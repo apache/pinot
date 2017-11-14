@@ -29,10 +29,6 @@ public enum ThirdEyeConfigProperties {
   /** Comma Separated dimension types */
   THIRDEYE_DIMENSION_TYPES("thirdeye.dimension.types"),
 
-  /** Comma Separated value, to be used as "other" for this dimension
-   * Relevant when topk/whitelisting is done, where we replace all non selected values with "other" */
-  THIRDEYE_DIMENSION_OTHER_VALUE("thirdeye.dimension.other.value"),
-
   /** Comma separated metric names */
   THIRDEYE_METRIC_NAMES("thirdeye.metric.names"),
 
@@ -90,7 +86,11 @@ public enum ThirdEyeConfigProperties {
 
   /** Use by appending dimension name at the end eg: thirdeye.whitelist.dimension.d1
    * Comma separated list of values to whitelist for given dimension */
-  THIRDEYE_WHITELIST_DIMENSION("thirdeye.whitelist.dimension");
+  THIRDEYE_WHITELIST_DIMENSION("thirdeye.whitelist.dimension"),
+
+  /** Use by appending dimension name at the end eg: thirdeye.nonwhitelist.value.dimension.d1
+   * Value to be used for values which don't belong to whitelist */
+  THIRDEYE_NONWHITELIST_VALUE_DIMENSION("thirdeye.nonwhitelist.value.dimension");
 
   String name;
 

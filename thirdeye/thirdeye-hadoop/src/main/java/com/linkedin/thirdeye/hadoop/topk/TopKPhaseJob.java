@@ -325,7 +325,7 @@ public class TopKPhaseJob extends Configured {
           double metricValue = aggMetricValues[i].doubleValue();
           double metricSum = metricSums[i].doubleValue();
           double metricThresholdPercentage = metricThresholds.get(metric);
-          if (metricValue > (metricSum * metricThresholdPercentage / 100)) {
+          if (metricValue >= (metricSum * metricThresholdPercentage / 100)) {
             isPassThreshold = true;
             thresholdPassCount.put(dimensionName, thresholdPassCount.get(dimensionName) + 1);
             break;

@@ -21,7 +21,7 @@
             "name": "d2_topk",
             "type": [
                 "null",
-                "long"
+                "string"
             ]
         },
         {
