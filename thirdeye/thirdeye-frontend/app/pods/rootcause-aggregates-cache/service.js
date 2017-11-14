@@ -80,11 +80,6 @@ export default Ember.Service.extend({
       return;
     }
 
-    if (_.isEmpty(incoming)) {
-      console.log('rootcauseAggregatesService: received empty result.');
-      return;
-    }
-
     const newPending = new Set([...pending].filter(urn => !incoming[urn]));
     const newAggregates = Object.assign({}, aggregates, incoming);
 
