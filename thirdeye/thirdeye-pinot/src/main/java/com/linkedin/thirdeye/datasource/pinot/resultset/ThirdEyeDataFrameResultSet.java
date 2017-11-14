@@ -78,7 +78,22 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
   public static ThirdEyeDataFrameResultSet fromPinotResultSet(ResultSet resultSet) {
     // Build the meta data of this result set
     List<String> groupKeyColumnNames = new ArrayList<>();
-    for (int groupKeyColumnIdx = 0; groupKeyColumnIdx < resultSet.getGroupKeyLength(); groupKeyColumnIdx++) {
+    int groupByColumnCount = 0;
+    try {
+      groupByColumnCount = resultSet.getGroupKeyLength();
+    } catch (Exception e) {
+      // Only happens when result set is GroupByResultSet type and contains empty result.
+      // In this case, we have to use brutal force to count the number of group by columns.
+      while (true) {
+        try {
+          resultSet.getGroupKeyColumnName(groupByColumnCount);
+          ++groupByColumnCount;
+        } catch (Exception breakSignal) {
+          break;
+        }
+      }
+    }
+    for (int groupKeyColumnIdx = 0; groupKeyColumnIdx < groupByColumnCount; groupKeyColumnIdx++) {
       groupKeyColumnNames.add(resultSet.getGroupKeyColumnName(groupKeyColumnIdx));
     }
     List<String> metricColumnNames = new ArrayList<>();
@@ -91,7 +106,6 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
     // Build the DataFrame
     DataFrame.Builder dfBuilder = DataFrame.builder(thirdEyeResultSetMetaData.getAllColumnNames());
     int rowCount = resultSet.getRowCount();
-    int groupByColumnCount = resultSet.getGroupKeyLength();
     int metricColumnCount = resultSet.getColumnCount();
     int totalColumnCount = groupByColumnCount + metricColumnCount;
     // Dump the values in ResultSet to the DataFrame

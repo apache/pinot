@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.datasource.pinot.resultset;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.ObjectSeries;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -64,7 +66,8 @@ public class ThirdEyeDataFrameResultSetTest {
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
   }
 
-  @Test public void testFromPinotSingleGroupByResultSet() {
+  @Test
+  public void testFromPinotSingleGroupByResultSet() {
     final String functionName = "sum_metric_name";
 
     List<String> groupByColumnNames = new ArrayList<>();
@@ -92,6 +95,31 @@ public class ThirdEyeDataFrameResultSetTest {
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
   }
 
+  @Test
+  public void testFromEmptyPinotSingleGroupByResultSet() {
+    final String functionName = "sum_metric_name";
+
+    List<String> groupByColumnNames = new ArrayList<>();
+    groupByColumnNames.add("country");
+    groupByColumnNames.add("pageName");
+
+    List<MockedSingleGroupByResultSet.GroupByRowResult> resultArray = new ArrayList<>();
+
+    ResultSet singleGroupByResultSet = new MockedSingleGroupByResultSet(groupByColumnNames, functionName, resultArray);
+    ThirdEyeDataFrameResultSet actualDataFrameResultSet =
+        ThirdEyeDataFrameResultSet.fromPinotResultSet(singleGroupByResultSet);
+
+    ThirdEyeResultSetMetaData metaData =
+        new ThirdEyeResultSetMetaData(groupByColumnNames, Collections.singletonList(functionName));
+    DataFrame dataFrame = new DataFrame();
+    dataFrame.addSeries("country", ObjectSeries.builder().build());
+    dataFrame.addSeries("pageName", ObjectSeries.builder().build());
+    dataFrame.addSeries(functionName, ObjectSeries.builder().build());
+    ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
+
+    Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
+  }
+
   private static class MockedSingleGroupByResultSet extends MockedAbstractResultSet {
     List<String> groupByColumnNames = Collections.emptyList();
     String functionName;
@@ -108,34 +136,48 @@ public class ThirdEyeDataFrameResultSetTest {
       this.resultArray = resultArray;
     }
 
-    @Override public int getRowCount() {
+    @Override
+    public int getRowCount() {
       return resultArray.size();
     }
 
-    @Override public int getColumnCount() {
+    @Override
+    public int getColumnCount() {
       return 1;
     }
 
-    @Override public String getColumnName(int i) {
+    @Override
+    public String getColumnName(int i) {
       return functionName;
     }
 
-    @Override public String getString(int rowIdx, int columnIdx) {
+    @Override
+    public String getString(int rowIdx, int columnIdx) {
       if (columnIdx != 0) {
         throw new IllegalArgumentException("Column index has to be 0 for single group by result.");
       }
       return resultArray.get(rowIdx).value;
     }
 
-    @Override public int getGroupKeyLength() {
-      return groupByColumnNames.size();
+    @Override
+    public int getGroupKeyLength() {
+      // This method mimics the behavior of GroupByResultSet in Pinot, which throw exceptions when the result array
+      // is empty.
+      try {
+        return resultArray.get(0).groupByColumnValues.size();
+      } catch (Exception e) {
+        throw new PinotClientException(
+            "For some reason, Pinot decides to throw exception when the result is empty.");
+      }
     }
 
-    @Override public String getGroupKeyColumnName(int i) {
+    @Override
+    public String getGroupKeyColumnName(int i) {
       return groupByColumnNames.get(i);
     }
 
-    @Override public String getGroupKeyString(int rowIdx, int columnIdx) {
+    @Override
+    public String getGroupKeyString(int rowIdx, int columnIdx) {
       return resultArray.get(rowIdx).groupByColumnValues.get(columnIdx);
     }
 
