@@ -1,10 +1,41 @@
-urns
-{{#each-in labels as |urn label|}}
-  |
-  {{input
-    type="checkbox"
-    checked=(set-has-not invisibleUrns urn)
-    click=(action "toggleVisibility" urn)}}
-  {{label}}
-  <a {{action "removeUrn" urn}}>[X]</a>
-{{/each-in}}
+<button {{action "visibleMetrics"}}>metrics</button> |
+<button {{action "visibleEvents"}}>events</button> |
+<button {{action "visibleAll"}}>all</button> |
+<button {{action "visibleNone"}}>none</button> |
+<button {{action "visibleInvert"}}>invert</button>
+
+{{#if hasMetrics}}
+  <h4>Metrics</h4>
+  <ol>
+    {{#each-in metrics as |urn label|}}
+      <li>
+        {{input
+          type="checkbox"
+          checked=(set-has-not invisibleUrns urn)
+          click=(action "toggleVisibility" urn)}}
+        {{label}}
+        <a {{action "removeUrn" urn}}>[X]</a>
+      </li>
+    {{/each-in}}
+  </ol>
+{{else}}
+  <h4>No metrics</h4>
+{{/if}}
+
+{{#if hasEvents}}
+  <h4>Events</h4>
+  <ol>
+    {{#each-in events as |urn label|}}
+      <li>
+        {{input
+          type="checkbox"
+          checked=(set-has-not invisibleUrns urn)
+          click=(action "toggleVisibility" urn)}}
+        {{label}}
+        <a {{action "removeUrn" urn}}>[X]</a>
+      </li>
+    {{/each-in}}
+  </ol>
+{{else}}
+  <h4>No events</h4>
+{{/if}}
