@@ -29,7 +29,7 @@ public class DimensionValueMetricPairTest {
 
     DimensionValueMetricPair d1 = new DimensionValueMetricPair("d1", 1);
     DimensionValueMetricPair d2 = new DimensionValueMetricPair("d2", 2);
-    DimensionValueMetricPair d3 = new DimensionValueMetricPair("d3", 3);
+    DimensionValueMetricPair d3 = new DimensionValueMetricPair(30, 3);
     DimensionValueMetricPair d4 = new DimensionValueMetricPair("d4", 4);
 
     testQueue.add(d1);
@@ -39,7 +39,7 @@ public class DimensionValueMetricPairTest {
 
     for (DimensionValueMetricPair pair : testQueue) {
       Assert.assertEquals(pair.getMetricValue().intValue() > 2, true,
-          "Incorrect comparator for DimensionValueMetricPair, queue must retain hight metric values");
+          "Incorrect comparator for DimensionValueMetricPair, queue must retain highest metric values");
     }
 
   }

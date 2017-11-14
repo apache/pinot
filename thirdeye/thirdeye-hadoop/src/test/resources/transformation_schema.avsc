@@ -13,7 +13,7 @@
             "name": "d2",
             "type": [
                 "null",
-                "string"
+                "long"
             ]
         },
         {

@@ -42,6 +42,7 @@ import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
@@ -157,6 +158,22 @@ public class ThirdeyeAvroUtils {
   }
 
   /**
+   * Constructs dimensionTypes property string from the dimension names with the help of the avro schema
+   * @param metricNamesProperty
+   * @param avroSchema
+   * @return
+   */
+  public static String getDimensionTypesProperty(String dimensionNamesProperty, Schema avroSchema) {
+    List<String> dimensionTypesFromSchema = new ArrayList<>();
+    List<String> dimensionNamesFromConfig = Lists.newArrayList(dimensionNamesProperty.split(ThirdEyeConstants.FIELD_SEPARATOR));
+    for (String dimensionName : dimensionNamesFromConfig) {
+      dimensionTypesFromSchema.add(ThirdeyeAvroUtils.getDataTypeForField(dimensionName, avroSchema));
+    }
+    return Joiner.on(ThirdEyeConstants.FIELD_SEPARATOR).join(dimensionTypesFromSchema);
+  }
+
+
+  /**
    * Constructs metricTypes property string from the metric names with the help of the avro schema
    * @param metricNamesProperty
    * @param avroSchema
@@ -191,10 +208,12 @@ public class ThirdeyeAvroUtils {
     return validatedMetricTypesProperty;
   }
 
-  public static String getDimensionFromRecord(GenericRecord record, String dimensionName) {
-    String dimensionValue = (String) record.get(dimensionName);
+  public static Object getDimensionFromRecord(GenericRecord record, String dimensionName) {
+    Object dimensionValue = record.get(dimensionName);
     if (dimensionValue == null) {
-      dimensionValue = ThirdEyeConstants.EMPTY_STRING;
+      String dataType = getDataTypeForField(dimensionName, record.getSchema());
+      DimensionType dimensionType = DimensionType.valueOf(dataType);
+      dimensionValue = dimensionType.getDefaultNullvalue();
     }
     return dimensionValue;
   }
@@ -210,23 +229,10 @@ public class ThirdeyeAvroUtils {
   public static Number getMetricFromRecord(GenericRecord record, String metricName, MetricType metricType) {
     Number metricValue = (Number) record.get(metricName);
     if (metricValue == null) {
-      switch (metricType) {
-      case DOUBLE:
-        metricValue = 0d;
-        break;
-      case FLOAT:
-        metricValue = 0f;
-        break;
-      case LONG:
-        metricValue = 0L;
-        break;
-      case INT:
-      case SHORT:
-      default:
-        metricValue = 0;
-      }
+      metricValue = metricType.getDefaultNullValue();
     }
     return metricValue;
   }
+
 
 }

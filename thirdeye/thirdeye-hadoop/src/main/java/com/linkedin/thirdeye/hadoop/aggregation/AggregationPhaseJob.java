@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.hadoop.ThirdEyeJobProperties;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
@@ -83,7 +84,8 @@ public class AggregationPhaseJob extends Configured {
 
     private ThirdEyeConfig thirdeyeConfig;
     private AggregationPhaseConfig config;
-    private List<String> dimensionsNames;
+    private List<String> dimensionNames;
+    private List<DimensionType> dimensionTypes;
     private List<String> metricNames;
     List<MetricType> metricTypes;
     private int numMetrics;
@@ -101,7 +103,8 @@ public class AggregationPhaseJob extends Configured {
 
       thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(AGG_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
       config = AggregationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
-      dimensionsNames = config.getDimensionNames();
+      dimensionNames = config.getDimensionNames();
+      dimensionTypes = config.getDimensionTypes();
       metricNames = config.getMetricNames();
       numMetrics = metricNames.size();
       metricTypes = config.getMetricTypes();
@@ -120,9 +123,9 @@ public class AggregationPhaseJob extends Configured {
       GenericRecord inputRecord = record.datum();
 
       // dimensions
-      List<String> dimensions = new ArrayList<>();
-      for (String dimension : dimensionsNames) {
-        String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
+      List<Object> dimensions = new ArrayList<>();
+      for (String dimension : dimensionNames) {
+        Object dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
         dimensions.add(dimensionValue);
       }
 
@@ -138,7 +141,7 @@ public class AggregationPhaseJob extends Configured {
       long inputTimeMillis = inputGranularity.toMillis(timeValue);
       long bucketTime = aggregateGranularity.convertToUnit(inputTimeMillis);
 
-      AggregationPhaseMapOutputKey keyWrapper = new AggregationPhaseMapOutputKey(bucketTime, dimensions);
+      AggregationPhaseMapOutputKey keyWrapper = new AggregationPhaseMapOutputKey(bucketTime, dimensions, dimensionTypes);
       byte[] keyBytes = keyWrapper.toBytes();
       keyWritable.set(keyBytes, 0, keyBytes.length);
 
@@ -163,6 +166,7 @@ public class AggregationPhaseJob extends Configured {
     private ThirdEyeConfig thirdeyeConfig;
     private AggregationPhaseConfig config;
     private List<String> dimensionsNames;
+    private List<DimensionType> dimensionTypes;
     private List<String> metricNames;
     List<MetricType> metricTypes;
     private int numMetrics;
@@ -178,6 +182,7 @@ public class AggregationPhaseJob extends Configured {
       thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(AGG_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
       config = AggregationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
       dimensionsNames = config.getDimensionNames();
+      dimensionTypes = config.getDimensionTypes();
       metricNames = config.getMetricNames();
       numMetrics = metricNames.size();
       metricTypes = config.getMetricTypes();
@@ -195,17 +200,17 @@ public class AggregationPhaseJob extends Configured {
       // output record
       GenericRecord outputRecord = new Record(avroSchema);
 
-      AggregationPhaseMapOutputKey keyWrapper = AggregationPhaseMapOutputKey.fromBytes(aggregationKey.getBytes());
+      AggregationPhaseMapOutputKey keyWrapper = AggregationPhaseMapOutputKey.fromBytes(aggregationKey.getBytes(), dimensionTypes);
 
       // time
       long timeValue = keyWrapper.getTime();
       outputRecord.put(time.getColumnName(), timeValue);
 
       // dimensions
-      List<String> dimensionValues = keyWrapper.getDimensions();
+      List<Object> dimensionValues = keyWrapper.getDimensionValues();
       for (int i = 0; i < dimensionsNames.size(); i++) {
         String dimensionName = dimensionsNames.get(i);
-        String dimensionValue = dimensionValues.get(i);
+        Object dimensionValue = dimensionValues.get(i);
         outputRecord.put(dimensionName, dimensionValue);
       }
 
@@ -273,6 +278,9 @@ public class AggregationPhaseJob extends Configured {
     job.getConfiguration().set(AGG_PHASE_AVRO_SCHEMA.toString(), avroSchema.toString());
 
     // ThirdEyeConfig
+    String dimensionTypesProperty = ThirdeyeAvroUtils.getDimensionTypesProperty(
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString()), avroSchema);
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString(), dimensionTypesProperty);
     String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty(
         props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()),
         props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString()), avroSchema);

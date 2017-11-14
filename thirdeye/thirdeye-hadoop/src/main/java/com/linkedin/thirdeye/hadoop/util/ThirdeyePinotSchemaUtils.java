@@ -61,9 +61,9 @@ public class ThirdeyePinotSchemaUtils {
       FieldSpec fieldSpec = new DimensionFieldSpec();
       String dimensionName = dimensionSpec.getName();
       fieldSpec.setName(dimensionName);
-      fieldSpec.setDataType(DataType.STRING);
+      fieldSpec.setDataType(DataType.valueOf(dimensionSpec.getDimensionType().toString()));
       fieldSpec.setSingleValueField(true);
-      schema.addField(dimensionName, fieldSpec);
+      schema.addField(fieldSpec);
 
       if (transformDimensions.contains(dimensionName)) {
         fieldSpec = new DimensionFieldSpec();
@@ -71,7 +71,7 @@ public class ThirdeyePinotSchemaUtils {
         fieldSpec.setName(dimensionName);
         fieldSpec.setDataType(DataType.STRING);
         fieldSpec.setSingleValueField(true);
-        schema.addField(dimensionName, fieldSpec);
+        schema.addField(fieldSpec);
       }
     }
     boolean countIncluded = false;
@@ -84,7 +84,7 @@ public class ThirdeyePinotSchemaUtils {
       fieldSpec.setName(metricName);
       fieldSpec.setDataType(DataType.valueOf(metricSpec.getType().toString()));
       fieldSpec.setSingleValueField(true);
-      schema.addField(metricName, fieldSpec);
+      schema.addField(fieldSpec);
     }
     if (!countIncluded) {
       FieldSpec fieldSpec = new MetricFieldSpec();
@@ -92,7 +92,7 @@ public class ThirdeyePinotSchemaUtils {
       fieldSpec.setName(metricName);
       fieldSpec.setDataType(DataType.LONG);
       fieldSpec.setDefaultNullValue(1);
-      schema.addField(metricName, fieldSpec);
+      schema.addField(fieldSpec);
     }
     TimeGranularitySpec incoming =
         new TimeGranularitySpec(DataType.LONG,
@@ -107,7 +107,7 @@ public class ThirdeyePinotSchemaUtils {
             thirdeyeConfig.getTime().getTimeFormat(),
             thirdeyeConfig.getTime().getColumnName());
 
-    schema.addField(thirdeyeConfig.getTime().getColumnName(), new TimeFieldSpec(incoming, outgoing));
+    schema.addField(new TimeFieldSpec(incoming, outgoing));
 
     schema.setSchemaName(thirdeyeConfig.getCollection());
 

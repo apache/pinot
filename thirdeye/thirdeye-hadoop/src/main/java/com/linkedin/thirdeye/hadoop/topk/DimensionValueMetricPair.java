@@ -23,18 +23,18 @@ package com.linkedin.thirdeye.hadoop.topk;
  */
 public class DimensionValueMetricPair implements Comparable<DimensionValueMetricPair>{
 
-  private String dimensionValue;
+  private Object dimensionValue;
   private Number metricValue;
 
-  public DimensionValueMetricPair(String dimensionValue, Number metricValue) {
+  public DimensionValueMetricPair(Object dimensionValue, Number metricValue) {
     this.dimensionValue = dimensionValue;
     this.metricValue = metricValue;
   }
 
-  public String getDimensionValue() {
+  public Object getDimensionValue() {
     return dimensionValue;
   }
-  public void setDimensionValue(String dimensionValue) {
+  public void setDimensionValue(Object dimensionValue) {
     this.dimensionValue = dimensionValue;
   }
   public Number getMetricValue() {

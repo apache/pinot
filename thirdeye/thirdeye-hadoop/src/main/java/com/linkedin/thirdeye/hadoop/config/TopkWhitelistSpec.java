@@ -20,15 +20,23 @@ import java.util.Map;
 
 /**
  * Config class to define topk and whitelist
- * @param threshold - dimension values which do not satisfy metric thresholds will be ignored
+ *
+ * @param threshold - dimension values which do not satisfy metric thresholds will be ignored.
+ * The metric total contributed by a dimension will be compared with the metric total across all the records.
+ *
  * @param topKDimensionToMetricsSpec - list of dimension and a map of metric to topk value for that dimension
- * @param whitelist - values to whitelist for given dimension
+ * Only top k values for the dimension will be picked, based on metric
+ *
+ * @param whitelist - values to whitelist for given dimension (dimension:whitelist values)
+ *
+ * @param non whitelist value - value to be used for a dimension value, which is not in whitelist
  */
 public class TopkWhitelistSpec {
 
   Map<String, Double> threshold;
   List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec;
-  Map<String, String> whitelist;
+  Map<String, List<String>> whitelist;
+  Map<String, String> nonWhitelistValue;
 
   public TopkWhitelistSpec() {
 
@@ -50,14 +58,20 @@ public class TopkWhitelistSpec {
     this.topKDimensionToMetricsSpec = topKDimensionToMetricsSpec;
   }
 
-  public Map<String, String> getWhitelist() {
+  public Map<String, List<String>> getWhitelist() {
     return whitelist;
   }
 
-  public void setWhitelist(Map<String, String> whitelist) {
+  public void setWhitelist(Map<String, List<String>> whitelist) {
     this.whitelist = whitelist;
   }
 
+  public Map<String, String> getNonWhitelistValue() {
+    return nonWhitelistValue;
+  }
 
+  public void setNonWhitelistValue(Map<String, String> nonWhitelistValue) {
+    this.nonWhitelistValue = nonWhitelistValue;
+  }
 
 }
