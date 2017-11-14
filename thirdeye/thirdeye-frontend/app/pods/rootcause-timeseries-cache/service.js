@@ -85,11 +85,6 @@ export default Ember.Service.extend({
       return;
     }
 
-    if (_.isEmpty(incoming)) {
-      console.log('rootcauseTimeseriesService: received empty result.');
-      return;
-    }
-
     const newPending = new Set([...pending].filter(urn => !incoming[urn]));
     const newTimeseries = Object.assign({}, timeseries, incoming);
 

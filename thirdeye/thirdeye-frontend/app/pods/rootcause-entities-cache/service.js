@@ -19,6 +19,7 @@ export default Ember.Service.extend({
     console.log('rootcauseEntitiesCache: request()', requestContext, urns);
     const { context } = this.getProperties('context');
     if (_.isEqual(context, requestContext)) {
+      console.log('rootcauseEntitiesCache: request: context is up-to-date. ignoring.');
       return;
     }
 
@@ -43,11 +44,6 @@ export default Ember.Service.extend({
     const { context } = this.getProperties('context');
     if (!_.isEqual(context, requestContext)) {
       console.log('rootcauseEntitiesCache: received stale result. ignoring.');
-      return;
-    }
-
-    if (_.isEmpty(incoming)) {
-      console.log('rootcauseEntitiesCache: received empty result.');
       return;
     }
 
