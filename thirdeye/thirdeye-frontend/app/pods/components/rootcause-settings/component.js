@@ -19,6 +19,54 @@
 import Ember from 'ember';
 import moment from 'moment';
 
+
+// TODO: move this to a utils file (DRYER)
+const _calculateBaselineRange = (range, compareMode) => {
+  const [
+    start,
+    end
+  ] = range;
+  const offset = {
+    WoW: 1,
+    Wo2W: 2,
+    Wo3W: 3,
+    Wo4W: 4
+  }[compareMode];
+
+  const baselineRangeStart = moment(start).subtract(offset, 'weeks').valueOf();
+  const baselineRangeEnd = moment(end).subtract(offset, 'weeks').valueOf();
+
+  return [baselineRangeStart, baselineRangeEnd];
+};
+
+// TODO: move this to a utils file (DRYER)
+const _urnsToFilter = (urns) => {
+  return Array.from(urns).reduce((hash, urn) => {
+    const [_te, type, ...filter] = urn.split(':');
+    if (type === 'dimension') {
+      const [key, value, _provided] = filter;
+      if (!hash[key]) {
+        hash[key] = [];
+      }
+      hash[key].push(value);
+    }
+    return hash;
+  }, {});
+};
+// TODO: move this to a utils file (DRYER)
+const _filterToUrn = (filters) => {
+  const urns = [];
+  const filterObject = JSON.parse(filters);
+  Object.keys(filterObject)
+    .forEach((key) => {
+      const filterUrns = filterObject[key]
+        .map(dimension => `thirdeye:dimension:${key}:${dimension}:provided`);
+      urns.push(...filterUrns);
+    });
+
+  return urns;
+};
+
 const { 
   setProperties,
   getProperties
@@ -117,8 +165,6 @@ export default Ember.Component.extend({
    */
   compareMode: 'WoW',
 
-  // compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
-
   /**
    * Predefined Custom Ranges for
    * the display region
@@ -139,7 +185,6 @@ export default Ember.Component.extend({
    * Selected filters
    * @type {String} - a JSON string
    */
-  selectedFilters: JSON.stringify({}),
   filters: JSON.stringify({}),
 
 
@@ -183,14 +228,23 @@ export default Ember.Component.extend({
       anomalyRange,
       baselineRange,
       analysisRange,
-      granularity
+      granularity,
+      compareMode
     } = this.get('context');
+    
+    const filterUrns = Array.from(urns).filter(urn => urn.includes(':dimension:'));
+    const otherUrns = Array.from(urns).filter(urn => !urn.includes(':dimension:'));
+    const filters = JSON.stringify(_urnsToFilter(filterUrns));
+
+
     this.setProperties({ 
-      urnString: [...urns].join(','),
+      otherUrns,
       anomalyRangeStart: anomalyRange[0], anomalyRangeEnd: anomalyRange[1],
       baselineRangeStart: baselineRange[0], baselineRangeEnd: baselineRange[1],
       analysisRangeStart: analysisRange[0], analysisRangeEnd: analysisRange[1],
-      granularity
+      granularity,
+      compareMode,
+      filters
     });
   },
 
@@ -226,59 +280,39 @@ export default Ember.Component.extend({
      * @return {undefined}
      */
     updateContext() {
-      const { urnString, anomalyRangeStart, anomalyRangeEnd, baselineRangeStart, baselineRangeEnd, analysisRangeStart, analysisRangeEnd, granularity } =
-        this.getProperties('urnString', 'anomalyRangeStart', 'anomalyRangeEnd', 'baselineRangeStart', 'baselineRangeEnd', 'analysisRangeStart', 'analysisRangeEnd', 'granularity');
+      const {
+        anomalyRangeStart,
+        anomalyRangeEnd,
+        analysisRangeStart,
+        analysisRangeEnd,
+        granularity,
+        filters,
+        compareMode,
+        otherUrns
+      } = this.getProperties(
+        'otherUrns',
+        'granularity',
+        'filters',
+        'anomalyRangeStart',
+        'anomalyRangeEnd',
+        'compareMode',
+        'analysisRangeStart',
+        'analysisRangeEnd');
       const onChange = this.get('onChange');
+
+      
       if (onChange != null) {
-        const urns = new Set(urnString.split(','));
+        const filterUrns = _filterToUrn(filters);
+        const urns = new Set([...otherUrns, ...filterUrns]);
         const anomalyRange = [parseInt(anomalyRangeStart), parseInt(anomalyRangeEnd)];
-        const baselineRange = [parseInt(baselineRangeStart), parseInt(baselineRangeEnd)];
         const analysisRange = [parseInt(analysisRangeStart), parseInt(analysisRangeEnd)];
-        const newContext = { urns, anomalyRange, baselineRange, analysisRange, granularity };
+        const [baselineRangeStart, baselineRangeEnd] = _calculateBaselineRange(anomalyRange, compareMode);
+        const baselineRange = [parseInt(baselineRangeStart), parseInt(baselineRangeEnd)];
+        const newContext = { urns, anomalyRange, baselineRange, analysisRange, granularity, compareMode };
         onChange(newContext);
       }
     },
-      // const {
-      //   urnString,
-      //   anomalyRangeStart,
-      //   anomalyRangeEnd,
-      //   baselineRangeStart,
-      //   baselineRangeEnd,
-      //   analysisRangeStart,
-      //   analysisRangeEnd,
-      //   granularity,
-      //   filters
-      // } = this.getProperties(
-      //   'urnString',
-      //   'granularity',
-      //   'filters',
-      //   'anomalyRangeStart',
-      //   'anomalyRangeEnd',
-      //   'baselineRangeStart',
-      //   'baselineRangeEnd',
-      //   'analysisRangeStart',
-      //   'analysisRangeEnd');
 
-    //   const onChange = this.get('onChange');
-    //   if (!onChange) return;
-
-    //   onChange(getProperties(
-    //     this,
-    //     [
-    //       'urnString',
-    //       'granularity',
-    //       'filters',
-    //       'compareMode',
-    //       'anomalyRangeStart',
-    //       'anomalyRangeEnd',
-    //       'baselineRangeStart',
-    //       'baselineRangeEnd',
-    //       'analysisRangeStart',
-    //       'analysisRangeEnd'
-    //     ]
-    //   ));
-    // },
-    
     /**
      * Sets the new anomaly region date in ms
      * @method setAnomalyDateRange
@@ -314,6 +348,7 @@ export default Ember.Component.extend({
       });
       this.send('updateContext');
     },
+  
 
     /**
      * Updates the compare mode

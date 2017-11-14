@@ -80,7 +80,7 @@ export default Ember.Controller.extend({
     function() {
       const model = get(this, 'model');
       const settingsOptions = ['granularityOptions', 'filterOptions', 'compareModeOptions'];
-      // debugger;
+
       return getProperties(model, settingsOptions);
     }
   ),

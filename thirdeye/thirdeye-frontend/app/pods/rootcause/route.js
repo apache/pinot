@@ -5,11 +5,11 @@ import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 
-const anomalyRange = [1509044400000, 1509422400000];
-const baselineRange = [1508439600000, 1508817600000];
-const analysisRange = [1508785200000, 1509422400000];
-const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:in:provided']);
-const granularity = '30_MINUTES';
+// const anomalyRange = [1509044400000, 1509422400000];
+// const baselineRange = [1508439600000, 1508817600000];
+// const analysisRange = [1508785200000, 1509422400000];
+// const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:in:provided']);
+// const granularity = '30_MINUTES';
 
 const queryParamsConfig = {
   refreshModel: false,
@@ -29,17 +29,19 @@ const isValid = (key, value) => {
       return ['MINUTES', 'HOURS', 'DAYS'].includes(value);
     case 'filters':
       return value && value.length;
+    case 'compareMode':
+      return ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'];
     default:
       return moment(+value).isValid();
   }
 };
 
 // TODO: move into utils
-const _calculateBaselineRange = (analysisRange, compareMode) => {
-  const {
-    analysisRangeStart,
-    analysisRangeEnd
-  } = analysisRange;
+const _calculateBaselineRange = (range, compareMode) => {
+  const [
+    start,
+    end
+  ] = range;
   const offset = {
     WoW: 1,
     Wo2W: 2,
@@ -47,27 +49,25 @@ const _calculateBaselineRange = (analysisRange, compareMode) => {
     Wo4W: 4
   }[compareMode];
 
-  const baselineRangeStart = moment(analysisRangeStart).subtract(offset, 'weeks').valueOf();
-  const baselineRangeEnd = moment(analysisRangeEnd).subtract(offset, 'weeks').valueOf();
+  const baselineRangeStart = moment(start).subtract(offset, 'weeks').valueOf();
+  const baselineRangeEnd = moment(end).subtract(offset, 'weeks').valueOf();
 
   return [ baselineRangeStart, baselineRangeEnd ];
 };
 
-
-// {"continent":["Europe","Africa","Asia"],"osName_topk":["net bsd","android"]}
+// TODO: move this to a utils file (DRYER)
 const _filterToUrn = (filters) => {
   const urns = [];
   const filterObject = JSON.parse(filters);
   Object.keys(filterObject)
     .forEach((key) => {
       const filterUrns = filterObject[key]
-        .map(dimension => `te:dim:${key}:${dimension}`);
+        .map(dimension => `thirdeye:dimension:${key}:${dimension}:provided`);
       urns.push(...filterUrns);
     });
 
   return urns;
 };
-
 
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
   queryParams: {
@@ -138,8 +138,17 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
     const analysisRange = [analysisRangeStart, analysisRangeEnd];
-    const baselineRange = _calculateBaselineRange(analysisRange, compareMode);
-    const urns = [`te:metric:${model.id}`, ..._filterToUrn(filters)];
+    const baselineRange = _calculateBaselineRange(anomalyRange, compareMode);
+    const urns = new Set([`thirdeye:metric:${model.id}`, ..._filterToUrn(filters)]);
+
+    const context = {
+      urns,
+      anomalyRange,
+      baselineRange,
+      analysisRange,
+      granularity,
+      compareMode
+    };
 
     controller.setProperties({
       selectedUrns: new Set([
@@ -149,8 +158,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
       filteredUrns: new Set(),
-      context: { urns, anomalyRange, baselineRange, analysisRange, granularity },
-      // context: { urns, anomalyRange, baselineRange, analysisRange, granularity },
+      context,
       ...model.queryParams
     });
   }
