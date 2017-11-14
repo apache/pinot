@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toBaselineUrn, hasPrefix } from '../../../helpers/utils';
+import { toBaselineUrn, filterPrefix, hasPrefix } from '../../../helpers/utils';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -23,6 +23,61 @@ export default Ember.Component.extend({
     }
   ),
 
+  sortedUrns: Ember.computed(
+    'entities',
+    'selectedUrns',
+    function () {
+      const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
+      return [...selectedUrns]
+        .filter(urn => entities[urn])
+        .map(urn => [entities[urn].label.split("::")[1], urn])
+        .sort()
+        .map(t => t[1]);
+    }
+  ),
+
+  metrics: Ember.computed(
+    'entities',
+    'sortedUrns',
+    function () {
+      const { entities, sortedUrns } = this.getProperties('entities', 'sortedUrns');
+      return filterPrefix(sortedUrns, 'thirdeye:metric:').reduce((agg, urn) => { agg[urn] = entities[urn].label.split("::")[1]; return agg; }, {});
+    }
+  ),
+
+  events: Ember.computed(
+    'entities',
+    'sortedUrns',
+    function () {
+      const { entities, sortedUrns } = this.getProperties('entities', 'sortedUrns');
+      return filterPrefix(sortedUrns, 'thirdeye:event:').reduce((agg, urn) => { agg[urn] = entities[urn].label; return agg; }, {});
+    }
+  ),
+
+  hasMetrics: Ember.computed(
+    'metrics',
+    function () {
+      return Object.keys(this.get('metrics')).length > 0;
+    }
+  ),
+
+  hasEvents: Ember.computed(
+    'events',
+    function () {
+      return Object.keys(this.get('events')).length > 0;
+    }
+  ),
+
+  _bulkSelect(visible, other) {
+    const { onVisibility } = this.getProperties('onVisibility');
+    const updates = {};
+    [...visible].forEach(urn => updates[urn] = true);
+    [...other].forEach(urn => updates[urn] = false);
+    if (onVisibility) {
+      onVisibility(updates);
+    }
+  },
+
   actions: {
     toggleVisibility(urn) {
       const { onVisibility, invisibleUrns } = this.getProperties('onVisibility', 'invisibleUrns');
@@ -35,7 +90,7 @@ export default Ember.Component.extend({
         onVisibility(updates);
       }
     },
-    
+
     removeUrn(urn) {
       const { onSelection } = this.getProperties('onSelection');
       if (onSelection) {
@@ -45,6 +100,37 @@ export default Ember.Component.extend({
         }
         onSelection(updates);
       }
+    },
+
+    visibleMetrics() {
+      const { selectedUrns } = this.getProperties('selectedUrns');
+      const visible = new Set(filterPrefix(selectedUrns, ['thirdeye:metric:', 'frontend:baseline:metric:']));
+      const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
+      this._bulkSelect(visible, other);
+    },
+
+    visibleEvents() {
+      const { selectedUrns } = this.getProperties('selectedUrns');
+      const visible = new Set(filterPrefix(selectedUrns, 'thirdeye:event:'));
+      const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
+      this._bulkSelect(visible, other);
+    },
+
+    visibleAll() {
+      const { selectedUrns } = this.getProperties('selectedUrns');
+      this._bulkSelect(selectedUrns, new Set());
+    },
+
+    visibleNone() {
+      const { selectedUrns } = this.getProperties('selectedUrns');
+      this._bulkSelect(new Set(), selectedUrns);
+    },
+
+    visibleInvert() {
+      const { selectedUrns, invisibleUrns } = this.getProperties('selectedUrns', 'invisibleUrns');
+      const visible = new Set(invisibleUrns);
+      const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
+      this._bulkSelect(visible, other);
     }
   }
 });

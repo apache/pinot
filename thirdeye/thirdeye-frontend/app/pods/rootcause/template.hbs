@@ -1,57 +1,51 @@
-<h3>This manipulates the controller state.</h3>
-<a {{action "addSelectedUrns" "thirdeye:metric:17606338"}}>add test metric</a> |
-<a {{action "removeSelectedUrns" "thirdeye:metric:17606338"}}>remove test metric</a> |
-<a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a>
+<p>testing | <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a></p>
 
-<h3>This is the settings bar.</h3>
 {{rootcause-settings
   context=context
   onChange=(action "settingsOnChange")
 }}
 
-<h3>This is the legend.</h3>
-{{rootcause-legend
-  entities=entities
-  selectedUrns=selectedUrns
-  invisibleUrns=invisibleUrns
-  onVisibility=(action "onVisibility")
-  onSelection=(action "onSelection")
-}}
-
-<h3>This is the loading indicator.</h3>
-type
+<p>loading
 {{#if isLoadingEntities}}
   | ENTITIES
 {{/if}}
 {{#if isLoadingTimeseries}}
   | TIMESERIES
 {{/if}}
-
-<h3>This is the graph.</h3>
-{{rootcause-chart
-  entities=entities
-  selectedUrns=chartSelectedUrns
-  timeseries=timeseries
-  anomalyRange=context.anomalyRange
-  baselineRange=context.baselineRange
-  analysisRange=context.analysisRange
-  onHover=(action "chartOnHover")}}
-
-<h3>This is the hover section.</h3>
-urns
-{{#each hoverUrns as |urn|}}
-  | {{urn}}
-{{/each}}
-
-<h3>This is the filter bar.</h3>
-{{rootcause-filter
-  entities=eventFilterEntities
-  onSelect=(action "filterOnSelect")
-}}
+</p>
 
 <div class="row">
   <div class="col-xs-3">
-    <h3>This is the filter bar.</h3>
+    {{rootcause-legend
+      entities=entities
+      selectedUrns=selectedUrns
+      invisibleUrns=invisibleUrns
+      onVisibility=(action "onVisibility")
+      onSelection=(action "onSelection")
+    }}
+  </div>
+  <div class="col-xs-8">
+    {{rootcause-chart
+      entities=entities
+      selectedUrns=chartSelectedUrns
+      timeseries=timeseries
+      anomalyRange=context.anomalyRange
+      baselineRange=context.baselineRange
+      analysisRange=context.analysisRange
+      onHover=(action "chartOnHover")
+    }}
+  </div>
+</div>
+
+<p>hovering
+  {{#each hoverUrns as |urn|}}
+    | {{urn}}
+  {{/each}}
+</p>
+
+<h3>Events</h3>
+<div class="row">
+  <div class="col-xs-3">
     {{filter-bar
       config=config
       activeTab=selectedTab
@@ -59,7 +53,6 @@ urns
       onSelect=(action "filterOnSelect")}}
   </div>
   <div class="col-xs-8">
-    <h3>This is the table.</h3>
     {{rootcause-table
       entities=eventTableEntities
       columns=eventTableColumns
@@ -69,7 +62,7 @@ urns
   </div>
 </div>
 
-<h3>This is the metric tab.</h3>
+<h3>Metrics</h3>
 {{rootcause-metrics
   entities=entities
   aggregates=aggregates
@@ -77,7 +70,7 @@ urns
   onSelection=(action "onSelection")
 }}
 
-<h3>This is the heatmap.</h3>
+<h3>Dimensions</h3>
 {{rootcause-heatmap
   breakdowns=breakdowns
   currentUrns=heatmapCurrentUrns
