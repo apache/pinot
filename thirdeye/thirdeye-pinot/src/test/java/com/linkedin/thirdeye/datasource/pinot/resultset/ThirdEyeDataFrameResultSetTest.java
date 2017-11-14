@@ -5,6 +5,7 @@ import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.ObjectSeries;
+import com.linkedin.thirdeye.dataframe.StringSeries;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -112,8 +113,8 @@ public class ThirdEyeDataFrameResultSetTest {
     ThirdEyeResultSetMetaData metaData =
         new ThirdEyeResultSetMetaData(groupByColumnNames, Collections.singletonList(functionName));
     DataFrame dataFrame = new DataFrame();
-    dataFrame.addSeries("country", ObjectSeries.builder().build());
-    dataFrame.addSeries("pageName", ObjectSeries.builder().build());
+    dataFrame.addSeries("country", StringSeries.builder().build());
+    dataFrame.addSeries("pageName", StringSeries.builder().build());
     dataFrame.addSeries(functionName, ObjectSeries.builder().build());
     ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
 
