@@ -1,13 +1,13 @@
 package com.linkedin.thirdeye.common;
 
+/**
+ * This BaseFactory is responsible to generate an instance from a given class path.
+ * @param <T> the class of return instance
+ */
 public class BaseFactory<T> {
-  protected FactorySource factorySource;
-  public BaseFactory(FactorySource factorySource) {
-    this.factorySource = factorySource;
-  }
-  public <T> T getInstance(String classType)
+  public <T> T getInstance(String classPath)
       throws ClassNotFoundException, IllegalAccessException, InstantiationException{
-    T typeInstance = (T) Class.forName(factorySource.getPackagePath() + "." + classType).newInstance();
+    T typeInstance = (T) Class.forName(classPath).newInstance();
     return typeInstance;
   }
 }

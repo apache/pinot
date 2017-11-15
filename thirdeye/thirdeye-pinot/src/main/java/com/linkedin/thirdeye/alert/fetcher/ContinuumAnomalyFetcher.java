@@ -31,10 +31,10 @@ public class ContinuumAnomalyFetcher extends BaseAnomalyFetcher {
   }
 
   /**
-   * Fetch anomalies whose end time is after last notify time
+   * Fetch continuum anomalies whose end time is after last notify time; that is, the anomaly continues after last alert
    * @param current current DateTime
    * @param alertSnapShot the snapshot of the AnomalyFeed
-   * @return a liest of continuing merged anomalies
+   * @return a list of continuing merged anomalies
    */
 
   @Override

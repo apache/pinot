@@ -34,10 +34,10 @@ public class UnnotifiedAnomalyFetcher extends BaseAnomalyFetcher {
   }
 
   /**
-   * Fetch the list of un-notified anomalies
+   * Fetch the list of un-notified anomalies, whose create time is after last notify time
    * @param current the current DateTime
    * @param alertSnapShot the snapshot of the AnomalyFeed
-   * @return a liest of un-notified anomalies
+   * @return a list of un-notified anomalies
    */
   @Override
   public Collection<MergedAnomalyResultDTO> getAlertCandidates(DateTime current, AlertSnapshotDTO alertSnapShot) {
