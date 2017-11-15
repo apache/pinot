@@ -18,10 +18,18 @@ package com.linkedin.pinot.core.operator.dociditerators;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
-public final class EmptyDocIdIterator implements BlockDocIdIterator {
-  @Override
-  public int advance(int targetDocId) {
-    return Constants.EOF;
+
+/**
+ * Singleton class which extends {@link BlockDocIdIterator} that is empty, i.e. does not contain any document.
+ */
+public final class EmptyBlockDocIdIterator implements BlockDocIdIterator {
+  private EmptyBlockDocIdIterator() {
+  }
+
+  private static final EmptyBlockDocIdIterator INSTANCE = new EmptyBlockDocIdIterator();
+
+  public static EmptyBlockDocIdIterator getInstance() {
+    return INSTANCE;
   }
 
   @Override
@@ -30,7 +38,12 @@ public final class EmptyDocIdIterator implements BlockDocIdIterator {
   }
 
   @Override
+  public int advance(int targetDocId) {
+    return Constants.EOF;
+  }
+
+  @Override
   public int currentDocId() {
-    return -1;
+    return Constants.EOF;
   }
 }

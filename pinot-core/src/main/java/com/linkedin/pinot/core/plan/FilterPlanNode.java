@@ -146,7 +146,7 @@ public class FilterPlanNode implements PlanNode {
     }
     // If operator evaluates to false, then just return an empty operator.
     if (ret.isResultEmpty()) {
-      ret = new EmptyFilterOperator();
+      ret = EmptyFilterOperator.getInstance();
     }
     return ret;
   }
@@ -173,7 +173,7 @@ public class FilterPlanNode implements PlanNode {
     switch (filterType) {
       case AND:
         if (optimizeAlwaysFalse && numChildrenAlwaysFalse > 0) {
-          operator = new EmptyFilterOperator();
+          operator = EmptyFilterOperator.getInstance();
         } else {
           reorder(nonFalseChildren);
           operator = new AndOperator(nonFalseChildren);
@@ -182,7 +182,7 @@ public class FilterPlanNode implements PlanNode {
 
       case OR:
         if (optimizeAlwaysFalse && numChildrenAlwaysFalse == numChildren) {
-          operator = new EmptyFilterOperator();
+          operator = EmptyFilterOperator.getInstance();
         } else {
           reorder(nonFalseChildren);
           operator = new OrOperator(nonFalseChildren);
