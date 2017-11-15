@@ -40,6 +40,11 @@ export default Ember.Service.extend({
 
     this.setProperties({ context: _.cloneDeep(requestContext), aggregates: newAggregates, pending: newPending });
 
+    if (_.isEmpty(missing)) {
+      console.log('rootcauseAggregatesService: request: all metrics up-to-date. ignoring.');
+      return;
+    }
+    
     const filtersMap = this._makeFiltersMap(requestContext.urns);
 
     // metrics
@@ -52,11 +57,11 @@ export default Ember.Service.extend({
         const dimensionFilters = encodeURIComponent(JSON.stringify(this._makeDimensionFiltersMap(filtersMap, urn)));
 
         const url = `/aggregation/aggregate?metricIds=${metricId}&ranges=${requestContext.anomalyRange[0]}:${requestContext.anomalyRange[1]}&filters=${dimensionFilters}`;
-
+        const urnFunc = (mid, ds) => `frontend:metric:current:${mid}${ds}`;
         fetch(url)
           // .then(checkStatus)
           .then(res => res.json())
-          .then(res => this._extractAggregates(res, (mid) => `frontend:metric:current:${mid}` + dimensionString))
+          .then(res => this._extractAggregates(res, (mid) => urnFunc(mid, dimensionString)))
           .then(incoming => this._complete(requestContext, incoming));
       });
     }
@@ -71,10 +76,11 @@ export default Ember.Service.extend({
         const dimensionFilters = encodeURIComponent(JSON.stringify(this._makeDimensionFiltersMap(filtersMap, urn)));
 
         const url = `/aggregation/aggregate?metricIds=${metricId}&ranges=${requestContext.baselineRange[0]}:${requestContext.baselineRange[1]}&filters=${dimensionFilters}`;
+        const urnFunc = (mid, ds) => `frontend:metric:baseline:${mid}${ds}`;
         fetch(url)
            // .then(checkStatus)
           .then(res => res.json())
-          .then(res => this._extractAggregates(res, (mid) => `frontend:metric:baseline:${mid}` + dimensionString))
+          .then(res => this._extractAggregates(res, (mid) => urnFunc(mid, dimensionString)))
           .then(incoming => this._complete(requestContext, incoming));
       });
     }
@@ -86,7 +92,7 @@ export default Ember.Service.extend({
 
     // only accept latest result
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseAggregatesService: received stale result. ignoring.');
+      console.log('rootcauseAggregatesService: _complete: received stale result. ignoring.');
       return;
     }
 

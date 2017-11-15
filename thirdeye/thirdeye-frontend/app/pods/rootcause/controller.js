@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { makeIterable, filterObject, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { makeIterable, filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import moment from 'moment';
@@ -78,8 +78,10 @@ export default Ember.Controller.extend({
       timeseriesService.request(context, selectedUrns);
       breakdownsService.request(context, selectedUrns);
 
-      const allUrns = new Set(Object.keys(entities));
-      aggregatesService.request(context, allUrns);
+      const metricUrns = new Set(filterPrefix(Object.keys(entities), 'thirdeye:metric:'));
+      const currentUrns = [...metricUrns].map(toCurrentUrn);
+      const baselineUrns = [...metricUrns].map(toBaselineUrn);
+      aggregatesService.request(context, new Set(currentUrns.concat(baselineUrns)));
     }
   ),
 
@@ -174,6 +176,7 @@ export default Ember.Controller.extend({
       const urns = new Set(selectedUrns);
       [...invisibleUrns].forEach(urn => urns.delete(urn));
 
+      console.log('chartSelectedUrns: urns', urns);
       return urns;
     }
   ),

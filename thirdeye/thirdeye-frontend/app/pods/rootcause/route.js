@@ -155,7 +155,9 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       selectedUrns: new Set([
         'thirdeye:metric:194591', 'frontend:metric:current:194591', 'frontend:metric:baseline:194591',
         'thirdeye:metric:194592', 'frontend:metric:current:194592', 'frontend:metric:baseline:194592',
-        'frontend:dimension:metric:194591:browserName=chrome:browserName=firefox:browserName=safari',
+        'thirdeye:metric:194591:browserName=chrome:browserName=firefox:browserName=safari',
+        'frontend:metric:current:194591:browserName=chrome:browserName=firefox:browserName=safari',
+        'frontend:metric:baseline:194591:browserName=chrome:browserName=firefox:browserName=safari',
         'thirdeye:event:holiday:2712391']),
       invisibleUrns: new Set(),
       hoverUrns: new Set(),

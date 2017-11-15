@@ -90,7 +90,7 @@ export default Ember.Component.extend({
         this.getProperties('entities', 'timeseries', 'selectedUrns');
 
       return filterPrefix(selectedUrns, ['thirdeye:event:', 'frontend:metric:'])
-        .filter(urn => entities[urn])
+        .filter(urn => !hasPrefix(urn, 'thirdeye:event:') || entities[urn])
         .filter(urn => !hasPrefix(urn, 'frontend:metric:') || timeseries[urn]);
     }
   ),
@@ -103,14 +103,16 @@ export default Ember.Component.extend({
     'baselineRange',
     'timeseriesMode',
     function () {
-      const { timeseriesMode, displayableUrns } =
-        this.getProperties('timeseriesMode', 'displayableUrns');
+      const { timeseries, timeseriesMode, displayableUrns } =
+        this.getProperties('timeseries', 'timeseriesMode', 'displayableUrns');
 
       if (timeseriesMode == TIMESERIES_MODE_SPLIT) {
         return {};
       }
 
-      return this._makeSeries(displayableUrns);
+      console.log('rootcauseChart: series: timeseries', timeseries);
+      console.log('rootcauseChart: series: displayableUrns', displayableUrns);
+      return this._makeChartSeries(displayableUrns);
     }
   ),
 
@@ -134,7 +136,6 @@ export default Ember.Component.extend({
         return {};
       }
 
-      console.log('rootcauseChart: splitLabels: generating series');
       const splitSeries = {};
       const metricUrns = new Set(filterPrefix(displayableUrns, 'frontend:metric:'));
       const otherUrns = new Set([...displayableUrns].filter(urn => !metricUrns.has(urn)));
@@ -148,7 +149,7 @@ export default Ember.Component.extend({
 
         const splitUrns = new Set(splitMetricUrns.concat([...otherUrns]));
 
-        splitSeries[urn] = this._makeSeries(splitUrns);
+        splitSeries[urn] = this._makeChartSeries(splitUrns);
       });
 
       return splitSeries;
@@ -168,7 +169,6 @@ export default Ember.Component.extend({
         return {};
       }
 
-      console.log('rootcauseChart: splitLabels: generating urns');
       return filterPrefix(displayableUrns, 'frontend:metric:current:')
         .map(urn => [entities[urn].label.split("::")[1], urn])
         .sort()
@@ -189,7 +189,6 @@ export default Ember.Component.extend({
         return {};
       }
 
-      console.log('rootcauseChart: splitLabels: generating labels');
       return filterPrefix(displayableUrns, 'frontend:metric:current:')
         .reduce((agg, urn) => {
           agg[urn] = entities[urn].label.split("::")[1];
@@ -210,14 +209,12 @@ export default Ember.Component.extend({
   // helpers
   //
 
-  _makeSeries(urns) {
-    const { entities, anomalyRange, baselineRange } =
-      this.getProperties('entities', 'anomalyRange', 'baselineRange');
+  _makeChartSeries(urns) {
+    const { anomalyRange, baselineRange } = this.getProperties('anomalyRange', 'baselineRange');
 
     const series = {};
     [...urns].forEach(urn => {
-      const e = entities[urn];
-      series[this._entityToLabel(e)] = this._entityToSeries(e);
+      series[this._makeLabel(urn)] = this._makeSeries(urn);
     });
 
     series['anomalyRange'] = {
@@ -242,13 +239,11 @@ export default Ember.Component.extend({
     'timeseries',
     'displayableUrns',
     function () {
-      const { entities, displayableUrns } =
-        this.getProperties('entities', 'displayableUrns');
+      const { displayableUrns } = this.getProperties('displayableUrns');
 
       const bounds = {};
       [...displayableUrns].forEach(urn => {
-        const e = entities[urn];
-        const timestamps = this._entityToSeries(e).timestamps;
+        const timestamps = this._makeSeries(urn).timestamps;
         bounds[urn] = [timestamps[0], timestamps[timestamps.length-1]];
       });
 
@@ -302,38 +297,38 @@ export default Ember.Component.extend({
     }
   ),
 
-  _entityToLabel(entity) {
-    return entity.urn;
+  _makeLabel(urn) {
+    return urn;
   },
 
-  _entityToSeries(entity) {
-    const { timeseries, timeseriesMode, _eventValues } =
-      this.getProperties('timeseries', 'timeseriesMode', '_eventValues');
+  _makeSeries(urn) {
+    const { entities, timeseries, timeseriesMode, _eventValues } =
+      this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues');
 
-    if (hasPrefix(entity.urn, 'frontend:metric:current:')) {
+    if (hasPrefix(urn, 'frontend:metric:current:')) {
       const series = {
-        timestamps: timeseries[entity.urn].timestamps,
-        values: timeseries[entity.urn].values,
+        timestamps: timeseries[urn].timestamps,
+        values: timeseries[urn].values,
         type: 'line',
         axis: 'y'
       };
 
       return this._transformSeries(timeseriesMode, series);
 
-    } else if (hasPrefix(entity.urn, 'frontend:metric:baseline:')) {
+    } else if (hasPrefix(urn, 'frontend:metric:baseline:')) {
       const series = {
-        timestamps: timeseries[entity.urn].timestamps,
-        values: timeseries[entity.urn].values,
+        timestamps: timeseries[urn].timestamps,
+        values: timeseries[urn].values,
         type: 'scatter',
         axis: 'y'
       };
 
       return this._transformSeries(timeseriesMode, series);
 
-    } else if (hasPrefix(entity.urn, 'thirdeye:event:')) {
-      const val = _eventValues[entity.urn];
+    } else if (hasPrefix(urn, 'thirdeye:event:')) {
+      const val = _eventValues[urn];
       return {
-        timestamps: [entity.start, entity.end || entity.start],
+        timestamps: [entities[urn].start, entities[urn].end || entities[urn].start],
         values: [val, val],
         type: 'line',
         axis: 'y2'

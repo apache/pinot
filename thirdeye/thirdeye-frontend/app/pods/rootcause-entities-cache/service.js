@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, toCurrentUrn, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -43,7 +43,7 @@ export default Ember.Service.extend({
     // only accept latest result
     const { context } = this.getProperties('context');
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseEntitiesCache: received stale result. ignoring.');
+      console.log('rootcauseEntitiesCache: _complete: received stale result. ignoring.');
       return;
     }
 
@@ -58,11 +58,11 @@ export default Ember.Service.extend({
     Object.keys(entities).filter(urn => !staleUnselected.has(urn)).forEach(urn => remaining[urn] = entities[urn]);
     Object.keys(entities).filter(urn => staleSelected.has(urn)).forEach(urn => remaining[urn].score = -1);
 
-    // augment results
-    const augmenting = this._augment(incoming);
-
+    // // augment results
+    // const augmenting = this._augment(incoming);
+    //
     // merge
-    const newEntities = Object.assign({}, remaining, augmenting, incoming);
+    const newEntities = Object.assign({}, remaining, incoming);
 
     // update pending
     const newPending = new Set(pending);
@@ -83,24 +83,24 @@ export default Ember.Service.extend({
     }
   },
 
-  _augment(incoming) {
-    const entities = {};
-    filterPrefix(Object.keys(incoming), 'thirdeye:metric:').forEach(urn => {
-      const currentUrn = toCurrentUrn(urn);
-      entities[currentUrn] = {
-        urn: currentUrn,
-        label: incoming[urn].label
-      };
-
-      const baselineUrn = toBaselineUrn(urn);
-      entities[baselineUrn] = {
-        urn: baselineUrn,
-        label: incoming[urn].label + ' (baseline)'
-      };
-    });
-    return entities;
-  },
-
+  // _augment(incoming) {
+  //   const entities = {};
+  //   filterPrefix(Object.keys(incoming), 'thirdeye:metric:').forEach(urn => {
+  //     const currentUrn = toCurrentUrn(urn);
+  //     entities[currentUrn] = {
+  //       urn: currentUrn,
+  //       label: incoming[urn].label
+  //     };
+  //
+  //     const baselineUrn = toBaselineUrn(urn);
+  //     entities[baselineUrn] = {
+  //       urn: baselineUrn,
+  //       label: incoming[urn].label + ' (baseline)'
+  //     };
+  //   });
+  //   return entities;
+  // },
+  //
   _makeUrl(framework, context) {
     const urnString = [...context.urns].join(',');
     return `/rootcause/query?framework=${framework}` +

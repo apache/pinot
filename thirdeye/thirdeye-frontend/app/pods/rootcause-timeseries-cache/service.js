@@ -40,6 +40,11 @@ export default Ember.Service.extend({
 
     this.setProperties({ context: _.cloneDeep(requestContext), timeseries: newTimeseries, pending: newPending });
 
+    if (_.isEmpty(missing)) {
+      console.log('rootcauseTimeseriesService: request: all metrics up-to-date. ignoring.');
+      return;
+    }
+
     const filtersMap = this._makeFiltersMap(requestContext.urns);
 
     // metrics
@@ -51,11 +56,12 @@ export default Ember.Service.extend({
         const dimensionString = dimensionFragments ? ':' + dimensionFragments : '';
         const dimensionFilters = encodeURIComponent(JSON.stringify(this._makeDimensionFiltersMap(filtersMap, urn)));
 
+        const urnFunc = (mid, ds) => `frontend:metric:current:${mid}${ds}`;
         const url = `/timeseries/query?metricIds=${metricId}&ranges=${requestContext.analysisRange[0]}:${requestContext.analysisRange[1]}&filters=${dimensionFilters}&granularity=${requestContext.granularity}`;
         fetch(url)
           // .then(checkStatus)
           .then(res => res.json())
-          .then(json => this._extractTimeseries(json, (mid) => `frontend:metric:current:${mid}` + dimensionString))
+          .then(json => this._extractTimeseries(json, (mid) => urnFunc(mid, dimensionString)))
           .then(incoming => this._complete(requestContext, incoming));
       });
     }
@@ -73,11 +79,12 @@ export default Ember.Service.extend({
         const dimensionString = dimensionFragments ? ':' + dimensionFragments : '';
         const dimensionFilters = encodeURIComponent(JSON.stringify(this._makeDimensionFiltersMap(filtersMap, urn)));
 
+        const urnFunc = (mid, ds) => `frontend:metric:baseline:${mid}${ds}`;
         const url = `/timeseries/query?metricIds=${metricId}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&filters=${dimensionFilters}&granularity=${requestContext.granularity}`;
         fetch(url)
           // .then(checkStatus)
           .then(res => res.json())
-          .then(json => this._extractTimeseries(json, (mid) => `frontend:metric:baseline:${mid}` + dimensionString))
+          .then(json => this._extractTimeseries(json, (mid) => urnFunc(mid, dimensionString)))
           .then(incoming => this._convertToBaseline(incoming, baselineOffset))
           .then(incoming => this._complete(requestContext, incoming));
       });
@@ -90,7 +97,7 @@ export default Ember.Service.extend({
 
     // only accept latest result
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseTimeseriesService: received stale result. ignoring.');
+      console.log('rootcauseTimeseriesService: _complete: received stale result. ignoring.');
       return;
     }
 

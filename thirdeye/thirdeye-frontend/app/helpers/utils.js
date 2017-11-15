@@ -49,27 +49,46 @@ export function filterObject(obj, func) {
 }
 
 export function toCurrentUrn(urn) {
+  const parts = urn.split(':');
   if (hasPrefix(urn, 'thirdeye:metric:')) {
-    const mid = urn.split(':')[2];
-    return `frontend:metric:current:${mid}`;
+    const tail = makeUrnTail(parts, 3);
+    return `frontend:metric:current:${parts[2]}${tail}`;
   }
   if (hasPrefix(urn, 'frontend:metric:')) {
-    const mid = urn.split(':')[3];
-    return `frontend:metric:current:${mid}`;
+    const tail = makeUrnTail(parts, 4);
+    return `frontend:metric:current:${parts[3]}${tail}`;
   }
   throw new Error(`Requires metric urn, but found ${urn}`);
 }
 
 export function toBaselineUrn(urn) {
+  const parts = urn.split(':');
   if (hasPrefix(urn, 'thirdeye:metric:')) {
-    const mid = urn.split(':')[2];
-    return `frontend:metric:baseline:${mid}`;
+    const tail = makeUrnTail(parts, 3);
+    return `frontend:metric:baseline:${parts[2]}${tail}`;
   }
   if (hasPrefix(urn, 'frontend:metric:')) {
-    const mid = urn.split(':')[3];
-    return `frontend:metric:baseline:${mid}`;
+    const tail = makeUrnTail(parts, 4);
+    return `frontend:metric:baseline:${parts[3]}${tail}`;
   }
   throw new Error(`Requires metric urn, but found ${urn}`);
+}
+
+export function toMetricUrn(urn) {
+  const parts = urn.split(':');
+  if (hasPrefix(urn, 'thirdeye:metric:')) {
+    const tail = makeUrnTail(parts, 3);
+    return `thirdeye:metric:${parts[2]}${tail}`;
+  }
+  if (hasPrefix(urn, 'frontend:metric:')) {
+    const tail = makeUrnTail(parts, 4);
+    return `thirdeye:metric:${parts[3]}${tail}`;
+  }
+  throw new Error(`Requires metric urn, but found ${urn}`);
+}
+
+export function makeUrnTail(parts, baseLen) {
+  return parts.length > baseLen ? ':' + _.slice(parts, baseLen).join(':') : '';
 }
 
 export function hasPrefix(urn, prefixes) {
@@ -94,4 +113,4 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, hasPrefix, filterPrefix, findLabelMapping });
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, makeUrnTail, hasPrefix, filterPrefix, findLabelMapping });
