@@ -127,9 +127,12 @@ public class DataFrameUtils {
       values[i] = MetricExpression.evaluateExpression(me, context);
     }
 
-    df.addSeries(COL_VALUE, values);
+    // drop intermediate columns
+    for(MetricFunction f : functions) {
+      df.dropSeries(f.toString());
+    }
 
-    return df;
+    return df.addSeries(COL_VALUE, values);
   }
 
   /**
