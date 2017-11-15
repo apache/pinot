@@ -48,6 +48,14 @@ export default Ember.Component.extend({
     }
   },
 
+  subchart: { // on init only
+    show: true
+  },
+
+  zoom: { // on init only
+    enabled: true
+  },
+
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
@@ -146,6 +154,8 @@ export default Ember.Component.extend({
     config.regions = diffConfig.regions;
     config.tooltip = diffConfig.tooltip;
     config.legend = diffConfig.legend;
+    config.subchart = this.get('subchart');
+    config.zoom = this.get('zoom');
 
     console.log('timeseries-chart: didInsertElement(): config', config);
 
