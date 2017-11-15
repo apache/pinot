@@ -243,8 +243,9 @@ export default Ember.Component.extend({
     const selectedDimensions = this.get('selectedDimensions') || [];
     const events = this.get('holidayEvents') || [];
 
-    Ember.set(primaryMetric, 'isSelected', true);
-
+    if (primaryMetric.isSelected === undefined) {
+      Ember.set(primaryMetric, 'isSelected', true);
+    }
     const data = [
       primaryMetric,
       ...relatedMetric,

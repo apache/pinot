@@ -36,6 +36,7 @@ export default Ember.Controller.extend({
   isDuplicateEmail: false,
   showGraphLegend: false,
   metricGranularityOptions: [],
+  topDimensions: [],
   originalDimensions: [],
   bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
@@ -115,6 +116,18 @@ export default Ember.Controller.extend({
     Medium: 'MEDIUM',
     Sensitive: 'HIGH'
   },
+
+  /**
+   * All selected dimensions to be loaded into graph
+   * @returns {Array}
+   */
+  selectedDimensions: Ember.computed(
+    'topDimensions',
+    'topDimensions.@each.isSelected',
+    function() {
+      return this.get('topDimensions').filterBy('isSelected');
+    }
+  ),
 
   /**
    * Setting default sensitivity if selectedSensitivity is undefined
@@ -447,7 +460,8 @@ export default Ember.Controller.extend({
                 name: subDimension,
                 color: colors[colorIndex],
                 baselineValues: dimensionObj[subDimension].baselineValues,
-                currentValues: dimensionObj[subDimension].currentValues
+                currentValues: dimensionObj[subDimension].currentValues,
+                isSelected: true
               });
               colorIndex++;
             }
@@ -887,7 +901,7 @@ export default Ember.Controller.extend({
       this.clearAll();
       this.setProperties({
         isMetricDataLoading: true,
-        topDimensions: null,
+        topDimensions: [],
         selectedMetricOption: selectedObj
       });
       this.fetchMetricData(selectedObj.id)
@@ -1099,6 +1113,16 @@ export default Ember.Controller.extend({
      */
     onResetForm() {
       this.clearAll();
+    },
+
+    /**
+     * Enable reaction to dimension toggling in graph legend component
+     * @method onSelection
+     * @return {undefined}
+     */
+    onSelection(selectedDimension) {
+      const { isSelected } = selectedDimension;
+      Ember.set(selectedDimension, 'isSelected', !isSelected);
     },
 
     /**
