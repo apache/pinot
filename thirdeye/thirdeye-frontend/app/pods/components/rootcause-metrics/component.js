@@ -88,11 +88,10 @@ export default Ember.Component.extend({
     'entities',
     'aggregates',
     function () {
-      const { aggregates } = this.getProperties('aggregates');
-      return filterPrefix(Object.keys(aggregates), ['thirdeye:metric:'])
-        .filter(urn => aggregates[toBaselineUrn(urn)])
+      const { entities, aggregates } = this.getProperties('entities', 'aggregates');
+      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
         .reduce((agg, urn) => {
-          agg[urn] = aggregates[urn] / aggregates[toBaselineUrn(urn)] - 1;
+          agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toBaselineUrn(urn)] - 1;
           return agg;
         }, {});
     }

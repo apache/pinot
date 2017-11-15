@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, hasPrefix } from '../../../helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, stripTail, hasPrefix } from '../../../helpers/utils';
 import _ from 'lodash';
 
 export default Ember.Component.extend({
@@ -18,7 +18,7 @@ export default Ember.Component.extend({
     'selectedUrns',
     function () {
       const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
-      return filterPrefix(selectedUrns, 'thirdeye:').filter(urn => entities[urn] || entities[this._makePlainUrn(urn)]);
+      return filterPrefix(selectedUrns, 'thirdeye:').filter(urn => entities[urn] || entities[stripTail(urn)]);
     }
   ),
 
@@ -69,10 +69,9 @@ export default Ember.Component.extend({
 
   _makeMetricLabel(urn) {
     const { entities } = this.getProperties('entities');
-    const parts = urn.split(':');
 
-    const metricUrn = this._makePlainUrn(urn);
-    const metricName = entities[metricUrn].label.split("::")[1];
+    const metricName = entities[stripTail(urn)].label.split("::")[1];
+    const parts = urn.split(':');
 
     if (parts.length <= 3) {
       return metricName;
@@ -80,11 +79,6 @@ export default Ember.Component.extend({
 
     const tail = _.slice(parts, 3);
     return metricName + ' (' + tail.join(', ') + ')';
-  },
-
-  _makePlainUrn(urn) { // TODO fix this hack
-    const parts = urn.split(':');
-    return _.slice(parts, 0, 3).join(':');
   },
 
   actions: {

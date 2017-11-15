@@ -48,46 +48,43 @@ export function filterObject(obj, func) {
   return out;
 }
 
-export function toCurrentUrn(urn) {
+export function stripTail(urn) {
   const parts = urn.split(':');
-  if (hasPrefix(urn, 'thirdeye:metric:')) {
-    const tail = makeUrnTail(parts, 3);
-    return `frontend:metric:current:${parts[2]}${tail}`;
+  if (urn.startsWith('thirdeye:metric:')) {
+    return _.slice(parts, 0, 3).join(':');
   }
-  if (hasPrefix(urn, 'frontend:metric:')) {
-    const tail = makeUrnTail(parts, 4);
-    return `frontend:metric:current:${parts[3]}${tail}`;
+  if (urn.startsWith('frontend:metric:')) {
+    return _.slice(parts, 0, 4).join(':');
   }
-  throw new Error(`Requires metric urn, but found ${urn}`);
+  return urn;
+}
+
+export function toCurrentUrn(urn) {
+  return metricUrnHelper('frontend:metric:current:', urn);
 }
 
 export function toBaselineUrn(urn) {
-  const parts = urn.split(':');
-  if (hasPrefix(urn, 'thirdeye:metric:')) {
-    const tail = makeUrnTail(parts, 3);
-    return `frontend:metric:baseline:${parts[2]}${tail}`;
-  }
-  if (hasPrefix(urn, 'frontend:metric:')) {
-    const tail = makeUrnTail(parts, 4);
-    return `frontend:metric:baseline:${parts[3]}${tail}`;
-  }
-  throw new Error(`Requires metric urn, but found ${urn}`);
+  return metricUrnHelper('frontend:metric:baseline:', urn);
 }
 
 export function toMetricUrn(urn) {
+  return metricUrnHelper('thirdeye:metric:', urn);
+}
+
+function metricUrnHelper(prefix, urn) {
   const parts = urn.split(':');
   if (hasPrefix(urn, 'thirdeye:metric:')) {
     const tail = makeUrnTail(parts, 3);
-    return `thirdeye:metric:${parts[2]}${tail}`;
+    return `${prefix}${parts[2]}${tail}`;
   }
   if (hasPrefix(urn, 'frontend:metric:')) {
     const tail = makeUrnTail(parts, 4);
-    return `thirdeye:metric:${parts[3]}${tail}`;
+    return `${prefix}${parts[3]}${tail}`;
   }
   throw new Error(`Requires metric urn, but found ${urn}`);
 }
 
-export function makeUrnTail(parts, baseLen) {
+function makeUrnTail(parts, baseLen) {
   return parts.length > baseLen ? ':' + _.slice(parts, baseLen).join(':') : '';
 }
 
@@ -107,10 +104,10 @@ export function findLabelMapping(label, config) {
   let labelMapping = '';
   config.some(filterBlock => filterBlock.inputs.some(input => {
     if (input.label === label) {
-    labelMapping = input.labelMapping;
-  }
-}));
+      labelMapping = input.labelMapping;
+    }
+  }));
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, makeUrnTail, hasPrefix, filterPrefix, findLabelMapping });
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, hasPrefix, filterPrefix, findLabelMapping });
