@@ -18,14 +18,19 @@ package com.linkedin.pinot.tools.admin.command;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.startree.hll.HllConfig;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -39,47 +44,53 @@ import org.slf4j.LoggerFactory;
 public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
 
-  @Option(name = "-generatorConfigFile", required = false, metaVar = "<string>",
-      usage = "Config file for segment generator.")
+  @Option(name = "-generatorConfigFile", metaVar = "<string>", usage = "Config file for segment generator.")
   private String _generatorConfigFile;
 
-  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory containing the data.")
+  @Option(name = "-dataDir", metaVar = "<string>", usage = "Directory containing the data.")
   private String _dataDir;
 
-  @Option(name = "-format", required = false, metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
+  @Option(name = "-format", metaVar = "<AVRO/CSV/JSON>", usage = "Input data format.")
   private FileFormat _format;
 
-  @Option(name = "-outDir", required = false, metaVar = "<string>", usage = "Name of output directory.")
+  @Option(name = "-outDir", metaVar = "<string>", usage = "Name of output directory.")
   private String _outDir;
 
-  @Option(name = "-overwrite", required = false, usage = "Overwrite existing output directory.")
+  @Option(name = "-overwrite", usage = "Overwrite existing output directory.")
   private boolean _overwrite = false;
 
-  @Option(name = "-tableName", required = false, metaVar = "<string>", usage = "Name of the table.")
+  @Option(name = "-tableName", metaVar = "<string>", usage = "Name of the table.")
   private String _tableName;
 
-  @Option(name = "-segmentName", required = false, metaVar = "<string>", usage = "Name of the segment.")
+  @Option(name = "-segmentName", metaVar = "<string>", usage = "Name of the segment.")
   private String _segmentName;
 
-  @Option(name = "-schemaFile", required = false, metaVar = "<string>", usage = "File containing schema for data.")
+  @Option(name = "-schemaFile", metaVar = "<string>", usage = "File containing schema for data.")
   private String _schemaFile;
 
-  @Option(name = "-readerConfigFile", required = false, metaVar = "<string>", usage = "Config file for record reader.")
+  @Option(name = "-readerConfigFile", metaVar = "<string>", usage = "Config file for record reader.")
   private String _readerConfigFile;
 
-  @Option(name = "-enableStarTreeIndex", required = false, usage = "Enable Star Tree Index.")
+  @Option(name = "-enableStarTreeIndex", usage = "Enable Star Tree Index.")
   boolean _enableStarTreeIndex = false;
 
-  @Option(name = "-starTreeIndexSpecFile", required = false, metaVar = "<string>",
-      usage = "Config file for star tree index.")
+  @Option(name = "-starTreeIndexSpecFile", metaVar = "<string>", usage = "Config file for star tree index.")
   private String _starTreeIndexSpecFile;
 
-  @Option(name = "-numThreads", required = false, metaVar = "<int>",
-      usage = "Parallelism while generating segments, default is 1.")
+  @Option(name = "-hllSize", metaVar = "<5,6,7,8,9>", usage = "HLL size (log scale), default is 9.")
+  private int _hllSize = 9;
+
+  @Option(name = "-hllColumns", metaVar = "<string>", usage = "Columns to compute HLL.")
+  private String _hllColumns;
+
+  @Option(name = "-hllSuffix", metaVar = "<string>", usage = "Suffix for the derived HLL columns")
+  private String _hllSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
+
+  @Option(name = "-numThreads", metaVar = "<int>", usage = "Parallelism while generating segments, default is 1.")
   private int _numThreads = 1;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @SuppressWarnings("FieldCanBeLocal")
+  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   public CreateSegmentCommand setGeneratorConfigFile(String generatorConfigFile) {
@@ -137,6 +148,18 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public void setHllSize(int hllSize) {
+    _hllSize = hllSize;
+  }
+
+  public void setHllColumns(String hllColumns) {
+    _hllColumns = hllColumns;
+  }
+
+  public void setHllSuffix(String hllSuffix) {
+    _hllSuffix = hllSuffix;
+  }
+
   public CreateSegmentCommand setNumThreads(int numThreads) {
     _numThreads = numThreads;
     return this;
@@ -148,7 +171,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
         + _format + " -outDir " + _outDir + " -overwrite " + _overwrite + " -tableName " + _tableName + " -segmentName "
         + _segmentName + " -schemaFile " + _schemaFile + " -readerConfigFile " + _readerConfigFile
         + " -enableStarTreeIndex " + _enableStarTreeIndex + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile
-        + " -numThreads " + _numThreads);
+        + " -hllSize " + _hllSize + " -hllColumns " + _hllColumns + " -hllSuffix " + _hllSuffix + " -numThreads "
+        + _numThreads);
   }
 
   @Override
@@ -167,8 +191,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   @Override
-  public boolean execute()
-      throws Exception {
+  public boolean execute() throws Exception {
     LOGGER.info("Executing command: {}", toString());
 
     // Load generator config if exist.
@@ -265,6 +288,8 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
           "Data directory " + _dataDir + " does not contain " + _format.toString().toUpperCase() + " files.");
     }
 
+    LOGGER.info("Accepted files: {}", Arrays.toString(files));
+
     // Make sure output directory does not already exist, or can be overwritten.
     File outDir = new File(_outDir);
     if (outDir.exists()) {
@@ -309,6 +334,17 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
             _starTreeIndexSpecFile);
       }
       segmentGeneratorConfig.setStarTreeIndexSpecFile(_starTreeIndexSpecFile);
+    }
+    if (_hllColumns != null) {
+      String[] hllColumns = StringUtils.split(StringUtils.deleteWhitespace(_hllColumns), ',');
+      if (hllColumns.length != 0) {
+        LOGGER.info("Derive HLL fields on columns: {} with size: {} and suffix: {}", Arrays.toString(hllColumns),
+            _hllSize, _hllSuffix);
+        HllConfig hllConfig = new HllConfig(_hllSize);
+        hllConfig.setColumnsToDeriveHllFields(new HashSet<>(Arrays.asList(hllColumns)));
+        hllConfig.setHllDeriveColumnSuffix(_hllSuffix);
+        segmentGeneratorConfig.setHllConfig(hllConfig);
+      }
     }
 
     ExecutorService executor = Executors.newFixedThreadPool(_numThreads);

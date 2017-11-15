@@ -187,8 +187,8 @@ public class TableConfigTest {
 
     Assert.assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
     Assert.assertEquals(starTreeIndexSpec.getMaxLeafRecords(), new Integer(5));
-    Assert.assertEquals(starTreeIndexSpec.getskipMaterializationCardinalityThreshold(), 1);
-    Assert.assertEquals(starTreeIndexSpec.getskipMaterializationForDimensions(), dims);
+    Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
+    Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
     Assert.assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
   }
 

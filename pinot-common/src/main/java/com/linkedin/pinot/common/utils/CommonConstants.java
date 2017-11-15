@@ -198,7 +198,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_HELIX_MAX_DISCONNECT_THRESHOLD = "pinot.server.flapping.maxDisconnectThreshold";
     public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "1";
     public static final String DEFAULT_HELIX_FLAPPING_MAX_DISCONNECT_THRESHOLD = "100";
+  }
 
+  public static class Broker {
+    public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
+    public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
+    public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
+    public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
+    public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
   }
 
   public static class Server {

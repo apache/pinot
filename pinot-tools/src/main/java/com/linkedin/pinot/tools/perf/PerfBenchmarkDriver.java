@@ -58,6 +58,7 @@ import org.yaml.snakeyaml.Yaml;
 @SuppressWarnings("FieldCanBeLocal")
 public class PerfBenchmarkDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkDriver.class);
+  private static final long BROKER_TIMEOUT_MS = 60_000L;
 
   private final PerfBenchmarkDriverConf _conf;
   private final String _zkAddress;
@@ -208,6 +209,7 @@ public class PerfBenchmarkDriver {
     Configuration brokerConfiguration = new PropertiesConfiguration();
     String brokerInstanceName = "Broker_localhost_" + CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
     brokerConfiguration.setProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
+    brokerConfiguration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
     new HelixBrokerStarter(_clusterName, _zkAddress, brokerConfiguration);
   }

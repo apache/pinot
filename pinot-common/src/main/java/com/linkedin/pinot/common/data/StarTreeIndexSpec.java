@@ -15,9 +15,10 @@
  */
 package com.linkedin.pinot.common.data;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
@@ -27,15 +28,15 @@ public class StarTreeIndexSpec {
   public static final int DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD = 10000;
 
   /** The upper bound on the number of leaf records to be scanned for any query */
-  private Integer maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
+  private Integer _maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
 
   /** Dimension split order (if null or absent, descending w.r.t. dimension cardinality) */
-  private List<String> dimensionsSplitOrder;
+  private List<String> _dimensionsSplitOrder;
 
   /** Dimensions for which to exclude star nodes at split. */
-  private Set<String> skipStarNodeCreationForDimensions = Collections.emptySet();
+  private Set<String> _skipStarNodeCreationForDimensions;
   private Set<String> _skipMaterializationForDimensions;
-  private int skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
+  private int _skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
 
@@ -43,30 +44,30 @@ public class StarTreeIndexSpec {
   }
 
   public Integer getMaxLeafRecords() {
-    return maxLeafRecords;
+    return _maxLeafRecords;
   }
 
   public void setMaxLeafRecords(Integer maxLeafRecords) {
-    this.maxLeafRecords = maxLeafRecords;
+    this._maxLeafRecords = maxLeafRecords;
   }
 
   public List<String> getDimensionsSplitOrder() {
-    return dimensionsSplitOrder;
+    return _dimensionsSplitOrder;
   }
 
   public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
-    this.dimensionsSplitOrder = dimensionsSplitOrder;
-  }
-
-  public void setSkipStarNodeCreationForDimensions(Set<String> skipStarNodeCreationForDimensions) {
-    this.skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
+    _dimensionsSplitOrder = dimensionsSplitOrder;
   }
 
   public Set<String> getSkipStarNodeCreationForDimensions() {
-    return skipStarNodeCreationForDimensions;
+    return _skipStarNodeCreationForDimensions;
   }
 
-  public Set<String> getskipMaterializationForDimensions() {
+  public void setSkipStarNodeCreationForDimensions(Set<String> skipStarNodeCreationForDimensions) {
+    _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
+  }
+
+  public Set<String> getSkipMaterializationForDimensions() {
     return _skipMaterializationForDimensions;
   }
 
@@ -74,12 +75,12 @@ public class StarTreeIndexSpec {
     _skipMaterializationForDimensions = skipMaterializationForDimensions;
   }
 
-  public int getskipMaterializationCardinalityThreshold() {
-    return skipMaterializationCardinalityThreshold;
+  public int getSkipMaterializationCardinalityThreshold() {
+    return _skipMaterializationCardinalityThreshold;
   }
 
   public void setSkipMaterializationCardinalityThreshold(int skipMaterializationCardinalityThreshold) {
-    this.skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
+    _skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
   }
 
   public boolean isExcludeSkipMaterializationDimensionsForStarTreeIndex() {
@@ -89,5 +90,10 @@ public class StarTreeIndexSpec {
   public void setExcludeSkipMaterializationDimensionsForStarTreeIndex(
       boolean excludeSkipMaterializationDimensionsForStarTreeIndex) {
     _excludeSkipMaterializationDimensionsForStarTreeIndex = excludeSkipMaterializationDimensionsForStarTreeIndex;
+  }
+
+  @Override
+  public String toString() {
+    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 }

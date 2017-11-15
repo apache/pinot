@@ -218,9 +218,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setDimensionsSplitOrder(starTreeIndexSpec.getDimensionsSplitOrder());
     starTreeBuilderConfig.setSkipStarNodeCreationDimensions(
         starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
-    starTreeBuilderConfig.setSkipMaterializationDimensions(starTreeIndexSpec.getskipMaterializationForDimensions());
+    starTreeBuilderConfig.setSkipMaterializationDimensions(starTreeIndexSpec.getSkipMaterializationForDimensions());
     starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(
-        starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
+        starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setMaxNumLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
     starTreeBuilderConfig.setExcludeSkipMaterializationDimensionsForStarTreeIndex(
         starTreeIndexSpec.isExcludeSkipMaterializationDimensionsForStarTreeIndex());

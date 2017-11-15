@@ -141,9 +141,9 @@ public class IndexingConfigTest {
     Assert.assertEquals(actualStarTreeSpec.getDimensionsSplitOrder(), expectedDimensionSplitOrder);
     Assert.assertEquals(actualStarTreeSpec.getMaxLeafRecords(), expectedMaxLeafRecords);
 
-    Assert.assertEquals(actualStarTreeSpec.getskipMaterializationCardinalityThreshold(),
+    Assert.assertEquals(actualStarTreeSpec.getSkipMaterializationCardinalityThreshold(),
         expectedSkipMaterializationThreshold);
-    Assert.assertEquals(actualStarTreeSpec.getskipMaterializationForDimensions(),
+    Assert.assertEquals(actualStarTreeSpec.getSkipMaterializationForDimensions(),
         expectedSkipMaterializationDimensions);
     Assert.assertEquals(actualStarTreeSpec.getSkipStarNodeCreationForDimensions(),
         expectedSkipStarNodeCreationForDimension);

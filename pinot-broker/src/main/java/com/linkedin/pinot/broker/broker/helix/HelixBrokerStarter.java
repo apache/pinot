@@ -17,7 +17,6 @@ package com.linkedin.pinot.broker.broker.helix;
 
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
-import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -97,7 +96,7 @@ public class HelixBrokerStarter {
                         + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
-    _pinotHelixProperties.addProperty(BrokerRequestHandler.BROKER_ID_CONFIG_KEY, brokerId);
+    _pinotHelixProperties.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID, brokerId);
     setupHelixSystemProperties();
 
     // Remove all white-spaces from the list of zkServers (if any).
