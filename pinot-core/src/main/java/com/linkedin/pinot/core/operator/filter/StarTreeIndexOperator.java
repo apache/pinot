@@ -108,7 +108,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
     // If dictionary does not have any values that satisfy the predicate, set emptyResults to
     // true.
-    if (predicateEvaluator.alwaysFalse()) {
+    if (predicateEvaluator.isAlwaysFalse()) {
       emptyResult = true;
     }
 
@@ -313,20 +313,19 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
   private BaseFilterOperator createChildOperator(int startDocId, int endDocId, String column,
       PredicateEntry predicateEntry) {
-    DataSource dataSource = segment.getDataSource(column);
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-    BaseFilterOperator childOperator;
     Predicate predicate = predicateEntry.predicate;
+    DataSource dataSource = segment.getDataSource(column);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource);
+    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     if (dataSourceMetadata.hasInvertedIndex()) {
       if (dataSourceMetadata.isSorted()) {
-        childOperator = new SortedInvertedIndexBasedFilterOperator(predicate, dataSource, startDocId, endDocId);
+        return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
       } else {
-        childOperator = new BitmapBasedFilterOperator(predicate, dataSource, startDocId, endDocId);
+        return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
       }
     } else {
-      childOperator = new ScanBasedFilterOperator(predicate, dataSource, startDocId, endDocId);
+      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
     }
-    return childOperator;
   }
 
   private BaseFilterBlock createBaseFilterBlock(final BitmapDocIdIterator bitmapDocIdIterator) {
@@ -436,7 +435,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
       remainingPredicateColumns.remove(column);
       remainingGroupByColumns.remove(column);
 
-      int[] matchingDictionaryIds = predicateEntry.predicateEvaluator.getMatchingDictionaryIds();
+      int[] matchingDictionaryIds = predicateEntry.predicateEvaluator.getMatchingDictIds();
       for (int matchingDictionaryId : matchingDictionaryIds) {
         StarTreeNode child = node.getChildForDimensionValue(matchingDictionaryId);
         if (child != null) {

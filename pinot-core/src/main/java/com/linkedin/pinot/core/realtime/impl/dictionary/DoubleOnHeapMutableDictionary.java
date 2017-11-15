@@ -25,12 +25,6 @@ public class DoubleOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public int indexOf(Object rawValue) {
-    int index = insertionIndexOf(rawValue);
-    return (index >= 0) ? index : -1;
-  }
-
-  @Override
-  public int insertionIndexOf(Object rawValue) {
     if (rawValue instanceof String) {
       return getDictId(Double.valueOf((String) rawValue));
     } else {

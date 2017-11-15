@@ -40,7 +40,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     _evaluator = evaluator;
     _valueIterator = (BlockSingleValIterator) blockValSet.iterator();
 
-    if (evaluator.alwaysFalse()) {
+    if (evaluator.isAlwaysFalse()) {
       _currentDocId = Constants.EOF;
       setStartDocId(Constants.EOF);
       setEndDocId(Constants.EOF);
@@ -49,7 +49,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       setEndDocId(blockMetadata.getEndDocId());
     }
 
-    if (blockMetadata.hasDictionary()) {
+    if (evaluator.isDictionaryBased()) {
       _valueMatcher = new IntMatcher(); // Match using dictionary id's that are integers.
     } else {
       _valueMatcher = getValueMatcherForType(blockMetadata.getDataType());
@@ -136,7 +136,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   @Override
   public MutableRoaringBitmap applyAnd(MutableRoaringBitmap answer) {
     MutableRoaringBitmap result = new MutableRoaringBitmap();
-    if (_evaluator.alwaysFalse()) {
+    if (_evaluator.isAlwaysFalse()) {
       return result;
     }
     IntIterator intIterator = answer.getIntIterator();
@@ -201,7 +201,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
-      return _evaluator.apply(valueIterator.nextIntVal());
+      return _evaluator.applySV(valueIterator.nextIntVal());
     }
   }
 
@@ -209,7 +209,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
-      return _evaluator.apply(valueIterator.nextLongVal());
+      return _evaluator.applySV(valueIterator.nextLongVal());
     }
   }
 
@@ -217,7 +217,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
-      return _evaluator.apply(valueIterator.nextFloatVal());
+      return _evaluator.applySV(valueIterator.nextFloatVal());
     }
   }
 
@@ -225,7 +225,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
-      return _evaluator.apply(valueIterator.nextDoubleVal());
+      return _evaluator.applySV(valueIterator.nextDoubleVal());
     }
   }
 
@@ -233,7 +233,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
     @Override
     public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
-      return _evaluator.apply(valueIterator.nextStringVal());
+      return _evaluator.applySV(valueIterator.nextStringVal());
     }
   }
 }

@@ -16,11 +16,11 @@
 
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import java.io.IOException;
-import java.util.Arrays;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import java.io.IOException;
+import java.util.Arrays;
 import javax.annotation.Nonnull;
 
 
@@ -44,12 +44,6 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   @Override
   public int indexOf(Object rawValue) {
-    int index = insertionIndexOf(rawValue);
-    return (index >= 0) ? index : -1;
-  }
-
-  @Override
-  public int insertionIndexOf(Object rawValue) {
     if (rawValue instanceof String) {
       return getDictId(Long.valueOf((String) rawValue), null);
     } else {

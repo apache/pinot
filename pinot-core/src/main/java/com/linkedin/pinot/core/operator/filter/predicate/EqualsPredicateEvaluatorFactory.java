@@ -16,299 +16,176 @@
 package com.linkedin.pinot.core.operator.filter.predicate;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
- * Factory for equality predicate evaluators.
+ * Factory for EQ predicate evaluators.
  */
 public class EqualsPredicateEvaluatorFactory {
-
-  // Private constructor
   private EqualsPredicateEvaluatorFactory() {
-
   }
 
   /**
-   * Returns a new instance of dictionary based equality predicate evaluator.
-   * @param predicate Predicate to evaluate
+   * Create a new instance of dictionary based EQ predicate evaluator.
+   *
+   * @param eqPredicate EQ predicate to evaluate
    * @param dictionary Dictionary for the column
-   * @return Dictionary based equality predicate evaluator
+   * @return Dictionary based EQ predicate evaluator
    */
-  public static PredicateEvaluator newDictionaryBasedEvaluator(EqPredicate predicate, Dictionary dictionary) {
-    return new DictionaryBasedEqualsPredicateEvaluator(predicate, dictionary);
+  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(EqPredicate eqPredicate,
+      Dictionary dictionary) {
+    return new DictionaryBasedEqPredicateEvaluator(eqPredicate, dictionary);
   }
 
   /**
-   * Returns a new instance of no-dictionary based equality predicate evaluator.
-   * @param predicate Predicate to evaluate
+   * Create a new instance of raw value based EQ predicate evaluator.
+   *
+   * @param eqPredicate EQ predicate to evaluate
    * @param dataType Data type for the column
-   * @return No Dictionary based equality predicate evaluator
+   * @return Raw value based EQ predicate evaluator
    */
-  public static PredicateEvaluator newNoDictionaryBasedEvaluator(EqPredicate predicate, FieldSpec.DataType dataType) {
+  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate,
+      FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
-        return new IntNoDictionaryBasedEqualsEvaluator(predicate);
-
+        return new IntRawValueBasedEqPredicateEvaluator(eqPredicate);
       case LONG:
-        return new LongNoDictionaryBasedEqualsEvaluator(predicate);
-
+        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate);
       case FLOAT:
-        return new FloatNoDictionaryBasedEqualsEvaluator(predicate);
-
+        return new FloatRawValueBasedEqPredicateEvaluator(eqPredicate);
       case DOUBLE:
-        return new DoubleNoDictionaryBasedEqualsEvaluator(predicate);
-
+        return new DoubleRawValueBasedEqPredicateEvaluator(eqPredicate);
       case STRING:
-        return new StringNoDictionaryBasedEqualsEvaluator(predicate);
-
+        return new StringRawValueBasedEqPredicateEvaluator(eqPredicate);
       default:
-        throw new UnsupportedOperationException(
-            "No dictionary based Equals predicate evaluator not supported for datatype:" + dataType);
+        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
   }
 
-  /**
-   *
-   * No dictionary equality evaluator for int data type.
-   */
-  private static final class IntNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
-    int _expectedValue;
+  private static final class DictionaryBasedEqPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+    final int _matchingDictId;
+    final int[] _matchingDictIds;
 
-    public IntNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
-      _expectedValue = Integer.parseInt(predicate.getEqualsValue());
-    }
-
-    @Override
-    public boolean apply(int inputValue) {
-      return (_expectedValue == inputValue);
-    }
-
-    @Override
-    public boolean apply(int[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(int[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        int inputValue = inputValues[i];
-        if (_expectedValue == inputValue) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
-
-  /**
-   *
-   * No dictionary equality evaluator for long data type.
-   */
-  private static final class LongNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
-    long _expectedValue;
-
-    public LongNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
-      _expectedValue = Long.parseLong(predicate.getEqualsValue());
-    }
-
-    @Override
-    public boolean apply(long inputValue) {
-      return (_expectedValue == inputValue);
-    }
-
-    @Override
-    public boolean apply(long[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(long[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        long inputValue = inputValues[i];
-        if (_expectedValue == inputValue) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
-
-  /**
-   *
-   * No dictionary equality evaluator for float data type.
-   */
-  private static final class FloatNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
-    float _expectedValue;
-
-    public FloatNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
-      _expectedValue = Float.parseFloat(predicate.getEqualsValue());
-    }
-
-    @Override
-    public boolean apply(float inputValue) {
-      return (_expectedValue == inputValue);
-    }
-
-    @Override
-    public boolean apply(float[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(float[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        float inputValue = inputValues[i];
-        if (_expectedValue == inputValue) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
-
-  /**
-   *
-   * No dictionary equality evaluator for double data type.
-   */
-  private static final class DoubleNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
-    double _expectedValue;
-
-    public DoubleNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
-      _expectedValue = Double.parseDouble(predicate.getEqualsValue());
-    }
-
-    @Override
-    public boolean apply(double inputValue) {
-      return (_expectedValue == inputValue);
-    }
-
-    @Override
-    public boolean apply(double[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(double[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        double inputValue = inputValues[i];
-        if (_expectedValue == inputValue) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
-
-  /**
-   *
-   * No dictionary equality evaluator for string data type.
-   */
-  private static final class StringNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
-    String _expectedValue;
-
-    public StringNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
-      _expectedValue = predicate.getEqualsValue();
-    }
-
-    @Override
-    public boolean apply(String inputValue) {
-      return (_expectedValue.equals(inputValue));
-    }
-
-    @Override
-    public boolean apply(String[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(String[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        String inputValue = inputValues[i];
-        if (_expectedValue.equals(inputValue)) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
-
-  /**
-   *
-   * Dictionary Based Equals predicate Evaluator
-   *
-   */
-  private static final class DictionaryBasedEqualsPredicateEvaluator extends BasePredicateEvaluator {
-    private int[] _matchingIds;
-    private int _equalsMatchDictId;
-    private EqPredicate _predicate;
-
-    public DictionaryBasedEqualsPredicateEvaluator(EqPredicate predicate, Dictionary dictionary) {
-      _predicate = predicate;
-      _equalsMatchDictId = dictionary.indexOf(predicate.getEqualsValue());
-      if (_equalsMatchDictId >= 0) {
-        _matchingIds = new int[1];
-        _matchingIds[0] = _equalsMatchDictId;
+    DictionaryBasedEqPredicateEvaluator(EqPredicate eqPredicate, Dictionary dictionary) {
+      _matchingDictId = dictionary.indexOf(eqPredicate.getEqualsValue());
+      if (_matchingDictId >= 0) {
+        _matchingDictIds = new int[]{_matchingDictId};
       } else {
-        _matchingIds = new int[0];
+        _matchingDictIds = new int[0];
       }
     }
 
     @Override
-    public boolean apply(int dictionaryId) {
-      return (dictionaryId == _equalsMatchDictId);
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.EQ;
     }
 
     @Override
-    public boolean apply(int[] dictionaryIds) {
-      if (_equalsMatchDictId < 0) {
-        return false;
-      }
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int dictId : dictionaryIds) {
-        if (dictId == _equalsMatchDictId) {
-          return true;
-        }
-      }
-      return false;
+    public boolean isAlwaysFalse() {
+      return _matchingDictId < 0;
     }
 
     @Override
-    public int[] getMatchingDictionaryIds() {
-      return _matchingIds;
+    public boolean applySV(int dictId) {
+      return _matchingDictId == dictId;
     }
 
     @Override
-    public int[] getNonMatchingDictionaryIds() {
-      throw new UnsupportedOperationException(
-          "Returning non matching values is expensive for predicateType:" + _predicate.getType());
+    public int[] getMatchingDictIds() {
+      return _matchingDictIds;
+    }
+  }
+
+  private static final class IntRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final int _matchingValue;
+
+    IntRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
+      _matchingValue = Integer.parseInt(eqPredicate.getEqualsValue());
     }
 
     @Override
-    public boolean apply(int[] dictionaryIds, int length) {
-      for (int i = 0; i < length; i++) {
-        int dictId = dictionaryIds[i];
-        if (dictId == _equalsMatchDictId) {
-          return true;
-        }
-      }
-      return false;
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.EQ;
     }
 
     @Override
-    public boolean alwaysFalse() {
-      return _equalsMatchDictId < 0;
+    public boolean applySV(int value) {
+      return _matchingValue == value;
+    }
+  }
+
+  private static final class LongRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final long _matchingValue;
+
+    LongRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
+      _matchingValue = Long.parseLong(eqPredicate.getEqualsValue());
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.EQ;
+    }
+
+    @Override
+    public boolean applySV(long value) {
+      return (_matchingValue == value);
+    }
+  }
+
+  private static final class FloatRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final float _matchingValue;
+
+    FloatRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
+      _matchingValue = Float.parseFloat(eqPredicate.getEqualsValue());
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.EQ;
+    }
+
+    @Override
+    public boolean applySV(float value) {
+      return _matchingValue == value;
+    }
+  }
+
+  private static final class DoubleRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final double _matchingValue;
+
+    DoubleRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
+      _matchingValue = Double.parseDouble(eqPredicate.getEqualsValue());
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.EQ;
+    }
+
+    @Override
+    public boolean applySV(double value) {
+      return _matchingValue == value;
+    }
+  }
+
+  private static final class StringRawValueBasedEqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final String _matchingValue;
+
+    StringRawValueBasedEqPredicateEvaluator(EqPredicate eqPredicate) {
+      _matchingValue = eqPredicate.getEqualsValue();
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.EQ;
+    }
+
+    @Override
+    public boolean applySV(String value) {
+      return _matchingValue.equals(value);
     }
   }
 }

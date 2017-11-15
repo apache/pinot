@@ -16,11 +16,11 @@
 
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import javax.annotation.Nonnull;
 
 
@@ -104,13 +104,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public int indexOf(Object rawValue) {
-    int index = insertionIndexOf(rawValue);
-    return (index >= 0) ? index : -1;
-  }
-
-  @Override
-  public int insertionIndexOf(Object rawValue) {
-    byte[] serializedValue = ((String)rawValue).getBytes(UTF_8);
+    byte[] serializedValue = ((String) rawValue).getBytes(UTF_8);
     return getDictId(rawValue, serializedValue);
   }
 

@@ -20,7 +20,6 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
 import java.util.Map;
 
 
@@ -35,11 +34,6 @@ public class TransformBlock implements Block {
   public TransformBlock(ProjectionBlock projectionBlock, Map<String, BlockValSet> transformBlockValSetMap) {
     _projectionBlock = projectionBlock;
     _transformBlockValSetMap = transformBlockValSetMap;
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

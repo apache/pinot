@@ -90,7 +90,7 @@ public abstract class BaseStarTreeIndexTest {
    */
   private Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    Operator filterOperator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _segment, true);
+    Operator filterOperator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _segment);
     Assert.assertFalse(filterOperator instanceof StarTreeIndexOperator);
 
     return compute(filterOperator);
