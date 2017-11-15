@@ -5,11 +5,12 @@ import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 
-// const anomalyRange = [1509044400000, 1509422400000];
-// const baselineRange = [1508439600000, 1508817600000];
-// const analysisRange = [1508785200000, 1509422400000];
-// const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:in:provided']);
-// const granularity = '30_MINUTES';
+const anomalyRange = [1509044400000, 1509422400000];
+const baselineRange = [1508439600000, 1508817600000];
+const analysisRange = [1508785200000, 1509422400000];
+const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:in:provided']);
+const granularity = '30_MINUTES';
+const testContext = { urns, anomalyRange, baselineRange, analysisRange, granularity };
 
 const queryParamsConfig = {
   refreshModel: false,
@@ -17,13 +18,13 @@ const queryParamsConfig = {
 };
 
 /**
- * Helper function that checks if a query param 
+ * Helper function that checks if a query param
  * key/value pair is valid
  * @param {*} key   - query param key
  * @param {*} value - query param value
  * @return {Boolean}
  */
-const isValid = (key, value) => { 
+const isValid = (key, value) => {
   switch(key) {
     case 'granularity':
       return ['MINUTES', 'HOURS', 'DAYS'].includes(value);
@@ -101,7 +102,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       granularity: model.granularityOptions[0],
       anomalyRangeStart: moment().subtract(1, 'day').valueOf(),
       anomalyRangeEnd: model.maxTime || moment().valueOf(),
-      analysisRangeStart: moment().subtract(1, 'week').valueOf(), 
+      analysisRangeStart: moment().subtract(1, 'week').valueOf(),
       analysisRangeEnd: model.maxTime,
       compareMode: 'WoW'
     };
@@ -152,14 +153,16 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     controller.setProperties({
       selectedUrns: new Set([
-        'thirdeye:metric:194591', 'frontend:baseline:metric:194591',
-        'thirdeye:metric:194592', 'frontend:baseline:metric:194592',
+        'thirdeye:metric:194591', 'frontend:metric:current:194591', 'frontend:metric:baseline:194591',
+        'thirdeye:metric:194592', 'frontend:metric:current:194592', 'frontend:metric:baseline:194592',
+        'frontend:dimension:metric:194591:browserName=chrome:browserName=firefox:browserName=safari',
         'thirdeye:event:holiday:2712391']),
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
       filteredUrns: new Set(),
-      context,
-      ...model.queryParams
+      context: testContext
+      // context,
+      // ...model.queryParams
     });
   }
 });

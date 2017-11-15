@@ -48,12 +48,28 @@ export function filterObject(obj, func) {
   return out;
 }
 
-export function toBaselineUrn(urn) {
-  if (!urn.startsWith('thirdeye:metric:')) {
-    throw new Error(`Requires metric urn, but found ${urn}`);
+export function toCurrentUrn(urn) {
+  if (hasPrefix(urn, 'thirdeye:metric:')) {
+    const mid = urn.split(':')[2];
+    return `frontend:metric:current:${mid}`;
   }
-  const mid = urn.split(':')[2];
-  return `frontend:baseline:metric:${mid}`;
+  if (hasPrefix(urn, 'frontend:metric:')) {
+    const mid = urn.split(':')[3];
+    return `frontend:metric:current:${mid}`;
+  }
+  throw new Error(`Requires metric urn, but found ${urn}`);
+}
+
+export function toBaselineUrn(urn) {
+  if (hasPrefix(urn, 'thirdeye:metric:')) {
+    const mid = urn.split(':')[2];
+    return `frontend:metric:baseline:${mid}`;
+  }
+  if (hasPrefix(urn, 'frontend:metric:')) {
+    const mid = urn.split(':')[3];
+    return `frontend:metric:baseline:${mid}`;
+  }
+  throw new Error(`Requires metric urn, but found ${urn}`);
 }
 
 export function hasPrefix(urn, prefixes) {
@@ -78,4 +94,4 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toBaselineUrn, hasPrefix, filterPrefix, findLabelMapping });
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, hasPrefix, filterPrefix, findLabelMapping });

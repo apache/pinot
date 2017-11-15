@@ -211,24 +211,6 @@ export default Ember.Controller.extend({
     }
   ),
 
-  heatmapCurrentUrns: Ember.computed(
-    'selectedUrns',
-    function () {
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      return new Set(filterPrefix(selectedUrns, 'thirdeye:metric:'));
-    }
-  ),
-
-  heatmapCurrent2Baseline: Ember.computed(
-    'selectedUrns',
-    function () {
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      const baselineUrns = {};
-      filterPrefix(selectedUrns, 'thirdeye:metric:').forEach(urn => baselineUrns[urn] = toBaselineUrn(urn));
-      return baselineUrns;
-    }
-  ),
-
   isLoadingEntities: Ember.computed(
     'entitiesService.entities',
     function () {

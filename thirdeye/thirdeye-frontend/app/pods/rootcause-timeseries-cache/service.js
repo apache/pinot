@@ -18,7 +18,7 @@ export default Ember.Service.extend({
     console.log('rootcauseTimeseriesService: request()', requestContext, urns);
     const { context, timeseries, pending } = this.getProperties('context', 'timeseries', 'pending');
 
-    const metrics = [...urns].filter(urn => (urn.startsWith('thirdeye:metric:') || urn.startsWith('frontend:baseline:metric:')));
+    const metrics = [...urns].filter(urn => urn.startsWith('frontend:metric:'));
 
     // TODO eviction on cache size limit
 
@@ -41,19 +41,23 @@ export default Ember.Service.extend({
     this.setProperties({ context: _.cloneDeep(requestContext), timeseries: newTimeseries, pending: newPending });
 
     const filtersMap = this._makeFiltersMap(requestContext.urns);
-    const filtersString = encodeURIComponent(JSON.stringify(filtersMap));
 
     // metrics
-    const metricUrns = filterPrefix(missing, 'thirdeye:metric:');
+    const metricUrns = filterPrefix(missing, 'frontend:metric:current:');
     if (!_.isEmpty(metricUrns)) {
-      const metricIdString = metricUrns.map(urn => urn.split(":")[2]).join(',');
-      const metricUrl = `/timeseries/query?metricIds=${metricIdString}&ranges=${requestContext.analysisRange[0]}:${requestContext.analysisRange[1]}&filters=${filtersString}&granularity=${requestContext.granularity}`;
+      metricUrns.forEach(urn => {
+        const metricId = urn.split(":")[3];
+        const dimensionFragments = _.slice(urn.split(':'), 4).join(':');
+        const dimensionString = dimensionFragments ? ':' + dimensionFragments : '';
+        const dimensionFilters = encodeURIComponent(JSON.stringify(this._makeDimensionFiltersMap(filtersMap, urn)));
 
-      fetch(metricUrl)
-        // .then(checkStatus)
-        .then(res => res.json())
-        .then(this._extractTimeseries)
-        .then(incoming => this._complete(requestContext, incoming));
+        const url = `/timeseries/query?metricIds=${metricId}&ranges=${requestContext.analysisRange[0]}:${requestContext.analysisRange[1]}&filters=${dimensionFilters}&granularity=${requestContext.granularity}`;
+        fetch(url)
+          // .then(checkStatus)
+          .then(res => res.json())
+          .then(json => this._extractTimeseries(json, (mid) => `frontend:metric:current:${mid}` + dimensionString))
+          .then(incoming => this._complete(requestContext, incoming));
+      });
     }
 
     // baselines
@@ -61,17 +65,22 @@ export default Ember.Service.extend({
     const baselineAnalysisStart = requestContext.analysisRange[0] - baselineOffset;
     const baselineAnalysisEnd = requestContext.analysisRange[1] - baselineOffset;
 
-    const baselineUrns = filterPrefix(missing, 'frontend:baseline:metric:');
+    const baselineUrns = filterPrefix(missing, 'frontend:metric:baseline:');
     if (!_.isEmpty(baselineUrns)) {
-      const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
-      const baselineUrl = `/timeseries/query?metricIds=${baselineIdString}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&filters=${filtersString}&granularity=${requestContext.granularity}`;
+      baselineUrns.forEach(urn => {
+        const metricId = urn.split(":")[3];
+        const dimensionFragments = _.slice(urn.split(':'), 4).join(':');
+        const dimensionString = dimensionFragments ? ':' + dimensionFragments : '';
+        const dimensionFilters = encodeURIComponent(JSON.stringify(this._makeDimensionFiltersMap(filtersMap, urn)));
 
-      fetch(baselineUrl)
-        // .then(checkStatus)
-        .then(res => res.json())
-        .then(this._extractTimeseries)
-        .then(incoming => this._convertToBaseline(incoming, baselineOffset))
-        .then(incoming => this._complete(requestContext, incoming));
+        const url = `/timeseries/query?metricIds=${metricId}&ranges=${baselineAnalysisStart}:${baselineAnalysisEnd}&filters=${dimensionFilters}&granularity=${requestContext.granularity}`;
+        fetch(url)
+          // .then(checkStatus)
+          .then(res => res.json())
+          .then(json => this._extractTimeseries(json, (mid) => `frontend:metric:baseline:${mid}` + dimensionString))
+          .then(incoming => this._convertToBaseline(incoming, baselineOffset))
+          .then(incoming => this._complete(requestContext, incoming));
+      });
     }
   },
 
@@ -91,12 +100,12 @@ export default Ember.Service.extend({
     this.setProperties({ timeseries: newTimeseries, pending: newPending });
   },
 
-  _extractTimeseries(json) {
+  _extractTimeseries(json, urnFunc) {
     console.log('rootcauseTimeseriesService: _extractTimeseries()', json);
     const timeseries = {};
     Object.keys(json).forEach(range =>
       Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
-        const urn = `thirdeye:metric:${sid}`;
+        const urn = urnFunc(sid);
         const jrng = json[range];
         const jval = jrng[sid];
 
@@ -133,5 +142,22 @@ export default Ember.Service.extend({
   _makeFiltersMap(urns) {
     const filters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => { const t = urn.split(':'); return [t[2], t[3]]; });
     return filters.reduce((agg, t) => { if (!agg[t[0]]) { agg[t[0]] = [t[1]]; } else { agg[t[0]] = agg[t[0]].concat(t[1]); } return agg; }, {});
+  },
+
+  _makeDimensionFiltersMap(filtersMap, urn) {
+    const filters = _.cloneDeep(filtersMap);
+
+    // frontend:dimension:metric:12345:key=value:otherKey=otherValue
+    const encodedDimensions = _.slice(urn.split(':'), 4);
+    encodedDimensions.forEach(enc => {
+      const [key, value] = enc.split('=');
+      if (filters[key]) {
+        filters[key].push(value);
+      } else {
+        filters[key] = [value];
+      }
+    });
+
+    return filters;
   }
 });

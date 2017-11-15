@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toBaselineUrn, filterPrefix, hasPrefix } from '../../../helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, hasPrefix } from '../../../helpers/utils';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -85,6 +85,7 @@ export default Ember.Component.extend({
         const state = invisibleUrns.has(urn);
         const updates = { [urn]: state };
         if (hasPrefix(urn, 'thirdeye:metric:')) {
+          updates[toCurrentUrn(urn)] = state;
           updates[toBaselineUrn(urn)] = state;
         }
         onVisibility(updates);
@@ -96,6 +97,7 @@ export default Ember.Component.extend({
       if (onSelection) {
         const updates = { [urn]: false };
         if (hasPrefix(urn, 'thirdeye:metric:')) {
+          updates[toCurrentUrn(urn)] = false;
           updates[toBaselineUrn(urn)] = false;
         }
         onSelection(updates);
@@ -104,7 +106,7 @@ export default Ember.Component.extend({
 
     visibleMetrics() {
       const { selectedUrns } = this.getProperties('selectedUrns');
-      const visible = new Set(filterPrefix(selectedUrns, ['thirdeye:metric:', 'frontend:baseline:metric:']));
+      const visible = new Set(filterPrefix(selectedUrns, ['thirdeye:metric:', 'frontend:metric:']));
       const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
       this._bulkVisibility(visible, other);
     },

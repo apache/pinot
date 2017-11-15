@@ -1,13 +1,20 @@
 import Ember from 'ember';
+import { toCurrentUrn, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Component.extend({
   breakdowns: null, // {}
 
-  currentUrns: null, // Set
-
-  current2baseline: null, // {}
+  selectedUrns: null, // Set
 
   currentUrn: null, // ""
+
+  urns: Ember.computed(
+    'selectedUrns',
+    function () {
+      const { selectedUrns } = this.getProperties('selectedUrns');
+      return filterPrefix(selectedUrns, 'thirdeye:metric:');
+    }
+  ),
 
   current: Ember.computed(
     'breakdowns',
@@ -17,9 +24,13 @@ export default Ember.Component.extend({
       const { breakdowns, currentUrn, currentUrns } =
         this.getProperties('breakdowns', 'currentUrn', 'currentUrns');
 
-      const breakdown = breakdowns[currentUrn];
+      console.log('rootcauseHeatmap: current: breakdowns currentUrn', breakdowns, currentUrn);
+      if (!currentUrn) {
+        return {};
+      }
+      const breakdown = breakdowns[toCurrentUrn(currentUrn)];
 
-      if (!currentUrn || !breakdown || !currentUrns.has(currentUrn)) {
+      if (!breakdown) {
         return {};
       }
       return breakdown;
@@ -28,16 +39,18 @@ export default Ember.Component.extend({
 
   baseline: Ember.computed(
     'breakdowns',
-    'current2baseline',
     'currentUrn',
     function () {
-      const { breakdowns, current2baseline, currentUrn } =
-        this.getProperties('breakdowns', 'current2baseline', 'currentUrn');
+      const { breakdowns, currentUrn } =
+        this.getProperties('breakdowns', 'currentUrn');
 
-      const baselineUrn = current2baseline[currentUrn];
-      const breakdown = breakdowns[baselineUrn];
+      console.log('rootcauseHeatmap: baseline: breakdowns currentUrn', breakdowns, currentUrn);
+      if (!currentUrn) {
+        return {};
+      }
+      const breakdown = breakdowns[toBaselineUrn(currentUrn)];
 
-      if (!currentUrn || !baselineUrn || !breakdown) {
+      if (!breakdown) {
         return {};
       }
       return breakdown;

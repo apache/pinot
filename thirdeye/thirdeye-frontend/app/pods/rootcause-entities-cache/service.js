@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, toBaselineUrn } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, toCurrentUrn, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -73,23 +73,28 @@ export default Ember.Service.extend({
 
   _evictionCandidates(entities, framework) {
     if (framework == 'relatedEvents') {
-      return Object.keys(entities).filter(urn => entities[urn].type == 'event');
+      return filterPrefix(Object.keys(entities), 'thirdeye:event:');
     }
     if (framework == 'relatedDimensions') {
-      return Object.keys(entities).filter(urn => entities[urn].type == 'dimension');
+      return filterPrefix(Object.keys(entities), 'thirdeye:dimension:');
     }
     if (framework == 'relatedMetrics') {
-      return Object.keys(entities).filter(urn => ['metric', 'frontend:baseline:metric'].includes(entities[urn].type));
+      return filterPrefix(Object.keys(entities), ['thirdeye:metric:', 'frontend:metric:']);
     }
   },
 
   _augment(incoming) {
     const entities = {};
-    Object.keys(incoming).filter(urn => incoming[urn].type == 'metric').forEach(urn => {
+    filterPrefix(Object.keys(incoming), 'thirdeye:metric:').forEach(urn => {
+      const currentUrn = toCurrentUrn(urn);
+      entities[currentUrn] = {
+        urn: currentUrn,
+        label: incoming[urn].label
+      };
+
       const baselineUrn = toBaselineUrn(urn);
       entities[baselineUrn] = {
         urn: baselineUrn,
-        type: 'frontend:baseline:metric',
         label: incoming[urn].label + ' (baseline)'
       };
     });
