@@ -1,6 +1,13 @@
-metrics
-{{#each-in labels as |urn label|}}
-  | <a {{action "toggleSelection" urn}}>{{label}} ({{get changes urn}})</a>
-{{else}}
-  No Metrics.
-{{/each-in}}
+<button {{action "toggleSort" "metric"}}>metric</button> |
+<button {{action "toggleSort" "dataset"}}>dataset</button> |
+<button {{action "toggleSort" "change"}}>change</button>
+
+<div class="container">
+  {{#each urns as |urn|}}
+    <div class="col-xs-2 rootcause-metric">
+      <a {{action "toggleSelection" urn}}>{{get metrics urn}}<br/>({{get datasets urn}})<br/>{{get changesFormatted urn}}</a>
+    </div>
+  {{else}}
+    No Metrics.
+  {{/each}}
+</div>

@@ -45,36 +45,47 @@
   {{/each}}
 </p>
 
-<h3>Events</h3>
-<div class="row">
-  <div class="col-xs-3">
-    {{filter-bar
-      config=config
-      activeTab=selectedTab
-      entities=eventFilterEntities
-      onSelect=(action "filterOnSelect")}}
-  </div>
-  <div class="col-xs-8">
-    {{rootcause-table
-      entities=eventTableEntities
-      columns=eventTableColumns
-      selectedUrns=selectedUrns
-      onSelection=(action "onSelection")
-    }}
-  </div>
-</div>
+<button {{action (mut activeTab) "dimensions"}}>dimensions</button> |
+<button {{action (mut activeTab) "metrics"}}>metrics</button> |
+<button {{action (mut activeTab) "events"}}>events</button>
 
-<h3>Metrics</h3>
-{{rootcause-metrics
-  entities=entities
-  aggregates=aggregates
-  selectedUrns=selectedUrns
-  onSelection=(action "onSelection")
-}}
+{{#if (eq activeTab "dimensions")}}
+  <h3>Dimensions</h3>
+  {{rootcause-heatmap
+    breakdowns=breakdowns
+    currentUrns=heatmapCurrentUrns
+    current2baseline=heatmapCurrent2Baseline
+  }}
+{{/if}}
 
-<h3>Dimensions</h3>
-{{rootcause-heatmap
-  breakdowns=breakdowns
-  currentUrns=heatmapCurrentUrns
-  current2baseline=heatmapCurrent2Baseline
-}}
+{{#if (eq activeTab "metrics")}}
+  <h3>Metrics</h3>
+  {{rootcause-metrics
+    entities=entities
+    aggregates=aggregates
+    selectedUrns=selectedUrns
+    onSelection=(action "onSelection")
+  }}
+{{/if}}
+
+{{#if (eq activeTab "events")}}
+  <h3>Events</h3>
+  <div class="row">
+    <div class="col-xs-3">
+      {{filter-bar
+        config=config
+        activeTab=selectedTab
+        entities=eventFilterEntities
+        onSelect=(action "filterOnSelect")}}
+    </div>
+    <div class="col-xs-8">
+      {{rootcause-table
+        entities=eventTableEntities
+        columns=eventTableColumns
+        selectedUrns=selectedUrns
+        onSelection=(action "onSelection")
+      }}
+    </div>
+  </div>
+{{/if}}
+

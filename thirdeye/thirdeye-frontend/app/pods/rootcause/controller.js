@@ -11,6 +11,10 @@ const {
   computed
 } = Ember;
 
+const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
+const ROOTCAUSE_TAB_METRICS = "metrics";
+const ROOTCAUSE_TAB_EVENTS = "events";
+
 export default Ember.Controller.extend({
 
   /**
@@ -43,6 +47,13 @@ export default Ember.Controller.extend({
   context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
 
   config: config, // {}
+  
+  activeTab: null, // ""
+  
+  init() {
+    this._super(...arguments);
+    this.setProperties({ activeTab: ROOTCAUSE_TAB_DIMENSIONS });
+  },
 
   filteredUrns: null,
 
