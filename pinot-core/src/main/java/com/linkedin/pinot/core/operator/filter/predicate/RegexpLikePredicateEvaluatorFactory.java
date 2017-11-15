@@ -15,163 +15,106 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
-import java.util.regex.Pattern;
-
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
+import java.util.regex.Pattern;
 
+
+/**
+ * Factory for REGEXP_LIKE predicate evaluators.
+ */
 public class RegexpLikePredicateEvaluatorFactory {
-
   private RegexpLikePredicateEvaluatorFactory() {
-
   }
 
-  public static PredicateEvaluator newDictionaryBasedEvaluator(RegexpLikePredicate predicate, Dictionary dictionary) {
-    return new DictionaryBasedRegexPredicateEvaluator(predicate, dictionary);
+  /**
+   * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
+   *
+   * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
+   * @param dictionary Dictionary for the column
+   * @return Dictionary based REGEXP_LIKE predicate evaluator
+   */
+  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
+    return new DictionaryBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
   }
 
-  public static PredicateEvaluator newNoDictionaryBasedEvaluator(RegexpLikePredicate predicate) {
-    return new NoDictionaryBasedRegexPredicateEvaluator(predicate);
+  /**
+   * Create a new instance of raw value based REGEXP_LIKE predicate evaluator.
+   *
+   * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
+   * @param dataType Data type for the column
+   * @return Raw value based REGEXP_LIKE predicate evaluator
+   */
+  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(RegexpLikePredicate regexpLikePredicate,
+      FieldSpec.DataType dataType) {
+    Preconditions.checkArgument(dataType == FieldSpec.DataType.STRING, "Unsupported data type: " + dataType);
+    return new RawValueBasedRegexpLikePredicateEvaluator(regexpLikePredicate);
   }
 
-  private static class DictionaryBasedRegexPredicateEvaluator extends BasePredicateEvaluator {
-    private Dictionary dictionary;
-    private Pattern pattern;
+  private static final int PATTERN_FLAG = Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE;
 
-    public DictionaryBasedRegexPredicateEvaluator(RegexpLikePredicate predicate, Dictionary dictionary) {
-      this.dictionary = dictionary;
-      int flags = Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE;
-      pattern = Pattern.compile(predicate.getRegex(), flags);
+  private static final class DictionaryBasedRegexpLikePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+    final Pattern _pattern;
+    final Dictionary _dictionary;
+    int[] _matchingDictIds;
+
+    public DictionaryBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
+      _pattern = Pattern.compile(regexpLikePredicate.getRegex(), PATTERN_FLAG);
+      _dictionary = dictionary;
     }
 
     @Override
-    public boolean apply(int dictionaryId) {
-      String value = dictionary.getStringValue(dictionaryId);
-      return pattern.matcher(value).find();
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.REGEXP_LIKE;
     }
 
     @Override
-    public boolean apply(int[] dictionaryIds) {
+    public boolean isAlwaysFalse() {
+      return false;
+    }
 
-      for (int dictId : dictionaryIds) {
-        String value = dictionary.getStringValue(dictId);
-        if (pattern.matcher(value).find()) {
-          return true;
+    @Override
+    public boolean applySV(int dictId) {
+      return _pattern.matcher(_dictionary.getStringValue(dictId)).find();
+    }
+
+    @Override
+    public int[] getMatchingDictIds() {
+      if (_matchingDictIds == null) {
+        IntList matchingDictIds = new IntArrayList();
+        int dictionarySize = _dictionary.length();
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          if (applySV(dictId)) {
+            matchingDictIds.add(dictId);
+          }
         }
+        _matchingDictIds = matchingDictIds.toIntArray();
       }
-      return false;
+      return _matchingDictIds;
     }
-
-    @Override
-    public boolean apply(int[] dictionaryIds, int length) {
-      for (int i = 0; i < length; i++) {
-        int dictId = dictionaryIds[i];
-        String value = dictionary.getStringValue(dictId);
-        if (pattern.matcher(value).find()) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public boolean alwaysFalse() {
-      return false;
-    }
-
   }
 
-  private static class NoDictionaryBasedRegexPredicateEvaluator extends BasePredicateEvaluator {
+  private static final class RawValueBasedRegexpLikePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final Pattern _pattern;
 
-    private Pattern pattern;
-
-    public NoDictionaryBasedRegexPredicateEvaluator(RegexpLikePredicate predicate) {
-      int flags = Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE;
-      pattern = Pattern.compile(predicate.getRegex(), flags);
+    public RawValueBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate) {
+      _pattern = Pattern.compile(regexpLikePredicate.getRegex(), PATTERN_FLAG);
     }
 
     @Override
-    public boolean apply(String value) {
-      return pattern.matcher(value).find();
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.REGEXP_LIKE;
     }
 
     @Override
-    public boolean apply(String[] values) {
-      return apply(values, values.length);
-    }
-
-    @Override
-    public boolean apply(String[] values, int length) {
-      for (int i = 0; i < length; i++) {
-        String value = values[i];
-        if (pattern.matcher(value).find()) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public boolean apply(long value) {
-      return apply(String.valueOf(value));
-    }
-
-    @Override
-    public boolean apply(long[] values) {
-      return apply(values, values.length);
-    }
-
-    @Override
-    public boolean apply(long[] values, int length) {
-      for (int i = 0; i < length; i++) {
-        long value = values[i];
-        if (apply(value)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public boolean apply(float value) {
-      return apply(String.valueOf(value));
-    }
-
-    @Override
-    public boolean apply(float[] values) {
-      return apply(values, values.length);
-    }
-
-    @Override
-    public boolean apply(float[] values, int length) {
-      for (int i = 0; i < length; i++) {
-        float value = values[i];
-        if (apply(value)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public boolean apply(double value) {
-      return apply(String.valueOf(value));
-    }
-
-    @Override
-    public boolean apply(double[] values) {
-      return apply(values, values.length);
-    }
-
-    @Override
-    public boolean apply(double[] values, int length) {
-      for (int i = 0; i < length; i++) {
-        double value = values[i];
-        if (apply(value)) {
-          return true;
-        }
-      }
-      return false;
+    public boolean applySV(String value) {
+      return _pattern.matcher(value).find();
     }
   }
 }

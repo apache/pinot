@@ -20,7 +20,6 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
@@ -91,10 +90,6 @@ public class IndexSegmentImpl implements IndexSegment {
   @Override
   public ColumnDataSource getDataSource(String columnName) {
     return new ColumnDataSource(indexContainerMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
-  }
-
-  public DataSource getDataSource(String columnName, Predicate p) {
-    throw new UnsupportedOperationException("cannot ask for a data source with a predicate");
   }
 
   @Override

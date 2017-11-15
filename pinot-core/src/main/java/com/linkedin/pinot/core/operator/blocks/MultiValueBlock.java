@@ -21,7 +21,6 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.operator.docvalsets.MultiValueSet;
@@ -36,11 +35,6 @@ public final class MultiValueBlock implements Block {
       FieldSpec.DataType dataType, Dictionary dictionary) {
     _blockValSet = new MultiValueSet(reader, numDocs, dataType);
     _blockMetadata = new BlockMetadataImpl(numDocs, false, maxNumMultiValues, dataType, dictionary);
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

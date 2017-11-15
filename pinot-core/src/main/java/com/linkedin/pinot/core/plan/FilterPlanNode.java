@@ -34,6 +34,8 @@ import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -44,18 +46,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- */
 public class FilterPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterPlanNode.class);
   private final BrokerRequest _brokerRequest;
   private final IndexSegment _segment;
-  private boolean _optimizeAlwaysFalse;
 
   public FilterPlanNode(IndexSegment segment, BrokerRequest brokerRequest) {
     _segment = segment;
     _brokerRequest = brokerRequest;
-    _optimizeAlwaysFalse = true;
   }
 
   @Override
@@ -63,11 +61,11 @@ public class FilterPlanNode implements PlanNode {
     long start = System.currentTimeMillis();
     Operator operator;
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    if (_segment.getSegmentMetadata().hasStarTree()
-        && RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), filterQueryTree, _brokerRequest)) {
+    if (_segment.getSegmentMetadata().hasStarTree() && RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(),
+        filterQueryTree, _brokerRequest)) {
       operator = new StarTreeIndexOperator(_segment, _brokerRequest);
     } else {
-      operator = constructPhysicalOperator(filterQueryTree, _segment, _optimizeAlwaysFalse);
+      operator = constructPhysicalOperator(filterQueryTree, _segment);
     }
     long end = System.currentTimeMillis();
     LOGGER.debug("FilterPlanNode.run took:{}", (end - start));
@@ -78,121 +76,71 @@ public class FilterPlanNode implements PlanNode {
    * Helper method to build the operator tree from the filter query tree.
    * @param filterQueryTree
    * @param segment Index segment
-   * @param optimizeAlwaysFalse Optimize isResultEmpty predicates
    * @return Filter Operator created
    */
   @VisibleForTesting
-  public static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree, IndexSegment segment,
-      boolean optimizeAlwaysFalse) {
-    BaseFilterOperator ret;
-
-    if (null == filterQueryTree) {
+  public static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree, IndexSegment segment) {
+    if (filterQueryTree == null) {
       return new MatchEntireSegmentOperator(segment.getSegmentMetadata().getTotalRawDocs());
     }
 
-    final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
-    final boolean isLeaf = (childFilters == null) || childFilters.isEmpty();
-
-    if (!isLeaf) {
-      int numChildrenAlwaysFalse = 0;
-      int numChildren = childFilters.size();
-      List<BaseFilterOperator> operators = new ArrayList<>();
-
-      final FilterOperator filterType = filterQueryTree.getOperator();
-      for (final FilterQueryTree query : childFilters) {
-        BaseFilterOperator childOperator = constructPhysicalOperator(query, segment, optimizeAlwaysFalse);
-
-        // Count number of always false children.
-        if (optimizeAlwaysFalse && childOperator.isResultEmpty()) {
-          numChildrenAlwaysFalse++;
-
-          // Early bailout for 'AND' as soon as one of the children always evaluates to false.
-          if (filterType == FilterOperator.AND) {
-            break;
+    // For non-leaf node, recursively create the child filter operators
+    FilterOperator filterType = filterQueryTree.getOperator();
+    if (filterType == FilterOperator.AND || filterType == FilterOperator.OR) {
+      List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
+      List<BaseFilterOperator> childFilterOperators = new ArrayList<>(childFilters.size());
+      if (filterType == FilterOperator.AND) {
+        for (FilterQueryTree childFilter : childFilters) {
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment);
+          if (childFilterOperator.isResultEmpty()) {
+            return EmptyFilterOperator.getInstance();
+          }
+          childFilterOperators.add(childFilterOperator);
+        }
+        reorder(childFilterOperators);
+        return new AndOperator(childFilterOperators);
+      } else {
+        for (FilterQueryTree childFilter : childFilters) {
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment);
+          if (!childFilterOperator.isResultEmpty()) {
+            childFilterOperators.add(childFilterOperator);
           }
         }
-        operators.add(childOperator);
+        if (childFilterOperators.isEmpty()) {
+          return EmptyFilterOperator.getInstance();
+        } else if (childFilterOperators.size() == 1) {
+          return childFilterOperators.get(0);
+        } else {
+          reorder(childFilterOperators);
+          return new OrOperator(childFilterOperators);
+        }
+      }
+    } else {
+      Predicate predicate = Predicate.newPredicate(filterQueryTree);
+      DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
+      PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource);
+      if (predicateEvaluator.isAlwaysFalse()) {
+        return EmptyFilterOperator.getInstance();
       }
 
-      ret = buildNonLeafOperator(filterType, operators, numChildrenAlwaysFalse, numChildren, optimizeAlwaysFalse);
-    } else {
-      final FilterOperator filterType = filterQueryTree.getOperator();
-      final String column = filterQueryTree.getColumn();
-      Predicate predicate = Predicate.newPredicate(filterQueryTree);
-
-      DataSource ds;
-      ds = segment.getDataSource(column);
-      DataSourceMetadata dataSourceMetadata = ds.getDataSourceMetadata();
-      BaseFilterOperator baseFilterOperator;
+      DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
       int startDocId = 0;
-      int endDocId = segment.getSegmentMetadata().getTotalRawDocs() - 1; //end is inclusive
-      //use inverted index only if the column has dictionary.
-      if (dataSourceMetadata.hasInvertedIndex() && dataSourceMetadata.hasDictionary()) {
-        // RANGE/REGEXP_LIKE evaluation based on inv index is inefficient, so do this only if is NOT range.
-        if (!filterType.equals(FilterOperator.RANGE) && !filterType.equals(FilterOperator.REGEXP_LIKE)) {
-          if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
-            // if the column is sorted use sorted inverted index based implementation
-            baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(predicate, ds, startDocId, endDocId);
-          } else {
-            baseFilterOperator = new BitmapBasedFilterOperator(predicate, ds, startDocId, endDocId);
-          }
+      // TODO: make it exclusive
+      // NOTE: end is inclusive
+      int endDocId = segment.getSegmentMetadata().getTotalRawDocs() - 1;
+
+      // Use inverted index if the filter type is not RANGE or REGEXP_LIKE for efficiency
+      if (dataSourceMetadata.hasInvertedIndex() && (filterType != FilterOperator.RANGE) && (filterType
+          != FilterOperator.REGEXP_LIKE)) {
+        if (dataSourceMetadata.isSorted()) {
+          return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
         } else {
-          baseFilterOperator = new ScanBasedFilterOperator(predicate, ds, startDocId, endDocId);
+          return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
         }
       } else {
-        baseFilterOperator = new ScanBasedFilterOperator(predicate, ds, startDocId, endDocId);
+        return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
       }
-      ret = baseFilterOperator;
     }
-    // If operator evaluates to false, then just return an empty operator.
-    if (ret.isResultEmpty()) {
-      ret = EmptyFilterOperator.getInstance();
-    }
-    return ret;
-  }
-
-  /**
-   * Helper method to build AND/OR operators.
-   * <ul>
-   *   <li> Returns {@link EmptyFilterOperator} if at least on child always evaluates to false for AND. </li>
-   *   <li> Returns {@link EmptyFilterOperator} if all children always evaluates to false for OR. </li>
-   *   <li> Returns {@link AndOperator} or {@link OrOperator} based on filterType, otherwise. </li>
-   * </ul>
-   * @param filterType AND/OR
-   * @param nonFalseChildren Children that are not alwaysFalse.
-   * @param numChildrenAlwaysFalse Number of children that are always false.
-   * @param numChildren Total number of children.
-   * @param optimizeAlwaysFalse Optimize alwaysFalse predicates
-   * @return Filter Operator created
-   */
-  private static BaseFilterOperator buildNonLeafOperator(FilterOperator filterType,
-      List<BaseFilterOperator> nonFalseChildren, int numChildrenAlwaysFalse, int numChildren,
-      boolean optimizeAlwaysFalse) {
-    BaseFilterOperator operator;
-
-    switch (filterType) {
-      case AND:
-        if (optimizeAlwaysFalse && numChildrenAlwaysFalse > 0) {
-          operator = EmptyFilterOperator.getInstance();
-        } else {
-          reorder(nonFalseChildren);
-          operator = new AndOperator(nonFalseChildren);
-        }
-        break;
-
-      case OR:
-        if (optimizeAlwaysFalse && numChildrenAlwaysFalse == numChildren) {
-          operator = EmptyFilterOperator.getInstance();
-        } else {
-          reorder(nonFalseChildren);
-          operator = new OrOperator(nonFalseChildren);
-        }
-        break;
-      default:
-        throw new UnsupportedOperationException("Not support filter type - " + filterType + " with children operators");
-    }
-
-    return operator;
   }
 
   /**
@@ -202,7 +150,7 @@ public class FilterPlanNode implements PlanNode {
    */
   private static void reorder(List<BaseFilterOperator> operators) {
 
-    final Map<Operator, Integer> operatorPriorityMap = new HashMap<Operator, Integer>();
+    final Map<Operator, Integer> operatorPriorityMap = new HashMap<>();
     for (Operator operator : operators) {
       Integer priority = Integer.MAX_VALUE;
       if (operator instanceof SortedInvertedIndexBasedFilterOperator) {
