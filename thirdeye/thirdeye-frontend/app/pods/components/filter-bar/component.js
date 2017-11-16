@@ -165,6 +165,7 @@ export default Ember.Component.extend({
   actions: {
 
     /**
+     * Filters results in the events table depending on a selected event type in the filter block
      * Expands/collapses a filter block
      * @method filterByEvent
      * @param {Object} clickedBlock - selected filter block object
@@ -185,7 +186,7 @@ export default Ember.Component.extend({
 
       /*
       * If results were already previously filtered for this filter block (i.e. "Holiday", "Deployment"),
-      * call onSelect on the cached urns
+      * call onSelect on the cached urns.
       */
       if (cachedHeader) {
         onSelect(cachedHeader);
@@ -194,7 +195,9 @@ export default Ember.Component.extend({
       else {
         const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
                                                   && entities[urn].eventType == clickedBlock.eventType);
-        this.urnsCache[clickedBlock.header] = urns;
+        if (urns.length) {
+          this.urnsCache[clickedBlock.header] = urns;
+        }
         onSelect(urns);
       }
     },

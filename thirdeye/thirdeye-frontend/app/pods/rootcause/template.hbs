@@ -64,16 +64,17 @@
   <div class="row">
     <div class="col-xs-3">
       {{filter-bar
-        config=filterConfig
+        config=config
         activeTab=selectedTab
         entities=eventFilterEntities
-        onSelect=(action "onFilter")}}
+        onSelect=(action "filterOnSelect")}}
     </div>
     <div class="col-xs-8">
       {{rootcause-table
         entities=eventTableEntities
         columns=eventTableColumns
         selectedUrns=selectedUrns
+        onSelect=(action "filterOnSelect")
         onSelection=(action "onSelection")
       }}
     </div>
