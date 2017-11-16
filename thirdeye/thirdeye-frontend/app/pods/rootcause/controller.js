@@ -2,7 +2,7 @@ import Ember from 'ember';
 import { makeIterable, filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
-import { findLabelMapping } from 'thirdeye-frontend/helpers/utils';
+import _ from 'lodash';
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -317,38 +317,87 @@ export default Ember.Controller.extend({
       console.log('heatmap click registerd for: ', dimension, subdimension);
     },
 
-    updateFilterCache(eventType, subfilter, filterText) {
-      this.filterCache[eventType].subFilter = subfilter;
+    /**
+     * Updates the filters cache with newly selected filters
+     * @param {String} eventType - event type (i.e. Holiday, GCN)
+     * @param {Object} subFilter - representation of subfilter and its values (i.e. {key: "country", value: ["US"]})
+     * @param {String} filterText - user's input text in filter search bar
+     */
+    updateFiltersCache(eventType, subFilter, filterText) {
+      // Initialize object assignments in the cache
+      if (!this.filtersCache[eventType]) {
+        this.filtersCache[eventType] = {};
+      }
+      if (!this.filtersCache[eventType].subFilters) {
+        this.filtersCache[eventType].subFilters = {};
+      }
+
+      if (subFilter && !this.filtersCache[eventType].subFilters[subFilter.key]) {
+        this.filtersCache[eventType].subFilters[subFilter.key] = [];
+      }
+
+      if (!this.filtersCache[eventType].filterText) {
+        this.filtersCache[eventType].filterText = '';
+      }
+
+      // Set the subFilters value based on event type
+      if (subFilter) {
+        this.filtersCache[eventType].subFilters[subFilter.key] = subFilter.value;
+      }
+
+      // Set the filterText value (from user's input in search filter bar) based on event type
       this.filtersCache[eventType].filterText = filterText;
     },
 
+    /**
+     * Updates the urns cache by event type
+     * @param {String} eventType
+     * @param {Array} urns - array of urns
+     */
     updateUrnsCache(eventType, urns) {
       this.urnsCache[eventType] = urns;
     },
 
-    filterUrns(eventType, label) {
+    filterUrns(eventType, subFilter, text) {
       let urns;
-      const cachedEvent = this.filtersCache[eventType];
+      const cachedEvent = this.urnsCache[eventType];
+      const filtersCache = this.filtersCache;
 
-      if (cachedEvent) {
+      this.send('updateFiltersCache', eventType, subFilter, text);
+
+      if (!_.isEmpty(cachedEvent) && !subFilter) {
         urns = cachedEvent;
       } else {
         const entities = this.get('eventFilterEntities');
         urns = Object.keys(entities).filter(urn => entities[urn].eventType == eventType);
-                                      // .filter(urn => {
-                                      //   // Filter by subfilters
-                                      //   const subFilters = filtersCache[eventType].subFilters;
-                                      //   if (!Ember.isEmpty(filtersCache[eventType].subFilters)) {
-                                      //     let labelMapping = label ? findLabelMapping(label) : '';
-                                      //     if (entities[urn].attributes[labelMapping]) {
-                                      //       return Object.keys(subFilters).filter(filter => {
-                                      //         return subFilters[filter]
-                                      //                 .some(value => entities[urn].attributes[labelMapping]
-                                      //                   .includes(value));
-                                      //       });
-                                      //     }
+
+        const subFilters = filtersCache[eventType].subFilters;
+
+        if (!_.isEmpty(subFilters)) {
+          urns = urns.filter(urn => {
+            let labels = Object.keys(subFilters);
+            return labels.some(label => {
+              let attributeValues = entities[urn].attributes[label];
+              if (attributeValues) {
+                if (!subFilters[label].length) {
+                  return true;
+                } else {
+                  return _.intersection(attributeValues, subFilters[label]).length;
+                }
+              }
+            });
+          });
+        }
+
+                                      //     // if (entities[urn].attributes[labelMapping]) {
+                                      //     //   return Object.keys(subFilters).filter(filter => {
+                                      //     //     return subFilters[filter]
+                                      //     //             .some(value => entities[urn].attributes[labelMapping]
+                                      //     //               .includes(value));
+                                      //     //   });
+                                      //     // }
                                       //   }
-                                      // })
+                                      // });
                                       // // Filter by input from filter search bar
                                       // .filter(urn => {
                                       //   const filterText = filtersCache[eventType].filterText;

@@ -11,13 +11,13 @@
       <ul class="entity-filter__group-list {{if block.isHidden " entity-filter__group-list--hidden "}}">
         {{#each block.inputs as |filter|}}
           {{filter-bar-input
-            header=block.header
+            eventType=block.eventType
             config=config
             label=filter.label
             type=filter.type
             attributesMap=attributesMap
             entities=entities
-            onSelect=onSelect
+            filterUrns=filterUrns
             updateCache=(action 'updateCache')}}
         {{/each}}
       </ul>

@@ -42,11 +42,11 @@ export default Ember.Component.extend({
     'label',
     'attributesMap',
     function() {
-      const { label, attributesMap, config, header } = this.getProperties('label', 'attributesMap', 'config', 'header');
+      const { label, attributesMap, config, eventType } = this.getProperties('label', 'attributesMap', 'config', 'eventType');
       const labelMapping = findLabelMapping(label, config);
       let inputValues = '';
       if (!_.isEmpty(attributesMap) && labelMapping) {
-        inputValues = Array.from(attributesMap[header.toLowerCase()][labelMapping]);
+        inputValues = Array.from(attributesMap[eventType.toLowerCase()][labelMapping]);
       }
 
       return inputValues;
@@ -60,31 +60,18 @@ export default Ember.Component.extend({
      * @param {Array} selectedValue - selected value in the input
      */
     onSubfilterSelection(selectedValue) {
-      const { label, entities, onSelect, header, updateCache } = this.getProperties('label', 'entities', 'onSelect', 'header', 'updateCache');
+      const { label, filterUrns, eventType } = this.getProperties('label', 'filterUrns', 'eventType');
       const labelMapping = findLabelMapping(label, this.get('config'));
-      debugger;
 
+      // Saves the selected values in UI
       this.set('selected', selectedValue);
 
-      if (onSelect) {
-        let urns;
-        // If there are no filters, show all entities under that event type
-        if (!selectedValue.length) {
-          urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
-                                                    && entities[urn].eventType == header.toLowerCase());
-        } else {
-          urns = Object.keys(entities).filter(urn => {
-            if (entities[urn].attributes[labelMapping]) {
-              return selectedValue.some(value => entities[urn].attributes[labelMapping].includes(value));
-            }
-          });
-        }
-        // Call parent's onSelect() in the route controller to filter entities based on a list of urns
-        onSelect(urns);
+      const subFilter = {
+        key: labelMapping,
+        value: selectedValue
+      };
 
-        // Call parent's updateCache() in the filter bar component to update the urns cache
-        updateCache(header, urns);
-      }
+      filterUrns(eventType, subFilter);
     }
   }
 });
