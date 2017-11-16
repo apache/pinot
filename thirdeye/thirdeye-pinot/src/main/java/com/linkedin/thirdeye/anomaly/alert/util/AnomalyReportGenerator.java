@@ -1,6 +1,10 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
+import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 
 import java.io.ByteArrayOutputStream;
@@ -106,12 +110,6 @@ public class AnomalyReportGenerator {
     return anomalies;
   }
 
-  public void buildReport(List<MergedAnomalyResultDTO> anomalies,
-      ThirdEyeAnomalyConfiguration configuration, AlertConfigDTO alertConfig) {
-    buildReport(null, null, anomalies, configuration, alertConfig.getRecipients(), alertConfig.getFromAddress(),
-        alertConfig.getName());
-  }
-
   /**
    * Build report/alert for the given list of anomalies, which could belong to a grouped anomaly if groupId is not null.
    * @param groupId the group id of the list of anomalies; null means they does not belong to any grouped anomaly.
@@ -119,12 +117,12 @@ public class AnomalyReportGenerator {
    * @param anomalies the list of anomalies to be put in the report/alert.
    * @param configuration the configuration that contains the information of ThirdEye host.
    * @param recipients the recipients of this (group) list of anomalies.
-   * @param fromAddress the source email address of this report/alert.
-   * @param alertConfigName the name of this alert configuration.
+   * @param alertConfig the alert config
+   * @param emailSubjectName the name of this alert configuration.
    */
   public void buildReport(Long groupId, String groupName, List<MergedAnomalyResultDTO> anomalies,
-      ThirdEyeAnomalyConfiguration configuration, String recipients, String fromAddress, String alertConfigName) {
-    String subject = "Thirdeye Alert : " + alertConfigName;
+      ThirdEyeAnomalyConfiguration configuration, String recipients, String emailSubjectName, AlertConfigDTO alertConfig) {
+    String subject = "Thirdeye Alert : " + emailSubjectName;
     long startTime = System.currentTimeMillis();
     long endTime = 0;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
@@ -136,12 +134,12 @@ public class AnomalyReportGenerator {
       }
     }
     buildReport(startTime, endTime, groupId, groupName, anomalies, subject, configuration, false,
-        recipients, fromAddress, alertConfigName, false);
+        recipients, emailSubjectName, alertConfig, false);
   }
 
   public void buildReport(long startTime, long endTime, Long groupId, String groupName,
       List<MergedAnomalyResultDTO> anomalies, String subject, ThirdEyeAnomalyConfiguration configuration,
-      boolean includeSentAnomaliesOnly, String emailRecipients, String fromEmail, String alertConfigName,
+      boolean includeSentAnomaliesOnly, String emailRecipients, String emailSubjectName, AlertConfigDTO alertConfig,
       boolean includeSummary) {
     if (anomalies == null || anomalies.size() == 0) {
       LOG.info("No anomalies found to send email, please check the parameters.. exiting");
@@ -149,7 +147,9 @@ public class AnomalyReportGenerator {
       DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
       Set<String> metrics = new HashSet<>();
 
-      List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
+      Multimap<String, String> anomalyDimensions = ArrayListMultimap.create();
+      Multimap<String, AnomalyReportDTO> groupedAnomalyReports = ArrayListMultimap.create();
+      List<AnomalyReportDTO> anomalyReports = new ArrayList<>();
       List<String> anomalyIds = new ArrayList<>();
       Set<String> datasets = new HashSet<>();
       for (MergedAnomalyResultDTO anomaly : anomalies) {
@@ -181,15 +181,20 @@ public class AnomalyReportGenerator {
             getIssueType(anomaly)
         );
 
+        // function name
+        String functionName = "Alerts";
+        if (anomaly.getFunction() != null) {
+          functionName = anomaly.getFunction().getFunctionName();
+        }
+
+        // dimension filters / values
+        
+
         // include notified alerts only in the email
-        if (includeSentAnomaliesOnly) {
-          if (anomaly.isNotified()) {
-            anomalyReportDTOList.add(anomalyReportDTO);
-            anomalyIds.add(anomalyReportDTO.getAnomalyId());
-          }
-        } else {
-          anomalyReportDTOList.add(anomalyReportDTO);
+        if (!includeSentAnomaliesOnly || anomaly.isNotified()) {
+          anomalyReports.add(anomalyReportDTO);
           anomalyIds.add(anomalyReportDTO.getAnomalyId());
+          groupedAnomalyReports.put(functionName, anomalyReportDTO);
         }
       }
 
@@ -211,8 +216,10 @@ public class AnomalyReportGenerator {
       templateData.put("trueAnomalyCount", precisionRecallEvaluator.getTrueAnomalies());
       templateData.put("falseAlertCount", precisionRecallEvaluator.getFalseAlarm());
       templateData.put("newTrendCount", precisionRecallEvaluator.getTrueAnomalyNewTrend());
-      templateData.put("anomalyDetails", anomalyReportDTOList);
-      templateData.put("alertConfigName", alertConfigName);
+      templateData.put("anomalyDetails", anomalyReports);
+      templateData.put("groupedAnomalyDetails", groupedAnomalyReports);
+      templateData.put("emailSubjectName", emailSubjectName);
+      templateData.put("alertConfigName", alertConfig.getName()); // NOTE: breaks backwards compatibility
       templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
@@ -234,23 +241,23 @@ public class AnomalyReportGenerator {
         templateData.put("falseNegative", precisionRecallEvaluator.getFalseNegativeRate());
       }
 
-      if (CollectionUtils.isNotEmpty(anomalyReportDTOList)) {
+      if (CollectionUtils.isNotEmpty(anomalyReports)) {
         Set<String> metricNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        Iterator<AnomalyReportDTO> iterator = anomalyReportDTOList.iterator();
+        Iterator<AnomalyReportDTO> iterator = anomalyReports.iterator();
         while (iterator.hasNext() && metricNames.size() < 2) {
           AnomalyReportDTO anomalyReportDTO = iterator.next();
           metricNames.add(anomalyReportDTO.getMetric());
         }
         if (metricNames.size() == 1) {
-          AnomalyReportDTO singleAnomaly = anomalyReportDTOList.get(0);
+          AnomalyReportDTO singleAnomaly = anomalyReports.get(0);
           subject = subject + " - " + singleAnomaly.getMetric();
         }
       }
 
       String imgPath = null;
       String cid = "";
-      if (anomalyReportDTOList.size() == 1) {
-        AnomalyReportDTO singleAnomaly = anomalyReportDTOList.get(0);
+      if (anomalyReports.size() == 1) {
+        AnomalyReportDTO singleAnomaly = anomalyReports.get(0);
         try {
           imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
           if (StringUtils.isNotBlank(imgPath)) {
@@ -263,7 +270,7 @@ public class AnomalyReportGenerator {
       templateData.put("cid", cid);
 
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
-          emailRecipients, fromEmail, email);
+          emailRecipients, alertConfig.getFromAddress(), email);
 
       if (StringUtils.isNotBlank(imgPath)) {
         try {
