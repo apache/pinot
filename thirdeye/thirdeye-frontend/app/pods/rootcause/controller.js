@@ -278,6 +278,11 @@ export default Ember.Controller.extend({
       const { invisibleUrns } = this.getProperties('invisibleUrns');
       makeIterable(urns).forEach(urn => invisibleUrns.delete(urn));
       this.set('invisibleUrns', new Set(invisibleUrns));
+    },
+
+    onHeatmapClick([dimension, subdimension]) {
+      // TODO: do something with the call back
+      console.log('heatmap click registerd for: ', dimension, subdimension);
     }
   }
 });
