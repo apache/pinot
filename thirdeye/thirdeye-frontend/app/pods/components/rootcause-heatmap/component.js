@@ -37,6 +37,12 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Action to be passed into component
+   * @type {Function}
+   */
+  onHeatmapClick: () => {},
+
   baseline: Ember.computed(
     'breakdowns',
     'currentUrn',
@@ -55,5 +61,14 @@ export default Ember.Component.extend({
       }
       return breakdown;
     }
-  )
+  ),
+
+  actions: {
+    /**
+     * Bubbles the action to the parent
+     */
+    onHeatmapClick() {
+      this.attrs.onHeatmapClick(...arguments);
+    }
+  }
 });
