@@ -28,17 +28,6 @@ export default Ember.Component.extend({
   options: ['All', 'None'],
 
   /**
-   * Cache for urns, filtered by search criteria
-   * @type {Object}
-   * @example
-   * {
-   *  Holiday: {urns1, urns2},
-   *  Region: {urns3, urns4}
-   * }
-   */
-  urnsCache: {},
-
-  /**
    * Overwrite the init function
    * Initializes values of the filter blocks
    * Example of a filter block:
@@ -171,8 +160,7 @@ export default Ember.Component.extend({
      * @param {Object} clickedBlock - selected filter block object
      */
     selectEventType(clickedBlock) {
-      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
-      const cachedHeader = this.urnsCache[clickedBlock.header];
+      const filterUrns = this.get('filterUrns');
       let filterBlocks = this.get('config');
 
       // Hide all other blocks when one is clicked
@@ -184,22 +172,8 @@ export default Ember.Component.extend({
       // Show clickedBlock
       Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
 
-      /*
-      * If results were already previously filtered for this filter block (i.e. "Holiday", "Deployment"),
-      * call onSelect on the cached urns.
-      */
-      if (cachedHeader) {
-        onSelect(cachedHeader);
-      }
-      // If this is the first time results are computed, cache them
-      else {
-        const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
-                                                  && entities[urn].eventType == clickedBlock.eventType);
-        if (urns.length) {
-          this.urnsCache[clickedBlock.header] = urns;
-        }
-        onSelect(urns);
-      }
+      // Calls parent to filter urns by event type
+      filterUrns(clickedBlock.eventType);
     },
 
     /**

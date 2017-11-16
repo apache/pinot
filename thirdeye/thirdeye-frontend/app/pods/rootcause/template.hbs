@@ -65,9 +65,10 @@
     <div class="col-xs-3">
       {{filter-bar
         config=config
+        urnsCache=urnsCache
         activeTab=selectedTab
         entities=eventFilterEntities
-        onSelect=(action "filterOnSelect")}}
+        filterUrns=(action "filterUrns")}}
     </div>
     <div class="col-xs-8">
       {{rootcause-table

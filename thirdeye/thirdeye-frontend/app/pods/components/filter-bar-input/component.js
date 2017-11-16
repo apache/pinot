@@ -62,6 +62,7 @@ export default Ember.Component.extend({
     onSubfilterSelection(selectedValue) {
       const { label, entities, onSelect, header, updateCache } = this.getProperties('label', 'entities', 'onSelect', 'header', 'updateCache');
       const labelMapping = findLabelMapping(label, this.get('config'));
+      debugger;
 
       this.set('selected', selectedValue);
 

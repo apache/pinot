@@ -2,6 +2,7 @@ import Ember from 'ember';
 import { makeIterable, filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
+import { findLabelMapping } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -39,7 +40,7 @@ export default Ember.Controller.extend({
   context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
 
   filterConfig: config, // {}
-  
+
   settingsConfig: null, // {}
 
   activeTab: null, // ""
@@ -138,6 +139,7 @@ export default Ember.Controller.extend({
     function () {
       console.log('eventTableEntities()');
       const { entities, filteredUrns } = this.getProperties('entities', 'filteredUrns');
+      console.log("EVENT TABLE ENTITIES: ", filterObject(entities, (e) => filteredUrns.has(e.urn)));
       return filterObject(entities, (e) => filteredUrns.has(e.urn));
     }
   ),
@@ -150,6 +152,7 @@ export default Ember.Controller.extend({
       console.log('eventFilterEntities()');
       const { entities } = this.getProperties('entities');
       console.log("printing entities: ", entities);
+      console.log("EVENT FILTER ENTITIES: ", filterObject(entities, (e) => e.type == 'event'));
       return filterObject(entities, (e) => e.type == 'event');
     }
   ),
@@ -188,6 +191,35 @@ export default Ember.Controller.extend({
       return this.get('aggregatesService.aggregates').size > 0;
     }
   ),
+
+  /**
+   * Cache for urns, filtered by event type
+   * This is to cache results when toggling between events on filter bar
+   * @type {Object}
+   * @example
+   * {
+   *  Holiday: {urns1, urns2},
+   *  Deployment: {urns3, urns4}
+   * }
+   */
+  urnsCache: {},
+
+  /**
+   * Cache for filters by event type
+   * @type {Object}
+   * @example
+   * {
+   *  holiday: {
+   *    subFilters: {
+   *      country: ['US', 'CA'],
+   *      region: ['North America']
+   *    },
+   *    filterText: "" // user's input text from filter search bar
+   *  },
+   *  GCN: {...}
+   * }
+   */
+  filtersCache: {},
 
   //
   // Actions
@@ -283,6 +315,53 @@ export default Ember.Controller.extend({
     onHeatmapClick([dimension, subdimension]) {
       // TODO: do something with the call back
       console.log('heatmap click registerd for: ', dimension, subdimension);
+    },
+
+    updateFilterCache(eventType, subfilter, filterText) {
+      this.filterCache[eventType].subFilter = subfilter;
+      this.filtersCache[eventType].filterText = filterText;
+    },
+
+    updateUrnsCache(eventType, urns) {
+      this.urnsCache[eventType] = urns;
+    },
+
+    filterUrns(eventType, label) {
+      let urns;
+      const cachedEvent = this.filtersCache[eventType];
+
+      if (cachedEvent) {
+        urns = cachedEvent;
+      } else {
+        const entities = this.get('eventFilterEntities');
+        urns = Object.keys(entities).filter(urn => entities[urn].eventType == eventType);
+                                      // .filter(urn => {
+                                      //   // Filter by subfilters
+                                      //   const subFilters = filtersCache[eventType].subFilters;
+                                      //   if (!Ember.isEmpty(filtersCache[eventType].subFilters)) {
+                                      //     let labelMapping = label ? findLabelMapping(label) : '';
+                                      //     if (entities[urn].attributes[labelMapping]) {
+                                      //       return Object.keys(subFilters).filter(filter => {
+                                      //         return subFilters[filter]
+                                      //                 .some(value => entities[urn].attributes[labelMapping]
+                                      //                   .includes(value));
+                                      //       });
+                                      //     }
+                                      //   }
+                                      // })
+                                      // // Filter by input from filter search bar
+                                      // .filter(urn => {
+                                      //   const filterText = filtersCache[eventType].filterText;
+                                      //   if (filterText) {
+                                      //     return entities[urn].label.includes(filterText);
+                                      //   }
+                                      // });
+      }
+
+      this.send('filterOnSelect', urns);
+
+      // Updates urnsCache
+      this.send('updateUrnsCache', eventType, urns);
     }
   }
 });
