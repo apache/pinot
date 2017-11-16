@@ -4,7 +4,10 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
+import com.linkedin.thirdeye.anomaly.events.EventFilter;
+import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 
 import java.io.ByteArrayOutputStream;
@@ -14,6 +17,8 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -24,6 +29,7 @@ import java.util.Set;
 import java.util.TimeZone;
 
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -61,6 +67,9 @@ public class AnomalyReportGenerator {
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
   private static final String DATE_PATTERN = "MMM dd, HH:mm";
   private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "multiple-anomalies-email-template.ftl";
+
+  private static final EventDataProviderManager EVENT_MANAGER = EventDataProviderManager.getInstance();
+  private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(1);
 
   public static AnomalyReportGenerator getInstance() {
     return INSTANCE;
@@ -188,7 +197,9 @@ public class AnomalyReportGenerator {
         }
 
         // dimension filters / values
-        
+        for (Map.Entry<String, String> entry : anomaly.getDimensions().entrySet()) {
+          anomalyDimensions.put(entry.getKey(), entry.getValue());
+        }
 
         // include notified alerts only in the email
         if (!includeSentAnomaliesOnly || anomaly.isNotified()) {
@@ -198,6 +209,23 @@ public class AnomalyReportGenerator {
         }
       }
 
+      // holidays
+      EventFilter filter = new EventFilter();
+      filter.setEventType(EventType.HOLIDAY.toString());
+      filter.setStartTime(startTime - EVENT_TIME_TOLERANCE);
+      filter.setEndTime(endTime - EVENT_TIME_TOLERANCE);
+
+      List<EventDTO> holidays = EVENT_MANAGER.getEvents(filter);
+      Collections.sort(holidays, new Comparator<EventDTO>() {
+        @Override
+        public int compare(EventDTO o1, EventDTO o2) {
+          return Long.compare(o1.getStartTime(), o2.getStartTime());
+        }
+      });
+
+      // TODO filter holidays by country dimension? this could lead to false negatives
+
+      // template data
       PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(anomalies);
 
       HtmlEmail email = new HtmlEmail();
@@ -224,6 +252,7 @@ public class AnomalyReportGenerator {
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
+      templateData.put("holidays", holidays);
       if (groupId != null) {
         templateData.put("isGroupedAnomaly", true);
         templateData.put("groupId", Long.toString(groupId));
