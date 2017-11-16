@@ -136,7 +136,7 @@ export function toFilters(urns) {
   const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':'), 2, 4));
   const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => tup.split('='))).reduce(flatten, []);
   const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => tup.split('='))).reduce(flatten, []);
-  return [].concat(dimensionFilters).concat(metricFilters).concat(frontendMetricFilters);
+  return [...dimensionFilters, ...metricFilters, ...frontendMetricFilters];
 }
 
 export function toFilterMap(filters) {
