@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterPrefix, toBaselineRange } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -58,9 +58,6 @@ export default Ember.Service.extend({
     Object.keys(entities).filter(urn => !staleUnselected.has(urn)).forEach(urn => remaining[urn] = entities[urn]);
     Object.keys(entities).filter(urn => staleSelected.has(urn)).forEach(urn => remaining[urn].score = -1);
 
-    // // augment results
-    // const augmenting = this._augment(incoming);
-    //
     // merge
     const newEntities = Object.assign({}, remaining, incoming);
 
@@ -83,29 +80,12 @@ export default Ember.Service.extend({
     }
   },
 
-  // _augment(incoming) {
-  //   const entities = {};
-  //   filterPrefix(Object.keys(incoming), 'thirdeye:metric:').forEach(urn => {
-  //     const currentUrn = toCurrentUrn(urn);
-  //     entities[currentUrn] = {
-  //       urn: currentUrn,
-  //       label: incoming[urn].label
-  //     };
-  //
-  //     const baselineUrn = toBaselineUrn(urn);
-  //     entities[baselineUrn] = {
-  //       urn: baselineUrn,
-  //       label: incoming[urn].label + ' (baseline)'
-  //     };
-  //   });
-  //   return entities;
-  // },
-  //
   _makeUrl(framework, context) {
     const urnString = [...context.urns].join(',');
+    const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
       `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
-      `&baselineStart=${context.baselineRange[0]}&baselineEnd=${context.baselineRange[1]}` +
+      `&baselineStart=${baselineRange[0]}&baselineEnd=${baselineRange[1]}` +
       `&analysisStart=${context.analysisRange[0]}&analysisEnd=${context.analysisRange[1]}` +
       `&urns=${urnString}`;
   },

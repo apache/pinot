@@ -6,11 +6,11 @@ import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-rout
 
 
 const anomalyRange = [1509044400000, 1509422400000];
-const baselineRange = [1508439600000, 1508817600000];
+const compareMode = 'WoW';
 const analysisRange = [1508785200000, 1509422400000];
 const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:in:provided']);
-const granularity = '30_MINUTES';
-const testContext = { urns, anomalyRange, baselineRange, analysisRange, granularity };
+const granularity = '15_MINUTES';
+const testContext = { urns, anomalyRange, compareMode, analysisRange, granularity };
 
 const queryParamsConfig = {
   refreshModel: false,
@@ -27,7 +27,7 @@ const queryParamsConfig = {
 const isValid = (key, value) => {
   switch(key) {
     case 'granularity':
-      return ['MINUTES', 'HOURS', 'DAYS'].includes(value);
+      return ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS', '7_DAYS'].includes(value);
     case 'filters':
       return value && value.length;
     case 'compareMode':
@@ -35,25 +35,6 @@ const isValid = (key, value) => {
     default:
       return moment(+value).isValid();
   }
-};
-
-// TODO: move into utils
-const _calculateBaselineRange = (range, compareMode) => {
-  const [
-    start,
-    end
-  ] = range;
-  const offset = {
-    WoW: 1,
-    Wo2W: 2,
-    Wo3W: 3,
-    Wo4W: 4
-  }[compareMode];
-
-  const baselineRangeStart = moment(start).subtract(offset, 'weeks').valueOf();
-  const baselineRangeEnd = moment(end).subtract(offset, 'weeks').valueOf();
-
-  return [ baselineRangeStart, baselineRangeEnd ];
 };
 
 // TODO: move this to a utils file (DRYER)
@@ -88,7 +69,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     if (!id) { return; }
 
     return RSVP.hash({
-      granularityOptions: fetch(`/data/agg/granularity/metric/${id}`).then(res => res.json()),
+      //granularityOptions: fetch(`/data/agg/granularity/metric/${id}`).then(res => res.json()),
+      granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
       filterOptions: fetch(`/data/autocomplete/filters/metric/${id}`).then(res => res.json()),
       maxTime: fetch(`/data/maxDataTime/metricId/${id}`).then(res => res.json()),
       compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
@@ -125,7 +107,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
   setupController(controller, model) {
     this._super(...arguments);
-    console.log('route: setupController()');
 
     const {
       filters,
@@ -137,16 +118,17 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyRangeEnd
     } = model.queryParams;
 
-    const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
-    const analysisRange = [analysisRangeStart, analysisRangeEnd];
-    const baselineRange = _calculateBaselineRange(anomalyRange, compareMode);
-    const urns = new Set([`thirdeye:metric:${model.id}`, ..._filterToUrn(filters)]);
+    const settingsConfig = {
+      granularityOptions: model.granularityOptions,
+      filterOptions: model.filterOptions,
+      compareModeOptions: model.compareModeOptions,
+      maxTime: model.maxTime
+    };
 
     const context = {
-      urns,
-      anomalyRange,
-      baselineRange,
-      analysisRange,
+      urns: new Set([`thirdeye:metric:${model.id}`, ..._filterToUrn(filters)]),
+      anomalyRange: [anomalyRangeStart, anomalyRangeEnd],
+      analysisRange: [analysisRangeStart, analysisRangeEnd],
       granularity,
       compareMode
     };
@@ -162,9 +144,9 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
       filteredUrns: new Set(),
+      settingsConfig,
       context: testContext
-      // context,
-      // ...model.queryParams
+      // context
     });
   }
 });

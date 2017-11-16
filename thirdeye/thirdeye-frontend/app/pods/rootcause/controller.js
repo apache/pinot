@@ -2,14 +2,6 @@ import Ember from 'ember';
 import { makeIterable, filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
-import moment from 'moment';
-
-const {
-  getProperties,
-  get,
-  setProperties,
-  computed
-} = Ember;
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -46,10 +38,12 @@ export default Ember.Controller.extend({
 
   context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
 
-  config: config, // {}
+  filterConfig: config, // {}
   
+  settingsConfig: null, // {}
+
   activeTab: null, // ""
-  
+
   init() {
     this._super(...arguments);
     this.setProperties({ activeTab: ROOTCAUSE_TAB_DIMENSIONS });
@@ -85,52 +79,9 @@ export default Ember.Controller.extend({
     }
   ),
 
-  /**
-   * Configuration for the Settings component
-   */
-  settingsConfig: computed(
-    'model.{granularityOptions,filterOptions,compareModeOptions}',
-    function() {
-      const model = get(this, 'model');
-      const settingsOptions = ['granularityOptions', 'filterOptions', 'compareModeOptions'];
-
-      return getProperties(model, settingsOptions);
-    }
-  ),
-
   //
   // Public properties (computed)
   //
-
-  /**
-   * Hash containing all possible option values
-   * @type {Object}
-   */
-  options: Ember.computed('model', function() {
-    const model = this.get('model');
-    return getProperties(model, ['granularityOptions', 'filterOptions', 'maxTime', 'compareModeOptions']);
-  }),
-
-  /**
-   * Convert a  query value into option vlaue
-   * @param {String} key          - query param key
-   * @param {String|Object} value - query param value
-   */
-  queryToOption(key, value) {
-    switch(key) {
-      case 'baselineRangeStart':
-      case 'baselineRangeEnd':
-      case 'anomalyRangeStart':
-      case 'anomalyRangeEnd':
-      case 'analysisRangeStart':
-      case 'analysisRangeEnd':
-        return moment(+value).isValid ? parseInt(value) : undefined;
-      case 'granularity':
-      case 'filters':
-      case 'compareMode':
-        return value;
-    }
-  },
 
   entities: Ember.computed(
     'entitiesService.entities',
@@ -261,8 +212,17 @@ export default Ember.Controller.extend({
       this.set('invisibleUrns', new Set(invisibleUrns));
     },
 
-    // TODO refactor filter to match onSelection()
-    filterOnSelect(urns) {
+    /**
+     * Handles the rootcause_setting change event
+     * and updates query params and context
+     * @param {Object} newParams new parameters to update
+     */
+    onContext(context) {
+      console.log('settingsOnChange()');
+      this.set('context', context);
+    },
+
+    onFilter(urns) {
       console.log('filterOnSelect()');
       this.set('filteredUrns', new Set(urns));
     },
@@ -276,20 +236,6 @@ export default Ember.Controller.extend({
       console.log('loadtestSelected()');
       const { entities } = this.getProperties('entities');
       this.set('selectedUrns', new Set(Object.keys(entities)));
-    },
-
-    /**
-     * Handles the rootcause_setting change event
-     * and updates query params and context
-     * @param {Object} newParams new parameters to update
-     */
-    settingsOnChange(context) {
-      console.log('settingsOnChange()');
-      console.log('settingsOnChange: context', context);
-      
-      setProperties(this, {
-        context
-      });
     },
 
     addSelectedUrns(urns) {

@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterPrefix, toBaselineRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -44,46 +44,15 @@ export default Ember.Service.extend({
       console.log('rootcauseAggregatesService: request: all metrics up-to-date. ignoring.');
       return;
     }
-    
-    const filtersMap = this._makeFiltersMap(requestContext.urns);
 
     // metrics
     const metricUrns = missing.filter(urn => urn.startsWith('frontend:metric:current:'));
-    if (!_.isEmpty(metricUrns)) {
-      metricUrns.forEach(urn => {
-        const metricId = urn.split(":")[3];
-        const dimensionFragments = _.slice(urn.split(':'), 4).join(':');
-        const dimensionString = dimensionFragments ? ':' + dimensionFragments : '';
-        const dimensionFilters = encodeURIComponent(JSON.stringify(this._makeDimensionFiltersMap(filtersMap, urn)));
-
-        const url = `/aggregation/aggregate?metricIds=${metricId}&ranges=${requestContext.anomalyRange[0]}:${requestContext.anomalyRange[1]}&filters=${dimensionFilters}`;
-        const urnFunc = (mid, ds) => `frontend:metric:current:${mid}${ds}`;
-        fetch(url)
-          // .then(checkStatus)
-          .then(res => res.json())
-          .then(res => this._extractAggregates(res, (mid) => urnFunc(mid, dimensionString)))
-          .then(incoming => this._complete(requestContext, incoming));
-      });
-    }
+    metricUrns.forEach(urn => this._fetchSlice(urn, requestContext.anomalyRange, requestContext));
 
     // baselines
+    const baselineRange = toBaselineRange(requestContext.anomalyRange, requestContext.compareMode);
     const baselineUrns = missing.filter(urn => urn.startsWith('frontend:metric:baseline:'));
-    if (!_.isEmpty(baselineUrns)) {
-      baselineUrns.forEach(urn => {
-        const metricId = urn.split(':')[3];
-        const dimensionFragments = _.slice(urn.split(':'), 4).join(':');
-        const dimensionString = dimensionFragments ? ':' + dimensionFragments : '';
-        const dimensionFilters = encodeURIComponent(JSON.stringify(this._makeDimensionFiltersMap(filtersMap, urn)));
-
-        const url = `/aggregation/aggregate?metricIds=${metricId}&ranges=${requestContext.baselineRange[0]}:${requestContext.baselineRange[1]}&filters=${dimensionFilters}`;
-        const urnFunc = (mid, ds) => `frontend:metric:baseline:${mid}${ds}`;
-        fetch(url)
-           // .then(checkStatus)
-          .then(res => res.json())
-          .then(res => this._extractAggregates(res, (mid) => urnFunc(mid, dimensionString)))
-          .then(incoming => this._complete(requestContext, incoming));
-      });
-    }
+    baselineUrns.forEach(urn => this._fetchSlice(urn, baselineRange, requestContext));
   },
 
   _complete(requestContext, incoming) {
@@ -102,38 +71,31 @@ export default Ember.Service.extend({
     this.setProperties({ aggregates: newAggregates, pending: newPending });
   },
 
-  _extractAggregates(incoming, urnFunc) {
+  _extractAggregates(incoming, urn) {
     // NOTE: only supports single time range
     const aggregates = {};
     Object.keys(incoming).forEach(range => {
       Object.keys(incoming[range]).forEach(mid => {
         const aggregate = incoming[range][mid];
-        const urn = urnFunc(mid);
         aggregates[urn] = aggregate;
       });
     });
     return aggregates;
   },
 
-  _makeFiltersMap(urns) {
-    const filters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => { const t = urn.split(':'); return [t[2], t[3]]; });
-    return filters.reduce((agg, t) => { if (!agg[t[0]]) { agg[t[0]] = [t[1]]; } else { agg[t[0]] = agg[t[0]].concat(t[1]); } return agg; }, {});
-  },
+  _fetchSlice(urn, range, context) {
+    const metricId = urn.split(':')[3];
+    const metricFilters = toFilters([urn]);
+    const contextFilters = toFilters(filterPrefix(context.urns, 'thirdeye:dimension:'));
+    const filters = toFilterMap(metricFilters.concat(contextFilters));
 
-  _makeDimensionFiltersMap(filtersMap, urn) {
-    const filters = _.cloneDeep(filtersMap);
+    const filterString = encodeURIComponent(JSON.stringify(filters));
 
-    // frontend:dimension:metric:12345:key=value:otherKey=otherValue
-    const encodedDimensions = _.slice(urn.split(':'), 4);
-    encodedDimensions.forEach(enc => {
-      const [key, value] = enc.split('=');
-      if (filters[key]) {
-        filters[key].push(value);
-      } else {
-        filters[key] = [value];
-      }
-    });
-
-    return filters;
+    const url = `/aggregation/aggregate?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}`;
+    return fetch(url)
+    // .then(checkStatus)
+      .then(res => res.json())
+      .then(res => this._extractAggregates(res, urn))
+      .then(res => this._complete(context, res));
   }
 });

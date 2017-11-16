@@ -1,7 +1,7 @@
 import Ember from 'ember';
 import d3 from 'd3';
 import moment from 'moment';
-import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail } from 'thirdeye-frontend/helpers/utils';
+import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange } from 'thirdeye-frontend/helpers/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -15,13 +15,9 @@ export default Ember.Component.extend({
 
   timeseries: null, // {}
 
+  context: null, // {}
+
   onHover: null, // function (urns)
-
-  anomalyRange: null, // [2]
-
-  baselineRange: null, // [2]
-
-  analysisRange: null, // [2]
 
   timeseriesMode: null, // 'absolute', 'relative', 'log'
 
@@ -52,12 +48,13 @@ export default Ember.Component.extend({
   ),
 
   axis: Ember.computed(
-    'analysisRange',
+    'context',
     function () {
       console.log('rootcause-chart: axis');
-      const { analysisRange } = this.getProperties('analysisRange');
-      console.log('rootcause-chart: axis: analysisRange', analysisRange);
-
+      const { context } = this.getProperties('context');
+      
+      const { analysisRange } = context; 
+      
       return {
         y: {
           show: true
@@ -98,9 +95,8 @@ export default Ember.Component.extend({
   series: Ember.computed(
     'entities',
     'timeseries',
+    'context',
     'displayableUrns',
-    'anomalyRange',
-    'baselineRange',
     'timeseriesMode',
     function () {
       const { timeseries, timeseriesMode, displayableUrns } =
@@ -123,9 +119,8 @@ export default Ember.Component.extend({
   splitSeries: Ember.computed(
     'entities',
     'timeseries',
+    'context',
     'displayableUrns',
-    'anomalyRange',
-    'baselineRange',
     'timeseriesMode',
     function () {
       console.log('rootcauseChart: splitSeries()');
@@ -210,7 +205,10 @@ export default Ember.Component.extend({
   //
 
   _makeChartSeries(urns) {
-    const { anomalyRange, baselineRange } = this.getProperties('anomalyRange', 'baselineRange');
+    const { context } = this.getProperties('context');
+    
+    const { anomalyRange, compareMode } = context;
+    const baselineRange = toBaselineRange(anomalyRange, compareMode);
 
     const series = {};
     [...urns].forEach(urn => {

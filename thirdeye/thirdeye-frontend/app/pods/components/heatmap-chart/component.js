@@ -104,7 +104,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  contributions: Ember.computed(
+  sizes: Ember.computed(
     '_dataRollup',
     function () {
       const { _dataRollup: data } = this.getProperties('_dataRollup');
