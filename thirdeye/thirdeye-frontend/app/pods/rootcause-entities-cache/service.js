@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, toBaselineUrn } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterPrefix, toBaselineRange } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -43,7 +43,7 @@ export default Ember.Service.extend({
     // only accept latest result
     const { context } = this.getProperties('context');
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseEntitiesCache: received stale result. ignoring.');
+      console.log('rootcauseEntitiesCache: _complete: received stale result. ignoring.');
       return;
     }
 
@@ -58,11 +58,8 @@ export default Ember.Service.extend({
     Object.keys(entities).filter(urn => !staleUnselected.has(urn)).forEach(urn => remaining[urn] = entities[urn]);
     Object.keys(entities).filter(urn => staleSelected.has(urn)).forEach(urn => remaining[urn].score = -1);
 
-    // augment results
-    const augmenting = this._augment(incoming);
-
     // merge
-    const newEntities = Object.assign({}, remaining, augmenting, incoming);
+    const newEntities = Object.assign({}, remaining, incoming);
 
     // update pending
     const newPending = new Set(pending);
@@ -73,34 +70,22 @@ export default Ember.Service.extend({
 
   _evictionCandidates(entities, framework) {
     if (framework == 'relatedEvents') {
-      return Object.keys(entities).filter(urn => entities[urn].type == 'event');
+      return filterPrefix(Object.keys(entities), 'thirdeye:event:');
     }
     if (framework == 'relatedDimensions') {
-      return Object.keys(entities).filter(urn => entities[urn].type == 'dimension');
+      return filterPrefix(Object.keys(entities), 'thirdeye:dimension:');
     }
     if (framework == 'relatedMetrics') {
-      return Object.keys(entities).filter(urn => ['metric', 'frontend:baseline:metric'].includes(entities[urn].type));
+      return filterPrefix(Object.keys(entities), ['thirdeye:metric:', 'frontend:metric:']);
     }
-  },
-
-  _augment(incoming) {
-    const entities = {};
-    Object.keys(incoming).filter(urn => incoming[urn].type == 'metric').forEach(urn => {
-      const baselineUrn = toBaselineUrn(urn);
-      entities[baselineUrn] = {
-        urn: baselineUrn,
-        type: 'frontend:baseline:metric',
-        label: incoming[urn].label + ' (baseline)'
-      };
-    });
-    return entities;
   },
 
   _makeUrl(framework, context) {
     const urnString = [...context.urns].join(',');
+    const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
       `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
-      `&baselineStart=${context.baselineRange[0]}&baselineEnd=${context.baselineRange[1]}` +
+      `&baselineStart=${baselineRange[0]}&baselineEnd=${baselineRange[1]}` +
       `&analysisStart=${context.analysisRange[0]}&analysisEnd=${context.analysisRange[1]}` +
       `&urns=${urnString}`;
   },

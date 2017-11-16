@@ -18,41 +18,8 @@
 
 import Ember from 'ember';
 import moment from 'moment';
+import { toFilters, toFilterMap } from '../../../helpers/utils';
 
-
-// TODO: move this to a utils file (DRYER)
-const _calculateBaselineRange = (range, compareMode) => {
-  const [
-    start,
-    end
-  ] = range;
-  const offset = {
-    WoW: 1,
-    Wo2W: 2,
-    Wo3W: 3,
-    Wo4W: 4
-  }[compareMode];
-
-  const baselineRangeStart = moment(start).subtract(offset, 'weeks').valueOf();
-  const baselineRangeEnd = moment(end).subtract(offset, 'weeks').valueOf();
-
-  return [baselineRangeStart, baselineRangeEnd];
-};
-
-// TODO: move this to a utils file (DRYER)
-const _urnsToFilter = (urns) => {
-  return Array.from(urns).reduce((hash, urn) => {
-    const [_te, type, ...filter] = urn.split(':');
-    if (type === 'dimension') {
-      const [key, value, _provided] = filter;
-      if (!hash[key]) {
-        hash[key] = [];
-      }
-      hash[key].push(value);
-    }
-    return hash;
-  }, {});
-};
 // TODO: move this to a utils file (DRYER)
 const _filterToUrn = (filters) => {
   const urns = [];
@@ -70,7 +37,7 @@ const _filterToUrn = (filters) => {
 /**
  * Date formate the date picker component expects
  * @type String
- * 
+ *
  */
 const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
@@ -182,15 +149,31 @@ export default Ember.Component.extend({
    */
   filters: JSON.stringify({}),
 
-
   /**
-   * Indicates the date format to be used based on granularity
+   * Indicates the unit of the granularity
    * @type {String}
    */
-  uiDateFormat: Ember.computed('granularity', function () {
+  granularityUnit: Ember.computed('granularity', function () {
     const granularity = this.get('granularity');
+    const units = ['MINUTES', 'HOURS', 'DAYS'];
 
-    switch (granularity) {
+    for (let i = 0; i < units.length; i++) {
+      if (granularity.endsWith(units[i])) {
+        return units[i];
+      }
+    }
+
+    return 'MINUTES';
+  }),
+
+  /**
+   * Indicates the date format to be used based on granularityUnit
+   * @type {String}
+   */
+  uiDateFormat: Ember.computed('granularityUnit', function () {
+    const granularityUnit = this.get('granularityUnit');
+
+    switch (granularityUnit) {
       case 'DAYS':
         return 'MMM D, YYYY';
       case 'HOURS':
@@ -201,13 +184,13 @@ export default Ember.Component.extend({
   }),
 
   /**
-   * Indicates the allowed date range picker increment based on granularity
+   * Indicates the allowed date range picker increment based on granularityUnit
    * @type {Number}
    */
-  timePickerIncrement: Ember.computed('granularity', function () {
-    const granularity = this.get('granularity');
+  timePickerIncrement: Ember.computed('granularityUnit', function () {
+    const granularityUnit = this.get('granularityUnit');
 
-    switch (granularity) {
+    switch (granularityUnit) {
       case 'DAYS':
         return 1440;
       case 'HOURS':
@@ -225,21 +208,18 @@ export default Ember.Component.extend({
     const {
       urns,
       anomalyRange,
-      baselineRange,
       analysisRange,
       granularity,
       compareMode
     } = this.get('context');
-    
-    const filterUrns = Array.from(urns).filter(urn => urn.includes(':dimension:'));
-    const otherUrns = Array.from(urns).filter(urn => !urn.includes(':dimension:'));
-    const filters = JSON.stringify(_urnsToFilter(filterUrns));
 
+    const filterUrns = Array.from(urns).filter(urn => urn.startsWith('thirdeye:dimension:'));
+    const otherUrns = Array.from(urns).filter(urn => !urn.startsWith('thirdeye:dimension:'));
+    const filters = JSON.stringify(toFilterMap(toFilters(filterUrns)));
 
-    this.setProperties({ 
+    this.setProperties({
       otherUrns,
       anomalyRangeStart: anomalyRange[0], anomalyRangeEnd: anomalyRange[1],
-      baselineRangeStart: baselineRange[0], baselineRangeEnd: baselineRange[1],
       analysisRangeStart: analysisRange[0], analysisRangeEnd: analysisRange[1],
       granularity,
       compareMode,
@@ -292,15 +272,13 @@ export default Ember.Component.extend({
         'analysisRangeEnd');
       const onChange = this.get('onChange');
 
-      
+
       if (onChange != null) {
         const filterUrns = _filterToUrn(filters);
         const urns = new Set([...otherUrns, ...filterUrns]);
         const anomalyRange = [parseInt(anomalyRangeStart), parseInt(anomalyRangeEnd)];
         const analysisRange = [parseInt(analysisRangeStart), parseInt(analysisRangeEnd)];
-        const [baselineRangeStart, baselineRangeEnd] = _calculateBaselineRange(anomalyRange, compareMode);
-        const baselineRange = [parseInt(baselineRangeStart), parseInt(baselineRangeEnd)];
-        const newContext = { urns, anomalyRange, baselineRange, analysisRange, granularity, compareMode };
+        const newContext = { urns, anomalyRange, analysisRange, granularity, compareMode };
         onChange(newContext);
       }
     },
@@ -340,7 +318,7 @@ export default Ember.Component.extend({
       });
       this.send('updateContext');
     },
-  
+
 
     /**
      * Updates the compare mode

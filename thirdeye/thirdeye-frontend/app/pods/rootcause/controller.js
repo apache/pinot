@@ -1,15 +1,7 @@
 import Ember from 'ember';
-import { makeIterable, filterObject, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { makeIterable, filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
-import moment from 'moment';
-
-const {
-  getProperties,
-  get,
-  setProperties,
-  computed
-} = Ember;
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -46,10 +38,12 @@ export default Ember.Controller.extend({
 
   context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
 
-  config: config, // {}
+  filterConfig: config, // {}
   
+  settingsConfig: null, // {}
+
   activeTab: null, // ""
-  
+
   init() {
     this._super(...arguments);
     this.setProperties({ activeTab: ROOTCAUSE_TAB_DIMENSIONS });
@@ -78,57 +72,16 @@ export default Ember.Controller.extend({
       timeseriesService.request(context, selectedUrns);
       breakdownsService.request(context, selectedUrns);
 
-      const allUrns = new Set(Object.keys(entities));
-      aggregatesService.request(context, allUrns);
-    }
-  ),
-
-  /**
-   * Configuration for the Settings component
-   */
-  settingsConfig: computed(
-    'model.{granularityOptions,filterOptions,compareModeOptions}',
-    function() {
-      const model = get(this, 'model');
-      const settingsOptions = ['granularityOptions', 'filterOptions', 'compareModeOptions'];
-
-      return getProperties(model, settingsOptions);
+      const metricUrns = new Set(filterPrefix(Object.keys(entities), 'thirdeye:metric:'));
+      const currentUrns = [...metricUrns].map(toCurrentUrn);
+      const baselineUrns = [...metricUrns].map(toBaselineUrn);
+      aggregatesService.request(context, new Set(currentUrns.concat(baselineUrns)));
     }
   ),
 
   //
   // Public properties (computed)
   //
-
-  /**
-   * Hash containing all possible option values
-   * @type {Object}
-   */
-  options: Ember.computed('model', function() {
-    const model = this.get('model');
-    return getProperties(model, ['granularityOptions', 'filterOptions', 'maxTime', 'compareModeOptions']);
-  }),
-
-  /**
-   * Convert a  query value into option vlaue
-   * @param {String} key          - query param key
-   * @param {String|Object} value - query param value
-   */
-  queryToOption(key, value) {
-    switch(key) {
-      case 'baselineRangeStart':
-      case 'baselineRangeEnd':
-      case 'anomalyRangeStart':
-      case 'anomalyRangeEnd':
-      case 'analysisRangeStart':
-      case 'analysisRangeEnd':
-        return moment(+value).isValid ? parseInt(value) : undefined;
-      case 'granularity':
-      case 'filters':
-      case 'compareMode':
-        return value;
-    }
-  },
 
   entities: Ember.computed(
     'entitiesService.entities',
@@ -174,6 +127,7 @@ export default Ember.Controller.extend({
       const urns = new Set(selectedUrns);
       [...invisibleUrns].forEach(urn => urns.delete(urn));
 
+      console.log('chartSelectedUrns: urns', urns);
       return urns;
     }
   ),
@@ -208,24 +162,6 @@ export default Ember.Controller.extend({
       const { entities, invisibleUrns, hoverUrns } = this.getProperties('entities', 'invisibleUrns', 'hoverUrns');
       const visibleUrns = [...hoverUrns].filter(urn => !invisibleUrns.has(urn));
       return filterObject(entities, (e) => visibleUrns.has(e.urn));
-    }
-  ),
-
-  heatmapCurrentUrns: Ember.computed(
-    'selectedUrns',
-    function () {
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      return new Set(filterPrefix(selectedUrns, 'thirdeye:metric:'));
-    }
-  ),
-
-  heatmapCurrent2Baseline: Ember.computed(
-    'selectedUrns',
-    function () {
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      const baselineUrns = {};
-      filterPrefix(selectedUrns, 'thirdeye:metric:').forEach(urn => baselineUrns[urn] = toBaselineUrn(urn));
-      return baselineUrns;
     }
   ),
 
@@ -276,8 +212,17 @@ export default Ember.Controller.extend({
       this.set('invisibleUrns', new Set(invisibleUrns));
     },
 
-    // TODO refactor filter to match onSelection()
-    filterOnSelect(urns) {
+    /**
+     * Handles the rootcause_setting change event
+     * and updates query params and context
+     * @param {Object} newParams new parameters to update
+     */
+    onContext(context) {
+      console.log('settingsOnChange()');
+      this.set('context', context);
+    },
+
+    onFilter(urns) {
       console.log('filterOnSelect()');
       this.set('filteredUrns', new Set(urns));
     },
@@ -291,20 +236,6 @@ export default Ember.Controller.extend({
       console.log('loadtestSelected()');
       const { entities } = this.getProperties('entities');
       this.set('selectedUrns', new Set(Object.keys(entities)));
-    },
-
-    /**
-     * Handles the rootcause_setting change event
-     * and updates query params and context
-     * @param {Object} newParams new parameters to update
-     */
-    settingsOnChange(context) {
-      console.log('settingsOnChange()');
-      console.log('settingsOnChange: context', context);
-      
-      setProperties(this, {
-        context
-      });
     },
 
     addSelectedUrns(urns) {

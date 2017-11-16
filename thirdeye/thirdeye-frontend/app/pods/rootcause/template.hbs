@@ -1,10 +1,9 @@
 <p>testing | <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a></p>
 
-<h3>This is the settings bar.</h3>
 {{rootcause-settings
   context=context
   config=settingsConfig
-  onChange=(action "settingsOnChange")
+  onChange=(action "onContext")
 }}
 
 <p>loading
@@ -31,19 +30,11 @@
       entities=entities
       selectedUrns=chartSelectedUrns
       timeseries=timeseries
-      anomalyRange=context.anomalyRange
-      baselineRange=context.baselineRange
-      analysisRange=context.analysisRange
+      context=context
       onHover=(action "chartOnHover")
     }}
   </div>
 </div>
-
-<p>hovering
-  {{#each hoverUrns as |urn|}}
-    | {{urn}}
-  {{/each}}
-</p>
 
 <button {{action (mut activeTab) "dimensions"}}>dimensions</button> |
 <button {{action (mut activeTab) "metrics"}}>metrics</button> |
@@ -53,8 +44,7 @@
   <h3>Dimensions</h3>
   {{rootcause-heatmap
     breakdowns=breakdowns
-    currentUrns=heatmapCurrentUrns
-    current2baseline=heatmapCurrent2Baseline
+    selectedUrns=selectedUrns
   }}
 {{/if}}
 
@@ -73,10 +63,10 @@
   <div class="row">
     <div class="col-xs-3">
       {{filter-bar
-        config=config
+        config=filterConfig
         activeTab=selectedTab
         entities=eventFilterEntities
-        onSelect=(action "filterOnSelect")}}
+        onSelect=(action "onFilter")}}
     </div>
     <div class="col-xs-8">
       {{rootcause-table
@@ -88,4 +78,3 @@
     </div>
   </div>
 {{/if}}
-

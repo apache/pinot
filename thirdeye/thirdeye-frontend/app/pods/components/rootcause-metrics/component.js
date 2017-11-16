@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toBaselineUrn, hasPrefix, filterPrefix } from '../../../helpers/utils';
+import { toCurrentUrn, toBaselineUrn, hasPrefix, filterPrefix } from '../../../helpers/utils';
 
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
@@ -85,13 +85,13 @@ export default Ember.Component.extend({
   ),
 
   changes: Ember.computed(
+    'entities',
     'aggregates',
     function () {
-      const { aggregates } = this.getProperties('aggregates');
-      return filterPrefix(Object.keys(aggregates), ['thirdeye:metric:'])
-        .filter(urn => aggregates[toBaselineUrn(urn)])
+      const { entities, aggregates } = this.getProperties('entities', 'aggregates');
+      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
         .reduce((agg, urn) => {
-          agg[urn] = aggregates[urn] / aggregates[toBaselineUrn(urn)] - 1;
+          agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toBaselineUrn(urn)] - 1;
           return agg;
         }, {});
     }
@@ -116,6 +116,7 @@ export default Ember.Component.extend({
         const state = !selectedUrns.has(urn);
         const updates = { [urn]: state };
         if (hasPrefix(urn, 'thirdeye:metric:')) {
+          updates[toCurrentUrn(urn)] = state;
           updates[toBaselineUrn(urn)] = state;
         }
         onSelection(updates);
