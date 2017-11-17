@@ -8,7 +8,7 @@ import Ember from 'ember';
  */
 export function colorDelta([value = 'N/A']) {
   if (value ===  'N/A') { return; }
-  return parseInt(value) >= 0 ? 'positive' : 'negative';
+  return parseInt(value * 100) >= 0 ? 'positive' : 'negative';
 }
 
 export default Ember.Helper.helper(colorDelta);

@@ -84,8 +84,64 @@
 }
 
 .rootcause-metric {
-  height: 150px;
-  border: 1px solid gray;
-  text-align: center;
-  float: left;
+  &__wrapper {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  &__card {
+    border-radius: 2px;
+    padding: 16px;
+    border: 1px solid rgba(0,0,0,0.15);
+    margin: 8px;
+    margin-right: auto;
+    display: flex;
+    flex-basis: 0;
+    min-width: 200px;
+    flex-direction: column;
+    justify-content: space-between;
+
+    &--selected,
+    &:hover {
+      border: 2px solid $te-blue-6;
+      padding: 15px;    
+    }
+    &--selected:hover {
+      border-style: dashed;
+    }
+  }
+
+  &__title {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    word-break: break-word;
+  }
+
+  &__name {
+    font-size: 14px;
+    color: rgba(0,0,0,0.9);
+    line-height: 20px;
+  }
+
+  &__dataset {
+    font-size: 12px;
+    line-height: 16px;
+    color: rgba(0,0,0,0.6);
+  }
+  &__change {
+    color: rgba(0,0,0,0.85);
+    font-size: 32px;
+    line-height: 32px;
+    padding-top: 16px;
+
+    &--positive { 
+      color: $te-green;
+    }
+
+    &--negative {
+      color: $te-red;
+    }
+  }
+
 }
