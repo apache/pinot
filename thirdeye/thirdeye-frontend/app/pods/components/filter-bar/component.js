@@ -60,6 +60,7 @@ export default Ember.Component.extend({
     this._super(...arguments);
     // Fetch the config file to create sub-filters
     const filterBlocks = this.get('config');
+    debugger;
 
     // Set up filter block object
     filterBlocks.forEach((block, index) => {

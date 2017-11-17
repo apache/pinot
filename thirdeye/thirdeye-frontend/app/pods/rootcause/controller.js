@@ -397,7 +397,7 @@ export default Ember.Controller.extend({
       }
 
       // Reset filtered urns
-      this.send('filterOnSelect', urns);
+      this.send('onFilter', urns);
     }
   }
 });
