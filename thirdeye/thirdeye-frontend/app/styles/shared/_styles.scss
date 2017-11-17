@@ -14,6 +14,10 @@ body {
     @include padding-reset;
     @include margin-reset;
   }
+  &--rootcause {
+    color: app-shade(black, 0.85);
+    margin-top: 0;
+  }
 }
 
 .te-sub-title {
@@ -66,7 +70,7 @@ body {
 
 .te-label {
   font-weight: normal;
-  color:  app-shade(black, 8);
+  color:  app-shade(black, 7);
   margin-bottom: 12px;
 
   &--flush {

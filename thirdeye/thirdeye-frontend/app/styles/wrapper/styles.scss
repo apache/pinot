@@ -38,14 +38,14 @@ body {
   padding-left: 0;
   padding-right: 0;
   font-size: 16px;
-  color: lighten(black, 30%);
+  color: app-shade(black, 7);
 }
 
 .thirdeye-link--active,
 .thirdeye-link--nav:hover {
-  color: $te-blue;
-  padding-bottom: 14px;
-  border-bottom: 2px solid $te-blue !important;
+  color: $te-blue-6;
+  padding-bottom: 10px;
+  border-bottom: 4px solid $te-blue-6 !important;
   text-decoration: none;
 }
 

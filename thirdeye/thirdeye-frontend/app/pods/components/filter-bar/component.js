@@ -19,6 +19,8 @@
 import Ember from 'ember';
 import _ from 'lodash';
 
+const { setProperties } = Ember;
+
 export default Ember.Component.extend({
 
   /**
@@ -81,7 +83,10 @@ export default Ember.Component.extend({
       });
 
       // Now add new initialized props to block item
-      Object.assign(block, { filtersArray, isHidden });
+      setProperties(block, {
+        filtersArray,
+        isHidden
+      });
     });
   },
 

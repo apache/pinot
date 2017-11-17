@@ -81,6 +81,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
       filterOptions: fetch(`/data/autocomplete/filters/metric/${id}`).then(res => res.json()),
       maxTime: fetch(`/data/maxDataTime/metricId/${id}`).then(res => res.json()),
+      metricName: fetch(`/data/metric/${id}`).then(res => res.json()).then(res => res.name),
       compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
       id
     });
