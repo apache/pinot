@@ -111,7 +111,16 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     } else {
       cacheLoaderClassName = PinotControllerResponseCacheLoader.class.getName();
     }
-    Constructor<?> constructor = Class.forName(cacheLoaderClassName).getConstructor();
+    LOG.info("Constructing cache loader: {}", cacheLoaderClassName);
+    Class<?> aClass = null;
+    try {
+      aClass = Class.forName(cacheLoaderClassName);
+    } catch (Throwable throwable) {
+      LOG.error("Failed to initiate cache loader: {}; reason:", cacheLoaderClassName, throwable);
+      aClass = PinotControllerResponseCacheLoader.class;
+    }
+    LOG.info("Initiating cache loader: {}", aClass.getName());
+    Constructor<?> constructor = aClass.getConstructor();
     PinotResponseCacheLoader pinotResponseCacheLoader = (PinotResponseCacheLoader) constructor.newInstance();
     return pinotResponseCacheLoader;
   }
