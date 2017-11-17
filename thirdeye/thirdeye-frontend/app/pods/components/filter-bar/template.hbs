@@ -1,5 +1,9 @@
 {{!-- TODO: Create separate styling for filter-bar component --}}
 <div class="entity-filter filter-bar">
+  {{rca-filter-search-bar
+    activeEventType=activeEventType
+    filterUrns=filterUrns}}
+
   {{#each config as |block|}}
     <section class="entity-filter__group">
       <h5 class="entity-filter__group-title">
@@ -17,8 +21,7 @@
             type=filter.type
             attributesMap=attributesMap
             entities=entities
-            filterUrns=filterUrns
-            updateCache=(action 'updateCache')}}
+            filterUrns=filterUrns}}
         {{/each}}
       </ul>
     </section>

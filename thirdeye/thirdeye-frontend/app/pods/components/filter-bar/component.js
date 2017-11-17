@@ -28,6 +28,13 @@ export default Ember.Component.extend({
   options: ['All', 'None'],
 
   /**
+   * Currently active event type
+   * This is used for the rca-filter-search-bar
+   * @type {String}
+   */
+  activeEventType: '',
+
+  /**
    * Overwrite the init function
    * Initializes values of the filter blocks
    * Example of a filter block:
@@ -174,16 +181,9 @@ export default Ember.Component.extend({
 
       // Calls parent to filter urns by event type
       filterUrns(clickedBlock.eventType);
-    },
 
-    /**
-     * Bubbled up action, called by the child component, filter-bar-input component, to update the urns cache
-     * @method updateCache
-     * @param {String} header - name of filter block (i.e. "Holiday", "Deployment")
-     * @param {Array} urns - list of urns that are filtered based on subfilters (i.e. country, region)
-     */
-    updateCache(header, urns) {
-      this.urnsCache[header] = urns;
+      // Update the currently active block
+      this.set('activeEventType', clickedBlock.eventType);
     }
   }
 });

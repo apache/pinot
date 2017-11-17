@@ -15,11 +15,9 @@ export default Ember.Component.extend({
      * @method filterResults
      */
     filterResults() {
-      const { entities, onSelect } = this.getProperties('entities', 'onSelect');
+      const { activeEventType, filterUrns, value } = this.getProperties('activeEventType', 'filterUrns', 'value');
       this.set('value', this.get('value'));
-      debugger;
-      const urns = Object.keys(entities).filter(urn => entities[urn].label.includes(this.value.toLowerCase()));
-      onSelect(urns);
+      filterUrns(activeEventType, null, value);
     }
   }
 });

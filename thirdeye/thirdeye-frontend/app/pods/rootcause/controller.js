@@ -362,17 +362,23 @@ export default Ember.Controller.extend({
       let urns;
       const cachedEvent = this.urnsCache[eventType];
       const filtersCache = this.filtersCache;
+      const entities = this.get('eventFilterEntities');
 
       this.send('updateFiltersCache', eventType, subFilter, text);
 
       if (!_.isEmpty(cachedEvent) && !subFilter) {
         urns = cachedEvent;
+        if (text) {
+          urns = urns.filter(urn => entities[urn].label.includes(text ? text.toLowerCase() : ''));
+        }
       } else {
-        const entities = this.get('eventFilterEntities');
-        urns = Object.keys(entities).filter(urn => entities[urn].eventType == eventType);
-
         const subFilters = filtersCache[eventType].subFilters;
 
+        // Filter by event type
+        urns = Object.keys(entities).filter(urn => entities[urn].eventType == eventType
+                                                  && entities[urn].label.includes(text ? text.toLowerCase() : ''));
+
+        // Filter by subfilters
         if (!_.isEmpty(subFilters)) {
           urns = urns.filter(urn => {
             let labels = Object.keys(subFilters);
@@ -389,22 +395,6 @@ export default Ember.Controller.extend({
           });
         }
 
-                                      //     // if (entities[urn].attributes[labelMapping]) {
-                                      //     //   return Object.keys(subFilters).filter(filter => {
-                                      //     //     return subFilters[filter]
-                                      //     //             .some(value => entities[urn].attributes[labelMapping]
-                                      //     //               .includes(value));
-                                      //     //   });
-                                      //     // }
-                                      //   }
-                                      // });
-                                      // // Filter by input from filter search bar
-                                      // .filter(urn => {
-                                      //   const filterText = filtersCache[eventType].filterText;
-                                      //   if (filterText) {
-                                      //     return entities[urn].label.includes(filterText);
-                                      //   }
-                                      // });
       }
 
       this.send('filterOnSelect', urns);
