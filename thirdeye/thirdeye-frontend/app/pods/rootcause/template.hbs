@@ -1,81 +1,111 @@
-<p>testing | <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a></p>
-
-{{rootcause-settings
-  context=context
-  config=settingsConfig
-  onChange=(action "onContext")
-}}
-
-<p>loading
-{{#if isLoadingEntities}}
-  | ENTITIES
-{{/if}}
-{{#if isLoadingTimeseries}}
-  | TIMESERIES
-{{/if}}
-</p>
-
-<div class="row">
-  <div class="col-xs-3">
-    {{rootcause-legend
-      entities=entities
-      selectedUrns=selectedUrns
-      invisibleUrns=invisibleUrns
-      onVisibility=(action "onVisibility")
-      onSelection=(action "onSelection")
-    }}
-  </div>
-  <div class="col-xs-8">
-    {{rootcause-chart
-      entities=entities
-      selectedUrns=chartSelectedUrns
-      timeseries=timeseries
-      context=context
-      onHover=(action "chartOnHover")
-    }}
-  </div>
-</div>
-
-<button {{action (mut activeTab) "dimensions"}}>dimensions</button> |
-<button {{action (mut activeTab) "metrics"}}>metrics</button> |
-<button {{action (mut activeTab) "events"}}>events</button>
-
-{{#if (eq activeTab "dimensions")}}
-  <h3>Dimensions</h3>
-  {{rootcause-heatmap
-    breakdowns=breakdowns
-    selectedUrns=selectedUrns
-    onHeatmapClick=(action "onHeatmapClick")
-  }}
-{{/if}}
-
-{{#if (eq activeTab "metrics")}}
-  <h3>Metrics</h3>
-  {{rootcause-metrics
-    entities=entities
-    aggregates=aggregates
-    selectedUrns=selectedUrns
-    onSelection=(action "onSelection")
-  }}
-{{/if}}
-
-{{#if (eq activeTab "events")}}
-  <h3>Events</h3>
+<div class="container">
   <div class="row">
-    <div class="col-xs-3">
-      {{filter-bar
-        config=filterConfig
-        activeTab=selectedTab
-        entities=eventFilterEntities
-        onSelect=(action "onFilter")}}
-    </div>
-    <div class="col-xs-8">
-      {{rootcause-table
-        entities=eventTableEntities
-        columns=eventTableColumns
-        selectedUrns=selectedUrns
-        onSelection=(action "onSelection")
-      }}
+    {{!-- TODO: delete <p> tag before release --}}
+    <p>testing | <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a></p>
+    
+    <h2 class="te-title te-title--rootcause">Root Cause Analysis for {{model.metricName}}</h2>
+    {{rootcause-settings
+      context=context
+      config=settingsConfig
+      onChange=(action "onContext")
+    }}
+  </div>
+
+  <p>loading
+  {{#if isLoadingEntities}}
+    | ENTITIES
+  {{/if}}
+  {{#if isLoadingTimeseries}}
+    | TIMESERIES
+  {{/if}}
+  </p>
+
+  <div class="row">
+    <div class="card-container card-container--box-shadow">
+      <div class="card-container__header">
+          <div class="card-container__subnav">
+            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
+              Events Correlation
+            </a>
+          </div>
+          <div class="card-container__subnav">
+            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
+              Dimensions Analysis
+            </a>
+          </div>
+          <div class="card-container__subnav">
+            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
+              Metrics Correlation
+            </a>
+          </div>
+      </div>
+      <div class="card-container__body">
+        <div class="row">
+          <div class="col-xs-3">
+            {{rootcause-legend
+              entities=entities
+              selectedUrns=selectedUrns
+              invisibleUrns=invisibleUrns
+              onVisibility=(action "onVisibility")
+              onSelection=(action "onSelection")
+            }}
+          </div>
+          <div class="col-xs-8">
+            {{rootcause-chart
+              entities=entities
+              selectedUrns=chartSelectedUrns
+              timeseries=timeseries
+              context=context
+              onHover=(action "chartOnHover")
+            }}
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-xs-12">
+            {{#if (eq activeTab "dimensions")}}
+              <h3>Dimensions</h3>
+              {{rootcause-heatmap
+                breakdowns=breakdowns
+                selectedUrns=selectedUrns
+                onHeatmapClick=(action "onHeatmapClick")
+              }}
+            {{/if}}
+
+            {{#if (eq activeTab "metrics")}}
+              <h3>Metrics</h3>
+              {{rootcause-metrics
+                entities=entities
+                aggregates=aggregates
+                selectedUrns=selectedUrns
+                onSelection=(action "onSelection")
+              }}
+            {{/if}}
+
+            {{#if (eq activeTab "events")}}
+              <h3>Events</h3>
+              <div class="row">
+                <div class="col-xs-3">
+                  {{filter-bar
+                    config=filterConfig
+                    activeTab=selectedTab
+                    entities=eventFilterEntities
+                    onSelect=(action "onFilter")}}
+                </div>
+                <div class="col-xs-8">
+                  {{rootcause-table
+                    entities=eventTableEntities
+                    columns=eventTableColumns
+                    selectedUrns=selectedUrns
+                    onSelection=(action "onSelection")
+                  }}
+                </div>
+              </div>
+            {{/if}}
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-{{/if}}
+
+</div>

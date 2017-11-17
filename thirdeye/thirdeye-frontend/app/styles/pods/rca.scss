@@ -32,7 +32,7 @@
   height: 30px;
 }
 
-.paper-container {
+.card-container {
   background-color: white;
   border: 1px solid $te-grey--border;
   margin-top: $te-spacing-lg;
@@ -41,12 +41,26 @@
   &--padded {
     padding: 24px;
   }
-}
+  &--box-shadow {
+    border: none;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 2px 3px 0 rgba(0,0,0,0.2);
+  }
+  &__header {
+    display: flex;
+    border-bottom: 1px solid $te-grey--border;
+    padding: 12px $te-spacing-lg;
+    color: app-shade(black, 0.85);
+  }
 
-.paper-container__header,
-.paper-container__body,
-.paper-container__footer {
-  padding: $te-spacing-lg;
+  &__subnav {
+    margin-right: $te-spacing-lg;
+    font-size: 17px;
+  }
+
+  &__body,
+  &__footer {
+    padding: $te-spacing-lg;
+  }
 }
 
 .rca-search-bar {

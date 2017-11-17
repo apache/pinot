@@ -1,8 +1,8 @@
 <div class="container">
   <div class="row">
     <h2 class="te-title">Summary</h2>
-    <div class="paper-container">
-      <div class="paper-container__body">
+    <div class="card-container">
+      <div class="card-container__body">
         <section class="rca-summary">
           <div class="row">
             <div class="col-xs-4">
@@ -90,7 +90,7 @@
             </div>
           </div>
 
-          <main class="paper-container">
+          <main class="card-container">
             {{#containers/primary-metric-container as |summary actions|}}
               {{#if (or summary.loading (not summary.loaded))}}
                 <div class="spinner-wrapper">
@@ -129,7 +129,7 @@
     </div>
 
     <h2 class="te-title">Root Cause Analysis</h2>
-    <div id="root-cause-analysis" class="paper-container">
+    <div id="root-cause-analysis" class="card-container">
       <div class="contribution-table__header">
         <div class="contribution-table__subnav">
           {{#link-to "rca.details.events" class="thirdeye-link thirdeye-link--nav" activeClass="thirdeye-link--active"}}
