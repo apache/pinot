@@ -24,7 +24,7 @@ export default [
     ]
   },
   {
-    header: "Holiday",
+    header: "Holidays",
     eventType: "holiday",
     inputs: [
       {
@@ -74,7 +74,7 @@ export default [
     ]
   },
   {
-    header: "Deployment",
+    header: "Deployments",
     eventType: "informed",
     inputs: [
       {

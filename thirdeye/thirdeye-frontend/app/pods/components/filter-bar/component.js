@@ -65,7 +65,7 @@ export default Ember.Component.extend({
   init() {
     this._super(...arguments);
     // Fetch the config file to create sub-filters
-    const filterBlocks = this.get('config');
+    const filterBlocks = _.cloneDeep(this.get('config'));
 
     // Set up filter block object
     filterBlocks.forEach((block, index) => {
@@ -146,14 +146,13 @@ export default Ember.Component.extend({
               }
               // If map doesn't have a key of eventType (i.e. holidays, GCN, Lix)
               else {
-                let obj = { [attr]: new Set(event.attributes.countryCode) };
+                let obj = { [attr]: new Set() };
                 map[eventType] = obj;
               }
             }
           });
         });
       }
-
       return map;
     }
   ),

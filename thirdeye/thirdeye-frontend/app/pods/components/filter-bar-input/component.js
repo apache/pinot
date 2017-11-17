@@ -41,14 +41,15 @@ export default Ember.Component.extend({
   options: Ember.computed(
     'label',
     'attributesMap',
+    'config',
+    'eventType',
     function() {
-      const { label, attributesMap, config, header } = this.getProperties('label', 'attributesMap', 'config', 'header');
+      const { label, attributesMap, config, eventType } = this.getProperties('label', 'attributesMap', 'config', 'eventType');
       const labelMapping = findLabelMapping(label, config);
       let inputValues = '';
-      if (!_.isEmpty(attributesMap) && labelMapping) {
-        inputValues = Array.from(attributesMap[header.toLowerCase()][labelMapping]);
+      if (attributesMap && attributesMap[eventType] && labelMapping) {
+        inputValues = Array.from(attributesMap[eventType][labelMapping]);
       }
-
       return inputValues;
     }
   ),
@@ -60,8 +61,8 @@ export default Ember.Component.extend({
      * @param {Array} selectedValue - selected value in the input
      */
     onSubfilterSelection(selectedValue) {
-      const { label, entities, onSelect, header, updateCache } = this.getProperties('label', 'entities', 'onSelect', 'header', 'updateCache');
-      const labelMapping = findLabelMapping(label, this.get('config'));
+      const { label, entities, onSelect, eventType, updateCache, config, header } = this.getProperties('label', 'entities', 'onSelect', 'eventType', 'updateCache', 'config', 'header');
+      const labelMapping = findLabelMapping(label, config);
 
       this.set('selected', selectedValue);
 
@@ -69,8 +70,7 @@ export default Ember.Component.extend({
         let urns;
         // If there are no filters, show all entities under that event type
         if (!selectedValue.length) {
-          urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
-                                                    && entities[urn].eventType == header.toLowerCase());
+          urns = Object.keys(entities).filter(urn => entities[urn].type == 'event' && entities[urn].eventType == eventType);
         } else {
           urns = Object.keys(entities).filter(urn => {
             if (entities[urn].attributes[labelMapping]) {
