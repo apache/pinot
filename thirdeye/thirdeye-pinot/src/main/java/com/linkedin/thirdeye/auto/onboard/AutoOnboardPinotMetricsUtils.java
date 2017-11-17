@@ -133,7 +133,7 @@ public class AutoOnboardPinotMetricsUtils {
   public Map<String, String> getCustomConfigsFromPinotEndpoint(String dataset) throws IOException {
     HttpGet request = new HttpGet(String.format(PINOT_TABLES_ENDPOINT_TEMPLATE, dataset));
     CloseableHttpResponse response = pinotControllerClient.execute(pinotControllerHost, request);
-    LOG.debug("Retrieving datasets' D2 name: {}", request);
+    LOG.debug("Retrieving dataset's custom config: {}", request);
 
     // Retrieve table config
     JsonNode tables = null;
@@ -144,7 +144,7 @@ public class AutoOnboardPinotMetricsUtils {
       InputStream tablesContent = response.getEntity().getContent();
       tables = OBJECT_MAPPER.readTree(tablesContent);
     } catch (Exception e) {
-      LOG.error("Exception in loading dataset", e);
+      LOG.error("Exception in loading dataset {}", dataset, e);
     } finally {
       if (response.getEntity() != null) {
         EntityUtils.consume(response.getEntity());
@@ -164,7 +164,7 @@ public class AutoOnboardPinotMetricsUtils {
           JsonNode jsonNode = table.get("metadata").get("customConfigs");
           customConfigs = OBJECT_MAPPER.convertValue(jsonNode, HashMap.class);
         } catch (Exception e) {
-          LOG.error("Failed to get D2 name for dataset: {}. Reason: {}", dataset, e);
+          LOG.warn("Failed to get custom config for dataset: {}. Reason: {}", dataset, e);
         }
       } else {
         LOG.debug("Dataset {} doesn't exists in Pinot.", dataset);
