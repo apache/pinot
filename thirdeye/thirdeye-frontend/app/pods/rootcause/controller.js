@@ -213,8 +213,7 @@ export default Ember.Controller.extend({
    *    subFilters: {
    *      country: ['US', 'CA'],
    *      region: ['North America']
-   *    },
-   *    filterText: "" // user's input text from filter search bar
+   *    }
    *  },
    *  GCN: {...}
    * }
@@ -321,9 +320,8 @@ export default Ember.Controller.extend({
      * Updates the filters cache with newly selected filters
      * @param {String} eventType - event type (i.e. Holiday, GCN)
      * @param {Object} subFilter - representation of subfilter and its values (i.e. {key: "country", value: ["US"]})
-     * @param {String} filterText - user's input text in filter search bar
      */
-    updateFiltersCache(eventType, subFilter, filterText) {
+    updateFiltersCache(eventType, subFilter) {
       // Initialize object assignments in the cache
       if (!this.filtersCache[eventType]) {
         this.filtersCache[eventType] = {};
@@ -336,17 +334,10 @@ export default Ember.Controller.extend({
         this.filtersCache[eventType].subFilters[subFilter.key] = [];
       }
 
-      if (!this.filtersCache[eventType].filterText) {
-        this.filtersCache[eventType].filterText = '';
-      }
-
       // Set the subFilters value based on event type
       if (subFilter) {
         this.filtersCache[eventType].subFilters[subFilter.key] = subFilter.value;
       }
-
-      // Set the filterText value (from user's input in search filter bar) based on event type
-      this.filtersCache[eventType].filterText = filterText;
     },
 
     /**
@@ -358,14 +349,21 @@ export default Ember.Controller.extend({
       this.urnsCache[eventType] = urns;
     },
 
+    /**
+     * Filters urns based on event type, subfilters selected, and user text from filter search bar
+     * @param {String} eventType - type of event
+     * @param {Object} subFilter - filter within event (i.e. country, region for Holiday)
+     * @param {String} text - user's input from filter search bar
+     */
     filterUrns(eventType, subFilter, text) {
       let urns;
       const cachedEvent = this.urnsCache[eventType];
       const filtersCache = this.filtersCache;
       const entities = this.get('eventFilterEntities');
 
-      this.send('updateFiltersCache', eventType, subFilter, text);
+      this.send('updateFiltersCache', eventType, subFilter);
 
+      // If the event is cached and there are no new subfilters selected
       if (!_.isEmpty(cachedEvent) && !subFilter) {
         urns = cachedEvent;
         if (text) {
@@ -374,7 +372,7 @@ export default Ember.Controller.extend({
       } else {
         const subFilters = filtersCache[eventType].subFilters;
 
-        // Filter by event type
+        // Filter by event type and text
         urns = Object.keys(entities).filter(urn => entities[urn].eventType == eventType
                                                   && entities[urn].label.includes(text ? text.toLowerCase() : ''));
 
@@ -395,12 +393,13 @@ export default Ember.Controller.extend({
           });
         }
 
+        // Update urnsCache
+        this.send('updateUrnsCache', eventType, urns);
       }
 
+      // Reset filtered urns
       this.send('filterOnSelect', urns);
 
-      // Updates urnsCache
-      this.send('updateUrnsCache', eventType, urns);
     }
   }
 });

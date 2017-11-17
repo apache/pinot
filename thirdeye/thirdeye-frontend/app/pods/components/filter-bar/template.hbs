@@ -1,9 +1,9 @@
 {{!-- TODO: Create separate styling for filter-bar component --}}
-<div class="entity-filter filter-bar">
-  {{rca-filter-search-bar
-    activeEventType=activeEventType
-    filterUrns=filterUrns}}
+{{rca-filter-search-bar
+  activeEventType=activeEventType
+  filterUrns=filterUrns}}
 
+<div class="entity-filter filter-bar">
   {{#each config as |block|}}
     <section class="entity-filter__group">
       <h5 class="entity-filter__group-title">
