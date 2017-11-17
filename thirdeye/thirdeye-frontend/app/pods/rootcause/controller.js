@@ -139,7 +139,6 @@ export default Ember.Controller.extend({
     function () {
       console.log('eventTableEntities()');
       const { entities, filteredUrns } = this.getProperties('entities', 'filteredUrns');
-      console.log("EVENT TABLE ENTITIES: ", filterObject(entities, (e) => filteredUrns.has(e.urn)));
       return filterObject(entities, (e) => filteredUrns.has(e.urn));
     }
   ),
@@ -152,7 +151,6 @@ export default Ember.Controller.extend({
       console.log('eventFilterEntities()');
       const { entities } = this.getProperties('entities');
       console.log("printing entities: ", entities);
-      console.log("EVENT FILTER ENTITIES: ", filterObject(entities, (e) => e.type == 'event'));
       return filterObject(entities, (e) => e.type == 'event');
     }
   ),
@@ -322,7 +320,7 @@ export default Ember.Controller.extend({
      * @param {Object} subFilter - representation of subfilter and its values (i.e. {key: "country", value: ["US"]})
      */
     updateFiltersCache(eventType, subFilter) {
-      // Initialize object assignments in the cache
+      // Initialize objects before assignment in the cache
       if (!this.filtersCache[eventType]) {
         this.filtersCache[eventType] = {};
       }
@@ -361,6 +359,7 @@ export default Ember.Controller.extend({
       const filtersCache = this.filtersCache;
       const entities = this.get('eventFilterEntities');
 
+      // Updates the filters cache with new filters
       this.send('updateFiltersCache', eventType, subFilter);
 
       // If the event is cached and there are no new subfilters selected
@@ -399,7 +398,6 @@ export default Ember.Controller.extend({
 
       // Reset filtered urns
       this.send('filterOnSelect', urns);
-
     }
   }
 });
