@@ -1,5 +1,9 @@
 import Ember from 'ember';
 import { toCurrentUrn, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import _ from 'lodash';
+
+const ROOTCAUSE_ROLLUP_HEAD = 'HEAD';
+const ROOTCAUSE_ROLLUP_TAIL = 'TAIL';
 
 export default Ember.Component.extend({
   breakdowns: null, // {}
@@ -8,7 +12,7 @@ export default Ember.Component.extend({
 
   currentUrn: null, // ""
 
-  rollup: 20, // ""
+  rollupRange: [0, 20], // ""
 
   mode: "change", // ""
 
@@ -29,10 +33,9 @@ export default Ember.Component.extend({
   current: Ember.computed(
     'breakdowns',
     'currentUrn',
-    'currentUrns',
     function () {
-      const { breakdowns, currentUrn, currentUrns } =
-        this.getProperties('breakdowns', 'currentUrn', 'currentUrns');
+      const { breakdowns, currentUrn } =
+        this.getProperties('breakdowns', 'currentUrn');
 
       console.log('rootcauseHeatmap: current: breakdowns currentUrn', breakdowns, currentUrn);
       if (!currentUrn) {
@@ -70,36 +73,37 @@ export default Ember.Component.extend({
   _dataRollup: Ember.computed(
     'current',
     'baseline',
-    'rollup',
+    'rollupRange',
     function () {
-      const { current, baseline, rollup } =
-        this.getProperties('current', 'baseline', 'rollup');
+      const { current, baseline, rollupRange } =
+        this.getProperties('current', 'baseline', 'rollupRange');
 
-        // collect all dimension names
-        const dimNames = new Set(Object.keys(current).concat(Object.keys(baseline)));
+      // collect all dimension names
+      const dimNames = new Set(Object.keys(current).concat(Object.keys(baseline)));
 
-        // collect all dimension values for all dimension names
-        const dimValues = {};
-        [...dimNames].forEach(n => dimValues[n] = new Set());
-        [...dimNames].filter(n => n in current).forEach(n => Object.keys(current[n]).forEach(v => dimValues[n].add(v)));
-        [...dimNames].filter(n => n in baseline).forEach(n => Object.keys(baseline[n]).forEach(v => dimValues[n].add(v)));
+      // collect all dimension values for all dimension names
+      const dimValues = {};
+      [...dimNames].forEach(n => dimValues[n] = new Set());
+      [...dimNames].filter(n => n in current).forEach(n => Object.keys(current[n]).forEach(v => dimValues[n].add(v)));
+      [...dimNames].filter(n => n in baseline).forEach(n => Object.keys(baseline[n]).forEach(v => dimValues[n].add(v)));
 
-        const values = {};
-        [...dimNames].forEach(n => {
-          let curr = current[n] || {};
-        let base = baseline[n] || {};
-        let dimVals = dimValues[n] || new Set();
+      const values = {};
+      [...dimNames].forEach(n => {
+        // order based on current contribution
+        const all = this._sortKeysByValue(current[n]).reverse();
 
-        // conditional rollup
-        if (rollup > 0 && Object.keys(curr).length >= rollup) {
-          const topk = new Set(this._makeTopK(curr, rollup - 1));
-          curr = this._makeRollup(curr, topk, 'OTHER');
-          base = this._makeRollup(base, topk, 'OTHER');
-          dimVals = new Set(['OTHER', ...topk]);
-        }
+        const head = _.slice(all, 0, rollupRange[0]);
+        const visible = _.slice(all, rollupRange[0], rollupRange[1]);
+        const tail = _.slice(all, rollupRange[1]);
+
+        const curr = this._makeRollup(current[n], head, visible, tail);
+        const base = this._makeRollup(baseline[n], head, visible, tail);
+
+        console.log('rootcauseHeatmap: _dataRollup: n curr', n, curr);
+        console.log('rootcauseHeatmap: _dataRollup: n base', n, base);
 
         values[n] = {};
-        [...dimVals].forEach(v => {
+        [ROOTCAUSE_ROLLUP_HEAD, ...visible, ROOTCAUSE_ROLLUP_TAIL].forEach(v => {
           values[n][v] = {
             current: curr[v] || 0,
             baseline: base[v] || 0
@@ -131,7 +135,7 @@ export default Ember.Component.extend({
           cells[n][v] = {
             value: Math.round(transformation(curr, base, currTotal, baseTotal) * 10000) / 100.0, // percent, 2 commas
             size: Math.round(1.0 * curr / currTotal * 10000) / 100.0 // percent, 2 commas
-          }
+          };
         });
       });
 
@@ -151,15 +155,18 @@ export default Ember.Component.extend({
     return (curr, base, currTotal, baseTotal) => 0;
   },
 
-  _makeRollup(dimNameObj, topk, otherValue) {
+  _makeRollup(dimNameObj, head, visible, tail) {
     if (!dimNameObj) {
       return dimNameObj;
     }
-    const rollup = {};
-    [...topk].forEach(v => rollup[v] = dimNameObj[v]);
 
-    const sumOther = this._makeSumOther(dimNameObj, topk);
-    rollup[otherValue] = sumOther;
+    const rollup = {};
+    rollup[ROOTCAUSE_ROLLUP_HEAD] = 0;
+    rollup[ROOTCAUSE_ROLLUP_TAIL] = 0;
+
+    [...head].forEach(v => rollup[ROOTCAUSE_ROLLUP_HEAD] += dimNameObj[v] || 0);
+    [...visible].forEach(v => rollup[v] = dimNameObj[v] || 0);
+    [...tail].forEach(v => rollup[ROOTCAUSE_ROLLUP_TAIL] += dimNameObj[v] || 0);
 
     return rollup;
   },
@@ -171,13 +178,13 @@ export default Ember.Component.extend({
     return Object.values(dimNameObj).reduce((agg, x) => agg + funcExtract(x), 0);
   },
 
-  _makeSumOther(dimNameObj, topk) {
-    if (!dimNameObj) {
-      return 0;
-    }
-    return Object.keys(dimNameObj).filter(v => !topk.has(v)).map(v => dimNameObj[v]).reduce((agg, x) => agg + x, 0);
-  },
-
+  // _makeSumOther(dimNameObj, topk) {
+  //   if (!dimNameObj) {
+  //     return 0;
+  //   }
+  //   return Object.keys(dimNameObj).filter(v => !topk.has(v)).map(v => dimNameObj[v]).reduce((agg, x) => agg + x, 0);
+  // },
+  //
   _makeTopK(dimNameObj, k) {
     if (!dimNameObj) {
       return [];
@@ -187,12 +194,20 @@ export default Ember.Component.extend({
     return dimValues;
   },
 
+  _sortKeysByValue(dimNameObj) {
+    return Object.keys(dimNameObj).map(v => [dimNameObj[v], v]).sort().map(t => t[1]);
+  },
+
   actions: {
     /**
      * Bubbles the action to the parent
      */
     onHeatmapClick() {
       this.attrs.onHeatmapClick(...arguments);
+    },
+
+    onRollupRange(from, to) {
+      this.set('rollupRange', [parseInt(from), parseInt(to)]);
     }
   }
 });

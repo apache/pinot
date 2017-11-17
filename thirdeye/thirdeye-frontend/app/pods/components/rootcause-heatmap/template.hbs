@@ -9,9 +9,9 @@ mode
 | <button {{action (mut mode) "contributionToDiff"}}>contribution to diff</button>
 
 rollup
-| <button {{action (mut rollup) "5"}}>top 5</button>
-| <button {{action (mut rollup) "10"}}>top 10</button>
-| <button {{action (mut rollup) "20"}}>top 20</button>
+| <button {{action "onRollupRange" "0" "10"}}>top 10</button>
+| <button {{action "onRollupRange" "10" "20"}}>top 10-20</button>
+| <button {{action "onRollupRange" "20" "50"}}>top 20-50</button>
 
 {{heatmap-chart
   cells=cells
