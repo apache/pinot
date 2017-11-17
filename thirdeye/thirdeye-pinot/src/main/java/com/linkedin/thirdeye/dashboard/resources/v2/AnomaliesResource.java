@@ -460,18 +460,6 @@ public class AnomaliesResource {
       throw new IllegalArgumentException(String.format("Could not resolve anomaly function id %d", anomalyFunctionId));
     }
 
-    if (startTime == null) {
-      throw new IllegalArgumentException("Must provide startTime");
-    }
-
-    if (endTime == null) {
-      throw new IllegalArgumentException("Must provide endTime");
-    }
-
-    if (feedbackType == null) {
-      throw new IllegalArgumentException("Must provide feedbackType");
-    }
-
     MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
     anomaly.setFunction(anomalyFunction);
     anomaly.setStartTime(startTime);
@@ -495,6 +483,59 @@ public class AnomaliesResource {
     anomaly.setFeedback(feedback);
 
     mergedAnomalyResultDAO.updateAnomalyFeedback(anomaly);
+  }
+
+  /**
+   * Update anomaly feedback for all anomalies of a specific anomaly function within a time range.
+   *
+   * @param startTime start time utc (in millis)
+   * @param endTime end time utc (in millis)
+   * @param functionId anomaly function id
+   * @param feedbackType feedback type
+   */
+  @POST
+  @Path(value = "/updateFeedbackRange/{startTime}/{endTime}/{functionId}")
+  public void updateFeedbackForAnomalyFunctionAndTimeRange(
+      @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime,
+      @PathParam("functionId") Long functionId,
+      @QueryParam("feedbackType") String feedbackType) {
+
+    if (functionId == null) {
+      throw new IllegalArgumentException("Must provide functionId");
+    }
+
+    if (startTime == null) {
+      throw new IllegalArgumentException("Must provide startTime");
+    }
+
+    if (endTime == null) {
+      throw new IllegalArgumentException("Must provide endTime");
+    }
+
+    if (feedbackType == null) {
+      throw new IllegalArgumentException("Must provide feedbackType");
+    }
+
+    // fetch anomalies
+    List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.findByFunctionId(functionId, false);
+
+    // apply feedback
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.getStartTime() < endTime && startTime < anomaly.getEndTime()) {
+        LOG.info("Updating feedback for anomaly id {}", anomaly.getId());
+
+        AnomalyFeedback feedback = anomaly.getFeedback();
+        if (feedback == null) {
+          feedback = new AnomalyFeedbackDTO();
+        }
+
+        feedback.setFeedbackType(AnomalyFeedbackType.valueOf(feedbackType));
+        anomaly.setFeedback(feedback);
+
+        mergedAnomalyResultDAO.updateAnomalyFeedback(anomaly);
+      }
+    }
   }
 
   // ----------- HELPER FUNCTIONS
