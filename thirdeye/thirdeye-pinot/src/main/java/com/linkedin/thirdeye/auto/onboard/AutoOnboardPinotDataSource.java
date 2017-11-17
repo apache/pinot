@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -54,14 +55,16 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     try {
       List<String> allDatasets = new ArrayList<>();
       Map<String, Schema> allSchemas = new HashMap<>();
-      loadDatasets(allDatasets, allSchemas);
+      Map<String, Map<String, String>> allCustomConfigs = new HashMap<>();
+      loadDatasets(allDatasets, allSchemas, allCustomConfigs);
       LOG.info("Checking all datasets");
       for (String dataset : allDatasets) {
         LOG.info("Checking dataset {}", dataset);
 
         Schema schema = allSchemas.get(dataset);
+        Map<String, String> customConfigs = allCustomConfigs.get(dataset);
         DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
-        addPinotDataset(dataset, schema, datasetConfig);
+        addPinotDataset(dataset, schema, customConfigs, datasetConfig);
       }
     } catch (Exception e) {
       LOG.error("Exception in loading datasets", e);
@@ -74,13 +77,14 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
    * @param schema
    * @param datasetConfig
    */
-  public void addPinotDataset(String dataset, Schema schema, DatasetConfigDTO datasetConfig) throws Exception {
+  public void addPinotDataset(String dataset, Schema schema, Map<String, String> customConfigs,
+      DatasetConfigDTO datasetConfig) throws Exception {
     if (datasetConfig == null) {
       LOG.info("Dataset {} is new, adding it to thirdeye", dataset);
-      addNewDataset(dataset, schema);
+      addNewDataset(dataset, schema, customConfigs);
     } else {
       LOG.info("Dataset {} already exists, checking for updates", dataset);
-      refreshOldDataset(dataset, datasetConfig, schema);
+      refreshOldDataset(dataset, schema, customConfigs, datasetConfig);
     }
   }
 
@@ -89,11 +93,11 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
    * @param dataset
    * @param schema
    */
-  private void addNewDataset(String dataset, Schema schema) throws Exception {
+  private void addNewDataset(String dataset, Schema schema, Map<String, String> customConfigs) throws Exception {
     List<MetricFieldSpec> metricSpecs = schema.getMetricFieldSpecs();
 
     // Create DatasetConfig
-    DatasetConfigDTO datasetConfigDTO = ConfigGenerator.generateDatasetConfig(dataset, schema);
+    DatasetConfigDTO datasetConfigDTO = ConfigGenerator.generateDatasetConfig(dataset, schema, customConfigs);
     LOG.info("Creating dataset for {}", dataset);
     DAO_REGISTRY.getDatasetConfigDAO().save(datasetConfigDTO);
 
@@ -109,14 +113,15 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
    * Refreshes an existing dataset in the thirdeye database
    * with any dimension/metric changes from pinot schema
    * @param dataset
-   * @param datasetConfig
    * @param schema
+   * @param datasetConfig
    */
-  private void refreshOldDataset(String dataset, DatasetConfigDTO datasetConfig, Schema schema) throws Exception {
+  private void refreshOldDataset(String dataset, Schema schema, Map<String, String> customConfigs,
+      DatasetConfigDTO datasetConfig) throws Exception {
     checkDimensionChanges(dataset, datasetConfig, schema);
     checkMetricChanges(dataset, datasetConfig, schema);
+    appendNewCustomConfigs(datasetConfig, customConfigs);
   }
-
 
   private void checkDimensionChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
 
@@ -210,17 +215,53 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
   }
 
   /**
+   * This method ensures that the given custom configs exist in the dataset config and their value are the same.
+   *
+   * @param datasetConfig the current dataset config to be appended with new custom config.
+   * @param customConfigs the custom config to be matched with that from dataset config.
+   *
+   * TODO: Remove out-of-date Pinot custom config from dataset config.
+   */
+  private void appendNewCustomConfigs(DatasetConfigDTO datasetConfig, Map<String, String> customConfigs) {
+    if (MapUtils.isNotEmpty(customConfigs)) {
+      Map<String, String> properties = datasetConfig.getProperties();
+      boolean hasUpdate = false;
+      if (MapUtils.isEmpty(properties)) {
+        properties = customConfigs;
+        hasUpdate = true;
+      } else {
+        for (Map.Entry<String, String> customConfig : customConfigs.entrySet()) {
+          String configKey = customConfig.getKey();
+          String configValue = customConfig.getValue();
+
+          String existingValue = properties.get(configKey);
+          if (!Objects.equals(configValue, existingValue)) {
+            properties.put(configKey, configValue);
+            hasUpdate = true;
+          }
+        }
+      }
+      if (hasUpdate) {
+        datasetConfig.setProperties(properties);
+        DAO_REGISTRY.getDatasetConfigDAO().update(datasetConfig);
+      }
+    }
+  }
+
+  /**
    * Reads all table names in pinot, and loads their schema
    * @param allSchemas
    * @param allDatasets
    * @throws IOException
    */
-  private void loadDatasets(List<String> allDatasets, Map<String, Schema> allSchemas) throws IOException {
+  private void loadDatasets(List<String> allDatasets, Map<String, Schema> allSchemas,
+      Map<String, Map<String, String>> allCustomConfigs) throws IOException {
 
     JsonNode tables = autoLoadPinotMetricsUtils.getAllTablesFromPinot();
     LOG.info("Getting all schemas");
     for (JsonNode table : tables) {
       String dataset = table.asText();
+      Map<String, String> pinotCustomProperty = autoLoadPinotMetricsUtils.getCustomConfigsFromPinotEndpoint(dataset);
       Schema schema = autoLoadPinotMetricsUtils.getSchemaFromPinot(dataset);
       if (schema != null) {
         if (!autoLoadPinotMetricsUtils.verifySchemaCorrectness(schema)) {
@@ -228,6 +269,7 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
         } else {
           allDatasets.add(dataset);
           allSchemas.put(dataset, schema);
+          allCustomConfigs.put(dataset, pinotCustomProperty);
         }
       }
     }

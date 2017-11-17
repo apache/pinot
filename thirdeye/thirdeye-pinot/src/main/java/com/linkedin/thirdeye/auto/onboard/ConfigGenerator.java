@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.auto.onboard;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -20,7 +21,8 @@ public class ConfigGenerator {
 
   private static final String PDT_TIMEZONE = "US/Pacific";
 
-  public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema) {
+  public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema,
+      Map<String, String> customConfigs) {
     List<String> dimensions = schema.getDimensionNames();
     TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
 
@@ -37,6 +39,7 @@ public class ConfigGenerator {
       datasetConfigDTO.setTimezone(PDT_TIMEZONE);
     }
     datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+    datasetConfigDTO.setProperties(customConfigs);
     return datasetConfigDTO;
   }
 
