@@ -60,7 +60,6 @@ export default Ember.Component.extend({
     this._super(...arguments);
     // Fetch the config file to create sub-filters
     const filterBlocks = this.get('config');
-    debugger;
 
     // Set up filter block object
     filterBlocks.forEach((block, index) => {
@@ -78,7 +77,8 @@ export default Ember.Component.extend({
       });
 
       // Now add new initialized props to block item
-      Object.assign(block, { filtersArray, isHidden });
+      Ember.set(block, 'filtersArray', filtersArray);
+      Ember.set(block, 'isHidden', isHidden);
     });
   },
 
