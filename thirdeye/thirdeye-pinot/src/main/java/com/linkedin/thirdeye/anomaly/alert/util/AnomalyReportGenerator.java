@@ -245,7 +245,7 @@ public class AnomalyReportGenerator {
       templateData.put("falseAlertCount", precisionRecallEvaluator.getFalseAlarm());
       templateData.put("newTrendCount", precisionRecallEvaluator.getTrueAnomalyNewTrend());
       templateData.put("anomalyDetails", anomalyReports);
-      templateData.put("groupedAnomalyDetails", groupedAnomalyReports);
+      templateData.put("groupedAnomalyDetails", groupedAnomalyReports.asMap());
       templateData.put("emailSubjectName", emailSubjectName);
       templateData.put("alertConfigName", alertConfig.getName()); // NOTE: breaks backwards compatibility
       templateData.put("includeSummary", includeSummary);
