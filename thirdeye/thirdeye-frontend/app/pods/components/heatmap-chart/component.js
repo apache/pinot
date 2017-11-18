@@ -38,7 +38,7 @@ export default Ember.Component.extend({
 
     if (!callback) { return; }
 
-    callback([role, dimName, dimValue]);
+    callback(role, dimName, dimValue);
   },
 
   /**
@@ -59,8 +59,6 @@ export default Ember.Component.extend({
 
     const dimensions = Object.keys(cells);
     if (!dimensions.length) { return; }
-
-    console.log('heatmapChart: _buildHeatmap: cells', cells);
 
     dimensions.forEach((dimension) => {
       const dimensionPlaceHolderId = `#${dimension}-heatmap-placeholder`;
