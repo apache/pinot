@@ -7,7 +7,7 @@ const { get } = Ember;
 
 // TODO: move to utils file
 const getBackgroundColor = function (factor = 0) {
-  const opacity = Math.abs(factor / 25);
+  const opacity = Math.abs(factor / 0.25);
   const color = factor > 0 ? '0,0,234' : '234,0,0';
 
   return `rgba(${color},${opacity})`;
@@ -15,14 +15,14 @@ const getBackgroundColor = function (factor = 0) {
 
 // TODO: move to utils file
 const getTextColor = function (factor = 0) {
-  const opacity = Math.abs(factor / 25);
+  const opacity = Math.abs(factor / 0.25);
 
   return opacity < 0.5 ? '#000000' : '#ffffff';
 };
 
 export default Ember.Component.extend({
-  cells: null, // {} 
-  
+  cells: null, // {}
+
   /**
    * Bubbles the click up to the parent component
    * @param {String[]} subdimension
@@ -31,12 +31,13 @@ export default Ember.Component.extend({
   heatmapClickHandler(subdimension) {
     const callback = this.attrs.onHeatmapClick;
     const {
-      name,
-      dimension
+      dimName,
+      dimValue
     } = subdimension;
+
     if (!callback) { return; }
 
-    callback([dimension, name]);
+    callback([dimName, dimValue]);
   },
 
   /**
@@ -58,18 +59,21 @@ export default Ember.Component.extend({
     const dimensions = Object.keys(cells);
     if (!dimensions.length) { return; }
 
+    console.log('heatmapChart: _buildHeatmap: cells', cells);
+
     dimensions.forEach((dimension) => {
       const dimensionPlaceHolderId = `#${dimension}-heatmap-placeholder`;
-      const cell = cells[dimension];
-      const children = Object.entries(cell)
-        .filter(([, { size }]) => size)
-        .map(([name, { size, value }]) => {
+      const children = cells[dimension]
+        .filter(({ size }) => size)
+        .map(({ label, size, value, dimName, dimValue, index }) => {
           return {
-            name,
+            label,
             value: size,
             size: size,
             actualValue: value,
-            dimension
+            dimName,
+            dimValue,
+            index
           };
         });
 
@@ -78,7 +82,7 @@ export default Ember.Component.extend({
       const width = domElem.width();
       const treeMap = d3.layout.treemap()
         .size([width, height])
-        .sort((a, b) => a.size - b.size);
+        .sort((a, b) => b.index - a.index);
 
       const div = d3.select(dimensionPlaceHolderId)
         .attr('class', 'heatmap')
@@ -138,7 +142,7 @@ export default Ember.Component.extend({
       .attr('dy', '.35em')
       .attr('text-anchor', 'middle')
       .text((d) => {
-        const text = `${d.name} (${d.actualValue})`;
+        const text = d.label;
 
         //each character takes up 7 pixels on an average
         const estimatedTextLength = text.length * 7;
@@ -171,7 +175,7 @@ export default Ember.Component.extend({
 
   didRender() {
     this._super(...arguments);
-    
+
     this._buildHeatmap();
   }
 });

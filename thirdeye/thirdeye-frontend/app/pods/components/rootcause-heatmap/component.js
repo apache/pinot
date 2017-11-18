@@ -102,11 +102,18 @@ export default Ember.Component.extend({
         console.log('rootcauseHeatmap: _dataRollup: n curr', n, curr);
         console.log('rootcauseHeatmap: _dataRollup: n base', n, base);
 
-        values[n] = {};
-        [ROOTCAUSE_ROLLUP_HEAD, ...visible, ROOTCAUSE_ROLLUP_TAIL].forEach(v => {
-          values[n][v] = {
-            current: curr[v] || 0,
-            baseline: base[v] || 0
+        values[n] = [ROOTCAUSE_ROLLUP_HEAD, ...visible, ROOTCAUSE_ROLLUP_TAIL].map(v => {
+          let dv;
+          if (all.includes(v)) {
+            dv = v;
+          }
+
+          return {
+            label: v,
+            dimName: n,
+            dimValue: dv,
+            current: curr[v],
+            baseline: base[v]
           };
         });
       });
@@ -119,23 +126,43 @@ export default Ember.Component.extend({
     '_dataRollup',
     'mode',
     function () {
-      const { _dataRollup: data, mode } = this.getProperties('_dataRollup', 'mode');
+      const { _dataRollup: values, mode } = this.getProperties('_dataRollup', 'mode');
 
       const transformation = this._makeTransformation(mode);
 
-      const cells = {};
-      Object.keys(data).forEach(n => {
-        cells[n] = {};
-        Object.keys(data[n]).forEach(v => {
-          const curr = data[n][v].current;
-          const base = data[n][v].baseline;
-          const currTotal = this._makeSum(data[n], (d) => d.current);
-          const baseTotal = this._makeSum(data[n], (d) => d.baseline);
+      console.log('rootcauseHeatmap: cells: values', values);
 
-          cells[n][v] = {
-            value: Math.round(transformation(curr, base, currTotal, baseTotal) * 10000) / 100.0, // percent, 2 commas
-            size: Math.round(1.0 * curr / currTotal * 10000) / 100.0 // percent, 2 commas
-          };
+      const cells = {};
+      Object.keys(values).forEach(n => {
+        cells[n] = [];
+        const valid = values[n].filter(val => val.current);
+
+        const visibleTotal = valid.filter(v => v.dimValue);
+        const currTotal = this._makeSum(visibleTotal, (v) => v.current);
+        const baseTotal = this._makeSum(visibleTotal, (v) => v.baseline);
+
+        const sizeCoeff = 1.0 - (valid.length - visibleTotal.length) / 2.0 * 0.3; // head & tail
+
+        valid.forEach((val, index) => {
+          const curr = val.current;
+          const base = val.baseline;
+
+          const value = transformation(curr, base, currTotal, baseTotal);
+          const valueLabel = Math.round(value * 10000.0) / 100.0;
+
+          let size = curr / currTotal * sizeCoeff;
+          if (!val.dimValue) {
+            size = 0.15; // head or tail
+          }
+
+          cells[n].push({
+            index,
+            dimName: val.dimName,
+            dimValue: val.dimValue,
+            label: `${val.label} (${valueLabel})`,
+            value: value, // percent, 2 commas
+            size: size // percent, 2 commas
+          });
         });
       });
 
