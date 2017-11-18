@@ -43,7 +43,9 @@
   }
   &--box-shadow {
     border: none;
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 2px 3px 0 rgba(0,0,0,0.2);
+    box-shadow: 
+      0 0 0 1px app-shade(black, 0.1), 
+      0 2px 3px 0 app-shade(black, 0.2);
   }
   &__header {
     display: flex;
@@ -92,7 +94,7 @@
   &__card {
     border-radius: 2px;
     padding: 16px;
-    border: 1px solid rgba(0,0,0,0.15);
+    border: 1px solid app-shade(black, 0.15);
     margin: 8px;
     margin-right: auto;
     display: flex;
@@ -120,17 +122,17 @@
 
   &__name {
     font-size: 14px;
-    color: rgba(0,0,0,0.9);
+    color: app-shade(black, 0.9);
     line-height: 20px;
   }
 
   &__dataset {
     font-size: 12px;
     line-height: 16px;
-    color: rgba(0,0,0,0.6);
+    color: app-shade(black, 0.6);
   }
   &__change {
-    color: rgba(0,0,0,0.85);
+    color: app-shade(black, 0.85);
     font-size: 32px;
     line-height: 32px;
     padding-top: 16px;
