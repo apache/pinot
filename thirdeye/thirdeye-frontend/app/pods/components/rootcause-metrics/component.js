@@ -102,8 +102,13 @@ export default Ember.Component.extend({
     function () {
       const { changes } = this.getProperties('changes');
       return Object.keys(changes).reduce((agg, urn) => {
-        const sign = changes[urn] > 0 ? '+' : '';
-        agg[urn] = sign + (changes[urn] * 100).toFixed(2) + '%';
+        const value = changes[urn];
+        const sign = value > 0 ? '+' : '';
+        if (Math.abs(value) > 5) {
+          agg[urn] = 'spike';
+        } else {
+          agg[urn] = sign + (value * 100).toFixed(2) + '%';
+        }
         return agg;
       }, {});
     }

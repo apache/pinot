@@ -1,13 +1,23 @@
-<button {{action "toggleSort" "metric"}}>metric</button> |
-<button {{action "toggleSort" "dataset"}}>dataset</button> |
-<button {{action "toggleSort" "change"}}>change</button>
-
-<div class="container">
-  {{#each urns as |urn|}}
-    <div class="col-xs-2 rootcause-metric">
-      <a {{action "toggleSelection" urn}}>{{get metrics urn}}<br/>({{get datasets urn}})<br/>{{get changesFormatted urn}}</a>
-    </div>
-  {{else}}
-    No Metrics.
-  {{/each}}
+<div class="row">
+  <div class="col-xs-12">
+    <button {{action "toggleSort" "metric"}}>metric</button> |
+    <button {{action "toggleSort" "dataset"}}>dataset</button> |
+    <button {{action "toggleSort" "change"}}>change</button>
+  </div>
 </div>
+
+  <div class="rootcause-metric__wrapper">
+    {{#each urns as |urn|}}
+      <div class="col-lg-2 col-md-3 col-xs-6 rootcause-metric__card 
+        {{if (set-has selectedUrns urn) "rootcause-metric__card--selected"}}" 
+        {{action "toggleSelection" urn}}>
+        <div class="rootcause-metric__title">
+          <span class="rootcause-metric__name">{{get metrics urn}}</span>
+          <span class="rootcause-metric__dataset">{{get datasets urn}}</span>
+        </div>
+        <span class="rootcause-metric__change rootcause-metric__change--{{color-delta (get changes urn)}}">{{get changesFormatted urn}}</span>
+      </div>
+    {{else}}
+      No Metrics.
+    {{/each}}
+  </div>
