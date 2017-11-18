@@ -5,6 +5,10 @@ import _ from 'lodash';
 const ROOTCAUSE_ROLLUP_HEAD = 'HEAD';
 const ROOTCAUSE_ROLLUP_TAIL = 'TAIL';
 
+const ROOTCAUSE_ROLE_VALUE = 'value';
+const ROOTCAUSE_ROLE_HEAD = 'head';
+const ROOTCAUSE_ROLE_TAIL = 'tail';
+
 export default Ember.Component.extend({
   breakdowns: null, // {}
 
@@ -103,15 +107,11 @@ export default Ember.Component.extend({
         console.log('rootcauseHeatmap: _dataRollup: n base', n, base);
 
         values[n] = [ROOTCAUSE_ROLLUP_HEAD, ...visible, ROOTCAUSE_ROLLUP_TAIL].map(v => {
-          let dv;
-          if (all.includes(v)) {
-            dv = v;
-          }
-
           return {
+            role: this._makeRole(v),
             label: v,
             dimName: n,
-            dimValue: dv,
+            dimValue: v,
             current: curr[v],
             baseline: base[v]
           };
@@ -137,29 +137,39 @@ export default Ember.Component.extend({
         cells[n] = [];
         const valid = values[n].filter(val => val.current);
 
-        const visibleTotal = valid.filter(v => v.dimValue);
+        const visibleTotal = valid.filter(v => v.role == ROOTCAUSE_ROLE_VALUE);
         const currTotal = this._makeSum(visibleTotal, (v) => v.current);
         const baseTotal = this._makeSum(visibleTotal, (v) => v.baseline);
 
-        const sizeCoeff = 1.0 - (valid.length - visibleTotal.length) / 2.0 * 0.3; // head & tail
+        const sizeCoeff = 1.0 - (valid.length - visibleTotal.length) / 2.0 * 0.15; // head & tail
 
         valid.forEach((val, index) => {
           const curr = val.current;
           const base = val.baseline;
 
-          const value = transformation(curr, base, currTotal, baseTotal);
-          const valueLabel = Math.round(value * 10000.0) / 100.0;
+          let value = transformation(curr, base, currTotal, baseTotal);
+          let valueLabel = `${val.label} [${index}] (${Math.round(value * 10000.0) / 100.0})`;
+          if (val.role != ROOTCAUSE_ROLE_VALUE) {
+            value = 0;
+            valueLabel = val.label;
+            if (val.label == ROOTCAUSE_ROLLUP_HEAD) {
+              valueLabel = `<< ${valueLabel}`;
+            } else if (val.label == ROOTCAUSE_ROLLUP_TAIL){
+              valueLabel = `${valueLabel} >>`;
+            }
+          }
 
           let size = curr / currTotal * sizeCoeff;
-          if (!val.dimValue) {
-            size = 0.15; // head or tail
+          if (val.role != ROOTCAUSE_ROLE_VALUE) {
+            size = 0.075; // head or tail
           }
 
           cells[n].push({
             index,
+            role: val.role,
             dimName: val.dimName,
             dimValue: val.dimValue,
-            label: `${val.label} (${valueLabel})`,
+            label: valueLabel,
             value: value, // percent, 2 commas
             size: size // percent, 2 commas
           });
@@ -169,6 +179,16 @@ export default Ember.Component.extend({
       return cells;
     }
   ),
+
+  _makeRole(v) {
+    switch(v) {
+      case ROOTCAUSE_ROLLUP_HEAD:
+        return ROOTCAUSE_ROLE_HEAD;
+      case ROOTCAUSE_ROLLUP_TAIL:
+        return ROOTCAUSE_ROLE_TAIL;
+    }
+    return ROOTCAUSE_ROLE_VALUE;
+  },
 
   _makeTransformation(mode) {
     switch (mode) {
@@ -212,17 +232,17 @@ export default Ember.Component.extend({
   //   return Object.keys(dimNameObj).filter(v => !topk.has(v)).map(v => dimNameObj[v]).reduce((agg, x) => agg + x, 0);
   // },
   //
-  _makeTopK(dimNameObj, k) {
-    if (!dimNameObj) {
-      return [];
-    }
-    const tuples = Object.keys(dimNameObj).map(v => [-dimNameObj[v], v]).sort();
-    const dimValues = _.slice(tuples, 0, k).map(t => t[1]);
-    return dimValues;
-  },
+  // _makeTopK(dimNameObj, k) {
+  //   if (!dimNameObj) {
+  //     return [];
+  //   }
+  //   const tuples = Object.keys(dimNameObj).map(v => [-dimNameObj[v], v]).sort();
+  //   const dimValues = _.slice(tuples, 0, k).map(t => t[1]);
+  //   return dimValues;
+  // },
 
   _sortKeysByValue(dimNameObj) {
-    return Object.keys(dimNameObj).map(v => [dimNameObj[v], v]).sort().map(t => t[1]);
+    return Object.keys(dimNameObj).map(v => [dimNameObj[v], v]).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(t => t[1]);
   },
 
   actions: {

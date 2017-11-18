@@ -31,13 +31,14 @@ export default Ember.Component.extend({
   heatmapClickHandler(subdimension) {
     const callback = this.attrs.onHeatmapClick;
     const {
+      role,
       dimName,
       dimValue
     } = subdimension;
 
     if (!callback) { return; }
 
-    callback([dimName, dimValue]);
+    callback([role, dimName, dimValue]);
   },
 
   /**
@@ -65,7 +66,7 @@ export default Ember.Component.extend({
       const dimensionPlaceHolderId = `#${dimension}-heatmap-placeholder`;
       const children = cells[dimension]
         .filter(({ size }) => size)
-        .map(({ label, size, value, dimName, dimValue, index }) => {
+        .map(({ label, size, value, dimName, dimValue, index, role }) => {
           return {
             label,
             value: size,
@@ -73,6 +74,7 @@ export default Ember.Component.extend({
             actualValue: value,
             dimName,
             dimValue,
+            role,
             index
           };
         });
