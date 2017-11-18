@@ -36,7 +36,6 @@ public class ContinuumAnomalyFetcher extends BaseAnomalyFetcher {
    * @param alertSnapShot the snapshot of the AnomalyFeed
    * @return a list of continuing merged anomalies
    */
-
   @Override
   public Collection<MergedAnomalyResultDTO> getAlertCandidates(DateTime current, AlertSnapshotDTO alertSnapShot) {
     if (!this.active) {
