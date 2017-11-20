@@ -75,8 +75,11 @@ export function appendTail(urn, tail) {
   if (_.isEmpty(tail)) {
     return urn;
   }
-  const tailString = tail.join(':');
-  return `${urn}:${tailString}`;
+  
+  const existingTail = extractTail(urn);
+  const tailString = [...makeIterable(tail), ...existingTail].sort().join(':');
+  const appendString = tailString ? `:${tailString}` : '';
+  return `${stripTail(urn)}${appendString}`;
 }
 
 export function toCurrentUrn(urn) {
@@ -148,7 +151,7 @@ export function toFilters(urns) {
   const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':'), 2, 4));
   const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => tup.split('='))).reduce(flatten, []);
   const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => tup.split('='))).reduce(flatten, []);
-  return [...dimensionFilters, ...metricFilters, ...frontendMetricFilters];
+  return [...dimensionFilters, ...metricFilters, ...frontendMetricFilters].sort();
 }
 
 export function toFilterMap(filters) {

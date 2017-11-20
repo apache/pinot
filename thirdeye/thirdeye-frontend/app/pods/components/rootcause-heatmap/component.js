@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendTail } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const ROOTCAUSE_ROLLUP_MODE_CHANGE = 'change';
@@ -263,7 +263,7 @@ export default Ember.Component.extend({
 
       // selection
       if (role == ROOTCAUSE_ROLE_VALUE) {
-        const metricUrn = `${currentUrn}:${dimName}=${dimValue}`;
+        const metricUrn = appendTail(currentUrn, `${dimName}=${dimValue}`);
         const state = !selectedUrns.has(metricUrn);
         const updates = { [metricUrn]: state, [toBaselineUrn(metricUrn)]: state, [toCurrentUrn(metricUrn)]: state };
         if (onSelection) {
