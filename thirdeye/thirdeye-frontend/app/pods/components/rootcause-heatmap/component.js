@@ -241,7 +241,10 @@ export default Ember.Component.extend({
 
   actions: {
     onHeatmapClick(role, dimName, dimValue) {
-      const { rollupRange } = this.getProperties('rollupRange');
+      const { rollupRange, selectedUrns, onSelection, currentUrn } =
+        this.getProperties('rollupRange', 'selectedUrns', 'onSelection', 'currentUrn');
+
+      // scrolling
       const range = rollupRange[dimName] || ROOTCAUSE_ROLLUP_RANGE_DEFAULT;
       if (role == ROOTCAUSE_ROLE_HEAD) {
         rollupRange[dimName] = range.map(v => v - 10);
@@ -250,6 +253,16 @@ export default Ember.Component.extend({
       if (role == ROOTCAUSE_ROLE_TAIL) {
         rollupRange[dimName] = range.map(v => v + 10);
         this.set('rollupRange', Object.assign({}, rollupRange));
+      }
+
+      // selection
+      if (role == ROOTCAUSE_ROLE_VALUE) {
+        const metricUrn = `${currentUrn}:${dimName}=${dimValue}`;
+        const state = !selectedUrns.has(metricUrn);
+        const updates = { [metricUrn]: state, [toBaselineUrn(metricUrn)]: state, [toCurrentUrn(metricUrn)]: state };
+        if (onSelection) {
+          onSelection(updates);
+        }
       }
     },
 
