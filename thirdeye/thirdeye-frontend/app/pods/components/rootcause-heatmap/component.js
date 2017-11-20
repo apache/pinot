@@ -148,7 +148,7 @@ export default Ember.Component.extend({
         const currTotal = this._makeSum(visibleTotal, (v) => v.current);
         const baseTotal = this._makeSum(visibleTotal, (v) => v.baseline);
 
-        const sizeCoeff = 1.0 - (valid.length - visibleTotal.length) / 2.0 * 0.10; // head & tail
+        const sizeCoeff = 1.0 - (valid.length - visibleTotal.length) / 2.0 * 0.20; // head & tail
 
         valid.forEach((val, index) => {
           const curr = val.current;
@@ -158,7 +158,7 @@ export default Ember.Component.extend({
 
           let size = curr / currTotal * sizeCoeff;
           if (val.role != ROOTCAUSE_ROLE_VALUE) {
-            size = 0.05; // head or tail
+            size = 0.10; // head or tail
           }
 
           cells[n].push({
