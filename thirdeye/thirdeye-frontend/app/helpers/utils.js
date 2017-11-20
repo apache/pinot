@@ -91,6 +91,18 @@ export function toMetricUrn(urn) {
   return metricUrnHelper('thirdeye:metric:', urn);
 }
 
+export function toMetricLabel(urn, entities) {
+  let metricName = stripTail(urn);
+  if (entities && entities[stripTail(urn)]) {
+    metricName = entities[stripTail(urn)].label.split("::")[1];
+  }
+
+  const filters = toFilters(urn).map(t => t[1]);
+  const filterString = filters.length ? ` (${filters.join(', ')})` : '';
+
+  return `${metricName}${filterString}`;
+}
+
 function metricUrnHelper(prefix, urn) {
   const parts = urn.split(':');
   if (hasPrefix(urn, 'thirdeye:metric:')) {
@@ -169,4 +181,4 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping });
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel });

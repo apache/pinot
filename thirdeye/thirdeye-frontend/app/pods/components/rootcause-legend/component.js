@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, stripTail, hasPrefix } from '../../../helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, stripTail, hasPrefix, toFilters, toEntities, toMetricLabel } from '../../../helpers/utils';
 import _ from 'lodash';
 
 export default Ember.Component.extend({
@@ -18,7 +18,7 @@ export default Ember.Component.extend({
     'selectedUrns',
     function () {
       const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
-      return filterPrefix(selectedUrns, 'thirdeye:').filter(urn => entities[urn] || entities[stripTail(urn)]);
+      return filterPrefix(selectedUrns, 'thirdeye:').filter(urn => entities[urn] || urn.startsWith('thirdeye:metric:'));
     }
   ),
 
@@ -26,9 +26,9 @@ export default Ember.Component.extend({
     'entities',
     'validUrns',
     function () {
-      const { validUrns } = this.getProperties('validUrns');
+      const { validUrns, entities } = this.getProperties('validUrns', 'entities');
       return filterPrefix(validUrns, 'thirdeye:metric:').reduce((agg, urn) => {
-        agg[urn] = this._makeMetricLabel(urn);
+        agg[urn] = toMetricLabel(urn, entities);
         return agg;
       }, {});
     }
@@ -65,20 +65,6 @@ export default Ember.Component.extend({
     if (onVisibility) {
       onVisibility(updates);
     }
-  },
-
-  _makeMetricLabel(urn) {
-    const { entities } = this.getProperties('entities');
-
-    const metricName = entities[stripTail(urn)].label.split("::")[1];
-    const parts = urn.split(':');
-
-    if (parts.length <= 3) {
-      return metricName;
-    }
-
-    const tail = _.slice(parts, 3);
-    return metricName + ' (' + tail.join(', ') + ')';
   },
 
   actions: {
