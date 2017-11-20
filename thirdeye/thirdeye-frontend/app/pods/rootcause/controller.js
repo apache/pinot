@@ -235,7 +235,13 @@ export default Ember.Controller.extend({
     loadtestSelectedUrns() {
       console.log('loadtestSelected()');
       const { entities } = this.getProperties('entities');
-      this.set('selectedUrns', new Set(Object.keys(entities)));
+
+      const entityUrns = Object.keys(entities);
+      const metricUrns = filterPrefix(entityUrns, 'thirdeye:metric:');
+      const baselineUrns = metricUrns.map(toBaselineUrn);
+      const currentUrns = metricUrns.map(toCurrentUrn);
+
+      this.set('selectedUrns', new Set([...entityUrns, ...baselineUrns, ...currentUrns]));
     },
 
     addSelectedUrns(urns) {
