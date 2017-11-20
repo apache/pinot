@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.tools;
+package com.linkedin.pinot.tools.admin;
 
 import java.util.Arrays;
 import java.util.List;
@@ -62,6 +62,6 @@ public final class SchemaInfo {
             "new_data/adsTable.json", "new_data/articlesTable.json", "new_data/viewsTable.json");
 
     /* Upload intervals for each table (in minutes) */
-    public static final List<Integer> UPLOAD_DURATION = Arrays.asList(1, 2, 3, 4);
+    public static final List<Integer> UPLOAD_DURATION = Arrays.asList(1, 2, 1, 2);
 
 }
