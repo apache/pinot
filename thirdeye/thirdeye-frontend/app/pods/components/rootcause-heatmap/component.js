@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const ROOTCAUSE_ROLLUP_MODE_CHANGE = 'change';
@@ -16,13 +16,15 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 const ROOTCAUSE_ROLLUP_RANGE_DEFAULT = [0, 10];
 
 export default Ember.Component.extend({
+  entities: null, // {}
+
   breakdowns: null, // {}
 
   selectedUrns: null, // Set
 
-  currentUrn: null, // ""
-
   onSelection: null, // func (updates)
+
+  currentUrn: null, // ""
 
   rollupRange: null, // ""
 
@@ -34,11 +36,15 @@ export default Ember.Component.extend({
     this.setProperties({ rollupRange: {}, mode: ROOTCAUSE_ROLLUP_MODE_CHANGE});
   },
 
-  urns: Ember.computed(
+  labels: Ember.computed(
     'selectedUrns',
+    'entities',
     function () {
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      return filterPrefix(selectedUrns, 'thirdeye:metric:');
+      const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
+      return filterPrefix(selectedUrns, 'thirdeye:metric:').reduce((agg, urn) => {
+        agg[urn] = toMetricLabel(urn, entities);
+        return agg;
+      }, {});
     }
   ),
 
