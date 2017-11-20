@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -60,6 +61,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
@@ -78,6 +80,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -429,6 +432,69 @@ public class AnomaliesResource {
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
+  }
+
+  /**
+   * Create a user-reported anomaly
+   *
+   * @param anomalyFunctionId anomaly function id (must exist)
+   * @param startTime start time utc (in millis)
+   * @param endTime end time utc (in millis)
+   * @param feedbackType anomaly feedback type
+   * @param comment anomaly feedback comment (optional)
+   * @param dimensionsJson dimension map json string (optional)
+   * @throws IllegalArgumentException if the anomaly function id cannot be found
+   * @throws IllegalArgumentException if the anomaly cannot be stored
+   */
+  @POST
+  @Path(value = "/reportAnomaly/{anomalyFunctionId}")
+  public void createUserAnomaly(@PathParam("anomalyFunctionId") long anomalyFunctionId,
+      @QueryParam("startTime") Long startTime,
+      @QueryParam("endTime") Long endTime,
+      @QueryParam("feedbackType") AnomalyFeedbackType feedbackType,
+      @QueryParam("comment") String comment,
+      @QueryParam("dimensionsJson") String dimensionsJson) {
+
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(anomalyFunctionId);
+    if (anomalyFunction == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve anomaly function id %d", anomalyFunctionId));
+    }
+
+    if (startTime == null) {
+      throw new IllegalArgumentException("Must provide startTime");
+    }
+
+    if (endTime == null) {
+      throw new IllegalArgumentException("Must provide endTime");
+    }
+
+    if (feedbackType == null) {
+      throw new IllegalArgumentException("Must provide feedbackType");
+    }
+
+    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
+    anomaly.setFunction(anomalyFunction);
+    anomaly.setStartTime(startTime);
+    anomaly.setEndTime(endTime);
+    anomaly.setDimensions(new DimensionMap(dimensionsJson != null ? dimensionsJson : "{}"));
+    anomaly.setAnomalyResultSource(AnomalyResultSource.USER_LABELED_ANOMALY);
+    anomaly.setMetric(anomalyFunction.getTopicMetric());
+    anomaly.setCollection(anomalyFunction.getCollection());
+    anomaly.setProperties(Collections.<String, String>emptyMap());
+    anomaly.setAnomalyResults(Collections.<RawAnomalyResultDTO>emptyList());
+
+    if (mergedAnomalyResultDAO.save(anomaly) == null) {
+      throw new IllegalArgumentException(String.format("Could not store user reported anomaly: '%s'", anomaly));
+    }
+
+    // TODO fix feedback not being saved on create by DAO
+    AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
+    feedback.setFeedbackType(feedbackType);
+    feedback.setComment(comment);
+
+    anomaly.setFeedback(feedback);
+
+    mergedAnomalyResultDAO.updateAnomalyFeedback(anomaly);
   }
 
   // ----------- HELPER FUNCTIONS
