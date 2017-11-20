@@ -32,7 +32,7 @@ public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  public static PredicateEvaluator getPredicateFunctionFor(Predicate predicate, DataSource dataSource) {
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource) {
     try {
       if (dataSource.getDataSourceMetadata().hasDictionary()) {
         Dictionary dictionary = dataSource.getDictionary();

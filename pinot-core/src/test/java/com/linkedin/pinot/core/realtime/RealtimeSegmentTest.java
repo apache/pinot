@@ -128,7 +128,7 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new EqPredicate("count", rhs);
-    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, ds1);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     BitmapBasedFilterOperator op =
         new BitmapBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
 
@@ -156,7 +156,7 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new EqPredicate("count", rhs);
-    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, ds1);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     ScanBasedFilterOperator op =
         new ScanBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
 
@@ -184,7 +184,7 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new NEqPredicate("count", rhs);
-    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, ds1);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     BitmapBasedFilterOperator op =
         new BitmapBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
 
@@ -209,7 +209,7 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new NEqPredicate("count", rhs);
-    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, ds1);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     ScanBasedFilterOperator op =
         new ScanBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
 
@@ -234,7 +234,7 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t*)");
     Predicate predicate = new RangePredicate("count", rhs);
-    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, ds1);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     BitmapBasedFilterOperator op =
         new BitmapBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
 
@@ -262,7 +262,7 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t*)");
     Predicate predicate = new RangePredicate("count", rhs);
-    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, ds1);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     ScanBasedFilterOperator op =
         new ScanBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
 
@@ -290,7 +290,7 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t100)");
     Predicate predicate = new RangePredicate("count", rhs);
-    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, ds1);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     BitmapBasedFilterOperator op =
         new BitmapBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
 
@@ -315,7 +315,7 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t100)");
     Predicate predicate = new RangePredicate("count", rhs);
-    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, ds1);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     ScanBasedFilterOperator op =
         new ScanBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
 

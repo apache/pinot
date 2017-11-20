@@ -55,21 +55,21 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
       HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
 
   private static final String[] HARD_CODED_QUERIES = new String[]{
-      "SELECT FASTHLL(d3) FROM T",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 = 'd1-v1'",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 <> 'd1-v1'",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3'",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2')",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1')",
-      "SELECT FASTHLL(d3) FROM T GROUP BY d1",
-      "SELECT FASTHLL(d3) FROM T GROUP BY d1, d2",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 = 'd1-v2' GROUP BY d1",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' GROUP BY d2",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 = 'd1-v2' GROUP BY d2, d3",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 <> 'd1-v1' GROUP BY d2",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') GROUP BY d2",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3, d4"
+      "SELECT FASTHLL(d3_hll) FROM T",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 = 'd1-v1'",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 <> 'd1-v1' AND d1 >= 'd1-v2'",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' AND d1 <> 'd1-v2'",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 IN ('d1-v1', 'd1-v2')",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1')",
+      "SELECT FASTHLL(d3_hll) FROM T GROUP BY d1",
+      "SELECT FASTHLL(d3_hll) FROM T GROUP BY d1, d2",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 = 'd1-v2' GROUP BY d1",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' GROUP BY d2",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 = 'd1-v2' GROUP BY d2, d3",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 <> 'd1-v1' GROUP BY d2",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') GROUP BY d2",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 NOT IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') AND d2 > 'd2-v2' GROUP BY d3, d4"
   };
 
   @Override

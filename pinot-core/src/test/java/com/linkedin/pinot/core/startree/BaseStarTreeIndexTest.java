@@ -22,7 +22,7 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.filter.StarTreeIndexOperator;
+import com.linkedin.pinot.core.operator.filter.StarTreeIndexBasedFilterOperator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
@@ -91,7 +91,7 @@ public abstract class BaseStarTreeIndexTest {
   private Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
     Operator filterOperator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _segment);
-    Assert.assertFalse(filterOperator instanceof StarTreeIndexOperator);
+    Assert.assertFalse(filterOperator instanceof StarTreeIndexBasedFilterOperator);
 
     return compute(filterOperator);
   }
@@ -101,7 +101,7 @@ public abstract class BaseStarTreeIndexTest {
    */
   private Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
     Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
-    Assert.assertTrue(filterOperator instanceof StarTreeIndexOperator);
+    Assert.assertTrue(filterOperator instanceof StarTreeIndexBasedFilterOperator);
 
     return compute(filterOperator);
   }
