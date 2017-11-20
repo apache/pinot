@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
 import com.linkedin.pinot.core.plan.AggregationPlanNode;
 import com.linkedin.pinot.core.plan.CombinePlanNode;
+import com.linkedin.pinot.core.plan.DictionaryBasedAggregationPlanNode;
 import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
 import com.linkedin.pinot.core.plan.InstanceResponsePlanNode;
 import com.linkedin.pinot.core.plan.MetadataBasedAggregationPlanNode;
@@ -94,6 +95,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
           // Aggregation only query.
         if (isFitForMetadataBasedPlan(brokerRequest)) {
           return new MetadataBasedAggregationPlanNode(indexSegment, brokerRequest.getAggregationsInfo());
+        } else if (isFitForDictionaryBasedPlan(brokerRequest, indexSegment)) {
+          return new DictionaryBasedAggregationPlanNode(indexSegment, brokerRequest.getAggregationsInfo());
         } else {
           return new AggregationPlanNode(indexSegment, brokerRequest);
         }
@@ -129,7 +132,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   /**
    * Helper method to identify if query is fit to be be served purely based on metadata.
-   * Currently count, min, max, minmaxrange queries without any filters are supported.
+   * Currently count queries without any filters are supported.
    *
    * @param brokerRequest Broker request
    * @return True if query can be served using metadata, false otherwise.
@@ -144,14 +147,48 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (aggregationsInfo != null && !brokerRequest.isSetGroupBy()) {
       for (int i = 0; i < aggregationsInfo.size(); i++) {
         String aggregationType = aggregationsInfo.get(i).getAggregationType();
-        if (!aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())
-            && !aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MAX.getName())
-            && !aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MIN.getName())
-            && !aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGE.getName())) {
+        if (!aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
           return false;
         }
       }
     }
     return true;
+  }
+
+  /**
+   * Helper method to identify if query is fit to be be served purely based on dictionary.
+   * It can be served through dictionary only for min, max, minmaxrange queries as of now,
+   * and if a dictionary is present for the column
+   *
+   * @param brokerRequest Broker request
+   * @param indexSegment
+   * @return True if query can be served using dictionary, false otherwise.
+   */
+  private boolean isFitForDictionaryBasedPlan(BrokerRequest brokerRequest, IndexSegment indexSegment) {
+    FilterQuery filterQuery = brokerRequest.getFilterQuery();
+    if (filterQuery != null) {
+      return false;
+    }
+
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    for (AggregationInfo aggregationInfo : aggregationsInfo) {
+      if (!isDictionaryBasedAggregationFunction(aggregationInfo.getAggregationType())) {
+        return false;
+      }
+      String column = aggregationInfo.getAggregationParams().get("column");
+      if (indexSegment.getDataSource(column).getDictionary() == null) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean isDictionaryBasedAggregationFunction(String aggregationType) {
+    if (aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MAX.getName())
+    || aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MIN.getName())
+    || aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGE.getName())) {
+      return true;
+    }
+    return false;
   }
 }
