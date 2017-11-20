@@ -6,38 +6,26 @@ import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-
-import java.util.Map;
-import java.util.Set;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
+import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.validation.constraints.NotNull;
+import javax.ws.rs.*;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.util.*;
 
 
 @Path("thirdeye/email")
@@ -79,6 +67,74 @@ public class EmailResource {
   public Response deleteByAlertId(@PathParam("alertId") Long alertId) {
     alertDAO.deleteById(alertId);
     return Response.ok().build();
+  }
+
+  /**
+   * update alert config's cron and activation by id
+   * @param id alert config id
+   * @param cron cron expression for alert
+   * @param isActive activate or not
+   * @return Response
+   * @throws Exception
+   */
+  @PUT
+  @Path("/alert/{id}")
+  public Response updateAlertConfig(@NotNull @PathParam("id") Long id,
+      @QueryParam("cron") String cron, @QueryParam("isActive") Boolean isActive) throws Exception {
+
+    AlertConfigDTO alert = alertDAO.findById(id);
+    if (alert == null) {
+      throw new IllegalStateException("Alert Config with id " + id + " does not exist");
+    }
+
+    if (isActive != null) {
+      alert.setActive(isActive);
+    }
+
+    if (StringUtils.isNotEmpty(cron)) {
+      // validate cron
+      if (!CronExpression.isValidExpression(cron)) {
+        throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
+      }
+      alert.setCronExpression(cron);
+    }
+
+    alertDAO.update(alert);
+    return Response.ok(id).build();
+  }
+
+  /**
+   * update alert config's holiday cron and activation by id
+   * if this cron is not null then holiday mode is activate
+   * @param id id of the config
+   * @param cron holiday cron expression
+   * @return Response
+   * @throws Exception
+   */
+  @PUT
+  @Path("/alert/{id}/holiday-mode")
+  public Response updateAlertConfigHolidayCron(@NotNull @PathParam("id") Long id,
+      @QueryParam("cron") String cron) throws Exception {
+
+    AlertConfigDTO alert = alertDAO.findById(id);
+    if (alert == null) {
+      throw new IllegalStateException("Alert Config with id " + id + " does not exist");
+    }
+
+    if (StringUtils.isNotEmpty(cron)) {
+      // validate cron
+      if (!CronExpression.isValidExpression(cron)) {
+        throw new IllegalArgumentException("Invalid cron expression for cron : " + cron);
+      }
+      // as long as there is an valid holiday cron expression within the class
+      // the holiday model is activate
+      alert.setHolidayCronExpression(cron);
+    } else {
+      alert.setHolidayCronExpression(null);  // equivalent to deactivate holiday
+    }
+
+    alertDAO.update(alert);
+    return Response.ok(id).build();
   }
 
   @GET
