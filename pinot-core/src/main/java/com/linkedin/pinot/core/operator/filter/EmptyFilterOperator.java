@@ -34,22 +34,12 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
   protected BaseFilterBlock getNextBlock() {
     return EmptyFilterBlock.getInstance();
   }
 
   @Override
   public boolean isResultEmpty() {
-    return true;
-  }
-
-  @Override
-  public boolean close() {
     return true;
   }
 

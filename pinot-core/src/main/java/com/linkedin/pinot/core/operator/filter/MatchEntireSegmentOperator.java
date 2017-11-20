@@ -28,16 +28,6 @@ public class MatchEntireSegmentOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
-  public boolean close() {
-    return true;
-  }
-
-  @Override
   protected BaseFilterBlock getNextBlock() {
     return new MatchEntireSegmentDocIdSetBlock(_totalDocs);
   }

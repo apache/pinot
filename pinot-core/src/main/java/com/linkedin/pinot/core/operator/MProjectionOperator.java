@@ -48,24 +48,6 @@ public class MProjectionOperator extends BaseOperator<ProjectionBlock> {
   }
 
   @Override
-  public boolean open() {
-    for (final String column : _columnToDataSourceMap.keySet()) {
-      _columnToDataSourceMap.get(column).open();
-    }
-    _docIdSetOperator.open();
-    return true;
-  }
-
-  @Override
-  public boolean close() {
-    for (final String column : _columnToDataSourceMap.keySet()) {
-      _columnToDataSourceMap.get(column).close();
-    }
-    _docIdSetOperator.close();
-    return true;
-  }
-
-  @Override
   protected ProjectionBlock getNextBlock() {
     DocIdSetBlock docIdSetBlock = _docIdSetOperator.nextBlock();
     if (docIdSetBlock == null) {

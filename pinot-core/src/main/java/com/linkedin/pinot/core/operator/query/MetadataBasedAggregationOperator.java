@@ -58,14 +58,6 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   }
 
   @Override
-  public boolean open() {
-    for (BaseOperator operator : _dataSourceMap.values()) {
-      operator.open();
-    }
-    return true;
-  }
-
-  @Override
   protected IntermediateResultsBlock getNextBlock() {
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
@@ -102,14 +94,6 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    for (BaseOperator operator : _dataSourceMap.values()) {
-      operator.close();
-    }
-    return true;
   }
 
   @Override

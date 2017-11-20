@@ -47,11 +47,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean open() {
-    return _dataSource.open();
-  }
-
-  @Override
   protected BaseFilterBlock getNextBlock() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     FilterBlockDocIdSet docIdSet;
@@ -74,11 +69,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   @Override
   public boolean isResultEmpty() {
     return _predicateEvaluator.isAlwaysFalse();
-  }
-
-  @Override
-  public boolean close() {
-    return _dataSource.close();
   }
 
   @Override

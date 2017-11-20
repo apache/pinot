@@ -58,11 +58,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean open() {
-    return _dataSource.open();
-  }
-
-  @Override
   protected BaseFilterBlock getNextBlock() {
     if (_bitmaps != null) {
       return new BitmapBlock(_bitmaps, _startDocId, _endDocId, _exclusive);
@@ -94,11 +89,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   @Override
   public boolean isResultEmpty() {
     return _predicateEvaluator != null && _predicateEvaluator.isAlwaysFalse();
-  }
-
-  @Override
-  public boolean close() {
-    return _dataSource.close();
   }
 
   @Override

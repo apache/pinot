@@ -100,7 +100,6 @@ public class StarTreeIndexViewer {
 
     for (String columnName : metadata.getAllColumns()) {
       DataSource dataSource = indexSegment.getDataSource(columnName);
-      dataSource.open();
       Block block = dataSource.nextBlock();
       BlockValSet blockValSet = block.getBlockValueSet();
       BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();

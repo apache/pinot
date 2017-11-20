@@ -69,7 +69,6 @@ public class SumStarTreeIndexTest extends BaseStarTreeIndexTest {
 
   @Override
   protected Map<List<Integer>, List<Double>> compute(Operator filterOperator) {
-    filterOperator.open();
     BlockDocIdIterator docIdIterator = filterOperator.nextBlock().getBlockDocIdSet().iterator();
 
     Map<List<Integer>, List<Double>> results = new HashMap<>();
@@ -96,7 +95,6 @@ public class SumStarTreeIndexTest extends BaseStarTreeIndexTest {
         sums.set(i, sums.get(i) + _metricDictionaries[i].getDoubleValue(dictId));
       }
     }
-    filterOperator.close();
 
     return results;
   }
