@@ -15,16 +15,12 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.codehaus.jackson.map.ObjectMapper;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -55,13 +51,8 @@ public class StarTreeIndexSpec {
   public StarTreeIndexSpec() {
   }
 
-  public StarTreeIndexSpec(String jsonString) {
-    StarTreeIndexSpec starTreeIndexSpec = JSON.parseObject(jsonString, StarTreeIndexSpec.class);
-    _dimensionsSplitOrder = starTreeIndexSpec.getDimensionsSplitOrder();
-    _maxLeafRecords = starTreeIndexSpec.getMaxLeafRecords();
-    _skipMaterializationCardinalityThreshold = starTreeIndexSpec.getSkipMaterializationCardinalityThreshold();
-    _skipMaterializationForDimensions = starTreeIndexSpec.getSkipMaterializationForDimensions();
-    _skipStarNodeCreationForDimensions = starTreeIndexSpec.getSkipStarNodeCreationForDimensions();
+  public static StarTreeIndexSpec fromJsonString(String jsonString) throws Exception {
+    return new ObjectMapper().readValue(jsonString, StarTreeIndexSpec.class);
   }
 
   public Integer getMaxLeafRecords() {
@@ -118,14 +109,7 @@ public class StarTreeIndexSpec {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 
-  public String toJsonString() {
-    Map<String, Object> map = new HashMap<>();
-    map.put(DIMENSIONS_SPLIT_ORDER_PARAM, _dimensionsSplitOrder);
-    map.put(MAX_LEAF_RECORDS_PARAM, _maxLeafRecords);
-    map.put(SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD_PARAM, _skipMaterializationCardinalityThreshold);
-    map.put(SKIP_MATERIALIZATION_FOR_DIMENSIONS_PARAM, _skipMaterializationForDimensions);
-    map.put(SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS_PARAM, _skipStarNodeCreationForDimensions);
-    JSONObject jsonObject = new JSONObject(map);
-    return jsonObject.toString();
+  public String toJsonString() throws Exception {
+    return new ObjectMapper().writeValueAsString(this);
   }
 }
