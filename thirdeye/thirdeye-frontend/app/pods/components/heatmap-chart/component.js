@@ -142,7 +142,7 @@ export default Ember.Component.extend({
       .attr('dy', '.35em')
       .attr('text-anchor', 'middle')
       .text((d) => {
-        const text = d.label;
+        const text = d.label || '';
 
         //each character takes up 7 pixels on an average
         const estimatedTextLength = text.length * 7;
