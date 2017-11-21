@@ -41,13 +41,6 @@ public class StarTreeIndexSpec {
 
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
 
-  private static final String SEPARATOR = ",";
-  private static final String DIMENSIONS_SPLIT_ORDER_PARAM = "dimensionsSplitOrder";
-  private static final String MAX_LEAF_RECORDS_PARAM = "maxLeafRecords";
-  private static final String SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD_PARAM = "skipMaterializationCardinalityThreshold";
-  private static final String SKIP_MATERIALIZATION_FOR_DIMENSIONS_PARAM = "skipMaterializationForDimensions";
-  private static final String SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS_PARAM = "skipStarNodeCreationForDimensions";
-
   public StarTreeIndexSpec() {
   }
 
