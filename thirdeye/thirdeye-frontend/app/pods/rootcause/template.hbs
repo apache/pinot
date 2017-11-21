@@ -80,6 +80,15 @@
 
             {{#if (eq activeTab "metrics")}}
               <h3>Metrics</h3>
+              <div class="col-xs-3">
+                Select user-defined metric:
+              </div>
+              <div class="col-xs-8">
+                {{rootcause-metrics-user
+                  onSelection=(action "onSelection")
+                }}
+              </div>
+
               {{rootcause-metrics
                 entities=entities
                 aggregates=aggregates
