@@ -69,7 +69,7 @@ public class AnomalyReportGenerator {
   private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "multiple-anomalies-email-template.ftl";
 
   private static final EventDataProviderManager EVENT_MANAGER = EventDataProviderManager.getInstance();
-  private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(1);
+  private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(2);
 
   public static AnomalyReportGenerator getInstance() {
     return INSTANCE;
@@ -157,7 +157,8 @@ public class AnomalyReportGenerator {
       Set<String> metrics = new HashSet<>();
 
       Multimap<String, String> anomalyDimensions = ArrayListMultimap.create();
-      Multimap<String, AnomalyReportDTO> groupedAnomalyReports = ArrayListMultimap.create();
+      Multimap<String, AnomalyReportDTO> functionAnomalyReports = ArrayListMultimap.create();
+      Multimap<String, AnomalyReportDTO> metricAnomalyReports = ArrayListMultimap.create();
       List<AnomalyReportDTO> anomalyReports = new ArrayList<>();
       List<String> anomalyIds = new ArrayList<>();
       Set<String> datasets = new HashSet<>();
@@ -205,7 +206,8 @@ public class AnomalyReportGenerator {
         if (!includeSentAnomaliesOnly || anomaly.isNotified()) {
           anomalyReports.add(anomalyReportDTO);
           anomalyIds.add(anomalyReportDTO.getAnomalyId());
-          groupedAnomalyReports.put(functionName, anomalyReportDTO);
+          functionAnomalyReports.put(functionName, anomalyReportDTO);
+          metricAnomalyReports.put(anomaly.getMetric(), anomalyReportDTO);
         }
       }
 
@@ -245,7 +247,8 @@ public class AnomalyReportGenerator {
       templateData.put("falseAlertCount", precisionRecallEvaluator.getFalseAlarm());
       templateData.put("newTrendCount", precisionRecallEvaluator.getTrueAnomalyNewTrend());
       templateData.put("anomalyDetails", anomalyReports);
-      templateData.put("groupedAnomalyDetails", groupedAnomalyReports.asMap());
+      templateData.put("functionAnomalyDetails", functionAnomalyReports.asMap());
+      templateData.put("metricAnomalyDetails", metricAnomalyReports.asMap());
       templateData.put("emailSubjectName", emailSubjectName);
       templateData.put("alertConfigName", alertConfig.getName()); // NOTE: breaks backwards compatibility
       templateData.put("includeSummary", includeSummary);
