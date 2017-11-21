@@ -207,10 +207,14 @@ public class EmailResource {
     configuration.setPhantomJsPath(thirdeyeConfiguration.getPhantomJsPath());
     configuration.setRootDir(thirdeyeConfiguration.getRootDir());
 
+    AlertConfigDTO dummyAlertConfig = new AlertConfigDTO();
+    dummyAlertConfig.setName(alertName);
+    dummyAlertConfig.setFromAddress(fromAddr);
+
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
         .buildReport(startTime, endTime, groupId, groupName, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, alertName, includeSummary);
+            includeSentAnomaliesOnly, toAddr, alertName, dummyAlertConfig, includeSummary);
     return Response.ok("Request to generate report-email accepted ").build();
   }
 
