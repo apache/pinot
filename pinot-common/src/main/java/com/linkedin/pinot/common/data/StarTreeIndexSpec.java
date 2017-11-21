@@ -41,11 +41,13 @@ public class StarTreeIndexSpec {
 
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   public StarTreeIndexSpec() {
   }
 
   public static StarTreeIndexSpec fromJsonString(String jsonString) throws Exception {
-    return new ObjectMapper().readValue(jsonString, StarTreeIndexSpec.class);
+    return OBJECT_MAPPER.readValue(jsonString, StarTreeIndexSpec.class);
   }
 
   public Integer getMaxLeafRecords() {
@@ -103,6 +105,6 @@ public class StarTreeIndexSpec {
   }
 
   public String toJsonString() throws Exception {
-    return new ObjectMapper().writeValueAsString(this);
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 }
