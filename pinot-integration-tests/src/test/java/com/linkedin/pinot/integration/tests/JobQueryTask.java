@@ -1,5 +1,7 @@
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+
 import java.util.Properties;
 
 public class JobQueryTask extends QueryTask {
@@ -29,13 +31,16 @@ public class JobQueryTask extends QueryTask {
         int experienceRange = max_experience - min_experience + 1;
         long timestamp = min_timestamp + (int)(Math.random() * timestampRange);
 
+        String query;
         switch (queryId) {
             case 0:
-                runQuery(String.format(queries[queryId], timestamp));
+                query = String.format(queries[queryId], timestamp);
+                runQuery(query);
                 break;
             case 1:
                 int experience = min_experience + (int)(Math.random() * experienceRange);
-                runQuery(String.format(queries[queryId], timestamp, experience));
+                query = String.format(queries[queryId], timestamp, experience);
+                runQuery(query);
                 break;
             case 2:
                 int lowerBound = min_experience + (int)(Math.random() * experienceRange);
@@ -46,10 +51,12 @@ public class JobQueryTask extends QueryTask {
                     lowerBound = higherBound;
                     higherBound = temp;
                 }
-                runQuery(String.format(queries[queryId], timestamp, lowerBound, higherBound));
+                query = String.format(queries[queryId], timestamp, lowerBound, higherBound);
+                runQuery(query);
                 break;
             case 3:
-                runQuery(String.format(queries[queryId], timestamp));
+                query = String.format(queries[queryId], timestamp);
+                runQuery(query);
                 break;
         }
 

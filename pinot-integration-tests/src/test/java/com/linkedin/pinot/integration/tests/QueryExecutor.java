@@ -1,5 +1,7 @@
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,10 +14,12 @@ import java.util.concurrent.TimeUnit;
 
 public abstract class QueryExecutor {
     Properties config;
+    private PostQueryCommand postQueryCommand;
 
     public static QueryExecutor getInstance(){
         return null;
     }
+
 
     public static List<QueryExecutor> getTableExecutors() {
         List<QueryExecutor> queryExecutors = new ArrayList<>();
@@ -27,7 +31,9 @@ public abstract class QueryExecutor {
         loadConfig();
         int threadCnt = Integer.parseInt(config.getProperty("threads"));
         ExecutorService threadPool = Executors.newFixedThreadPool(threadCnt);
-        threadPool.execute(getTask(config));
+        QueryTask queryTask = getTask(config);
+        queryTask.setPostQueryCommand(this.postQueryCommand);
+        threadPool.execute(queryTask);
         threadPool.awaitTermination(1, TimeUnit.MINUTES);
         threadPool.shutdownNow();
     }
@@ -45,6 +51,10 @@ public abstract class QueryExecutor {
             System.out.println("IOException");
             e.printStackTrace();
         }
+    }
+
+    public void setPostQueryCommand(PostQueryCommand postQueryCommand) {
+        this.postQueryCommand = postQueryCommand;
     }
 
     public abstract String getConfigFile();

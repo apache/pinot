@@ -12,6 +12,7 @@ public class QueryTask implements Runnable{
     private Properties config;
     private String[] queries;
     private Random rand = new Random();
+    private PostQueryCommand postQueryCommand;
 
     public enum Color {
         RESET("\u001B[0m"),
@@ -61,11 +62,9 @@ public class QueryTask implements Runnable{
         System.out.println(color._code + message + QueryTask.Color.RESET._code);
     }
 
-    public static void runQuery(String query) throws Exception {
-        printStatus(QueryTask.Color.YELLOW, "Total number of documents in the table");
+    public void runQuery(String query) throws Exception {
         printStatus(QueryTask.Color.CYAN, "Query : " + query);
-        printStatus(QueryTask.Color.YELLOW, prettyPrintResponse(new JSONObject(new PostQueryCommand().
-                setBrokerPort(String.valueOf(8099)).setQuery(query).run())));
+        printStatus(QueryTask.Color.YELLOW, prettyPrintResponse(new JSONObject(getPostQueryCommand().setQuery(query).run())));
         printStatus(QueryTask.Color.GREEN, "***************************************************");
     }
 
@@ -89,5 +88,12 @@ public class QueryTask implements Runnable{
 
     }
 
+    public PostQueryCommand getPostQueryCommand() {
+        return this.postQueryCommand;
+    }
+
+    public void setPostQueryCommand(PostQueryCommand postQueryCommand) {
+        this.postQueryCommand = postQueryCommand;
+    }
 
 }
