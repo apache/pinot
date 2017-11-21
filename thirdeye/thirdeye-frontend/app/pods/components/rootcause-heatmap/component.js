@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendTail } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const ROOTCAUSE_ROLLUP_MODE_CHANGE = 'change';
@@ -16,13 +16,15 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 const ROOTCAUSE_ROLLUP_RANGE_DEFAULT = [0, 10];
 
 export default Ember.Component.extend({
+  entities: null, // {}
+
   breakdowns: null, // {}
 
   selectedUrns: null, // Set
 
-  currentUrn: null, // ""
-
   onSelection: null, // func (updates)
+
+  currentUrn: null, // ""
 
   rollupRange: null, // ""
 
@@ -34,11 +36,15 @@ export default Ember.Component.extend({
     this.setProperties({ rollupRange: {}, mode: ROOTCAUSE_ROLLUP_MODE_CHANGE});
   },
 
-  urns: Ember.computed(
+  labels: Ember.computed(
     'selectedUrns',
+    'entities',
     function () {
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      return filterPrefix(selectedUrns, 'thirdeye:metric:');
+      const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
+      return filterPrefix(selectedUrns, 'thirdeye:metric:').reduce((agg, urn) => {
+        agg[urn] = toMetricLabel(urn, entities);
+        return agg;
+      }, {});
     }
   ),
 
@@ -241,7 +247,10 @@ export default Ember.Component.extend({
 
   actions: {
     onHeatmapClick(role, dimName, dimValue) {
-      const { rollupRange } = this.getProperties('rollupRange');
+      const { rollupRange, selectedUrns, onSelection, currentUrn } =
+        this.getProperties('rollupRange', 'selectedUrns', 'onSelection', 'currentUrn');
+
+      // scrolling
       const range = rollupRange[dimName] || ROOTCAUSE_ROLLUP_RANGE_DEFAULT;
       if (role == ROOTCAUSE_ROLE_HEAD) {
         rollupRange[dimName] = range.map(v => v - 10);
@@ -250,6 +259,16 @@ export default Ember.Component.extend({
       if (role == ROOTCAUSE_ROLE_TAIL) {
         rollupRange[dimName] = range.map(v => v + 10);
         this.set('rollupRange', Object.assign({}, rollupRange));
+      }
+
+      // selection
+      if (role == ROOTCAUSE_ROLE_VALUE) {
+        const metricUrn = appendTail(currentUrn, `${dimName}=${dimValue}`);
+        const state = !selectedUrns.has(metricUrn);
+        const updates = { [metricUrn]: state, [toBaselineUrn(metricUrn)]: state, [toCurrentUrn(metricUrn)]: state };
+        if (onSelection) {
+          onSelection(updates);
+        }
       }
     },
 

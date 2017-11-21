@@ -1,7 +1,7 @@
 urns
-{{#each urns as |urn|}}
-  | <button {{action (mut currentUrn) urn}}>{{urn}}</button>
-{{/each}}
+{{#each-in labels as |urn label|}}
+  | <button {{action (mut currentUrn) urn}}>{{label}}</button>
+{{/each-in}}
 
 mode
 | <button {{action (mut mode) "change"}}>change</button>

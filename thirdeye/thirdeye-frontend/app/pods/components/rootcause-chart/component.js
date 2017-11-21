@@ -1,7 +1,7 @@
 import Ember from 'ember';
 import d3 from 'd3';
 import moment from 'moment';
-import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange } from 'thirdeye-frontend/helpers/utils';
+import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -165,7 +165,7 @@ export default Ember.Component.extend({
       }
 
       return filterPrefix(displayableUrns, 'frontend:metric:current:')
-        .map(urn => [entities[stripTail(toMetricUrn(urn))].label.split("::")[1], urn])
+        .map(urn => [toMetricLabel(toMetricUrn(urn), entities), urn])
         .sort()
         .map(t => t[1]);
     }
@@ -186,7 +186,7 @@ export default Ember.Component.extend({
 
       return filterPrefix(displayableUrns, 'frontend:metric:current:')
         .reduce((agg, urn) => {
-          agg[urn] = entities[stripTail(toMetricUrn(urn))].label.split("::")[1];
+          agg[urn] = toMetricLabel(toMetricUrn(urn), entities);
           return agg;
         }, {});
     }
