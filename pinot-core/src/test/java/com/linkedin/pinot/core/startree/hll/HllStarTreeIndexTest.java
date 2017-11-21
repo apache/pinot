@@ -84,7 +84,6 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
 
   @Override
   protected Map<List<Integer>, List<Double>> compute(Operator filterOperator) throws Exception {
-    filterOperator.open();
     BlockDocIdIterator docIdIterator = filterOperator.nextBlock().getBlockDocIdSet().iterator();
 
     Map<List<Integer>, List<HyperLogLog>> intermediateResults = new HashMap<>();
@@ -113,7 +112,6 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
         hyperLogLogs.set(i, hyperLogLog);
       }
     }
-    filterOperator.close();
 
     // Compute the final result
     Map<List<Integer>, List<Double>> finalResults = new HashMap<>();

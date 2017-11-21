@@ -192,11 +192,6 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
   public BaseFilterBlock getNextBlock() {
     if (_resultEmpty) {
       return EmptyFilterBlock.getInstance();
@@ -215,11 +210,6 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
   @Override
   public boolean isResultEmpty() {
     return _resultEmpty;
-  }
-
-  @Override
-  public boolean close() {
-    return true;
   }
 
   @Override

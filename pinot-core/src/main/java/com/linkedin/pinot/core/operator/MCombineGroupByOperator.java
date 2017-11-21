@@ -90,20 +90,6 @@ public class MCombineGroupByOperator extends BaseOperator<IntermediateResultsBlo
 
   /**
    * {@inheritDoc}
-   * Calls 'open' on all the underlying operators.
-   *
-   * @return
-   */
-  @Override
-  public boolean open() {
-    for (Operator operator : _operators) {
-      operator.open();
-    }
-    return true;
-  }
-
-  /**
-   * {@inheritDoc}
    * Builds and returns a block containing result of combine:
    * - Group-by blocks from underlying operators are merged.
    * - Merged results are sorted and trimmed (for 'TOP N').
@@ -256,13 +242,5 @@ public class MCombineGroupByOperator extends BaseOperator<IntermediateResultsBlo
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    for (Operator operator : _operators) {
-      operator.close();
-    }
-    return true;
   }
 }

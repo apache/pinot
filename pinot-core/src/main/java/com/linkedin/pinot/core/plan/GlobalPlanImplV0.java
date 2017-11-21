@@ -27,45 +27,29 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
-public class GlobalPlanImplV0 extends Plan {
+public class GlobalPlanImplV0 implements Plan {
   private static final Logger LOGGER = LoggerFactory.getLogger(GlobalPlanImplV0.class);
 
-  private InstanceResponsePlanNode _rootNode;
-  private DataTable _instanceResponseDataTable;
+  private final InstanceResponsePlanNode _instanceResponsePlanNode;
 
-  public GlobalPlanImplV0(InstanceResponsePlanNode rootNode) {
-    _rootNode = rootNode;
+  public GlobalPlanImplV0(InstanceResponsePlanNode instanceResponsePlanNode) {
+    _instanceResponsePlanNode = instanceResponsePlanNode;
+  }
+
+  @Override
+  public DataTable execute() {
+    long startTime = System.currentTimeMillis();
+    UResultOperator uResultOperator = _instanceResponsePlanNode.run();
+    long endTime1 = System.currentTimeMillis();
+    LOGGER.debug("InstanceResponsePlanNode.run() took: {}ms", endTime1 - startTime);
+    InstanceResponseBlock instanceResponseBlock = uResultOperator.nextBlock();
+    long endTime2 = System.currentTimeMillis();
+    LOGGER.debug("UResultOperator.nextBlock() took: {}ms", endTime2 - endTime1);
+    return instanceResponseBlock.getInstanceResponseDataTable();
   }
 
   @Override
   public void print() {
-    _rootNode.showTree("");
-  }
-
-  @Override
-  public PlanNode getRoot() {
-    return _rootNode;
-  }
-
-  @Override
-  public void execute() {
-    long startTime = System.currentTimeMillis();
-    PlanNode root = getRoot();
-    UResultOperator operator = (UResultOperator) root.run();
-    try {
-      long endTime1 = System.currentTimeMillis();
-      LOGGER.debug("InstanceResponsePlanNode.run took:{}", (endTime1 - startTime));
-      InstanceResponseBlock instanceResponseBlock = (InstanceResponseBlock) operator.nextBlock();
-      long endTime2 = System.currentTimeMillis();
-      LOGGER.debug("UResultOperator took :{}", (endTime2 - endTime1));
-      _instanceResponseDataTable = instanceResponseBlock.getInstanceResponseDataTable();
-    } finally {
-      operator.close();
-    }
-  }
-
-  @Override
-  public DataTable getInstanceResponse() {
-    return _instanceResponseDataTable;
+    _instanceResponsePlanNode.showTree("");
   }
 }
