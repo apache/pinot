@@ -24,8 +24,8 @@ public class NettyServerWorkload {
     protected int threads = THREADS;
     protected ExecutorService threadPool = Executors.newFixedThreadPool(THREADS);
     protected AsynchronousFileChannel log;
-    public static final long CAPTURE_WINDOW = 1;
-    public static final long FLUSH_WINDOW = 1;
+    public static final long CAPTURE_WINDOW = 80;
+    public static final long FLUSH_WINDOW = 2;
     private final Map<String, ServerLoadMetrics> avgLoadMap;
 
     public NettyServerWorkload(){
@@ -38,23 +38,23 @@ public class NettyServerWorkload {
             List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
             //Get the last entry in the list
             ServerLatencyMetric l = list.get(list.size()-1);
+            System.out.println(l.getTimestamp() + "-" + load.getTimestamp());
             if(l.getTimestamp() + CAPTURE_WINDOW >= load.getTimestamp()){
                 //if incoming load within last window then update window
                 updateLastWindow(tableName, load);
             }else{
                 //else add new entry
                 list.add(load);
+                //flush records to file, flushRecords will take care weather window has maxed out or not
+                flushRecords(tableName);
             }
-        }else{
+        }else {
             //if tableName doesn't exist till now
             ServerLoadMetrics loadMetrics = new ServerLoadMetrics();
             loadMetrics.set_latencies(new ArrayList<ServerLatencyMetric>());
             loadMetrics.get_latencies().add(load);
             avgLoadMap.put(tableName, loadMetrics);
         }
-
-        //flush records to file, flushRecords will take care weather window has maxed out or not
-        flushRecords(tableName);
     }
 
     private void updateLastWindow(String tableName, ServerLatencyMetric load) {
@@ -66,6 +66,7 @@ public class NettyServerWorkload {
         lastLoad.setNumRequests(lastLoad.getNumRequests() + 1);
         lastLoad.setDocuments(lastLoad.getDocuments() + load.getDocuments());
         //update the same index in list now
+        System.out.println(lastLoad.getTimestamp() + "-" + lastLoad.getNumRequests());
         list.set(list.size()-1, lastLoad);
     }
 
@@ -123,10 +124,10 @@ public class NettyServerWorkload {
     private String getRecordsToWrite(String tableName) {
         List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
         if(list.size() >= FLUSH_WINDOW){
-            long size = list.size();
+            long size = list.size()-1;
             String msg = "";
             StringBuilder builder = new StringBuilder(msg);
-            while(size >= FLUSH_WINDOW){
+            while(size > 0){
                 ServerLatencyMetric record = list.get(0);
                 builder.append(record.toString());
                 list.remove(0);

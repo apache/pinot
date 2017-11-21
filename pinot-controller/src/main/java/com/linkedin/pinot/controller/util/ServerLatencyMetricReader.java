@@ -167,10 +167,10 @@ public class ServerLatencyMetricReader {
 
     public static void main(String args[]){
         ServerLoadMetrics metrics = new ServerLoadMetrics();
-        ServerLatencyMetric metric = new ServerLatencyMetric(300,20.0,40.0);
-        ServerLatencyMetric metric1 = new ServerLatencyMetric(300,20.0,40.0);
-        ServerLatencyMetric metric2 = new ServerLatencyMetric(300,20.0,40.0);
-        ServerLatencyMetric metric3 = new ServerLatencyMetric(300,20.0,40.0);
+        ServerLatencyMetric metric = new ServerLatencyMetric(300,20,40, 9000);
+        ServerLatencyMetric metric1 = new ServerLatencyMetric(300,20,40, 9000);
+        ServerLatencyMetric metric2 = new ServerLatencyMetric(300,20,40, 9000);
+        ServerLatencyMetric metric3 = new ServerLatencyMetric(300,20,40, 9000);
         List list = new ArrayList();
         list.add(metric);
         list.add(metric1);
