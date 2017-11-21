@@ -137,19 +137,24 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param brokerRequest Broker request
    * @return True if query can be served using metadata, false otherwise.
    */
-  private boolean isFitForMetadataBasedPlan(BrokerRequest brokerRequest) {
+  public boolean isFitForMetadataBasedPlan(BrokerRequest brokerRequest) {
     FilterQuery filterQuery = brokerRequest.getFilterQuery();
     if (filterQuery != null) {
       return false;
     }
 
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
-    if (aggregationsInfo != null && !brokerRequest.isSetGroupBy()) {
-      for (int i = 0; i < aggregationsInfo.size(); i++) {
-        String aggregationType = aggregationsInfo.get(i).getAggregationType();
-        if (!aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-          return false;
-        }
+    if (aggregationsInfo == null) {
+      return false;
+    }
+    if (brokerRequest.isSetGroupBy()) {
+      return false;
+    }
+
+    for (int i = 0; i < aggregationsInfo.size(); i++) {
+      String aggregationType = aggregationsInfo.get(i).getAggregationType();
+      if (!aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        return false;
       }
     }
     return true;
@@ -164,13 +169,19 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param indexSegment
    * @return True if query can be served using dictionary, false otherwise.
    */
-  private boolean isFitForDictionaryBasedPlan(BrokerRequest brokerRequest, IndexSegment indexSegment) {
+  public boolean isFitForDictionaryBasedPlan(BrokerRequest brokerRequest, IndexSegment indexSegment) {
     FilterQuery filterQuery = brokerRequest.getFilterQuery();
     if (filterQuery != null) {
       return false;
     }
 
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo == null) {
+      return false;
+    }
+    if (brokerRequest.isSetGroupBy()) {
+      return false;
+    }
     for (AggregationInfo aggregationInfo : aggregationsInfo) {
       if (!isDictionaryBasedAggregationFunction(aggregationInfo.getAggregationType())) {
         return false;
