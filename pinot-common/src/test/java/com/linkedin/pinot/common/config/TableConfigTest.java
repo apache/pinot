@@ -190,6 +190,13 @@ public class TableConfigTest {
     Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
     Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
     Assert.assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
+
+    StarTreeIndexSpec starTreeIndexSpec1 = new StarTreeIndexSpec(starTreeIndexSpec.toJsonString());
+    Assert.assertEquals(starTreeIndexSpec1.getDimensionsSplitOrder(), Collections.singletonList("dim"));
+    Assert.assertEquals(starTreeIndexSpec1.getMaxLeafRecords(), new Integer(5));
+    Assert.assertEquals(starTreeIndexSpec1.getSkipMaterializationCardinalityThreshold(), 1);
+    Assert.assertEquals(starTreeIndexSpec1.getSkipMaterializationForDimensions(), dims);
+    Assert.assertEquals(starTreeIndexSpec1.getSkipStarNodeCreationForDimensions(), dims);
   }
 
   private void checkTableConfigWithHllConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
