@@ -32,6 +32,7 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
   private String _downloadUrl = null;
   private long _pushTime = Long.MIN_VALUE;
   private long _refreshTime = Long.MIN_VALUE;
+  private String _segmentPushStatus = null;
 
   public OfflineSegmentZKMetadata() {
     setSegmentType(SegmentType.OFFLINE);
@@ -43,6 +44,7 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     _downloadUrl = znRecord.getSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL);
     _pushTime = znRecord.getLongField(CommonConstants.Segment.Offline.PUSH_TIME, Long.MIN_VALUE);
     _refreshTime = znRecord.getLongField(CommonConstants.Segment.Offline.REFRESH_TIME, Long.MIN_VALUE);
+    _segmentPushStatus = znRecord.getSimpleField(CommonConstants.Segment.Offline.SEGMENT_PUSH_STATUS);
   }
 
   public String getDownloadUrl() {
@@ -69,12 +71,21 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     _refreshTime = currentTimeMillis;
   }
 
+  public String getSegmentPushStatus() {
+    return _segmentPushStatus;
+  }
+
+  public void setSegmentPushStatus(String segmentPushStatus) {
+    _segmentPushStatus = segmentPushStatus;
+  }
+
   @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = super.toZNRecord();
     znRecord.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, _downloadUrl);
     znRecord.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, _pushTime);
     znRecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, _refreshTime);
+    znRecord.setSimpleField(CommonConstants.Segment.Offline.SEGMENT_PUSH_STATUS, _segmentPushStatus);
     return znRecord;
   }
 
@@ -92,6 +103,8 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     result.append("  " + CommonConstants.Segment.Offline.PUSH_TIME + " : " + _pushTime);
     result.append(newline);
     result.append("  " + CommonConstants.Segment.Offline.REFRESH_TIME + " : " + _refreshTime);
+    result.append(newline);
+    result.append("  " + CommonConstants.Segment.Offline.SEGMENT_PUSH_STATUS + " : " + _segmentPushStatus);
     result.append(newline);
     result.append("}");
     return result.toString();
@@ -111,7 +124,8 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     return super.equals(metadata) &&
         isEqual(_pushTime, metadata._pushTime) &&
         isEqual(_refreshTime, metadata._refreshTime) &&
-        isEqual(_downloadUrl, metadata._downloadUrl);
+        isEqual(_downloadUrl, metadata._downloadUrl) &&
+        isEqual(_segmentPushStatus, metadata._segmentPushStatus);
   }
 
   @Override
@@ -120,6 +134,7 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     result = hashCodeOf(result, _downloadUrl);
     result = hashCodeOf(result, _pushTime);
     result = hashCodeOf(result, _refreshTime);
+    result = hashCodeOf(result, _segmentPushStatus);
     return result;
   }
 
@@ -129,6 +144,7 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     configMap.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, _downloadUrl);
     configMap.put(CommonConstants.Segment.Offline.PUSH_TIME, Long.toString(_pushTime));
     configMap.put(CommonConstants.Segment.Offline.REFRESH_TIME, Long.toString(_refreshTime));
+    configMap.put(CommonConstants.Segment.Offline.SEGMENT_PUSH_STATUS, _segmentPushStatus);
     configMap.put(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.OFFLINE.toString());
     return configMap;
   }

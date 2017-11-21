@@ -113,6 +113,9 @@ public interface SegmentMetadata {
   @Nullable
   List<String> getOptimizations();
 
+  @Nullable
+  String getSegmentPushStatus();
+
   Map<String, String> toMap();
 
   boolean close();

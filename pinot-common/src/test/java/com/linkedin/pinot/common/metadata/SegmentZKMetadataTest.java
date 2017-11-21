@@ -206,6 +206,7 @@ public class SegmentZKMetadataTest {
     record.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/testTable_O_3000_4000");
     record.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, 4000);
     record.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, 8000);
+    record.setSimpleField(CommonConstants.Segment.Offline.SEGMENT_PUSH_STATUS, null);
     return record;
   }
 
