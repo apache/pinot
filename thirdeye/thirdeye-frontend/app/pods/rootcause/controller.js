@@ -166,26 +166,30 @@ export default Ember.Controller.extend({
   ),
 
   isLoadingEntities: Ember.computed(
-    'entitiesService.entities',
+    'entitiesService.pending',
     function () {
-      console.log('isLoadingEntities()');
       return this.get('entitiesService.pending').size > 0;
     }
   ),
 
   isLoadingTimeseries: Ember.computed(
-    'timeseriesService.timeseries',
+    'timeseriesService.pending',
     function () {
-      console.log('isLoadingTimeseries()');
       return this.get('timeseriesService.pending').size > 0;
     }
   ),
 
   isLoadingAggregates: Ember.computed(
-    'aggregatesService.aggregates',
+    'aggregatesService.pending',
     function () {
-      console.log('isLoadingAggregates()');
-      return this.get('aggregatesService.aggregates').size > 0;
+      return this.get('aggregatesService.pending').size > 0;
+    }
+  ),
+
+  isLoadingBreakdowns: Ember.computed(
+    'breakdownsService.pending',
+    function () {
+      return this.get('breakdownsService.pending').size > 0;
     }
   ),
 

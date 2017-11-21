@@ -12,12 +12,18 @@
   </div>
 
   <p>loading
-  {{#if isLoadingEntities}}
-    | ENTITIES
-  {{/if}}
-  {{#if isLoadingTimeseries}}
-    | TIMESERIES
-  {{/if}}
+    {{#if isLoadingEntities}}
+      | ENTITIES
+    {{/if}}
+    {{#if isLoadingTimeseries}}
+      | TIMESERIES
+    {{/if}}
+    {{#if isLoadingAggregates}}
+      | AGGREGATES
+    {{/if}}
+    {{#if isLoadingBreakdowns}}
+      | BREAKDOWNS
+    {{/if}}
   </p>
 
   <div class="row">
