@@ -346,6 +346,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       try (StarTreeDataTable dataTable = new StarTreeDataTable(new MMapBuffer(_dataFile, MMapMode.READ_WRITE),
           _dimensionSize, _metricSize, 0, _numRawDocs)) {
         dataTable.sort(0, _numRawDocs, _sortOrder);
+        dataTable.flush();
       }
       // Recursively construct the star tree
       constructStarTree(_rootNode, 0, _numRawDocs, 0);
@@ -365,6 +366,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     try (StarTreeDataTable dataTable = new StarTreeDataTable(new MMapBuffer(_dataFile, MMapMode.READ_WRITE),
         _dimensionSize, _metricSize, 0, _numRawDocs)) {
       dataTable.sort(0, _numRawDocs, _sortOrder);
+      dataTable.flush();
       Iterator<Pair<byte[], byte[]>> iterator = dataTable.iterator(0, _numRawDocs);
       DimensionBuffer currentDimensions = null;
       MetricBuffer currentMetrics = null;
@@ -466,6 +468,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
         try (StarTreeDataTable dataTable = new StarTreeDataTable(new MMapBuffer(_dataFile, MMapMode.READ_WRITE),
             _dimensionSize, _metricSize, 0, _numRawDocs + _numAggregatedDocs)) {
           splitLeafNodesOnTimeColumnHelper(dataTable, _rootNode, 0, timeColumnId);
+          dataTable.flush();
         }
       }
     }
@@ -669,20 +672,16 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     final StarTreeDataTable dataTable =
         new StarTreeDataTable(tempBuffer, _dimensionSize, _metricSize, startDocId, endDocId);
     _dataTablesToClose.add(dataTable);
-    if (_skipMaterializationDimensions.isEmpty() || _excludeSkipMaterializationDimensionsForStarTreeIndex) {
-      dataTable.setDimensionValue(dimensionIdToRemove, StarTreeNode.ALL);
-    } else {
-      // Need to set skip materialization dimensions value to ALL before sorting
-      int numDimensionsToRemove = 1 + _skipMaterializationDimensions.size();
-      int[] dimensionIdsToRemove = new int[numDimensionsToRemove];
-      int index = 0;
-      dimensionIdsToRemove[index++] = dimensionIdToRemove;
+
+    // Need to set skip materialization dimensions value to ALL before sorting
+    if (!_skipMaterializationDimensions.isEmpty() && !_excludeSkipMaterializationDimensionsForStarTreeIndex) {
       for (int dimensionIdToSkip : _skipMaterializationDimensions) {
-        dimensionIdsToRemove[index++] = dimensionIdToSkip;
+        dataTable.setDimensionValue(dimensionIdToSkip, StarTreeNode.ALL);
       }
-      dataTable.setDimensionValue(dimensionIdsToRemove, StarTreeNode.ALL);
     }
+    dataTable.setDimensionValue(dimensionIdToRemove, StarTreeNode.ALL);
     dataTable.sort(startDocId, endDocId, _sortOrder);
+    dataTable.flush();
 
     return new Iterator<Pair<DimensionBuffer, MetricBuffer>>() {
       private final Iterator<Pair<byte[], byte[]>> _iterator = dataTable.iterator(startDocId, endDocId);
