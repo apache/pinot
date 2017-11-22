@@ -16,7 +16,6 @@
 package com.linkedin.pinot.integration.tests;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,7 +24,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -325,91 +323,14 @@ public class DictionaryBasedAggregationClusterIntegrationTest extends BaseCluste
 
   @AfterClass
   public void tearDown() throws Exception {
-    // Test instance decommission before tearing down
-    testInstanceDecommission();
+    dropOfflineTable(getTableName());
 
-    // Brokers and servers has been stopped
+    stopServer();
+    stopBroker();
     stopController();
     stopZk();
+
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  private void testInstanceDecommission() throws Exception {
-    // Fetch all instances
-    JSONObject response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    JSONArray instanceList = response.getJSONArray("instances");
-    int numInstances = instanceList.length();
-    Assert.assertEquals(numInstances, getNumBrokers() + getNumServers());
-
-    // Try to delete a server that does not exist
-    String deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete("potato");
-    try {
-      sendDeleteRequest(deleteInstanceRequest);
-      Assert.fail("Delete should have returned a failure status (404)");
-    } catch (IOException e) {
-      // Expected exception on 404 status code
-    }
-
-    // Get the server name
-    String serverName = null;
-    String brokerName = null;
-    for (int i = 0; i < numInstances; i++) {
-      String instanceName = instanceList.getString(i);
-      if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        serverName = instanceName;
-      } else if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-        brokerName = instanceName;
-      }
-    }
-
-    // Try to delete a live server
-    deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete(serverName);
-    try {
-      sendDeleteRequest(deleteInstanceRequest);
-      Assert.fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
-      // Expected exception on 409 status code
-    }
-
-    // Stop servers
-    stopServer();
-
-    // Try to delete a server whose information is still on the ideal state
-    try {
-      sendDeleteRequest(deleteInstanceRequest);
-      Assert.fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
-      // Expected exception on 409 status code
-    }
-
-    // Delete the table
-    dropOfflineTable(getTableName());
-
-    // Now, delete server should work
-    response = new JSONObject(sendDeleteRequest(deleteInstanceRequest));
-    // TODO Cannot compare messages. We need to compare response code.
-//    Assert.assertEquals(response.getString("status"), "success");
-
-    // Try to delete a broker whose information is still live
-    try {
-      deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete(brokerName);
-      sendDeleteRequest(deleteInstanceRequest);
-      Assert.fail("Delete should have returned a failure status (409)");
-    } catch (IOException e) {
-      // Expected exception on 409 status code
-    }
-
-    // Stop brokers
-    stopBroker();
-
-    // TODO: Add test to delete broker instance. Currently, stopBroker() does not work correctly.
-
-    // Check if '/INSTANCES/<serverName>' has been erased correctly
-    String instancePath = "/" + _clusterName + "/INSTANCES/" + serverName;
-    Assert.assertFalse(_propertyStore.exists(instancePath, 0));
-
-    // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
-    String configPath = "/" + _clusterName + "/CONFIGS/PARTICIPANT/" + serverName;
-    Assert.assertFalse(_propertyStore.exists(configPath, 0));
-  }
 }
