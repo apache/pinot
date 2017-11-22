@@ -60,11 +60,6 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
   }
 
   @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
   protected IntermediateResultsBlock getNextBlock() {
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
@@ -112,10 +107,6 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
     return OPERATOR_NAME;
   }
 
-  @Override
-  public boolean close() {
-    return true;
-  }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
