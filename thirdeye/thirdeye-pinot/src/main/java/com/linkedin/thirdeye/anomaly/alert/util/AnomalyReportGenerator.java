@@ -210,7 +210,7 @@ public class AnomalyReportGenerator {
 
       // holidays
       final long eventStart = startTime - EVENT_TIME_TOLERANCE;
-      final long eventEnd = endTime - EVENT_TIME_TOLERANCE;
+      final long eventEnd = endTime + EVENT_TIME_TOLERANCE;
       List<EventDTO> holidays = eventDAO.findEventsBetweenTimeRange(EventType.HOLIDAY.toString(), eventStart, eventEnd);
 
       Collections.sort(holidays, new Comparator<EventDTO>() {
