@@ -174,7 +174,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (filterQuery != null) {
       return false;
     }
-
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
     if (aggregationsInfo == null) {
       return false;
@@ -187,7 +186,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         return false;
       }
       String column = aggregationInfo.getAggregationParams().get("column");
-      if (indexSegment.getDataSource(column).getDictionary() == null) {
+      if (!indexSegment.getDataSource(column).getDataSourceMetadata().hasDictionary()) {
         return false;
       }
     }
