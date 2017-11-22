@@ -66,7 +66,7 @@ public class AnomalyReportGenerator {
 
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
   private static final String DATE_PATTERN = "MMM dd, HH:mm";
-  private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "multiple-anomalies-email-template.ftl";
+  private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "holiday-anomaly-report.ftl";
 
   private static final EventDataProviderManager EVENT_MANAGER = EventDataProviderManager.getInstance();
   private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(2);
@@ -155,6 +155,7 @@ public class AnomalyReportGenerator {
     } else {
       DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
       Set<String> metrics = new HashSet<>();
+      Map<String, Long> functionToId = new HashMap<>();
 
       Multimap<String, String> anomalyDimensions = ArrayListMultimap.create();
       Multimap<String, AnomalyReportDTO> functionAnomalyReports = ArrayListMultimap.create();
@@ -208,6 +209,7 @@ public class AnomalyReportGenerator {
           anomalyIds.add(anomalyReportDTO.getAnomalyId());
           functionAnomalyReports.put(functionName, anomalyReportDTO);
           metricAnomalyReports.put(anomaly.getMetric(), anomalyReportDTO);
+          functionToId.put(functionName, anomaly.getFunction().getId());
         }
       }
 
@@ -256,6 +258,7 @@ public class AnomalyReportGenerator {
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
       templateData.put("holidays", holidays);
+      templateData.put("functionToId", functionToId);
       if (groupId != null) {
         templateData.put("isGroupedAnomaly", true);
         templateData.put("groupId", Long.toString(groupId));
