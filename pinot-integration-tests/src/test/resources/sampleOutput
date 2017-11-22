@@ -1,0 +1,40 @@
+SELECT * from Job WHERE jobPostTime > 1494211633
+SELECT * from Job WHERE jobPostTime > 1000525418
+SELECT * from Job WHERE jobPostTime > 1047908178
+SELECT * from Job WHERE jobPostTime > 1153233087
+SELECT * from Job WHERE jobPostTime > 1014775684
+SELECT * from Job WHERE jobPostTime > 1148258694
+SELECT * from Job WHERE jobPostTime > 1023055261
+SELECT * from Job WHERE jobPostTime > 1313466149
+SELECT * from Job WHERE jobPostTime > 1121205047
+SELECT * from Job WHERE jobPostTime > 1234028810
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1077795505 AND experience > 2 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1184280642 AND experience > 3 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1338891317 AND experience > 4 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1456416846 AND experience > 7 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1074592031 AND experience > 3 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1062410869 AND experience > 1 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1067170485 AND experience > 1 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1297872497 AND experience > 10 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1299262784 AND experience > 4 GROUP BY industry
+SELECT industry, MIN(baseSalary), AVG(baseSalary),MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto),AVG(signOnBonus) FROM Job WHERE jobPostTime > 1436490605 AND experience > 5 GROUP BY industry
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1174644618 AND experience BETWEEN 3 AND 4 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1247465731 AND experience BETWEEN 3 AND 5 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1087565639 AND experience BETWEEN 1 AND 6 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1320052680 AND experience BETWEEN 1 AND 9 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1502970612 AND experience BETWEEN 10 AND 10 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1170894672 AND experience BETWEEN 2 AND 10 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1329985963 AND experience BETWEEN 1 AND 5 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1499582057 AND experience BETWEEN 5 AND 6 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1185742960 AND experience BETWEEN 2 AND 3 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, bonus,COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus),MIN(experience) FROM Job WHERE jobPostTime > 1067837482 AND experience BETWEEN 5 AND 6 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 1366289446 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 1498977349 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 1105811925 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 955767475 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 1290156722 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 1452680751 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 1143093334 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 951453359 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 1414174721 GROUP BY company, title, location, stock, baseSalary, signOnBonus
+SELECT company, title, location, stock, baseSalary, signOnBonus,COUNT(*) FROM Job WHERE jobPostTime > 1379897278 GROUP BY company, title, location, stock, baseSalary, signOnBonus

@@ -1,0 +1,64 @@
+[
+  {
+    "column" : "title",
+    "range" : false,
+    "cardinality" : 10000
+  },
+  {
+    "column" : "jobPostTime",
+    "range" : true,
+    "rangeStart" : 946684800,
+    "rangeEnd"   : 1508873892
+  },
+  {
+    "column" : "company",
+    "range" : false,
+    "cardinality" : 5000
+  },
+  {
+    "column" : "industry",
+    "range" : false,
+    "cardinality" : 100
+  },
+  {
+    "column" : "location",
+    "range" : false,
+    "cardinality" : 20000
+  },
+  {
+    "column" : "experience",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 10
+  },
+  {
+    "column" : "baseSalary",
+    "range" : true,
+    "rangeStart" : 60000,
+    "rangeEnd"   : 150000
+  },
+  {
+    "column" : "signOnBonus",
+    "range" : true,
+    "rangeStart" : 0,
+    "rangeEnd"   : 100000
+  },
+  {
+    "column" : "stock",
+    "range" : true,
+    "rangeStart" : 0,
+    "rangeEnd"   : 150000
+  },
+  {
+    "column" : "annualBonus",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100
+  },
+  {
+    "column" : "pto",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 365
+  }
+]

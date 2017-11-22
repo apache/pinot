@@ -1,0 +1,15 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "id"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "name"
+    }
+  ],
+  "schemaName": "testSchema"
+}
