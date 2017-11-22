@@ -4,6 +4,7 @@ import { toCurrentUrn, toBaselineUrn, hasPrefix, filterPrefix } from '../../../h
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE = 'change';
+const ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE = 'score';
 
 const ROOTCAUSE_METRICS_SORT_MODE_ASC = 'asc';
 const ROOTCAUSE_METRICS_SORT_MODE_DESC = 'desc';
@@ -34,8 +35,8 @@ export default Ember.Component.extend({
     'sortProperty',
     'sortMode',
     function () {
-      const { entities, metrics, datasets, changes, sortProperty, sortMode } =
-        this.getProperties('entities', 'metrics', 'datasets', 'changes', 'sortProperty', 'sortMode');
+      const { entities, metrics, datasets, changes, scores, sortProperty, sortMode } =
+        this.getProperties('entities', 'metrics', 'datasets', 'changes', 'scores', 'sortProperty', 'sortMode');
 
       const metricUrns = filterPrefix(Object.keys(entities), ['thirdeye:metric:']);
       let output = [];
@@ -50,6 +51,10 @@ export default Ember.Component.extend({
 
       if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE) {
         output = metricUrns.map(urn => [changes[urn], urn]).sort((a, b) => parseFloat(a) - parseFloat(b)).map(t => t[1]);
+      }
+
+      if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE) {
+        output = metricUrns.map(urn => [scores[urn], urn]).sort((a, b) => parseFloat(b) - parseFloat(a)).map(t => t[1]);
       }
 
       if (sortMode == ROOTCAUSE_METRICS_SORT_MODE_DESC) {
@@ -92,6 +97,18 @@ export default Ember.Component.extend({
       return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
         .reduce((agg, urn) => {
           agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toBaselineUrn(urn)] - 1;
+          return agg;
+        }, {});
+    }
+  ),
+
+  scores: Ember.computed(
+    'entities',
+    function () {
+      const { entities } = this.getProperties('entities');
+      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
+        .reduce((agg, urn) => {
+          agg[urn] = entities[urn].score;
           return agg;
         }, {});
     }
