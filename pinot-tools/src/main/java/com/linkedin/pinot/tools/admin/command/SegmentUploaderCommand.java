@@ -16,7 +16,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.linkedin.pinot.tools.Command;
-import com.linkedin.pinot.tools.admin.SchemaInfo;
+import com.linkedin.pinot.tools.SchemaInfo;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +48,16 @@ public class SegmentUploaderCommand extends AbstractBaseAdminCommand implements 
     @Override
     public boolean getHelp() {
         return _help;
+    }
+
+    public SegmentUploaderCommand set_controllerHost(String _controllerHost) {
+        this._controllerHost = _controllerHost;
+        return this;
+    }
+
+    public SegmentUploaderCommand set_controllerPort(String _controllerPort) {
+        this._controllerPort = _controllerPort;
+        return this;
     }
 
     private SegmentUploaderCommand set_segDir(String _segDir) {
@@ -93,7 +103,8 @@ public class SegmentUploaderCommand extends AbstractBaseAdminCommand implements 
             int segmentUploadPeriod = fullUploadPeriod / SchemaInfo.NUM_SEGMENTS.get(i);
 
             /* Spawning thread for the table */
-            Thread t = new Thread(new SegmentUploaderCommand().set_segDir(PARENT_FOLDER + SEG_DIR +
+            Thread t = new Thread(new SegmentUploaderCommand().set_controllerHost(_controllerHost)
+                    .set_controllerPort(_controllerPort).set_segDir(PARENT_FOLDER + SEG_DIR +
                     SchemaInfo.DATA_DIRS.get(i)).set_uploadPeriod(segmentUploadPeriod));
             t.start();
 
