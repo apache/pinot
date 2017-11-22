@@ -4,22 +4,6 @@ import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
-
-// const anomalyRange = [1509044400000, 1509422400000];
-// const compareMode = 'WoW';
-// const analysisRange = [1508785200000, 1509422400000];
-// const urns = new Set(['thirdeye:metric:194591', 'thirdeye:dimension:countryCode:in:provided']);
-// const granularity = '15_MINUTES';
-//
-// const testContext = { urns, anomalyRange, compareMode, analysisRange, granularity };
-// const testSelectedUrns = new Set([
-//   'thirdeye:metric:194591', 'frontend:metric:current:194591', 'frontend:metric:baseline:194591',
-//   'thirdeye:metric:194592', 'frontend:metric:current:194592', 'frontend:metric:baseline:194592',
-//   'thirdeye:metric:194591:browserName=chrome:browserName=firefox:browserName=safari',
-//   'frontend:metric:current:194591:browserName=chrome:browserName=firefox:browserName=safari',
-//   'frontend:metric:baseline:194591:browserName=chrome:browserName=firefox:browserName=safari',
-//   'thirdeye:event:holiday:2712391']);
-
 const queryParamsConfig = {
   refreshModel: false,
   replace: false
