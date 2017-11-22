@@ -1,15 +1,31 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
-import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
-import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.bao.EventManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
-
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateExceptionHandler;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -27,7 +43,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
-
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
@@ -39,27 +54,6 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.Joiner;
-import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
-import freemarker.template.Configuration;
-import freemarker.template.Template;
-import freemarker.template.TemplateExceptionHandler;
-
 public class AnomalyReportGenerator {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyReportGenerator.class);
@@ -68,8 +62,9 @@ public class AnomalyReportGenerator {
   private static final String DATE_PATTERN = "MMM dd, HH:mm";
   private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "holiday-anomaly-report.ftl";
 
-  private static final EventDataProviderManager EVENT_MANAGER = EventDataProviderManager.getInstance();
   private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(2);
+
+  private static final EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
 
   public static AnomalyReportGenerator getInstance() {
     return INSTANCE;
@@ -214,12 +209,10 @@ public class AnomalyReportGenerator {
       }
 
       // holidays
-      EventFilter filter = new EventFilter();
-      filter.setEventType(EventType.HOLIDAY.toString());
-      filter.setStartTime(startTime - EVENT_TIME_TOLERANCE);
-      filter.setEndTime(endTime - EVENT_TIME_TOLERANCE);
+      final long eventStart = startTime - EVENT_TIME_TOLERANCE;
+      final long eventEnd = endTime - EVENT_TIME_TOLERANCE;
+      List<EventDTO> holidays = eventDAO.findEventsBetweenTimeRange(EventType.HOLIDAY.toString(), eventStart, eventEnd);
 
-      List<EventDTO> holidays = EVENT_MANAGER.getEvents(filter);
       Collections.sort(holidays, new Comparator<EventDTO>() {
         @Override
         public int compare(EventDTO o1, EventDTO o2) {
