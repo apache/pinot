@@ -19,7 +19,7 @@
             <td style="padding: 32px; background-color: #0073B1; color: #FFF; text-align: center" colspan="2">
               <p style="font-size: 20px; font-weight: 500; margin-bottom: 12px;">${anomalyCount} anomalies were detected </p>
               <p style="font-size: 16px; font-weight: 300; line-height:20px; color:#FFF">between ${startTime} ${timeZone} and ${endTime} ${timeZone}.</p>
-              <p style="margin-top: 0px; font-size:14px;  margin-bottom: 25px;">Below are the list of all anomalies from alers subscribed by
+              <p style="margin-top: 0px; font-size:14px;  margin-bottom: 25px;">Below are the list of all anomalies from alerts subscribed by
                 <strong>${alertConfigName}</strong>.</p>
               <#if isGroupedAnomaly>
                 <a style="margin-top: 0px; padding: 4px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;"
