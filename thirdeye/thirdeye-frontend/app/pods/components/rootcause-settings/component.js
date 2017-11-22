@@ -18,7 +18,7 @@
 
 import Ember from 'ember';
 import moment from 'moment';
-import { toFilters, toFilterMap } from '../../../helpers/utils';
+import { toFilters, toFilterMap, filterPrefix } from '../../../helpers/utils';
 
 // TODO: move this to a utils file (DRYER)
 const _filterToUrn = (filters) => {
@@ -43,6 +43,7 @@ const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
 export default Ember.Component.extend({
   onChange: null,
+  onSelection: null,
   urnString: null,
   anomalyRangeStart: null,
   anomalyRangeEnd: null,
@@ -178,6 +179,21 @@ export default Ember.Component.extend({
     }
 
     return 'MINUTES';
+  }),
+
+  /**
+   * Selected primary metric(s)
+   * @type {Number}
+   */
+  primaryMetricUrn: Ember.computed('otherUrns', function () {
+    const otherUrns = this.get('otherUrns');
+    const metricUrns = filterPrefix(otherUrns, 'thirdeye:metric:');
+
+    if (!metricUrns) {
+      return undefined;
+    }
+    
+    return metricUrns[0];
   }),
 
   /**
@@ -317,6 +333,25 @@ export default Ember.Component.extend({
      */
     onFiltersChange(filters) {
       this.set('filters', filters);
+      this.send('updateContext');
+    },
+
+    /**
+     * Updates the primary metric(s)
+     * @method onMetricSelection
+     * @param {Object} updates metric selection/deselection
+     * @return {undefined}
+     */
+    onMetricSelection(updates) {
+      const { onSelection } = this.getProperties('onSelection');
+
+      if (onSelection) {
+        onSelection(updates);
+      }
+
+      const selected = filterPrefix(Object.keys(updates), 'thirdeye:metric:').filter(urn => updates[urn]);
+
+      this.set('otherUrns', selected);
       this.send('updateContext');
     }
   }
