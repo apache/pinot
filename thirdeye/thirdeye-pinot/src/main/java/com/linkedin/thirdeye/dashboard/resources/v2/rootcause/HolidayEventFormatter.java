@@ -28,14 +28,14 @@ public class HolidayEventFormatter extends RootCauseEventEntityFormatter {
     StringBuilder dimensions = new StringBuilder();
     for(Map.Entry<String, List<String>> entry : eventDto.getTargetDimensionMap().entrySet()) {
       String dimName = entry.getKey();
-      dimensions.append(String.format(" (%s:", dimName));
+      dimensions.append(" (");
       dimensions.append(StringUtils.join(entry.getValue(), ","));
       dimensions.append(")");
 
       attributes.putAll(dimName, entry.getValue());
     }
 
-    String label = String.format("%s %s", eventDto.getName(), dimensions.toString());
+    String label = String.format("%s%s", eventDto.getName(), dimensions.toString());
     String link =  String.format("https://www.google.com/search?q=%s", eventDto.getName());
 
     RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, eventDto.getStartTime(), eventDto.getEndTime(), "");
