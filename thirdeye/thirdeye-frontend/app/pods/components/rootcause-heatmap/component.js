@@ -220,7 +220,7 @@ export default Ember.Component.extend({
 
   _makeRollup(dimNameObj, head, visible, tail) {
     if (!dimNameObj) {
-      return dimNameObj;
+      return {};
     }
 
     const rollup = {};
@@ -242,6 +242,9 @@ export default Ember.Component.extend({
   },
 
   _sortKeysByValue(dimNameObj) {
+    if (!dimNameObj) {
+      return [];
+    }
     return Object.keys(dimNameObj).map(v => [dimNameObj[v], v]).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(t => t[1]);
   },
 
