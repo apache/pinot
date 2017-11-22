@@ -120,6 +120,7 @@ export default Ember.Component.extend({
    * @type {String[]}
    */
   granularityOptions: Ember.computed.reads('config.granularityOptions'),
+
   /**
    * Compare Mode Options
    * @type {String[]}
@@ -130,7 +131,7 @@ export default Ember.Component.extend({
    * filter options
    * @type {Object}
    */
-  filterOptions: Ember.computed.reads('config.filterOptions'),
+  filterOptions: {},
 
   /**
    * Selected Compare Mode
@@ -189,11 +190,27 @@ export default Ember.Component.extend({
     const otherUrns = this.get('otherUrns');
     const metricUrns = filterPrefix(otherUrns, 'thirdeye:metric:');
 
-    if (!metricUrns) {
-      return undefined;
-    }
-    
+    if (!metricUrns) { return null; }
+
     return metricUrns[0];
+  }),
+
+  /**
+   * filter options
+   * @type {Object}
+   */
+  filterOptionsObserver: Ember.observer('otherUrns', function () {
+    // TODO anti pattern - refactor into separate component?
+
+    const otherUrns = this.get('otherUrns');
+    const metricUrns = filterPrefix(otherUrns, 'thirdeye:metric:');
+
+    if (!metricUrns) { return {}; }
+
+    const id = metricUrns[0].split(':')[2];
+    return fetch(`/data/autocomplete/filters/metric/${id}`)
+      .then(res => res.json())
+      .then(res => this.set('filterOptions', res));
   }),
 
   /**
