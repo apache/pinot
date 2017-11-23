@@ -11,10 +11,13 @@ import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
 import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetSerializer;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.concurrent.ExecutionException;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +33,7 @@ public class PinotDataSourceResource {
     OBJECT_MAPPER = new ObjectMapper();
     OBJECT_MAPPER.registerModule(module);
   }
+  private static final String URL_ENCODING = "UTF-8";
 
   private PinotThirdEyeDataSource pinotDataSource;
 
@@ -44,11 +48,14 @@ public class PinotDataSourceResource {
    */
   @GET
   @Path("/query")
-  public String executePQL(String pql, String tableName) {
+  public String executePQL(@QueryParam("pql") String pql, @QueryParam("tableName") String tableName)
+      throws UnsupportedEncodingException {
     initPinotDataSource();
 
     String resultString;
-    PinotQuery pinotQuery = new PinotQuery(pql, tableName);
+    String decodedPql = URLDecoder.decode(pql, URL_ENCODING);
+    String decodedTableName = URLDecoder.decode(tableName, URL_ENCODING);
+    PinotQuery pinotQuery = new PinotQuery(decodedPql, decodedTableName);
     try {
       ThirdEyeResultSetGroup thirdEyeResultSetGroup = pinotDataSource.executePQL(pinotQuery);
       resultString = OBJECT_MAPPER.writeValueAsString(thirdEyeResultSetGroup);
