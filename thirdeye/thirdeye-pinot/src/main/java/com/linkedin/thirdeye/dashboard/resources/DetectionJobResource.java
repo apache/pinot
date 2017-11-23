@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
-import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
