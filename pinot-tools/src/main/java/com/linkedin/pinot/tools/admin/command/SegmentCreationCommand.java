@@ -16,7 +16,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.linkedin.pinot.tools.Command;
-import com.linkedin.pinot.tools.admin.SchemaInfo;
+import com.linkedin.pinot.tools.SchemaInfo;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
-import static com.linkedin.pinot.tools.admin.SchemaInfo.*;
+import static com.linkedin.pinot.tools.SchemaInfo.*;
 
 public class SegmentCreationCommand extends AbstractBaseAdminCommand implements Command {
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationCommand.class);
@@ -44,48 +44,6 @@ public class SegmentCreationCommand extends AbstractBaseAdminCommand implements 
     @Override
     public boolean getHelp() {
         return _help;
-    }
-
-    private void startZookeeper() throws IOException {
-        StartZookeeperCommand zkStarter = new StartZookeeperCommand();
-        zkStarter.execute();
-    }
-
-    private void startContollers() throws Exception {
-        StartControllerCommand controllerStarter = new StartControllerCommand();
-        controllerStarter.setControllerPort(SchemaInfo.DEFAULT_CONTROLLER_PORT)
-            .setZkAddress(DEFAULT_ZOOKEEPER_ADDRESS)
-            .setDataDir(DEFAULT_DATA_DIR);
-        controllerStarter.execute();
-    }
-
-    private void startBrokers() throws Exception {
-        StartBrokerCommand brokerStarter = new StartBrokerCommand();
-        brokerStarter.setPort(DEFAULT_BROKER_PORT)
-                .setZkAddress(DEFAULT_ZOOKEEPER_ADDRESS);
-        brokerStarter.execute();
-    }
-
-    private void startServers() throws Exception {
-        StartServerCommand serverStarter = new StartServerCommand();
-        serverStarter.setPort(DEFAULT_SERVER_PORT)
-                .setDataDir(DATA_DIR)
-                .setSegmentDir(SEGMENT_DIR)
-                .setZkAddress(DEFAULT_ZOOKEEPER_ADDRESS);
-        serverStarter.execute();
-    }
-
-    private void startAllServices() throws Exception {
-        startZookeeper();
-        startContollers();
-        startBrokers();
-        startServers();
-    }
-
-    public void stopAllServices() throws Exception {
-        StopProcessCommand stopper = new StopProcessCommand(false);
-        stopper.stopController().stopBroker().stopServer().stopZookeeper();
-        stopper.execute();
     }
 
     private void generateData(int numRecords, int numFiles, String schemaFile, String schemaAnnotationFile,
@@ -136,9 +94,6 @@ public class SegmentCreationCommand extends AbstractBaseAdminCommand implements 
         String PARENT_FOLDER = _dir + "/";
         String DATA_DIR = "data" + "/";
         String SEG_DIR = "segment" + "/";
-
-        LOGGER.info("----- Starting All Services -----");
-        seg.startAllServices();
 
         for (int i = 0; i < SCHEMAS.size(); i++) {
             LOGGER.info("----- Generating data -----");
