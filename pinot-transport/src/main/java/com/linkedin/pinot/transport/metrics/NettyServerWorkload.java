@@ -63,6 +63,7 @@ public class NettyServerWorkload {
         ServerLatencyMetric lastLoad = list.get(list.size()-1);
         lastLoad.setLatency(lastLoad.getLatency() + load.getLatency());
         lastLoad.setSegmentSize(lastLoad.getSegmentSize() + load.getSegmentSize());
+        lastLoad.setSegmentCount(lastLoad.getSegmentCount() + load.getSegmentCount());
         lastLoad.setNumRequests(lastLoad.getNumRequests() + 1);
         lastLoad.setDocuments(lastLoad.getDocuments() + load.getDocuments());
         //update the same index in list now

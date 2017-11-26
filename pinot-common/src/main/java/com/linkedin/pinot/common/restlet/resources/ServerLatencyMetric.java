@@ -8,14 +8,16 @@ public class ServerLatencyMetric {
     private long _timestamp;
     private long _latency;
     private long _segments;
-    private long _numRequests;
+    private long _segment_size;
+    private long _numRequests = 1;
     private long _documents;
 
-    public ServerLatencyMetric(long timestamp, long latency, long segments, long documents){
+    public ServerLatencyMetric(long timestamp, long latency, long segments, long documents, long segment_size){
         _timestamp = timestamp;
         _segments = segments;
         _latency = latency;
         _documents = documents;
+        _segment_size = segment_size;
         _numRequests = 1;
     }
 
@@ -40,19 +42,31 @@ public class ServerLatencyMetric {
     }
 
     public long getSegmentSize() {
-        return _segments;
+        return _segment_size;
     }
 
     public void setSegmentSize(Long _segmentSize) {
-        this._segments = _segmentSize;
+        this._segment_size = _segmentSize;
+    }
+
+    public long getSegmentCount() {
+        return _segments;
+    }
+
+    public void setSegmentCount(Long _segments) {
+        this._segments = _segments;
     }
 
     public double getAvglatency() {
         return 1.0*(_latency/_numRequests);
     }
 
-    public double getAvgSegmentSize() {
+    public double getAvgSegmentCount() {
         return 1.0*(_segments /_numRequests);
+    }
+
+    public double getAvgSegmentSize() {
+        return 1.0*(_segment_size /_numRequests);
     }
 
     public double getAvgDocumentSize() {
@@ -77,6 +91,6 @@ public class ServerLatencyMetric {
 
     @Override
     public String toString() {
-        return (this.getTimestamp() + "," + this.getNumRequests() + "," + this.getAvglatency() + "," + this.getAvgSegmentSize() + "," + this.getAvgDocumentSize() + "\n");
+        return (this.getTimestamp() + "," + this.getNumRequests() + "," + this.getAvglatency() + "," + this.getAvgSegmentSize() + "," + this.getAvgSegmentCount() + "," + this.getAvgDocumentSize() + "\n");
     }
 }

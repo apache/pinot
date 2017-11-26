@@ -123,10 +123,18 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
     LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
     ListenableFuture<byte[]> queryResponse = queryScheduler.submit(queryRequest);
     requestProcessingLatency.stop();
+
     long latency = requestProcessingLatency.getLatencyMs();
     String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
-    final ServerLatencyMetric metric = new ServerLatencyMetric(queryStartTimeMs, requestProcessingLatency.getLatencyMs(), serverMetrics.getValueOfTableGauge(tableName, ServerGauge.SEGMENT_COUNT), serverMetrics.getValueOfTableGauge(tableName, ServerGauge.DOCUMENT_COUNT));
+    final ServerLatencyMetric metric = new ServerLatencyMetric();
+    metric.setNumRequests(1);
+    metric.setTimestamp(queryStartTimeMs);
+    metric.setLatency(requestProcessingLatency.getLatencyMs());
+    metric.setSegmentCount(serverMetrics.getValueOfTableGauge(tableName, ServerGauge.SEGMENT_COUNT));
+    metric.setDocuments(serverMetrics.getValueOfTableGauge(tableName, ServerGauge.DOCUMENT_COUNT));
+    metric.setSegmentSize(serverMetrics.getValueOfTableGauge(tableName, ServerGauge.SEGMENT_SIZE));
     workload.addWorkLoad(tableName, metric);
+
     return queryResponse;
   }
 
