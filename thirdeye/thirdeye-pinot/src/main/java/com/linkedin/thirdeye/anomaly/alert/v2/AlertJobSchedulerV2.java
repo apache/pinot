@@ -202,8 +202,14 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
   private void scheduleJob(JobContext jobContext, AlertConfigDTO alertConfig) throws SchedulerException {
     LOG.info("Starting {}", jobContext.getJobName());
     String triggerKey = String.format("alert_scheduler_trigger_%d", alertConfig.getId());
+
+    String cronSchedule = alertConfig.getCronExpression();
+    if (!StringUtils.isBlank(alertConfig.getHolidayCronExpression())) {
+      cronSchedule = alertConfig.getHolidayCronExpression();
+    }
+
     CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
-        .withSchedule(CronScheduleBuilder.cronSchedule(alertConfig.getCronExpression())).build();
+        .withSchedule(CronScheduleBuilder.cronSchedule(cronSchedule)).build();
     String jobKey = jobContext.getJobName();
     JobDetail job = JobBuilder.newJob(AlertJobRunnerV2.class).withIdentity(jobKey).build();
     job.getJobDataMap().put(AlertJobRunnerV2.ALERT_JOB_CONTEXT_V2, jobContext);
