@@ -877,6 +877,14 @@ export default Ember.Controller.extend({
    */
   actions: {
 
+
+    /**
+     * Handles the primary metric selection in the alert creation
+     */
+    onPrimaryMetricToggle() {
+      return;
+    },
+
     /**
      * When a metric is selected, fetch its props, and send them to the graph builder
      * @method onSelectMetric

@@ -16,6 +16,7 @@ export const ActionTypes = {
   LOAD_PRIMARY_METRIC: type('[Primary Metric] Load Primary Primary Metric'),
   UPDATE_COMPARE_MODE: type('[Primary Metric] Update Compare Mode'),
   UPDATE_DATES: type('[Primary Metric] Update Date'),
+  SELECT_PRIMARY: type('[Primary Metric] Toggles Primary Metric Selection'),
   SELECT_DIMENSION: type('[Primary Metric] Set Selected Dimension'),
   SELECT_EVENTS: type('[Primary Metric] Set Selected Events'),
   SELECT_METRICS: type('[Primary Metric] set Selected Metrics'),
@@ -95,6 +96,12 @@ function resetSelectedData() {
   return {
     type: ActionTypes.RESET
   };
+}
+
+function selectPrimary() {
+  return {
+    type: ActionTypes.SELECT_PRIMARY
+  }
 }
 
 
@@ -249,6 +256,7 @@ export const Actions = {
   updateCompareMode,
   updateMetricDate,
   updateAnalysisDates,
+  selectPrimary,
   selectMetric,
   selectDimension,
   selectEvent,

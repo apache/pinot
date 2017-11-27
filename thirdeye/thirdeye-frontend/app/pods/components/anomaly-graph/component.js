@@ -243,7 +243,10 @@ export default Ember.Component.extend({
     const selectedDimensions = this.get('selectedDimensions') || [];
     const events = this.get('holidayEvents') || [];
 
-    Ember.set(primaryMetric, 'isSelected', true);
+    // This check is necessary so that it is only set once
+    if (primaryMetric.isSelected === undefined) {
+      Ember.set(primaryMetric, 'isSelected', true);
+    }
 
     const data = [
       primaryMetric,
@@ -826,7 +829,11 @@ export default Ember.Component.extend({
      * Shows/Hides the primary metric
      */
     onPrimaryMetricToggle() {
-      this.toggleProperty('primaryMetric.isSelected');
+      if (!this.attrs.onPrimaryClick) {
+        this.toggleProperty('primaryMetric.isSelected');
+      } else {
+        this.attrs.onPrimaryClick(...arguments);
+      }
     },
 
     /**
