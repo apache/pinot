@@ -443,6 +443,10 @@ public class SegmentGeneratorConfig {
 
   public void setStarTreeIndexSpecFile(String starTreeIndexSpecFile) {
     _starTreeIndexSpecFile = starTreeIndexSpecFile;
+
+    // Setting the star tree index spec should automatically enable star tree generation, so that clients
+    // don't have to explicitly set both.
+    _enableStarTreeIndex = true;
   }
 
   public StarTreeIndexSpec getStarTreeIndexSpec() {
