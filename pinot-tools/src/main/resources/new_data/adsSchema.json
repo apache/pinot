@@ -1,0 +1,35 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType" : "INT",
+      "name" : "SecondsEpoch"
+    },
+    {
+      "dataType" : "INT",
+      "name" : "Popularity"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Description"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Link"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "Id"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name": "PosterId"
+    }
+  ],
+  "schemaName": "AdsSchema"
+}

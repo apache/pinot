@@ -121,6 +121,7 @@ public abstract class AbstractTableDataManager implements TableDataManager {
     LOGGER.info("Trying to add a new segment {} of table {} with OfflineSegmentDataManager", segmentName, _tableName);
     OfflineSegmentDataManager newSegmentManager = new OfflineSegmentDataManager(indexSegmentToAdd);
     final int newNumDocs = indexSegmentToAdd.getSegmentMetadata().getTotalRawDocs();
+    final long segmentSize = indexSegmentToAdd.getDiskSizeBytes();
     SegmentDataManager oldSegmentManager;
     int refCnt = -1;
     try {
@@ -142,6 +143,7 @@ public abstract class AbstractTableDataManager implements TableDataManager {
     }
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT, newNumDocs);
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.SEGMENT_COUNT, 1L);
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.SEGMENT_SIZE, segmentSize);
   }
 
   /**

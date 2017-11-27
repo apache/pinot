@@ -1,61 +1,108 @@
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.common.restlet.resources;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-
-/**
- * Created by Gandharv on 10/14/2017.
- */
 public class ServerLatencyMetric {
     public static final int OBJ_SIZE = 8*4;
-    public long _timestamp;
-    public Double _avglatency;
-    public Double  _avgSegments;
-    public long _numRequests;
+    private long _timestamp;
+    private long _latency;
+    private long _segments;
+    private long _segment_size;
+    private long _numRequests = 1;
+    private long _documents;
 
-    public ServerLatencyMetric(long timestamp, Double avglatency, Double avgSegments){
+    public ServerLatencyMetric(long timestamp, long latency, long segments, long documents, long segment_size){
         _timestamp = timestamp;
-        _avgSegments = avgSegments;
-        _avglatency = avglatency;
+        _segments = segments;
+        _latency = latency;
+        _documents = documents;
+        _segment_size = segment_size;
+        _numRequests = 1;
     }
 
     public ServerLatencyMetric(){
 
     }
 
-    public Double get_avglatency() {
-        return _avglatency;
+    public long getDocuments() {
+        return _documents;
     }
 
-    public void set_avglatency(Double _avglatency) {
-        this._avglatency = _avglatency;
+    public void setDocuments(long _documents) {
+        this._documents = _documents;
     }
 
-    public Double get_avgSegments() {
-        return _avgSegments;
+    public long getLatency() {
+        return _latency;
     }
 
-    public void set_avgSegments(Double _avgSegments) {
-        this._avgSegments = _avgSegments;
+    public void setLatency(Long _latency) {
+        this._latency = _latency;
     }
 
-    public long get_numRequests() {
+    public long getSegmentSize() {
+        return _segment_size;
+    }
+
+    public void setSegmentSize(Long _segmentSize) {
+        this._segment_size = _segmentSize;
+    }
+
+    public long getSegmentCount() {
+        return _segments;
+    }
+
+    public void setSegmentCount(Long _segments) {
+        this._segments = _segments;
+    }
+
+    public double getAvglatency() {
+        return 1.0*(_latency/_numRequests);
+    }
+
+    public double getAvgSegmentCount() {
+        return 1.0*(_segments /_numRequests);
+    }
+
+    public double getAvgSegmentSize() {
+        return 1.0*(_segment_size /_numRequests);
+    }
+
+    public double getAvgDocumentSize() {
+        return 1.0*(_documents/_numRequests);
+    }
+
+    public long getNumRequests() {
         return _numRequests;
     }
 
-    public void set_numRequests(long _numRequests) {
+    public void setNumRequests(long _numRequests) {
         this._numRequests = _numRequests;
     }
 
-    public long get_timestamp() {
+    public long getTimestamp() {
         return _timestamp;
     }
 
-    public void set_timestamp(long _timestamp) {
+    public void setTimestamp(long _timestamp) {
         this._timestamp = _timestamp;
     }
 
     @Override
     public String toString() {
-        return (this._timestamp + "," + this._avglatency + "," + this._avgSegments + "\n");
+        return (this.getTimestamp() + "," + this.getNumRequests() + "," + this.getAvglatency() + "," + this.getAvgSegmentSize() + "," + this.getAvgSegmentCount() + "," + this.getAvgDocumentSize() + "\n");
     }
 }

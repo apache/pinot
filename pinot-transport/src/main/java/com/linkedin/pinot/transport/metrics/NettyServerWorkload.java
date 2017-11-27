@@ -1,21 +1,32 @@
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.transport.metrics;
 
 import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
 import com.linkedin.pinot.common.restlet.resources.ServerLoadMetrics;
-import org.apache.log4j.spi.ErrorCode;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
-
-/**
- * Created by Gandharv on 10/6/2017.
- */
 
 public class NettyServerWorkload {
 
@@ -24,51 +35,56 @@ public class NettyServerWorkload {
     protected int threads = THREADS;
     protected ExecutorService threadPool = Executors.newFixedThreadPool(THREADS);
     protected AsynchronousFileChannel log;
-    public static final long CAPTURE_WINDOW = 1;
-    public static final long FLUSH_WINDOW = 1;
+    public static final long CAPTURE_WINDOW = 80;
+    public static final long FLUSH_WINDOW = 2;
     private final Map<String, ServerLoadMetrics> avgLoadMap;
 
     public NettyServerWorkload(){
-        avgLoadMap = new HashMap<>();
+        avgLoadMap = new ConcurrentHashMap<>();
     }
 
     public void addWorkLoad(String tableName, ServerLatencyMetric load){
         if(avgLoadMap.containsKey(tableName)){
+            //If already contains tableName get the load list for that table
             List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
+            //Get the last entry in the list
             ServerLatencyMetric l = list.get(list.size()-1);
-            if(l._timestamp + CAPTURE_WINDOW >= load._timestamp){
-                //if incoming load within last window -> update window
+            System.out.println(l.getTimestamp() + "-" + load.getTimestamp());
+            if(l.getTimestamp() + CAPTURE_WINDOW >= load.getTimestamp()){
+                //if incoming load within last window then update window
                 updateLastWindow(tableName, load);
             }else{
-                load._numRequests = 1;
+                //else add new entry
                 list.add(load);
+                //flush records to file, flushRecords will take care weather window has maxed out or not
+                flushRecords(tableName);
             }
-        }else{
+        }else {
+            //if tableName doesn't exist till now
             ServerLoadMetrics loadMetrics = new ServerLoadMetrics();
             loadMetrics.set_latencies(new ArrayList<ServerLatencyMetric>());
-            load._numRequests = 1;
             loadMetrics.get_latencies().add(load);
             avgLoadMap.put(tableName, loadMetrics);
         }
-
-        flushRecords(tableName);
     }
 
     private void updateLastWindow(String tableName, ServerLatencyMetric load) {
+        //Updating last entry in list with current load
         List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
         ServerLatencyMetric lastLoad = list.get(list.size()-1);
-        Double currAvgLatency = lastLoad._avglatency;
-        Double CurrAvgSegments = lastLoad._avgSegments;
-        long n = lastLoad._numRequests;
-        lastLoad._avglatency = (currAvgLatency*n + load._avglatency)/(n+1);
-        lastLoad._avgSegments = (CurrAvgSegments*n + load._avgSegments)/(n+1);
-        lastLoad._numRequests = n+1;
+        lastLoad.setLatency(lastLoad.getLatency() + load.getLatency());
+        lastLoad.setSegmentSize(lastLoad.getSegmentSize() + load.getSegmentSize());
+        lastLoad.setSegmentCount(lastLoad.getSegmentCount() + load.getSegmentCount());
+        lastLoad.setNumRequests(lastLoad.getNumRequests() + 1);
+        lastLoad.setDocuments(lastLoad.getDocuments() + load.getDocuments());
+        //update the same index in list now
+        System.out.println(lastLoad.getTimestamp() + "-" + lastLoad.getNumRequests());
         list.set(list.size()-1, lastLoad);
     }
 
-    public ServerLoadMetrics getAvgLoad(String tablename){
-        if(avgLoadMap.containsKey(tablename)){
-            return avgLoadMap.get(tablename);
+    public ServerLoadMetrics getAvgLoad(String tableName){
+        if(avgLoadMap.containsKey(tableName)){
+            return avgLoadMap.get(tableName);
         }else{
             return null;
         }
@@ -120,10 +136,10 @@ public class NettyServerWorkload {
     private String getRecordsToWrite(String tableName) {
         List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
         if(list.size() >= FLUSH_WINDOW){
-            long size = list.size();
+            long size = list.size()-1;
             String msg = "";
             StringBuilder builder = new StringBuilder(msg);
-            while(size >= FLUSH_WINDOW){
+            while(size > 0){
                 ServerLatencyMetric record = list.get(0);
                 builder.append(record.toString());
                 list.remove(0);
