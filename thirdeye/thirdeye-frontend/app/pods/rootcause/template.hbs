@@ -8,6 +8,7 @@
       context=context
       config=settingsConfig
       onChange=(action "onContext")
+      onSelection=(action "onSelection")
     }}
   </div>
 
@@ -85,7 +86,7 @@
                 Select user-defined metric:
               </div>
               <div class="col-xs-8">
-                {{rootcause-metrics-user
+                {{rootcause-metric-select
                   onSelection=(action "onSelection")
                 }}
               </div>

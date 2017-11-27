@@ -2,11 +2,19 @@ import Ember from 'ember';
 import fetch from 'fetch';
 import { toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import { task, timeout } from 'ember-concurrency';
+import _ from 'lodash';
 
 export default Ember.Component.extend({
+  selectedUrn: null, // ""
+
   onSelection: null, // function (metricUrn)
 
+
   mostRecentSearch: null, // promise
+
+  selectedUrnCache: null, // ""
+
+  selectedMetric: null, // {}
 
   /**
    * Ember concurrency task that triggers the metric autocomplete
@@ -19,6 +27,26 @@ export default Ember.Component.extend({
   }),
 
   placeholder: 'Search for a Metric',
+
+  didReceiveAttrs() {
+    this._super(...arguments);
+
+    const { selectedUrn, selectedUrnCache } = this.getProperties('selectedUrn', 'selectedUrnCache');
+
+    if (!_.isEqual(selectedUrn, selectedUrnCache)) {
+      this.set('selectedUrnCache', selectedUrn);
+
+      if (selectedUrn) {
+        const url = `/data/metric/${selectedUrn.split(':')[2]}`;
+        fetch(url)
+          .then(res => res.json())
+          .then(res => this.set('selectedMetric', res));
+
+      } else {
+        this.set('selectedMetric', undefined);
+      }
+    }
+  },
 
   actions: {
     /**

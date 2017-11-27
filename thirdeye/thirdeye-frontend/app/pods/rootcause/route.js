@@ -61,9 +61,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     if (!id) { return; }
 
     return RSVP.hash({
-      granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
-      compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
-      filterOptions: fetch(`/data/autocomplete/filters/metric/${id}`).then(res => res.json()),
       maxTime: fetch(`/data/maxDataTime/metricId/${id}`).then(res => res.json()),
       id
     });
@@ -76,7 +73,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     const defaultParams = {
       filters: JSON.stringify({}),
-      granularity: model.granularityOptions[2],
+      granularity: '1_HOURS',
       anomalyRangeStart:  moment(maxTime).subtract(3, 'hours').valueOf(),
       anomalyRangeEnd: moment(maxTime).valueOf(),
       analysisRangeStart: moment(maxTime).endOf('day').subtract(1, 'week').valueOf(),
@@ -114,9 +111,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     } = model.queryParams;
 
     const settingsConfig = {
-      granularityOptions: model.granularityOptions,
-      filterOptions: model.filterOptions,
-      compareModeOptions: model.compareModeOptions
+      granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
+      compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W']
     };
 
     const context = {

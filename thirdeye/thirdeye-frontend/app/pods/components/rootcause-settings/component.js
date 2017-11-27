@@ -18,7 +18,7 @@
 
 import Ember from 'ember';
 import moment from 'moment';
-import { toFilters, toFilterMap } from '../../../helpers/utils';
+import { toFilters, toFilterMap, filterPrefix } from '../../../helpers/utils';
 
 // TODO: move this to a utils file (DRYER)
 const _filterToUrn = (filters) => {
@@ -43,6 +43,7 @@ const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
 export default Ember.Component.extend({
   onChange: null,
+  onSelection: null,
   urnString: null,
   anomalyRangeStart: null,
   anomalyRangeEnd: null,
@@ -119,6 +120,7 @@ export default Ember.Component.extend({
    * @type {String[]}
    */
   granularityOptions: Ember.computed.reads('config.granularityOptions'),
+
   /**
    * Compare Mode Options
    * @type {String[]}
@@ -129,7 +131,7 @@ export default Ember.Component.extend({
    * filter options
    * @type {Object}
    */
-  filterOptions: Ember.computed.reads('config.filterOptions'),
+  filterOptions: {},
 
   /**
    * Selected Compare Mode
@@ -178,6 +180,37 @@ export default Ember.Component.extend({
     }
 
     return 'MINUTES';
+  }),
+
+  /**
+   * Selected primary metric(s)
+   * @type {Number}
+   */
+  primaryMetricUrn: Ember.computed('otherUrns', function () {
+    const otherUrns = this.get('otherUrns');
+    const metricUrns = filterPrefix(otherUrns, 'thirdeye:metric:');
+
+    if (!metricUrns) { return null; }
+
+    return metricUrns[0];
+  }),
+
+  /**
+   * filter options
+   * @type {Object}
+   */
+  filterOptionsObserver: Ember.observer('otherUrns', function () {
+    // TODO anti pattern - refactor into separate component?
+
+    const otherUrns = this.get('otherUrns');
+    const metricUrns = filterPrefix(otherUrns, 'thirdeye:metric:');
+
+    if (!metricUrns) { return {}; }
+
+    const id = metricUrns[0].split(':')[2];
+    return fetch(`/data/autocomplete/filters/metric/${id}`)
+      .then(res => res.json())
+      .then(res => this.set('filterOptions', res));
   }),
 
   /**
@@ -317,6 +350,25 @@ export default Ember.Component.extend({
      */
     onFiltersChange(filters) {
       this.set('filters', filters);
+      this.send('updateContext');
+    },
+
+    /**
+     * Updates the primary metric(s)
+     * @method onMetricSelection
+     * @param {Object} updates metric selection/deselection
+     * @return {undefined}
+     */
+    onMetricSelection(updates) {
+      const { onSelection } = this.getProperties('onSelection');
+
+      if (onSelection) {
+        onSelection(updates);
+      }
+
+      const selected = filterPrefix(Object.keys(updates), 'thirdeye:metric:').filter(urn => updates[urn]);
+
+      this.set('otherUrns', selected);
       this.send('updateContext');
     }
   }
