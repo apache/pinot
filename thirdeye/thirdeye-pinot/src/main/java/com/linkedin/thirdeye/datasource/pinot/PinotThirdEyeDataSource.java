@@ -445,7 +445,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
             int weight = 0;
             for (int idx = 0; idx < resultSetCount; ++idx) {
               ThirdEyeResultSet resultSet = resultSetGroup.get(idx);
-              weight += (resultSet.getColumnCount() * resultSet.getRowCount());
+              weight += ((resultSet.getColumnCount() + resultSet.getGroupKeyLength()) * resultSet.getRowCount());
             }
             return weight;
           }

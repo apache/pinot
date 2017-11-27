@@ -10,10 +10,12 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean worker = false;
   private boolean monitor = false;
   private boolean alert = false;
+  @Deprecated
   private boolean merger = false;
   private boolean autoload = false;
   private boolean dataCompleteness = false;
   private boolean classifier = false;
+  private boolean pinotProxy = false;
 
   private long id;
   private String dashboardHost;
@@ -132,6 +134,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setClassifier(boolean classifier) {
     this.classifier = classifier;
+  }
+
+  public boolean isPinotProxy() {
+    return pinotProxy;
+  }
+
+  public void setPinotProxy(boolean pinotProxy) {
+    this.pinotProxy = pinotProxy;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {

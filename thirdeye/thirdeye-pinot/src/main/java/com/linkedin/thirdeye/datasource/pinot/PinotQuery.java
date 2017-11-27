@@ -36,4 +36,13 @@ public class PinotQuery {
     PinotQuery that = (PinotQuery) obj;
     return this.pql.equals(that.pql);
   }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder("PinotQuery{");
+    sb.append("pql='").append(pql).append('\'');
+    sb.append(", tableName='").append(tableName).append('\'');
+    sb.append('}');
+    return sb.toString();
+  }
 }

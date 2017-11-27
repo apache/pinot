@@ -48,6 +48,8 @@ public class ThirdEyeDataFrameResultSetTest {
     ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
 
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
+    Assert.assertEquals(actualDataFrameResultSet.getGroupKeyLength(), 0);
+    Assert.assertEquals(actualDataFrameResultSet.getColumnCount(), 2);
   }
 
   @Test
@@ -65,6 +67,8 @@ public class ThirdEyeDataFrameResultSetTest {
     ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
 
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
+    Assert.assertEquals(actualDataFrameResultSet.getGroupKeyLength(), 0);
+    Assert.assertEquals(actualDataFrameResultSet.getColumnCount(), 1);
   }
 
   @Test
@@ -94,6 +98,8 @@ public class ThirdEyeDataFrameResultSetTest {
     ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
 
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
+    Assert.assertEquals(actualDataFrameResultSet.getGroupKeyLength(), 2);
+    Assert.assertEquals(actualDataFrameResultSet.getColumnCount(), 1);
   }
 
   @Test
