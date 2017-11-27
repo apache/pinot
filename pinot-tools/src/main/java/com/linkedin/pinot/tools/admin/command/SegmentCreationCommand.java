@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.SchemaInfo;
+import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +38,8 @@ public class SegmentCreationCommand extends AbstractBaseAdminCommand implements 
     @Option(name = "-dir", required = true, metaVar = "<String>", usage = "Parent directory to store data & segments.")
     private String _dir;
 
+
+
     @Override
     public String description() {
         return "Create data and segments as per the provided schema";
@@ -48,42 +52,48 @@ public class SegmentCreationCommand extends AbstractBaseAdminCommand implements 
 
     private void generateData(int numRecords, int numFiles, String schemaFile, String schemaAnnotationFile,
                               String outputDataDir) throws Exception {
+
+        final File tmpDir = new File("temp");
+
+        if (!tmpDir.exists()) {
+            Preconditions.checkState(tmpDir.mkdirs());
+        }
+
+        File file = new File(tmpDir, "tempSchemaFile.json");
         ClassLoader classLoader = SegmentCreationCommand.class.getClassLoader();
         URL resource = classLoader.getResource(schemaFile);
-
+        com.google.common.base.Preconditions.checkNotNull(resource);
+        FileUtils.copyURLToFile(resource, file);
         GenerateDataCommand generator = new GenerateDataCommand();
-        generator.init(numRecords, numFiles, resource.toString().substring(5), outputDataDir);
+        generator.init(numRecords, numFiles, file.getAbsolutePath(), outputDataDir);
 
+        File ann_file = new File(tmpDir, "tempSchemaAnnFile.json");
         resource = classLoader.getResource(schemaAnnotationFile);
-        generator.set_schemaAnnFile(resource.toString().substring(5));
+        com.google.common.base.Preconditions.checkNotNull(resource);
+        FileUtils.copyURLToFile(resource, ann_file);
+        generator.set_schemaAnnFile(ann_file.getAbsolutePath());
 
         generator.execute();
     }
 
     private void createSegments(String schemaFile, String dataDir, String segmentName, String tableName,
                                 String segOutputDir) throws Exception {
+
+        final File tmpDir = new File("temp");
+        File file = new File(tmpDir, "tempSchemaFile.json");
         ClassLoader classLoader = SegmentCreationCommand.class.getClassLoader();
         URL resource = classLoader.getResource(schemaFile);
+        com.google.common.base.Preconditions.checkNotNull(resource);
+        FileUtils.copyURLToFile(resource, file);
 
         CreateSegmentCommand segmentCreator = new CreateSegmentCommand();
         segmentCreator.setDataDir(dataDir)
-                .setSchemaFile(resource.toString().substring(5))
+                .setSchemaFile(file.getAbsolutePath())
                 .setSegmentName(segmentName)
                 .setTableName(tableName)
                 .setOutDir(segOutputDir);
+
         segmentCreator.execute();
-
-    }
-
-    private void addTable(String tableSchema) throws Exception {
-        ClassLoader classLoader = SegmentCreationCommand.class.getClassLoader();
-        URL resource = classLoader.getResource(tableSchema);
-
-        AddTableCommand adder = new AddTableCommand();
-        adder.setFilePath(resource.toString().substring(5))
-                .setControllerPort(SchemaInfo.DEFAULT_CONTROLLER_PORT)
-                .setExecute(true);
-        adder.execute();
     }
 
 
@@ -110,10 +120,10 @@ public class SegmentCreationCommand extends AbstractBaseAdminCommand implements 
             seg.createSegments(SCHEMAS.get(i), PARENT_FOLDER + DATA_DIR + SchemaInfo.DATA_DIRS.get(i),
                     SEGMENT_NAME, TABLE_NAMES.get(i), PARENT_FOLDER + SEG_DIR + SchemaInfo.DATA_DIRS.get(i));
 
-            LOGGER.info("----- Adding Table Schema -----");
-            seg.addTable(TABLE_DEFINITIONS.get(i));
-
         }
+
+        /* Deleting temporary directory used to store config files */
+        FileUtils.deleteDirectory(new File("temp"));
 
         return true;
     }

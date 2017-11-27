@@ -15,11 +15,16 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.SchemaInfo;
+import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.net.URL;
 
 
 public class SegmentUploaderCommand extends AbstractBaseAdminCommand implements Command, Runnable {
@@ -70,6 +75,28 @@ public class SegmentUploaderCommand extends AbstractBaseAdminCommand implements 
         return this;
     }
 
+    private SegmentUploaderCommand addTable(String tableSchema) throws Exception {
+        final File tmpDir = new File("temp");
+
+        if (!tmpDir.exists()) {
+            Preconditions.checkState(tmpDir.mkdirs());
+        }
+
+        File file = new File(tmpDir, "tempSchemaFile.json");
+        ClassLoader classLoader = SegmentCreationCommand.class.getClassLoader();
+        URL resource = classLoader.getResource(tableSchema);
+        com.google.common.base.Preconditions.checkNotNull(resource);
+        FileUtils.copyURLToFile(resource, file);
+
+        AddTableCommand adder = new AddTableCommand();
+        adder.setFilePath(file.getAbsolutePath())
+                .setControllerHost(_controllerHost)
+                .setControllerPort(_controllerPort)
+                .setExecute(true);
+        adder.execute();
+        return this;
+    }
+
     private void uploadSegments() throws Exception {
         UploadSegmentCommand uploader = new UploadSegmentCommand();
         uploader.setControllerPort(_controllerPort)
@@ -104,11 +131,15 @@ public class SegmentUploaderCommand extends AbstractBaseAdminCommand implements 
 
             /* Spawning thread for the table */
             Thread t = new Thread(new SegmentUploaderCommand().set_controllerHost(_controllerHost)
-                    .set_controllerPort(_controllerPort).set_segDir(PARENT_FOLDER + SEG_DIR +
-                    SchemaInfo.DATA_DIRS.get(i)).set_uploadPeriod(segmentUploadPeriod));
+                    .set_controllerPort(_controllerPort).addTable(SchemaInfo.TABLE_DEFINITIONS.get(i))
+                    .set_segDir(PARENT_FOLDER + SEG_DIR + SchemaInfo.DATA_DIRS.get(i))
+                    .set_uploadPeriod(segmentUploadPeriod));
             t.start();
 
         }
+
+        /* Deleting temporary directory used to store config files */
+        FileUtils.deleteDirectory(new File("temp"));
 
         return true;
     }
