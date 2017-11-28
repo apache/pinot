@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, filterPrefix, toBaselineRange } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterObject, filterPrefix, toBaselineRange } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -17,9 +17,15 @@ export default Ember.Service.extend({
 
   request(requestContext, urns) {
     console.log('rootcauseEntitiesCache: request()', requestContext, urns);
-    const { context } = this.getProperties('context');
+    const { context, entities } = this.getProperties('context', 'entities');
     if (_.isEqual(context, requestContext)) {
       console.log('rootcauseEntitiesCache: request: context is up-to-date. ignoring.');
+      return;
+    }
+
+    if (!requestContext.urns || !requestContext.urns.size) {
+      const newEntities = filterObject(entities, (e) => urns.has(e.urn));
+      this.setProperties({ context: _.cloneDeep(requestContext), entities: newEntities });
       return;
     }
 
