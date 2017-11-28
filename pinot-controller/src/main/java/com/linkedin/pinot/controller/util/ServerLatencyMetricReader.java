@@ -33,6 +33,7 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.sharding.ServerLoadMetric;
 import org.apache.commons.httpclient.ConnectTimeoutException;
 import org.apache.commons.httpclient.ConnectionPoolTimeoutException;
@@ -48,13 +49,13 @@ public class ServerLatencyMetricReader {
     private static Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
     private Executor _executor;
     private HttpConnectionManager _connectionManager;
-    private HelixAdmin _helixAdmin;
+    private PinotHelixResourceManager _helixResourceManager;
 
     public ServerLatencyMetricReader(Executor executor, HttpConnectionManager connectionManager,
-                                     HelixAdmin helixAdmin) {
+                                     PinotHelixResourceManager helixResourceManager) {
         _executor = executor;
         _connectionManager = connectionManager;
-        _helixAdmin = helixAdmin;
+        _helixResourceManager = helixResourceManager;
     }
 
     public @Nullable
@@ -63,7 +64,7 @@ public class ServerLatencyMetricReader {
         Preconditions.checkNotNull(serverNameOrEndpoint, "Server Name Or Endpoint name should not be null");
         Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
         if (isThisServerName) {
-            Preconditions.checkNotNull(_helixAdmin, "_helixAdmin should not be null");
+            Preconditions.checkNotNull(_helixResourceManager, "_helixResourceManager should not be null");
         }
 
         ServerLoadMetrics serverLatencyInfo = new ServerLoadMetrics();
@@ -108,77 +109,5 @@ public class ServerLatencyMetricReader {
             }
         }
         return serverLatencyInfo;
-    }
-
-    public static void writeToFile(String inputDirLoc) {
-        String outputLoc = "target/training";
-        String expectedOutputFileName = "";
-        File inputDir = new File(inputDirLoc);
-        File outputDir = new File(outputLoc);
-
-        if (!outputDir.exists()) {
-            if (!outputDir.mkdirs()) {
-                throw new RuntimeException("Failed to create output directory: " + outputDir);
-            }
-        }
-
-        String[] inputFileNames = inputDir.list();
-        assert inputFileNames != null;
-        BufferedWriter writer = null;
-        for (String inputFileName : inputFileNames) {
-            BufferedReader reader = null;
-            try {
-                reader = new BufferedReader(new FileReader(new File(inputDir, inputFileName)));
-                writer = new BufferedWriter(new FileWriter(new File(outputDir, inputFileName)));
-                assert writer != null;
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    writer.write(line);
-                    writer.newLine();
-                }
-                reader.close();
-                if (writer != null) {
-                    writer.close();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-    }
-    public static void writeJSONToFile(ServerLoadMetrics loadMetrics){
-        ObjectMapper mapper = new ObjectMapper();
-        try {
-            File file = new File("target/loadmetrics.json");
-            mapper.writeValue(file, loadMetrics);
-            System.out.println(file.getAbsolutePath());
-            //Convert object to JSON string
-            String jsonInString = mapper.writeValueAsString(loadMetrics);
-            System.out.println(jsonInString);
-            //Convert object to JSON string and pretty print
-            jsonInString = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(loadMetrics);
-            System.out.println(jsonInString);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-
-    }
-
-    public static void main(String args[]){
-        ServerLoadMetrics metrics = new ServerLoadMetrics();
-        ServerLatencyMetric metric = new ServerLatencyMetric(300,20,40, 9000, 40000);
-        ServerLatencyMetric metric1 = new ServerLatencyMetric(300,20,40, 9000, 4000);
-        ServerLatencyMetric metric2 = new ServerLatencyMetric(300,20,40, 9000, 40000);
-        ServerLatencyMetric metric3 = new ServerLatencyMetric(300,20,40, 9000, 40000);
-        List list = new ArrayList();
-        list.add(metric);
-        list.add(metric1);
-        list.add(metric2);
-        list.add(metric3);
-
-        metrics.set_latencies(list);
-        writeToFile("target/workloadData/");
-        //writeJSONToFile(metrics);
     }
 }
