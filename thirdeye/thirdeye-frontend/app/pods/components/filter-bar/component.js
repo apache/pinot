@@ -34,8 +34,8 @@ export default Ember.Component.extend({
    * @type {Object}
    * @example
    * {
-   *  Holiday: {urns1, urns2},
-   *  Region: {urns3, urns4}
+   *  anomaly: {urns1, urns2},
+   *  holiday: {urns3, urns4}
    * }
    */
   urnsCache: {},
@@ -97,7 +97,16 @@ export default Ember.Component.extend({
   entitiesObserver: Ember.observer(
     'entities',
     function() {
-      const filterBlocks = this.get('config');
+      const { config: filterBlocks, entities } = this.getProperties('config', 'entities');
+
+      // When entities are changed (i.e. from user interacting with the selection form), recompute urns to cache
+      filterBlocks.forEach(block => {
+        let urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
+                                                  && entities[urn].eventType == block.eventType);
+        this.urnsCache[block.eventType] = urns;
+      });
+
+      // Have the first block selected by default
       this.send('selectEventType', filterBlocks[0]);
     }
   ),
@@ -175,7 +184,7 @@ export default Ember.Component.extend({
      */
     selectEventType(clickedBlock) {
       const { entities, onSelect } = this.getProperties('entities', 'onSelect');
-      const cachedHeader = this.urnsCache[clickedBlock.header];
+      const cachedEventType = this.urnsCache[clickedBlock.eventType];
       let filterBlocks = this.get('config');
 
       // Hide all other blocks when one is clicked
@@ -188,17 +197,17 @@ export default Ember.Component.extend({
       Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
 
       /*
-      * If results were already previously filtered for this filter block (i.e. "Holiday", "Deployment"),
+      * If results were already previously filtered for this filter block (i.e. "anomaly", "holiday"),
       * call onSelect on the cached urns
       */
-      if (cachedHeader) {
-        onSelect(cachedHeader);
+      if (!Ember.isEmpty(cachedEventType)) {
+        onSelect(cachedEventType);
       }
       // If this is the first time results are computed, cache them
       else {
         const urns = Object.keys(entities).filter(urn => entities[urn].type == 'event'
                                                   && entities[urn].eventType == clickedBlock.eventType);
-        this.urnsCache[clickedBlock.header] = urns;
+        this.urnsCache[clickedBlock.eventType] = urns;
         onSelect(urns);
       }
     },
@@ -206,11 +215,11 @@ export default Ember.Component.extend({
     /**
      * Bubbled up action, called by the child component, filter-bar-input component, to update the urns cache
      * @method updateCache
-     * @param {String} header - name of filter block (i.e. "Holiday", "Deployment")
+     * @param {String} eventType - type of event of filter block (i.e. "anomaly", "holiday")
      * @param {Array} urns - list of urns that are filtered based on subfilters (i.e. country, region)
      */
-    updateCache(header, urns) {
-      this.urnsCache[header] = urns;
+    updateCache(eventType, urns) {
+      this.urnsCache[eventType] = urns;
     }
   }
 });
