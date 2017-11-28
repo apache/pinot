@@ -76,8 +76,7 @@ public class StarTreeIndexTestSegmentHelper {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
     starTreeIndexSpec.setMaxLeafRecords(10);
-    config.setEnableStarTreeIndex(true);
-    config.setStarTreeIndexSpec(starTreeIndexSpec);
+    config.enableStarTreeIndex(starTreeIndexSpec);
     config.setOutDir(segmentDirName);
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);

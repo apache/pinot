@@ -101,7 +101,6 @@ public class BackfillDateTimeColumn {
 
     StarTreeMetadata starTreeMetadata = originalSegmentMetadata.getStarTreeMetadata();
     if (starTreeMetadata != null) {
-      config.setEnableStarTreeIndex(true);
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
       starTreeIndexSpec.setDimensionsSplitOrder(starTreeMetadata.getDimensionsSplitOrder());
       starTreeIndexSpec.setMaxLeafRecords((int) starTreeMetadata.getMaxLeafRecords());
@@ -111,7 +110,7 @@ public class BackfillDateTimeColumn {
           .getSkipMaterializationForDimensions()));
       starTreeIndexSpec.setSkipStarNodeCreationForDimensions(Sets.newHashSet(starTreeMetadata
           .getSkipStarNodeCreationForDimensions()));
-      config.setStarTreeIndexSpec(starTreeIndexSpec);
+      config.enableStarTreeIndex(starTreeIndexSpec);
     }
 
     LOGGER.info("Creating segment for {} with config {}", segmentName, config.toString());

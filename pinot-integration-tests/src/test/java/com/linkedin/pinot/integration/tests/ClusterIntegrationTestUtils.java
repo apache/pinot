@@ -249,7 +249,9 @@ public class ClusterIntegrationTestUtils {
             // Test segment with space and special character in the file name
             segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
 
-            segmentGeneratorConfig.setEnableStarTreeIndex(createStarTreeIndex);
+            if (createStarTreeIndex) {
+              segmentGeneratorConfig.enableStarTreeIndex(null);
+            }
 
             if (rawIndexColumns != null) {
               segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexColumns);
