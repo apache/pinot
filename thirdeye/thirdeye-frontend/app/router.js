@@ -32,7 +32,8 @@ Router.map(function() {
     this.route('import-metric');
   });
   this.route('screenshot', { path: 'screenshot/:anomalyId' });
-  this.route('rootcause', { path: 'rootcause/:rootcauseId' });
+  this.route('rca-poc');
+  this.route('rootcause');
 });
 
 export default Router;

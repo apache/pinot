@@ -3,6 +3,7 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
+import { toCurrentUrn, toBaselineUrn } from 'thirdeye-frontend/helpers/utils';
 
 const queryParamsConfig = {
   refreshModel: false,
@@ -24,6 +25,18 @@ const isValid = (key, value) => {
       return value && value.length;
     case 'compareMode':
       return ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'];
+    case 'metricId':
+      return !value || (Number.isInteger(value) && parseInt(value) >= 0);
+    case 'anomalyId':
+      return !value || (Number.isInteger(value) && parseInt(value) >= 0);
+    case 'shareId':
+      return true;
+    case 'metricUrn':
+      return !value || value.startsWith('thirdeye:metric:');
+    case 'anomalyUrn':
+      return !value || value.startsWith('thirdeye:event:anomaly:');
+    case 'share':
+      return !value || JSON.parse(value);
     default:
       return moment(+value).isValid();
   }
@@ -45,31 +58,43 @@ const _filterToUrn = (filters) => {
 
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
   queryParams: {
-    granularity: queryParamsConfig,
-    filters: queryParamsConfig,
-    compareMode: queryParamsConfig,
-    analysisRangeStart: queryParamsConfig,
-    analysisRangeEnd: queryParamsConfig,
-    anomalyRangeStart: queryParamsConfig,
-    anomalyRangeEnd: queryParamsConfig
+    metricId: queryParamsConfig,
+    anomalyId: queryParamsConfig,
+    shareId: queryParamsConfig
   },
 
   model(params) {
-    const { rootcauseId: id } = params;
+    const { metricId, anomalyId, shareId } = params;
 
-    // TODO handle error better
-    if (!id) { return; }
+    let metricUrn;
+    if (metricId) {
+      metricUrn = `thirdeye:metric:${metricId}`;
+    }
+
+    let anomalyUrn;
+    if (anomalyId) {
+      anomalyUrn = `thirdeye:event:anomaly:${anomalyId}`;
+    }
+
+    let share;
+    if (shareId) {
+      share = fetch(`/config/rootcause-share/${shareId}`).then(res => res.json());
+    }
+
+    console.log('route: model: metricUrn anomalyUrn, share', metricUrn, anomalyUrn, share);
 
     return RSVP.hash({
-      maxTime: fetch(`/data/maxDataTime/metricId/${id}`).then(res => res.json()),
-      id
+      metricId,
+      anomalyId,
+      shareId,
+      metricUrn,
+      anomalyUrn,
+      share
     });
   },
 
   afterModel(model, transition) {
-    const maxTime = model.maxTime ? model.maxTime + 1 : moment().valueOf();
-
-    console.log('route: maxTime', maxTime);
+    const maxTime = moment().valueOf();
 
     const defaultParams = {
       filters: JSON.stringify({}),
@@ -78,7 +103,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyRangeEnd: moment(maxTime).valueOf(),
       analysisRangeStart: moment(maxTime).endOf('day').subtract(1, 'week').valueOf(),
       analysisRangeEnd: moment(maxTime).endOf('day').valueOf(),
-      compareMode: 'WoW'
+      compareMode: 'WoW',
     };
     let { queryParams } = transition;
 
@@ -91,7 +116,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         hash[key] = queryParams[key];
         return hash;
       }, {});
-    Object.assign(
+
+    return Object.assign(
       model,
       { queryParams: { ...defaultParams, ...validParams }}
     );
@@ -107,30 +133,67 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       analysisRangeEnd,
       compareMode,
       anomalyRangeStart,
-      anomalyRangeEnd
+      anomalyRangeEnd,
     } = model.queryParams;
+
+    const {
+      metricUrn,
+      anomalyUrn,
+      share
+    } = model;
+
+    console.log('route: setupController: metricUrn anomalyUrn, share', metricUrn, anomalyUrn, share);
 
     const settingsConfig = {
       granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
       compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W']
     };
 
-    const context = {
-      urns: new Set([`thirdeye:metric:${model.id}`, ..._filterToUrn(filters)]),
-      anomalyRange: [anomalyRangeStart, anomalyRangeEnd],
-      analysisRange: [analysisRangeStart, analysisRangeEnd],
+    const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
+    const analysisRange = [analysisRangeStart, analysisRangeEnd];
+
+    // default blank context
+    let context = {
+      urns: new Set(),
+      anomalyRange,
+      analysisRange,
       granularity,
       compareMode
     };
 
+    let selectedUrns = new Set();
+
+    // metric-initialized context
+    if (metricUrn) {
+      console.log('route: setupController: initializing context from metric mode');
+      context = {
+        urns: new Set([metricUrn, ..._filterToUrn(filters)]),
+        anomalyRange,
+        analysisRange,
+        granularity,
+        compareMode
+      };
+
+      selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
+    }
+
+    // anomaly-initialized context
+    if (anomalyUrn) {
+      console.log('route: setupController: initializing context from anomaly mode');
+      // TODO
+    }
+
+    // share-initialized context
+    if (share) {
+      console.log('route: setupController: initializing context from share mode');
+      context = share.context;
+      context.urns = new Set(context.urns);
+      selectedUrns = new Set(share.selectedUrns);
+    }
+
     controller.setProperties({
-      // selectedUrns: testSelectedUrns,
-      selectedUrns: new Set([`thirdeye:metric:${model.id}`, `frontend:metric:current:${model.id}`, `frontend:metric:baseline:${model.id}`]),
-      invisibleUrns: new Set(),
-      hoverUrns: new Set(),
-      filteredUrns: new Set(),
       settingsConfig,
-      // context: testContext
+      selectedUrns,
       context
     });
   }

@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { makeIterable, filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 
@@ -8,48 +8,62 @@ const ROOTCAUSE_TAB_METRICS = "metrics";
 const ROOTCAUSE_TAB_EVENTS = "events";
 
 export default Ember.Controller.extend({
-
-  /**
-   * QueryParams that needs to update the url
-   */
   queryParams: [
-    'granularity',
-    'filters',
-    'compareMode',
-    'anomalyRangeStart',
-    'anomalyRangeEnd',
-    'analysisRangeStart',
-    'analysisRangeEnd'
+    'metricId',
+    'anomalyId',
+    'shareId',
+    'metricUrn',
+    'anomalyUrn',
+    'share'
   ],
-  entitiesService: Ember.inject.service('rootcause-entities-cache'), // service
 
-  timeseriesService: Ember.inject.service('rootcause-timeseries-cache'), // service
+  //
+  // services
+  //
+  entitiesService: Ember.inject.service('rootcause-entities-cache'),
 
-  aggregatesService: Ember.inject.service('rootcause-aggregates-cache'), // service
+  timeseriesService: Ember.inject.service('rootcause-timeseries-cache'),
 
-  breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'), // service
+  aggregatesService: Ember.inject.service('rootcause-aggregates-cache'),
 
+  breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'),
 
+  ajax: Ember.inject.service(),
+
+  //
+  // rootcause search context
+  //
+  context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
+
+  //
+  // user selection
+  //
   selectedUrns: null, // Set
 
   invisibleUrns: null, // Set
 
   hoverUrns: null, // Set
 
-  context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
-
-  filterConfig: config, // {}
-  
-  settingsConfig: null, // {}
+  filteredUrns: null,
 
   activeTab: null, // ""
 
+  //
+  // static component config
+  //
+  filterConfig: config, // {}
+
+  settingsConfig: null, // {}
+
   init() {
     this._super(...arguments);
-    this.setProperties({ activeTab: ROOTCAUSE_TAB_DIMENSIONS });
+    this.setProperties({
+      invisibleUrns: new Set(),
+      hoverUrns: new Set(),
+      filteredUrns: new Set(),
+      activeTab: ROOTCAUSE_TAB_DIMENSIONS
+    });
   },
-
-  filteredUrns: null,
 
   _contextObserver: Ember.observer(
     'context',
@@ -248,51 +262,11 @@ export default Ember.Controller.extend({
       this.set('selectedUrns', new Set([...entityUrns, ...baselineUrns, ...currentUrns]));
     },
 
-    addSelectedUrns(urns) {
-      console.log('addSelectedUrns()');
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      makeIterable(urns).forEach(urn => selectedUrns.add(urn));
-      this.set('selectedUrns', new Set(selectedUrns));
-    },
+    onShare(id) {
+      const { ajax, context, selectedUrns } = this.getProperties('ajax', 'context', 'selectedUrns');
 
-    removeSelectedUrns(urns) {
-      console.log('removeSelectedUrns()');
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      makeIterable(urns).forEach(urn => selectedUrns.delete(urn));
-      this.set('selectedUrns', new Set(selectedUrns));
-    },
-
-    addFilteredUrns(urns) {
-      console.log('addFilteredUrns()');
-      const { filteredUrns } = this.getProperties('filteredUrns');
-      makeIterable(urns).forEach(urn => filteredUrns.add(urn));
-      this.set('filteredUrns', new Set(filteredUrns));
-    },
-
-    removeFilteredUrns(urns) {
-      console.log('removeFilteredUrns()');
-      const { filteredUrns } = this.getProperties('filteredUrns');
-      makeIterable(urns).forEach(urn => filteredUrns.delete(urn));
-      this.set('filteredUrns', new Set(filteredUrns));
-    },
-
-    addInvisibleUrns(urns) {
-      console.log('addInvisibleUrns()');
-      const { invisibleUrns } = this.getProperties('invisibleUrns');
-      makeIterable(urns).forEach(urn => invisibleUrns.add(urn));
-      this.set('invisibleUrns', new Set(invisibleUrns));
-    },
-
-    removeInvisibleUrns(urns) {
-      console.log('removeInvisibleUrns()');
-      const { invisibleUrns } = this.getProperties('invisibleUrns');
-      makeIterable(urns).forEach(urn => invisibleUrns.delete(urn));
-      this.set('invisibleUrns', new Set(invisibleUrns));
-    },
-
-    onHeatmapClick([dimension, subdimension]) {
-      // TODO: do something with the call back
-      console.log('heatmap click registerd for: ', dimension, subdimension);
+      const jsonString = JSON.stringify({ selectedUrns, context });
+      return ajax.post(`/config/rootcause-share/${id}`, { data: jsonString });
     }
   }
 });
