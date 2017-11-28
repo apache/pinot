@@ -78,8 +78,8 @@ export default Ember.Route.extend({
     } = transition.queryParams;
 
     const newEndDate = maxTime.isValid() && maxTime.isBefore(moment(+endDate))
-        ? maxTime
-        : moment(+endDate);
+      ? maxTime
+      : moment(+endDate);
 
     if (granularity === 'DAYS') {
       start = newEndDate.clone().subtract(29, 'days').startOf('day');
@@ -132,7 +132,7 @@ export default Ember.Route.extend({
     return {};
   },
 
-  resetController(controller, isExiting, transition) {
+  resetController(controller, isExiting) {
     this._super(...arguments);
 
     if (isExiting) {
