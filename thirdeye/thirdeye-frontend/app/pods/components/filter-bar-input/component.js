@@ -2,7 +2,7 @@
  * Filter Bar Input Component
  * Component for input fields in a filter bar (i.e. dropdown, checkbox)
  * @module components/filter-bar-input
- * @property {string} header        - [required] header of subfilter (i.e. "Holiday", "Deployment")
+ * @property {string} eventType     - [required] type of event of subfilter (i.e. "anomaly", "holiday")
  * @property {object} config        - [required] config file to construct filter bar, passed by parent component,
  *                                  filter-bar
  * @property {string} label         - [required] label of input (i.e. "country", "region")
@@ -61,7 +61,7 @@ export default Ember.Component.extend({
      * @param {Array} selectedValue - selected value in the input
      */
     onSubfilterSelection(selectedValue) {
-      const { label, entities, onSelect, eventType, updateCache, config, header } = this.getProperties('label', 'entities', 'onSelect', 'eventType', 'updateCache', 'config', 'header');
+      const { label, entities, onSelect, eventType, updateCache, config } = this.getProperties('label', 'entities', 'onSelect', 'eventType', 'updateCache', 'config');
       const labelMapping = findLabelMapping(label, config);
 
       this.set('selected', selectedValue);
@@ -82,7 +82,7 @@ export default Ember.Component.extend({
         onSelect(urns);
 
         // Call parent's updateCache() in the filter bar component to update the urns cache
-        updateCache(header, urns);
+        updateCache(eventType, urns);
       }
     }
   }
