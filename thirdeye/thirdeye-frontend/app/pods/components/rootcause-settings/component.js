@@ -18,6 +18,7 @@
 
 import Ember from 'ember';
 import moment from 'moment';
+import fetch from 'fetch';
 import { toFilters, toFilterMap, filterPrefix } from '../../../helpers/utils';
 
 // TODO: move this to a utils file (DRYER)
