@@ -1,9 +1,10 @@
 import Ember from 'ember';
 
 import { Actions } from 'thirdeye-frontend/actions/dimensions';
+import { inject as service } from '@ember/service';
 
 export default Ember.Route.extend({
-  redux: Ember.inject.service(),
+  redux: service(),
 
   // queryParam unique to the dimension route
   queryParams: {
