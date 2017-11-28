@@ -23,6 +23,7 @@ public class ServerLatencyMetric {
     private long _segment_size;
     private long _numRequests = 1;
     private long _documents;
+    private String _tableName = "";
 
     public ServerLatencyMetric(long timestamp, long latency, long segments, long documents, long segment_size){
         _timestamp = timestamp;
@@ -35,6 +36,23 @@ public class ServerLatencyMetric {
 
     public ServerLatencyMetric(){
 
+    }
+
+    public ServerLatencyMetric(ServerLatencyMetric metric) {
+        _timestamp = metric.getTimestamp();
+        _segments = metric.getSegmentCount();
+        _latency = metric.getLatency();
+        _documents = metric.getDocuments();
+        _segment_size = metric.getSegmentSize();
+        _numRequests = metric.getNumRequests();
+    }
+
+    public String get_tableName() {
+        return _tableName;
+    }
+
+    public void set_tableName(String _tableName) {
+        this._tableName = _tableName;
     }
 
     public long getDocuments() {

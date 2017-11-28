@@ -35,8 +35,8 @@ public class NettyServerWorkload {
     protected int threads = THREADS;
     protected ExecutorService threadPool = Executors.newFixedThreadPool(THREADS);
     protected AsynchronousFileChannel log;
-    public static final long CAPTURE_WINDOW = 80;
-    public static final long FLUSH_WINDOW = 2;
+    public static final long CAPTURE_WINDOW = 1000;
+    public static final long FLUSH_WINDOW = 4;
     private final Map<String, ServerLoadMetrics> avgLoadMap;
 
     public NettyServerWorkload(){
@@ -50,7 +50,7 @@ public class NettyServerWorkload {
             //Get the last entry in the list
             ServerLatencyMetric l = list.get(list.size()-1);
             System.out.println(l.getTimestamp() + "-" + load.getTimestamp());
-            if(l.getTimestamp() + CAPTURE_WINDOW >= load.getTimestamp()){
+            if(l.getTimestamp() < load.getTimestamp() && l.getTimestamp() + CAPTURE_WINDOW >= load.getTimestamp()){
                 //if incoming load within last window then update window
                 updateLastWindow(tableName, load);
             }else{

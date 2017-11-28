@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
 import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
@@ -85,7 +86,7 @@ public abstract class NettyServer implements Runnable {
      * @return Serialized response
      */
     ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request);
-    ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request, NettyServerWorkload workload);
+    ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request, ServerLatencyMetric metric);
   }
 
   public interface RequestHandlerFactory {
@@ -252,11 +253,13 @@ public abstract class NettyServer implements Runnable {
       //Call processing handler
       final TimerContext requestProcessingLatency = MetricsHelper.startTimer();
       final ChannelHandlerContext requestChannelHandlerContext = ctx;
-      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request, _workload);
+      final ServerLatencyMetric metric = new ServerLatencyMetric();
+      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request, metric);
       Futures.addCallback(serializedQueryResponse, new FutureCallback<byte[]>() {
         void sendResponse(@Nonnull final byte[] result) {
           requestProcessingLatency.stop();
-
+          metric.setLatency(requestProcessingLatency.getLatencyMs());
+          _workload.addWorkLoad(metric.get_tableName(), new ServerLatencyMetric(metric));
           //update workload here
 
           // Send Response

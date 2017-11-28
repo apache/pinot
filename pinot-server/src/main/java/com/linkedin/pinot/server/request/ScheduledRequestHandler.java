@@ -89,11 +89,11 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
 
   @Override
   public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext,
-                                                 ByteBuf request, NettyServerWorkload workload) {
+                                                 ByteBuf request, ServerLatencyMetric metric) {
 
     final long queryStartTimeNs = System.nanoTime();
-    final long queryStartTimeMs = System.currentTimeMillis();
-    final MetricsHelper.TimerContext requestProcessingLatency = MetricsHelper.startTimer();
+    final long queryStartTime = System.currentTimeMillis();
+    //final MetricsHelper.TimerContext requestProcessingLatency = MetricsHelper.startTimer();
     serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
 
     LOGGER.debug("Processing request : {}", request);
@@ -122,18 +122,15 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
 
     LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
     ListenableFuture<byte[]> queryResponse = queryScheduler.submit(queryRequest);
-    requestProcessingLatency.stop();
 
-    long latency = requestProcessingLatency.getLatencyMs();
     String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
-    final ServerLatencyMetric metric = new ServerLatencyMetric();
     metric.setNumRequests(1);
-    metric.setTimestamp(queryStartTimeMs);
-    metric.setLatency(requestProcessingLatency.getLatencyMs());
+    metric.setTimestamp(queryStartTime);
+    //metric.setLatency(requestProcessingLatency.getLatencyNs());
     metric.setSegmentCount(serverMetrics.getValueOfTableGauge(tableName, ServerGauge.SEGMENT_COUNT));
     metric.setDocuments(serverMetrics.getValueOfTableGauge(tableName, ServerGauge.DOCUMENT_COUNT));
     metric.setSegmentSize(serverMetrics.getValueOfTableGauge(tableName, ServerGauge.SEGMENT_SIZE));
-    workload.addWorkLoad(tableName, metric);
+    metric.set_tableName(tableName);
 
     return queryResponse;
   }
