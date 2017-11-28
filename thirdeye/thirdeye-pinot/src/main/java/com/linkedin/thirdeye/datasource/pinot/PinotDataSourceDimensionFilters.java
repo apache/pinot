@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -78,17 +79,16 @@ public class PinotDataSourceDimensionFilters {
     Map<String, List<String>> result = new HashMap<>();
     for (Map.Entry<ThirdEyeRequest, Future<ThirdEyeResponse>> entry : responseFuturesMap.entrySet()) {
       ThirdEyeRequest request = entry.getKey();
-      String dimension = request.getGroupBy().get(0);
       ThirdEyeResponse thirdEyeResponse = entry.getValue().get();
       int n = thirdEyeResponse.getNumRowsFor(metricFunction);
 
       List<String> values = new ArrayList<>();
       for (int i = 0; i < n; i++) {
-        Map<String, String> row = thirdEyeResponse.getRow(metricFunction, i);
-        String dimensionValue = row.get(dimension);
+        String dimensionValue = thirdEyeResponse.getRow(i).getDimensions().get(0);
         values.add(dimensionValue);
       }
       Collections.sort(values);
+      String dimension = request.getGroupBy().get(0);
       result.put(dimension, values);
     }
     return result;

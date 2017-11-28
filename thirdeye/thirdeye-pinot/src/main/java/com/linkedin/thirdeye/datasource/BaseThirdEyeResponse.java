@@ -45,9 +45,6 @@ public abstract class BaseThirdEyeResponse implements ThirdEyeResponse {
   public abstract int getNumRowsFor(MetricFunction metricFunction);
 
   @Override
-  public abstract Map<String, String> getRow(MetricFunction metricFunction, int rowId);
-
-  @Override
   public ThirdEyeRequest getRequest() {
     return request;
   }
@@ -65,7 +62,7 @@ public abstract class BaseThirdEyeResponse implements ThirdEyeResponse {
   public String[] getAllColumnNames() {
     return allColumnNames;
   }
-  
+
   @Override
   public String toString() {
     return super.toString();
