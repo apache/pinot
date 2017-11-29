@@ -144,20 +144,14 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
 
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
-    if (aggregationsInfo == null) {
-      return false;
-    }
-    if (brokerRequest.isSetGroupBy()) {
-      return false;
-    }
-
-    for (int i = 0; i < aggregationsInfo.size(); i++) {
-      String aggregationType = aggregationsInfo.get(i).getAggregationType();
-      if (!aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-        return false;
+    if (aggregationsInfo != null && aggregationsInfo.size() == 1 && !brokerRequest.isSetGroupBy()) {
+      if (aggregationsInfo.get(0)
+          .getAggregationType()
+          .equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        return true;
       }
     }
-    return true;
+    return false;
   }
 
   /**

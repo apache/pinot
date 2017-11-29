@@ -113,7 +113,7 @@ public class MetadataBasedAggregationClusterIntegrationTest extends BaseClusterI
 
 
   @Test
-  public void testDictionaryBasedQueries() throws Exception {
+  public void testMetadataBasedQueries() throws Exception {
 
     String pqlQuery;
     String sqlQuery;
