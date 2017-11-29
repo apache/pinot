@@ -110,7 +110,7 @@ export default Ember.Service.extend({
   },
 
   _makeUrl(framework, context) {
-    const baseUrns = [...context.urns].map(stripTail);
+    const baseUrns = filterPrefix(context.urns, ['thirdeye:metric:', 'thirdeye:dimension:']).map(stripTail);
     const urnString = baseUrns.join(',');
     const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
