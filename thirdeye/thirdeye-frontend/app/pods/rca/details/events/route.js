@@ -1,5 +1,4 @@
 import Ember from 'ember';
-import moment from 'moment';
 import { Actions } from 'thirdeye-frontend/actions/events';
 
 export default Ember.Route.extend({
