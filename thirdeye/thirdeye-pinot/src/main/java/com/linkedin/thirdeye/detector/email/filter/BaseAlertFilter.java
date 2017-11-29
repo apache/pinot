@@ -82,4 +82,8 @@ public abstract class BaseAlertFilter implements AlertFilter {
   public Properties toProperties(){
     return new Properties();
   }
+
+  public double getAlertFilterMTTD (double severity) {
+    return 0.0;
+  }
 }
