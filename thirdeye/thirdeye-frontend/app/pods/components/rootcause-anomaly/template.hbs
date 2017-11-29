@@ -1,0 +1,86 @@
+{{#if anomaly}}
+  {{#if isNotResolved}}
+    <div class="card-container card-container--box-shadow">
+      <div class="card-container__body">
+        <!-- copy&paste from old UI -->
+        <div class="row">
+          <h3 class="anomaly-feedback-title">
+            <span>Is this a true anomaly? (not implemented yet)</span>
+            <a class="anomaly-feedback-title__help thirdeye-link" href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
+          </h3>
+        </div>
+        <form class="anomaly-feedback-radio" id="anomaly-feedback-radio">
+          <label class="radio-inline" for="feedback-radio-yes">
+            <input type="radio" id="feedback-radio-yes" name="feedback-radio" value="ANOMALY">
+            <span class="label-medium-semibold">Yes</span> (True Anomaly)
+          </label>
+          <label for=feedback-radio-na class="radio-inline">
+            <input class="" type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NEW_TREND">
+            <span class="label-medium-semibold">Yes</span> (But New Trend)
+          </label>
+          <label for=feedback-radio-no class="radio-inline">
+            <input class="" type="radio" id="feedback-radio-no" name="feedback-radio" value="NOT_ANOMALY">
+            <span class="label-medium-semibold">No</span> (False Alarm)
+          </label><br>
+        </form>
+        <div id="anomaly-feedback-comment" class="anomaly-feedback__comment anomaly-feedback__comment--show form-group hidden">
+          <label for="feedback-comment"><span class="label-medium-semibold">Comment</span> (optional)</label>
+          <textarea placeholder="Enter a comment" class="form-control" rows="2" id="feedback-comment"></textarea>
+        </div>
+        <p>Your feedback improves the accuracy of future alerts.</p>
+      </div>
+    </div>
+  {{/if}}
+
+  <div class="card-container card-container--box-shadow">
+    <div class="card-container__body">
+      <div class="row">
+        <span>
+          <div>{{functionName}}</div>
+          <div>#{{anomalyId}} on {{metric}} ({{dataset}})</div>
+        </span>
+      </div>
+
+      <div class="row">
+        <div class="col-xs-2">
+          <label class="te-label">Duration</label>
+          <span>{{duration}}</span>
+        </div>
+        <div class="col-xs-2">
+          <label class="te-label">Current Avg</label>
+          <span>{{current}}</span>
+        </div>
+        <div class="col-xs-2">
+          <label class="te-label">Baseline Avg</label>
+          <span>{{baseline}}</span>
+        </div>
+        <div class="col-xs-2">
+          <label class="te-label">Change</label>
+          <span>{{change}}</span>
+        </div>
+        <div class="col-xs-2">
+          <label class="te-label">Status</label>
+          <span>{{status}}</span>
+        </div>
+        {{#if issueType}}
+          <div class="col-xs-2">
+            <label class="te-label">Issue Type</label>
+            <span>{{issueType}}</span>
+          </div>
+        {{/if}}
+      </div>
+
+      <div class="row">
+        <div class="col-xs-12">
+          <label class="te-label">Dimensions</label>
+          <span>{{dimensions}}</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+{{else}}
+  <div>Loading anomaly info ...</div>
+
+{{/if}}

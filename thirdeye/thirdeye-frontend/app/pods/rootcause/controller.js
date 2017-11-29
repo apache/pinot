@@ -11,10 +11,7 @@ export default Ember.Controller.extend({
   queryParams: [
     'metricId',
     'anomalyId',
-    'shareId',
-    'metricUrn',
-    'anomalyUrn',
-    'share'
+    'shareId'
   ],
 
   //
@@ -126,6 +123,18 @@ export default Ember.Controller.extend({
     function () {
       console.log('breakdowns()');
       return this.get('breakdownsService.breakdowns');
+    }
+  ),
+  
+  anomalyUrn: Ember.computed(
+    'context',
+    function () {
+      const { context } = this.getProperties('context');
+      const anomalyUrns = filterPrefix(context.urns, 'thirdeye:event:anomaly:');
+      
+      if (!anomalyUrns) { return false; }
+      
+      return anomalyUrns[0];
     }
   ),
 

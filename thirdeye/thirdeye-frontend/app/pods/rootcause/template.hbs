@@ -1,4 +1,13 @@
 <div class="container">
+  {{#if anomalyUrn}}
+    <div class="row">
+      {{rootcause-anomaly
+        entities=entities
+        anomalyUrn=anomalyUrn
+      }}
+    </div>
+  {{/if}}
+
   <div class="row">
     {{!-- TODO: delete <p> tags before release --}}
     <p>loading
