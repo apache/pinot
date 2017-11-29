@@ -108,8 +108,7 @@ public class RealtimeSegmentConverter {
 
     // Presence of the spec enables star tree generation.
     if (starTreeIndexSpec != null) {
-      genConfig.setEnableStarTreeIndex(true);
-      genConfig.setStarTreeIndexSpec(starTreeIndexSpec);
+      genConfig.enableStarTreeIndex(starTreeIndexSpec);
     }
 
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());

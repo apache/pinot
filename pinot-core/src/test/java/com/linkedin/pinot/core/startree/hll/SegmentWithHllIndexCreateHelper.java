@@ -105,10 +105,9 @@ public class SegmentWithHllIndexCreateHelper {
 
   private void setupStarTreeConfig(SegmentGeneratorConfig segmentGenConfig) {
     // StarTree related
-    segmentGenConfig.setEnableStarTreeIndex(true);
     StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
     starTreeIndexSpec.setMaxLeafRecords(StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS);
-    segmentGenConfig.setStarTreeIndexSpec(starTreeIndexSpec);
+    segmentGenConfig.enableStarTreeIndex(starTreeIndexSpec);
     LOGGER.info("segmentGenConfig Schema (w/o derived fields): ");
     printSchema(segmentGenConfig.getSchema());
   }

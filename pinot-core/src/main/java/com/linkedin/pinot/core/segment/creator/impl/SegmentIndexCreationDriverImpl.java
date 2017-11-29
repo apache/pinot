@@ -209,7 +209,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (starTreeIndexSpec == null) {
       starTreeIndexSpec = new StarTreeIndexSpec();
       starTreeIndexSpec.setMaxLeafRecords(StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS);
-      config.setStarTreeIndexSpec(starTreeIndexSpec);
+
+      // Overwrite the null index spec with default one.
+      config.enableStarTreeIndex(starTreeIndexSpec);
     }
     //create star builder config from startreeindexspec. Merge these two in one later.
     StarTreeBuilderConfig starTreeBuilderConfig = new StarTreeBuilderConfig();
