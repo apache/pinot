@@ -1478,15 +1478,25 @@ public class PinotHelixResourceManager {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
           ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentName);
       if (offlineSegmentZKMetadata != null) {
-        // Segment exists, check whether need to refresh
+        String pushStatus = offlineSegmentZKMetadata.getSegmentPushStatus();
+        if (pushStatus != null || tooLate(pushStatus)) {
+          // Check whether segment is already being committed or if it's too late
+          res.status = ResponseStatus.failure;
+          return res;
+        } else {
+          // Write to zk that we are writing to the segment
+          offlineSegmentZKMetadata.setSegmentPushStatus("COMMITTING," + System.currentTimeMillis());
+          ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
+        }
 
         long existedCrc = offlineSegmentZKMetadata.getCrc();
         if (crc != null && !crc.equals(existedCrc)) {
-          // Segment has been replaced during minion task, return failure
+          // Segment has been replaced since upload was called, return failure
           res.status = ResponseStatus.failure;
           return res;
         }
 
+        // Segment exists, check whether need to refresh
         if (ifRefreshAnExistedSegment(segmentMetadata, offlineSegmentZKMetadata, offlineTableName, segmentName)) {
           // NOTE: must first set the segment ZK metadata before trying to refresh because server will pick up the
           // latest segment ZK metadata and compare with local segment metadata to decide whether to download the new
@@ -1514,6 +1524,8 @@ public class PinotHelixResourceManager {
                 segmentName, offlineTableName);
             offlineSegmentZKMetadata.setCrc(-1L);
             offlineSegmentZKMetadata.setCreationTime(-1L);
+            // Resetting segment push status to null
+            offlineSegmentZKMetadata.setSegmentPushStatus(null);
             ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           }
         } else {
@@ -1548,6 +1560,16 @@ public class PinotHelixResourceManager {
     return res;
   }
 
+  private boolean tooLate(String pushStatus) {
+    Long tenMinuteTimeout = 600000L;
+    Long longMillis = Long.parseLong(pushStatus);
+    Long currentMillis = System.currentTimeMillis();
+    if (currentMillis - longMillis >= tenMinuteTimeout) {
+      return true;
+    } else {
+      return false;
+    }
+  }
   private boolean ifRefreshAnExistedSegment(@Nonnull SegmentMetadata newSegmentMetadata,
       @Nonnull OfflineSegmentZKMetadata existedSegmentZKMetadata, @Nonnull String offlineTableName,
       @Nonnull String segmentName) {
@@ -1571,12 +1593,6 @@ public class PinotHelixResourceManager {
     if (newCreationTime <= existedCreationTime) {
       LOGGER.info("Reject segment: {} in table: {} because of older or same creation time, new: {}, existed: {}",
           segmentName, offlineTableName, newCreationTime, existedCreationTime);
-      return false;
-    }
-
-    // Check segment CRC
-    if (newCrc == existedCrc) {
-      LOGGER.info("Reject segment: {} in table: {} because of same CRC: {}", segmentName, offlineTableName, newCrc);
       return false;
     }
 
