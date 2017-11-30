@@ -88,7 +88,7 @@ public class ConvertToRawIndexTaskExecutor extends BaseTaskExecutor {
       // Upload the converted tarred segment file
       FileUploadUtils.sendFile(uploadURL, convertedTarredSegmentFile.getName(),
           new FileInputStream(convertedTarredSegmentFile), convertedTarredSegmentFile.length(),
-          FileUploadUtils.SendFileMethod.POST);
+          FileUploadUtils.SendFileMethod.POST, null);
 
       LOGGER.info("Done executing ConvertToRawIndexTask on table: {}, segment: {}", tableName, segmentName);
     } catch (TaskCancelledException e) {

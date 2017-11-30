@@ -25,6 +25,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import org.apache.commons.httpclient.Header;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpVersion;
@@ -46,7 +47,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
-import org.apache.http.protocol.HTTP;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntity;
@@ -54,6 +54,7 @@ import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.CoreConnectionPNames;
+import org.apache.http.protocol.HTTP;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,11 +97,11 @@ public class FileUploadUtils {
 
   public static int sendFile(final String host, final String port, final String path, final String fileName,
       final InputStream inputStream, final long lengthInBytes, SendFileMethod httpMethod) {
-    return sendFile("http://" + host + ":" + port + "/" + path, fileName, inputStream, lengthInBytes, httpMethod);
+    return sendFile("http://" + host + ":" + port + "/" + path, fileName, inputStream, lengthInBytes, httpMethod, null);
   }
 
   public static int sendFile(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
-      SendFileMethod httpMethod) {
+      SendFileMethod httpMethod, String crc) {
     EntityEnclosingMethod method = null;
     try {
       method = httpMethod.forUri(uri);
@@ -121,6 +122,9 @@ public class FileUploadUtils {
         }
       })};
       method.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
+      Header header = new Header("If-Match", crc);
+      method.addRequestHeader(header);
+
       FILE_UPLOAD_HTTP_CLIENT.executeMethod(method);
       if (method.getStatusCode() >= 400) {
         String errorString = "POST Status Code: " + method.getStatusCode() + "\n";
