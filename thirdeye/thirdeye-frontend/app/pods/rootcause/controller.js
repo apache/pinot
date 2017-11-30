@@ -2,6 +2,7 @@ import Ember from 'ember';
 import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
+import SHA256 from 'cryptojs/sha256';
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -44,6 +45,8 @@ export default Ember.Controller.extend({
   filteredUrns: null,
 
   activeTab: null, // ""
+
+  lastShare: null, // ""
 
   //
   // static component config
@@ -125,15 +128,15 @@ export default Ember.Controller.extend({
       return this.get('breakdownsService.breakdowns');
     }
   ),
-  
+
   anomalyUrn: Ember.computed(
     'context',
     function () {
       const { context } = this.getProperties('context');
       const anomalyUrns = filterPrefix(context.urns, 'thirdeye:event:anomaly:');
-      
+
       if (!anomalyUrns) { return false; }
-      
+
       return anomalyUrns[0];
     }
   ),
@@ -271,10 +274,17 @@ export default Ember.Controller.extend({
       this.set('selectedUrns', new Set([...entityUrns, ...baselineUrns, ...currentUrns]));
     },
 
-    onShare(id) {
-      const { ajax, context, selectedUrns } = this.getProperties('ajax', 'context', 'selectedUrns');
+    onShare() {
+      const { ajax, context, selectedUrns, lastShare } =
+        this.getProperties('ajax', 'context', 'selectedUrns', 'lastShare');
 
-      const jsonString = JSON.stringify({ selectedUrns, context });
+      const version = 1;
+
+      const jsonString = JSON.stringify({ selectedUrns, context, version });
+      const id = SHA256(jsonString);
+
+      this.setProperties({ lastShare: id });
+
       return ajax.post(`/config/rootcause-share/${id}`, { data: jsonString });
     }
   }
