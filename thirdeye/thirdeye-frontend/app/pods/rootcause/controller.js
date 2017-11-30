@@ -26,8 +26,6 @@ export default Ember.Controller.extend({
 
   breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'),
 
-  ajax: Ember.inject.service(),
-
   //
   // rootcause search context
   //
