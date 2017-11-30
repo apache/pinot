@@ -83,6 +83,11 @@ public abstract class BaseAlertFilter implements AlertFilter {
     return new Properties();
   }
 
+  /**
+   * get Alert Filter Minimum Time to Detect in HOUR given severity value
+   * @param severity severity of an anomaly
+   * @return minimum time to detect in HOUR given severity
+   */
   public double getAlertFilterMTTD (double severity) {
     return 0.0;
   }

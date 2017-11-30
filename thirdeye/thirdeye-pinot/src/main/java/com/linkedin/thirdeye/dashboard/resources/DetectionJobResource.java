@@ -1096,8 +1096,8 @@ public class DetectionJobResource {
    */
   @GET
   @Path("/eval/mttd/{functionId}")
-  public Response getAlertFilterMTTD (@PathParam("functionId") long id,
-      @QueryParam("severity") double severity) {
+  public Response getAlertFilterMTTD (@PathParam("functionId") @NotNull long id,
+      @QueryParam("severity") @NotNull double severity) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     double alertFilterMTTDInHour = alertFilter.getAlertFilterMTTD(severity);
