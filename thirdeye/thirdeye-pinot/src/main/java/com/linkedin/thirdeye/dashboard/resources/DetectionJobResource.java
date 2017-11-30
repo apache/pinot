@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
+import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -63,7 +65,6 @@ import com.linkedin.thirdeye.util.SeverityComputationUtil;
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
-  private final AnomalyFunctionManager anomalyFunctionSpecDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final RawAnomalyResultManager rawAnomalyResultDAO;
@@ -78,7 +79,6 @@ public class DetectionJobResource {
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
-    this.anomalyFunctionSpecDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
@@ -108,12 +108,12 @@ public class DetectionJobResource {
 
   @Deprecated
   private void toggleActive(Long id, boolean state) {
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new NullArgumentException("Function spec not found");
     }
     anomalyFunctionSpec.setIsActive(state);
-    anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
+    anomalyFunctionDAO.update(anomalyFunctionSpec);
   }
 
   // endpoints to modify to aonmaly detection function
@@ -133,12 +133,12 @@ public class DetectionJobResource {
   }
 
   private void toggleRequiresCompletenessCheck(Long id, boolean state) {
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if(anomalyFunctionSpec == null) {
       throw new NullArgumentException("Function spec not found");
     }
     anomalyFunctionSpec.setRequiresCompletenessCheck(state);
-    anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
+    anomalyFunctionDAO.update(anomalyFunctionSpec);
   }
 
   @POST
@@ -1085,5 +1085,25 @@ public class DetectionJobResource {
       metaData.add(new AnomalyUtils.MetaDataNode(anomaly));
     }
     return Response.ok(metaData).build();
+  }
+
+  /**
+   * Get Minimum Time to Detection for Function.
+   * This endpoint evaluate both alert filter's MTTD and bucket size for function and returns the maximum of the two as MTTD
+   * @param id function Id to be evaluated
+   * @param severity severity value
+   * @return minimum time to detection in HOUR
+   */
+  @GET
+  @Path("/eval/mttd/{functionId}")
+  public Response getAlertFilterMTTD (@PathParam("functionId") @NotNull long id,
+      @QueryParam("severity") @NotNull double severity) {
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+    double alertFilterMTTDInHour = alertFilter.getAlertFilterMTTD(severity);
+    TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
+    int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
+    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize, detectionUnit);
+    return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
   }
 }
