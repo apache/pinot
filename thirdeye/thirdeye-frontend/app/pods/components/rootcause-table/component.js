@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import _ from 'lodash';
 
 export default Ember.Component.extend({
   columns: null, // []
@@ -9,34 +10,59 @@ export default Ember.Component.extend({
 
   onSelection: null, // function (e)
 
-  data: Ember.computed(
-    'entities',
-    function () {
-      const { entities } = this.getProperties('entities');
-      return Object.values(entities);
-    }
-  ),
-
-  // NOTE: only works on init
-  // NOTE: checkboxes do not bind to model, show unselected
-  // http://onechiporenko.github.io/ember-models-table/v.1/#/
-  preselectedItems: Ember.computed(
+  /**
+   * Returns a list of record objects to display in the table
+   * Sets the 'isSelected' property to respond to table selection
+   * @type {Object} - object with keys as urns and values as entities
+   */
+  records: Ember.computed(
     'entities',
     'selectedUrns',
     function () {
       const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
-      const selectedEntities = [...selectedUrns].filter(urn => entities[urn]).map(urn => entities[urn]);
+
+      const records = _.cloneDeep(entities);
+      Object.keys(records).forEach(urn => records[urn].isSelected = selectedUrns.has(urn));
+      return records;
+    }
+  ),
+
+  /**
+   * Returns a list of values to display in the rootcause table
+   * @type {Array[Objects]} - array of entities
+   */
+  data: Ember.computed(
+    'records',
+    function () {
+      return Object.values(this.get('records'));
+    }
+  ),
+
+  /**
+   * Keeps track of items that are selected in the table
+   * @type {Array}
+   */
+  preselectedItems: Ember.computed(
+    'records',
+    'selectedUrns',
+    function () {
+      const { records, selectedUrns } = this.getProperties('records', 'selectedUrns');
+      const selectedEntities = [...selectedUrns].filter(urn => records[urn]).map(urn => records[urn]);
       return selectedEntities;
     }
   ),
 
   actions: {
+    /**
+     * Updates the currently selected urns based on user selection on the table
+     * @param {Object} e
+     */
     displayDataChanged (e) {
-      const { entities, selectedUrns, onSelection } = this.getProperties('entities', 'selectedUrns', 'onSelection');
+      const { records, selectedUrns, onSelection } = this.getProperties('records', 'selectedUrns', 'onSelection');
       if (onSelection) {
         const table = new Set(e.selectedItems.map(e => e.urn));
         const added = [...table].filter(urn => !selectedUrns.has(urn));
-        const removed = [...selectedUrns].filter(urn => entities[urn] && !table.has(urn));
+        const removed = [...selectedUrns].filter(urn => records[urn] && !table.has(urn));
 
         const updates = {};
         added.forEach(urn => updates[urn] = true);
