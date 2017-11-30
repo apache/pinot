@@ -1458,8 +1458,13 @@ public class PinotHelixResourceManager {
   }
 
   @Nonnull
+  public PinotResourceManagerResponse addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl) {
+    return addSegment(segmentMetadata, downloadUrl, null);
+  }
+
+  @Nonnull
   public PinotResourceManagerResponse addSegment(@Nonnull SegmentMetadata segmentMetadata,
-      @Nonnull String downloadUrl) {
+      @Nonnull String downloadUrl, String crc) {
     PinotResourceManagerResponse res = new PinotResourceManagerResponse();
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
@@ -1474,6 +1479,13 @@ public class PinotHelixResourceManager {
           ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentName);
       if (offlineSegmentZKMetadata != null) {
         // Segment exists, check whether need to refresh
+
+        long existedCrc = offlineSegmentZKMetadata.getCrc();
+        if (crc != null && !crc.equals(existedCrc)) {
+          // Segment has been replaced during minion task, return failure
+          res.status = ResponseStatus.failure;
+          return res;
+        }
 
         if (ifRefreshAnExistedSegment(segmentMetadata, offlineSegmentZKMetadata, offlineTableName, segmentName)) {
           // NOTE: must first set the segment ZK metadata before trying to refresh because server will pick up the
