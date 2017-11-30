@@ -1,7 +1,37 @@
 <div class="container">
+  {{#if anomalyUrn}}
+    <div class="row">
+      {{rootcause-anomaly
+        entities=entities
+        anomalyUrn=anomalyUrn
+      }}
+    </div>
+  {{/if}}
+
   <div class="row">
-    {{!-- TODO: delete <p> tag before release --}}
+    {{!-- TODO: delete <p> tags before release --}}
+    <p>loading
+      {{#if isLoadingEntities}}
+        | ENTITIES
+      {{/if}}
+      {{#if isLoadingTimeseries}}
+        | TIMESERIES
+      {{/if}}
+      {{#if isLoadingAggregates}}
+        | AGGREGATES
+      {{/if}}
+      {{#if isLoadingBreakdowns}}
+        | BREAKDOWNS
+      {{/if}}
+    </p>
+
     <p>testing | <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a></p>
+
+    <p>sharing | <a {{action "onShare"}}>save</a>
+      {{#if shareId}}
+        | {{#link-to "rootcause" (query-params shareId=shareId)}}{{shareId}}{{/link-to}}
+      {{/if}}
+    </p>
 
     <h2 class="te-title te-title--rootcause">Root Cause Analysis</h2>
     {{rootcause-settings
@@ -11,21 +41,6 @@
       onSelection=(action "onSelection")
     }}
   </div>
-
-  <p>loading
-    {{#if isLoadingEntities}}
-      | ENTITIES
-    {{/if}}
-    {{#if isLoadingTimeseries}}
-      | TIMESERIES
-    {{/if}}
-    {{#if isLoadingAggregates}}
-      | AGGREGATES
-    {{/if}}
-    {{#if isLoadingBreakdowns}}
-      | BREAKDOWNS
-    {{/if}}
-  </p>
 
   <div class="row">
     <div class="card-container card-container--box-shadow">

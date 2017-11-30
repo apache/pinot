@@ -3,6 +3,8 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
+import { toCurrentUrn, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import _ from 'lodash';
 
 const queryParamsConfig = {
   refreshModel: false,
@@ -24,6 +26,18 @@ const isValid = (key, value) => {
       return value && value.length;
     case 'compareMode':
       return ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'];
+    case 'metricId':
+      return !value || (Number.isInteger(value) && parseInt(value) >= 0);
+    case 'anomalyId':
+      return !value || (Number.isInteger(value) && parseInt(value) >= 0);
+    case 'shareId':
+      return true;
+    case 'metricUrn':
+      return !value || value.startsWith('thirdeye:metric:');
+    case 'anomalyUrn':
+      return !value || value.startsWith('thirdeye:event:anomaly:');
+    case 'share':
+      return !value || JSON.parse(value);
     default:
       return moment(+value).isValid();
   }
@@ -45,31 +59,47 @@ const _filterToUrn = (filters) => {
 
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
   queryParams: {
-    granularity: queryParamsConfig,
-    filters: queryParamsConfig,
-    compareMode: queryParamsConfig,
-    analysisRangeStart: queryParamsConfig,
-    analysisRangeEnd: queryParamsConfig,
-    anomalyRangeStart: queryParamsConfig,
-    anomalyRangeEnd: queryParamsConfig
+    metricId: queryParamsConfig,
+    anomalyId: queryParamsConfig,
+    shareId: queryParamsConfig
   },
 
   model(params) {
-    const { rootcauseId: id } = params;
+    const { metricId, anomalyId, shareId } = params;
 
-    // TODO handle error better
-    if (!id) { return; }
+    let metricUrn, anomalyUrn, share, anomalyContext;
+
+    if (metricId) {
+      metricUrn = `thirdeye:metric:${metricId}`;
+    }
+
+    if (anomalyId) {
+      anomalyUrn = `thirdeye:event:anomaly:${anomalyId}`;
+    }
+
+    if (shareId) {
+      share = fetch(`/config/rootcause-share/${shareId}`).then(res => res.json());
+    }
+
+    if (anomalyUrn) {
+      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(res => res.json());
+    }
+
+    console.log('route: model: metricUrn anomalyUrn share anomalyContext', metricUrn, anomalyUrn, share, anomalyContext);
 
     return RSVP.hash({
-      maxTime: fetch(`/data/maxDataTime/metricId/${id}`).then(res => res.json()),
-      id
+      metricId,
+      anomalyId,
+      shareId,
+      metricUrn,
+      anomalyUrn,
+      share,
+      anomalyContext
     });
   },
 
   afterModel(model, transition) {
-    const maxTime = model.maxTime ? model.maxTime + 1 : moment().valueOf();
-
-    console.log('route: maxTime', maxTime);
+    const maxTime = moment().valueOf();
 
     const defaultParams = {
       filters: JSON.stringify({}),
@@ -91,7 +121,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         hash[key] = queryParams[key];
         return hash;
       }, {});
-    Object.assign(
+
+    return Object.assign(
       model,
       { queryParams: { ...defaultParams, ...validParams }}
     );
@@ -110,27 +141,86 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyRangeEnd
     } = model.queryParams;
 
+    const {
+      shareId,
+      metricUrn,
+      anomalyUrn,
+      share,
+      anomalyContext
+    } = model;
+
+    console.log('route: setupController: metricUrn anomalyUrn share anomalyContext', metricUrn, anomalyUrn, share, anomalyContext);
+
     const settingsConfig = {
       granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
       compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W']
     };
 
-    const context = {
-      urns: new Set([`thirdeye:metric:${model.id}`, ..._filterToUrn(filters)]),
-      anomalyRange: [anomalyRangeStart, anomalyRangeEnd],
-      analysisRange: [analysisRangeStart, analysisRangeEnd],
+    const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
+    const analysisRange = [analysisRangeStart, analysisRangeEnd];
+
+    // default blank context
+    let context = {
+      urns: new Set(),
+      anomalyRange,
+      analysisRange,
       granularity,
       compareMode
     };
 
+    let selectedUrns = new Set();
+
+    // metric-initialized context
+    if (metricUrn) {
+      console.log('route: setupController: initializing context from metric mode');
+      context = {
+        urns: new Set([metricUrn, ..._filterToUrn(filters)]),
+        anomalyRange,
+        analysisRange,
+        granularity,
+        compareMode
+      };
+
+      selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
+    }
+
+    // anomaly-initialized context
+    if (anomalyUrn && anomalyContext) {
+      console.log('route: setupController: initializing context from anomaly mode');
+
+      const contextUrns = anomalyContext.map(e => e.urn);
+
+      const metricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
+      const dimensionUrns = filterPrefix(contextUrns, 'thirdeye:dimension:');
+
+      const anomalyRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:anomaly:');
+      const analysisRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:analysis:');
+
+      console.log('route: setupController: contextUrns metricUrns dimensionUrns anomalyRangeUrns analysisRangeUrns', contextUrns, metricUrns, dimensionUrns, anomalyRangeUrns, analysisRangeUrns);
+
+      context = {
+        urns: new Set([...metricUrns, ...dimensionUrns, anomalyUrn]),
+        anomalyRange: _.slice(anomalyRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10)), // thirdeye:timerange:anomaly:{start}:{end}
+        analysisRange: _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10)), // thirdeye:timerange:analysis:{start}:{end}
+        granularity,
+        compareMode
+      };
+
+      selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
+    }
+
+    // share-initialized context
+    if (share) {
+      console.log('route: setupController: initializing context from share mode');
+      context = share.context;
+      context.urns = new Set(context.urns);
+      selectedUrns = new Set(share.selectedUrns);
+    }
+
     controller.setProperties({
-      // selectedUrns: testSelectedUrns,
-      selectedUrns: new Set([`thirdeye:metric:${model.id}`, `frontend:metric:current:${model.id}`, `frontend:metric:baseline:${model.id}`]),
-      invisibleUrns: new Set(),
-      hoverUrns: new Set(),
-      filteredUrns: new Set(),
+      shareId,
       settingsConfig,
-      // context: testContext
+      selectedUrns,
       context
     });
   }
