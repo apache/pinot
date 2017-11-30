@@ -283,7 +283,7 @@ export default Ember.Component.extend({
       });
 
       const normalized = {};
-      Object.keys(urn2lane).forEach(urn => normalized[urn] = 1 - 1.0 * urn2lane[urn] / max);
+      Object.keys(urn2lane).forEach(urn => normalized[urn] = 1 - 0.5 * urn2lane[urn] / max);
 
       return normalized;
     }
@@ -298,9 +298,11 @@ export default Ember.Component.extend({
       this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues');
 
     if (hasPrefix(urn, 'frontend:metric:current:')) {
+      const metricEntity = entities[toMetricUrn(stripTail(urn))];
       const series = {
         timestamps: timeseries[urn].timestamps,
         values: timeseries[urn].values,
+        color: metricEntity ? metricEntity.color : 'none',
         type: 'line',
         axis: 'y'
       };
@@ -308,9 +310,11 @@ export default Ember.Component.extend({
       return this._transformSeries(timeseriesMode, series);
 
     } else if (hasPrefix(urn, 'frontend:metric:baseline:')) {
+      const metricEntity = entities[toMetricUrn(stripTail(urn))];
       const series = {
         timestamps: timeseries[urn].timestamps,
         values: timeseries[urn].values,
+        color: metricEntity ? metricEntity.color : 'none',
         type: 'scatter',
         axis: 'y'
       };
@@ -322,6 +326,7 @@ export default Ember.Component.extend({
       return {
         timestamps: [entities[urn].start, entities[urn].end || entities[urn].start],
         values: [val, val],
+        color: entities[urn].color,
         type: 'line',
         axis: 'y2'
       };

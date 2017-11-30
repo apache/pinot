@@ -13,6 +13,7 @@
           type="checkbox"
           checked=(set-has-not invisibleUrns urn)
           click=(action "toggleVisibility" urn)}}
+        <div class="rootcause-legend__box--{{get colors urn}}"></div>
         {{label}}
         <a {{action "removeUrn" urn}}>[X]</a>
       </li>
@@ -31,6 +32,7 @@
           type="checkbox"
           checked=(set-has-not invisibleUrns urn)
           click=(action "toggleVisibility" urn)}}
+        <div class="rootcause-legend__box--{{get colors urn}}"></div>
         {{label}}
         <a {{action "removeUrn" urn}}>[X]</a>
       </li>

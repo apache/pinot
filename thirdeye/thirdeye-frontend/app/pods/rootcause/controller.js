@@ -1,8 +1,9 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toColor } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import CryptoJS from 'cryptojs';
+import _ from 'lodash';
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -98,6 +99,10 @@ export default Ember.Controller.extend({
     'entitiesService.entities',
     function () {
       return this.get('entitiesService.entities');
+
+      Object.keys(entities).forEach(urn => entities[urn].color = toColor(urn));
+
+      return entities;
     }
   ),
 

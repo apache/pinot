@@ -1,6 +1,5 @@
 import Ember from 'ember';
 import { toCurrentUrn, toBaselineUrn, filterPrefix, stripTail, hasPrefix, toFilters, toEntities, toMetricLabel } from '../../../helpers/utils';
-import _ from 'lodash';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -40,6 +39,15 @@ export default Ember.Component.extend({
     function () {
       const { entities, validUrns } = this.getProperties('entities', 'validUrns');
       return filterPrefix(validUrns, 'thirdeye:event:').reduce((agg, urn) => { agg[urn] = entities[urn].label; return agg; }, {});
+    }
+  ),
+
+  colors: Ember.computed(
+    'entities',
+    'validUrns',
+    function () {
+      const { entities, validUrns } = this.getProperties('entities', 'validUrns');
+      return validUrns.filter(urn => entities[urn]).reduce((agg, urn) => { agg[urn] = entities[urn].color; return agg; }, {});
     }
   ),
 
