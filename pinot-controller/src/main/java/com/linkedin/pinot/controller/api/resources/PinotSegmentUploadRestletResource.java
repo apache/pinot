@@ -228,10 +228,9 @@ public class PinotSegmentUploadRestletResource {
   public SuccessResponse uploadSegmentAsMultiPart(
       FormDataMultiPart multiPart,
       @Context HttpHeaders headers,
-      @Context Request request,
-      @ApiParam(value = "Segment CRC", required = false) @PathParam("crc") String crc
+      @Context Request request
   ) {
-    return uploadSegmentInternal(multiPart, null, headers, request, crc);
+    return uploadSegmentInternal(multiPart, null, headers, request);
   }
 
   @POST
@@ -243,14 +242,18 @@ public class PinotSegmentUploadRestletResource {
   public SuccessResponse uploadSegmentAsJson(
       String segmentJsonStr,    // If segment is present as json body
       @Context HttpHeaders headers,
-      @Context Request request,
-      @ApiParam(value = "Segment CRC", required = false) @PathParam("crc") String crc
+      @Context Request request
   ) {
-    return uploadSegmentInternal(null, segmentJsonStr, headers, request, crc);
+    return uploadSegmentInternal(null, segmentJsonStr, headers, request);
   }
 
   private SuccessResponse uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr, HttpHeaders headers,
-      Request request, String crc) {
+      Request request) {
+    // If match header can check if the modification of a resource that the user wants to upload will not override
+    // another change that has been done since the original resource was fetched.
+    // If the request cannot be fulfilled, the 412 (Precondition Failed) response is returned.
+    String crc = headers.getHeaderString(HttpHeaders.IF_MATCH);
+
     File tempTarredSegmentFile = null;
     File tempSegmentDir = null;
 
