@@ -34,7 +34,7 @@ public class DatasetConfigBean extends AbstractBean {
 
   private String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
 
-  private String timezone = TimeSpec.DEFAULT_TIMEZONE;
+  private String timezone = TimeSpec.DEFAULT_TIMEZONE.toString();
 
   /** Introduce this as a dataset property because count* queries will have no metric information **/
   private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;

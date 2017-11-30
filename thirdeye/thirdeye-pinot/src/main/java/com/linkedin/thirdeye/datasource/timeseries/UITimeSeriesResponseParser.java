@@ -43,7 +43,7 @@ public class UITimeSeriesResponseParser extends BaseTimeSeriesResponseParser {
     Map<String, Double> metricThresholds = ThirdEyeUtils.getMetricThresholdsMap(metricFunctions);
     List<TimeSeriesRow> rows = new ArrayList<>();
 
-    Map<Integer, List<Double>> metricSums = Collections.emptyMap();
+    Map<Long, List<Double>> metricSums = Collections.emptyMap();
     if (doRollUp) {
       metricSums = ResponseParserUtils.getMetricSumsByTime(response);
     }

@@ -64,7 +64,7 @@ public class PqlUtilsTest {
     return new Object[] {
         new DateTime(startISO, DateTimeZone.UTC), new DateTime(endISO, DateTimeZone.UTC),
         new TimeSpec(timeColumn, new TimeGranularity(timeGranularitySize, timeGranularityUnit),
-            timeSpecFormat),
+            timeSpecFormat, TimeSpec.DEFAULT_TIMEZONE),
         expected
     };
   }

@@ -174,14 +174,14 @@ public class Utils {
    * This method returns the time zone of the data in this collection
    */
   public static DateTimeZone getDataTimeZone(String collection)  {
-    String timezone = TimeSpec.DEFAULT_TIMEZONE;
+    DateTimeZone timezone = TimeSpec.DEFAULT_TIMEZONE;
     try {
       DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      timezone = datasetConfig.getTimezone();
+      timezone = DateTimeZone.forID(datasetConfig.getTimezone());
     } catch (ExecutionException e) {
-      LOG.error("Exception while getting dataset config for {}", collection);
+      LOG.error("Exception while getting dataset's ({}) timezone; default timezone {} is used.", collection, timezone);
     }
-    return DateTimeZone.forID(timezone);
+    return timezone;
   }
 
   public static String getJsonFromObject(Object obj) throws JsonProcessingException {

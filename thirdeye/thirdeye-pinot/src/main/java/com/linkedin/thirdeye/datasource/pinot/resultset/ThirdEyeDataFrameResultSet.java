@@ -68,6 +68,20 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
     return dataFrame.get(thirdEyeResultSetMetaData.getGroupKeyColumnNames().get(columnIdx)).getString(rowIdx);
   }
 
+  public ThirdEyeResultSetMetaData getMetaData() {
+    return thirdEyeResultSetMetaData;
+  }
+
+  /**
+   * Returns the data frame of this result set. Caution: Modifying the data frame may cause inconsistency between it
+   * and the metadata of this result set.
+   *
+   * @return the data frame of this result set.
+   */
+  public DataFrame getDataFrame() {
+    return dataFrame;
+  }
+
   /**
    * Constructs a {@link ThirdEyeDataFrameResultSet} from any Pinot's {@link ResultSet}.
    *
@@ -140,6 +154,7 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
       dfBuilder.append(columnsOfTheRow);
     }
     DataFrame dataFrame = dfBuilder.build();
+    dataFrame.setIndex(thirdEyeResultSetMetaData.getGroupKeyColumnNames());
     // Build ThirdEye's result set
     ThirdEyeDataFrameResultSet thirdEyeDataFrameResultSet =
         new ThirdEyeDataFrameResultSet(thirdEyeResultSetMetaData, dataFrame);

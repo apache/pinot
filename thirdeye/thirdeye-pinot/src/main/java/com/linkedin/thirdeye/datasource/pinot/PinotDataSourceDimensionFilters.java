@@ -18,6 +18,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,12 +81,15 @@ public class PinotDataSourceDimensionFilters {
     for (Map.Entry<ThirdEyeRequest, Future<ThirdEyeResponse>> entry : responseFuturesMap.entrySet()) {
       ThirdEyeRequest request = entry.getKey();
       ThirdEyeResponse thirdEyeResponse = entry.getValue().get();
-      int n = thirdEyeResponse.getNumRowsFor(metricFunction);
+      int numRows = thirdEyeResponse.getNumRows();
 
       List<String> values = new ArrayList<>();
-      for (int i = 0; i < n; i++) {
-        String dimensionValue = thirdEyeResponse.getRow(i).getDimensions().get(0);
-        values.add(dimensionValue);
+      for (int i = 0; i < numRows; i++) {
+        List<String> dimensionValues = thirdEyeResponse.getRow(i).getDimensions();
+        if (CollectionUtils.isNotEmpty(dimensionValues)) {
+          String dimensionValue = dimensionValues.get(0);
+          values.add(dimensionValue);
+        }
       }
       Collections.sort(values);
       String dimension = request.getGroupBy().get(0);

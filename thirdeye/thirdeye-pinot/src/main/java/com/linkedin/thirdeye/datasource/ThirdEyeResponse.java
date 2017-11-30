@@ -8,19 +8,19 @@ import com.linkedin.thirdeye.api.TimeSpec;
  * The result of calling {@link ThirdEyeDataSource#execute(ThirdEyeRequest)}.
  */
 public interface ThirdEyeResponse {
-
-  List<MetricFunction> getMetricFunctions();
-
-  int getNumRows();
-
-  ThirdEyeResponseRow getRow(int rowId);
-
-  int getNumRowsFor(MetricFunction metricFunction);
-
+  // Metadata Getters
   ThirdEyeRequest getRequest();
 
   TimeSpec getDataTimeSpec();
 
   List<String> getGroupKeyColumns();
+
+  // TODO: Replace with getMetricNames (i.e., ids)
+  List<MetricFunction> getMetricFunctions();
+
+  int getNumRows();
+
+  // Data Getters
+  ThirdEyeResponseRow getRow(int rowId);
 
 }

@@ -227,11 +227,6 @@ public class BaseTimeSeriesResponseParserTest {
     }
 
     @Override
-    public int getNumRowsFor(MetricFunction metricFunction) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public ThirdEyeRequest getRequest() {
       return thirdEyeRequest;
     }
