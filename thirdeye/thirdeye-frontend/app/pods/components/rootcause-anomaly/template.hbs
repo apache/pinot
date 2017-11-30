@@ -1,36 +1,34 @@
 {{#if anomaly}}
-  {{#if isNotResolved}}
-    <div class="card-container card-container--box-shadow">
-      <div class="card-container__body">
-        <!-- copy&paste from old UI -->
-        <div class="row">
-          <h3 class="anomaly-feedback-title">
-            <span>Is this a true anomaly? (not implemented yet)</span>
-            <a class="anomaly-feedback-title__help thirdeye-link" href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
-          </h3>
-        </div>
-        <form class="anomaly-feedback-radio" id="anomaly-feedback-radio">
-          <label class="radio-inline" for="feedback-radio-yes">
-            <input type="radio" id="feedback-radio-yes" name="feedback-radio" value="ANOMALY">
-            <span class="label-medium-semibold">Yes</span> (True Anomaly)
-          </label>
-          <label for=feedback-radio-na class="radio-inline">
-            <input class="" type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NEW_TREND">
-            <span class="label-medium-semibold">Yes</span> (But New Trend)
-          </label>
-          <label for=feedback-radio-no class="radio-inline">
-            <input class="" type="radio" id="feedback-radio-no" name="feedback-radio" value="NOT_ANOMALY">
-            <span class="label-medium-semibold">No</span> (False Alarm)
-          </label><br>
-        </form>
-        <div id="anomaly-feedback-comment" class="anomaly-feedback__comment anomaly-feedback__comment--show form-group hidden">
-          <label for="feedback-comment"><span class="label-medium-semibold">Comment</span> (optional)</label>
-          <textarea placeholder="Enter a comment" class="form-control" rows="2" id="feedback-comment"></textarea>
-        </div>
-        <p>Your feedback improves the accuracy of future alerts.</p>
+  <div class="card-container card-container--box-shadow">
+    <div class="card-container__body">
+      <!-- from old UI -->
+      <div class="row">
+        <h3>
+          <span>Is this a true anomaly? (not implemented yet)</span>
+          <a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
+        </h3>
       </div>
+      <form id="anomaly-feedback-radio">
+        <label for="feedback-radio-yes">
+          <input type="radio" id="feedback-radio-yes" name="feedback-radio" value="ANOMALY">
+          <span>Yes</span> (True Anomaly)
+        </label>
+        <label for=feedback-radio-na class="radio-inline">
+          <input type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NEW_TREND">
+          <span>Yes</span> (But New Trend)
+        </label>
+        <label for=feedback-radio-no class="radio-inline">
+          <input type="radio" id="feedback-radio-no" name="feedback-radio" value="NOT_ANOMALY">
+          <span>No</span> (False Alarm)
+        </label><br>
+      </form>
+      <div id="anomaly-feedback-comment">
+        <label for="feedback-comment"><span>Comment</span> (optional)</label>
+        <textarea placeholder="Enter a comment" rows="2" id="feedback-comment"></textarea>
+      </div>
+      <p>Your feedback improves the accuracy of future alerts.</p>
     </div>
-  {{/if}}
+  </div>
 
   <div class="card-container card-container--box-shadow">
     <div class="card-container__body">

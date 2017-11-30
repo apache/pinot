@@ -28,9 +28,10 @@ export default Ember.Service.extend({
 
       this.setProperties({ nativeUrns: requestNativeUrns });
 
-      if ([...requestNativeUrns].some(urn => !entities[urn])) {
+      const missingSelectedEntities = [...requestNativeUrns].filter(urn => !entities[urn]);
+      if (missingSelectedEntities) {
         fetch(this._makeIdentityUrl(requestNativeUrns))
-          .then(res => res.json())
+          .then(checkStatus)
           .then(this._jsonToEntities)
           .then(incoming => this._complete(requestContext, urns, incoming, 'identity'));
       }
@@ -53,8 +54,7 @@ export default Ember.Service.extend({
 
       frameworks.forEach(framework => {
         fetch(this._makeUrl(framework, requestContext))
-          // .then(checkStatus) // TODO why doesn't this return parsed json here?
-          .then(res => res.json())
+          .then(checkStatus)
           .then(this._jsonToEntities)
           .then(incoming => this._complete(requestContext, urns, incoming, framework));
       });

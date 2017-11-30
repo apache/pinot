@@ -2,7 +2,7 @@ import Ember from 'ember';
 import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
-import SHA256 from 'cryptojs/sha256';
+import CryptoJS from 'cryptojs';
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -275,17 +275,16 @@ export default Ember.Controller.extend({
     },
 
     onShare() {
-      const { ajax, context, selectedUrns, lastShare } =
-        this.getProperties('ajax', 'context', 'selectedUrns', 'lastShare');
+      const { context, selectedUrns } =
+        this.getProperties('context', 'selectedUrns');
 
       const version = 1;
-
       const jsonString = JSON.stringify({ selectedUrns, context, version });
-      const id = SHA256(jsonString);
 
-      this.setProperties({ lastShare: id });
+      const id = CryptoJS.SHA256(jsonString).toString().substring(0, 16);
 
-      return ajax.post(`/config/rootcause-share/${id}`, { data: jsonString });
+      return fetch(`/config/rootcause-share/${id}`, { method: 'POST', body: jsonString })
+        .then(res => this.set('shareId', id));
     }
   }
 });

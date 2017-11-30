@@ -61,14 +61,10 @@ export default Ember.Component.extend({
   dimensions: Ember.computed('anomaly', function () {
     const attr = this.get('anomaly').attributes;
     const dimNames = attr.dimensions;
-    const dimValues = dimNames.reduce((agg, n) => { agg[n] = attr[n][0]; return agg; }, {});
-    return dimNames.map(n => `${n}=${dimValues[n]}`).join(', ');
+    const dimValues = dimNames.reduce((agg, dimName) => { agg[dimName] = attr[dimName][0]; return agg; }, {});
+    return dimNames.map(dimName => `${dimName}=${dimValues[dimName]}`).join(', ');
   }),
 
   issueType: null, // TODO
-
-  isNotResolved: Ember.computed('anomaly', function () {
-    return this.get('anomaly').attributes.status[0] == 'NO_FEEDBACK';
-  })
 
 });

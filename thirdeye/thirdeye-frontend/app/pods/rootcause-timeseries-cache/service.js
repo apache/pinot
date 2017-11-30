@@ -123,8 +123,7 @@ export default Ember.Service.extend({
 
     const url = `/timeseries/query?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}&granularity=${context.granularity}`;
     return fetch(url)
-    // .then(checkStatus)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))
       .then(res => offsetFunc(res))
       .then(res => this._complete(context, res));

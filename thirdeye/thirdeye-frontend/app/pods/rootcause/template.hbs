@@ -28,8 +28,8 @@
     <p>testing | <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a></p>
 
     <p>sharing | <a {{action "onShare"}}>save</a>
-      {{#if lastShare}}
-        | {{#link-to "rootcause" (query-params direction=lastShare)}}{{lastShare}}{{/link-to}}
+      {{#if shareId}}
+        | {{#link-to "rootcause" (query-params shareId=shareId)}}{{shareId}}{{/link-to}}
       {{/if}}
     </p>
 

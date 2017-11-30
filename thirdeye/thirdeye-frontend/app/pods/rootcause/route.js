@@ -67,22 +67,20 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   model(params) {
     const { metricId, anomalyId, shareId } = params;
 
-    let metricUrn;
+    let metricUrn, anomalyUrn, share, anomalyContext;
+
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
     }
 
-    let anomalyUrn;
     if (anomalyId) {
       anomalyUrn = `thirdeye:event:anomaly:${anomalyId}`;
     }
 
-    let share;
     if (shareId) {
       share = fetch(`/config/rootcause-share/${shareId}`).then(res => res.json());
     }
 
-    let anomalyContext;
     if (anomalyUrn) {
       anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(res => res.json());
     }
@@ -144,6 +142,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     } = model.queryParams;
 
     const {
+      shareId,
       metricUrn,
       anomalyUrn,
       share,
@@ -219,6 +218,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     }
 
     controller.setProperties({
+      shareId,
       settingsConfig,
       selectedUrns,
       context

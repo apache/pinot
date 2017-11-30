@@ -93,8 +93,7 @@ export default Ember.Service.extend({
 
     const url = `/aggregation/query?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}&rollup=20`;
     return fetch(url)
-    // .then(checkStatus)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => this._extractBreakdowns(res, urn))
       .then(res => this._complete(context, res));
   }
