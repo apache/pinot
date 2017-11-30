@@ -4,13 +4,15 @@
  * @module components/filter-bar
  * @property {object[]} config            - [required] array of objects (config file) passed in from the route that sets
  *                                          up the filter bar sub-filters
- * @property {number} maxStrLen           - number of characters for filter name truncation
+ * @property {object[]} filterBlock       - [required] array of objects constructed from config to render filter bar
+ * @property {number} maxStrLen           - [optional] number of characters for filter name truncation
  * @property {array}  onFilterSelection   - [required] closure action to bubble to controller on filter selection change
  *
  * @example
  * {{filter-bar
  *   config=filterBarConfig
  *   filterBlocks=filterBlocks
+ *   entities=entities
  *   maxStrLen=25
  *   onSelectFilter=(action "onFilterSelection")}}
  *
@@ -18,8 +20,6 @@
  */
 import Ember from 'ember';
 import _ from 'lodash';
-
-const { setProperties } = Ember;
 
 export default Ember.Component.extend({
 
@@ -41,57 +41,7 @@ export default Ember.Component.extend({
   urnsCache: {},
 
   /**
-   * Overwrite the init function
-   * Initializes values of the filter blocks
-   * Example of a filter block:
-   * {
-   *  filtersArray: [
-   *    {
-   *      isActive: false,
-   *      name: 'country',
-   *      id: 'country'
-   *    }
-   *  ],
-   *  header: 'holiday',
-   *  isHidden: true,
-   *  inputs: [
-   *    {
-   *      label: 'country',
-   *      type: 'dropdown
-   *    }
-   *  ]
-   * }
-   */
-  init() {
-    this._super(...arguments);
-    // Fetch the config file to create sub-filters
-    const filterBlocks = _.cloneDeep(this.get('config'));
-
-    // Set up filter block object
-    filterBlocks.forEach((block, index) => {
-      // Show first sub-filter by default but hide the rest
-      let isHidden = Boolean(index);
-      let filtersArray = [];
-
-      // Generate a name and id for each one based on provided filter keys
-      block.inputs.forEach((filter) => {
-        filtersArray.push({
-          isActive: false,
-          name: filter.label,
-          id: filter.label.dasherize()
-        });
-      });
-
-      // Now add new initialized props to block item
-      setProperties(block, {
-        filtersArray,
-        isHidden
-      });
-    });
-  },
-
-  /**
-   * observer on entities to set default event type when entities is loaded
+   * Observer on entities to set default event type when new entities are loaded
    * @type {undefined}
    */
   entitiesObserver: Ember.observer(

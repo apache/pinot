@@ -3,6 +3,7 @@ import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn } from 'thirdey
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import CryptoJS from 'cryptojs';
+const { setProperties } = Ember;
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -214,6 +215,60 @@ export default Ember.Controller.extend({
     'breakdownsService.pending',
     function () {
       return this.get('breakdownsService.pending').size > 0;
+    }
+  ),
+
+  /**
+   * Constructs filter blocks based on the filter bar config to render the filter bar
+   * Example of a filter block:
+   * {
+   *  filtersArray: [
+   *    {
+   *      isActive: false,
+   *      name: 'country',
+   *      id: 'country'
+   *    }
+   *  ],
+   *  header: 'holiday',
+   *  isHidden: true,
+   *  inputs: [
+   *    {
+   *      label: 'country',
+   *      type: 'dropdown
+   *    }
+   *  ]
+   * }
+   * @type {Object[]} - array of filter block objects
+   */
+  filterBlocks: Ember.computed(
+    'config',
+    function() {
+      this._super(...arguments);
+      // Fetch the config file to create sub-filters
+      const filterBlocks = config;
+
+      // Set up filter block object
+      filterBlocks.forEach((block, index) => {
+        // Show first sub-filter by default but hide the rest
+        let isHidden = Boolean(index);
+        let filtersArray = [];
+
+        // Generate a name and id for each one based on provided filter keys
+        block.inputs.forEach((filter) => {
+          filtersArray.push({
+            isActive: false,
+            name: filter.label,
+            id: filter.label.dasherize()
+          });
+        });
+
+        // Now add new initialized props to block item
+        setProperties(block, {
+          filtersArray,
+          isHidden
+        });
+      });
+      return filterBlocks;
     }
   ),
 
