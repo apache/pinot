@@ -361,7 +361,7 @@ export default Ember.Component.extend({
      * @return {undefined}
      */
     onMetricSelection(updates) {
-      const { onSelection } = this.getProperties('onSelection');
+      const { onSelection, otherUrns } = this.getProperties('onSelection', 'otherUrns');
 
       if (onSelection) {
         onSelection(updates);
@@ -369,7 +369,10 @@ export default Ember.Component.extend({
 
       const selected = filterPrefix(Object.keys(updates), 'thirdeye:metric:').filter(urn => updates[urn]);
 
-      this.set('otherUrns', selected);
+      const nonMetricUrns = [...otherUrns].filter(urn => !urn.startsWith('thirdeye:metric:'));
+      const newOtherUrns = [...nonMetricUrns, ...selected];
+      
+      this.set('otherUrns', newOtherUrns);
       this.send('updateContext');
     }
   }
