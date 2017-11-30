@@ -46,14 +46,22 @@ export default Component.extend({
       const metricUrns = filterPrefix(hoverUrns, 'thirdeye:metric:');
       const eventUrns = filterPrefix(hoverUrns, 'thirdeye:event:');
 
-      console.log('rootcauseTooltip: values: timeseriesLookup', timeseriesLookup);
-
       const values = {};
       metricUrns.forEach(urn => {
-        const current = timeseriesLookup[toCurrentUrn(urn)].find(t => t[0] >= hoverTimestamp)[1];
-        const baseline = timeseriesLookup[toBaselineUrn(urn)].find(t => t[0] >= hoverTimestamp)[1];
-        values[urn] = `${current} / ${baseline} (${current / baseline - 1})`;
+        const currentLookup = timeseriesLookup[toCurrentUrn(urn)] || [];
+        const currentTimeseries = currentLookup.find(t => t[0] >= hoverTimestamp);
+        const current = currentTimeseries ? currentTimeseries[1] : parseFloat('NaN');
+
+        const baselineLookup = timeseriesLookup[toBaselineUrn(urn)] || [];
+        const baselineTimeseries = baselineLookup.find(t => t[0] >= hoverTimestamp);
+        const baseline = baselineTimeseries ? baselineTimeseries[1] : parseFloat('NaN');
+
+        const change = current / baseline - 1;
+
+        values[urn] = `${this.format(current)} / ${this.format(baseline)} (${change > 0 ? '+' : ''}${this.format(change * 100)}%)`;
       });
+
+      eventUrns.forEach(urn => values[urn] = '');
 
       return values;
     }
@@ -74,6 +82,11 @@ export default Component.extend({
 
       return lookup;
     }
-  )
+  ),
+
+  format(f) {
+    const fixed = Math.max(3 - Math.max(Math.floor(Math.log10(f)) + 1, 0), 0);
+    return f.toFixed(fixed);
+  }
 
 });
