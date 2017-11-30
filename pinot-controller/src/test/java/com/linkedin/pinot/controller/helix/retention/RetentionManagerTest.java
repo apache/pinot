@@ -334,6 +334,11 @@ public class RetentionManagerTest {
       }
 
       @Override
+      public String getSegmentPushStatus() {
+        return null;
+      }
+
+      @Override
       public String getVersion() {
         return SegmentVersion.v1.toString();
       }

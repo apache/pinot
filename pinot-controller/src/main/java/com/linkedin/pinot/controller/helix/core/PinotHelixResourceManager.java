@@ -1479,19 +1479,12 @@ public class PinotHelixResourceManager {
           ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentName);
       if (offlineSegmentZKMetadata != null) {
         String pushStatus = offlineSegmentZKMetadata.getSegmentPushStatus();
-        if (pushStatus != null || tooLate(pushStatus)) {
-          // Check whether segment is already being committed or if it's too late
-          res.status = ResponseStatus.failure;
-          return res;
-        } else {
+
+        if (pushStatus.equals("null") || !tooLate(pushStatus)) {
           // Write to zk that we are writing to the segment
           offlineSegmentZKMetadata.setSegmentPushStatus("COMMITTING," + System.currentTimeMillis());
           ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
-        }
-
-        long existedCrc = offlineSegmentZKMetadata.getCrc();
-        if (crc != null && !crc.equals(existedCrc)) {
-          // Segment has been replaced since upload was called, return failure
+        } else {
           res.status = ResponseStatus.failure;
           return res;
         }
@@ -1507,6 +1500,14 @@ public class PinotHelixResourceManager {
           ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           LOGGER.info("Refresh segment {} of table {} to propertystore ", segmentName, offlineTableName);
 
+          long existedCrc = offlineSegmentZKMetadata.getCrc();
+          long crcValue = Long.parseLong(crc);
+          if (!crc.isEmpty() && crcValue != existedCrc) {
+            // Segment has been replaced since upload was called, return failure
+            res.status = ResponseStatus.failure;
+            return res;
+          }
+
           boolean success = true;
           if (shouldSendMessage(offlineSegmentZKMetadata)) {
             // Send a message to the servers to update the segment.
@@ -1518,6 +1519,9 @@ public class PinotHelixResourceManager {
             success = updateExistedSegment(offlineSegmentZKMetadata);
           }
           if (success) {
+            // Write segment push status
+            offlineSegmentZKMetadata.setSegmentPushStatus(null);
+            ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
             res.status = ResponseStatus.success;
           } else {
             LOGGER.error("Failed to refresh segment {} of table {}, marking crc and creation time as invalid",

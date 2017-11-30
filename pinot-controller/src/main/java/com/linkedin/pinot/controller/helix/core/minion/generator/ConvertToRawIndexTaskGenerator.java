@@ -124,6 +124,7 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
           configs.put(MinionConstants.SEGMENT_NAME_KEY, segmentName);
           configs.put(MinionConstants.DOWNLOAD_URL_KEY, offlineSegmentZKMetadata.getDownloadUrl());
           configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoProvider.getVipUrl() + "/segments");
+          configs.put(MinionConstants.CRC_KEY, String.valueOf(offlineSegmentZKMetadata.getCrc()));
           if (columnsToConvertConfig != null) {
             configs.put(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, columnsToConvertConfig);
           }
