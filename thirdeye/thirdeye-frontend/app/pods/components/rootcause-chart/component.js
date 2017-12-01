@@ -50,7 +50,6 @@ export default Ember.Component.extend({
   axis: Ember.computed(
     'context',
     function () {
-      console.log('rootcause-chart: axis');
       const { context } = this.getProperties('context');
       
       const { analysisRange } = context; 
@@ -106,8 +105,6 @@ export default Ember.Component.extend({
         return {};
       }
 
-      console.log('rootcauseChart: series: timeseries', timeseries);
-      console.log('rootcauseChart: series: displayableUrns', displayableUrns);
       return this._makeChartSeries(displayableUrns);
     }
   ),
@@ -123,7 +120,6 @@ export default Ember.Component.extend({
     'displayableUrns',
     'timeseriesMode',
     function () {
-      console.log('rootcauseChart: splitSeries()');
       const { displayableUrns, timeseriesMode } =
         this.getProperties('displayableUrns', 'timeseriesMode');
 
@@ -156,7 +152,6 @@ export default Ember.Component.extend({
     'displayableUrns',
     'timeseriesMode',
     function () {
-      console.log('rootcauseChart: splitUrns()');
       const { entities, displayableUrns, timeseriesMode } =
         this.getProperties('entities', 'displayableUrns', 'timeseriesMode');
 
@@ -176,7 +171,6 @@ export default Ember.Component.extend({
     'displayableUrns',
     'timeseriesMode',
     function () {
-      console.log('rootcauseChart: splitLabels()');
       const { entities, displayableUrns, timeseriesMode } =
         this.getProperties('entities', 'displayableUrns', 'timeseriesMode');
 
@@ -195,7 +189,6 @@ export default Ember.Component.extend({
   isSplit: Ember.computed(
     'timeseriesMode',
     function () {
-      console.log('rootcauseChart: isSplit()');
       return this.get('timeseriesMode') == TIMESERIES_MODE_SPLIT;
     }
   ),

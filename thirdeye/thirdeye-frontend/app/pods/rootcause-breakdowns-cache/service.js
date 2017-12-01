@@ -15,7 +15,6 @@ export default Ember.Service.extend({
   },
 
   request(requestContext, urns) {
-    console.log('rootcauseBreakdownsService: request()', requestContext, urns);
     const { context, breakdowns, pending } = this.getProperties('context', 'breakdowns', 'pending');
 
     const metrics = [...urns].filter(urn => urn.startsWith('frontend:metric:'));
@@ -41,7 +40,7 @@ export default Ember.Service.extend({
     this.setProperties({ context: _.cloneDeep(requestContext), breakdowns: newBreakdowns, pending: newPending });
 
     if (_.isEmpty(missing)) {
-      console.log('rootcauseBreakdownsService: request: all metrics up-to-date. ignoring.');
+      // console.log('rootcauseBreakdownsService: request: all metrics up-to-date. ignoring.');
       return;
     }
 
@@ -56,12 +55,11 @@ export default Ember.Service.extend({
   },
 
   _complete(requestContext, incoming) {
-    console.log('rootcauseBreakdownsService: _complete()', incoming);
     const { context, pending, breakdowns } = this.getProperties('context', 'pending', 'breakdowns');
 
     // only accept latest result
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseBreakdownsService: _complete: received stale result. ignoring.');
+      // console.log('rootcauseBreakdownsService: _complete: received stale result. ignoring.');
       return;
     }
 

@@ -18,14 +18,11 @@ export default Ember.Service.extend({
   },
 
   request(requestContext, urns) {
-    console.log('rootcauseEntitiesCache: request()', requestContext, urns);
     const { context, entities, nativeUrns } = this.getProperties('context', 'entities', 'nativeUrns');
 
     // special case: urn identity
     const requestNativeUrns = new Set(filterPrefix(urns, 'thirdeye:metric:'));
     if (!_.isEqual(nativeUrns, requestNativeUrns)) {
-      console.log('rootcauseEntitiesCache: request: refreshing urn identity');
-
       this.setProperties({ nativeUrns: requestNativeUrns });
 
       const missingSelectedEntities = [...requestNativeUrns].filter(urn => !entities[urn]);
@@ -39,10 +36,7 @@ export default Ember.Service.extend({
 
     // rootcause search
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseEntitiesCache: request: refreshing rootcause search');
-
       if (!requestContext.urns || !requestContext.urns.size) {
-        console.log('rootcauseEntitiesCache: request: no urns for rootcause search. ignoring.');
         const newEntities = filterObject(entities, (e) => urns.has(e.urn));
         this.setProperties({ context: _.cloneDeep(requestContext), entities: newEntities });
         return;
@@ -62,12 +56,10 @@ export default Ember.Service.extend({
   },
 
   _complete(requestContext, pinnedUrns, incoming, framework) {
-    console.log('rootcauseEntitiesCache: complete()', requestContext, pinnedUrns, incoming, framework);
-
     // only accept latest result
     const { context } = this.getProperties('context');
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseEntitiesCache: _complete: received stale result. ignoring.');
+      // console.log('rootcauseEntitiesCache: _complete: received stale result. ignoring.');
       return;
     }
 

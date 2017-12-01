@@ -116,9 +116,6 @@ export default Ember.Component.extend({
         const curr = this._makeRollup(current[n], head, visible, tail);
         const base = this._makeRollup(baseline[n], head, visible, tail);
 
-        console.log('rootcauseHeatmap: _dataRollup: n curr', n, curr);
-        console.log('rootcauseHeatmap: _dataRollup: n base', n, base);
-
         values[n] = [ROOTCAUSE_ROLLUP_HEAD, ...visible, ROOTCAUSE_ROLLUP_TAIL].map(v => {
           return {
             role: this._makeRole(v),
@@ -142,8 +139,6 @@ export default Ember.Component.extend({
       const { _dataRollup: values, mode } = this.getProperties('_dataRollup', 'mode');
 
       const transformation = this._makeTransformation(mode);
-
-      console.log('rootcauseHeatmap: cells: values', values);
 
       const cells = {};
       Object.keys(values).forEach(n => {
