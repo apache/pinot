@@ -34,8 +34,7 @@ public class ResponseParserUtils {
     return responseMap;
   }
 
-  public static Map<String, ThirdEyeResponseRow> createResponseMapByTime(
-      ThirdEyeResponse thirdEyeResponse) {
+  public static Map<String, ThirdEyeResponseRow> createResponseMapByTime(ThirdEyeResponse thirdEyeResponse) {
     Map<String, ThirdEyeResponseRow> responseMap;
     responseMap = new HashMap<>();
     int numRows = thirdEyeResponse.getNumRows();
@@ -104,17 +103,17 @@ public class ResponseParserUtils {
     return metricSums;
   }
 
-  public static String computeTimeDimensionValue(long timeBucketId, String dimensionValue) {
-    return timeBucketId + TIME_DIMENSION_JOINER + dimensionValue;
+  public static String computeTimeDimensionValue(long timestamp, String dimensionValue) {
+    return timestamp + TIME_DIMENSION_JOINER + dimensionValue;
   }
 
-  public static String computeTimeDimensionValues(long timeBucketId, List<String> dimensionValues) {
+  public static String computeTimeDimensionValues(long timestamp, List<String> dimensionValues) {
     if (dimensionValues == null || dimensionValues.size() == 0) {
-      return Long.toString(timeBucketId);
+      return Long.toString(timestamp);
     } else if (dimensionValues.size() == 1) {
-      return computeTimeDimensionValue(timeBucketId, dimensionValues.get(0));
+      return computeTimeDimensionValue(timestamp, dimensionValues.get(0));
     } else {
-      StringBuilder sb = new StringBuilder(Long.toString(timeBucketId)).append(TIME_DIMENSION_JOINER);
+      StringBuilder sb = new StringBuilder(Long.toString(timestamp)).append(TIME_DIMENSION_JOINER);
       String separator = "";
       for (String dimensionValue : dimensionValues) {
         sb.append(separator).append(dimensionValue);

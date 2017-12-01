@@ -79,7 +79,8 @@ public abstract class BaseTimeSeriesResponseParser implements TimeSeriesResponse
       Range<DateTime> timeRange = ranges.get(timeBucketId);
 
       // compute the time|dimension key
-      String timeDimensionValue = ResponseParserUtils.computeTimeDimensionValues(timeBucketId, dimensionValues);
+      long timestamp = timeRange.lowerEndpoint().getMillis();
+      String timeDimensionValue = ResponseParserUtils.computeTimeDimensionValues(timestamp, dimensionValues);
 
       ThirdEyeResponseRow responseRow = responseMap.get(timeDimensionValue);
 

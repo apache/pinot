@@ -81,14 +81,14 @@ public class DetectionJobScheduler implements Runnable {
   public void run() {
 
     // read all anomaly functions
-    LOG.info("Reading all anomaly functions");
+    LOG.debug("Reading all anomaly functions");
     List<AnomalyFunctionDTO> anomalyFunctions = DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions();
 
     // for each active anomaly function
     for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
 
       try {
-        LOG.info("Function: {}", anomalyFunction);
+        LOG.info("Calculating the detection entries for function: {}", anomalyFunction);
         long functionId = anomalyFunction.getId();
         String dataset = anomalyFunction.getCollection();
         DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
@@ -98,12 +98,12 @@ public class DetectionJobScheduler implements Runnable {
         // find last entry into detectionStatus table, for this function
         DetectionStatusDTO lastEntryForFunction = DAO_REGISTRY.getDetectionStatusDAO().
             findLatestEntryForFunctionId(functionId);
-        LOG.info("Function: {} Dataset: {} Last entry is {}", functionId, dataset, lastEntryForFunction);
+        LOG.debug("Function: {} Dataset: {} Last entry is {}", functionId, dataset, lastEntryForFunction);
 
         // calculate entries from last entry to current time
         Map<String, Long> newEntries = DetectionJobSchedulerUtils.getNewEntries(currentDateTime, lastEntryForFunction,
             anomalyFunction, datasetConfig, dateTimeZone);
-        LOG.info("Function: {} Dataset: {} Creating {} new entries {}", functionId, dataset, newEntries.size(), newEntries);
+        LOG.debug("Function: {} Dataset: {} Creating {} new entries {}", functionId, dataset, newEntries.size(), newEntries);
 
         // create these entries
         for (Entry<String, Long> entry : newEntries.entrySet()) {
@@ -120,7 +120,7 @@ public class DetectionJobScheduler implements Runnable {
             findAllInTimeRangeForFunctionAndDetectionRun(currentDateTime.minusDays(3).getMillis(),
                 currentDateTime.getMillis(), functionId, false);
         Collections.sort(entriesInLast3Days);
-        LOG.info("Function: {} Dataset: {} Entries in last 3 days {}", functionId, dataset, entriesInLast3Days);
+        LOG.debug("Function: {} Dataset: {} Entries in last 3 days {}", functionId, dataset, entriesInLast3Days);
 
         // for each entry, collect startTime and endTime
         List<Long> startTimes = new ArrayList<>();
@@ -130,13 +130,13 @@ public class DetectionJobScheduler implements Runnable {
         for (DetectionStatusDTO detectionStatus : entriesInLast3Days) {
 
           try {
-            LOG.info("Function: {} Dataset: {} Entry : {}", functionId, dataset, detectionStatus);
+            LOG.debug("Function: {} Dataset: {} Entry : {}", functionId, dataset, detectionStatus);
 
             long dateToCheck = detectionStatus.getDateToCheckInMS();
             // check availability for monitoring window - delay
             long endTime = dateToCheck - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowDelay(), anomalyFunction.getWindowDelayUnit());
             long startTime = endTime - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
-            LOG.info("Function: {} Dataset: {} Checking start:{} {} to end:{} {}", functionId, dataset, startTime, new DateTime(startTime, dateTimeZone), endTime, new DateTime(endTime, dateTimeZone));
+            LOG.debug("Function: {} Dataset: {} Checking start:{} {} to end:{} {}", functionId, dataset, startTime, new DateTime(startTime, dateTimeZone), endTime, new DateTime(endTime, dateTimeZone));
 
             boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig, anomalyFunction);
             if (pass) {
@@ -244,24 +244,26 @@ public class DetectionJobScheduler implements Runnable {
      */
     if (anomalyFunction.isRequiresCompletenessCheck()) {
 
-      LOG.info("Function: {} Dataset: {} Checking for completeness of time range {}({}) to {}({})",
+      LOG.debug("Function: {} Dataset: {} Checking for completeness of time range {}({}) to {}({})",
           anomalyFunction.getId(), dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
 
       List<DataCompletenessConfigDTO> incompleteTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
           findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, false);
-      LOG.info("Function: {} Dataset: {} Incomplete periods {}", anomalyFunction.getId(), dataset, incompleteTimePeriods);
+      if (CollectionUtils.isNotEmpty(incompleteTimePeriods)) {
+        LOG.debug("Function: {} Dataset: {} Incomplete periods {}", anomalyFunction.getId(), dataset, incompleteTimePeriods);
+      }
 
       if (incompleteTimePeriods.size() == 0) { // nothing incomplete
         // find complete buckets
         List<DataCompletenessConfigDTO> completeTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
             findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, true);
-        LOG.info("Function: {} Dataset: {} Complete periods {}", anomalyFunction.getId(), dataset, completeTimePeriods);
+        LOG.debug("Function: {} Dataset: {} Complete periods {}", anomalyFunction.getId(), dataset, completeTimePeriods);
         long expectedCompleteBuckets = DetectionJobSchedulerUtils.getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
-        LOG.info("Function: {} Dataset: {} Num complete periods: {} Expected num buckets:{}",
+        LOG.debug("Function: {} Dataset: {} Num complete periods: {} Expected num buckets:{}",
             anomalyFunction.getId(), dataset, completeTimePeriods.size(), expectedCompleteBuckets);
 
         if (completeTimePeriods.size() == expectedCompleteBuckets) { // complete matches expected
-          LOG.info("Function: {} Dataset: {}  Found complete time range {}({}) to {}({})",
+          LOG.debug("Function: {} Dataset: {}  Found complete time range {}({}) to {}({})",
               anomalyFunction.getId(), dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
           pass = true;
         }

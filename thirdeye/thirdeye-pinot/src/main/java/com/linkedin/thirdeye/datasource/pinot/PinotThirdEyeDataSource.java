@@ -139,8 +139,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
   @Override
   public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    Preconditions.checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.",
-        getName());
+    Preconditions
+        .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
     long tStart = System.nanoTime();
     try {
@@ -172,7 +172,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
         String pql = null;
         if (metricConfig != null && metricConfig.isDimensionAsMetric()) {
-          pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, timestampTimeSpec, datasetConfig);
+          pql = PqlUtils
+              .getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, timestampTimeSpec, datasetConfig);
         } else {
           pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, timestampTimeSpec);
         }

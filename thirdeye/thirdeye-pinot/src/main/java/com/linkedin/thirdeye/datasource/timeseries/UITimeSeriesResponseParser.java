@@ -100,7 +100,8 @@ public class UITimeSeriesResponseParser extends BaseTimeSeriesResponseParser {
       if (doRollUp) {
         // check if rows pass threshold
         for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-          if (checkMetricSums(thresholdRows.get(timeBucketId), metricSums.get(timeBucketId), metricThresholds)) {
+          long timestamp = ranges.get(timeBucketId).lowerEndpoint().getMillis();
+          if (checkMetricSums(thresholdRows.get(timeBucketId), metricSums.get(timestamp), metricThresholds)) {
             passedThreshold = true;
             break;
           }

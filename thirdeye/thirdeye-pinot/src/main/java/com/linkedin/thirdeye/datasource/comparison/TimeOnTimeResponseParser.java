@@ -249,10 +249,12 @@ public class TimeOnTimeResponseParser {
         Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
 
         // compute the time|dimension key
-        String baselineTimeDimensionValue = ResponseParserUtils
-            .computeTimeDimensionValue(baselineTimeRange.lowerEndpoint().getMillis(), dimensionValue);
+        long baselineTimestamp = baselineTimeRange.lowerEndpoint().getMillis();
+        String baselineTimeDimensionValue =
+            ResponseParserUtils.computeTimeDimensionValue(baselineTimestamp, dimensionValue);
+        long currentTimestamp = currentTimeRange.lowerEndpoint().getMillis();
         String currentTimeDimensionValue =
-            ResponseParserUtils.computeTimeDimensionValue(currentTimeRange.lowerEndpoint().getMillis(), dimensionValue);
+            ResponseParserUtils.computeTimeDimensionValue(currentTimestamp, dimensionValue);
 
         ThirdEyeResponseRow baselineRow = baselineResponseMap.get(baselineTimeDimensionValue);
         ThirdEyeResponseRow currentRow = currentResponseMap.get(currentTimeDimensionValue);
