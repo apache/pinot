@@ -23,10 +23,12 @@ public class QueryController {
 
     public static void main(String[] args) throws Exception {
         PostQueryCommand postQueryCommand = getPostQueryCommand(args[0], args[1]);
+        int testDuration = Integer.parseInt(args[2]);
 
         List<QueryExecutor> executorList = createTableExecutors();
         for (QueryExecutor executor : executorList) {
             executor.setPostQueryCommand(postQueryCommand);
+            executor.setTestDuration(testDuration);
             executor.start();
         }
     }
