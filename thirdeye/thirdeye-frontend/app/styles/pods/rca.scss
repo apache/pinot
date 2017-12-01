@@ -147,6 +147,13 @@
   }
 }
 
+.color-box {
+  display: inline-block;
+  height: 0.8em;
+  width: 0.8em;
+  border: 1px solid black;
+}
+
 $colors:
   "blue" $te-blue,
   "orange" $te-orange,
@@ -156,12 +163,10 @@ $colors:
   "green" $te-green,
   "pink" $te-pink;
 
-  // creates box--"color" classes
+// creates color-box--"color" classes
 @each $i in $colors {
-  .rootcause-legend__box--#{nth($i, 1)} {
+  .color-box--#{nth($i, 1)} {
     background: nth($i, 2);
-    display: inline-block;
-    height: 0.8em;
-    width: 0.8em;
   }
 };
+
