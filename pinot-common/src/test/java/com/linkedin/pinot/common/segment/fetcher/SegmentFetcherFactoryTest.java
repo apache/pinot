@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import java.io.File;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.mockito.ArgumentCaptor;
@@ -31,16 +32,20 @@ public class SegmentFetcherFactoryTest {
     SegmentFetcher mockHdfsFetcher = mock(SegmentFetcher.class);
     SegmentFetcher mockHttpFetcher = mock(SegmentFetcher.class);
     SegmentFetcher mockHttpsFetcher = mock(SegmentFetcher.class);
+    SegmentFetcher replacableFetcher = mock(SegmentFetcher.class);
+    final String replacableProto = "replacable";
 
     Configuration conf = new PropertiesConfiguration();
     conf.addProperty("something", "abc");
     conf.addProperty("pinot.server.segment.fetcher.hdfs.hadoop.conf.path", "file:///somewhere/folder");
     conf.addProperty("pinot.server.segment.fetcher.http.other", "otherconfig");
     conf.addProperty("pinot.server.segment.fetcher.http2.more_other", "some-other");
-    conf.addProperty("pinot.server.segment.fetcher.test.class", "com.linkedin.pinot.common.segment.fetcher.TestSegmentFetcher");
+    conf.addProperty("pinot.server.segment.fetcher.test.class", TestSegmentFetcher.class.getName());
+    conf.addProperty("pinot.server.segment.fetcher." + replacableProto + ".class", ReplacedFetcher.class.getName());
     SegmentFetcherFactory.getPreloadSegmentFetchers().put("hdfs", mockHdfsFetcher);
     SegmentFetcherFactory.getPreloadSegmentFetchers().put("http", mockHttpFetcher);
     SegmentFetcherFactory.getPreloadSegmentFetchers().put("https", mockHttpsFetcher);
+    SegmentFetcherFactory.getPreloadSegmentFetchers().put(replacableProto, replacableFetcher);
 
     SegmentFetcherFactory.initSegmentFetcherFactory(conf);
     ArgumentCaptor<Configuration> captor = ArgumentCaptor.forClass(Configuration.class);
@@ -48,7 +53,9 @@ public class SegmentFetcherFactoryTest {
     Assert.assertEquals(captor.getValue().getString("hadoop.conf.path"), "file:///somewhere/folder");
     Assert.assertEquals(captor.getValue().getString("other"), null);
     Assert.assertTrue(SegmentFetcherFactory.containsProtocol("test"));
-    Assert.assertEquals(1, ((TestSegmentFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called);
+    Assert.assertEquals(((TestSegmentFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called, 1);
+    ReplacedFetcher fetcher = (ReplacedFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get(replacableProto);
+    Assert.assertEquals(fetcher.getInitCalled(), 1);
   }
 
   @Test
@@ -69,5 +76,21 @@ public class SegmentFetcherFactoryTest {
       return;
     }
     Assert.fail();
+  }
+
+  public static class ReplacedFetcher implements SegmentFetcher {
+
+    public int initCalled= 0;
+    @Override
+    public void init(Configuration configs) {
+      initCalled++;
+    }
+    public int getInitCalled() {
+      return initCalled;
+    }
+
+    @Override
+    public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+    }
   }
 }

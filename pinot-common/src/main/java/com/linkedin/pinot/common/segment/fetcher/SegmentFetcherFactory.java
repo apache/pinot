@@ -16,15 +16,14 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class SegmentFetcherFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
@@ -61,33 +60,61 @@ public class SegmentFetcherFactory {
     }
   }
 
+  // Requirements:
+  // We should instantiate a class only once (in case there is some static initialization with the class that is not idempotent).
+  // We should call init only once.
+  // We should be able to override an existing class from conf (i.e. instantiate and call init for the new class).
+  // A config for a protocol may not specify the class name, but specify other configs params (used in init())
   public static void initSegmentFetcherFactory(Configuration pinotHelixProperties) {
     Configuration segmentFetcherFactoryConfig =
         pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
-    // initialize predefined fetcher
-    for (String protocol: SEGMENT_FETCHER_MAP.keySet()) {
-      LOGGER.info("initializing segment fetcher for protocol [{}]", protocol);
-      Configuration conf = segmentFetcherFactoryConfig.subset(protocol);
-      logFetcherInitConfig(protocol, conf);
-      initSegmentFetcher(protocol, conf);
-    }
-
-    // initialize dynamic loaded fetcher
+    // Iterate through the configs to fill the map with any new configured classes or Overridden classes.
     Iterator segmentFetcherFactoryConfigIterator = segmentFetcherFactoryConfig.getKeys();
     while (segmentFetcherFactoryConfigIterator.hasNext()) {
       Object configKeyObject = segmentFetcherFactoryConfigIterator.next();
-      try {
-        String segmentFetcherConfigKey = configKeyObject.toString();
-        String protocol = segmentFetcherConfigKey.split("\\.", 2)[0];
-        if (!SegmentFetcherFactory.containsProtocol(protocol)) {
-          LOGGER.info("initializing segment fetcher for protocol [{}]", protocol);
-          Configuration conf = segmentFetcherFactoryConfig.subset(protocol);
-          logFetcherInitConfig(protocol, conf);
-          SegmentFetcherFactory.initSegmentFetcher(protocol, conf);
+      String segmentFetcherConfigKey = configKeyObject.toString();
+      String protocol = segmentFetcherConfigKey.split("\\.", 2)[0];
+      Configuration protocolConfig = segmentFetcherFactoryConfig.subset(protocol);
+      String configuredClassName = protocolConfig.getString(SEGMENT_FETCHER_CLASS_KEY);
+      if (configuredClassName == null || configuredClassName.isEmpty()) {
+        // If the class is not in the map, then it should already be instantiated, we can
+        // still init it with the config provided. Otherwise, the config is ignored, so
+        // flag a warning.
+        if (!SEGMENT_FETCHER_MAP.containsKey(protocol)) {
+          LOGGER.warn("No class name given for protocol {}. Configuration ignored", protocol);
         }
-      } catch (Exception e) {
-        LOGGER.error("Got exception to process the key: " + configKeyObject);
+        continue;
+      }
+      if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
+        String builtinClassName = SEGMENT_FETCHER_MAP.get(protocol).getClass().getName();
+        if (builtinClassName.equals(configuredClassName)) {
+          LOGGER.info("Configured class {} same as built-in class name for protocol {}", configuredClassName, protocol);
+          continue;
+        }
+        LOGGER.info("Overriding class {} for protoocol {} with {}", builtinClassName, protocol, configuredClassName);
+        instantiateSegmentFetcher(protocol, configuredClassName);
+        // If any exception happens during instantiation, the original class will be retained.
+      } else {
+        LOGGER.info("Instantiating new configured class {} for protocol {}", configuredClassName, protocol);
+        instantiateSegmentFetcher(protocol, configuredClassName);
+        // If any exception happened while instantiating this class, it will not be in the map.
+      }
+    }
+
+    // Call init on all the segment fetchers in the map.
+    for (Map.Entry<String, SegmentFetcher> entry: SEGMENT_FETCHER_MAP.entrySet()) {
+      final String protocol = entry.getKey();
+      final SegmentFetcher fetcher = entry.getValue();
+      try {
+        LOGGER.info("Initializing segment fetcher for protocol {}, class {}", protocol, fetcher.getClass().getName());
+        Configuration conf = segmentFetcherFactoryConfig.subset(protocol);
+        logFetcherInitConfig(protocol, conf);
+        fetcher.init(conf);
+      } catch (Exception | LinkageError e) {
+        LOGGER.error("Failed to initialize SegmentFetcher for protocol {}. This protocol will not be availalble ", protocol, e);
+        // If initialization fails, remove the protocol from the fetcher map.
+        SEGMENT_FETCHER_MAP.remove(protocol);
       }
     }
   }
@@ -95,27 +122,6 @@ public class SegmentFetcherFactory {
   @VisibleForTesting
   protected static Map<String, SegmentFetcher> getPreloadSegmentFetchers() {
     return SEGMENT_FETCHER_MAP;
-  }
-
-  private static void initSegmentFetcher(String protocol, Configuration configs) {
-    try {
-      final SegmentFetcher fetcher;
-      if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
-        fetcher = SEGMENT_FETCHER_MAP.get(protocol);
-      } else {
-        String segmentFetcherKlass = configs.getString(SEGMENT_FETCHER_CLASS_KEY);
-        if (Strings.isNullOrEmpty(segmentFetcherKlass)) {
-          throw new RuntimeException("No class def for provided segment fetcher " + protocol);
-        }
-        fetcher = (SegmentFetcher) Class.forName(segmentFetcherKlass).newInstance();
-        SEGMENT_FETCHER_MAP.put(protocol, fetcher);
-      }
-      fetcher.init(configs);
-    } catch (Exception | LinkageError e) {
-      LOGGER.error("Failed to init SegmentFetcher: " + protocol, e);
-      // If initialization fails, remove the protocol from the fetcher map.
-      SEGMENT_FETCHER_MAP.remove(protocol);
-    }
   }
 
   public static boolean containsProtocol(String protocol) {
