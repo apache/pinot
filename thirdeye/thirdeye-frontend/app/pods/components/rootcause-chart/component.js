@@ -38,8 +38,9 @@ export default Ember.Component.extend({
       return {
         format: {
           title: (d) => {
-            this._onHover(moment(d).valueOf());
-            return moment(d).format('MM/DD hh:mm a');
+            const t = moment(d);
+            this._onHover(t.valueOf());
+            return t.format('MM/DD hh:mm a');
           },
           value: (val, ratio, id) => d3.format('.3s')(val)
         }
