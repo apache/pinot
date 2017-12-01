@@ -72,13 +72,21 @@
               onSelection=(action "onSelection")
             }}
           </div>
-          <div class="col-xs-8">
+          <div class="col-xs-6">
             {{rootcause-chart
               entities=entities
               selectedUrns=chartSelectedUrns
               timeseries=timeseries
               context=context
               onHover=(action "chartOnHover")
+            }}
+          </div>
+          <div class="col-xs-2">
+            {{rootcause-tooltip
+              entities=entities
+              timeseries=timeseries
+              hoverUrns=hoverUrns
+              hoverTimestamp=hoverTimestamp
             }}
           </div>
         </div>

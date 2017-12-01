@@ -38,8 +38,9 @@ export default Ember.Component.extend({
       return {
         format: {
           title: (d) => {
-            this._onHover(d);
-            return moment(d).format('MM/DD hh:mm a');
+            const t = moment(d);
+            this._onHover(t.valueOf());
+            return t.format('MM/DD hh:mm a');
           },
           value: (val, ratio, id) => d3.format('.3s')(val)
         }
@@ -51,9 +52,9 @@ export default Ember.Component.extend({
     'context',
     function () {
       const { context } = this.getProperties('context');
-      
-      const { analysisRange } = context; 
-      
+
+      const { analysisRange } = context;
+
       return {
         y: {
           show: true
@@ -199,7 +200,7 @@ export default Ember.Component.extend({
 
   _makeChartSeries(urns) {
     const { context } = this.getProperties('context');
-    
+
     const { anomalyRange, compareMode } = context;
     const baselineRange = toBaselineRange(anomalyRange, compareMode);
 
@@ -360,7 +361,12 @@ export default Ember.Component.extend({
 
     if (onHover != null) {
       const urns = [...displayableUrns].filter(urn => bounds[urn] && bounds[urn][0] <= d && d <= bounds[urn][1]);
-      onHover(urns);
+
+      const metricUrns = filterPrefix(urns, 'frontend:metric:');
+      const eventUrns = filterPrefix(urns, 'thirdeye:event:');
+      const outputUrns = new Set([...metricUrns, ...metricUrns.map(toMetricUrn), ...eventUrns]);
+
+      onHover(outputUrns, d);
     }
   }
 });

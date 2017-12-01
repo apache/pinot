@@ -239,8 +239,9 @@ export default Ember.Controller.extend({
       this.set('filteredUrns', new Set(urns));
     },
 
-    chartOnHover(urns) {
-      this.set('hoverUrns', new Set(urns));
+    chartOnHover(urns, timestamp) {
+      console.log('chartOnHover(): urns timestamp', urns, timestamp);
+      this.setProperties({ hoverUrns: new Set(urns), hoverTimestamp: timestamp });
     },
 
     loadtestSelectedUrns() {
