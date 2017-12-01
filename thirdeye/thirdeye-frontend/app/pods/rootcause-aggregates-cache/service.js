@@ -15,7 +15,6 @@ export default Ember.Service.extend({
   },
 
   request(requestContext, urns) {
-    console.log('rootcauseAggregatesService: request()', requestContext, urns);
     const { context, aggregates, pending } = this.getProperties('context', 'aggregates', 'pending');
 
     const metrics = [...urns].filter(urn => urn.startsWith('frontend:metric:'));
@@ -41,7 +40,7 @@ export default Ember.Service.extend({
     this.setProperties({ context: _.cloneDeep(requestContext), aggregates: newAggregates, pending: newPending });
 
     if (_.isEmpty(missing)) {
-      console.log('rootcauseAggregatesService: request: all metrics up-to-date. ignoring.');
+      // console.log('rootcauseAggregatesService: request: all metrics up-to-date. ignoring.');
       return;
     }
 
@@ -56,12 +55,11 @@ export default Ember.Service.extend({
   },
 
   _complete(requestContext, incoming) {
-    console.log('rootcauseAggregatesService: _complete()', incoming);
     const { context, pending, aggregates } = this.getProperties('context', 'pending', 'aggregates');
 
     // only accept latest result
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseAggregatesService: _complete: received stale result. ignoring.');
+      // console.log('rootcauseAggregatesService: _complete: received stale result. ignoring.');
       return;
     }
 

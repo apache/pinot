@@ -15,7 +15,6 @@ export default Ember.Service.extend({
   },
 
   request(requestContext, urns) {
-    console.log('rootcauseTimeseriesService: request()', requestContext, urns);
     const { context, timeseries, pending } = this.getProperties('context', 'timeseries', 'pending');
 
     const metrics = [...urns].filter(urn => urn.startsWith('frontend:metric:'));
@@ -41,7 +40,7 @@ export default Ember.Service.extend({
     this.setProperties({ context: _.cloneDeep(requestContext), timeseries: newTimeseries, pending: newPending });
 
     if (_.isEmpty(missing)) {
-      console.log('rootcauseTimeseriesService: request: all metrics up-to-date. ignoring.');
+      // console.log('rootcauseTimeseriesService: request: all metrics up-to-date. ignoring.');
       return;
     }
 
@@ -58,12 +57,11 @@ export default Ember.Service.extend({
   },
 
   _complete(requestContext, incoming) {
-    console.log('rootcauseTimeseriesService: _complete()', incoming);
     const { context, pending, timeseries } = this.getProperties('context', 'pending', 'timeseries');
 
     // only accept latest result
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseTimeseriesService: _complete: received stale result. ignoring.');
+      // console.log('rootcauseTimeseriesService: _complete: received stale result. ignoring.');
       return;
     }
 
@@ -74,7 +72,6 @@ export default Ember.Service.extend({
   },
 
   _extractTimeseries(json, urn) {
-    console.log('rootcauseTimeseriesService: _extractTimeseries()', json);
     const timeseries = {};
     Object.keys(json).forEach(range =>
       Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
@@ -115,8 +112,6 @@ export default Ember.Service.extend({
     const metricId = urn.split(':')[3];
     const metricFilters = toFilters([urn]);
     const contextFilters = toFilters(filterPrefix(context.urns, 'thirdeye:dimension:'));
-    console.log('rootcauseTimeseriesCache: _fetchSlice: metricFilters', metricFilters);
-    console.log('rootcauseTimeseriesCache: _fetchSlice: contextFilters', contextFilters);
     const filters = toFilterMap(metricFilters.concat(contextFilters));
 
     const filterString = encodeURIComponent(JSON.stringify(filters));

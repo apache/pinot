@@ -85,8 +85,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(res => res.json());
     }
 
-    console.log('route: model: metricUrn anomalyUrn share anomalyContext', metricUrn, anomalyUrn, share, anomalyContext);
-
     return RSVP.hash({
       metricId,
       anomalyId,
@@ -149,8 +147,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyContext
     } = model;
 
-    console.log('route: setupController: metricUrn anomalyUrn share anomalyContext', metricUrn, anomalyUrn, share, anomalyContext);
-
     const settingsConfig = {
       granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
       compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W']
@@ -172,7 +168,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     // metric-initialized context
     if (metricUrn) {
-      console.log('route: setupController: initializing context from metric mode');
       context = {
         urns: new Set([metricUrn, ..._filterToUrn(filters)]),
         anomalyRange,
@@ -186,8 +181,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     // anomaly-initialized context
     if (anomalyUrn && anomalyContext) {
-      console.log('route: setupController: initializing context from anomaly mode');
-
       const contextUrns = anomalyContext.map(e => e.urn);
 
       const metricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
@@ -195,8 +188,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
       const anomalyRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:anomaly:');
       const analysisRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:analysis:');
-
-      console.log('route: setupController: contextUrns metricUrns dimensionUrns anomalyRangeUrns analysisRangeUrns', contextUrns, metricUrns, dimensionUrns, anomalyRangeUrns, analysisRangeUrns);
 
       context = {
         urns: new Set([...metricUrns, ...dimensionUrns, anomalyUrn]),
@@ -211,7 +202,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     // share-initialized context
     if (share) {
-      console.log('route: setupController: initializing context from share mode');
       context = share.context;
       context.urns = new Set(context.urns);
       selectedUrns = new Set(share.selectedUrns);

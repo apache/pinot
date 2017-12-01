@@ -72,7 +72,6 @@ export default Ember.Controller.extend({
     'aggregatesService',
     'breakdownsService',
     function () {
-      console.log('_contextObserver()');
       const { context, entities, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService } =
         this.getProperties('context', 'entities', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
 
@@ -98,7 +97,6 @@ export default Ember.Controller.extend({
   entities: Ember.computed(
     'entitiesService.entities',
     function () {
-      console.log('entities()');
       return this.get('entitiesService.entities');
     }
   ),
@@ -106,7 +104,6 @@ export default Ember.Controller.extend({
   timeseries: Ember.computed(
     'timeseriesService.timeseries',
     function () {
-      console.log('timeseries()');
       return this.get('timeseriesService.timeseries');
     }
   ),
@@ -114,7 +111,6 @@ export default Ember.Controller.extend({
   aggregates: Ember.computed(
     'aggregatesService.aggregates',
     function () {
-      console.log('aggregates()');
       return this.get('aggregatesService.aggregates');
     }
   ),
@@ -122,7 +118,6 @@ export default Ember.Controller.extend({
   breakdowns: Ember.computed(
     'breakdownsService.breakdowns',
     function () {
-      console.log('breakdowns()');
       return this.get('breakdownsService.breakdowns');
     }
   ),
@@ -144,14 +139,12 @@ export default Ember.Controller.extend({
     'selectedUrns',
     'invisibleUrns',
     function () {
-      console.log('chartSelectedUrns()');
       const { selectedUrns, invisibleUrns } =
         this.getProperties('selectedUrns', 'invisibleUrns');
 
       const urns = new Set(selectedUrns);
       [...invisibleUrns].forEach(urn => urns.delete(urn));
 
-      console.log('chartSelectedUrns: urns', urns);
       return urns;
     }
   ),
@@ -160,7 +153,6 @@ export default Ember.Controller.extend({
     'entities',
     'filteredUrns',
     function () {
-      console.log('eventTableEntities()');
       const { entities, filteredUrns } = this.getProperties('entities', 'filteredUrns');
       return filterObject(entities, (e) => filteredUrns.has(e.urn));
     }
@@ -171,9 +163,7 @@ export default Ember.Controller.extend({
   eventFilterEntities: Ember.computed(
     'entities',
     function () {
-      console.log('eventFilterEntities()');
       const { entities } = this.getProperties('entities');
-      console.log("printing entities: ", entities);
       return filterObject(entities, (e) => e.type == 'event');
     }
   ),
@@ -223,8 +213,6 @@ export default Ember.Controller.extend({
 
   actions: {
     onSelection(updates) {
-      console.log('onSelection()');
-      console.log('onSelection: updates', updates);
       const { selectedUrns } = this.getProperties('selectedUrns');
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
@@ -232,8 +220,6 @@ export default Ember.Controller.extend({
     },
 
     onVisibility(updates) {
-      console.log('onVisibility()');
-      console.log('onVisibility: updates', updates);
       const { invisibleUrns } = this.getProperties('invisibleUrns');
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => invisibleUrns.delete(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => invisibleUrns.add(urn));
@@ -246,22 +232,18 @@ export default Ember.Controller.extend({
      * @param {Object} newParams new parameters to update
      */
     onContext(context) {
-      console.log('settingsOnChange()');
       this.set('context', context);
     },
 
     onFilter(urns) {
-      console.log('filterOnSelect()');
       this.set('filteredUrns', new Set(urns));
     },
 
     chartOnHover(urns) {
-      console.log('chartOnHover()');
       this.set('hoverUrns', new Set(urns));
     },
 
     loadtestSelectedUrns() {
-      console.log('loadtestSelected()');
       const { entities } = this.getProperties('entities');
 
       const entityUrns = Object.keys(entities);
