@@ -67,6 +67,19 @@ export default Component.extend({
     }
   ),
 
+  colors: Ember.computed(
+    'entities',
+    'hoverUrns',
+    function () {
+      const { entities, hoverUrns } = this.getProperties('entities', 'hoverUrns');
+
+      return filterPrefix(hoverUrns, ['thirdeye:metric:', 'thirdeye:event:']).reduce((agg, urn) => {
+        agg[urn] = entities[urn].color;
+        return agg;
+      }, {});
+    }
+  ),
+
   timeseriesLookup: Ember.computed(
     'timeseries',
     'hoverUrns',

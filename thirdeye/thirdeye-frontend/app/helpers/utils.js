@@ -2,6 +2,28 @@ import Ember from 'ember';
 import moment from 'moment';
 import _ from 'lodash';
 
+// TODO load from config
+// colors for metrics
+const metricColors = [
+  'blue',
+  'green',
+  'red',
+  'purple',
+  'orange',
+  'teal',
+  'pink'
+];
+
+// TODO load from config
+// colors for events
+const eventColorMapping = {
+  holiday: 'green',
+  informed: 'red',
+  lix: 'purple',
+  gcn: 'orange',
+  anomaly: 'teal'
+};
+
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
  * This helps us define a custom response handler.
@@ -75,7 +97,7 @@ export function appendTail(urn, tail) {
   if (_.isEmpty(tail)) {
     return urn;
   }
-  
+
   const existingTail = extractTail(urn);
   const tailString = [...makeIterable(tail), ...existingTail].sort().join(':');
   const appendString = tailString ? `:${tailString}` : '';
@@ -170,6 +192,17 @@ export function toFilterMap(filters) {
   return filterMap;
 }
 
+export function toColor(urn) {
+  // TODO move to controller, requires color loading from backend
+  if (urn.startsWith('thirdeye:event:')) {
+    return eventColorMapping[urn.split(':')[2]];
+  }
+  if (urn.startsWith('thirdeye:metric:')) {
+    return metricColors[urn.split(':')[2] % metricColors.length];
+  }
+  return 'none';
+};
+
 /**
  * finds the corresponding labelMapping field given a label in the filterBarConfig
  * This is only a placeholder since the filterBarConfig is not finalized
@@ -184,4 +217,4 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel });
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor });

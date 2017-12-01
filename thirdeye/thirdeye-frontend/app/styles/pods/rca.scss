@@ -43,8 +43,8 @@
   }
   &--box-shadow {
     border: none;
-    box-shadow: 
-      0 0 0 1px app-shade(black, 0.1), 
+    box-shadow:
+      0 0 0 1px app-shade(black, 0.1),
       0 2px 3px 0 app-shade(black, 0.2);
   }
   &__header {
@@ -106,7 +106,7 @@
     &--selected,
     &:hover {
       border: 2px solid $te-blue-6;
-      padding: 15px;    
+      padding: 15px;
     }
     &--selected:hover {
       border-style: dashed;
@@ -137,7 +137,7 @@
     line-height: 32px;
     padding-top: 16px;
 
-    &--positive { 
+    &--positive {
       color: $te-green;
     }
 
@@ -145,5 +145,28 @@
       color: $te-red;
     }
   }
-
 }
+
+.color-box {
+  display: inline-block;
+  height: 0.8em;
+  width: 0.8em;
+  border: 1px solid black;
+}
+
+$colors:
+  "blue" $te-blue,
+  "orange" $te-orange,
+  "teal" $te-teal,
+  "purple" $te-purple,
+  "red" $te-red,
+  "green" $te-green,
+  "pink" $te-pink;
+
+// creates color-box--"color" classes
+@each $i in $colors {
+  .color-box--#{nth($i, 1)} {
+    background: nth($i, 2);
+  }
+};
+
