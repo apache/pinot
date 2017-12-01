@@ -283,6 +283,13 @@ export default Ember.Controller.extend({
 
       return fetch(`/config/rootcause-share/${id}`, { method: 'POST', body: jsonString })
         .then(res => this.set('shareId', id));
+    },
+
+    onFeedback(anomalyUrn, feedback, comment) {
+      const id = anomalyUrn.split(':')[3];
+      const jsonString = JSON.stringify({ feedbackType: feedback, comment });
+
+      return fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
     }
   }
 });

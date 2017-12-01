@@ -26,6 +26,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   public static final String ATTR_STATUS = "status";
   public static final String ATTR_ISSUE_TYPE = "issueType";
   public static final String ATTR_DIMENSIONS = "dimensions";
+  public static final String ATTR_COMMENT = "comment";
 
   private final MergedAnomalyResultManager anomalyDAO;
 
@@ -49,9 +50,11 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     MergedAnomalyResultDTO dto = this.anomalyDAO.findById(e.getId(), false);
     AnomalyFunctionDTO func = dto.getFunction();
 
-    AnomalyFeedbackType feedback = AnomalyFeedbackType.NO_FEEDBACK;
+    String comment = "";
+    AnomalyFeedbackType status = AnomalyFeedbackType.NO_FEEDBACK;
     if (dto.getFeedback() != null) {
-      feedback = dto.getFeedback().getFeedbackType();
+      comment = dto.getFeedback().getComment();
+      status = dto.getFeedback().getFeedbackType();
     }
 
     Multimap<String, String> attributes = ArrayListMultimap.create();
@@ -60,7 +63,8 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     attributes.put(ATTR_FUNCTION, func.getFunctionName());
     attributes.put(ATTR_CURRENT, String.valueOf(dto.getAvgCurrentVal()));
     attributes.put(ATTR_BASELINE, String.valueOf(dto.getAvgBaselineVal()));
-    attributes.put(ATTR_STATUS, feedback.toString());
+    attributes.put(ATTR_STATUS, status.toString());
+    attributes.put(ATTR_COMMENT, comment);
     // attributes.put(ATTR_ISSUE_TYPE, null); // TODO
     attributes.putAll(ATTR_DIMENSIONS, dto.getDimensions().keySet());
 

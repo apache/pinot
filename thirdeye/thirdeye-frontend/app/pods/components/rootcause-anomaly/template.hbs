@@ -4,27 +4,23 @@
       <!-- from old UI -->
       <div class="row">
         <h3>
-          <span>Is this a true anomaly? (not implemented yet)</span>
+          <span>Is this a true anomaly?</span>
           <a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
         </h3>
       </div>
-      <form id="anomaly-feedback-radio">
-        <label for="feedback-radio-yes">
-          <input type="radio" id="feedback-radio-yes" name="feedback-radio" value="ANOMALY">
-          <span>Yes</span> (True Anomaly)
-        </label>
-        <label for=feedback-radio-na class="radio-inline">
-          <input type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NEW_TREND">
-          <span>Yes</span> (But New Trend)
-        </label>
-        <label for=feedback-radio-no class="radio-inline">
-          <input type="radio" id="feedback-radio-no" name="feedback-radio" value="NOT_ANOMALY">
-          <span>No</span> (False Alarm)
-        </label><br>
-      </form>
+      <div id="anomaly-feedback-status">
+        <span>Status</span> {{status}}
+      </div>
       <div id="anomaly-feedback-comment">
         <label for="feedback-comment"><span>Comment</span> (optional)</label>
-        <textarea placeholder="Enter a comment" rows="2" id="feedback-comment"></textarea>
+        {{textarea id="feedback-comment" value=comment}}
+      </div>
+      <div id="anomaly-feedback-button">
+        status
+        | <button {{action "onFeedback" "ANOMALY"}}>Yes (True Anomaly)</button>
+        | <button {{action "onFeedback" "ANOMALY_NEW_TREND"}}>Yes (But New Trend)</button>
+        | <button {{action "onFeedback" "NOT_ANOMALY"}}>No (False Alarm)</button>
+        | <button {{action "onFeedback" "NO_FEEDBACK"}}>No Feedback</button>
       </div>
       <p>Your feedback improves the accuracy of future alerts.</p>
     </div>
@@ -34,8 +30,9 @@
     <div class="card-container__body">
       <div class="row">
         <span>
-          <div>{{functionName}}</div>
-          <div>#{{anomalyId}} on {{metric}} ({{dataset}})</div>
+          <div>{{functionName}}: Anomaly #{{anomalyId}}</div>
+          <div>{{metric}} ({{dimensions}})</div>
+          <div>{{dataset}}</div>
         </span>
       </div>
 
@@ -67,14 +64,6 @@
           </div>
         {{/if}}
       </div>
-
-      <div class="row">
-        <div class="col-xs-12">
-          <label class="te-label">Dimensions</label>
-          <span>{{dimensions}}</span>
-        </div>
-      </div>
-
     </div>
   </div>
 
