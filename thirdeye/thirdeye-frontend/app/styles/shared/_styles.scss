@@ -136,11 +136,6 @@ body {
   &__summary-item {
     line-height: 22px;
 
-    &--tag {
-      // margin-top: 4px;
-
-    }
-
     &--title {
       margin: 0;
     }
@@ -184,34 +179,4 @@ body {
 
 .te-link--hide {
   display: none;
-}
-
-.te-button {
-  border-radius: 2px; 
-  border: 1px solid #339BC7;
-  margin: 0 1px;
-  font-size: 17px;
-
-  &--cancel {
-    background-color: white;
-    color: #339BC7;
-    a {
-      color: #339BC7;
-    }
-    &:hover,
-    a:hover {
-      color: #339BC7;      
-      text-decoration: none;
-    }
-  }
-
-  &--submit {
-    background-color: #1A84BC;
-    color: white;
-    &:hover,
-    a:hover {
-      color: white;
-      text-decoration: none;
-    }
-  }
 }
