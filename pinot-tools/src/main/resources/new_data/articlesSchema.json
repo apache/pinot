@@ -2,38 +2,54 @@
   "metricFieldSpecs": [
     {
       "dataType" : "INT",
-      "name" : "SecondsEpoch"
+      "name" : "newsPostTime"
     },
     {
+      "singleValueField" : true,
       "dataType" : "INT",
-      "name" : "Score"
+      "name" : "posterId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "popularityScore"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "ranking"
     }
   ],
   "dimensionFieldSpecs": [
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "Headline"
+      "name": "headline"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "Description"
+      "name": "description"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "Link"
+      "name": "location"
+    },
+    {
+      "singleValueField" : false,
+      "dataType": "STRING",
+      "name": "keywords"
     },
     {
       "singleValueField" : true,
-      "dataType": "INT",
-      "name": "Id"
+      "dataType": "STRING",
+      "name": "category"
     },
     {
       "singleValueField" : true,
-      "dataType": "INT",
-      "name": "PosterId"
+      "dataType": "STRING",
+      "name": "sourceLink"
     }
   ],
   "schemaName": "ArticlesSchema"

@@ -1,8 +1,64 @@
 [
   {
-    "column" : "SecondsEpoch",
+    "column" : "profileViewedTimestamp",
     "range" : true,
     "rangeStart" : 946684800,
     "rangeEnd"   : 1508873892
+  },
+  {
+    "column" : "viewerId",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100000
+  },
+  {
+    "column" : "viewedUserId",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100000
+  },
+  {
+    "column" : "weeklyChange",
+    "range" : true,
+    "rangeStart" : 0,
+    "rangeEnd"   : 100
+  },
+  {
+    "column" : "monthlyChange",
+    "range" : true,
+    "rangeStart" : 0,
+    "rangeEnd"   : 100
+  },
+  {
+    "column" : "appearancesInSearch",
+    "range" : true,
+    "rangeStart" : 0,
+    "rangeEnd"   : 100000
+  },
+  {
+    "column" : "connectionDuration",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 20000
+  },
+  {
+    "column" : "viewerLocation",
+    "range" : false,
+    "cardinality" : 10000
+  },
+  {
+    "column" : "viewedUserLocation",
+    "range" : false,
+    "cardinality" : 10000
+  },
+  {
+    "column" : "viewerCompany",
+    "range" : false,
+    "cardinality" : 5000
+  },
+  {
+    "column" : "viewerTitle",
+    "range" : false,
+    "cardinality" : 10000
   }
 ]

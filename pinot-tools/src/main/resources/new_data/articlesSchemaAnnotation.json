@@ -1,8 +1,56 @@
 [
   {
-    "column" : "SecondsEpoch",
+    "column" : "newsPostTime",
     "range" : true,
     "rangeStart" : 946684800,
     "rangeEnd"   : 1508873892
+  },
+  {
+    "column" : "posterId",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100000
+  },
+  {
+    "column" : "popularityScore",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100
+  },
+  {
+    "column" : "ranking",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100
+  },
+  {
+    "column" : "headline",
+    "range" : false,
+    "cardinality" : 20000
+  },
+  {
+    "column" : "description",
+    "range" : false,
+    "cardinality" : 20000
+  },
+  {
+    "column" : "location",
+    "range" : false,
+    "cardinality" : 10000
+  },
+  {
+    "column" : "keywords",
+    "range" : false,
+    "cardinality" : 5000
+  },
+  {
+    "column" : "category",
+    "range" : false,
+    "cardinality" : 100
+  },
+  {
+    "column" : "sourceLink",
+    "range" : false,
+    "cardinality" : 20000
   }
 ]

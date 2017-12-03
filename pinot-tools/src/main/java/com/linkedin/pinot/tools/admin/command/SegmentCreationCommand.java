@@ -38,8 +38,6 @@ public class SegmentCreationCommand extends AbstractBaseAdminCommand implements 
     @Option(name = "-dir", required = true, metaVar = "<String>", usage = "Parent directory to store data & segments.")
     private String _dir;
 
-
-
     @Override
     public String description() {
         return "Create data and segments as per the provided schema";
