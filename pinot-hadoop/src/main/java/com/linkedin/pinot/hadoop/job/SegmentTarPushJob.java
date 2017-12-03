@@ -86,8 +86,9 @@ public class SegmentTarPushJob extends Configured {
         fileName = fileName.split(".tar")[0];
         LOGGER.info("******** Upoading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
         try {
+          InputStream is = fs.open(path);
           int responseCode = FileUploadUtils.sendSegment(
-              host + ":" + _port, fileName, /* pushTimeoutMs */ 60000, path, fs, 5, /* sleepTimeSec */ 60);
+              host + ":" + _port, fileName, /* pushTimeoutMs */ 60000, is, 5, /* sleepTimeSec */ 60);
           LOGGER.info("Response code: {}", responseCode);
         } catch (Exception e) {
           LOGGER.error("******** Error Upoading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
