@@ -41,12 +41,9 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.PartSource;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
-import org.apache.http.protocol.HTTP;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntity;
@@ -54,6 +51,7 @@ import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.CoreConnectionPNames;
+import org.apache.http.protocol.HTTP;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -344,16 +342,15 @@ public class FileUploadUtils {
   }
 
     public static int sendSegment(final String uriString, final String segmentName, final int pushTimeoutMs,
-        Path path, FileSystem fs, int maxRetries, int sleepTimeSec) {
-      return sendFileRetry(uriString, segmentName, pushTimeoutMs, path, fs, maxRetries, sleepTimeSec);
+        InputStream is, int maxRetries, int sleepTimeSec) {
+      return sendFileRetry(uriString, segmentName, pushTimeoutMs, is, maxRetries, sleepTimeSec);
     }
 
-    public static int sendFileRetry(final String uri, final String segmentName, int pushTimeoutMs, Path path, FileSystem fs,
+    public static int sendFileRetry(final String uri, final String segmentName, int pushTimeoutMs, InputStream inputStream,
         int maxRetries, int sleepTimeSec) {
       int retval;
       for (int numRetries = 0; ; numRetries++) {
         try {
-          InputStream inputStream = fs.open(path);
           retval = sendFile(uri, segmentName, inputStream, pushTimeoutMs);
           break;
         } catch (Exception e) {
