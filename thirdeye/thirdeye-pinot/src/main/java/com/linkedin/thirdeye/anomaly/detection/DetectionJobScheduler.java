@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Range;
+import com.google.common.collect.RangeSet;
+import com.google.common.collect.TreeRangeSet;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
@@ -23,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -30,8 +34,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
 import org.quartz.SchedulerException;
@@ -88,7 +95,7 @@ public class DetectionJobScheduler implements Runnable {
     for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
 
       try {
-        LOG.info("Calculating the detection entries for function: {}", anomalyFunction);
+        LOG.info("Calculating the detection entries for function {}: {}", anomalyFunction.getId(), anomalyFunction);
         long functionId = anomalyFunction.getId();
         String dataset = anomalyFunction.getCollection();
         DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
@@ -126,9 +133,9 @@ public class DetectionJobScheduler implements Runnable {
         List<Long> startTimes = new ArrayList<>();
         List<Long> endTimes = new ArrayList<>();
         List<DetectionStatusDTO> detectionStatusToUpdate = new ArrayList<>();
+        RangeSet<Long> skippedMonitoringTimeRange = TreeRangeSet.create();
 
         for (DetectionStatusDTO detectionStatus : entriesInLast3Days) {
-
           try {
             LOG.debug("Function: {} Dataset: {} Entry : {}", functionId, dataset, detectionStatus);
 
@@ -144,13 +151,30 @@ public class DetectionJobScheduler implements Runnable {
               endTimes.add(endTime);
               detectionStatusToUpdate.add(detectionStatus);
             } else {
-              LOG.warn("Function: {} Dataset: {} Data incomplete for monitoring window {} ({}) to {} ({}), skipping anomaly detection",
-                  functionId, dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
-              // TODO: Send email to owners/dev team
+              skippedMonitoringTimeRange.add(Range.closedOpen(startTime, endTime));
             }
           } catch (Exception e) {
             LOG.error("Function: {} Dataset: {} Exception in preparing entry {}", functionId, dataset, detectionStatus, e);
           }
+        }
+        Set<Range<Long>> skippedMonitoringRanges = skippedMonitoringTimeRange.asRanges();
+        if (CollectionUtils.isNotEmpty(skippedMonitoringRanges)) {
+          DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyy/MM/dd HH:mmZZ");
+          StringBuilder sb = new StringBuilder();
+          String rangeSeparator = "[";
+          for (Range<Long> skippedMonitoringRange : skippedMonitoringRanges) {
+            long startTimestamp = skippedMonitoringRange.lowerEndpoint();
+            long endTimestamp = skippedMonitoringRange.upperEndpoint();
+            String timeRangeString = String
+                .format("%s-%s (%s-%s)", dtf.print(new DateTime(startTimestamp)), dtf.print(new DateTime(endTimestamp)),
+                    startTimestamp, endTimestamp);
+            sb.append(rangeSeparator).append(timeRangeString);
+            rangeSeparator = ", ";
+          }
+          String skippedTimerangesString = sb.append("]").toString();
+          LOG.warn("Skipping anomaly detection on function: {} Dataset: {}: Data incomplete for monitoring windows: {}",
+              functionId, dataset, skippedTimerangesString);
+          // TODO: Send email to owners/dev team
         }
 
         // If any time periods found, for which detection needs to be run

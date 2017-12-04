@@ -7,6 +7,7 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -344,6 +345,13 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
           }
         }
       }
+    }
+
+    // Create empty result. This case typically happens when Pinot query encounters exceptions such as time out.
+    // TODO: create proper groupKeyColumnNames from ThirdEyeRequest?
+    if (joinedDf == null) {
+      joinedDf = new DataFrame();
+      groupKeyColumnNames = ImmutableList.of();
     }
 
     ThirdEyeResultSetMetaData metaData =
