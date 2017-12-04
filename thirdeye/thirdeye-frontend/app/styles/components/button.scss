@@ -1,7 +1,7 @@
 // Shared styling for buttons
 
 .te-button {
-  border-radius: 2px; 
+  border-radius: 2px;
   border: 1px solid #339BC7;
   margin: 0 1px;
   font-size: 17px;
@@ -23,7 +23,7 @@
     &:focus,
     &:active,
     a:hover {
-      color: #339BC7;      
+      color: #339BC7;
       text-decoration: none;
     }
   }
@@ -41,7 +41,7 @@
     a:hover, {
       background-color: rgba(207,207,207,.25);
       border-color: app-shade(black, 0.75);
-      color: app-shade(black, 0.75);    
+      color: app-shade(black, 0.75);
       text-decoration: none;
     }
   }
@@ -60,4 +60,11 @@
       background-color: $te-blue-8;
     }
   }
+}
+
+.btn span.glyphicon {
+  opacity: 0;
+}
+.btn.active span.glyphicon {
+  opacity: 1;
 }
