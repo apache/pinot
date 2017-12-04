@@ -8,6 +8,8 @@ export default Ember.Component.extend({
 
   anomalyUrn: null, // ""
 
+  onFeedback: null, // func (urn, feedback, comment)
+
   anomaly: Ember.computed(
     'entities',
     'anomalyUrn',
@@ -62,9 +64,27 @@ export default Ember.Component.extend({
     const attr = this.get('anomaly').attributes;
     const dimNames = attr.dimensions;
     const dimValues = dimNames.reduce((agg, dimName) => { agg[dimName] = attr[dimName][0]; return agg; }, {});
-    return dimNames.map(dimName => `${dimName}=${dimValues[dimName]}`).join(', ');
+    return dimNames.sort().map(dimName => dimValues[dimName]).join(', ');
+  }),
+
+  comment: Ember.computed('anomaly', function () {
+    const attr = this.get('anomaly').attributes;
+    return attr.comment[0];
   }),
 
   issueType: null, // TODO
 
+  actions: {
+    onFeedback(status) {
+      const { onFeedback, anomalyUrn, comment } =
+        this.getProperties('onFeedback', 'anomalyUrn','comment');
+
+      if (onFeedback) {
+        onFeedback(anomalyUrn, status, comment);
+      }
+
+      // TODO reload anomaly entity instead
+      this.setProperties({ status });
+    }
+  }
 });
