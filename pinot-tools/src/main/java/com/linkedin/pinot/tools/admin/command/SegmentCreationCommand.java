@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.sql.Timestamp;
 
 import static com.linkedin.pinot.tools.SchemaInfo.*;
 
@@ -116,7 +117,8 @@ public class SegmentCreationCommand extends AbstractBaseAdminCommand implements 
             if (!file.exists())
                 file.mkdirs();
             seg.createSegments(SCHEMAS.get(i), PARENT_FOLDER + DATA_DIR + SchemaInfo.DATA_DIRS.get(i),
-                    SEGMENT_NAME, TABLE_NAMES.get(i), PARENT_FOLDER + SEG_DIR + SchemaInfo.DATA_DIRS.get(i));
+                    SEGMENT_NAME + "_" + new Timestamp(System.currentTimeMillis()), TABLE_NAMES.get(i),
+                    PARENT_FOLDER + SEG_DIR + SchemaInfo.DATA_DIRS.get(i));
 
         }
 
