@@ -28,11 +28,11 @@ export default Ember.Service.extend({
       // new analysis range: evict all, reload, keep stale copy of incoming
       missing = metrics;
       newPending = new Set(metrics);
-      newAggregates = metrics.filter(urn => aggregates[urn]).reduce((agg, urn) => { agg[urn] = aggregates[urn]; return agg; }, {});
+      newAggregates = metrics.filter(urn => urn in aggregates).reduce((agg, urn) => { agg[urn] = aggregates[urn]; return agg; }, {});
 
     } else {
       // same context: load missing
-      missing = metrics.filter(urn => !aggregates[urn] && !pending.has(urn));
+      missing = metrics.filter(urn => !(urn in aggregates) && !pending.has(urn));
       newPending = new Set([...pending].concat(missing));
       newAggregates = aggregates;
     }
@@ -63,7 +63,7 @@ export default Ember.Service.extend({
       return;
     }
 
-    const newPending = new Set([...pending].filter(urn => !incoming[urn]));
+    const newPending = new Set([...pending].filter(urn => !(urn in incoming)));
     const newAggregates = Object.assign({}, aggregates, incoming);
 
     this.setProperties({ aggregates: newAggregates, pending: newPending });
@@ -74,8 +74,7 @@ export default Ember.Service.extend({
     const aggregates = {};
     Object.keys(incoming).forEach(range => {
       Object.keys(incoming[range]).forEach(mid => {
-        const aggregate = incoming[range][mid];
-        aggregates[urn] = aggregate;
+        aggregates[urn] = incoming[range][mid];
       });
     });
     return aggregates;
