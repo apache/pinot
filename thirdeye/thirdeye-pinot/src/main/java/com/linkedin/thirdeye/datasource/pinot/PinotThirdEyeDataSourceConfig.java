@@ -9,6 +9,7 @@ import java.util.Map;
 
 import java.util.Objects;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang3.StringUtils;
 
 import com.google.common.base.MoreObjects;
@@ -23,9 +24,13 @@ import org.slf4j.LoggerFactory;
 public class PinotThirdEyeDataSourceConfig {
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeDataSourceConfig.class);
 
+  public static final String HTTP_SCHEME = "http";
+  public static final String HTTPS_SCHEME = "https";
+
   private String zookeeperUrl;
   private String controllerHost;
   private int controllerPort;
+  private String controllerConnectionScheme;
   private String clusterName;
   private String brokerUrl;
   private String tag;
@@ -78,6 +83,14 @@ public class PinotThirdEyeDataSourceConfig {
     this.clusterName = clusterName;
   }
 
+  public String getControllerConnectionScheme() {
+    return controllerConnectionScheme;
+  }
+
+  private void setControllerConnectionScheme(String controllerConnectionScheme) {
+    this.controllerConnectionScheme = controllerConnectionScheme;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -90,23 +103,22 @@ public class PinotThirdEyeDataSourceConfig {
     return getControllerPort() == config.getControllerPort() && Objects
         .equals(getZookeeperUrl(), config.getZookeeperUrl()) && Objects
         .equals(getControllerHost(), config.getControllerHost()) && Objects
+        .equals(getControllerConnectionScheme(), config.getControllerConnectionScheme()) && Objects
         .equals(getClusterName(), config.getClusterName()) && Objects.equals(getBrokerUrl(), config.getBrokerUrl())
         && Objects.equals(getTag(), config.getTag());
   }
 
   @Override
   public int hashCode() {
-    return Objects
-        .hash(getZookeeperUrl(), getControllerHost(), getControllerPort(), getClusterName(), getBrokerUrl(), getTag());
+    return Objects.hash(getZookeeperUrl(), getControllerHost(), getControllerPort(), getControllerConnectionScheme(),
+        getClusterName(), getBrokerUrl(), getTag());
   }
 
   @Override
   public String toString() {
-    ToStringHelper stringHelper = MoreObjects.toStringHelper(PinotThirdEyeDataSourceConfig.class);
-    stringHelper.add("brokerUrl", brokerUrl).add("clusterName", clusterName)
-        .add("controllerHost", controllerHost).add("controllerPort", controllerPort)
-        .add("zookeeperUrl", zookeeperUrl);
-    return stringHelper.toString();
+    return MoreObjects.toStringHelper(this).add("zookeeperUrl", zookeeperUrl).add("controllerHost", controllerHost)
+        .add("controllerPort", controllerPort).add("controllerConnectionScheme", controllerConnectionScheme)
+        .add("clusterName", clusterName).add("brokerUrl", brokerUrl).add("tag", tag).toString();
   }
 
   public static Builder builder() {
@@ -117,6 +129,7 @@ public class PinotThirdEyeDataSourceConfig {
     private String zookeeperUrl;
     private String controllerHost;
     private int controllerPort = -1;
+    private String controllerConnectionScheme = HTTP_SCHEME; // HTTP_SCHEME or HTTPS_SCHEME
     private String clusterName;
     private String brokerUrl;
     private String tag;
@@ -151,12 +164,20 @@ public class PinotThirdEyeDataSourceConfig {
       return this;
     }
 
+    public Builder setControllerConnectionScheme(String controllerConnectionScheme) {
+      this.controllerConnectionScheme = controllerConnectionScheme;
+      return this;
+    }
+
     public PinotThirdEyeDataSourceConfig build() {
       final String className = PinotThirdEyeDataSourceConfig.class.getSimpleName();
       Preconditions.checkNotNull(controllerHost, "{} is missing 'Controller Host' property", className);
       Preconditions.checkArgument(controllerPort >= 0, "{} is missing 'Controller Port' property", className);
       Preconditions.checkNotNull(zookeeperUrl, "{} is missing 'Zookeeper URL' property", className);
       Preconditions.checkNotNull(clusterName, "{} is missing 'Cluster Name' property", className);
+      Preconditions.checkArgument(
+          controllerConnectionScheme.equals(HTTP_SCHEME) || controllerConnectionScheme.equals(HTTPS_SCHEME),
+          "{} accepts only 'http' or 'https' connection schemes", className);
 
       PinotThirdEyeDataSourceConfig config = new PinotThirdEyeDataSourceConfig();
       config.setControllerHost(controllerHost);
@@ -165,18 +186,21 @@ public class PinotThirdEyeDataSourceConfig {
       config.setClusterName(clusterName);
       config.setBrokerUrl(brokerUrl);
       config.setTag(tag);
+      config.setControllerConnectionScheme(controllerConnectionScheme);
       return config;
     }
   }
 
   /**
    * Returns pinot thirdeye datasource config given datasource config. There can be only ONE datasource of pinot type
+   *
    * @param dataSourceConfig
+   *
    * @return
    */
   public static PinotThirdEyeDataSourceConfig createFromDataSourceConfig(DataSourceConfig dataSourceConfig) {
-    if (dataSourceConfig == null ||
-        !dataSourceConfig.getClassName().equals(PinotThirdEyeDataSource.class.getCanonicalName())) {
+    if (dataSourceConfig == null || !dataSourceConfig.getClassName()
+        .equals(PinotThirdEyeDataSource.class.getCanonicalName())) {
       throw new IllegalStateException("Data source config is not of type pinot " + dataSourceConfig);
     }
     return createFromProperties(dataSourceConfig.getProperties());
@@ -201,7 +225,10 @@ public class PinotThirdEyeDataSourceConfig {
     }
 
     String controllerHost = processedProperties.get(PinotThirdeyeDataSourceProperties.CONTROLLER_HOST.getValue());
-    int controllerPort = Integer.valueOf(processedProperties.get(PinotThirdeyeDataSourceProperties.CONTROLLER_PORT.getValue()));
+    int controllerPort =
+        Integer.valueOf(processedProperties.get(PinotThirdeyeDataSourceProperties.CONTROLLER_PORT.getValue()));
+    String controllerConnectionScheme =
+        processedProperties.get(PinotThirdeyeDataSourceProperties.CONTROLLER_CONNECTION_SCHEME.getValue());
     String zookeeperUrl = processedProperties.get(PinotThirdeyeDataSourceProperties.ZOOKEEPER_URL.getValue());
     String clusterName = processedProperties.get(PinotThirdeyeDataSourceProperties.CLUSTER_NAME.getValue());
     // brokerUrl and tag are optional
@@ -216,6 +243,9 @@ public class PinotThirdEyeDataSourceConfig {
     }
     if (StringUtils.isNotBlank(tag)) {
       builder.setTag(tag);
+    }
+    if (StringUtils.isNotBlank(controllerConnectionScheme)) {
+      builder.setControllerConnectionScheme(controllerConnectionScheme);
     }
 
     return builder.build();
@@ -240,7 +270,8 @@ public class PinotThirdEyeDataSourceConfig {
         .asList(PinotThirdeyeDataSourceProperties.CONTROLLER_HOST, PinotThirdeyeDataSourceProperties.CONTROLLER_PORT,
             PinotThirdeyeDataSourceProperties.ZOOKEEPER_URL, PinotThirdeyeDataSourceProperties.CLUSTER_NAME);
     final List<PinotThirdeyeDataSourceProperties> optionalProperties = Arrays
-        .asList(PinotThirdeyeDataSourceProperties.BROKER_URL, PinotThirdeyeDataSourceProperties.TAG);
+        .asList(PinotThirdeyeDataSourceProperties.CONTROLLER_CONNECTION_SCHEME,
+            PinotThirdeyeDataSourceProperties.BROKER_URL, PinotThirdeyeDataSourceProperties.TAG);
 
     // Validates required properties
     final String className = PinotControllerResponseCacheLoader.class.getSimpleName();

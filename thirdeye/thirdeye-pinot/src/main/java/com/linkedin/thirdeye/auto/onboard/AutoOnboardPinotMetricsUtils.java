@@ -1,27 +1,34 @@
 package com.linkedin.thirdeye.auto.onboard;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URLEncoder;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpHost;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URLEncoder;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import javax.net.ssl.SSLContext;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpHost;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.ssl.TrustStrategy;
+import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AutoOnboardPinotMetricsUtils {
   private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardPinotMetricsUtils.class);
@@ -38,12 +45,29 @@ public class AutoOnboardPinotMetricsUtils {
   private CloseableHttpClient pinotControllerClient;
   private HttpHost pinotControllerHost;
 
-  public AutoOnboardPinotMetricsUtils(DataSourceConfig dataSourceConfig) {
+  public AutoOnboardPinotMetricsUtils(DataSourceConfig dataSourceConfig)
+      throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
     PinotThirdEyeDataSourceConfig pinotThirdeyeDataSourceConfig =
         PinotThirdEyeDataSourceConfig.createFromDataSourceConfig(dataSourceConfig);
-    this.pinotControllerClient = HttpClients.createDefault();
+
+    String controllerConnectionScheme = pinotThirdeyeDataSourceConfig.getControllerConnectionScheme();
+    if (PinotThirdEyeDataSourceConfig.HTTPS_SCHEME.equals(controllerConnectionScheme)) {
+      try {
+        // Accept all SSL certificate because we assume that the Pinot broker are setup in the same internal network
+        SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new AcceptAllTrustStrategy()).build();
+        this.pinotControllerClient =
+            HttpClients.custom().setSSLContext(sslContext).setSSLHostnameVerifier(new NoopHostnameVerifier()).build();
+      } catch (NoSuchAlgorithmException | KeyManagementException | KeyStoreException e) {
+        // This section shouldn't happen because we use Accept All Strategy
+        LOG.error("Failed to start auto onboard for Pinot data source.");
+        throw e;
+      }
+    } else {
+      this.pinotControllerClient = HttpClients.createDefault();
+    }
+
     this.pinotControllerHost = new HttpHost(pinotThirdeyeDataSourceConfig.getControllerHost(),
-        pinotThirdeyeDataSourceConfig.getControllerPort());
+        pinotThirdeyeDataSourceConfig.getControllerPort(), controllerConnectionScheme);
   }
 
   public JsonNode getAllTablesFromPinot() throws IOException {
@@ -171,5 +195,15 @@ public class AutoOnboardPinotMetricsUtils {
       }
     }
     return customConfigs;
+  }
+
+  /**
+   * This class accepts (i.e., ignores) all SSL certificate.
+   */
+  private static class AcceptAllTrustStrategy implements TrustStrategy {
+    @Override
+    public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
+      return true;
+    }
   }
 }
