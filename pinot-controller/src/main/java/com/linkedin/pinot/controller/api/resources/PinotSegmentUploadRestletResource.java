@@ -32,6 +32,8 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.access.AccessControl;
+import com.linkedin.pinot.controller.api.access.AccessControlFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -104,6 +106,9 @@ public class PinotSegmentUploadRestletResource {
   @Inject
   Executor _executor;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments")
@@ -154,8 +159,21 @@ public class PinotSegmentUploadRestletResource {
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
+      @Context HttpHeaders httpHeaders) {
+    // Validate data access
+    boolean hasDataAccess;
+    try {
+      AccessControl accessControl = _accessControlFactory.create();
+      hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableName);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+    if (!hasDataAccess) {
+      throw new ControllerApplicationException(LOGGER, "No data access to table: " + tableName,
+          Response.Status.FORBIDDEN);
+    }
+
     FileUploadPathProvider provider;
     try {
       provider = new FileUploadPathProvider(_controllerConf);
