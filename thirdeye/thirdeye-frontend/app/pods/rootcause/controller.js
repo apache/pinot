@@ -9,6 +9,8 @@ const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
 const ROOTCAUSE_TAB_EVENTS = "events";
 
+// TODO: Update module import to comply by new Ember standards
+
 export default Ember.Controller.extend({
   queryParams: [
     'metricId',
