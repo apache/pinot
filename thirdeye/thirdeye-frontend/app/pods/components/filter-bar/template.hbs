@@ -11,8 +11,8 @@
       <ul class="entity-filter__group-list {{if block.isHidden " entity-filter__group-list--hidden "}}">
         {{#each block.inputs as |filter|}}
           {{filter-bar-input
-            labelMapping=filter.labelMapping
             eventType=block.eventType
+            labelMapping=filter.labelMapping
             label=filter.label
             type=filter.type
             attributesMap=attributesMap
