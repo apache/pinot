@@ -231,7 +231,7 @@ export default Ember.Component.extend({
       return true;
     }
 
-    return Object.keys(filters).every(dimName => {
+    return Object.keys(filters).every((dimName) => {
       return !filters[dimName].size
         || (e.attributes[dimName] && e.attributes[dimName].some(dimValue => filters[dimName].has(dimValue)));
     });
