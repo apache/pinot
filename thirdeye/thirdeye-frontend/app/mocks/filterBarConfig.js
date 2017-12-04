@@ -15,10 +15,12 @@ export default [
     inputs: [
       {
         label: "dataset",
+        labelMapping: "dataset",
         type: "dropdown"
       },
       {
         label: "metric",
+        labelMapping: "metric",
         type: "dropdown"
       }
     ]
@@ -61,14 +63,17 @@ export default [
     inputs: [
       {
         label: "metrics",
+        labelMapping: "metrics",
         type: "dropdown"
       },
       {
         label: "services",
+        labelMapping: "services",
         type: "dropdown"
       },
       {
         label: "tags",
+        labelMapping: "tags",
         type: "dropdown"
       }
     ]
@@ -79,14 +84,17 @@ export default [
     inputs: [
       {
         label: "services",
+        labelMapping: "services",
         type: "dropdown"
       },
       {
         label: "actions",
+        labelMapping: "actions",
         type: "dropdown"
       },
       {
         label: "fabrics",
+        labelMapping: "fabrics",
         type: "dropdown"
       }
     ]
