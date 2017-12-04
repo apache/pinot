@@ -28,11 +28,11 @@ export default Ember.Service.extend({
       // new analysis range: evict all, reload, keep stale copy of incoming
       missing = metrics;
       newPending = new Set(metrics);
-      newTimeseries = metrics.filter(urn => timeseries[urn]).reduce((agg, urn) => { agg[urn] = timeseries[urn]; return agg; }, {});
+      newTimeseries = metrics.filter(urn => urn in timeseries).reduce((agg, urn) => { agg[urn] = timeseries[urn]; return agg; }, {});
 
     } else {
       // same context: load missing
-      missing = metrics.filter(urn => !timeseries[urn] && !pending.has(urn));
+      missing = metrics.filter(urn => !(urn in timeseries) && !pending.has(urn));
       newPending = new Set([...pending].concat(missing));
       newTimeseries = timeseries;
     }
@@ -65,7 +65,7 @@ export default Ember.Service.extend({
       return;
     }
 
-    const newPending = new Set([...pending].filter(urn => !incoming[urn]));
+    const newPending = new Set([...pending].filter(urn => !(urn in incoming)));
     const newTimeseries = Object.assign({}, timeseries, incoming);
 
     this.setProperties({ timeseries: newTimeseries, pending: newPending });

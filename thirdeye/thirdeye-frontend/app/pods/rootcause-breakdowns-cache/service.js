@@ -28,11 +28,11 @@ export default Ember.Service.extend({
       // new analysis range: evict all, reload, keep stale copy of incoming
       missing = metrics;
       newPending = new Set(metrics);
-      newBreakdowns = metrics.filter(urn => breakdowns[urn]).reduce((agg, urn) => { agg[urn] = breakdowns[urn]; return agg; }, {});
+      newBreakdowns = metrics.filter(urn => urn in breakdowns).reduce((agg, urn) => { agg[urn] = breakdowns[urn]; return agg; }, {});
 
     } else {
       // same context: load missing
-      missing = metrics.filter(urn => !breakdowns[urn] && !pending.has(urn));
+      missing = metrics.filter(urn => !(urn in breakdowns) && !pending.has(urn));
       newPending = new Set([...pending].concat(missing));
       newBreakdowns = breakdowns;
     }
@@ -63,7 +63,7 @@ export default Ember.Service.extend({
       return;
     }
 
-    const newPending = new Set([...pending].filter(urn => !incoming[urn]));
+    const newPending = new Set([...pending].filter(urn => !(urn in incoming)));
     const newBreakdowns = Object.assign({}, breakdowns, incoming);
 
     this.setProperties({ breakdowns: newBreakdowns, pending: newPending });
@@ -74,8 +74,7 @@ export default Ember.Service.extend({
     const breakdowns = {};
     Object.keys(incoming).forEach(range => {
       Object.keys(incoming[range]).forEach(mid => {
-        const breakdown = incoming[range][mid];
-        breakdowns[urn] = breakdown;
+        breakdowns[urn] = incoming[range][mid];
       });
     });
     return breakdowns;
