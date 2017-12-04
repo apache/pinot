@@ -23,9 +23,6 @@ public class RootcauseSessionManagerImpl extends AbstractManagerImpl<RootcauseSe
   private static final String FIND_BY_NAME_LIKE_TEMPLATE = "name LIKE :name__%d";
   private static final String FIND_BY_NAME_LIKE_KEY = "name__%d";
 
-  private static final String FIND_BY_CREATED_BY_LIKE_TEMPLATE = "owner LIKE :owner__%d";
-  private static final String FIND_BY_CREATED_BY_LIKE_KEY = "owner__%d";
-
   public RootcauseSessionManagerImpl() {
     super(RootcauseSessionDTO.class, RootcauseSessionBean.class);
   }
@@ -56,18 +53,8 @@ public class RootcauseSessionManagerImpl extends AbstractManagerImpl<RootcauseSe
   }
 
   @Override
-  public List<RootcauseSessionDTO> findByOwnerLike(Set<String> createdByFragments) {
-    return findByLike(createdByFragments, FIND_BY_CREATED_BY_LIKE_TEMPLATE, FIND_BY_CREATED_BY_LIKE_KEY);
-  }
-
-  @Override
   public List<RootcauseSessionDTO> findByAnomalyRange(long start, long end) {
     return findByPredicate(Predicate.AND(Predicate.GT("anomalyRangeEnd", start), Predicate.LT("anomalyRangeStart", end)));
-  }
-
-  @Override
-  public List<RootcauseSessionDTO> findByBaselineRange(long start, long end) {
-    return findByPredicate(Predicate.AND(Predicate.GT("baselineRangeEnd", start), Predicate.LT("baselineRangeStart", end)));
   }
 
   @Override

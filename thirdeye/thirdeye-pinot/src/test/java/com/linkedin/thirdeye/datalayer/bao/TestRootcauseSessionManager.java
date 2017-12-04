@@ -48,12 +48,14 @@ public class TestRootcauseSessionManager {
     RootcauseSessionDTO session = this.sessionDAO.findById(id);
     Assert.assertEquals(session.getAnomalyRangeStart(), (Long) 1000L);
     Assert.assertEquals(session.getAnomalyRangeEnd(), (Long) 1100L);
-    Assert.assertEquals(session.getBaselineRangeStart(), (Long) 500L);
-    Assert.assertEquals(session.getBaselineRangeEnd(), (Long) 600L);
+    Assert.assertEquals(session.getAnalysisRangeStart(), (Long) 900L);
+    Assert.assertEquals(session.getAnalysisRangeEnd(), (Long) 1200L);
     Assert.assertEquals(session.getCreated(), (Long) 1500L);
     Assert.assertEquals(session.getName(), "myname");
     Assert.assertEquals(session.getOwner(), "myowner");
     Assert.assertEquals(session.getText(), "mytext");
+    Assert.assertEquals(session.getGranularity(), "mygranularity");
+    Assert.assertEquals(session.getCompareMode(), "mycomparemode");
     Assert.assertEquals(session.getPreviousId(), (Long) 12345L);
   }
 
@@ -105,23 +107,6 @@ public class TestRootcauseSessionManager {
   }
 
   @Test
-  public void testFindSessionByOwnerLike() {
-    this.sessionDAO.save(makeOwner("XYZ"));
-    this.sessionDAO.save(makeOwner("YWX"));
-    this.sessionDAO.save(makeOwner("YX"));
-
-    List<RootcauseSessionDTO> sessionsWX = this.sessionDAO.findByOwnerLike(new HashSet<>(Arrays.asList("W", "X")));
-    List<RootcauseSessionDTO> sessionsXY = this.sessionDAO.findByOwnerLike(new HashSet<>(Arrays.asList("X", "Y")));
-    List<RootcauseSessionDTO> sessionsYZ = this.sessionDAO.findByOwnerLike(new HashSet<>(Arrays.asList("Y", "Z")));
-    List<RootcauseSessionDTO> sessionsWXYZ = this.sessionDAO.findByOwnerLike(new HashSet<>(Arrays.asList("W", "X", "Y", "Z")));
-
-    Assert.assertEquals(sessionsWX.size(), 1);
-    Assert.assertEquals(sessionsXY.size(), 3);
-    Assert.assertEquals(sessionsYZ.size(), 1);
-    Assert.assertEquals(sessionsWXYZ.size(), 0);
-  }
-
-  @Test
   public void testFindByCreatedRange() {
     this.sessionDAO.save(makeCreated(800));
     this.sessionDAO.save(makeCreated(900));
@@ -152,21 +137,6 @@ public class TestRootcauseSessionManager {
   }
 
   @Test
-  public void testFindByBaselineRange() {
-    this.sessionDAO.save(makeBaseline(1000, 1200));
-    this.sessionDAO.save(makeBaseline(1100, 1150));
-    this.sessionDAO.save(makeBaseline(1150, 1300));
-
-    List<RootcauseSessionDTO> sessionsBefore = this.sessionDAO.findByBaselineRange(0, 1000);
-    List<RootcauseSessionDTO> sessionsMid = this.sessionDAO.findByBaselineRange(1000, 1100);
-    List<RootcauseSessionDTO> sessionsEnd = this.sessionDAO.findByBaselineRange(1100, 1175);
-
-    Assert.assertEquals(sessionsBefore.size(), 0);
-    Assert.assertEquals(sessionsMid.size(), 1);
-    Assert.assertEquals(sessionsEnd.size(), 3);
-  }
-
-  @Test
   public void testFindByPreviousId() {
     this.sessionDAO.save(makePrevious(0));
     this.sessionDAO.save(makePrevious(1));
@@ -185,7 +155,8 @@ public class TestRootcauseSessionManager {
   }
 
   private static RootcauseSessionDTO makeDefault() {
-    return DaoTestUtils.getTestRootcauseSessionResult(1000, 1100, 500, 1500, "myname", "myowner", "mytext", 12345L);
+    return DaoTestUtils.getTestRootcauseSessionResult(1000, 1100, 1500, "myname", "myowner",
+        "mytext", "mygranularity", "mycomparemode", 12345L);
   }
 
   private static RootcauseSessionDTO makeName(String name) {
@@ -210,13 +181,6 @@ public class TestRootcauseSessionManager {
     RootcauseSessionDTO session = makeDefault();
     session.setAnomalyRangeStart(start);
     session.setAnomalyRangeEnd(end);
-    return session;
-  }
-
-  private static RootcauseSessionDTO makeBaseline(long start, long end) {
-    RootcauseSessionDTO session = makeDefault();
-    session.setBaselineRangeStart(start);
-    session.setBaselineRangeEnd(end);
     return session;
   }
 

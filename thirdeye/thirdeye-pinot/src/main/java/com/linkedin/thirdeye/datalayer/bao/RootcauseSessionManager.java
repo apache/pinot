@@ -9,9 +9,7 @@ public interface RootcauseSessionManager extends AbstractManager<RootcauseSessio
   List<RootcauseSessionDTO> findByName(String name);
   List<RootcauseSessionDTO> findByNameLike(Set<String> nameFragments);
   List<RootcauseSessionDTO> findByOwner(String owner);
-  List<RootcauseSessionDTO> findByOwnerLike(Set<String> ownerFragments);
   List<RootcauseSessionDTO> findByAnomalyRange(long start, long end);
-  List<RootcauseSessionDTO> findByBaselineRange(long start, long end);
   List<RootcauseSessionDTO> findByCreatedRange(long start, long end);
   List<RootcauseSessionDTO> findByPreviousId(long id);
 }

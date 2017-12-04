@@ -13,11 +13,13 @@ public class RootcauseSessionBean extends AbstractBean {
   private String name;
   private String text;
   private String owner;
+  private String compareMode;
+  private String granularity;
   private Long previousId;
   private Long anomalyRangeStart;
   private Long anomalyRangeEnd;
-  private Long baselineRangeStart;
-  private Long baselineRangeEnd;
+  private Long analysisRangeStart;
+  private Long analysisRangeEnd;
   private Long created;
 
   public String getName() {
@@ -44,6 +46,22 @@ public class RootcauseSessionBean extends AbstractBean {
     this.owner = owner;
   }
 
+  public String getCompareMode() {
+    return compareMode;
+  }
+
+  public void setCompareMode(String compareMode) {
+    this.compareMode = compareMode;
+  }
+
+  public String getGranularity() {
+    return granularity;
+  }
+
+  public void setGranularity(String granularity) {
+    this.granularity = granularity;
+  }
+
   public Long getPreviousId() {
     return previousId;
   }
@@ -68,20 +86,20 @@ public class RootcauseSessionBean extends AbstractBean {
     this.anomalyRangeEnd = anomalyRangeEnd;
   }
 
-  public Long getBaselineRangeStart() {
-    return baselineRangeStart;
+  public Long getAnalysisRangeStart() {
+    return analysisRangeStart;
   }
 
-  public void setBaselineRangeStart(Long baselineRangeStart) {
-    this.baselineRangeStart = baselineRangeStart;
+  public void setAnalysisRangeStart(Long analysisRangeStart) {
+    this.analysisRangeStart = analysisRangeStart;
   }
 
-  public Long getBaselineRangeEnd() {
-    return baselineRangeEnd;
+  public Long getAnalysisRangeEnd() {
+    return analysisRangeEnd;
   }
 
-  public void setBaselineRangeEnd(Long baselineRangeEnd) {
-    this.baselineRangeEnd = baselineRangeEnd;
+  public void setAnalysisRangeEnd(Long analysisRangeEnd) {
+    this.analysisRangeEnd = analysisRangeEnd;
   }
 
   public Long getCreated() {
@@ -102,15 +120,16 @@ public class RootcauseSessionBean extends AbstractBean {
     }
     RootcauseSessionBean that = (RootcauseSessionBean) o;
     return Objects.equals(name, that.name) && Objects.equals(text, that.text) && Objects.equals(owner, that.owner)
+        && Objects.equals(compareMode, that.compareMode) && Objects.equals(granularity, that.granularity)
         && Objects.equals(previousId, that.previousId) && Objects.equals(anomalyRangeStart, that.anomalyRangeStart)
-        && Objects.equals(anomalyRangeEnd, that.anomalyRangeEnd) && Objects.equals(baselineRangeStart,
-        that.baselineRangeStart) && Objects.equals(baselineRangeEnd, that.baselineRangeEnd) && Objects.equals(created,
+        && Objects.equals(anomalyRangeEnd, that.anomalyRangeEnd) && Objects.equals(analysisRangeStart,
+        that.analysisRangeStart) && Objects.equals(analysisRangeEnd, that.analysisRangeEnd) && Objects.equals(created,
         that.created);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, text, owner, previousId, anomalyRangeStart, anomalyRangeEnd, baselineRangeStart,
-        baselineRangeEnd, created);
+    return Objects.hash(name, text, owner, compareMode, granularity, previousId, anomalyRangeStart, anomalyRangeEnd,
+        analysisRangeStart, analysisRangeEnd, created);
   }
 }

@@ -304,18 +304,20 @@ public class DaoTestUtils {
     return anomaly;
   }
 
-  public static RootcauseSessionDTO getTestRootcauseSessionResult(long start, long end, long baselineOffset, long created,
-      String name, String owner, String text, Long previousId) {
+  public static RootcauseSessionDTO getTestRootcauseSessionResult(long start, long end, long created,
+      String name, String owner, String text, String granularity, String compareMode, Long previousId) {
     RootcauseSessionDTO session = new RootcauseSessionDTO();
     session.setAnomalyRangeStart(start);
     session.setAnomalyRangeEnd(end);
-    session.setBaselineRangeStart(start - baselineOffset);
-    session.setBaselineRangeEnd(end - baselineOffset);
+    session.setAnalysisRangeStart(start - 100);
+    session.setAnalysisRangeEnd(end + 100);
     session.setName(name);
     session.setOwner(owner);
     session.setText(text);
     session.setPreviousId(previousId);
     session.setCreated(created);
+    session.setGranularity(granularity);
+    session.setCompareMode(compareMode);
     return session;
   }
 }
