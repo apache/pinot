@@ -16,14 +16,40 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+import com.linkedin.pinot.tools.admin.command.SegmentCreationCommand;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 public class QueryController {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationCommand.class);
+    private static final int DEFAULT_TEST_DURATION = 60;
+
+    @Option(name = "-brokerHost", required = true, metaVar = "<String>", usage = "host name for controller.")
+    private  String _brokerHost = null;
+
+    @Option(name = "-brokerPort", required = true, metaVar = "<int>", usage = "Port number for controller.")
+    private  String _brokerPort = null;
+
+    @Option(name = "-testDuration", required = false, metaVar = "<int>", usage = "Port number for controller.")
+    private  int _testDuration = DEFAULT_TEST_DURATION;
+
 
     public static void main(String[] args) throws Exception {
-        PostQueryCommand postQueryCommand = getPostQueryCommand(args[0], args[1]);
-        int testDuration = Integer.parseInt(args[2]);
+        QueryController queryController = new QueryController();
+        CmdLineParser parser = new CmdLineParser(queryController);
+        parser.parseArgument(args);
+        if (queryController._brokerHost == null || queryController._brokerPort == null) {
+            LOGGER.error("brokerHost or brokerPort not specified");
+            return;
+        }
+
+        PostQueryCommand postQueryCommand = getPostQueryCommand(queryController._brokerHost, queryController._brokerPort);
+        int testDuration = queryController._testDuration;
 
         List<QueryExecutor> executorList = createTableExecutors();
         for (QueryExecutor executor : executorList) {

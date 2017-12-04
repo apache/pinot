@@ -2,7 +2,7 @@
   "metricFieldSpecs": [
     {
       "dataType" : "INT",
-      "name" : "newsPostTime"
+      "name" : "articlePostTime"
     },
     {
       "singleValueField" : true,

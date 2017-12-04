@@ -1,6 +1,6 @@
 [
   {
-    "column" : "newsPostTime",
+    "column" : "articlePostTime",
     "range" : true,
     "rangeStart" : 946684800,
     "rangeEnd"   : 1508873892
