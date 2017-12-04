@@ -328,3 +328,26 @@ create table if not exists alert_snapshot_index (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
+
+create table if not exists rootcause_session_index (
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    name varchar(256),
+    owner varchar(32),
+    previousId bigint(20),
+    anomaly_range_start bigint(8),
+    anomaly_range_end bigint(8),
+    baseline_range_start bigint(8),
+    baseline_range_end bigint(8),
+    created bigint(8),
+    version int(10)
+) ENGINE=InnoDB;
+create index rootcause_session_name_idx on rootcause_session_index(name);
+create index rootcause_session_owner_idx on rootcause_session_index(owner);
+create index rootcause_session_previousId_idx on rootcause_session_index(previousId);
+create index rootcause_session_anomaly_range_start_idx on rootcause_session_index(anomaly_range_start);
+create index rootcause_session_anomaly_range_end_idx on rootcause_session_index(anomaly_range_end);
+create index rootcause_session_baseline_range_start_idx on rootcause_session_index(baseline_range_start);
+create index rootcause_session_baseline_range_end_idx on rootcause_session_index(baseline_range_end);
+create index rootcause_session_created_idx on rootcause_session_index(created);
