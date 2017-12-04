@@ -245,7 +245,6 @@ export default Ember.Controller.extend({
     },
 
     chartOnHover(urns, timestamp) {
-      console.log('chartOnHover(): urns timestamp', urns, timestamp);
       this.setProperties({ hoverUrns: new Set(urns), hoverTimestamp: timestamp });
     },
 
