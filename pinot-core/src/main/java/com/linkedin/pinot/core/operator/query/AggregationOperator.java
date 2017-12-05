@@ -45,12 +45,6 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   }
 
   @Override
-  public boolean open() {
-    _transformOperator.open();
-    return true;
-  }
-
-  @Override
   protected IntermediateResultsBlock getNextBlock() {
     int numDocsScanned = 0;
 
@@ -78,12 +72,6 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    _transformOperator.close();
-    return true;
   }
 
   @Override

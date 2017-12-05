@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toBaselineUrn, filterPrefix, hasPrefix } from '../../../helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, stripTail, hasPrefix, toFilters, toEntities, toMetricLabel } from '../../../helpers/utils';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -12,45 +12,42 @@ export default Ember.Component.extend({
 
   onSelection: null, // function (Set, bool)
 
-  labels: Ember.computed(
+  validUrns: Ember.computed(
     'entities',
     'selectedUrns',
     function () {
       const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
-      const labels = {};
-      [...selectedUrns].filter(urn => hasPrefix(urn, 'thirdeye:')).filter(urn => entities[urn]).forEach(urn => labels[urn] = entities[urn].label);
-      return labels;
-    }
-  ),
-
-  sortedUrns: Ember.computed(
-    'entities',
-    'selectedUrns',
-    function () {
-      const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
-      return [...selectedUrns]
-        .filter(urn => entities[urn])
-        .map(urn => [entities[urn].label.split("::")[1], urn])
-        .sort()
-        .map(t => t[1]);
+      return filterPrefix(selectedUrns, 'thirdeye:').filter(urn => entities[urn] || urn.startsWith('thirdeye:metric:'));
     }
   ),
 
   metrics: Ember.computed(
     'entities',
-    'sortedUrns',
+    'validUrns',
     function () {
-      const { entities, sortedUrns } = this.getProperties('entities', 'sortedUrns');
-      return filterPrefix(sortedUrns, 'thirdeye:metric:').reduce((agg, urn) => { agg[urn] = entities[urn].label.split("::")[1]; return agg; }, {});
+      const { validUrns, entities } = this.getProperties('validUrns', 'entities');
+      return filterPrefix(validUrns, 'thirdeye:metric:').reduce((agg, urn) => {
+        agg[urn] = toMetricLabel(urn, entities);
+        return agg;
+      }, {});
     }
   ),
 
   events: Ember.computed(
     'entities',
-    'sortedUrns',
+    'validUrns',
     function () {
-      const { entities, sortedUrns } = this.getProperties('entities', 'sortedUrns');
-      return filterPrefix(sortedUrns, 'thirdeye:event:').reduce((agg, urn) => { agg[urn] = entities[urn].label; return agg; }, {});
+      const { entities, validUrns } = this.getProperties('entities', 'validUrns');
+      return filterPrefix(validUrns, 'thirdeye:event:').reduce((agg, urn) => { agg[urn] = entities[urn].label; return agg; }, {});
+    }
+  ),
+
+  colors: Ember.computed(
+    'entities',
+    'validUrns',
+    function () {
+      const { entities, validUrns } = this.getProperties('entities', 'validUrns');
+      return validUrns.filter(urn => entities[urn]).reduce((agg, urn) => { agg[urn] = entities[urn].color; return agg; }, {});
     }
   ),
 
@@ -85,6 +82,7 @@ export default Ember.Component.extend({
         const state = invisibleUrns.has(urn);
         const updates = { [urn]: state };
         if (hasPrefix(urn, 'thirdeye:metric:')) {
+          updates[toCurrentUrn(urn)] = state;
           updates[toBaselineUrn(urn)] = state;
         }
         onVisibility(updates);
@@ -96,6 +94,7 @@ export default Ember.Component.extend({
       if (onSelection) {
         const updates = { [urn]: false };
         if (hasPrefix(urn, 'thirdeye:metric:')) {
+          updates[toCurrentUrn(urn)] = false;
           updates[toBaselineUrn(urn)] = false;
         }
         onSelection(updates);
@@ -104,7 +103,7 @@ export default Ember.Component.extend({
 
     visibleMetrics() {
       const { selectedUrns } = this.getProperties('selectedUrns');
-      const visible = new Set(filterPrefix(selectedUrns, ['thirdeye:metric:', 'frontend:baseline:metric:']));
+      const visible = new Set(filterPrefix(selectedUrns, ['thirdeye:metric:', 'frontend:metric:']));
       const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
       this._bulkVisibility(visible, other);
     },

@@ -209,7 +209,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (starTreeIndexSpec == null) {
       starTreeIndexSpec = new StarTreeIndexSpec();
       starTreeIndexSpec.setMaxLeafRecords(StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS);
-      config.setStarTreeIndexSpec(starTreeIndexSpec);
+
+      // Overwrite the null index spec with default one.
+      config.enableStarTreeIndex(starTreeIndexSpec);
     }
     //create star builder config from startreeindexspec. Merge these two in one later.
     StarTreeBuilderConfig starTreeBuilderConfig = new StarTreeBuilderConfig();
@@ -218,9 +220,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setDimensionsSplitOrder(starTreeIndexSpec.getDimensionsSplitOrder());
     starTreeBuilderConfig.setSkipStarNodeCreationDimensions(
         starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
-    starTreeBuilderConfig.setSkipMaterializationDimensions(starTreeIndexSpec.getskipMaterializationForDimensions());
+    starTreeBuilderConfig.setSkipMaterializationDimensions(starTreeIndexSpec.getSkipMaterializationForDimensions());
     starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(
-        starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
+        starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setMaxNumLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
     starTreeBuilderConfig.setExcludeSkipMaterializationDimensionsForStarTreeIndex(
         starTreeIndexSpec.isExcludeSkipMaterializationDimensionsForStarTreeIndex());

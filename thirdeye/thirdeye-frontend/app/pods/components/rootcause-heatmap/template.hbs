@@ -1,9 +1,14 @@
 urns
-{{#each currentUrns as |urn|}}
-  | <button {{action (mut currentUrn) urn}}>{{urn}}</button>
-{{/each}}
+{{#each-in labels as |urn label|}}
+  | <button {{action (mut currentUrn) urn}}>{{label}}</button>
+{{/each-in}}
+
+mode
+| <button {{action (mut mode) "change"}}>change</button>
+| <button {{action (mut mode) "contributionDiff"}}>contribution diff</button>
+| <button {{action (mut mode) "contributionToDiff"}}>contribution to diff</button>
 
 {{heatmap-chart
-  current=current
-  baseline=baseline
+  cells=cells
+  onHeatmapClick=(action "onHeatmapClick")
 }}

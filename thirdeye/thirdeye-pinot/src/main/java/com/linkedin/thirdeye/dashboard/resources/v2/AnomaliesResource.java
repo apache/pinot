@@ -1,54 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Joiner;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
-import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
-import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
-import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
-import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
-import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
-import com.linkedin.thirdeye.util.AnomalyOffset;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -69,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -77,6 +29,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
@@ -89,6 +42,56 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
+import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+import com.linkedin.thirdeye.util.AnomalyOffset;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 
 @Path(value = "/anomalies")
@@ -115,7 +118,6 @@ public class AnomaliesResource {
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
-  private final DashboardConfigManager dashboardConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
   private ExecutorService threadPool;
   private AlertFilterFactory alertFilterFactory;
@@ -126,7 +128,6 @@ public class AnomaliesResource {
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     groupedAnomalyResultsDAO = DAO_REGISTRY.getGroupedAnomalyResultsDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
     datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     threadPool = Executors.newFixedThreadPool(NUM_EXECS);
     this.alertFilterFactory = alertFilterFactory;
@@ -281,14 +282,7 @@ public class AnomaliesResource {
       @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly
       ) throws Exception {
 
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime, false);
-    try {
-      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies, alertFilterFactory);
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to apply alert filters on anomalies in start:{}, end:{}, exception:{}",
-          new DateTime(startTime), new DateTime(endTime), e);
-    }
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findNotifiedByTime(startTime, endTime, false);
     AnomaliesWrapper
         anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
@@ -328,30 +322,6 @@ public class AnomaliesResource {
     return anomaliesWrapper;
   }
 
-  /**
-   * Find anomalies by dashboard id
-   * @param startTime
-   * @param endTime
-   * @param dashboardId
-   * @param functionName
-   * @return
-   * @throws Exception
-   */
-  @GET
-  @Path("search/dashboardId/{startTime}/{endTime}/{pageNumber}")
-  public AnomaliesWrapper getAnomaliesByDashboardId(
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime,
-      @PathParam("pageNumber") int pageNumber,
-      @QueryParam("dashboardId") String dashboardId,
-      @QueryParam("functionName") String functionName,
-      @QueryParam("searchFilters") String searchFiltersJSON,
-      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
-
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findById(Long.valueOf(dashboardId));
-    String metricIdsString = Joiner.on(COMMA_SEPARATOR).join(dashboardConfig.getMetricIds());
-    return getAnomaliesByMetricIds(startTime, endTime, pageNumber, metricIdsString, functionName, searchFiltersJSON, filterOnly);
-  }
 
   /**
    * Find anomalies by metric ids
@@ -461,6 +431,110 @@ public class AnomaliesResource {
       mergedAnomalyResultDAO.updateAnomalyFeedback(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
+    }
+  }
+
+  /**
+   * Create a user-reported anomaly
+   *
+   * @param anomalyFunctionId anomaly function id (must exist)
+   * @param startTime start time utc (in millis)
+   * @param endTime end time utc (in millis)
+   * @param feedbackType anomaly feedback type
+   * @param comment anomaly feedback comment (optional)
+   * @param dimensionsJson dimension map json string (optional)
+   * @throws IllegalArgumentException if the anomaly function id cannot be found
+   * @throws IllegalArgumentException if the anomaly cannot be stored
+   */
+  @POST
+  @Path(value = "/reportAnomaly/{anomalyFunctionId}")
+  public void createUserAnomaly(@PathParam("anomalyFunctionId") long anomalyFunctionId,
+      @QueryParam("startTime") Long startTime,
+      @QueryParam("endTime") Long endTime,
+      @QueryParam("feedbackType") AnomalyFeedbackType feedbackType,
+      @QueryParam("comment") String comment,
+      @QueryParam("dimensionsJson") String dimensionsJson) {
+
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(anomalyFunctionId);
+    if (anomalyFunction == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve anomaly function id %d", anomalyFunctionId));
+    }
+
+    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
+    anomaly.setFunction(anomalyFunction);
+    anomaly.setStartTime(startTime);
+    anomaly.setEndTime(endTime);
+    anomaly.setDimensions(new DimensionMap(dimensionsJson != null ? dimensionsJson : "{}"));
+    anomaly.setAnomalyResultSource(AnomalyResultSource.USER_LABELED_ANOMALY);
+    anomaly.setMetric(anomalyFunction.getTopicMetric());
+    anomaly.setCollection(anomalyFunction.getCollection());
+    anomaly.setProperties(Collections.<String, String>emptyMap());
+    anomaly.setAnomalyResults(Collections.<RawAnomalyResultDTO>emptyList());
+
+    if (mergedAnomalyResultDAO.save(anomaly) == null) {
+      throw new IllegalArgumentException(String.format("Could not store user reported anomaly: '%s'", anomaly));
+    }
+
+    // TODO fix feedback not being saved on create by DAO
+    AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
+    feedback.setFeedbackType(feedbackType);
+    feedback.setComment(comment);
+
+    anomaly.setFeedback(feedback);
+
+    mergedAnomalyResultDAO.updateAnomalyFeedback(anomaly);
+  }
+
+  /**
+   * Update anomaly feedback for all anomalies of a specific anomaly function within a time range.
+   *
+   * @param startTime start time utc (in millis)
+   * @param endTime end time utc (in millis)
+   * @param functionId anomaly function id
+   * @param feedbackType feedback type
+   */
+  @POST
+  @Path(value = "/updateFeedbackRange/{startTime}/{endTime}/{functionId}")
+  public void updateFeedbackForAnomalyFunctionAndTimeRange(
+      @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime,
+      @PathParam("functionId") Long functionId,
+      @QueryParam("feedbackType") String feedbackType) {
+
+    if (functionId == null) {
+      throw new IllegalArgumentException("Must provide functionId");
+    }
+
+    if (startTime == null) {
+      throw new IllegalArgumentException("Must provide startTime");
+    }
+
+    if (endTime == null) {
+      throw new IllegalArgumentException("Must provide endTime");
+    }
+
+    if (feedbackType == null) {
+      throw new IllegalArgumentException("Must provide feedbackType");
+    }
+
+    // fetch anomalies
+    List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.findByFunctionId(functionId, false);
+
+    // apply feedback
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.getStartTime() < endTime && startTime < anomaly.getEndTime()) {
+        LOG.info("Updating feedback for anomaly id {}", anomaly.getId());
+
+        AnomalyFeedback feedback = anomaly.getFeedback();
+        if (feedback == null) {
+          feedback = new AnomalyFeedbackDTO();
+        }
+
+        feedback.setFeedbackType(AnomalyFeedbackType.valueOf(feedbackType));
+        anomaly.setFeedback(feedback);
+
+        mergedAnomalyResultDAO.updateAnomalyFeedback(anomaly);
+      }
     }
   }
 

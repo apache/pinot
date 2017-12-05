@@ -28,20 +28,19 @@ public class ResponseParserUtils {
     for (int i = 0; i < numRows; i++) {
       ThirdEyeResponseRow thirdEyeResponseRow = thirdEyeResponse.getRow(i);
       String key =
-          computeTimeDimensionValues(thirdEyeResponseRow.getTimeBucketId(), thirdEyeResponseRow.getDimensions());
+          computeTimeDimensionValues(thirdEyeResponseRow.getTimestamp(), thirdEyeResponseRow.getDimensions());
       responseMap.put(key, thirdEyeResponseRow);
     }
     return responseMap;
   }
 
-  public static Map<String, ThirdEyeResponseRow> createResponseMapByTime(
-      ThirdEyeResponse thirdEyeResponse) {
+  public static Map<String, ThirdEyeResponseRow> createResponseMapByTime(ThirdEyeResponse thirdEyeResponse) {
     Map<String, ThirdEyeResponseRow> responseMap;
     responseMap = new HashMap<>();
     int numRows = thirdEyeResponse.getNumRows();
     for (int i = 0; i < numRows; i++) {
       ThirdEyeResponseRow thirdEyeResponseRow = thirdEyeResponse.getRow(i);
-      responseMap.put(String.valueOf(thirdEyeResponseRow.getTimeBucketId()), thirdEyeResponseRow);
+      responseMap.put(String.valueOf(thirdEyeResponseRow.getTimestamp()), thirdEyeResponseRow);
     }
     return responseMap;
   }
@@ -77,10 +76,10 @@ public class ResponseParserUtils {
     return Collections.emptyList();
   }
 
-  public static Map<Integer, List<Double>> getMetricSumsByTime(ThirdEyeResponse response) {
+  public static Map<Long, List<Double>> getMetricSumsByTime(ThirdEyeResponse response) {
 
     ThirdEyeRequest request = response.getRequest();
-    Map<Integer, List<Double>> metricSums = new HashMap<>();
+    Map<Long, List<Double>> metricSums = new HashMap<>();
     ThirdEyeRequestBuilder requestBuilder = ThirdEyeRequest.newBuilder();
     requestBuilder.setStartTimeInclusive(request.getStartTimeInclusive());
     requestBuilder.setEndTimeExclusive(request.getEndTimeExclusive());
@@ -99,22 +98,22 @@ public class ResponseParserUtils {
 
     for (int i = 0; i < metricSumsResponse.getNumRows(); i++) {
       ThirdEyeResponseRow row = metricSumsResponse.getRow(i);
-      metricSums.put(row.getTimeBucketId(), row.getMetrics());
+      metricSums.put(row.getTimestamp(), row.getMetrics());
     }
     return metricSums;
   }
 
-  public static String computeTimeDimensionValue(int timeBucketId, String dimensionValue) {
-    return timeBucketId + TIME_DIMENSION_JOINER + dimensionValue;
+  public static String computeTimeDimensionValue(long timestamp, String dimensionValue) {
+    return timestamp + TIME_DIMENSION_JOINER + dimensionValue;
   }
 
-  public static String computeTimeDimensionValues(int timeBucketId, List<String> dimensionValues) {
+  public static String computeTimeDimensionValues(long timestamp, List<String> dimensionValues) {
     if (dimensionValues == null || dimensionValues.size() == 0) {
-      return Integer.toString(timeBucketId);
+      return Long.toString(timestamp);
     } else if (dimensionValues.size() == 1) {
-      return computeTimeDimensionValue(timeBucketId, dimensionValues.get(0));
+      return computeTimeDimensionValue(timestamp, dimensionValues.get(0));
     } else {
-      StringBuilder sb = new StringBuilder(Integer.toString(timeBucketId)).append(TIME_DIMENSION_JOINER);
+      StringBuilder sb = new StringBuilder(Long.toString(timestamp)).append(TIME_DIMENSION_JOINER);
       String separator = "";
       for (String dimensionValue : dimensionValues) {
         sb.append(separator).append(dimensionValue);

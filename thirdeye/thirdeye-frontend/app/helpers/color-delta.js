@@ -7,8 +7,15 @@ import Ember from 'ember';
  * @return {String}          positive or negative modifier for BEM class
  */
 export function colorDelta([value = 'N/A']) {
+  let sign = true;
   if (value ===  'N/A') { return; }
-  return parseInt(value) >= 0 ? 'positive' : 'negative';
+  
+  if (Number.isFinite(value)) {
+    sign = parseInt(value * 100) >= 0;
+  } else {
+    sign = Math.sign(value);
+  }
+  return sign ? 'positive' : 'negative';
 }
 
 export default Ember.Helper.helper(colorDelta);

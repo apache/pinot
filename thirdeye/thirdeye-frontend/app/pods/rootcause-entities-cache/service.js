@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, toBaselineUrn } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterObject, filterPrefix, toBaselineRange, stripTail } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -8,61 +8,76 @@ export default Ember.Service.extend({
 
   context: null, // {}
 
+  nativeUrns: null, // Set
+
   pending: null, // Set
 
   init() {
     this._super(...arguments);
-    this.setProperties({ entities: {}, context: {}, pending: new Set() });
+    this.setProperties({ entities: {}, context: {}, pending: new Set(), nativeUrns: new Set() });
   },
 
   request(requestContext, urns) {
-    console.log('rootcauseEntitiesCache: request()', requestContext, urns);
-    const { context } = this.getProperties('context');
-    if (_.isEqual(context, requestContext)) {
-      console.log('rootcauseEntitiesCache: request: context is up-to-date. ignoring.');
-      return;
+    const { context, entities, nativeUrns } = this.getProperties('context', 'entities', 'nativeUrns');
+
+    // special case: urn identity
+    const requestNativeUrns = new Set(filterPrefix(urns, 'thirdeye:metric:'));
+    if (!_.isEqual(nativeUrns, requestNativeUrns)) {
+      this.setProperties({ nativeUrns: requestNativeUrns });
+
+      const missingSelectedEntities = [...requestNativeUrns].filter(urn => !entities[urn]);
+      if (missingSelectedEntities) {
+        fetch(this._makeIdentityUrl(requestNativeUrns))
+          .then(checkStatus)
+          .then(this._jsonToEntities)
+          .then(incoming => this._complete(requestContext, urns, incoming, 'identity'));
+      }
     }
 
-    const frameworks = new Set(['relatedEvents', 'relatedDimensions', 'relatedMetrics']);
+    // rootcause search
+    if (!_.isEqual(context, requestContext)) {
+      if (!requestContext.urns || !requestContext.urns.size) {
+        const newEntities = filterObject(entities, (e) => urns.has(e.urn));
+        this.setProperties({ context: _.cloneDeep(requestContext), entities: newEntities });
+        return;
+      }
 
-    this.setProperties({ context: _.cloneDeep(requestContext), pending: frameworks });
+      const frameworks = new Set(['relatedEvents', 'relatedDimensions', 'relatedMetrics']);
 
-    frameworks.forEach(framework => {
-      const url = this._makeUrl(framework, requestContext);
-      fetch(url)
-        // .then(checkStatus) // TODO why doesn't this return parsed json here?
-        .then(res => res.json())
-        .then(this._jsonToEntities)
-        .then(incoming => this._complete(requestContext, urns, incoming, framework));
-    });
+      this.setProperties({ context: _.cloneDeep(requestContext), pending: frameworks });
+
+      frameworks.forEach(framework => {
+        fetch(this._makeUrl(framework, requestContext))
+          .then(checkStatus)
+          .then(this._jsonToEntities)
+          .then(incoming => this._complete(requestContext, urns, incoming, framework));
+      });
+    }
   },
 
   _complete(requestContext, pinnedUrns, incoming, framework) {
-    console.log('rootcauseEntitiesCache: complete()', requestContext, pinnedUrns, incoming, framework);
-
     // only accept latest result
     const { context } = this.getProperties('context');
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseEntitiesCache: received stale result. ignoring.');
+      // console.log('rootcauseEntitiesCache: _complete: received stale result. ignoring.');
       return;
     }
 
+    const pinnedBaseUrns = new Set([...pinnedUrns].map(stripTail));
+
     // evict unselected
     const { entities, pending } = this.getProperties('entities', 'pending');
-    const stale = new Set(this._evictionCandidates(entities, framework));
-    const staleSelected = new Set([...stale].filter(urn => pinnedUrns.has(urn)));
-    const staleUnselected = new Set([...stale].filter(urn => !pinnedUrns.has(urn)));
+    const stale = new Set(this._evictionCandidates(entities, framework).map(stripTail));
+    const staleSelected = new Set([...stale].filter(urn => pinnedBaseUrns.has(urn)));
+    const staleUnselected = new Set([...stale].filter(urn => !pinnedBaseUrns.has(urn)));
 
     // rebuild remaining cache
     const remaining = {};
     Object.keys(entities).filter(urn => !staleUnselected.has(urn)).forEach(urn => remaining[urn] = entities[urn]);
     Object.keys(entities).filter(urn => staleSelected.has(urn)).forEach(urn => remaining[urn].score = -1);
 
-    // augment results
-    const augmenting = this._augment(incoming);
-
     // merge
-    const newEntities = Object.assign({}, remaining, augmenting, incoming);
+    const newEntities = Object.assign({}, remaining, incoming);
 
     // update pending
     const newPending = new Set(pending);
@@ -72,37 +87,35 @@ export default Ember.Service.extend({
   },
 
   _evictionCandidates(entities, framework) {
-    if (framework == 'relatedEvents') {
-      return Object.keys(entities).filter(urn => entities[urn].type == 'event');
+    switch (framework) {
+      case 'relatedEvents':
+        return filterPrefix(Object.keys(entities), 'thirdeye:event:');
+      case 'relatedDimensions':
+        return filterPrefix(Object.keys(entities), 'thirdeye:dimension:');
+      case 'relatedMetrics':
+        return filterPrefix(Object.keys(entities), 'thirdeye:metric:');
+      case 'identity':
+        return [];
+      default:
+        return [];
     }
-    if (framework == 'relatedDimensions') {
-      return Object.keys(entities).filter(urn => entities[urn].type == 'dimension');
-    }
-    if (framework == 'relatedMetrics') {
-      return Object.keys(entities).filter(urn => ['metric', 'frontend:baseline:metric'].includes(entities[urn].type));
-    }
-  },
-
-  _augment(incoming) {
-    const entities = {};
-    Object.keys(incoming).filter(urn => incoming[urn].type == 'metric').forEach(urn => {
-      const baselineUrn = toBaselineUrn(urn);
-      entities[baselineUrn] = {
-        urn: baselineUrn,
-        type: 'frontend:baseline:metric',
-        label: incoming[urn].label + ' (baseline)'
-      };
-    });
-    return entities;
   },
 
   _makeUrl(framework, context) {
-    const urnString = [...context.urns].join(',');
+    const baseUrns = filterPrefix(context.urns, ['thirdeye:metric:', 'thirdeye:dimension:']).map(stripTail);
+    const urnString = baseUrns.join(',');
+    const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
       `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
-      `&baselineStart=${context.baselineRange[0]}&baselineEnd=${context.baselineRange[1]}` +
+      `&baselineStart=${baselineRange[0]}&baselineEnd=${baselineRange[1]}` +
       `&analysisStart=${context.analysisRange[0]}&analysisEnd=${context.analysisRange[1]}` +
       `&urns=${urnString}`;
+  },
+
+  _makeIdentityUrl(urns) {
+    const baseUrns = [...urns].map(stripTail);
+    const urnString = baseUrns.join(',');
+    return `/rootcause/raw?framework=identity&urns=${urnString}`;
   },
 
   _jsonToEntities(res) {

@@ -319,7 +319,7 @@ export default Ember.Controller.extend({
    * @return {Boolean} whether errors were found
    */
   isEmailValid(emailArr) {
-    const emailRegex = /^.{3,}\@linkedin.com$/;
+    const emailRegex = /^.{3,}@linkedin.com$/;
     return emailArr.every(email => emailRegex.test(email));
   },
 
@@ -526,8 +526,8 @@ export default Ember.Controller.extend({
       const alertUrl = `/thirdeye/entity?entityType=ANOMALY_FUNCTION`;
       const originalConfigGroup = this.get('model.originalConfigGroup');
       const newApplication = this.get('selectedApplication.application');
-      const newEmailsArr = newEmails ? newEmails.replace(/ /g,'').split(',') : [];
-      const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g,'').split(',') : [];
+      const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
+      const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
       const cleanRecipientsArr = newRecipientsArr.filter(e => String(e).trim()).join(',');
       const postConfigBody = newGroupName ? this.get('newConfigGroupObj') : this.get('selectedConfigGroup');
@@ -557,63 +557,66 @@ export default Ember.Controller.extend({
       };
 
       // Step 1: Save any edits to the Alert entity in our DB
-      return fetch(alertUrl, postProps).then((res) => checkStatus(res, 'post'))
-      .then((saveAlertResponse) => {
+      return fetch(alertUrl, postProps)
+        .then((res) => checkStatus(res, 'post'))
+        .then((saveAlertResponse) => {
 
-        // Step 2: If any edits were made to the Notification Group, prep a POST object to save Config entity
-        if (this.get('isEditedConfigGroup')) {
+          // Step 2: If any edits were made to the Notification Group, prep a POST object to save Config entity
+          if (this.get('isEditedConfigGroup')) {
 
-          // Whether its a new Config object or existing, assign new user-supplied values to these props:
-          Ember.set(postConfigBody, 'application', newApplication);
-          Ember.set(postConfigBody, 'recipients', cleanRecipientsArr);
+            // Whether its a new Config object or existing, assign new user-supplied values to these props:
+            Ember.set(postConfigBody, 'application', newApplication);
+            Ember.set(postConfigBody, 'recipients', cleanRecipientsArr);
 
-          // Make sure current Id is part of new config array
-          if (postConfigBody.emailConfig) {
-            postConfigBody.emailConfig.functionIds = dedupedGroupAlertIdArray;
-          } else {
-            postConfigBody.emailConfig = { functionIds: dedupedGroupAlertIdArray };
-          }
-
-          // Re-use the postProps object, now for config group data
-          postProps.body = JSON.stringify(postConfigBody);
-
-          // Save the edited or new config object (we've added the new Alert Id to it)
-          return fetch(configUrl, postProps).then((res) => checkStatus(res, 'post'))
-          .then((saveConfigResponseA) => {
-            this.setProperties({
-              selectedConfigGroupRecipients: cleanRecipientsArr,
-              alertGroupNewRecipient: null,
-              newConfigGroupName: null
-            });
-
-            // If the user switched config groups or created a new one, remove Alert Id from previous group
-            if (this.get('isNewConfigGroup')) {
-              _.pull(originalConfigGroup.emailConfig.functionIds, currentId);
-              postProps.body = JSON.stringify(originalConfigGroup);
-              return fetch(configUrl, postProps).then((res) => checkStatus(res, 'post'))
-              .then((saveConfigResponseB) => {
-
-                // If save successful, update new config group name before model refresh (avoid big data delay)
-                this.set('updatedRecipients', cleanRecipientsArr);
-                if (Ember.isPresent(newGroupName)) {
-                  this.setProperties({
-                    isNewConfigGroupSaved: true,
-                    selectedConfigGroup: this.get('newConfigGroupObj')
-                  });
-                }
-                this.confirmEditSuccess();
-              });
+            // Make sure current Id is part of new config array
+            if (postConfigBody.emailConfig) {
+              postConfigBody.emailConfig.functionIds = dedupedGroupAlertIdArray;
             } else {
-              this.confirmEditSuccess();
+              postConfigBody.emailConfig = { functionIds: dedupedGroupAlertIdArray };
             }
-          });
-        } else {
-          this.confirmEditSuccess();
-        }
-      })
-      .catch((error) => {
-        this.set('isEditAlertError', true);
-      });
+
+            // Re-use the postProps object, now for config group data
+            postProps.body = JSON.stringify(postConfigBody);
+
+            // Save the edited or new config object (we've added the new Alert Id to it)
+            return fetch(configUrl, postProps)
+              .then((res) => checkStatus(res, 'post'))
+              .then((saveConfigResponseA) => {
+                this.setProperties({
+                  selectedConfigGroupRecipients: cleanRecipientsArr,
+                  alertGroupNewRecipient: null,
+                  newConfigGroupName: null
+                });
+
+                // If the user switched config groups or created a new one, remove Alert Id from previous group
+                if (this.get('isNewConfigGroup')) {
+                  _.pull(originalConfigGroup.emailConfig.functionIds, currentId);
+                  postProps.body = JSON.stringify(originalConfigGroup);
+                  return fetch(configUrl, postProps)
+                    .then((res) => checkStatus(res, 'post'))
+                    .then((saveConfigResponseB) => {
+
+                      // If save successful, update new config group name before model refresh (avoid big data delay)
+                      this.set('updatedRecipients', cleanRecipientsArr);
+                      if (Ember.isPresent(newGroupName)) {
+                        this.setProperties({
+                          isNewConfigGroupSaved: true,
+                          selectedConfigGroup: this.get('newConfigGroupObj')
+                        });
+                      }
+                      this.confirmEditSuccess();
+                    });
+                } else {
+                  this.confirmEditSuccess();
+                }
+              });
+          } else {
+            this.confirmEditSuccess();
+          }
+        })
+        .catch((error) => {
+          this.set('isEditAlertError', true);
+        });
     }
   }
 });

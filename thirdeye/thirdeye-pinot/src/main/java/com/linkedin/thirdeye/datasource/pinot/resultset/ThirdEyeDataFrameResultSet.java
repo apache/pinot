@@ -36,7 +36,7 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
 
   @Override
   public int getColumnCount() {
-    return dataFrame.getSeries().size();
+    return thirdEyeResultSetMetaData.getMetricColumnNames().size();
   }
 
   @Override
@@ -66,6 +66,20 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
   public String getGroupKeyColumnValue(int rowIdx, int columnIdx) {
     Preconditions.checkPositionIndexes(0, columnIdx, getGroupKeyLength() - 1);
     return dataFrame.get(thirdEyeResultSetMetaData.getGroupKeyColumnNames().get(columnIdx)).getString(rowIdx);
+  }
+
+  public ThirdEyeResultSetMetaData getMetaData() {
+    return thirdEyeResultSetMetaData;
+  }
+
+  /**
+   * Returns the data frame of this result set. Caution: Modifying the data frame may cause inconsistency between it
+   * and the metadata of this result set.
+   *
+   * @return the data frame of this result set.
+   */
+  public DataFrame getDataFrame() {
+    return dataFrame;
   }
 
   /**
@@ -100,11 +114,17 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
     for (int columnIdx = 0; columnIdx < resultSet.getColumnCount(); columnIdx++) {
       metricColumnNames.add(resultSet.getColumnName(columnIdx));
     }
-    ThirdEyeResultSetMetaData
-        thirdEyeResultSetMetaData = new ThirdEyeResultSetMetaData(groupKeyColumnNames, metricColumnNames);
+    ThirdEyeResultSetMetaData thirdEyeResultSetMetaData =
+        new ThirdEyeResultSetMetaData(groupKeyColumnNames, metricColumnNames);
 
     // Build the DataFrame
-    DataFrame.Builder dfBuilder = DataFrame.builder(thirdEyeResultSetMetaData.getAllColumnNames());
+    List<String> columnNameWithDataType = new ArrayList<>();
+    //   Always cast dimension values to STRING type
+    for (String groupColumnName : thirdEyeResultSetMetaData.getGroupKeyColumnNames()) {
+      columnNameWithDataType.add(groupColumnName + ":STRING");
+    }
+    columnNameWithDataType.addAll(thirdEyeResultSetMetaData.getMetricColumnNames());
+    DataFrame.Builder dfBuilder = DataFrame.builder(columnNameWithDataType);
     int rowCount = resultSet.getRowCount();
     int metricColumnCount = resultSet.getColumnCount();
     int totalColumnCount = groupByColumnCount + metricColumnCount;
@@ -134,6 +154,7 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
       dfBuilder.append(columnsOfTheRow);
     }
     DataFrame dataFrame = dfBuilder.build();
+    dataFrame.setIndex(thirdEyeResultSetMetaData.getGroupKeyColumnNames());
     // Build ThirdEye's result set
     ThirdEyeDataFrameResultSet thirdEyeDataFrameResultSet =
         new ThirdEyeDataFrameResultSet(thirdEyeResultSetMetaData, dataFrame);

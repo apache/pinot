@@ -1,0 +1,13 @@
+<h3>Tooltip</h3>
+
+<p>{{hoverTimestamp}}</p>
+
+<div class="container">
+  {{#each urns as |urn|}}
+    <div class="row">
+      <div class="col-xs-2">
+        <div class="color-box color-box--{{get colors urn}}"></div>
+        {{get labels urn}}<br/>{{get values urn}}</div>
+    </div>
+  {{/each}}
+</div>

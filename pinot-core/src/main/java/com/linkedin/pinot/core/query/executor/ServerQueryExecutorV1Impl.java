@@ -140,10 +140,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         }
 
         TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
-        globalQueryPlan.execute();
+        dataTable = globalQueryPlan.execute();
         planExecTimer.stopAndRecord();
 
-        dataTable = globalQueryPlan.getInstanceResponse();
         // Update the total docs in the metadata based on un-pruned segments.
         dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(totalRawDocs));
       }

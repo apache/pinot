@@ -7,17 +7,15 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
-
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.testng.Assert;
@@ -34,7 +32,6 @@ public class AutoOnboardPinotMetricsServiceTest {
   private DAOTestBase testDAOProvider;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
-  private DashboardConfigManager dashboardConfigDAO;
 
   @BeforeMethod
   void beforeMethod() throws Exception {
@@ -42,10 +39,12 @@ public class AutoOnboardPinotMetricsServiceTest {
     DAORegistry daoRegistry = DAORegistry.getInstance();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
-    dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
     testAutoLoadPinotMetricsService = new AutoOnboardPinotDataSource(null, null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
-    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, null);
+    Map<String, String> pinotCustomConfigs = new HashMap<>();
+    pinotCustomConfigs.put("configKey1", "configValue1");
+    pinotCustomConfigs.put("configKey2", "configValue2");
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, pinotCustomConfigs, null);
   }
 
   @AfterMethod(alwaysRun = true)
@@ -75,10 +74,6 @@ public class AutoOnboardPinotMetricsServiceTest {
       Assert.assertTrue(schemaMetricNames.contains(metricConfig.getName()));
       metricIds.add(metricConfig.getId());
     }
-
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.
-        findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset);
-    Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
   }
 
   @Test
@@ -86,15 +81,21 @@ public class AutoOnboardPinotMetricsServiceTest {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("newDimension", DataType.STRING, true);
     schema.addField(dimensionFieldSpec);
-    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
+    Map<String, String> pinotCustomConfigs = new HashMap<>();
+    pinotCustomConfigs.put("configKey1", "configValue1");
+    pinotCustomConfigs.put("configKey2", "configValue2");
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, new HashMap<>(pinotCustomConfigs), datasetConfig);
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     DatasetConfigDTO newDatasetConfig1 = datasetConfigDAO.findByDataset(dataset);
     Assert.assertEquals(newDatasetConfig1.getDataset(), dataset);
     Assert.assertEquals(Sets.newHashSet(newDatasetConfig1.getDimensions()), Sets.newHashSet(schema.getDimensionNames()));
+    Assert.assertEquals(newDatasetConfig1.getProperties(), pinotCustomConfigs);
 
     MetricFieldSpec metricFieldSpec = new MetricFieldSpec("newMetric", DataType.LONG);
     schema.addField(metricFieldSpec);
-    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, newDatasetConfig1);
+    pinotCustomConfigs.put("configKey3", "configValue3");
+    pinotCustomConfigs.remove("configKey2");
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, new HashMap<>(pinotCustomConfigs), newDatasetConfig1);
 
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
@@ -106,8 +107,14 @@ public class AutoOnboardPinotMetricsServiceTest {
       metricIds.add(metricConfig.getId());
     }
 
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.
-        findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset);
-    Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
+    // Get the updated dataset config and check custom configs
+    datasetConfig = datasetConfigDAO.findByDataset(dataset);
+    Map<String, String> datasetCustomConfigs = datasetConfig.getProperties();
+    for (Map.Entry<String, String> pinotCustomCnofig : pinotCustomConfigs.entrySet()) {
+      String configKey = pinotCustomCnofig.getKey();
+      String configValue = pinotCustomCnofig.getValue();
+      Assert.assertTrue(datasetCustomConfigs.containsKey(configKey));
+      Assert.assertEquals(datasetCustomConfigs.get(configKey), configValue);
+    }
   }
 }

@@ -179,17 +179,28 @@ public class TableConfigTest {
     Assert.assertNotNull(tableConfigToCompare.getValidationConfig().getStarTreeConfig());
 
     // Check that the configurations are correct.
-    StarTreeIndexSpec starTreeIndexSpec =
-        tableConfigToCompare.getValidationConfig().getStarTreeConfig();
+    StarTreeIndexSpec starTreeIndexSpec = tableConfigToCompare.getValidationConfig().getStarTreeConfig();
 
     Set<String> dims = new HashSet<>();
     dims.add("dims");
 
     Assert.assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
     Assert.assertEquals(starTreeIndexSpec.getMaxLeafRecords(), new Integer(5));
-    Assert.assertEquals(starTreeIndexSpec.getskipMaterializationCardinalityThreshold(), 1);
-    Assert.assertEquals(starTreeIndexSpec.getskipMaterializationForDimensions(), dims);
+    Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
+    Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
     Assert.assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
+
+    StarTreeIndexSpec starTreeIndexSpec1;
+    try {
+      starTreeIndexSpec1 = StarTreeIndexSpec.fromJsonString(starTreeIndexSpec.toJsonString());
+      Assert.assertEquals(starTreeIndexSpec1.getDimensionsSplitOrder(), Collections.singletonList("dim"));
+      Assert.assertEquals(starTreeIndexSpec1.getMaxLeafRecords(), new Integer(5));
+      Assert.assertEquals(starTreeIndexSpec1.getSkipMaterializationCardinalityThreshold(), 1);
+      Assert.assertEquals(starTreeIndexSpec1.getSkipMaterializationForDimensions(), dims);
+      Assert.assertEquals(starTreeIndexSpec1.getSkipStarNodeCreationForDimensions(), dims);
+    } catch (Exception e) {
+    }
+
   }
 
   private void checkTableConfigWithHllConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {

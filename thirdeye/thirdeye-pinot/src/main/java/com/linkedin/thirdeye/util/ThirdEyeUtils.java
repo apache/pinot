@@ -3,14 +3,7 @@
 package com.linkedin.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.api.DimensionMap;
 
 import java.io.IOException;
@@ -25,6 +18,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang.StringUtils;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,16 +28,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -211,8 +201,9 @@ public abstract class ThirdEyeUtils {
    */
   public static TimeSpec getTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
     String timeFormat = getTimeFormatString(datasetConfig);
+    String timezone = datasetConfig.getTimezone();
     TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
-        new TimeGranularity(datasetConfig.bucketTimeGranularity()), timeFormat);
+        new TimeGranularity(datasetConfig.bucketTimeGranularity()), timeFormat, DateTimeZone.forID(timezone));
     return timespec;
   }
 
@@ -228,8 +219,10 @@ public abstract class ThirdEyeUtils {
    */
   public static TimeSpec getTimestampTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
     String timeFormat = getTimeFormatString(datasetConfig);
+    String timezone = datasetConfig.getTimezone();
     TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
-        new TimeGranularity(datasetConfig.getTimeDuration(), datasetConfig.getTimeUnit()), timeFormat);
+        new TimeGranularity(datasetConfig.getTimeDuration(), datasetConfig.getTimeUnit()), timeFormat,
+        DateTimeZone.forID(timezone));
     return timespec;
   }
 
@@ -301,57 +294,11 @@ public abstract class ThirdEyeUtils {
     return metricConfig.getName();
   }
 
-  public static Schema createSchema(CollectionSchema collectionSchema) {
-    Schema schema = new Schema();
-
-    for (DimensionSpec dimensionSpec : collectionSchema.getDimensions()) {
-      FieldSpec fieldSpec = new DimensionFieldSpec();
-      String dimensionName = dimensionSpec.getName();
-      fieldSpec.setName(dimensionName);
-      fieldSpec.setDataType(DataType.STRING);
-      fieldSpec.setSingleValueField(true);
-      schema.addField(dimensionName, fieldSpec);
-    }
-    for (MetricSpec metricSpec : collectionSchema.getMetrics()) {
-      FieldSpec fieldSpec = new MetricFieldSpec();
-      String metricName = metricSpec.getName();
-      fieldSpec.setName(metricName);
-      fieldSpec.setDataType(DataType.valueOf(metricSpec.getType().toString()));
-      fieldSpec.setSingleValueField(true);
-      schema.addField(metricName, fieldSpec);
-    }
-    TimeSpec timeSpec = collectionSchema.getTime();
-    String timeFormat = timeSpec.getFormat().equals("sinceEpoch") ? TimeFormat.EPOCH.toString()
-        : TimeFormat.SIMPLE_DATE_FORMAT.toString() + ":" + timeSpec.getFormat();
-    TimeGranularitySpec incoming =
-        new TimeGranularitySpec(DataType.LONG,
-            timeSpec.getDataGranularity().getSize(),
-            timeSpec.getDataGranularity().getUnit(),
-            timeFormat,
-            timeSpec.getColumnName());
-    TimeGranularitySpec outgoing =
-        new TimeGranularitySpec(DataType.LONG,
-            timeSpec.getDataGranularity().getSize(),
-            timeSpec.getDataGranularity().getUnit(),
-            timeFormat,
-            timeSpec.getColumnName());
-
-    schema.addField(timeSpec.getColumnName(), new TimeFieldSpec(incoming, outgoing));
-
-    schema.setSchemaName(collectionSchema.getCollection());
-
-    return schema;
-  }
-
   public static String constructMetricAlias(String datasetName, String metricName) {
     String alias = datasetName + MetricConfigBean.ALIAS_JOINER + metricName;
     return alias;
   }
 
-  public static String getDefaultDashboardName(String dataset) {
-    String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
-    return dashboardName;
-  }
 
   //By default, query only offline, unless dataset has been marked as realtime
   public static String computeTableName(String collection) {

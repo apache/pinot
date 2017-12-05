@@ -64,7 +64,7 @@ public class DataFrameUtils {
     // values
     for(int i=0; i<response.getNumRows(); i++) {
       ThirdEyeResponseRow r = response.getRow(i);
-      timeBuilder.addValues(r.getTimeBucketId());
+      timeBuilder.addValues(r.getTimestamp());
 
       for(int j=0; j<r.getDimensions().size(); j++) {
         dimensionBuilders.get(j).addValues(r.getDimensions().get(j));
@@ -127,9 +127,12 @@ public class DataFrameUtils {
       values[i] = MetricExpression.evaluateExpression(me, context);
     }
 
-    df.addSeries(COL_VALUE, values);
+    // drop intermediate columns
+    for(MetricFunction f : functions) {
+      df.dropSeries(f.toString());
+    }
 
-    return df;
+    return df.addSeries(COL_VALUE, values);
   }
 
   /**
@@ -185,9 +188,7 @@ public class DataFrameUtils {
    * @return response as dataframe
    */
   public static DataFrame evaluateResponse(ThirdEyeResponse response, TimeSeriesRequestContainer rc) throws Exception {
-    long start = ((rc.start + rc.interval - 1) / rc.interval) * rc.interval;
-    long end = ((rc.end + rc.interval - 1) / rc.interval) * rc.interval;
-    return alignTimestamps(evaluateExpressions(parseResponse(response), rc.getExpressions()), start, end, rc.getInterval());
+    return evaluateExpressions(parseResponse(response), rc.getExpressions());
   }
 
   /**

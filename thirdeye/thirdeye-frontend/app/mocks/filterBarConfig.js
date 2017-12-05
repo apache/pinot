@@ -10,35 +10,91 @@
  */
 export default [
   {
-    header: "Holiday",
+    header: "Anomalies",
+    eventType: "anomaly",
+    inputs: [
+      {
+        label: "dataset",
+        labelMapping: "dataset",
+        type: "dropdown"
+      },
+      {
+        label: "metric",
+        labelMapping: "metric",
+        type: "dropdown"
+      }
+    ]
+  },
+  {
+    header: "Holidays",
     eventType: "holiday",
     inputs: [
       {
-        label: "country",
+        label: "Country",
         labelMapping: "countryCode",
         type: "dropdown"
-      }, {
-        label: "region",
+      }
+    ]
+  },
+  {
+    header: "Issues",
+    eventType: "gcn",
+    inputs: [
+      {
+        label: "Fabric",
+        labelMapping: "fabrics",
+        type: "dropdown"
+      },
+      {
+        label: "Status",
+        labelMapping: "status",
+        type: "dropdown"
+      },
+      {
+        label: "Priority",
+        labelMapping: "priority",
+        type: "dropdown"
+      },
+    ]
+  },
+  {
+    header: "Experiments",
+    eventType: "lix",
+    inputs: [
+      {
+        label: "metrics",
+        labelMapping: "metrics",
+        type: "dropdown"
+      },
+      {
+        label: "services",
+        labelMapping: "services",
+        type: "dropdown"
+      },
+      {
+        label: "tags",
+        labelMapping: "tags",
         type: "dropdown"
       }
     ]
   },
   {
-    header: "Deployment",
-    eventType: "deployment",
+    header: "Deployments",
+    eventType: "informed",
     inputs: [
       {
-        label: "fabric",
+        label: "services",
+        labelMapping: "services",
         type: "dropdown"
-      }
-    ]
-  },
-  {
-    header: "Other Anomalies",
-    eventType: "other anomalies",
-    inputs: [
+      },
       {
-        label: "resolution",
+        label: "actions",
+        labelMapping: "actions",
+        type: "dropdown"
+      },
+      {
+        label: "fabrics",
+        labelMapping: "fabrics",
         type: "dropdown"
       }
     ]

@@ -226,7 +226,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           // Generate and send out an anomaly report for this group
           AnomalyReportGenerator.getInstance()
               .buildReport(groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, thirdeyeConfig, recipientsForThisGroup,
-                  alertConfig.getFromAddress(), emailSubjectName);
+                  emailSubjectName, alertConfig);
           // Update notified flag
           if (alertGrouper instanceof DummyAlertGrouper) {
             // DummyAlertGroupFilter does not generate real GroupedAnomaly, so the flag has to be set on merged anomalies.

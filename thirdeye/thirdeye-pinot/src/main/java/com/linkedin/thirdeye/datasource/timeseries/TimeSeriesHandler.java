@@ -148,7 +148,7 @@ public class TimeSeriesHandler {
         try {
           return TimeSeriesHandler.this.handle(timeSeriesRequest, timeSeriesResponseParser);
         } catch (Exception e) {
-          LOG.warn("Failed to retrieve time series of the request: {}", timeSeriesRequest);
+          LOG.warn("Failed to retrieve time series of the request: {}", timeSeriesRequest, e);
         }
         return null;
       }

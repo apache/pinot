@@ -7,7 +7,9 @@ import com.linkedin.thirdeye.completeness.checker.Wo4WAvgDataCompletenessAlgorit
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -32,7 +34,7 @@ public class DatasetConfigBean extends AbstractBean {
 
   private String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
 
-  private String timezone = TimeSpec.DEFAULT_TIMEZONE;
+  private String timezone = TimeSpec.DEFAULT_TIMEZONE.toString();
 
   /** Introduce this as a dataset property because count* queries will have no metric information **/
   private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;
@@ -72,6 +74,8 @@ public class DatasetConfigBean extends AbstractBean {
   private String dataCompletenessAlgorithm = DEFAULT_COMPLETENESS_ALGORITHM;
   // expected percentage completeness for dataset to be marked complete
   private double expectedCompleteness = Wo4WAvgDataCompletenessAlgorithm.DEFAULT_EXPECTED_COMPLETENESS;
+
+  private Map<String, String> properties = new HashMap<>();
 
 
   public String getDataset() {
@@ -244,6 +248,14 @@ public class DatasetConfigBean extends AbstractBean {
 
   public void setDataCompletenessAlgorithm(String dataCompletenessAlgorithm) {
     this.dataCompletenessAlgorithm = dataCompletenessAlgorithm;
+  }
+
+  public Map<String, String> getProperties() {
+    return properties;
+  }
+
+  public void setProperties(Map<String, String> properties) {
+    this.properties = properties;
   }
 
   @Override

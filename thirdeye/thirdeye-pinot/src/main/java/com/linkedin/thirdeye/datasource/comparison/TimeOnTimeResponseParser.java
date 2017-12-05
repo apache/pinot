@@ -1,20 +1,5 @@
 package com.linkedin.thirdeye.datasource.comparison;
 
-import static com.linkedin.thirdeye.datasource.ResponseParserUtils.OTHER;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datasource.MetricFunction;
@@ -24,6 +9,20 @@ import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.datasource.comparison.Row.Builder;
 import com.linkedin.thirdeye.datasource.comparison.Row.Metric;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static com.linkedin.thirdeye.datasource.ResponseParserUtils.OTHER;
 
 public class TimeOnTimeResponseParser {
 
@@ -175,9 +174,11 @@ public class TimeOnTimeResponseParser {
 
     for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
       Range<DateTime> baselineTimeRange = baselineRanges.get(timeBucketId);
-      ThirdEyeResponseRow baselineRow = baselineResponseMap.get(String.valueOf(timeBucketId));
+      long baselineTimestamp = baselineTimeRange.lowerEndpoint().getMillis();
+      ThirdEyeResponseRow baselineRow = baselineResponseMap.get(Long.toString(baselineTimestamp));
       Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
-      ThirdEyeResponseRow currentRow = currentResponseMap.get(String.valueOf(timeBucketId));
+      long currentTimestamp = currentTimeRange.lowerEndpoint().getMillis();
+      ThirdEyeResponseRow currentRow = currentResponseMap.get(Long.toString(currentTimestamp));
       Row.Builder builder = new Row.Builder();
       builder.setBaselineStart(baselineTimeRange.lowerEndpoint());
       builder.setBaselineEnd(baselineTimeRange.upperEndpoint());
@@ -195,8 +196,8 @@ public class TimeOnTimeResponseParser {
     baselineResponseMap = ResponseParserUtils.createResponseMapByTimeAndDimension(baselineResponse);
     currentResponseMap = ResponseParserUtils.createResponseMapByTimeAndDimension(currentResponse);
 
-    Map<Integer, List<Double>> baselineMetricSums = ResponseParserUtils.getMetricSumsByTime(baselineResponse);
-    Map<Integer, List<Double>> currentMetricSums = ResponseParserUtils.getMetricSumsByTime(currentResponse);
+    Map<Long, List<Double>> baselineMetricSums = ResponseParserUtils.getMetricSumsByTime(baselineResponse);
+    Map<Long, List<Double>> currentMetricSums = ResponseParserUtils.getMetricSumsByTime(currentResponse);
 
     // group by time and dimension values
     Set<String> timeDimensionValues = new HashSet<>();
@@ -248,8 +249,12 @@ public class TimeOnTimeResponseParser {
         Range<DateTime> currentTimeRange = currentRanges.get(timeBucketId);
 
         // compute the time|dimension key
-        String baselineTimeDimensionValue = ResponseParserUtils.computeTimeDimensionValue(timeBucketId, dimensionValue);
-        String currentTimeDimensionValue = baselineTimeDimensionValue;
+        long baselineTimestamp = baselineTimeRange.lowerEndpoint().getMillis();
+        String baselineTimeDimensionValue =
+            ResponseParserUtils.computeTimeDimensionValue(baselineTimestamp, dimensionValue);
+        long currentTimestamp = currentTimeRange.lowerEndpoint().getMillis();
+        String currentTimeDimensionValue =
+            ResponseParserUtils.computeTimeDimensionValue(currentTimestamp, dimensionValue);
 
         ThirdEyeResponseRow baselineRow = baselineResponseMap.get(baselineTimeDimensionValue);
         ThirdEyeResponseRow currentRow = currentResponseMap.get(currentTimeDimensionValue);
@@ -270,7 +275,9 @@ public class TimeOnTimeResponseParser {
       // check if rows pass threshold
       boolean passedThreshold = false;
       for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-        if (checkMetricSums(thresholdRows.get(timeBucketId), baselineMetricSums.get(timeBucketId), currentMetricSums.get(timeBucketId))) {
+        if (checkMetricSums(thresholdRows.get(timeBucketId),
+            baselineMetricSums.get(baselineRanges.get(timeBucketId).lowerEndpoint()),
+            currentMetricSums.get(currentRanges.get(timeBucketId).lowerEndpoint()))) {
           passedThreshold = true;
           break;
         }

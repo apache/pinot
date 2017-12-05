@@ -202,11 +202,10 @@ export default Ember.Controller.extend({
     };
 
     // Two ways to trigger replay
-    if (isReplayModeWrapper) {
+    if (this.get('isReplayModeWrapper')) {
       fetch(replayWrapperUrl, postProps).then((res) => checkStatus(res, 'post')).then((response) => {
         this.set('isReplayPending', false);
-      })
-      .catch((error) => {
+      }).catch((error) => {
         this.set('isReplayStatusError', true);
       });
     } else {
@@ -214,8 +213,7 @@ export default Ember.Controller.extend({
         response.json().then((jobId) => {
           this.checkReplayStatus(Object.values(jobId)[0]);
         });
-      })
-      .catch((error) => {
+      }).catch((error) => {
         this.set('isReplayStatusError', true);
       });
     }

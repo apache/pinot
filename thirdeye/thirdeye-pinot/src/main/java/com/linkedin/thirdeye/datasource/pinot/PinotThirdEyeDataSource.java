@@ -7,20 +7,26 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.TimeRangeUtils;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeDataFrameResultSet;
 import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
 import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetMetaData;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
@@ -28,9 +34,11 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -111,7 +119,16 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     } else {
       cacheLoaderClassName = PinotControllerResponseCacheLoader.class.getName();
     }
-    Constructor<?> constructor = Class.forName(cacheLoaderClassName).getConstructor();
+    LOG.info("Constructing cache loader: {}", cacheLoaderClassName);
+    Class<?> aClass = null;
+    try {
+      aClass = Class.forName(cacheLoaderClassName);
+    } catch (Throwable throwable) {
+      LOG.error("Failed to initiate cache loader: {}; reason:", cacheLoaderClassName, throwable);
+      aClass = PinotControllerResponseCacheLoader.class;
+    }
+    LOG.info("Initiating cache loader: {}", aClass.getName());
+    Constructor<?> constructor = aClass.getConstructor();
     PinotResponseCacheLoader pinotResponseCacheLoader = (PinotResponseCacheLoader) constructor.newInstance();
     return pinotResponseCacheLoader;
   }
@@ -122,21 +139,22 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   }
 
   @Override
-  public PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    Preconditions.checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.",
-        getName());
+  public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
+    Preconditions
+        .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
     long tStart = System.nanoTime();
     try {
       LinkedHashMap<MetricFunction, List<ThirdEyeResultSet>> metricFunctionToResultSetList = new LinkedHashMap<>();
 
-      TimeSpec timeSpec = null;
+      // TODO: Change this to consider multiple data time spec from different datasets.
+      // We assume that every dataset has the same data time spec for now.
+      TimeSpec dataTimeSpec = null;
       for (MetricFunction metricFunction : request.getMetricFunctions()) {
         String dataset = metricFunction.getDataset();
         DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
-        TimeSpec dataTimeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
-        if (timeSpec == null) {
-          timeSpec = dataTimeSpec;
+        if (dataTimeSpec == null) {
+          dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
         }
 
         Multimap<String, String> decoratedFilterSet = request.getFilterSet();
@@ -151,25 +169,196 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         }
 
         // By default, query only offline, unless dataset has been marked as realtime
-        String tableName = ThirdEyeUtils.computeTableName(dataset);
-        String pql = null;
+        TimeSpec timestampTimeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
         MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
+        String pql = null;
         if (metricConfig != null && metricConfig.isDimensionAsMetric()) {
-          pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, dataTimeSpec, datasetConfig);
+          pql = PqlUtils
+              .getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, timestampTimeSpec, datasetConfig);
         } else {
-          pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
+          pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, timestampTimeSpec);
         }
+        String tableName = ThirdEyeUtils.computeTableName(dataset);
         ThirdEyeResultSetGroup resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
+        // Makes a copy for each DataFrameResultSet to prevent any change of the data frame refexes to the loading cache.
+        resultSetGroup = copyDataFrameResultSets(resultSetGroup);
+        // Create timestamp column to ms
+        resultSetGroup = convertTimestampToMS(resultSetGroup, timestampTimeSpec);
         metricFunctionToResultSetList.put(metricFunction, resultSetGroup.getResultSets());
       }
-
-      List<String[]> resultRows = parseResultSets(request, metricFunctionToResultSetList);
-      PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, timeSpec);
-      return resp;
+      // TODO: Roll up the data from different datasets to the same time granularity before join them
+      // Join the data from different result sets and datasets
+      ThirdEyeDataFrameResultSet joinedResultSet = joinResultSets(metricFunctionToResultSetList);
+      // TODO: Evaluate expression before return the response
+      TimeSpec convertedTimeSpec =
+          new TimeSpec(dataTimeSpec.getColumnName(), dataTimeSpec.getDataGranularity(), TimeSpec.SINCE_EPOCH_FORMAT,
+              dataTimeSpec.getTimezone());
+      return new PinotDataFrameThirdEyeResponse(request, convertedTimeSpec, joinedResultSet.getMetaData(),
+          joinedResultSet.getDataFrame());
     } finally {
       ThirdeyeMetricsUtil.pinotCallCounter.inc();
       ThirdeyeMetricsUtil.pinotDurationCounter.inc(System.nanoTime() - tStart);
     }
+  }
+
+  /**
+   * Ensures the data frame of {@link ThirdEyeDataFrameResultSet} is copied to prevent any future changes to its data
+   * frame also changes the value in the loading cache.
+   *
+   * @param resultSetGroup the result set group from the loading cache.
+   *
+   * @return the result set group whose data frame result sets are a copy of that in the loading cache.
+   */
+  private ThirdEyeResultSetGroup copyDataFrameResultSets(ThirdEyeResultSetGroup resultSetGroup) {
+    List<ThirdEyeResultSet> resultSets = resultSetGroup.getResultSets();
+    List<ThirdEyeResultSet> copiedResultSets = new ArrayList<>();
+    for (ThirdEyeResultSet resultSet : resultSets) {
+      if (resultSet instanceof ThirdEyeDataFrameResultSet) {
+        ThirdEyeDataFrameResultSet dataFrameResultSet = (ThirdEyeDataFrameResultSet) resultSet;
+        DataFrame copiedDataFrame = new DataFrame(dataFrameResultSet.getDataFrame());
+        ThirdEyeResultSet copiedResultSet =
+            new ThirdEyeDataFrameResultSet(dataFrameResultSet.getMetaData(), copiedDataFrame);
+        copiedResultSets.add(copiedResultSet);
+      } else {
+        copiedResultSets.add(resultSet);
+      }
+    }
+    return new ThirdEyeResultSetGroup(copiedResultSets);
+  }
+
+  /**
+   * Converts the timestamp that is stored in Pinot to ThirdEye's uniform format, i.e., milliseconds.
+   * This method takes care these timestamp formats in Pinot:
+   * 1. ISO format in yyyyMMdd.
+   * 2. EPOCH format in different granularity (e.g., Epoch in MS, Epoch in 5-MINS, Epoch in 1-HOURS, etc.)
+   *
+   * @param originalResultSetGroup the result set group that contains the result sets whose timestamp column should be
+   *                               converted to MS.
+   * @param timestampTimeSpec the timestamp spec. of the result set. Typically, the spec is related to the dataset from which
+   *                          the data of the result set group come.
+   *
+   * @return a result set group whose result sets' time column is converted to MS.
+   */
+  private ThirdEyeResultSetGroup convertTimestampToMS(ThirdEyeResultSetGroup originalResultSetGroup,
+      final TimeSpec timestampTimeSpec) {
+
+    if (timestampTimeSpec != null) {
+      final DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyyMMdd");
+      boolean isEPOCH =
+          timestampTimeSpec.getFormat() == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timestampTimeSpec.getFormat());
+
+      List<ThirdEyeResultSet> timestampConvertedResultSets = new ArrayList<>();
+      for (ThirdEyeResultSet thirdEyeResultSet : originalResultSetGroup.getResultSets()) {
+        // TODO: Should we enforce the usage of ThirdEyeDataFrameResultSet?
+        ThirdEyeDataFrameResultSet dataFrameResultSet = (ThirdEyeDataFrameResultSet) thirdEyeResultSet;
+        DataFrame dataFrame = new DataFrame(dataFrameResultSet.getDataFrame());
+        if (dataFrame.contains(timestampTimeSpec.getColumnName())) {
+          if (isEPOCH) {
+            final TimeGranularity dataGranularity = timestampTimeSpec.getDataGranularity();
+            dataFrame.mapInPlace(new Series.StringFunction() {
+              @Override
+              public String apply(String... values) {
+                return Long.toString(dataGranularity.toMillis(Long.parseLong(values[0])));
+              }
+            }, timestampTimeSpec.getColumnName());
+          } else {
+            dataFrame.mapInPlace(new Series.StringFunction() {
+              @Override
+              public String apply(String... values) {
+                DateTime dateTime = fmt.withZone(timestampTimeSpec.getTimezone()).parseDateTime(values[0]);
+                return Long.toString(dateTime.getMillis());
+              }
+            }, timestampTimeSpec.getColumnName());
+          }
+          // Add the timestamp-converted result set
+          ThirdEyeDataFrameResultSet newDataFrameResultSet =
+              new ThirdEyeDataFrameResultSet(dataFrameResultSet.getMetaData(), dataFrame);
+          timestampConvertedResultSets.add(newDataFrameResultSet);
+        } else {
+          timestampConvertedResultSets.add(dataFrameResultSet);
+        }
+      }
+
+      return new ThirdEyeResultSetGroup(timestampConvertedResultSets);
+    } else {
+      return originalResultSetGroup;
+    }
+  }
+
+  /**
+   * Returns a result sets that joins multiple (GroupBy) result sets. When we send a group-by query as the following:
+   *   SELECT SUM(traffic_count),SUM(page_view) FROM dataset GROUP BY time,
+   * two results will be returned, which contains the following columns, perspectively:
+   * 1. time, sum_traffic_count
+   * 2. time, page_view
+   *
+   * This method joins these two result sets and returns a result set that contain these columns in one table:
+   *   time, sum_traffic_count, page_view.
+   *
+   * @param metricFunctionToResultSetList the result sets returned from Pinot.
+   *
+   * @return a joined result set.
+   */
+  private ThirdEyeDataFrameResultSet joinResultSets(
+      Map<MetricFunction, List<ThirdEyeResultSet>> metricFunctionToResultSetList) {
+
+    Set<String> metricNames = new LinkedHashSet<>();
+    DataFrame joinedDf = null;
+    List<String> groupKeyColumnNames = null;
+    for (Entry<MetricFunction, List<ThirdEyeResultSet>> metricFunctionResultSets : metricFunctionToResultSetList
+        .entrySet()) {
+      List<ThirdEyeResultSet> resultSets = metricFunctionResultSets.getValue();
+      for (ThirdEyeResultSet resultSet : resultSets) {
+        ThirdEyeDataFrameResultSet dataFrameResultSet = (ThirdEyeDataFrameResultSet) resultSet;
+        // 2x2 join on all result sets
+        if (joinedDf != null) {
+          DataFrame dataFrameRight = dataFrameResultSet.getDataFrame();
+          if (Objects.equals(joinedDf.getIndexNames(), dataFrameRight.getIndexNames())) {
+            if (CollectionUtils.isNotEmpty(joinedDf.getIndexNames())) {
+              // Group-By Results
+              joinedDf = joinedDf.joinLeft(dataFrameRight);
+            } else {
+              // Aggregation Results or Select Results
+              for (Entry<String, Series> seriesEntry : dataFrameRight.getSeries().entrySet()) {
+                joinedDf.addSeries(seriesEntry.getKey(), seriesEntry.getValue());
+              }
+            }
+          } else {
+            // Mix of different types of results
+            throw new IllegalArgumentException("Unsupported Join operation on data frames with different indexes; "
+                + "Make sure the query results are the same types (e.g., all aggregation results, all group by results,"
+                + " etc.)");
+          }
+        } else {
+          // The very first result set
+          joinedDf = new DataFrame(dataFrameResultSet.getDataFrame());
+          groupKeyColumnNames = dataFrameResultSet.getMetaData().getGroupKeyColumnNames();
+        }
+        // Build matadata regarding metric column names
+        for (int i = 0; i < dataFrameResultSet.getColumnCount(); i++) {
+          String metricName = dataFrameResultSet.getColumnName(i);
+          if (metricNames.contains(metricName)) {
+            throw new IllegalArgumentException(
+                String.format("Unable to join duplicated metric column: %s", metricName));
+          } else {
+            metricNames.add(metricName);
+          }
+        }
+      }
+    }
+
+    // Create empty result. This case typically happens when Pinot query encounters exceptions such as time out.
+    // TODO: create proper groupKeyColumnNames from ThirdEyeRequest?
+    if (joinedDf == null) {
+      joinedDf = new DataFrame();
+      groupKeyColumnNames = ImmutableList.of();
+    }
+
+    ThirdEyeResultSetMetaData metaData =
+        new ThirdEyeResultSetMetaData(groupKeyColumnNames, new ArrayList<String>(metricNames));
+
+    ThirdEyeDataFrameResultSet resultSet = new ThirdEyeDataFrameResultSet(metaData, joinedDf);
+    return resultSet;
   }
 
   /**
@@ -254,120 +443,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
     pinotResponseCache.refresh(pinotQuery);
 
-    return pinotResponseCache.get(pinotQuery);
+    return executePQL(pinotQuery);
   }
-
-  private List<String[]> parseResultSets(ThirdEyeRequest request,
-      Map<MetricFunction, List<ThirdEyeResultSet>> metricFunctionToResultSetList) throws ExecutionException {
-
-    int numGroupByKeys = 0;
-    boolean hasGroupBy = false;
-    if (request.getGroupByTimeGranularity() != null) {
-      numGroupByKeys += 1;
-    }
-    if (request.getGroupBy() != null) {
-      numGroupByKeys += request.getGroupBy().size();
-    }
-    if (numGroupByKeys > 0) {
-      hasGroupBy = true;
-    }
-    int numMetrics = request.getMetricFunctions().size();
-    int numCols = numGroupByKeys + numMetrics;
-    boolean hasGroupByTime = false;
-    if (request.getGroupByTimeGranularity() != null) {
-      hasGroupByTime = true;
-    }
-
-    int position = 0;
-    LinkedHashMap<String, String[]> dataMap = new LinkedHashMap<>();
-    for (Entry<MetricFunction, List<ThirdEyeResultSet>> entry : metricFunctionToResultSetList.entrySet()) {
-
-      MetricFunction metricFunction = entry.getKey();
-
-      String dataset = metricFunction.getDataset();
-      DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
-      TimeSpec dataTimeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
-
-      TimeGranularity dataGranularity = null;
-      long startTime = request.getStartTimeInclusive().getMillis();
-      DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
-      DateTime startDateTime = new DateTime(startTime, dateTimeZone);
-      dataGranularity = dataTimeSpec.getDataGranularity();
-      boolean isISOFormat = false;
-      DateTimeFormatter inputDataDateTimeFormatter = null;
-      String timeFormat = dataTimeSpec.getFormat();
-      if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
-        isISOFormat = true;
-        inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dateTimeZone);
-      }
-
-      List<ThirdEyeResultSet> resultSets = entry.getValue();
-      for (int i = 0; i < resultSets.size(); i++) {
-        ThirdEyeResultSet resultSet = resultSets.get(i);
-        int numRows = resultSet.getRowCount();
-        for (int r = 0; r < numRows; r++) {
-          boolean skipRowDueToError = false;
-          String[] groupKeys;
-          if (hasGroupBy) {
-            groupKeys = new String[resultSet.getGroupKeyLength()];
-            for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
-              String groupKeyVal = "";
-              try {
-                groupKeyVal = resultSet.getGroupKeyColumnValue(r, grpKeyIdx);
-              } catch (Exception e) {
-                // IGNORE FOR NOW, workaround for Pinot Bug
-              }
-              if (hasGroupByTime && grpKeyIdx == 0) {
-                int timeBucket;
-                long millis;
-                if (!isISOFormat) {
-                  millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
-                } else {
-                  millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
-                }
-                if (millis < startTime) {
-                  LOG.error("Data point earlier than requested start time {}: {}", new Date(startTime), new Date(millis));
-                  skipRowDueToError = true;
-                  break;
-                }
-                timeBucket = TimeRangeUtils
-                    .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
-                        new DateTime(millis, dateTimeZone));
-                groupKeyVal = String.valueOf(timeBucket);
-              }
-              groupKeys[grpKeyIdx] = groupKeyVal;
-            }
-            if (skipRowDueToError) {
-              continue;
-            }
-          } else {
-            groupKeys = new String[] {};
-          }
-          StringBuilder groupKeyBuilder = new StringBuilder("");
-          for (String grpKey : groupKeys) {
-            groupKeyBuilder.append(grpKey).append("|");
-          }
-          String compositeGroupKey = groupKeyBuilder.toString();
-          String[] rowValues = dataMap.get(compositeGroupKey);
-          if (rowValues == null) {
-            rowValues = new String[numCols];
-            Arrays.fill(rowValues, "0");
-            System.arraycopy(groupKeys, 0, rowValues, 0, groupKeys.length);
-            dataMap.put(compositeGroupKey, rowValues);
-          }
-          rowValues[groupKeys.length + position + i] =
-              String.valueOf(Double.parseDouble(rowValues[groupKeys.length + position + i])
-                  + Double.parseDouble(resultSet.getString(r, 0)));
-        }
-      }
-      position ++;
-    }
-    List<String[]> rows = new ArrayList<>();
-    rows.addAll(dataMap.values());
-    return rows;
-
-  }
-
 
   @Override
   public List<String> getDatasets() throws Exception {
@@ -436,7 +513,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
             int weight = 0;
             for (int idx = 0; idx < resultSetCount; ++idx) {
               ThirdEyeResultSet resultSet = resultSetGroup.get(idx);
-              weight += (resultSet.getColumnCount() * resultSet.getRowCount());
+              weight += ((resultSet.getColumnCount() + resultSet.getGroupKeyLength()) * resultSet.getRowCount());
             }
             return weight;
           }

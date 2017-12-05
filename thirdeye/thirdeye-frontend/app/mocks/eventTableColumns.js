@@ -1,7 +1,7 @@
 // rootcause event table columns mock
 export default [
   {
-    template: 'custom/checkbox',
+    template: 'custom/table-checkbox',
     useFilter: false,
     mayBeHidden: false,
     className: 'events-table__column--checkbox'

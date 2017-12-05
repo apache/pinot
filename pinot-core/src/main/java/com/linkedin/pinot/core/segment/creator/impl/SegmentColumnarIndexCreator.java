@@ -290,9 +290,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
           starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
       properties.setProperty(STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY,
-          starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
+          starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
       properties.setProperty(STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS,
-          starTreeIndexSpec.getskipMaterializationForDimensions());
+          starTreeIndexSpec.getSkipMaterializationForDimensions());
     }
 
     HllConfig hllConfig = config.getHllConfig();

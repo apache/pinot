@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.datasource.pinot;
 public enum PinotThirdeyeDataSourceProperties {
   CONTROLLER_HOST("controllerHost"),
   CONTROLLER_PORT("controllerPort"),
+  CONTROLLER_CONNECTION_SCHEME("controllerConnectionScheme"),
   CLUSTER_NAME("clusterName"),
   ZOOKEEPER_URL("zookeeperUrl"),
   TAG("tag"),

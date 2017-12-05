@@ -1,21 +1,17 @@
-<button {{action (mut mode) "change"}}>change</button> |
-<button {{action (mut mode) "contributionDiff"}}>contribution diff</button> |
-<button {{action (mut mode) "contributionToDiff"}}>contribution to diff</button>
-
-<button {{action (mut rollup) "5"}}>top 5</button> |
-<button {{action (mut rollup) "10"}}>top 10</button> |
-<button {{action (mut rollup) "20"}}>top 20</button>
-
-<ol>
-  {{#each-in scores as |dimName dimValues|}}
-    <li>{{dimName}}
-        {{#each-in dimValues as |dimValue value|}}
-          | {{dimValue}} ({{value}})
-        {{else}}
-          | No values
+<div class="row dimension-heatmap">
+  <div class="col-xs-12">
+    <table class="table table-borderless dimension-heatmap__table">
+      <tbody>
+        {{#each-in cells as |dimName dimValues|}}
+          <tr>
+            <td class="col-xs-1" style="vertical-align: middle" class="label-medium-light">{{dimName}}</td>
+            <td class="col-xs-11">
+              <div id="{{dimName}}-heatmap-placeholder" style="height: 50px; width: 100%"></div>
+            </td>
+          </tr>
         {{/each-in}}
-    </li>
-  {{else}}
-    <li>No dimensions</li>
-  {{/each-in}}
-</ol>
+      </tbody>
+    </table>
+  </div>
+</div>
+

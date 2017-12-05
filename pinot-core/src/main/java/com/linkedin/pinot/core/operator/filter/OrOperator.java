@@ -35,14 +35,6 @@ public class OrOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean open() {
-    for (Operator operator : operators) {
-      operator.open();
-    }
-    return true;
-  }
-
-  @Override
   protected BaseFilterBlock getNextBlock() {
     List<FilterBlockDocIdSet> blockDocIdSets = new ArrayList<>();
     for (Operator operator : operators) {
@@ -60,14 +52,6 @@ public class OrOperator extends BaseFilterOperator {
       if (!operator.isResultEmpty()) {
         return false;
       }
-    }
-    return true;
-  }
-
-  @Override
-  public boolean close() {
-    for (Operator operator : operators) {
-      operator.close();
     }
     return true;
   }

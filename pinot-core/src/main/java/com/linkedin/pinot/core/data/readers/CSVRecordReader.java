@@ -18,12 +18,16 @@ package com.linkedin.pinot.core.data.readers;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import java.io.FileReader;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.zip.GZIPInputStream;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -56,9 +60,16 @@ public class CSVRecordReader extends BaseRecordReader {
 
   @Override
   public void init() throws Exception {
-    final Reader reader = new FileReader(_fileName);
-    _parser = new CSVParser(reader, getFormat());
-
+    InputStream fileStream = new FileInputStream(_fileName);
+    InputStream inputStream;
+    if (_fileName.endsWith(".gz")) {
+      inputStream = new GZIPInputStream(fileStream);
+    } else {
+      inputStream = fileStream;
+    }
+    Reader decoder = new InputStreamReader(inputStream, "UTF-8");
+    BufferedReader bufferedReader = new BufferedReader(decoder);
+    _parser = new CSVParser(bufferedReader, getFormat());
     _iterator = _parser.iterator();
   }
 
@@ -87,14 +98,19 @@ public class CSVRecordReader extends BaseRecordReader {
   public GenericRow next(GenericRow row) {
     CSVRecord record = _iterator.next();
 
-    for (final FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String column = fieldSpec.getName();
-      String token = getValueForColumn(record, column);
-
-      Object value = null;
-      if (token == null || token.isEmpty()) {
-        incrementNullCountFor(fieldSpec.getName());
+    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+      String columnName = fieldSpec.getName();
+      String token;
+      if (!record.isSet(columnName)) {
+        token = null;
+      } else {
+        token = getValueForColumn(record, columnName);
       }
+      if (token == null || token.isEmpty()) {
+        incrementNullCountFor(columnName);
+      }
+
+      Object value;
       if (fieldSpec.isSingleValueField()) {
         value = RecordReaderUtils.convertToDataType(token, fieldSpec);
       } else {
@@ -102,7 +118,7 @@ public class CSVRecordReader extends BaseRecordReader {
         value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec);
       }
 
-      row.putField(column, value);
+      row.putField(columnName, value);
     }
 
     return row;
@@ -149,16 +165,12 @@ public class CSVRecordReader extends BaseRecordReader {
     format = format.toUpperCase();
     if ((format.equals("DEFAULT"))) {
       return CSVFormat.DEFAULT;
-
     } else if (format.equals("EXCEL")) {
       return CSVFormat.EXCEL;
-
     } else if (format.equals("MYSQL")) {
       return CSVFormat.MYSQL;
-
     } else if (format.equals("RFC4180")) {
       return CSVFormat.RFC4180;
-
     } else if (format.equals("TDF")) {
       return CSVFormat.TDF;
     } else {

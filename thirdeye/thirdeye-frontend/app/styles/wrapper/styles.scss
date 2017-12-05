@@ -7,48 +7,6 @@ body {
   color: lighten(black, 40%);
 }
 
-.thirdeye-link {
-  cursor: pointer;
-  color: $te-blue-7;
-  padding: 0 8px;
-  text-decoration: none;
-  &:hover,
-  &:focus {
-    color: $te-blue-7;
-    text-decoration: none;
-  }
-}
-
-.thirdeye-link-secondary {
-  color: #369ece;
-  font-weight: 600;
-  letter-spacing: .1px;
-  font-size: 16px;
-
-  &--inside {
-    font-size: 15px;
-  }
-
-  &:hover {
-    color: #369ece;
-  }
-}
-
-.thirdeye-link--nav {
-  padding-left: 0;
-  padding-right: 0;
-  font-size: 16px;
-  color: lighten(black, 30%);
-}
-
-.thirdeye-link--active,
-.thirdeye-link--nav:hover {
-  color: $te-blue;
-  padding-bottom: 14px;
-  border-bottom: 2px solid $te-blue !important;
-  text-decoration: none;
-}
-
 .spinner-wrapper {
   margin: $te-default-element-spacing;
   height: 250px;

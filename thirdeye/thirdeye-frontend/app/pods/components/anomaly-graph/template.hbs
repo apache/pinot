@@ -6,10 +6,10 @@
         <li class="anomaly-graph__filter-item">
           {{input
             type="checkbox"
-            id=(concat primaryMetricId metric.id)
+            id=(concat primaryMetricId primaryMetric.metricId)
             change=(action "onPrimaryMetricToggle")
-            checked=true}}
-          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{primaryMetric.color}}" for="{{concat primaryMetricId metric.id}}" title={{primaryMetric.metricName}}> {{primaryMetric.metricName}} </label>
+            checked=primaryMetric.isSelected}}
+          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{primaryMetric.color}}" for="{{concat primaryMetricId primaryMetric.metricId}}" title={{primaryMetric.metricName}}> {{primaryMetric.metricName}} </label>
         </li>
       </ul>
 

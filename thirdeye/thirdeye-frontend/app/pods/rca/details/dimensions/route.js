@@ -1,9 +1,10 @@
 import Ember from 'ember';
 
 import { Actions } from 'thirdeye-frontend/actions/dimensions';
+import { inject as service } from '@ember/service';
 
 export default Ember.Route.extend({
-  redux: Ember.inject.service(),
+  redux: service(),
 
   // queryParam unique to the dimension route
   queryParams: {
@@ -19,7 +20,7 @@ export default Ember.Route.extend({
     const {
       analysisStart: initStart,
       analysisEnd: initEnd
-     } = this.modelFor('rca.details');
+    } = this.modelFor('rca.details');
 
     const {
       dimension = 'All',

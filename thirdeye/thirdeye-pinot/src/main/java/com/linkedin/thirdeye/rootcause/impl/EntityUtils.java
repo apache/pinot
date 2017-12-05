@@ -171,6 +171,10 @@ public class EntityUtils {
 
     } else if(HyperlinkEntity.TYPE.isType(urn)) {
       return HyperlinkEntity.fromURL(urn, score);
+
+    } else if(AnomalyEventEntity.TYPE.isType(urn)) {
+      return AnomalyEventEntity.fromURN(urn, score);
+
     }
     throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
   }

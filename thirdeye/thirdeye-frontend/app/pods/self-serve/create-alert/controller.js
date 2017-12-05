@@ -138,8 +138,8 @@ export default Ember.Controller.extend({
     'selectedGranularity',
     function() {
       let {
-       selectedSensitivity,
-       selectedGranularity
+        selectedSensitivity,
+        selectedGranularity
       } =  this.getProperties('selectedSensitivity', 'selectedGranularity');
 
       if (!selectedSensitivity) {
@@ -411,8 +411,7 @@ export default Ember.Controller.extend({
           selectedMetric: Object.assign(metricData, { color: 'blue' })
         });
       }
-    })
-    .catch((error) => {
+    }).catch((error) => {
       // The request failed. No graph to render.
       this.clearAll();
       this.setProperties({
@@ -678,7 +677,7 @@ export default Ember.Controller.extend({
    * @return {Boolean} whether errors were found
    */
   isEmailValid(emailArr) {
-    const emailRegex = /^.{3,}\@linkedin.com$/;
+    const emailRegex = /^.{3,}@linkedin.com$/;
     let isValid = true;
 
     for (var email of emailArr) {
@@ -890,6 +889,14 @@ export default Ember.Controller.extend({
    * Actions for create alert form view
    */
   actions: {
+
+
+    /**
+     * Handles the primary metric selection in the alert creation
+     */
+    onPrimaryMetricToggle() {
+      return;
+    },
 
     /**
      * When a metric is selected, fetch its props, and send them to the graph builder
@@ -1224,9 +1231,8 @@ export default Ember.Controller.extend({
             isMetricDataInvalid: false
           });
           return newFunctionId;
-        })
         // Redirects to manage alerts
-        .then((id) => {
+        }).then((id) => {
           if (redirectToAlertPage) {
             // Redirect to onboarding page to trigger wrapper
             this.transitionToRoute('manage.alert', id, { queryParams: { replay: true }});
@@ -1234,15 +1240,13 @@ export default Ember.Controller.extend({
             // Navigate to alerts search view
             this.transitionToRoute('manage.alerts.edit', id);
           }
-        })
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
-        .catch((error) => {
+        }).catch((error) => {
           this.setAlertCreateErrorState(error);
           this.removeThirdEyeFunction(newFunctionId);
         });
-      })
       // Alert creation call has failed
-      .catch((error) => {
+      }).catch((error) => {
         this.setAlertCreateErrorState(error);
       });
     }

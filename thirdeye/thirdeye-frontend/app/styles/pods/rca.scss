@@ -32,7 +32,7 @@
   height: 30px;
 }
 
-.paper-container {
+.card-container {
   background-color: white;
   border: 1px solid $te-grey--border;
   margin-top: $te-spacing-lg;
@@ -41,12 +41,28 @@
   &--padded {
     padding: 24px;
   }
-}
+  &--box-shadow {
+    border: none;
+    box-shadow:
+      0 0 0 1px app-shade(black, 0.1),
+      0 2px 3px 0 app-shade(black, 0.2);
+  }
+  &__header {
+    display: flex;
+    border-bottom: 1px solid $te-grey--border;
+    padding: 12px $te-spacing-lg;
+    color: app-shade(black, 0.85);
+  }
 
-.paper-container__header,
-.paper-container__body,
-.paper-container__footer {
-  padding: $te-spacing-lg;
+  &__subnav {
+    margin-right: $te-spacing-lg;
+    font-size: 17px;
+  }
+
+  &__body,
+  &__footer {
+    padding: $te-spacing-lg;
+  }
 }
 
 .rca-search-bar {
@@ -68,3 +84,89 @@
 .rca-body {
   min-height: 1000px;
 }
+
+.rootcause-metric {
+  &__wrapper {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  &__card {
+    border-radius: 2px;
+    padding: 16px;
+    border: 1px solid app-shade(black, 0.15);
+    margin: 8px;
+    margin-right: auto;
+    display: flex;
+    flex-basis: 0;
+    min-width: 200px;
+    flex-direction: column;
+    justify-content: space-between;
+
+    &--selected,
+    &:hover {
+      border: 2px solid $te-blue-6;
+      padding: 15px;
+    }
+    &--selected:hover {
+      border-style: dashed;
+    }
+  }
+
+  &__title {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    word-break: break-word;
+  }
+
+  &__name {
+    font-size: 14px;
+    color: app-shade(black, 0.9);
+    line-height: 20px;
+  }
+
+  &__dataset {
+    font-size: 12px;
+    line-height: 16px;
+    color: app-shade(black, 0.6);
+  }
+  &__change {
+    color: app-shade(black, 0.85);
+    font-size: 32px;
+    line-height: 32px;
+    padding-top: 16px;
+
+    &--positive {
+      color: $te-green;
+    }
+
+    &--negative {
+      color: $te-red;
+    }
+  }
+}
+
+.color-box {
+  display: inline-block;
+  height: 0.8em;
+  width: 0.8em;
+  border: 1px solid black;
+}
+
+$colors:
+  "blue" $te-blue,
+  "orange" $te-orange,
+  "teal" $te-teal,
+  "purple" $te-purple,
+  "red" $te-red,
+  "green" $te-green,
+  "pink" $te-pink;
+
+// creates color-box--"color" classes
+@each $i in $colors {
+  .color-box--#{nth($i, 1)} {
+    background: nth($i, 2);
+  }
+};
+

@@ -1,0 +1,73 @@
+{{#if anomaly}}
+  <div class="card-container card-container--box-shadow">
+    <div class="card-container__body">
+      <!-- from old UI -->
+      <div class="row">
+        <h3>
+          <span>Is this a true anomaly?</span>
+          <a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
+        </h3>
+      </div>
+      <div id="anomaly-feedback-status">
+        <span>Status</span> {{status}}
+      </div>
+      <div id="anomaly-feedback-comment">
+        <label for="feedback-comment"><span>Comment</span> (optional)</label>
+        {{textarea id="feedback-comment" value=comment}}
+      </div>
+      <div id="anomaly-feedback-button">
+        status
+        | <button {{action "onFeedback" "ANOMALY"}}>Yes (True Anomaly)</button>
+        | <button {{action "onFeedback" "ANOMALY_NEW_TREND"}}>Yes (But New Trend)</button>
+        | <button {{action "onFeedback" "NOT_ANOMALY"}}>No (False Alarm)</button>
+        | <button {{action "onFeedback" "NO_FEEDBACK"}}>No Feedback</button>
+      </div>
+      <p>Your feedback improves the accuracy of future alerts.</p>
+    </div>
+  </div>
+
+  <div class="card-container card-container--box-shadow">
+    <div class="card-container__body">
+      <div class="row">
+        <span>
+          <div>{{functionName}}: Anomaly #{{anomalyId}}</div>
+          <div>{{metric}} ({{dimensions}})</div>
+          <div>{{dataset}}</div>
+        </span>
+      </div>
+
+      <div class="row">
+        <div class="col-xs-2">
+          <label class="te-label">Duration</label>
+          <span>{{duration}}</span>
+        </div>
+        <div class="col-xs-2">
+          <label class="te-label">Current Avg</label>
+          <span>{{current}}</span>
+        </div>
+        <div class="col-xs-2">
+          <label class="te-label">Baseline Avg</label>
+          <span>{{baseline}}</span>
+        </div>
+        <div class="col-xs-2">
+          <label class="te-label">Change</label>
+          <span>{{change}}</span>
+        </div>
+        <div class="col-xs-2">
+          <label class="te-label">Status</label>
+          <span>{{status}}</span>
+        </div>
+        {{#if issueType}}
+          <div class="col-xs-2">
+            <label class="te-label">Issue Type</label>
+            <span>{{issueType}}</span>
+          </div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+
+{{else}}
+  <div>Loading anomaly info ...</div>
+
+{{/if}}

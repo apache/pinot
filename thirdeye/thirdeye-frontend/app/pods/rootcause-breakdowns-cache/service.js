@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterPrefix, toBaselineRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -15,10 +15,9 @@ export default Ember.Service.extend({
   },
 
   request(requestContext, urns) {
-    console.log('rootcauseBreakdownsService: request()', requestContext, urns);
     const { context, breakdowns, pending } = this.getProperties('context', 'breakdowns', 'pending');
 
-    const metrics = [...urns].filter(urn => (urn.startsWith('thirdeye:metric:') || urn.startsWith('frontend:baseline:metric:')));
+    const metrics = [...urns].filter(urn => urn.startsWith('frontend:metric:'));
 
     // TODO eviction on cache size limit
 
@@ -29,78 +28,70 @@ export default Ember.Service.extend({
       // new analysis range: evict all, reload, keep stale copy of incoming
       missing = metrics;
       newPending = new Set(metrics);
-      newBreakdowns = metrics.filter(urn => breakdowns[urn]).reduce((agg, urn) => { agg[urn] = breakdowns[urn]; return agg; }, {});
+      newBreakdowns = metrics.filter(urn => urn in breakdowns).reduce((agg, urn) => { agg[urn] = breakdowns[urn]; return agg; }, {});
 
     } else {
       // same context: load missing
-      missing = metrics.filter(urn => !breakdowns[urn] && !pending.has(urn));
+      missing = metrics.filter(urn => !(urn in breakdowns) && !pending.has(urn));
       newPending = new Set([...pending].concat(missing));
       newBreakdowns = breakdowns;
     }
 
     this.setProperties({ context: _.cloneDeep(requestContext), breakdowns: newBreakdowns, pending: newPending });
 
-    const filtersMap = this._makeFiltersMap(requestContext.urns);
-    const filtersString = encodeURIComponent(JSON.stringify(filtersMap));
+    if (_.isEmpty(missing)) {
+      // console.log('rootcauseBreakdownsService: request: all metrics up-to-date. ignoring.');
+      return;
+    }
 
     // metrics
-    const metricUrns = missing.filter(urn => urn.startsWith('thirdeye:metric:'));
-    if (!_.isEmpty(metricUrns)) {
-      const metricIdString = metricUrns.map(urn => urn.split(":")[2]).join(',');
-      const metricUrl = `/aggregation/query?metricIds=${metricIdString}&ranges=${requestContext.anomalyRange[0]}:${requestContext.anomalyRange[1]}&filters=${filtersString}`;
-
-      fetch(metricUrl)
-        // .then(checkStatus)
-        .then(res => res.json())
-        .then(res => this._extractAggregates(res, (mid) => `thirdeye:metric:${mid}`))
-        .then(incoming => this._complete(requestContext, incoming));
-    }
+    const metricUrns = missing.filter(urn => urn.startsWith('frontend:metric:current:'));
+    metricUrns.forEach(urn => this._fetchSlice(urn, requestContext.anomalyRange, requestContext));
 
     // baselines
-    const baselineUrns = missing.filter(urn => urn.startsWith('frontend:baseline:metric:'));
-    if (!_.isEmpty(baselineUrns)) {
-      const baselineIdString = baselineUrns.map(urn => urn.split(":")[3]).join(',');
-      const baselineUrl = `/aggregation/query?metricIds=${baselineIdString}&ranges=${requestContext.baselineRange[0]}:${requestContext.baselineRange[1]}&filters=${filtersString}`;
-
-      fetch(baselineUrl)
-         // .then(checkStatus)
-        .then(res => res.json())
-        .then(res => this._extractAggregates(res, (mid) => `frontend:baseline:metric:${mid}`))
-        .then(incoming => this._complete(requestContext, incoming));
-    }
+    const baselineRange = toBaselineRange(requestContext.anomalyRange, requestContext.compareMode);
+    const baselineUrns = missing.filter(urn => urn.startsWith('frontend:metric:baseline:'));
+    baselineUrns.forEach(urn => this._fetchSlice(urn, baselineRange, requestContext));
   },
 
   _complete(requestContext, incoming) {
-    console.log('rootcauseBreakdownsService: _complete()', incoming);
     const { context, pending, breakdowns } = this.getProperties('context', 'pending', 'breakdowns');
 
     // only accept latest result
     if (!_.isEqual(context, requestContext)) {
-      console.log('rootcauseBreakdownsService: received stale result. ignoring.');
+      // console.log('rootcauseBreakdownsService: _complete: received stale result. ignoring.');
       return;
     }
 
-    const newPending = new Set([...pending].filter(urn => !incoming[urn]));
+    const newPending = new Set([...pending].filter(urn => !(urn in incoming)));
     const newBreakdowns = Object.assign({}, breakdowns, incoming);
 
     this.setProperties({ breakdowns: newBreakdowns, pending: newPending });
   },
 
-  _extractAggregates(incoming, urnFunc) {
+  _extractBreakdowns(incoming, urn) {
     // NOTE: only supports single time range
     const breakdowns = {};
     Object.keys(incoming).forEach(range => {
       Object.keys(incoming[range]).forEach(mid => {
-        const breakdown = incoming[range][mid];
-        const urn = urnFunc(mid);
-        breakdowns[urn] = breakdown;
+        breakdowns[urn] = incoming[range][mid];
       });
     });
     return breakdowns;
   },
 
-  _makeFiltersMap(urns) {
-    const filters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => { const t = urn.split(':'); return [t[2], t[3]]; });
-    return filters.reduce((agg, t) => { if (!agg[t[0]]) { agg[t[0]] = [t[1]]; } else { agg[t[0]] = agg[t[0]].concat(t[1]); } return agg; }, {});
+  _fetchSlice(urn, range, context) {
+    const metricId = urn.split(':')[3];
+    const metricFilters = toFilters([urn]);
+    const contextFilters = toFilters(filterPrefix(context.urns, 'thirdeye:dimension:'));
+    const filters = toFilterMap(metricFilters.concat(contextFilters));
+
+    const filterString = encodeURIComponent(JSON.stringify(filters));
+
+    const url = `/aggregation/query?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}&rollup=20`;
+    return fetch(url)
+      .then(checkStatus)
+      .then(res => this._extractBreakdowns(res, urn))
+      .then(res => this._complete(context, res));
   }
 });

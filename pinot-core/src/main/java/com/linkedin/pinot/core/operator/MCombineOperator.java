@@ -69,14 +69,6 @@ public class MCombineOperator extends BaseOperator<IntermediateResultsBlock> {
   }
 
   @Override
-  public boolean open() {
-    for (Operator op : _operators) {
-      op.open();
-    }
-    return true;
-  }
-
-  @Override
   protected IntermediateResultsBlock getNextBlock() {
     final long startTime = System.currentTimeMillis();
     final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
@@ -202,13 +194,5 @@ public class MCombineOperator extends BaseOperator<IntermediateResultsBlock> {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    for (Operator op : _operators) {
-      op.close();
-    }
-    return true;
   }
 }

@@ -35,30 +35,30 @@ public class BaseTimeSeriesResponseParserTest {
     MockedThirdEyeResponse thirdEyeResponse = new MockedThirdEyeResponse();
 
     {
-      int timeBucketId = 0;
-      ThirdEyeResponseRow row1 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList1(), getMetricT1DV1());
-      ThirdEyeResponseRow row2 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList1(), getMetricT2DV1());
-      ThirdEyeResponseRow row3 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList1(), getMetricT3DV1());
+      int timestamp = 1;
+      ThirdEyeResponseRow row1 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList1(), getMetricT1DV1());
+      ThirdEyeResponseRow row2 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList1(), getMetricT2DV1());
+      ThirdEyeResponseRow row3 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList1(), getMetricT3DV1());
       thirdEyeResponse.addRow(row1);
       thirdEyeResponse.addRow(row2);
       thirdEyeResponse.addRow(row3);
     }
 
     {
-      int timeBucketId = 0;
-      ThirdEyeResponseRow row1 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList2(), getMetricT1DV2());
-      ThirdEyeResponseRow row2 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList2(), getMetricT2DV2());
-      ThirdEyeResponseRow row3 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList2(), getMetricT3DV2());
+      int timestamp = 1;
+      ThirdEyeResponseRow row1 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList2(), getMetricT1DV2());
+      ThirdEyeResponseRow row2 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList2(), getMetricT2DV2());
+      ThirdEyeResponseRow row3 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList2(), getMetricT3DV2());
       thirdEyeResponse.addRow(row1);
       thirdEyeResponse.addRow(row2);
       thirdEyeResponse.addRow(row3);
     }
 
     {
-      int timeBucketId = 0;
-      ThirdEyeResponseRow row1 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList3(), getMetricT1DV3());
-      ThirdEyeResponseRow row2 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList3(), getMetricT2DV3());
-      ThirdEyeResponseRow row3 = new ThirdEyeResponseRow(timeBucketId++, getDimensionValueList3(), getMetricT3DV3());
+      int timestamp = 1;
+      ThirdEyeResponseRow row1 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList3(), getMetricT1DV3());
+      ThirdEyeResponseRow row2 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList3(), getMetricT2DV3());
+      ThirdEyeResponseRow row3 = new ThirdEyeResponseRow(timestamp++, getDimensionValueList3(), getMetricT3DV3());
       thirdEyeResponse.addRow(row1);
       thirdEyeResponse.addRow(row2);
       thirdEyeResponse.addRow(row3);
@@ -224,16 +224,6 @@ public class BaseTimeSeriesResponseParserTest {
     @Override
     public ThirdEyeResponseRow getRow(int rowId) {
       return responseRows.get(rowId);
-    }
-
-    @Override
-    public int getNumRowsFor(MetricFunction metricFunction) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Map<String, String> getRow(MetricFunction metricFunction, int rowId) {
-      throw new UnsupportedOperationException();
     }
 
     @Override

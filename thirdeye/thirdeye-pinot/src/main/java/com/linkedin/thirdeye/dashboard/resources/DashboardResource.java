@@ -1,8 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
+import io.dropwizard.views.View;
 
-import io.dropwizard.auth.Auth;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -39,6 +38,7 @@ import com.google.common.base.Joiner;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.DashboardView;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
@@ -50,9 +50,7 @@ import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -65,8 +63,6 @@ import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
-import io.dropwizard.views.View;
 
 @Path(value = "/dashboard")
 public class DashboardResource {
@@ -82,14 +78,12 @@ public class DashboardResource {
   private LoadingCache<String, String> dimensionFiltersCache;
 
   private MetricConfigManager metricConfigDAO;
-  private DashboardConfigManager dashboardConfigDAO;
 
   public DashboardResource() {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.datasetMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-    this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
   @GET
@@ -180,72 +174,6 @@ public class DashboardResource {
     return jsonFilters;
   }
 
-
-  @GET
-  @Path(value = "/data/customDashboard")
-  @Produces(MediaType.APPLICATION_JSON)
-  public String getDashboardData(@QueryParam("dataset") String collection,
-      @QueryParam("dashboard") String dashboardName, @QueryParam("filters") String filterJson,
-      @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone,
-      @QueryParam("baselineStart") Long baselineStart, @QueryParam("baselineEnd") Long baselineEnd,
-      @QueryParam("currentStart") Long currentStart, @QueryParam("currentEnd") Long currentEnd,
-      @QueryParam("compareMode") String compareMode,
-      @QueryParam("aggTimeGranularity") String aggTimeGranularity) {
-    try {
-
-      TabularViewRequest request = new TabularViewRequest();
-      request.setCollection(collection);
-
-      List<MetricExpression> metricExpressions = new ArrayList<>();
-      DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
-      List<Long> metricIds = dashboardConfig.getMetricIds();
-      for (Long metricId : metricIds) {
-        MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
-        MetricExpression metricExpression = ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig);
-        metricExpressions.add(metricExpression);
-      }
-      request.setMetricExpressions(metricExpressions);
-
-      long maxDataTime = datasetMaxDataTimeCache.get(collection);
-      if (currentEnd > maxDataTime) {
-        long delta = currentEnd - maxDataTime;
-        currentEnd = currentEnd - delta;
-        baselineEnd = baselineEnd - delta;
-      }
-
-      // The input start and end time (i.e., currentStart, currentEnd, baselineStart, and
-      // baselineEnd) are given in millisecond since epoch, which is timezone insensitive. On the
-      // other hand, the start and end time of the request to be sent to backend database (e.g.,
-      // Pinot) could be converted to SimpleDateFormat, which is timezone sensitive. Therefore,
-      // we need to store user's start and end time in DateTime objects with data's timezone
-      // in order to ensure that the conversion to SimpleDateFormat is always correct regardless
-      // user and server's timezone, including daylight saving time.
-      DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
-      request.setBaselineStart(new DateTime(baselineStart, timeZoneForCollection));
-      request.setBaselineEnd(new DateTime(baselineEnd, timeZoneForCollection));
-      request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
-      request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
-
-      if (filterJson != null && !filterJson.isEmpty()) {
-        filterJson = URLDecoder.decode(filterJson, "UTF-8");
-        request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
-      }
-
-      request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
-
-      TabularViewHandler handler = new TabularViewHandler(queryCache);
-      String jsonResponse = null;
-
-      TabularViewResponse response = handler.process(request);
-      jsonResponse =
-          OBJECT_MAPPER.enable(SerializationFeature.INDENT_OUTPUT).writeValueAsString(response);
-      LOG.debug("customDashboard response {}", jsonResponse);
-      return jsonResponse;
-    } catch (Exception e) {
-      LOG.error("Exception while processing /data/tabular call", e);
-      return "{\"ERROR\": + " + e.getMessage() + "}";
-    }
-  }
 
   @GET
   @Path(value = "/data/heatmap")

@@ -25,16 +25,14 @@ import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  public static PredicateEvaluator getPredicateFunctionFor(final Predicate predicate, DataSource dataSource) {
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource) {
     try {
       if (dataSource.getDataSourceMetadata().hasDictionary()) {
         Dictionary dictionary = dataSource.getDictionary();
@@ -48,37 +46,31 @@ public class PredicateEvaluatorProvider {
           case NOT_IN:
             return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary);
           case RANGE:
-            if (dictionary instanceof ImmutableDictionaryReader) {
-              return RangePredicateEvaluatorFactory.newOfflineDictionaryBasedEvaluator((RangePredicate) predicate,
-                  (ImmutableDictionaryReader) dictionary);
-            } else {
-              return RangePredicateEvaluatorFactory.newRealtimeDictionaryBasedEvaluator((RangePredicate) predicate,
-                  (MutableDictionary) dictionary);
-            }
+            return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary);
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
                 dictionary);
           default:
-            throw new UnsupportedOperationException("UnKnown predicate type");
+            throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
       } else {
         DataType dataType = dataSource.getDataSourceMetadata().getDataType();
-
         switch (predicate.getType()) {
           case EQ:
-            return EqualsPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((EqPredicate) predicate, dataType);
+            return EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);
           case NEQ:
-            return NotEqualsPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((NEqPredicate) predicate, dataType);
+            return NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((NEqPredicate) predicate, dataType);
           case IN:
-            return InPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((InPredicate) predicate, dataType);
+            return InPredicateEvaluatorFactory.newRawValueBasedEvaluator((InPredicate) predicate, dataType);
           case NOT_IN:
-            return NotInPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((NotInPredicate) predicate, dataType);
+            return NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotInPredicate) predicate, dataType);
           case RANGE:
-            return RangePredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((RangePredicate) predicate, dataType);
+            return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator((RangePredicate) predicate, dataType);
           case REGEXP_LIKE:
-            return RegexpLikePredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((RegexpLikePredicate) predicate);
+            return RegexpLikePredicateEvaluatorFactory.newRawValueBasedEvaluator((RegexpLikePredicate) predicate,
+                dataType);
           default:
-            throw new UnsupportedOperationException("UnKnown predicate type");
+            throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
       }
     } catch (NumberFormatException e) {

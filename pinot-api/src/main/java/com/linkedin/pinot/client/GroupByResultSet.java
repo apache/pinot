@@ -24,13 +24,11 @@ import org.json.JSONObject;
  * in the query.
  */
 class GroupByResultSet extends AbstractResultSet {
-  private final JSONObject _jsonObject;
   private final JSONArray _groupByResults;
   private final JSONArray _groupByColumns;
   private final String _functionName;
 
   public GroupByResultSet(JSONObject jsonObject) {
-    _jsonObject = jsonObject;
     try {
       _groupByResults = jsonObject.getJSONArray("groupByResult");
       _groupByColumns = jsonObject.getJSONArray("groupByColumns");
@@ -56,11 +54,7 @@ class GroupByResultSet extends AbstractResultSet {
 
   @Override
   public String getColumnName(int columnIndex) {
-    try {
-      return _jsonObject.getString("function");
-    } catch (JSONException e) {
-      throw new PinotClientException(e);
-    }
+    return _functionName;
   }
 
   @Override
@@ -79,11 +73,7 @@ class GroupByResultSet extends AbstractResultSet {
 
   @Override
   public int getGroupKeyLength() {
-    try {
-      return _groupByResults.getJSONObject(0).getJSONArray("group").length();
-    } catch (JSONException e) {
-      throw new PinotClientException(e);
-    }
+    return _groupByColumns.length();
   }
 
   @Override

@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.operator.docidsets;
 
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.operator.blocks.BlockFactory;
+import com.linkedin.pinot.core.operator.dociditerators.EmptyBlockDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -80,7 +80,7 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
   @Override
   public BlockDocIdIterator iterator() {
     if (pairs == null || pairs.isEmpty()) {
-      return BlockFactory.emptyBlockDocIdSetIterator();
+      return EmptyBlockDocIdIterator.getInstance();
     }
     return new SortedDocIdIterator(datasourceName, pairs);
   }

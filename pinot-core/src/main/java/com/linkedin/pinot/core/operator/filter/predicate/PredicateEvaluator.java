@@ -15,92 +15,134 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
+import com.linkedin.pinot.core.common.Predicate;
+
+
 public interface PredicateEvaluator {
-
   /**
-   * @param dictionaryId
-   * @return
+   * APIs for both dictionary based and raw value based predicate evaluator
    */
-  public boolean apply(int dictionaryId);
 
   /**
-   * @param dictionaryIds
-   * @return
+   * Get the predicate type.
    */
-  public boolean apply(int[] dictionaryIds);
+  Predicate.Type getPredicateType();
 
   /**
-   * @param dictionaryIds
-   * @param length how many elements in the array should the predicate be evaluated against
-   * @return
+   * Return whether the predicate evaluator is dictionary based or raw value based.
    */
-  public boolean apply(int[] dictionaryIds, int length);
+  boolean isDictionaryBased();
 
   /**
-   * @return matching dictionary Ids
+   * Return whether the predicate is exclusive (e.g. NEQ, NOT_IN).
    */
-  public int[] getMatchingDictionaryIds();
+  boolean isExclusive();
 
   /**
-   * @return not matching dictionary Ids, useful for NOT IN, IN etc
+   * Return whether the predicate will always be evaluated as false.
    */
-  public int[] getNonMatchingDictionaryIds();
+  boolean isAlwaysFalse();
 
   /**
-   * Will return true if the predicate is evaluated as false all the time. Useful to skip the
-   * segment. e.g if country=zm and segment contains no record for "zm" country we can skip the
-   * segment
+   * Apply a single-value entry to the predicate.
    *
-   * @return
+   * @param value Dictionary id or raw value
+   * @return Whether the entry matches the predicate
    */
-  public boolean alwaysFalse();
+  boolean applySV(int value);
 
   /**
+   * Apply a multi-value entry to the predicate.
    *
-   * @param value
-   * @return
+   * @param values Array of dictionary ids or raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
    */
-  public boolean apply(String value);
+  boolean applyMV(int[] values, int length);
 
   /**
+   * APIs for dictionary based predicate evaluator
+   */
+
+  /**
+   * Get the matching dictionary ids.
+   */
+  int[] getMatchingDictIds();
+
+  /**
+   * Get the non-matching dictionary ids.
+   */
+  int[] getNonMatchingDictIds();
+
+  /**
+   * APIs for raw value based predicate evaluator.
+   */
+
+  /**
+   * Apply a single-value entry to the predicate.
    *
-   * @param values
-   * @return
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
    */
-  public boolean apply(String[] values);
+  boolean applySV(long value);
 
   /**
-   * @param values String[] type
-   * @param length how many elements in the array should the predicate be evaluated against
-   * @return
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
    */
-
-  public boolean apply(String[] values, int length);
+  boolean applyMV(long[] values, int length);
 
   /**
-   * LONG
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
    */
-  public boolean apply(long value);
-
-  public boolean apply(long[] values);
-
-  public boolean apply(long[] values, int length);
+  boolean applySV(float value);
 
   /**
-   * FLOAT
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
    */
-  public boolean apply(float value);
-
-  public boolean apply(float[] values);
-
-  public boolean apply(float[] values, int length);
+  boolean applyMV(float[] values, int length);
 
   /**
-   * DOUBLE
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
    */
-  public boolean apply(double value);
+  boolean applySV(double value);
 
-  public boolean apply(double[] values);
+  /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(double[] values, int length);
 
-  public boolean apply(double[] values, int length);
+  /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
+   */
+  boolean applySV(String value);
+
+  /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(String[] values, int length);
 }

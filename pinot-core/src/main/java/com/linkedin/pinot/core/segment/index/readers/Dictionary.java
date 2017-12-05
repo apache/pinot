@@ -30,18 +30,6 @@ public interface Dictionary extends Closeable {
    */
   int indexOf(Object rawValue);
 
-  /**
-   * Returns the insertion index of object in the dictionary.
-   * <ul>
-   *   <li> If the object already exists, then returns the current index. </li>
-   *   <li> If the object does not exist, then returns the index at which the object would be inserted, with -ve sign.
-   *        Sign of index is inverted to indicate that the object was not found in the dictionary. </li>
-   * </ul>
-   * @param rawValue Object for which to find the insertion index
-   * @return Insertion index of the object (as defined above).
-   */
-  int insertionIndexOf(Object rawValue);
-
   Object get(int dictId);
 
   int getIntValue(int dictId);

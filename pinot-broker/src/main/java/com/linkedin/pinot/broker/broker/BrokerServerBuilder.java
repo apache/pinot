@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.query.ReduceServiceRegistry;
 import com.linkedin.pinot.common.response.BrokerResponseFactory;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.transport.conf.TransportClientConf;
 import com.linkedin.pinot.transport.conf.TransportClientConf.RoutingMode;
@@ -166,12 +167,12 @@ public class BrokerServerBuilder {
     if (prunerNames == null) {
       prunerNames = DEFAULT_BROKER_SEGMENT_PRUNERS;
     }
-    SegmentZKMetadataPrunerService _brokerPrunerService = new SegmentZKMetadataPrunerService(prunerNames);
+    SegmentZKMetadataPrunerService brokerPrunerService = new SegmentZKMetadataPrunerService(prunerNames);
 
     // Setup Broker Request Handler
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
-        reduceServiceRegistry, _brokerPrunerService, _brokerMetrics, _config);
+        reduceServiceRegistry, brokerPrunerService, _brokerMetrics, _config);
 
     LOGGER.info("Network initialized !!");
   }
@@ -213,7 +214,7 @@ public class BrokerServerBuilder {
     _connPool.start();
     _state.set(State.RUNNING);
     if (listener != null) {
-      listener.init(_connPool, BrokerRequestHandler.DEFAULT_BROKER_TIME_OUT_MS);
+      listener.init(_connPool, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     }
     LOGGER.info("Network running !!");
   }

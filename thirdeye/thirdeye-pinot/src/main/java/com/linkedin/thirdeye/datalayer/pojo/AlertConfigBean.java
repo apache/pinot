@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
-import com.linkedin.thirdeye.datalayer.util.StringUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

@@ -32,7 +32,7 @@ public class DataCompletenessUtilsTest {
     String columnName = "Date";
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
     String timeFormat = "SIMPLE_DATE_FORMAT:yyyyMMdd";
-    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     long adjustedStartTime = DataCompletenessUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 0, 0, zone).getMillis());
 
@@ -43,19 +43,19 @@ public class DataCompletenessUtilsTest {
     dateTime1 = new DateTime(2017, 01, 12, 15, 46, zone);
     startTime = dateTime1.getMillis();
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     adjustedStartTime = DataCompletenessUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0, zone).getMillis());
 
     // DEFAULT
     timeGranularity = new TimeGranularity(1, TimeUnit.MILLISECONDS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     adjustedStartTime = DataCompletenessUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0, zone).getMillis());
 
     // MINUTES
     timeGranularity = new TimeGranularity(5, TimeUnit.MINUTES);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     adjustedStartTime = DataCompletenessUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 30, zone).getMillis());
 
@@ -72,29 +72,30 @@ public class DataCompletenessUtilsTest {
 
   @Test
   public void testGetBucketSizeForDataset() throws Exception {
+    DateTimeZone zone = DateTimeZone.UTC;
     String columnName = "Date";
     // DAYS bucket
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
     String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
-    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     long bucketSize = DataCompletenessUtils.getBucketSizeInMSForDataset(timeSpec);
     Assert.assertEquals(bucketSize, 24*60*60_000);
 
     // HOURS bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     bucketSize = DataCompletenessUtils.getBucketSizeInMSForDataset(timeSpec);
     Assert.assertEquals(bucketSize, 60*60_000);
 
     // MINUTES returns 30 MINUTES bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.MINUTES);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     bucketSize = DataCompletenessUtils.getBucketSizeInMSForDataset(timeSpec);
     Assert.assertEquals(bucketSize, 30*60_000);
 
     // DEFAULT bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.MILLISECONDS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     bucketSize = DataCompletenessUtils.getBucketSizeInMSForDataset(timeSpec);
     Assert.assertEquals(bucketSize, 60*60_000);
 
@@ -110,7 +111,7 @@ public class DataCompletenessUtilsTest {
     // DAYS bucket
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
     String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
-    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     DateTimeFormatter dateTimeFormatter = DataCompletenessUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "20170112");
 
@@ -118,7 +119,7 @@ public class DataCompletenessUtilsTest {
     long dateTimeInMS1 = new DateTime(2017, 01, 12, 05, 30, zone).getMillis();
     // DAYS bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     dateTimeFormatter = DataCompletenessUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS1), "20170112");
 
@@ -126,19 +127,19 @@ public class DataCompletenessUtilsTest {
     zone = DateTimeZone.UTC;
     dateTimeInMS = new DateTime(2017, 01, 12, 15, 30, zone).getMillis();
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     dateTimeFormatter = DataCompletenessUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "2017011215");
 
     // MINUTES bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.MINUTES);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     dateTimeFormatter = DataCompletenessUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "201701121530");
 
     // DEFAULT bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.MILLISECONDS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     dateTimeFormatter = DataCompletenessUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "2017011215");
   }
@@ -151,7 +152,7 @@ public class DataCompletenessUtilsTest {
     String columnName = "Date";
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
     String timeFormat = "SIMPLE_DATE_FORMAT:yyyyMMdd";
-    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
 
     // DAYS
     Map<String, Long> bucketNameToBucketValue = new HashMap<>();
@@ -171,11 +172,11 @@ public class DataCompletenessUtilsTest {
     // EPOCH
     zone = DateTimeZone.UTC;
     timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
 
     // HOURS
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     bucketNameToBucketValue = new HashMap<>();
     bucketNameToBucketValue.put("2017011200", new DateTime(2017, 01, 12, 0, 0, zone).getMillis());
     bucketNameToBucketValue.put("2017011201", new DateTime(2017, 01, 12, 1, 0, zone).getMillis());
@@ -192,7 +193,7 @@ public class DataCompletenessUtilsTest {
 
     // MINUTES
     timeGranularity = new TimeGranularity(10, TimeUnit.MINUTES);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat, zone);
     bucketNameToBucketValue = new HashMap<>();
     bucketNameToBucketValue.put("201701120000", new DateTime(2017, 01, 12, 0, 0, zone).getMillis());
     bucketNameToBucketValue.put("201701120030", new DateTime(2017, 01, 12, 0, 30, zone).getMillis());

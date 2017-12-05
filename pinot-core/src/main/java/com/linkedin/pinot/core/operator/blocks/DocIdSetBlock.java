@@ -20,7 +20,6 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
 
 
@@ -40,11 +39,6 @@ public class DocIdSetBlock implements Block {
 
   public int getSearchableLength() {
     return _searchableLength;
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    return true;
   }
 
   @Override

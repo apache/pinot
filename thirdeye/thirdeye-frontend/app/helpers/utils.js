@@ -1,5 +1,28 @@
 import Ember from 'ember';
+import moment from 'moment';
 import _ from 'lodash';
+
+// TODO load from config
+// colors for metrics
+const metricColors = [
+  'blue',
+  'green',
+  'red',
+  'purple',
+  'orange',
+  'teal',
+  'pink'
+];
+
+// TODO load from config
+// colors for events
+const eventColorMapping = {
+  holiday: 'green',
+  informed: 'red',
+  lix: 'purple',
+  gcn: 'orange',
+  anomaly: 'teal'
+};
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -48,12 +71,78 @@ export function filterObject(obj, func) {
   return out;
 }
 
-export function toBaselineUrn(urn) {
-  if (!urn.startsWith('thirdeye:metric:')) {
-    throw new Error(`Requires metric urn, but found ${urn}`);
+export function stripTail(urn) {
+  const parts = urn.split(':');
+  if (urn.startsWith('thirdeye:metric:')) {
+    return _.slice(parts, 0, 3).join(':');
   }
-  const mid = urn.split(':')[2];
-  return `frontend:baseline:metric:${mid}`;
+  if (urn.startsWith('frontend:metric:')) {
+    return _.slice(parts, 0, 4).join(':');
+  }
+  return urn;
+}
+
+export function extractTail(urn) {
+  const parts = urn.split(':');
+  if (urn.startsWith('thirdeye:metric:')) {
+    return _.slice(parts, 3);
+  }
+  if (urn.startsWith('frontend:metric:')) {
+    return _.slice(parts, 4);
+  }
+  return [];
+}
+
+export function appendTail(urn, tail) {
+  if (_.isEmpty(tail)) {
+    return urn;
+  }
+
+  const existingTail = extractTail(urn);
+  const tailString = [...makeIterable(tail), ...existingTail].sort().join(':');
+  const appendString = tailString ? `:${tailString}` : '';
+  return `${stripTail(urn)}${appendString}`;
+}
+
+export function toCurrentUrn(urn) {
+  return metricUrnHelper('frontend:metric:current:', urn);
+}
+
+export function toBaselineUrn(urn) {
+  return metricUrnHelper('frontend:metric:baseline:', urn);
+}
+
+export function toMetricUrn(urn) {
+  return metricUrnHelper('thirdeye:metric:', urn);
+}
+
+export function toMetricLabel(urn, entities) {
+  let metricName = stripTail(urn);
+  if (entities && entities[stripTail(urn)]) {
+    metricName = entities[stripTail(urn)].label.split("::")[1];
+  }
+
+  const filters = toFilters(urn).map(t => t[1]);
+  const filterString = filters.length ? ` (${filters.join(', ')})` : '';
+
+  return `${metricName}${filterString}`;
+}
+
+function metricUrnHelper(prefix, urn) {
+  const parts = urn.split(':');
+  if (hasPrefix(urn, 'thirdeye:metric:')) {
+    const tail = makeUrnTail(parts, 3);
+    return `${prefix}${parts[2]}${tail}`;
+  }
+  if (hasPrefix(urn, 'frontend:metric:')) {
+    const tail = makeUrnTail(parts, 4);
+    return `${prefix}${parts[3]}${tail}`;
+  }
+  throw new Error(`Requires metric urn, but found ${urn}`);
+}
+
+function makeUrnTail(parts, baseLen) {
+  return parts.length > baseLen ? ':' + _.slice(parts, baseLen).join(':') : '';
 }
 
 export function hasPrefix(urn, prefixes) {
@@ -64,6 +153,56 @@ export function filterPrefix(urns, prefixes) {
   return makeIterable(urns).filter(urn => hasPrefix(urn, prefixes));
 }
 
+export function toBaselineRange(anomalyRange, compareMode) {
+  const offset = {
+    WoW: 1,
+    Wo2W: 2,
+    Wo3W: 3,
+    Wo4W: 4
+  }[compareMode];
+
+  const start = moment(anomalyRange[0]).subtract(offset, 'weeks').valueOf();
+  const end = moment(anomalyRange[1]).subtract(offset, 'weeks').valueOf();
+
+  return [start, end];
+}
+
+export function toFilters(urns) {
+  const flatten = (agg, l) => agg.concat(l);
+
+  const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':'), 2, 4));
+  const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => tup.split('='))).reduce(flatten, []);
+  const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => tup.split('='))).reduce(flatten, []);
+  return [...dimensionFilters, ...metricFilters, ...frontendMetricFilters].sort();
+}
+
+export function toFilterMap(filters) {
+  const filterMap = {};
+  filters.forEach(t => {
+    const [dimName, dimValue] = t;
+    if (!filterMap[dimName]) {
+      filterMap[dimName] = new Set();
+    }
+    filterMap[dimName].add(dimValue);
+  });
+
+  // Set to list
+  Object.keys(filterMap).forEach(dimName => filterMap[dimName] = [...filterMap[dimName]]);
+
+  return filterMap;
+}
+
+export function toColor(urn) {
+  // TODO move to controller, requires color loading from backend
+  if (urn.startsWith('thirdeye:event:')) {
+    return eventColorMapping[urn.split(':')[2]];
+  }
+  if (urn.startsWith('thirdeye:metric:')) {
+    return metricColors[urn.split(':')[2] % metricColors.length];
+  }
+  return 'none';
+};
+
 /**
  * finds the corresponding labelMapping field given a label in the filterBarConfig
  * This is only a placeholder since the filterBarConfig is not finalized
@@ -72,10 +211,10 @@ export function findLabelMapping(label, config) {
   let labelMapping = '';
   config.some(filterBlock => filterBlock.inputs.some(input => {
     if (input.label === label) {
-    labelMapping = input.labelMapping;
-  }
-}));
+      labelMapping = input.labelMapping;
+    }
+  }));
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toBaselineUrn, hasPrefix, filterPrefix, findLabelMapping });
+export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor });

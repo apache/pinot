@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
@@ -28,7 +27,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.ApplicationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
@@ -111,10 +109,6 @@ public class DAORegistry {
 
   public MetricConfigManager getMetricConfigDAO() {
     return DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
-  }
-
-  public DashboardConfigManager getDashboardConfigDAO() {
-    return DaoProviderUtil.getInstance(DashboardConfigManagerImpl.class);
   }
 
   public OverrideConfigManager getOverrideConfigDAO() {

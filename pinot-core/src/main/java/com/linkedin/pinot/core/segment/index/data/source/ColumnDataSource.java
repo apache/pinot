@@ -151,14 +151,4 @@ public final class ColumnDataSource extends DataSource {
   public String getOperatorName() {
     return _operatorName;
   }
-
-  @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
-  public boolean close() {
-    return true;
-  }
 }
