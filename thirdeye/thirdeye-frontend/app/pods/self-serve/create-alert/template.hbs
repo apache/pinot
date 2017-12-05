@@ -92,13 +92,12 @@
         {{#if isMetricSelected}}
           {{anomaly-graph
             primaryMetric=selectedMetric
-            selectedDimensions=topDimensions
+            selectedDimensions=selectedDimensions
             dimensions=topDimensions
             showDimensions=true
             isLoading=loading
             showSubchart=true
-            showLegend=false
-            legendText=legendText
+            showLegend=true
             enableZoom=true
             componentId='create-alert'
             showGraphLegend=showGraphLegend

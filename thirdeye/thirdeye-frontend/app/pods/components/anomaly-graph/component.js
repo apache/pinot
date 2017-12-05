@@ -247,7 +247,7 @@ export default Ember.Component.extend({
     if (primaryMetric.isSelected === undefined) {
       Ember.set(primaryMetric, 'isSelected', true);
     }
-
+    
     const data = [
       primaryMetric,
       ...relatedMetric,
