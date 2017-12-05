@@ -103,7 +103,6 @@ export default Ember.Controller.extend({
       const entities = _.cloneDeep(this.get('entitiesService.entities'));
 
       Object.keys(entities).forEach(urn => entities[urn].color = toColor(urn));
-
       return entities;
     }
   ),

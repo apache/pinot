@@ -1,14 +1,14 @@
-{{!-- TODO: Create separate styling for filter-bar component --}}
-<div class="entity-filter filter-bar">
+<div class="filter-bar">
   {{#each filterBlocks as |block|}}
-    <section class="entity-filter__group">
-      <h5 class="entity-filter__group-title">
+    <section class="filter-bar__group">
+      <h5 class="filter-bar__group-title {{if block.isHidden "" "filter-bar__group-title--active "}}">
+        <div class="filter-bar__group-circle filter-bar__group-circle--{{block.color}}"></div>
         {{block.header}}
-        <a class="entity-filter__group-toggle" {{action 'selectEventType' block.eventType}}>
+        <a class="filter-bar__group-toggle" {{action 'selectEventType' block.eventType}}>
           <i class="glyphicon {{if block.isHidden " glyphicon-menu-up " "glyphicon-menu-down "}}"></i>
         </a>
       </h5>
-      <ul class="entity-filter__group-list {{if block.isHidden " entity-filter__group-list--hidden "}}">
+      <ul class="filter-bar__group-list {{if block.isHidden " filter-bar__group-list--hidden "}}">
         {{#each block.inputs as |filter|}}
           {{filter-bar-input
             eventType=block.eventType

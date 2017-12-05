@@ -3,7 +3,8 @@
  * Each objects contains the following properties:
  *  1. header {string} - displayed event type on the filter bar header
  *  2. eventType {string} - type of event to filter by
- *  3. inputs {array} - array of objects, each specifying the sub-filters of an eventType
+ *  3. color {string} - color of the dot next to the header on the filter bar
+ *  4. inputs {array} - array of objects, each specifying the sub-filters of an eventType
  *    a. label {string} - displayed name for the input
  *    b. labelMapping {string} - key value of label in the payload's attribute object that maps to the label
  *    c. type {string} - input type (i.e. dropdown, checkbox, drag)
@@ -12,6 +13,7 @@ export default [
   {
     header: "Anomalies",
     eventType: "anomaly",
+    color: "teal",
     inputs: [
       {
         label: "dataset",
@@ -28,6 +30,7 @@ export default [
   {
     header: "Holidays",
     eventType: "holiday",
+    color: "green",
     inputs: [
       {
         label: "Country",
@@ -39,6 +42,7 @@ export default [
   {
     header: "Issues",
     eventType: "gcn",
+    color: "orange",
     inputs: [
       {
         label: "Fabric",
@@ -54,12 +58,13 @@ export default [
         label: "Priority",
         labelMapping: "priority",
         type: "dropdown"
-      },
+      }
     ]
   },
   {
     header: "Experiments",
     eventType: "lix",
+    color: "purple",
     inputs: [
       {
         label: "metrics",
@@ -81,6 +86,7 @@ export default [
   {
     header: "Deployments",
     eventType: "informed",
+    color: "red",
     inputs: [
       {
         label: "services",
