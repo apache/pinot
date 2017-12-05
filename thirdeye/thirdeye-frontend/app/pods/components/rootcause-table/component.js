@@ -1,5 +1,6 @@
 import Ember from 'ember';
 import _ from 'lodash';
+import moment from 'moment';
 
 export default Ember.Component.extend({
   columns: null, // []
@@ -34,7 +35,12 @@ export default Ember.Component.extend({
   data: Ember.computed(
     'records',
     function () {
-      return Object.values(this.get('records'));
+      let values = Object.values(this.get('records'));
+      values.forEach(value => {
+        value.start = moment(value.start).format('LL');
+        value.end = moment(value.end).format('LL');
+      });
+      return values;
     }
   ),
 
