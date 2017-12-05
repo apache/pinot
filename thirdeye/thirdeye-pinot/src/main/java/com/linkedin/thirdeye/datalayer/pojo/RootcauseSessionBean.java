@@ -22,7 +22,6 @@ public class RootcauseSessionBean extends AbstractBean {
   private Long analysisRangeStart;
   private Long analysisRangeEnd;
   private Long created;
-  private Long sessionVersion;
   private Set<String> contextUrns;
   private Set<String> selectedUrns;
 
@@ -114,14 +113,6 @@ public class RootcauseSessionBean extends AbstractBean {
     this.created = created;
   }
 
-  public Long getSessionVersion() {
-    return sessionVersion;
-  }
-
-  public void setSessionVersion(Long sessionVersion) {
-    this.sessionVersion = sessionVersion;
-  }
-
   public Set<String> getContextUrns() {
     return contextUrns;
   }
@@ -152,13 +143,13 @@ public class RootcauseSessionBean extends AbstractBean {
         && Objects.equals(previousId, that.previousId) && Objects.equals(anomalyRangeStart, that.anomalyRangeStart)
         && Objects.equals(anomalyRangeEnd, that.anomalyRangeEnd) && Objects.equals(analysisRangeStart,
         that.analysisRangeStart) && Objects.equals(analysisRangeEnd, that.analysisRangeEnd) && Objects.equals(created,
-        that.created) && Objects.equals(sessionVersion, that.sessionVersion) && Objects.equals(contextUrns,
+        that.created) && Objects.equals(contextUrns,
         that.contextUrns) && Objects.equals(selectedUrns, that.selectedUrns);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(name, text, owner, compareMode, granularity, previousId, anomalyRangeStart, anomalyRangeEnd,
-        analysisRangeStart, analysisRangeEnd, created, sessionVersion, contextUrns, selectedUrns);
+        analysisRangeStart, analysisRangeEnd, created, contextUrns, selectedUrns);
   }
 }

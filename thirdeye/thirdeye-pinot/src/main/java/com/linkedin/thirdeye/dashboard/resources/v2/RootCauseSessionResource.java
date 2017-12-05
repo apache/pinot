@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.datalayer.bao.RootcauseSessionManager;
 import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
@@ -18,6 +19,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
+import org.joda.time.DateTime;
 
 
 @Path(value = "/session")
@@ -52,6 +54,11 @@ public class RootCauseSessionResource {
   public Long postSession(
       String jsonString) throws IOException {
     RootcauseSessionDTO session = this.mapper.readValue(jsonString, new TypeReference<RootcauseSessionDTO>() {});
+
+    if (session.getId() == null) {
+      session.setCreated(DateTime.now().getMillis());
+      session.setOwner(ThirdEyeAuthFilter.getCurrentPrincipal().getName());
+    }
 
     return this.sessionDAO.save(session);
   }
