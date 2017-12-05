@@ -120,6 +120,9 @@ public class SegmentCreationCommand extends AbstractBaseAdminCommand implements 
                     SEGMENT_NAME + "_" + new Timestamp(System.currentTimeMillis()), TABLE_NAMES.get(i),
                     PARENT_FOLDER + SEG_DIR + SchemaInfo.DATA_DIRS.get(i));
 
+            /* Deleting data directory */
+            FileUtils.deleteDirectory(new File(PARENT_FOLDER + DATA_DIR));
+
         }
 
         /* Deleting temporary directory used to store config files */
