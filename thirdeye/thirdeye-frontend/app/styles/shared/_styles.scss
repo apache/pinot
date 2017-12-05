@@ -100,15 +100,14 @@ body {
       font-weight: normal;
     }
   }
-  
+
   &--read-only:disabled {
-    color: app-shade(black, 0.55);    
+    color: app-shade(black, 0.55);
   }
 
   &:hover:not(:disabled){
     border-color: app-shade(black, 0.55);
   }
-
 }
 
 .te-page-right {
@@ -122,15 +121,80 @@ body {
 
 .te-search-results {
   border-bottom: 1px app-shade(black, 1) solid;
+  color: app-shade(black, 0.7);
   padding: 24px 0;
 
   &__list {
     list-style: none;
-    // margin-bottom: 24px;
+    font-weight: normal;
+    margin-bottom: 0;
+
+    &--summary-block {
+      padding: 0;
+    }
 
     &--details-block {
       padding: 0;
     }
+  }
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $te-spacing;
+  }
+
+  &__row {
+    display: flex;
+    font-size: 15px;
+  }
+
+  &__option {
+    display: inline-block;
+    width: 100px;
+    min-width: 100px;
+    font-weight: 600;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    margin-right: 10px;
+    color: app-shade(black, 4);
+  }
+
+  &__option-solo {
+    color: app-shade(black, 9);
+    width: 130px;
+    font-weight: 600;
+  }
+
+  &__value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: black;
+    max-height: 19px;
+  }
+
+  &__value-solo {
+    color: app-shade(black, 5);
+  }
+
+  &__title-group {
+    color: app-shade(black, 0.85);
+    font-size: 21px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 1;
+    overflow: hidden;
+  }
+
+  &__title {
+    min-width: 95px;
+  }
+
+  &__edit-button {
+    margin-left: $te-spacing;
   }
 
   &__summary-item {
@@ -138,22 +202,42 @@ body {
 
     &--title {
       margin: 0;
+      color: $te-blue-4;
+      font-size: 18px;
+      font-weight: 400;
     }
   }
 
   &__icon {
     float: right;
+    padding: 15px 15px 0 0;
+    color: app-shade(black, 2);
+  }
+
+  &__prop {
+    &--missing {
+      color: app-shade(black, 5);
+    }
   }
 
   &__tag {
     background-color: app-shade(black, 3);
-    border-radius: 5px;
+    font-size: 15px;
+    line-height: 20px;
+    letter-spacing: .05em;
+    border-radius: 3px;
     padding: 4px 8px;
-    margin-right: $te-spacing-lg;
-    color: app-shade(white, 8);
-    width: 150px;
+    margin: 0 20px;
+    display: inline-block;
+    color: white;
+    width: auto;
+
+    &--list {
+      margin: 0 10px 0 0;
+    }
+
     &--active {
-      background-color: app-shade(black, 7);
+      background-color: $te-blue;
     }
   }
 
@@ -179,4 +263,43 @@ body {
 
 .te-link--hide {
   display: none;
+}
+
+.te-button {
+  border-radius: 2px;
+  border: 1px solid $te-link-blue;
+  margin: 0 1px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  padding: 2px 15px;
+  letter-spacing: 0.3px;
+  color: $te-link-blue;
+
+  &--cancel {
+    background-color: white;
+    a {
+      color: $te-link-blue;
+    }
+    &:hover,
+    a:hover {
+      color: $te-link-blue;
+      text-decoration: none;
+    }
+  }
+
+  &--submit {
+    background-color: $te-button-blue;
+    color: white;
+    &:hover,
+    a:hover {
+      color: white;
+      text-decoration: none;
+    }
+  }
+
+  &--sub {
+    border: none;
+  }
 }

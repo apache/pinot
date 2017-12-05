@@ -201,7 +201,7 @@ export function toColor(urn) {
     return metricColors[urn.split(':')[2] % metricColors.length];
   }
   return 'none';
-};
+}
 
 /**
  * finds the corresponding labelMapping field given a label in the filterBarConfig

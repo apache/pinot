@@ -115,7 +115,7 @@ export default Ember.Controller.extend({
             metricName: subDimension,
             color: colors[colorIndex],
             baselineValues: dimensionObj[subDimension].baselineValues,
-            currentValues: dimensionObj[subDimension].currentValues,
+            currentValues: dimensionObj[subDimension].currentValues
           });
           colorIndex++;
         }
@@ -329,7 +329,6 @@ export default Ember.Controller.extend({
    * @return {undefined}
    */
   confirmEditSuccess() {
-    const that = this;
     this.set('isEditAlertSuccess', true);
     Ember.run.later(this, function() {
       this.clearAll();

@@ -94,51 +94,77 @@ body {
     padding: 15px 15px 0 0;
     color: app-shade(black, 2);
   }
+}
 
-  &__tag {
+.te-alert-page {
+  &__top {
+    background: white;
+    width: 100%;
+    border-top: 1px app-shade(black, 1) solid;
+  }
+}
+
+.te-alert-page-hzlist {
+    display: inline-block;
+    margin-left: 10px;
     font-size: 15px;
-    border-radius: 2px;
+    padding: 0;
+
+  &__item {
+    display: inline-block;
+    margin-right: 7px;
+    list-style: none;
+    font-weight: 600;
+    color: app-shade(black, 5);
+    padding: 4px 12px;
+    border: 1px solid app-shade(black, 5);
+    border-radius: 15px;
 
     &--active {
-      color: #398B18;
-      background-color: #DCF0CB;
-    }
-
-    &--inactive {
-      background-color: $te-red;
-      background-color: lighten($te-red, 30%);
-    }
-  }
-
-  &__prop {
-    &--missing {
-      color: app-shade(black, 3);
+      background-color: $te-alerts-background;
+      border-color: $te-alerts-background;
     }
   }
 }
 
-.te-alert-page-top {
+.te-content-block {
+  font-family: "Source Sans Pro", sans-serif;
+  border-radius: 5px;
+  border: 2px solid app-shade(black, 1);
+  margin: 10px 0 20px 0;
   background: white;
-  width: 100%;
-  border-top: 1px app-shade(black, 1) solid;
+  padding: 24px;
 }
 
 .te-alert-page-selectors {
+  clear: left;
+  margin-top: 12px;
+
   &__range-picker {
-    width: 23.5%;
+    display: inline-block;
+    color: app-shade(black, 7);
+    margin: 0;
+    width: 289px;
+
+    .daterangepicker-input {
+      background: none;
+      border: none;
+      box-shadow: none;
+      padding: 3px 5px;
+      height: auto;
+    }
   }
 
   &__label {
     margin: 15px 0 5px 0;
-    padding: 0 0 2px 3px;
-    font-weight: 500;
-    font-size: 16px;
-    color: app-shade(black, 9);
+    font-weight: 600;
+    color: app-shade(black, 7);
+    display: inline-block;
   }
 
   &__side-link {
-    font-size: 16px;
-    color: #0073b1;
+    font-size: 15px;
+    color: $te-link-blue;
     font-weight: 600;
     letter-spacing: .03em;
     float: right;
@@ -151,10 +177,11 @@ body {
 }
 
 .te-alert-page-cards {
-  font-family: $source-sans-pro;
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
+  &__container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
 
   &__card {
     list-style: none;
@@ -184,60 +211,93 @@ body {
   }
 
   &__card-value {
-    font-size: 45px;
+    font-size: 42px;
     font-weight: 300;
     display: flex;
     justify-content: center;
   }
+
+  &__card-tooltip {
+    font-size: 15px;
+  }
 }
 
 .te-alert-page-anomalies {
-  padding: 20px 10px;
-  background-color: white;
-  border-radius: 5px;
-  border: 2px solid app-shade(black, 1);
-
   &__graph {
-    margin: 10px 0 30px 0;
+    margin: 10px 0 20px -15px;
+  }
+
+  &__glyph {
+    font-size: 14px;
+    margin-left: 5px;
+
+    &--status {
+      -webkit-animation: fadeinout 4s linear forwards;
+      animation: fadeinout 4s linear forwards;
+      position: absolute;
+      font-size: 20px;
+      margin: 14px 0 0 -26px;
+    }
   }
 
   &__table {
-    width: 94%;
-    margin-left: 26px;
+    width: 97%;
+    margin-top: 12px;
+    border: 1px solid app-shade(black, 1);
 
     &--head {
       line-height: 40px;
     }
 
     &--cell-head {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       color: app-shade(black, 6);
+      padding-left: 20px;
+      line-height: 45px;
+    }
+
+    &--cell-link {
+      color: app-shade(black, 6);
+      font-weight: 700;
+
+      &:hover {
+        text-decoration: none;
+        cursor: pointer;
+        color: black;
+      }
     }
 
     &--cell {
-      padding: 5px 10px;
-      font-size: 16px;
+      padding: 5px 20px;
+      font-size: 15px;
       font-weight: 500;
       color: app-shade(black, 8);
+      position: relative;
     }
   }
 
   &__table-row {
-    border-bottom: 2px solid app-shade(black, 1);
+    border-bottom: 1px solid app-shade(black, 1);
   }
 
   &__table-list {
     list-style: none;
     margin-left: -39px;
+    margin-bottom: 0;
 
     &--lighter {
-      font-size: 14px;
+      font-size: 12px;
       color: app-shade(black, 6);
     }
 
     &--warning {
       color: $te-red;
+      font-size: 13px;
+    }
+
+    &--smaller {
+      font-size: 13px;
     }
   }
 
@@ -248,7 +308,7 @@ body {
   }
 
   &__table-link {
-    vertical-align: text-top;
+    vertical-align: top;
     color: $te-link-blue;
     font-weight: 600;
     letter-spacing: .03em;

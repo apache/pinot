@@ -1,6 +1,5 @@
 import Ember from 'ember';
 import fetch from 'fetch';
-import _ from 'lodash';
 
 export default Ember.Route.extend({
   model() {
@@ -8,7 +7,7 @@ export default Ember.Route.extend({
       alerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(res => res.json()),
       subscriberGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
-    })
+    });
   },
 
   setupController(controller, model, transition) {

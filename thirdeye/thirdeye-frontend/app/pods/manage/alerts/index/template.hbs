@@ -119,13 +119,11 @@
           <div class="te-search-results__header">
             <div class="te-search-results__title-group">
               <div class="te-search-results__title">
-                <span class="te-search-results__tag {{if alert.isActive "te-search-results__tag--active"}}">
+                <span class="te-search-results__tag te-search-results__tag--list {{if alert.isActive "te-search-results__tag--active"}}">
                   {{if alert.isActive "Active" "Inactive"}}
                 </span>
+                <span title={{alert.functionName}}>{{alert.functionName}}</span>
               </div>
-              <span title={{alert.functionName}}>
-                {{alert.functionName}}
-              </span>
             </div>
             <div class="te-search-results__edit-button">
               {{#link-to "manage.alerts.edit" alert.id}}<span class="glyphicon glyphicon-pencil"></span>{{/link-to}}
