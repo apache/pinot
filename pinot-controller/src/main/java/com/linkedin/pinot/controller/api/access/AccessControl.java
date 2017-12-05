@@ -15,10 +15,17 @@
  */
 package com.linkedin.pinot.controller.api.access;
 
-import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.HttpHeaders;
 
 
 public interface AccessControl {
 
-  boolean isAllowed(ContainerRequestContext requestContext);
+  /**
+   * Return whether the client has data access to the given table.
+   *
+   * @param httpHeaders Http headers
+   * @param tableName Name of the table to be accessed
+   * @return Whether the client has data access to the table
+   */
+  boolean hasDataAccess(HttpHeaders httpHeaders, String tableName);
 }
