@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
@@ -35,8 +36,9 @@ import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.pinot.PinotDataFrameThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetMetaData;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -204,27 +206,25 @@ public class AnomalyApplicationEndToEndTest {
 
 
   private ThirdEyeResponse getMockResponse(ThirdEyeRequest request) {
-    ThirdEyeResponse response = null;
     Random rand = new Random();
     DatasetConfigDTO datasetConfig = daoRegistry.getDatasetConfigDAO().findByDataset(collection);
     TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-    List<String[]> rows = new ArrayList<>();
     DateTime start = request.getStartTimeInclusive();
     DateTime end = request.getEndTimeExclusive();
-    List<String> metrics = request.getMetricNames();
-    int bucket = 0;
+    List<String> dimensionColumnNames = Collections.singletonList(dataTimeSpec.getColumnName());
+    List<String> metricColumnNames = request.getMetricNames();
+    ThirdEyeResultSetMetaData metaData = new ThirdEyeResultSetMetaData(dimensionColumnNames, metricColumnNames);
+    DataFrame.Builder dfBuilder = DataFrame.builder(metaData.getAllColumnNames());
     while (start.isBefore(end)) {
-      String[] row = new String[metrics.size() + 1];
-      row[0] = String.valueOf(bucket);
-      bucket++;
-      for (int i = 0; i < metrics.size(); i++) {
+      String[] row = new String[metricColumnNames.size() + 1];
+      row[0] = Long.toString(start.getMillis());
+      for (int i = 0; i < metricColumnNames.size(); i++) {
         row[i+1] = String.valueOf(rand.nextInt(1000));
       }
-      rows.add(row);
+      dfBuilder.append(row);
       start = start.plusHours(1);
     }
-    response = new PinotThirdEyeResponse(request, rows, dataTimeSpec);
-    return response;
+    return new PinotDataFrameThirdEyeResponse(request, dataTimeSpec, metaData, dfBuilder.build());
   }
 
   @Test(enabled=true)

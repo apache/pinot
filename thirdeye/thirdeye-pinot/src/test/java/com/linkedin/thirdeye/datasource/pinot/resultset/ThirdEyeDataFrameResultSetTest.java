@@ -41,15 +41,17 @@ public class ThirdEyeDataFrameResultSetTest {
     ThirdEyeDataFrameResultSet actualDataFrameResultSet =
         ThirdEyeDataFrameResultSet.fromPinotResultSet(selectResultSet);
 
+    ThirdEyeResultSetMetaData metaData = new ThirdEyeResultSetMetaData(Collections.<String>emptyList(), columnArray);
     DataFrame dataFrame = new DataFrame();
     dataFrame.addSeries("col1", 0, 10, 20);
     dataFrame.addSeries("col2", 1, 11, 21);
-    ThirdEyeResultSetMetaData metaData = new ThirdEyeResultSetMetaData(Collections.<String>emptyList(), columnArray);
+    dataFrame.setIndex(metaData.getGroupKeyColumnNames());
     ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
 
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
     Assert.assertEquals(actualDataFrameResultSet.getGroupKeyLength(), 0);
     Assert.assertEquals(actualDataFrameResultSet.getColumnCount(), 2);
+    Assert.assertEquals(dataFrame.getIndexNames(), expectedDataFrameResultSet.getDataFrame().getIndexNames());
   }
 
   @Test
@@ -64,11 +66,13 @@ public class ThirdEyeDataFrameResultSetTest {
         new ThirdEyeResultSetMetaData(Collections.<String>emptyList(), Collections.singletonList(functionName));
     DataFrame dataFrame = new DataFrame();
     dataFrame.addSeries(functionName, 150.33576);
+    dataFrame.setIndex(metaData.getGroupKeyColumnNames());
     ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
 
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
     Assert.assertEquals(actualDataFrameResultSet.getGroupKeyLength(), 0);
     Assert.assertEquals(actualDataFrameResultSet.getColumnCount(), 1);
+    Assert.assertEquals(dataFrame.getIndexNames(), expectedDataFrameResultSet.getDataFrame().getIndexNames());
   }
 
   @Test
@@ -95,11 +99,13 @@ public class ThirdEyeDataFrameResultSetTest {
     dataFrame.addSeries("country", "US", "US", "IN", "JP");
     dataFrame.addSeries("pageName", "page1", "page2", "page3", "page2");
     dataFrame.addSeries(functionName, 1111, 2222.2, 333.3, 44444.4);
+    dataFrame.setIndex(metaData.getGroupKeyColumnNames());
     ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
 
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
     Assert.assertEquals(actualDataFrameResultSet.getGroupKeyLength(), 2);
     Assert.assertEquals(actualDataFrameResultSet.getColumnCount(), 1);
+    Assert.assertEquals(dataFrame.getIndexNames(), expectedDataFrameResultSet.getDataFrame().getIndexNames());
   }
 
   @Test
@@ -122,9 +128,11 @@ public class ThirdEyeDataFrameResultSetTest {
     dataFrame.addSeries("country", StringSeries.builder().build());
     dataFrame.addSeries("pageName", StringSeries.builder().build());
     dataFrame.addSeries(functionName, ObjectSeries.builder().build());
+    dataFrame.setIndex(metaData.getGroupKeyColumnNames());
     ThirdEyeDataFrameResultSet expectedDataFrameResultSet = new ThirdEyeDataFrameResultSet(metaData, dataFrame);
 
     Assert.assertEquals(actualDataFrameResultSet, expectedDataFrameResultSet);
+    Assert.assertEquals(dataFrame.getIndexNames(), expectedDataFrameResultSet.getDataFrame().getIndexNames());
   }
 
   private static class MockedSingleGroupByResultSet extends MockedAbstractResultSet {
