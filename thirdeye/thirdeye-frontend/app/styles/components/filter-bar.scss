@@ -3,24 +3,20 @@
   background-color: white;
   border: 1px solid $te-grey--border;
 
-  &__head {
-    padding-bottom: 5px;
-    padding: 5px $te-default-element-spacing;
-  }
-
-  &__title {
-    font-size: 18px;
-    font-weight: 500;
-  }
-
   &__group {
-    padding: 5px $te-default-element-spacing;
     border-top: 1px solid $te-grey--border;
   }
 
   &__group-title {
+    padding: 15px $te-default-element-spacing;
+    margin-top: 0px;
+    margin-bottom: 0px;
     font-size: 16px;
-    color: app-shade(black, 4);
+
+    &--active {
+      border-left: 3px solid $te-blue-6;
+      font-weight: bold;
+    }
   }
 
   &__group-toggle {
@@ -34,8 +30,10 @@
   }
 
   &__group-list {
-    padding-left: 0;
-    margin-top: 15px;
+    border-top: 1px solid $te-grey--border;
+    padding: 25px $te-default-element-spacing;
+    margin-bottom: 0px;
+    background-color: #F3F6F8;
 
     &--hidden {
       display: none;
