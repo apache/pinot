@@ -2,6 +2,7 @@
   {{#each filterBlocks as |block|}}
     <section class="filter-bar__group">
       <h5 class="filter-bar__group-title {{if block.isHidden "" "filter-bar__group-title--active "}}">
+        <div class="filter-bar__group-circle filter-bar__group-circle--{{block.color}}"></div>
         {{block.header}}
         <a class="filter-bar__group-toggle" {{action 'selectEventType' block.eventType}}>
           <i class="glyphicon {{if block.isHidden " glyphicon-menu-up " "glyphicon-menu-down "}}"></i>

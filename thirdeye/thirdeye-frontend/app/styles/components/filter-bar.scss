@@ -19,14 +19,34 @@
     }
   }
 
+  &__group-circle {
+    display: inline-block;
+    margin-right: 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50px;
+  }
+
+  $colors:
+  "blue" $te-blue,
+  "orange" $te-orange,
+  "teal" $te-teal,
+  "purple" $te-purple,
+  "red" $te-red,
+  "green" $te-green,
+  "pink" $te-pink;
+
+  // creates filter-bar__group-color--"color" classes
+  @each $i in $colors {
+    .filter-bar__group-circle--#{nth($i, 1)} {
+      background: nth($i, 2);
+    }
+  };
+
   &__group-toggle {
     float: right;
     color: app-shade(black, 3);
     font-weight: 300;
-  }
-
-  &__group-filter {
-    list-style: none;
   }
 
   &__group-list {
@@ -37,27 +57,6 @@
 
     &--hidden {
       display: none;
-    }
-  }
-
-  &__group-label {
-    font-size: 15px;
-    font-weight: 400;
-    margin-left: 5px;
-    word-break: break-all;
-    vertical-align: middle;
-    overflow: hidden;
-    max-height: 21px;
-    max-width: 170px;
-    vertical-align: middle;
-    line-height: 21px;
-
-    &--truncated {
-      &:before {
-        content: '...';
-        position: absolute;
-        right: 41px;
-      }
     }
   }
 }
