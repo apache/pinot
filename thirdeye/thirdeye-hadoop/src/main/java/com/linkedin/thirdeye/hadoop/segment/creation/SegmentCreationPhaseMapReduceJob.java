@@ -243,7 +243,8 @@ public class SegmentCreationPhaseMapReduceJob {
         }
         LOGGER.info("Setting splitOrder {}", splitOrder);
       }
-      segmentGeneratorConfig.enableStarTreeIndex(starTreeIndexSpec);
+      segmentGeneratorConfig.setStarTreeIndexSpec(starTreeIndexSpec);
+      segmentGeneratorConfig.setEnableStarTreeIndex(true);
       LOGGER.info("*********************************************************************");
 
       // Set time for SIMPLE_DATE_FORMAT case
