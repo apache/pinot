@@ -34,11 +34,17 @@ public class TestRootcauseSessionManager {
     this.sessionDAO.save(makeDefault());
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class)
+  @Test
   public void testUpdateSession() throws Exception {
     RootcauseSessionDTO session = makeDefault();
     this.sessionDAO.save(session);
+
+    session.setName("mynewname");
     this.sessionDAO.save(session);
+
+    RootcauseSessionDTO read = this.sessionDAO.findById(session.getId());
+
+    Assert.assertEquals(read.getName(), "mynewname");
   }
 
   @Test

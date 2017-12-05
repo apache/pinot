@@ -28,16 +28,6 @@ public class RootcauseSessionManagerImpl extends AbstractManagerImpl<RootcauseSe
   }
 
   @Override
-  public int update(RootcauseSessionDTO entity) {
-    throw new IllegalArgumentException("RootcauseSessionBeans are immutable");
-  }
-
-  @Override
-  public int update(RootcauseSessionDTO entity, Predicate predicate) {
-    throw new IllegalArgumentException("RootcauseSessionBeans are immutable");
-  }
-
-  @Override
   public List<RootcauseSessionDTO> findByName(String name) {
     return findByPredicate(Predicate.EQ("name", name));
   }

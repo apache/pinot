@@ -5,8 +5,8 @@ import java.util.Objects;
 
 
 /**
- * RootcauseSessionBean holds information for stored rootcause investigation reports. Each session is immutable once
- * stored. Any modifications are stored in a new session with a backpointer to the previous version.
+ * RootcauseSessionBean holds information for stored rootcause investigation reports. Supports backpointers to previous
+ * versions.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RootcauseSessionBean extends AbstractBean {
