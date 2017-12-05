@@ -13,7 +13,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -170,8 +169,8 @@ public class RootCauseResource {
    * <br/><b>(1) comma-delimited:</b> {@code "urns=thirdeye:metric:123,thirdeye:metric:124"}
    * <br/><b>(2) multi-param</b> {@code "urns=thirdeye:metric:123&urns=thirdeye:metric:124"}
    *
-   * @param urns
-   * @return
+   * @param urns urns param
+   * @return list of urns
    */
   private static List<String> parseUrnsParam(List<String> urns) {
     if(urns.size() != 1)

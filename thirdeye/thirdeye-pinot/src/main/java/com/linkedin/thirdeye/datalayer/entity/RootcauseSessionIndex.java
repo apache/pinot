@@ -6,8 +6,6 @@ public class RootcauseSessionIndex extends AbstractIndexEntity {
   private Long previousId;
   private Long anomalyRangeStart;
   private Long anomalyRangeEnd;
-  private Long baselineRangeStart;
-  private Long baselineRangeEnd;
   private Long created;
 
   public String getName() {
@@ -48,22 +46,6 @@ public class RootcauseSessionIndex extends AbstractIndexEntity {
 
   public void setAnomalyRangeEnd(Long anomalyRangeEnd) {
     this.anomalyRangeEnd = anomalyRangeEnd;
-  }
-
-  public Long getBaselineRangeStart() {
-    return baselineRangeStart;
-  }
-
-  public void setBaselineRangeStart(Long baselineRangeStart) {
-    this.baselineRangeStart = baselineRangeStart;
-  }
-
-  public Long getBaselineRangeEnd() {
-    return baselineRangeEnd;
-  }
-
-  public void setBaselineRangeEnd(Long baselineRangeEnd) {
-    this.baselineRangeEnd = baselineRangeEnd;
   }
 
   public Long getCreated() {
