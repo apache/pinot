@@ -23,6 +23,7 @@ export default Ember.Component.extend({
 
       const records = _.cloneDeep(entities);
       Object.keys(records).forEach(urn => records[urn].isSelected = selectedUrns.has(urn));
+      console.log("records: ", records);
       return records;
     }
   ),
