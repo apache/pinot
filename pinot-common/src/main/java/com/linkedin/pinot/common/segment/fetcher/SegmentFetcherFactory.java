@@ -78,27 +78,33 @@ public class SegmentFetcherFactory {
       Configuration protocolConfig = segmentFetcherFactoryConfig.subset(protocol);
       String configuredClassName = protocolConfig.getString(SEGMENT_FETCHER_CLASS_KEY);
       if (configuredClassName == null || configuredClassName.isEmpty()) {
-        // If the class is not in the map, then it should already be instantiated, we can
-        // still init it with the config provided. Otherwise, the config is ignored, so
-        // flag a warning.
-        if (!SEGMENT_FETCHER_MAP.containsKey(protocol)) {
+        // No class name configured for this protocol
+        if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
+          // If the class is in the map, then it should already be instantiated, we can
+          // still init it with the config provided.
+          String builtinClassName = SEGMENT_FETCHER_MAP.get(protocol).getClass().getName();
+          LOGGER.info("Using built-in class {} for protocol {}", builtinClassName, protocol);
+        } else {
+          // flag a warning since we only have a protocol name and no class name to instantiate.
           LOGGER.warn("No class name given for protocol {}. Configuration ignored", protocol);
         }
-        continue;
-      }
-      if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
-        String builtinClassName = SEGMENT_FETCHER_MAP.get(protocol).getClass().getName();
-        if (builtinClassName.equals(configuredClassName)) {
-          LOGGER.info("Configured class {} same as built-in class name for protocol {}", configuredClassName, protocol);
-          continue;
-        }
-        LOGGER.info("Overriding class {} for protoocol {} with {}", builtinClassName, protocol, configuredClassName);
-        instantiateSegmentFetcher(protocol, configuredClassName);
-        // If any exception happens during instantiation, the original class will be retained.
       } else {
-        LOGGER.info("Instantiating new configured class {} for protocol {}", configuredClassName, protocol);
-        instantiateSegmentFetcher(protocol, configuredClassName);
-        // If any exception happened while instantiating this class, it will not be in the map.
+        // A class name has been configured for this protocol. If it is same as built-in class name,
+        // just use the one built-in, otherwise if it is different, then instantiate it and override it in the map.
+        if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
+          String builtinClassName = SEGMENT_FETCHER_MAP.get(protocol).getClass().getName();
+          if (builtinClassName.equals(configuredClassName)) {
+            LOGGER.info("Configured class {} same as built-in class name for protocol {}", configuredClassName, protocol);
+          } else {
+            LOGGER.info("Overriding class {} for protoocol {} with {}", builtinClassName, protocol, configuredClassName);
+            instantiateSegmentFetcher(protocol, configuredClassName);
+          }
+          // If any exception happens during instantiation, the original class will be retained.
+        } else {
+          LOGGER.info("Instantiating new configured class {} for protocol {}", configuredClassName, protocol);
+          instantiateSegmentFetcher(protocol, configuredClassName);
+          // If any exception happened while instantiating this class, it will not be in the map.
+        }
       }
     }
 
