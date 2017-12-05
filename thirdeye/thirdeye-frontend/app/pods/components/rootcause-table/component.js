@@ -36,7 +36,7 @@ export default Ember.Component.extend({
     'records',
     function () {
       let values = Object.values(this.get('records'));
-      values.forEach(value => {
+      values.forEach((value) => {
         value.start = moment(value.start).format('LL');
         value.end = moment(value.end).format('LL');
       });
