@@ -30,6 +30,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
@@ -301,5 +302,22 @@ public class DaoTestUtils {
     anomaly.setCreatedTime(createdTime);
 
     return anomaly;
+  }
+
+  public static RootcauseSessionDTO getTestRootcauseSessionResult(long start, long end, long created,
+      String name, String owner, String text, String granularity, String compareMode, Long previousId) {
+    RootcauseSessionDTO session = new RootcauseSessionDTO();
+    session.setAnomalyRangeStart(start);
+    session.setAnomalyRangeEnd(end);
+    session.setAnalysisRangeStart(start - 100);
+    session.setAnalysisRangeEnd(end + 100);
+    session.setName(name);
+    session.setOwner(owner);
+    session.setText(text);
+    session.setPreviousId(previousId);
+    session.setCreated(created);
+    session.setGranularity(granularity);
+    session.setCompareMode(compareMode);
+    return session;
   }
 }

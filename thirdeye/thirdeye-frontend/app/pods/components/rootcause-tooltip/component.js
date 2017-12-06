@@ -1,5 +1,5 @@
 import Component from '@ember/component';
-import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
+import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, stripTail } from 'thirdeye-frontend/helpers/utils';
 
 export default Component.extend({
   entities: null, // {}
@@ -74,7 +74,7 @@ export default Component.extend({
       const { entities, hoverUrns } = this.getProperties('entities', 'hoverUrns');
 
       return filterPrefix(hoverUrns, ['thirdeye:metric:', 'thirdeye:event:']).reduce((agg, urn) => {
-        agg[urn] = entities[urn].color;
+        agg[urn] = entities[stripTail(urn)].color;
         return agg;
       }, {});
     }

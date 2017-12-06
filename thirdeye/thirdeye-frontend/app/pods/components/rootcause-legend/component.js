@@ -47,7 +47,7 @@ export default Ember.Component.extend({
     'validUrns',
     function () {
       const { entities, validUrns } = this.getProperties('entities', 'validUrns');
-      return validUrns.filter(urn => entities[urn]).reduce((agg, urn) => { agg[urn] = entities[urn].color; return agg; }, {});
+      return validUrns.filter(urn => entities[stripTail(urn)]).reduce((agg, urn) => { agg[urn] = entities[stripTail(urn)].color; return agg; }, {});
     }
   ),
 

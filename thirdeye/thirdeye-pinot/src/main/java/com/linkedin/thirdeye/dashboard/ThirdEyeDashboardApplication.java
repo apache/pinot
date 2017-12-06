@@ -40,6 +40,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseResource;
+import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
@@ -149,6 +150,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new OnboardDatasetMetricResource());
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
+    env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
