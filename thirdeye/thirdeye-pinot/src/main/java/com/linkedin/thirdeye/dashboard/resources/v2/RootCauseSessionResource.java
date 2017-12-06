@@ -35,7 +35,7 @@ public class RootCauseSessionResource {
 
   @GET
   @Path("/{sessionId}")
-  public RootcauseSessionDTO getSession(@PathParam("sessionId") Long sessionId) {
+  public RootcauseSessionDTO get(@PathParam("sessionId") Long sessionId) {
     if (sessionId == null) {
       throw new IllegalArgumentException("Must provide sessionId");
     }
@@ -51,13 +51,21 @@ public class RootCauseSessionResource {
 
   @POST
   @Path("/")
-  public Long postSession(
+  public Long post(
       String jsonString) throws IOException {
     RootcauseSessionDTO session = this.mapper.readValue(jsonString, new TypeReference<RootcauseSessionDTO>() {});
 
     if (session.getId() == null) {
       session.setCreated(DateTime.now().getMillis());
       session.setOwner(ThirdEyeAuthFilter.getCurrentPrincipal().getName());
+
+    } else {
+      RootcauseSessionDTO existing = this.sessionDAO.findById(session.getId());
+      if (existing == null) {
+        throw new IllegalArgumentException(String.format("Could not resolve session id %d", session.getId()));
+      }
+
+      session = merge(existing, session);
     }
 
     return this.sessionDAO.save(session);
@@ -65,7 +73,7 @@ public class RootCauseSessionResource {
 
   @GET
   @Path("/query")
-  public List<RootcauseSessionDTO> getSession(
+  public List<RootcauseSessionDTO> query(
       @QueryParam("id") String idsString,
       @QueryParam("name") String namesString,
       @QueryParam("owner") String ownersString,
@@ -116,6 +124,12 @@ public class RootCauseSessionResource {
     return this.sessionDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[predicates.size()])));
   }
 
+  /**
+   * Returns query param value split by comma and trimmed of empty entries.
+   *
+   * @param str query param value string (comma separated)
+   * @return array of non-empty values
+   */
   private static String[] split(String str) {
     List<String> args = new ArrayList<>(Arrays.asList(str.split(",")));
     Iterator<String> itStr = args.iterator();
@@ -125,5 +139,46 @@ public class RootCauseSessionResource {
       }
     }
     return args.toArray(new String[args.size()]);
+  }
+
+  /**
+   * Merges attributes of an existing session with incoming updates. Does NOT update all values.
+   *
+   * @param session existing rootcause session
+   * @param other updated rootcause session
+   * @return modified, existing session
+   */
+  private static RootcauseSessionDTO merge(RootcauseSessionDTO session, RootcauseSessionDTO other) {
+    if (other.getName() != null)
+      session.setName(other.getName());
+
+    if (other.getText() != null)
+      session.setText(other.getText());
+
+    if (other.getCompareMode() != null)
+      session.setCompareMode(other.getCompareMode());
+
+    if (other.getGranularity() != null)
+      session.setGranularity(other.getGranularity());
+
+    if (other.getAnalysisRangeStart() != null)
+      session.setAnalysisRangeStart(other.getAnalysisRangeStart());
+
+    if (other.getAnalysisRangeEnd() != null)
+      session.setAnalysisRangeEnd(other.getAnalysisRangeEnd());
+
+    if (other.getAnomalyRangeStart() != null)
+      session.setAnomalyRangeStart(other.getAnomalyRangeStart());
+
+    if (other.getAnomalyRangeEnd() != null)
+      session.setAnomalyRangeEnd(other.getAnomalyRangeEnd());
+
+    if (other.getContextUrns() != null)
+      session.setContextUrns(other.getContextUrns());
+
+    if (other.getSelectedUrns() != null)
+      session.setSelectedUrns(other.getSelectedUrns());
+
+    return session;
   }
 }
