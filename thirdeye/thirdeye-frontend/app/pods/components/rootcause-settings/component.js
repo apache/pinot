@@ -19,7 +19,8 @@
 import Ember from 'ember';
 import moment from 'moment';
 import fetch from 'fetch';
-import { toFilters, toFilterMap, filterPrefix } from '../../../helpers/utils';
+import { toFilters, toFilterMap, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import _ from 'lodash'
 
 // TODO: move this to a utils file (DRYER)
 const _filterToUrn = (filters) => {
@@ -191,7 +192,7 @@ export default Ember.Component.extend({
     const otherUrns = this.get('otherUrns');
     const metricUrns = filterPrefix(otherUrns, 'thirdeye:metric:');
 
-    if (!metricUrns) { return null; }
+    if (_.isEmpty(metricUrns)) { return null; }
 
     return metricUrns[0];
   }),
@@ -206,7 +207,7 @@ export default Ember.Component.extend({
     const otherUrns = this.get('otherUrns');
     const metricUrns = filterPrefix(otherUrns, 'thirdeye:metric:');
 
-    if (!metricUrns) { return {}; }
+    if (_.isEmpty(metricUrns)) { return {}; }
 
     const id = metricUrns[0].split(':')[2];
     return fetch(`/data/autocomplete/filters/metric/${id}`)
@@ -371,7 +372,7 @@ export default Ember.Component.extend({
 
       const nonMetricUrns = [...otherUrns].filter(urn => !urn.startsWith('thirdeye:metric:'));
       const newOtherUrns = [...nonMetricUrns, ...selected];
-      
+
       this.set('otherUrns', newOtherUrns);
       this.send('updateContext');
     }

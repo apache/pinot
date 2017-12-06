@@ -97,7 +97,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   },
 
   afterModel(model, transition) {
-    const maxTime = moment().valueOf();
+    const maxTime = moment().startOf('hour').valueOf();
 
     const defaultParams = {
       filters: JSON.stringify({}),
