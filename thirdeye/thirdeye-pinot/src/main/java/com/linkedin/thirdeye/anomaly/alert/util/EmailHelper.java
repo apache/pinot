@@ -1,8 +1,10 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
@@ -22,6 +24,8 @@ import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
+import org.joda.time.Weeks;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +75,11 @@ public abstract class EmailHelper {
     sendEmail(smtpConfiguration, email, subject, fromAddress, toAddress);
   }
 
+  public static void sendEmailWithEmailEntity(EmailEntity emailEntity, SmtpConfiguration smtpConfiguration)
+      throws EmailException {
+    sendEmail(smtpConfiguration, emailEntity.getContent(), emailEntity.getSubject(), emailEntity.getFrom(), emailEntity.getTo());
+  }
+
   /** Sends email according to the provided config. */
   private static void sendEmail(SmtpConfiguration config, HtmlEmail email, String subject,
       String fromAddress, String toAddress) throws EmailException {
@@ -100,14 +109,15 @@ public abstract class EmailHelper {
       long offsetDelayMillis, boolean intraday)
       throws Exception {
 
-    long baselineOffset = getBaselineOffset(compareMode);
+    return getContributorDataForDataReport(collection, metric, dimensions, HashMultimap.<String, String>create(),
+        compareMode, offsetDelayMillis, intraday);
+  }
 
-    ContributorViewRequest request = new ContributorViewRequest();
-    request.setCollection(collection);
 
-    List<MetricExpression> metricExpressions =
-        Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
-    request.setMetricExpressions(metricExpressions);
+  public static ContributorViewResponse getContributorDataForDataReport(String collection,
+      String metric, List<String> dimensions, Multimap<String, String> filters, AlertConfigBean.COMPARE_MODE compareMode,
+      long offsetDelayMillis, boolean intraday)
+      throws Exception {
     long currentEnd = System.currentTimeMillis();
     long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
@@ -117,7 +127,6 @@ public abstract class EmailHelper {
     // align to nearest hour
     currentEnd = (currentEnd - (currentEnd % HOUR_MILLIS)) - offsetDelayMillis;
 
-    String aggTimeGranularity = "HOURS";
     long currentStart = currentEnd - DAY_MILLIS;
 
     // intraday option
@@ -132,36 +141,64 @@ public abstract class EmailHelper {
 
     DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
     if (datasetConfigDTO != null && TimeUnit.DAYS.equals(datasetConfigDTO.bucketTimeGranularity().getUnit())) {
-      aggTimeGranularity = datasetConfigDTO.bucketTimeGranularity().getUnit().name();
       currentEnd = currentEnd - (currentEnd % DAY_MILLIS);
       currentStart = currentEnd - WEEK_MILLIS;
     }
+    return getContributorDataForDataReport(collection, metric, dimensions, filters, compareMode, MetricAggFunction.SUM,
+        currentStart, currentEnd);
+  }
 
-    long baselineStart = currentStart - baselineOffset ;
-    long baselineEnd = currentEnd - baselineOffset;
 
-    String timeZone = datasetConfigDTO.getTimezone();
-    request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
-    request.setBaselineEnd(new DateTime(baselineEnd, DateTimeZone.forID(timeZone)));
-    request.setCurrentStart(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
-    request.setCurrentEnd(new DateTime(currentEnd, DateTimeZone.forID(timeZone)));
+  public static ContributorViewResponse getContributorDataForDataReport(String collection, String metric,
+      List<String> dimensions, Multimap<String, String> filters, AlertConfigBean.COMPARE_MODE compareMode, MetricAggFunction metricAggFunction,
+      long startInMillis, long endInMillis) throws Exception {
+    DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
+    DateTimeZone timeZone = DateTimeZone.forID(datasetConfigDTO.getTimezone());
+
+    Period baselinePeriod = getBaselinePeriod(compareMode);
+    ContributorViewRequest request = new ContributorViewRequest();
+
+    List<MetricExpression> metricExpressions =
+        Utils.convertToMetricExpressions(metric, metricAggFunction, collection);
+    request.setMetricExpressions(metricExpressions);
+
+    long currentEndInMills = endInMillis;
+    long maxDataTime = collectionMaxDataTimeCache.get(collection);
+    currentEndInMills = Math.min(currentEndInMills, maxDataTime);
+
+    DateTime currentStart = new DateTime(startInMillis, timeZone);
+    DateTime currentEnd = new DateTime(currentEndInMills, timeZone);
+
+    String aggTimeGranularity = "HOURS";
+    if (datasetConfigDTO != null && TimeUnit.DAYS.equals(datasetConfigDTO.bucketTimeGranularity().getUnit())) {
+      aggTimeGranularity = datasetConfigDTO.bucketTimeGranularity().getUnit().name();
+    }
+
+    DateTime baselineStart = currentStart.minus(baselinePeriod);
+    DateTime baselineEnd = currentEnd.minus(baselinePeriod);
+
+    request.setBaselineStart(baselineStart);
+    request.setBaselineEnd(baselineEnd);
+    request.setCurrentStart(currentStart);
+    request.setCurrentEnd(currentEnd);
     request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
     request.setGroupByDimensions(dimensions);
+    request.setFilters(filters);
     ContributorViewHandler handler = new ContributorViewHandler(queryCache);
     return handler.process(request);
   }
 
-  public static long getBaselineOffset(AlertConfigBean.COMPARE_MODE compareMode) {
+  public static Period getBaselinePeriod(AlertConfigBean.COMPARE_MODE compareMode) {
     switch (compareMode) {
-    case Wo2W:
-      return 2 * WEEK_MILLIS;
-    case Wo3W:
-      return 3 * WEEK_MILLIS;
-    case Wo4W:
-      return 4 * WEEK_MILLIS;
-    case WoW:
+      case Wo2W:
+        return Weeks.TWO.toPeriod();
+      case Wo3W:
+        return Weeks.THREE.toPeriod();
+      case Wo4W:
+        return Weeks.weeks(4).toPeriod();
+      case WoW:
       default:
-      return WEEK_MILLIS;
+        return Weeks.ONE.toPeriod();
     }
   }
 
