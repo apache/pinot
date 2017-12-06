@@ -7,6 +7,7 @@ export default [
     className: 'events-table__column--checkbox'
   },
   {
+    template: 'custom/table-label',
     propertyName: 'label',
     title: 'Event Name',
     className: 'events-table__column'

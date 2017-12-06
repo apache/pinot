@@ -1,5 +1,6 @@
 import Ember from 'ember';
 import _ from 'lodash';
+import moment from 'moment';
 
 export default Ember.Component.extend({
   columns: null, // []
@@ -23,7 +24,6 @@ export default Ember.Component.extend({
 
       const records = _.cloneDeep(entities);
       Object.keys(records).forEach(urn => records[urn].isSelected = selectedUrns.has(urn));
-      console.log("records: ", records);
       return records;
     }
   ),
@@ -35,7 +35,12 @@ export default Ember.Component.extend({
   data: Ember.computed(
     'records',
     function () {
-      return Object.values(this.get('records'));
+      let values = Object.values(this.get('records'));
+      values.forEach((value) => {
+        value.start = moment(value.start).format('dddd, MMMM Do YYYY');
+        value.end = moment(value.end).format('dddd, MMMM Do YYYY');
+      });
+      return values;
     }
   ),
 
