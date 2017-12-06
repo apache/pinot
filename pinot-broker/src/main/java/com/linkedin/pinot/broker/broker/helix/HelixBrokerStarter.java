@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.broker.helix;
 
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -64,6 +65,9 @@ public class HelixBrokerStarter {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
   private final MetricsRegistry _metricsRegistry;
+
+  // Set after broker is started, which is actually in the constructor.
+  private AccessControlFactory _accessControlFactory;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
 
@@ -184,6 +188,7 @@ public class HelixBrokerStarter {
             _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener);
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
+    _accessControlFactory = brokerServerBuilder.getAccessControlFactory();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
     brokerServerBuilder.start();
 
@@ -201,6 +206,10 @@ public class HelixBrokerStarter {
       }
     });
     return brokerServerBuilder;
+  }
+
+  public AccessControlFactory getAccessControlFactory() {
+    return _accessControlFactory;
   }
 
   /**

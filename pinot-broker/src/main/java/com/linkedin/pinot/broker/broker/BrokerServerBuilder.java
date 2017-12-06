@@ -63,6 +63,7 @@ public class BrokerServerBuilder {
   private static final String PINOT_BROKER_TABLE_LEVEL_METRICS_LIST = "pinot.broker.tablelevel.metrics.whitelist";
   private static final String BROKER_SEGMENT_PRUNERS = "pinot.broker.segment.pruners";
   private static final String[] DEFAULT_BROKER_SEGMENT_PRUNERS = {};
+  private static final String BROKER_ACCESS_CONTROL_PREFIX = "pinot.broker.access.control";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
   // Connection Pool Related
@@ -82,6 +83,7 @@ public class BrokerServerBuilder {
 
   private MetricsRegistry _registry;
   private BrokerMetrics _brokerMetrics;
+  private AccessControlFactory _accessControlFactory;
 
   // Broker Request Handler
   private BrokerRequestHandler _requestHandler;
@@ -171,10 +173,15 @@ public class BrokerServerBuilder {
 
     // Setup Broker Request Handler
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
+    _accessControlFactory = AccessControlFactory.loadFactory(_config.subset(BROKER_ACCESS_CONTROL_PREFIX));
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
-        reduceServiceRegistry, brokerPrunerService, _brokerMetrics, _config);
+        reduceServiceRegistry, brokerPrunerService, _brokerMetrics, _config, _accessControlFactory);
 
     LOGGER.info("Network initialized !!");
+  }
+
+  public AccessControlFactory getAccessControlFactory() {
+    return _accessControlFactory;
   }
 
   /**

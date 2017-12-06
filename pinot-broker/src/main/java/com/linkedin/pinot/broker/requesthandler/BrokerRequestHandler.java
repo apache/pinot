@@ -81,7 +81,6 @@ public class BrokerRequestHandler {
 
   private static final String BROKER_QUERY_SPLIT_IN_CLAUSE = "pinot.broker.query.split.in.clause";
   private static final String BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
-  private static final String BROKER_ACCESS_CONTROL_PREFIX = "pinot.broker.access.control";
   private static final ResponseType DEFAULT_BROKER_RESPONSE_TYPE = ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
   private static final boolean DEFAULT_BROKER_QUERY_SPLIT_IN_CLAUSE = false;
   private static final int DEFAULT_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
@@ -103,7 +102,8 @@ public class BrokerRequestHandler {
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
       ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry,
-      SegmentZKMetadataPrunerService segmentPrunerService, BrokerMetrics brokerMetrics, Configuration config) {
+      SegmentZKMetadataPrunerService segmentPrunerService, BrokerMetrics brokerMetrics, Configuration config,
+      AccessControlFactory accessControlFactory) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _reduceServiceRegistry = reduceServiceRegistry;
@@ -119,7 +119,7 @@ public class BrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _brokerId = config.getString(CommonConstants.Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _segmentPrunerService = segmentPrunerService;
-    _accessControlFactory = AccessControlFactory.loadFactory(config.subset(BROKER_ACCESS_CONTROL_PREFIX));
+    _accessControlFactory = accessControlFactory;
 
     LOGGER.info("Broker response limit is: " + _queryResponseLimit);
     LOGGER.info("Broker timeout is - " + _brokerTimeOutMs + " ms");
