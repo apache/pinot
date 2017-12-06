@@ -21,7 +21,7 @@ export default Ember.Service.extend({
     const { context, entities, nativeUrns } = this.getProperties('context', 'entities', 'nativeUrns');
 
     // special case: urn identity
-    const requestNativeUrns = new Set(filterPrefix(urns, 'thirdeye:metric:'));
+    const requestNativeUrns = new Set(filterPrefix(urns, ['thirdeye:metric:', 'thirdeye:event:anomaly:']));
     if (!_.isEqual(nativeUrns, requestNativeUrns)) {
       this.setProperties({ nativeUrns: requestNativeUrns });
 
