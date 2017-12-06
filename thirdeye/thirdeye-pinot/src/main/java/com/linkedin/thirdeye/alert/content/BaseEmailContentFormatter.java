@@ -239,6 +239,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     }
 
     HtmlEmail email = new HtmlEmail();
+<<<<<<< HEAD
     String cid = "";
     try {
       if (org.apache.commons.lang3.StringUtils.isNotBlank(imgPath)) {
@@ -246,6 +247,22 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       }
     } catch (Exception e) {
       LOG.error("Exception while embedding screenshot for anomaly", e);
+=======
+
+    // Insert anomaly snapshot image
+    String cid = "";
+    List<AnomalyReportEntity> anomalyDetails = (List<AnomalyReportEntity>) paramMap.get("anomalyDetails");
+    if (anomalyDetails.size() == 1) {
+      AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
+      try {
+        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), THIRDEYE_CONFIG);
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(imgPath)) {
+          cid = email.embed(new File(imgPath));
+        }
+      } catch (Exception e) {
+        LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
+      }
+>>>>>>> Implement EmailContentFormatter in ThirdEye
     }
     paramMap.put("cid", cid);
 
