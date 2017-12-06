@@ -92,19 +92,19 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
         putAnomaliesIntoRootOrLeaf(anomaly, rootAnomalyDetails, leafAnomalyDetails);
         anomalyIds.add(Long.toString(anomaly.getId()));
       }
-      List<EventDTO> sortedEvents = new ArrayList<>(relatedEvents);
-      Collections.sort(sortedEvents, new Comparator<EventDTO>() {
-        @Override
-        public int compare(EventDTO o1, EventDTO o2) {
-          return Long.compare(o1.getStartTime(), o2.getStartTime());
-        }
-      });
-      templateData.put("containsSeasonal", presentSeasonalValues);
-      templateData.put("rootAnomalyDetails", rootAnomalyDetails);
-      templateData.put("leafAnomalyDetails", leafAnomalyDetails);
-      templateData.put("holidays", sortedEvents);
-      templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
     }
+    List<EventDTO> sortedEvents = new ArrayList<>(relatedEvents);
+    Collections.sort(sortedEvents, new Comparator<EventDTO>() {
+      @Override
+      public int compare(EventDTO o1, EventDTO o2) {
+        return Long.compare(o1.getStartTime(), o2.getStartTime());
+      }
+    });
+    templateData.put("containsSeasonal", presentSeasonalValues);
+    templateData.put("rootAnomalyDetails", rootAnomalyDetails);
+    templateData.put("leafAnomalyDetails", leafAnomalyDetails);
+    templateData.put("holidays", sortedEvents);
+    templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
   }
 
   /**

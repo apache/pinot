@@ -91,6 +91,7 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
     anomalyFunction = DaoTestUtils.getTestFunctionSpec(TEST, TEST);
     anomalyFunction.setExploreDimensions("country");
     anomalyFunction.setId(null);
+    anomalyFunction.setFunctionName(anomalyFunction.getFunctionName() + " - country");
     anomalyFunctionDAO.save(anomalyFunction);
 
     anomaly = DaoTestUtils.getTestMergedAnomalyResult(

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.alert.content;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailScreenshotHelper;
@@ -149,6 +150,16 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
         return Long.compare(o1.getStartTime(), o2.getStartTime());
       }
     });
+
+    // Insert anomaly snapshot image
+    if (anomalyDetails.size() == 1) {
+      AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
+      try {
+        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), THIRDEYE_CONFIG);
+      } catch (Exception e) {
+        LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
+      }
+    }
 
     templateData.put("anomalyDetails", anomalyDetails);
     templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
