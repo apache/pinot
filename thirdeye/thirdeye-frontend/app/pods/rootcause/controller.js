@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toColor } from 'thirdeye-frontend/helpers/utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toColor, checkStatus } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import CryptoJS from 'cryptojs';
@@ -15,7 +15,7 @@ export default Ember.Controller.extend({
   queryParams: [
     'metricId',
     'anomalyId',
-    'shareId'
+    'sessionId'
   ],
 
   //
@@ -48,6 +48,14 @@ export default Ember.Controller.extend({
   activeTab: null, // ""
 
   lastShare: null, // ""
+
+  //
+  // session data
+  //
+
+  sessionName: null, // ""
+
+  sessionText: null, // ""
 
   //
   // static component config
@@ -213,6 +221,37 @@ export default Ember.Controller.extend({
     }
   ),
 
+  isLoading: Ember.computed(
+    'isLoadingEntities',
+    'isLoadingTimeseries',
+    'isLoadingAggregates',
+    'isLoadingBreakdowns',
+    function () {
+      const { isLoadingEntities, isLoadingTimeseries, isLoadingAggregates, isLoadingBreakdowns } =
+        this.getProperties('isLoadingEntities', 'isLoadingTimeseries', 'isLoadingAggregates', 'isLoadingBreakdowns');
+      return isLoadingEntities || isLoadingTimeseries || isLoadingAggregates || isLoadingBreakdowns;
+    }
+  ),
+
+  _makeSession() {
+    const { context, selectedUrns, sessionId, sessionName, sessionText } =
+      this.getProperties('context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText');
+
+    return {
+      id: sessionId,
+      name: sessionName,
+      text: sessionText,
+      compareMode: context.compareMode,
+      granularity: context.granularity,
+      anomalyRangeStart: context.anomalyRange[0],
+      anomalyRangeEnd: context.anomalyRange[1],
+      analysisRangeStart: context.analysisRange[0],
+      analysisRangeEnd: context.analysisRange[1],
+      contextUrns: context.urns,
+      selectedUrns
+    };
+  },
+
   //
   // Actions
   //
@@ -249,28 +288,26 @@ export default Ember.Controller.extend({
       this.setProperties({ hoverUrns: new Set(urns), hoverTimestamp: timestamp });
     },
 
-    loadtestSelectedUrns() {
-      const { entities } = this.getProperties('entities');
+    onSessionSave() {
+      const jsonString = JSON.stringify(this._makeSession());
 
-      const entityUrns = Object.keys(entities);
-      const metricUrns = filterPrefix(entityUrns, 'thirdeye:metric:');
-      const baselineUrns = metricUrns.map(toBaselineUrn);
-      const currentUrns = metricUrns.map(toCurrentUrn);
-
-      this.set('selectedUrns', new Set([...entityUrns, ...baselineUrns, ...currentUrns]));
+      return fetch(`/session/`, { method: 'POST', body: jsonString })
+        .then(checkStatus)
+        .then(res => this.set('sessionId', res));
     },
 
-    onShare() {
-      const { context, selectedUrns } =
-        this.getProperties('context', 'selectedUrns');
+    onSessionSaveCopy() {
+      const { sessionId } = this.getProperties('sessionId');
 
-      const version = 1;
-      const jsonString = JSON.stringify({ selectedUrns, context, version });
+      const session = this._makeSession();
+      delete session['id'];
+      session['previousId'] = sessionId;
 
-      const id = CryptoJS.SHA256(jsonString).toString().substring(0, 16);
+      const jsonString = JSON.stringify(session);
 
-      return fetch(`/config/rootcause-share/${id}`, { method: 'POST', body: jsonString })
-        .then(res => this.set('shareId', id));
+      return fetch(`/session/`, { method: 'POST', body: jsonString })
+        .then(checkStatus)
+        .then(res => this.set('sessionId', res));
     },
 
     onFeedback(anomalyUrn, feedback, comment) {

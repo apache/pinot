@@ -10,7 +10,8 @@
   {{/if}}
 
   <div class="row">
-    {{!-- TODO: delete <p> tags before release --}}
+    {{!-- TODO: replace with loading spinner --}}
+    {{#if isLoading}}
     <p>loading
       {{#if isLoadingEntities}}
         | ENTITIES
@@ -25,16 +26,18 @@
         | BREAKDOWNS
       {{/if}}
     </p>
+  {{/if}}
 
-    <p>testing | <a {{action "loadtestSelectedUrns"}}>select all entities (loadtest)</a></p>
-
-    <p>sharing | <a {{action "onShare"}}>save</a>
-      {{#if shareId}}
-        | {{#link-to "rootcause" (query-params shareId=shareId)}}{{shareId}}{{/link-to}}
+    <p>session | <a {{action "onSessionSave"}}>save</a> | <a {{action "onSessionSaveCopy"}}>save copy</a>
+      {{#if sessionId}}
+        | {{#link-to "rootcause" (query-params sessionId=sessionId)}}{{sessionId}}{{/link-to}}
       {{/if}}
     </p>
 
-    <h2 class="te-title te-title--rootcause">Root Cause Analysis</h2>
+    <h2 class="te-title te-title--rootcause">{{sessionName}} [edit?]</h2>
+
+    <p>{{#if sessionId}}(Session {{sessionId}}) {{/if}}{{sessionText}} [edit?]</p>
+
     {{rootcause-settings
       context=context
       config=settingsConfig
@@ -46,21 +49,21 @@
   <div class="row">
     <div class="card-container card-container--box-shadow">
       <div class="card-container__header">
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
-              Events Correlation
-            </a>
-          </div>
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
-              Dimensions Analysis
-            </a>
-          </div>
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
-              Metrics Correlation
-            </a>
-          </div>
+        <div class="card-container__subnav">
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
+            Dimensions
+          </a>
+        </div>
+        <div class="card-container__subnav">
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
+            Metrics
+          </a>
+        </div>
+        <div class="card-container__subnav">
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
+            Events
+          </a>
+        </div>
       </div>
       <div class="card-container__body">
         <div class="row">

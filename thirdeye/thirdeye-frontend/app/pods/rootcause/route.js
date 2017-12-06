@@ -61,13 +61,13 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   queryParams: {
     metricId: queryParamsConfig,
     anomalyId: queryParamsConfig,
-    shareId: queryParamsConfig
+    sessionId: queryParamsConfig
   },
 
   model(params) {
-    const { metricId, anomalyId, shareId } = params;
+    const { metricId, anomalyId, sessionId } = params;
 
-    let metricUrn, anomalyUrn, share, anomalyContext;
+    let metricUrn, anomalyUrn, session, anomalyContext;
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
@@ -77,8 +77,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyUrn = `thirdeye:event:anomaly:${anomalyId}`;
     }
 
-    if (shareId) {
-      share = fetch(`/config/rootcause-share/${shareId}`).then(res => res.json());
+    if (sessionId) {
+      session = fetch(`/session/${sessionId}`).then(res => res.json());
     }
 
     if (anomalyUrn) {
@@ -88,10 +88,10 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     return RSVP.hash({
       metricId,
       anomalyId,
-      shareId,
+      sessionId,
       metricUrn,
       anomalyUrn,
-      share,
+      session,
       anomalyContext
     });
   },
@@ -140,10 +140,12 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     } = model.queryParams;
 
     const {
-      shareId,
+      anomalyId,
+      metricId,
+      sessionId,
       metricUrn,
       anomalyUrn,
-      share,
+      session,
       anomalyContext
     } = model;
 
@@ -155,6 +157,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
     const analysisRange = [analysisRangeStart, analysisRangeEnd];
 
+    const dateFormat = 'ddd, MMM D YYYY, h:mm a';
+
     // default blank context
     let context = {
       urns: new Set(),
@@ -165,9 +169,11 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     };
 
     let selectedUrns = new Set();
+    let sessionName = 'New Investigation (' + moment().format(dateFormat) + ')';
+    let sessionText = '';
 
     // metric-initialized context
-    if (metricUrn) {
+    if (metricId && metricUrn) {
       context = {
         urns: new Set([metricUrn, ..._filterToUrn(filters)]),
         anomalyRange,
@@ -180,7 +186,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     }
 
     // anomaly-initialized context
-    if (anomalyUrn && anomalyContext) {
+    if (anomalyId && anomalyUrn && anomalyContext) {
       const contextUrns = anomalyContext.map(e => e.urn);
 
       const metricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
@@ -198,17 +204,28 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       };
 
       selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
+      sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormat) + ')';
+      sessionText = 'Anomaly #' + anomalyId + ' occurred due to ...';
     }
 
-    // share-initialized context
-    if (share) {
-      context = share.context;
-      context.urns = new Set(context.urns);
-      selectedUrns = new Set(share.selectedUrns);
+    // session-initialized context
+    if (sessionId && session) {
+      context = {
+        urns: new Set(session.contextUrns),
+        anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],
+        analysisRange: [session.analysisRangeStart, session.analysisRangeEnd],
+        granularity: session.granularity,
+        compareMode: session.compareMode
+      };
+      selectedUrns = new Set(session.selectedUrns);
+      sessionName = session.name;
+      sessionText = session.text;
     }
 
     controller.setProperties({
-      shareId,
+      sessionId,
+      sessionName,
+      sessionText,
       settingsConfig,
       selectedUrns,
       context
