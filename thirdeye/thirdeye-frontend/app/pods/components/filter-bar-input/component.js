@@ -44,7 +44,7 @@ export default Ember.Component.extend({
       const { labelMapping, attributesMap, eventType } = this.getProperties('labelMapping', 'attributesMap', 'eventType');
       let inputValues = [];
       if (attributesMap && attributesMap[eventType] && labelMapping) {
-        inputValues = Array.from(attributesMap[eventType][labelMapping]);
+        inputValues = Array.from(attributesMap[eventType][labelMapping] || []);
       }
       return inputValues;
     }
