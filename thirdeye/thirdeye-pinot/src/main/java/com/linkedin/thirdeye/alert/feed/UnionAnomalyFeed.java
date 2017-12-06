@@ -31,13 +31,13 @@ public class UnionAnomalyFeed implements AnomalyFeed {
   private AlertFilterFactory alertFilterFactory;
 
   private List<AnomalyFetcher> anomalyFetchers;
-  private List<AlertFilter> alertFilters;
+  private List<AlertFilter> alertCandidatesFilters;
   private AlertSnapshotDTO alertSnapshot;
   private DateTime alertTime;
 
   public UnionAnomalyFeed(){
     this.anomalyFetchers = new ArrayList<>();
-    this.alertFilters = new ArrayList<>();
+    this.alertCandidatesFilters = new ArrayList<>();
     this.alertTime = DateTime.now();
   }
 
@@ -49,6 +49,10 @@ public class UnionAnomalyFeed implements AnomalyFeed {
     String anomalySource = anomalyFeedConfig.getAnomalySource();
     if (anomalyFeedConfig.getAlertSnapshotId() != null) {
       alertSnapshot = alertSnapshotDAO.findById(anomalyFeedConfig.getAlertSnapshotId());
+    }
+    if (alertSnapshot == null) { // null handling
+      LOG.error("Alert snapshot is null.");
+      throw new NullPointerException("Alert snapshot is null");
     }
     List<AnomalyFetcherConfig> anomalyFetcherSpecs = anomalyFeedConfig.getAnomalyFetcherConfigs();
     List<Map<String, String>> alertFilterSpecs = anomalyFeedConfig.getAlertFilterConfigs();
@@ -69,7 +73,7 @@ public class UnionAnomalyFeed implements AnomalyFeed {
     }
 
     for(Map<String, String> alertFilterSpec : alertFilterSpecs) {
-      alertFilters.add(alertFilterFactory.fromSpec(alertFilterSpec));
+      alertCandidatesFilters.add(alertFilterFactory.fromSpec(alertFilterSpec));
     }
   }
 
@@ -79,10 +83,16 @@ public class UnionAnomalyFeed implements AnomalyFeed {
     for (AnomalyFetcher anomalyFetcher : anomalyFetchers) {
       mergedAnomalyResultSet.addAll(anomalyFetcher.getAlertCandidates(alertTime, alertSnapshot));
     }
-    List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>(mergedAnomalyResultSet);
-    AlertFilterHelper.applyFiltrationRule(mergedAnomalyResults, alertFilterFactory);
 
-    for(AlertFilter alertFilter : alertFilters) {
+    // If mergedAnomalyResultSet is empty, then no act after that.
+    if (mergedAnomalyResultSet.isEmpty()) {
+      return mergedAnomalyResultSet;
+    }
+
+    List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>(mergedAnomalyResultSet);
+    mergedAnomalyResults = AlertFilterHelper.applyFiltrationRule(mergedAnomalyResults, alertFilterFactory);
+
+    for(AlertFilter alertFilter : alertCandidatesFilters) {
       Iterator<MergedAnomalyResultDTO> mergedAnomalyIterator = mergedAnomalyResults.iterator();
       while (mergedAnomalyIterator.hasNext()) {
         MergedAnomalyResultDTO mergedAnomalyResult = mergedAnomalyIterator.next();
@@ -97,7 +107,8 @@ public class UnionAnomalyFeed implements AnomalyFeed {
   @Override
   public void updateSnapshot(Collection<MergedAnomalyResultDTO> alertedAnomalies) {
     if (alertSnapshot == null) {
-      LOG.warn("No alertSnapshot was initiated.");
+      LOG.error("No alertSnapshot was initiated.");
+      throw new NullPointerException("Alert snapshot is null");
     }
 
     alertSnapshot.updateSnapshot(alertTime, new ArrayList<>(alertedAnomalies));
