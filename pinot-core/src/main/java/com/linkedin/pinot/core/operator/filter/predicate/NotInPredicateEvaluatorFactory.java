@@ -83,7 +83,7 @@ public class NotInPredicateEvaluatorFactory {
     int[] _nonMatchingDictIds;
 
     DictionaryBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Dictionary dictionary) {
-      String[] values = notInPredicate.getNotInRange();
+      String[] values = notInPredicate.getValues();
       _nonMatchingDictIdSet = new IntOpenHashSet(values.length);
       for (String value : values) {
         int dictId = dictionary.indexOf(value);
@@ -137,7 +137,7 @@ public class NotInPredicateEvaluatorFactory {
     final IntSet _nonMatchingValues;
 
     IntRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
-      String[] values = notInPredicate.getNotInRange();
+      String[] values = notInPredicate.getValues();
       _nonMatchingValues = new IntOpenHashSet(values.length);
       for (String value : values) {
         _nonMatchingValues.add(Integer.parseInt(value));
@@ -159,7 +159,7 @@ public class NotInPredicateEvaluatorFactory {
     final LongSet _nonMatchingValues;
 
     LongRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
-      String[] values = notInPredicate.getNotInRange();
+      String[] values = notInPredicate.getValues();
       _nonMatchingValues = new LongOpenHashSet(values.length);
       for (String value : values) {
         _nonMatchingValues.add(Long.parseLong(value));
@@ -181,7 +181,7 @@ public class NotInPredicateEvaluatorFactory {
     final FloatSet _nonMatchingValues;
 
     FloatRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
-      String[] values = notInPredicate.getNotInRange();
+      String[] values = notInPredicate.getValues();
       _nonMatchingValues = new FloatOpenHashSet(values.length);
       for (String value : values) {
         _nonMatchingValues.add(Float.parseFloat(value));
@@ -203,7 +203,7 @@ public class NotInPredicateEvaluatorFactory {
     final DoubleSet _nonMatchingValues;
 
     DoubleRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
-      String[] values = notInPredicate.getNotInRange();
+      String[] values = notInPredicate.getValues();
       _nonMatchingValues = new DoubleOpenHashSet(values.length);
       for (String value : values) {
         _nonMatchingValues.add(Double.parseDouble(value));
@@ -225,7 +225,7 @@ public class NotInPredicateEvaluatorFactory {
     final Set<String> _nonMatchingValues;
 
     StringRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
-      String[] values = notInPredicate.getNotInRange();
+      String[] values = notInPredicate.getValues();
       _nonMatchingValues = new HashSet<>(values.length);
       Collections.addAll(_nonMatchingValues, values);
     }

@@ -15,32 +15,20 @@
  */
 package com.linkedin.pinot.core.common.predicate;
 
-import java.util.Arrays;
 import java.util.List;
 
-import com.linkedin.pinot.core.common.Predicate;
 
+/**
+ * This class implements the IN predicate.
+ */
+public class InPredicate extends BaseInPredicate {
 
-public class InPredicate extends Predicate {
-  public static final String DELIMITER = "\t\t";
-
+  /**
+   * Constructor for the class
+   * @param lhs LHS for the IN predicate (column name)
+   * @param rhs RHS for the IN predicate (list of values)
+   */
   public InPredicate(String lhs, List<String> rhs) {
     super(lhs, Type.IN, rhs);
   }
-
-  @Override
-  public String toString() {
-    List<String> rhs = getRhs();
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : "
-        + Arrays.toString(rhs.toArray(new String[rhs.size()])) + "\n";
-  }
-
-  public String[] getInRange() {
-    /* To maintain backward compatibility, we always split if number of values is one. We do not support
-       case where DELIMITER is a sub-string of value.
-     */
-    List<String> values = getRhs();
-    return (values.size() == 1) ? values.get(0).split(DELIMITER) : values.toArray(new String[values.size()]);
-  }
-
 }

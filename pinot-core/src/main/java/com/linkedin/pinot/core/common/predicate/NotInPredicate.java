@@ -15,25 +15,20 @@
  */
 package com.linkedin.pinot.core.common.predicate;
 
-import java.util.Arrays;
 import java.util.List;
 
-import com.linkedin.pinot.core.common.Predicate;
 
+/**
+ * This class implements the IN predicate.
+ */
+public class NotInPredicate extends BaseInPredicate {
 
-public class NotInPredicate extends Predicate {
-
+  /**
+   * Constructor for the class
+   * @param lhs LHS for the NOT-IN predicate (column name)
+   * @param rhs RHS for the NOT-IN predicate (list of values)
+   */
   public NotInPredicate(String lhs, List<String> rhs) {
     super(lhs, Type.NOT_IN, rhs);
-  }
-
-  @Override
-  public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : "
-        + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
-  }
-
-  public String[] getNotInRange() {
-    return getRhs().get(0).split("\t\t");
   }
 }
