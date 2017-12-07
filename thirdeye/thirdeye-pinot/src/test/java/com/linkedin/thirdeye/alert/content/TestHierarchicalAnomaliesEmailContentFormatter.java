@@ -23,6 +23,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,6 +51,7 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
   }
   @Test
   public void testGetEmailEntity() throws Exception {
+    DateTimeZone dateTimeZone = DateTimeZone.forID("America/Los_Angeles");
     ThirdEyeAnomalyConfiguration thirdeyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();
     thirdeyeAnomalyConfig.setId(id);
     thirdeyeAnomalyConfig.setDashboardHost(dashboardHost);
@@ -69,8 +71,9 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
     anomalyFunctionDAO.save(anomalyFunction);
 
     MergedAnomalyResultDTO anomaly = DaoTestUtils.getTestMergedAnomalyResult(
-        new DateTime(2017, 11, 6, 10, 0).getMillis(), new DateTime(2017, 11, 6, 13, 0).getMillis(),
-        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0).getMillis());
+        new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2017, 11, 6, 13, 0, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
     anomaly.setFunction(anomalyFunction);
     anomaly.setId(100l);
     anomaly.setAvgCurrentVal(1.1);
@@ -79,8 +82,9 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
     mergedAnomalyResultDAO.save(anomaly);
 
     anomaly = DaoTestUtils.getTestMergedAnomalyResult(
-        new DateTime(2017, 11, 7, 10, 0).getMillis(), new DateTime(2017, 11, 7, 17, 0).getMillis(),
-        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0).getMillis());
+        new DateTime(2017, 11, 7, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2017, 11, 7, 17, 0, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
     anomaly.setFunction(anomalyFunction);
     anomaly.setId(101l);
     anomaly.setAvgCurrentVal(0.9);
@@ -95,8 +99,9 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
     anomalyFunctionDAO.save(anomalyFunction);
 
     anomaly = DaoTestUtils.getTestMergedAnomalyResult(
-        new DateTime(2017, 11, 6, 10, 0).getMillis(), new DateTime(2017, 11, 6, 13, 0).getMillis(),
-        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0).getMillis());
+        new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2017, 11, 6, 13, 0, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
     anomaly.setFunction(anomalyFunction);
     anomaly.setId(102l);
     anomaly.setAvgCurrentVal(1.1);
@@ -105,8 +110,9 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
     mergedAnomalyResultDAO.save(anomaly);
 
     anomaly = DaoTestUtils.getTestMergedAnomalyResult(
-        new DateTime(2017, 11, 7, 10, 0).getMillis(), new DateTime(2017, 11, 7, 17, 0).getMillis(),
-        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0).getMillis());
+        new DateTime(2017, 11, 7, 10, 0, dateTimeZone).getMillis(),
+        new DateTime(2017, 11, 7, 17, 0, dateTimeZone).getMillis(),
+        TEST, TEST, 0.1, 1l, new DateTime(2017, 11, 6, 10, 0, dateTimeZone).getMillis());
     anomaly.setFunction(anomalyFunction);
     anomaly.setId(103l);
     anomaly.setAvgCurrentVal(0.9);
