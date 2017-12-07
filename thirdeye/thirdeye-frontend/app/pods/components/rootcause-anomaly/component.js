@@ -69,7 +69,11 @@ export default Ember.Component.extend({
 
   comment: Ember.computed('anomaly', function () {
     const attr = this.get('anomaly').attributes;
-    return attr.comment[0];
+    if (attr.comment) {
+      return attr.comment[0];
+    } else {
+      return [];
+    }
   }),
 
   issueType: null, // TODO

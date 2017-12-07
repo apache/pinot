@@ -1,28 +1,31 @@
 {{#if anomaly}}
   <div class="card-container card-container--box-shadow">
     <div class="card-container__body">
-      <!-- from old UI -->
-      <div class="row">
-        <h3>
-          <span>Is this a true anomaly?</span>
-          <a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
-        </h3>
+      <h3 class="rootcause-anomaly__title">
+        <span>Is this a true anomaly?</span>
+        <a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
+      </h3>
+      <div class="rootcause-anomaly__status">
+        <span class="rootcause-anomaly__label--bold">Status: </span>
+        {{status}}
       </div>
-      <div id="anomaly-feedback-status">
-        <span>Status</span> {{status}}
+      <form class="rootcause-anomaly__buttons">
+        <input type="radio" {{action "onFeedback" "ANOMALY"}}>
+        <label>Yes (True Anomaly)</label>
+        <input type="radio" {{action "onFeedback" "ANOMALY_NEW_TREND"}}>
+        <label>Yes (But New Trend)</label>
+        <input type="radio" {{action "onFeedback" "NOT_ANOMALY"}}>
+        <label>No (False Alarm)</label>
+        <input type="radio" {{action "onFeedback" "NO_FEEDBACK"}}>
+        <label>No Feedback</label>
+      </form>
+      <div id="anomaly-feedback__comment">
+        <label for="feedback-comment">
+          <span>Comment</span> (optional)
+        </label>
+        {{textarea placeholder="Enter a comment" id="feedback-comment" value=comment}}
       </div>
-      <div id="anomaly-feedback-comment">
-        <label for="feedback-comment"><span>Comment</span> (optional)</label>
-        {{textarea id="feedback-comment" value=comment}}
-      </div>
-      <div id="anomaly-feedback-button">
-        status
-        | <button {{action "onFeedback" "ANOMALY"}}>Yes (True Anomaly)</button>
-        | <button {{action "onFeedback" "ANOMALY_NEW_TREND"}}>Yes (But New Trend)</button>
-        | <button {{action "onFeedback" "NOT_ANOMALY"}}>No (False Alarm)</button>
-        | <button {{action "onFeedback" "NO_FEEDBACK"}}>No Feedback</button>
-      </div>
-      <p>Your feedback improves the accuracy of future alerts.</p>
+      <p class="rootcause-anomaly__note--italicize">Your feedback improves the accuracy of future alerts.</p>
     </div>
   </div>
 

@@ -1,0 +1,28 @@
+.rootcause-anomaly {
+  &__status {
+    margin-bottom: 15px;
+    font-size: 15px;
+  }
+
+  &__label {
+    &--bold {
+      font-weight: bold;
+    }
+  }
+
+  &__buttons {
+    margin-bottom: 10px;
+    font-size: 15px;
+
+    label {
+      margin-right: 20px;
+      font-weight: normal;
+    }
+  }
+
+  &__note {
+    &--italicize {
+      font-style: italic;
+    }
+  }
+}

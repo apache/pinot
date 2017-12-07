@@ -100,9 +100,9 @@ body {
       font-weight: normal;
     }
   }
-  
+
   &--read-only:disabled {
-    color: app-shade(black, 0.55);    
+    color: app-shade(black, 0.55);
   }
 
   &:hover:not(:disabled){
