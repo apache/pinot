@@ -19,29 +19,6 @@
     }
   }
 
-  &__group-circle {
-    display: inline-block;
-    margin-right: 10px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50px;
-  }
-
-  $colors:
-  "blue" $te-blue,
-  "orange" $te-orange,
-  "teal" $te-teal,
-  "purple" $te-purple,
-  "red" $te-red,
-  "green" $te-green,
-  "pink" $te-pink;
-
-  // creates filter-bar__group-color--"color" classes
-  @each $i in $colors {
-    .filter-bar__group-circle--#{nth($i, 1)} {
-      background: nth($i, 2);
-    }
-  };
 
   &__group-toggle {
     float: right;
@@ -58,5 +35,35 @@
     &--hidden {
       display: none;
     }
+  }
+}
+
+// creates filter-bar__group-color--"color" classes
+$colors:
+"blue" $te-blue,
+"orange" $te-orange,
+"teal" $te-teal,
+"purple" $te-purple,
+"red" $te-red,
+"green" $te-green,
+"pink" $te-pink;
+
+.filter-bar__group-circle,
+.entity-indicator {
+  display: inline-block;
+  margin-right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50px;
+  @each $i in $colors {
+    &--#{nth($i, 1)} {
+      background: nth($i, 2);
+    }
+  };
+
+  &--flat {
+    height: 2px;
+    border-radius: 0px;
+    vertical-align: middle;
   }
 }

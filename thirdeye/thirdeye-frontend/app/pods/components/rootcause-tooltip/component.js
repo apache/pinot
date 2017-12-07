@@ -1,4 +1,5 @@
 import Component from '@ember/component';
+import { computed } from '@ember/object';
 import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, stripTail } from 'thirdeye-frontend/helpers/utils';
 
 export default Component.extend({
@@ -10,7 +11,7 @@ export default Component.extend({
 
   hoverTimestamp: null, // 0
 
-  urns: Ember.computed(
+  urns: computed(
     'hoverUrns',
     function () {
       const { hoverUrns } = this.getProperties('hoverUrns');
@@ -20,7 +21,7 @@ export default Component.extend({
     }
   ),
 
-  labels: Ember.computed(
+  labels: computed(
     'entities',
     'hoverUrns',
     function () {
@@ -36,7 +37,7 @@ export default Component.extend({
     }
   ),
 
-  values: Ember.computed(
+  values: computed(
     'timeseriesLookup',
     'hoverUrns',
     'hoverTimestamp',
@@ -67,7 +68,7 @@ export default Component.extend({
     }
   ),
 
-  colors: Ember.computed(
+  colors: computed(
     'entities',
     'hoverUrns',
     function () {
@@ -80,7 +81,7 @@ export default Component.extend({
     }
   ),
 
-  timeseriesLookup: Ember.computed(
+  timeseriesLookup: computed(
     'timeseries',
     'hoverUrns',
     function () {

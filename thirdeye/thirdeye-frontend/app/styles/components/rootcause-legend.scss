@@ -1,0 +1,58 @@
+.rootcause-legend {
+  // border: 1px solid black;
+  flex-basis: 200px;
+  min-width: 200px;
+  padding: 12px 18px;
+  border-right: 1px solid app-shade(black, 0.15);
+  overflow: scroll;
+
+  &__item {
+    display: flex;
+    font-size: 13px;
+    line-height: 16px;
+    color: app-shade(black, 0.55);
+    justify-content: space-between;
+    margin-bottom: 4px;
+
+    &:hover {
+      .rootcause-legend__remove-icon {
+        visibility: visible;
+      }
+    }
+  }
+
+  &__indicator {
+    margin-right: 10px;
+    line-height: 14px;
+  }
+
+  &__list {
+    margin-bottom: 4px;
+    list-style: none;
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  &__label-group {
+    display: flex;
+    cursor: pointer;
+    text-decoration: none;
+    flex-wrap: nowrap;
+    word-break: break-all;
+    &--inactive {
+      color: app-shade(black, 0.15);
+      transition: color 0.2s ease-in; 
+    }
+  }
+
+  &__remove-icon {
+    visibility: hidden;
+    text-decoration: none;
+    cursor: pointer;
+    &:hover,
+    &:active,
+    &:focus {
+      text-decoration: none;
+    }
+  }
+}
