@@ -10,6 +10,15 @@ export default Ember.Component.extend({
 
   onFeedback: null, // func (urn, feedback, comment)
 
+  selected: 'Select a status',
+
+  options: [
+    'ANOMALY',
+    'ANOMALY_NEW_TREND',
+    'NOT_ANOMALY',
+    'NO_FEEDBACK'
+  ],
+
   anomaly: Ember.computed(
     'entities',
     'anomalyUrn',
@@ -88,7 +97,10 @@ export default Ember.Component.extend({
       }
 
       // TODO reload anomaly entity instead
-      this.setProperties({ status });
+      this.setProperties({
+        status,
+        selected: status
+      });
     }
   }
 });

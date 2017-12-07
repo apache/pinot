@@ -10,14 +10,24 @@
     }
   }
 
-  &__buttons {
-    margin-bottom: 10px;
-    font-size: 15px;
+  &__dropdown {
+    width: 200px;
+  }
 
+  &__comment {
     label {
-      margin-right: 20px;
-      font-weight: normal;
+      margin-top: 25px;
     }
+  }
+
+  &__form {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    width: 100%;
+    border-radius: 4px;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
   }
 
   &__note {
