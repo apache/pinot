@@ -10,6 +10,16 @@ export default Ember.Component.extend({
 
   onFeedback: null, // func (urn, feedback, comment)
 
+  /**
+   * Options to populate anomaly dropdown
+   */
+  options: [
+    'ANOMALY',
+    'ANOMALY_NEW_TREND',
+    'NOT_ANOMALY',
+    'NO_FEEDBACK'
+  ],
+
   anomaly: Ember.computed(
     'entities',
     'anomalyUrn',
@@ -68,8 +78,8 @@ export default Ember.Component.extend({
   }),
 
   comment: Ember.computed('anomaly', function () {
-    const attr = this.get('anomaly').attributes;
-    return attr.comment[0];
+    const attr = this.get('anomaly.attributes.comment.firstObject');
+    return attr || [];
   }),
 
   issueType: null, // TODO

@@ -1,0 +1,34 @@
+.rootcause-anomaly {
+
+  &__label {
+    &--bold {
+      font-weight: bold;
+    }
+  }
+
+  &__dropdown {
+    width: 200px;
+  }
+
+  &__comment {
+    label {
+      margin-top: 25px;
+    }
+  }
+
+  &__form {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    width: 100%;
+    border-radius: 4px;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+  }
+
+  &__note {
+    &--italicize {
+      font-style: italic;
+    }
+  }
+}
