@@ -147,11 +147,15 @@
   }
 }
 
-.color-box {
+.container-fluid {
+  padding: 0px;
+}
+
+.color-circle {
   display: inline-block;
-  height: 0.8em;
-  width: 0.8em;
-  border: 1px solid black;
+  height: 10px;
+  width: 10px;
+  border-radius: 50px;
 }
 
 $colors:
@@ -163,9 +167,9 @@ $colors:
   "green" $te-green,
   "pink" $te-pink;
 
-// creates color-box--"color" classes
+// creates color-circle--"color" classes
 @each $i in $colors {
-  .color-box--#{nth($i, 1)} {
+  .color-circle--#{nth($i, 1)} {
     background: nth($i, 2);
   }
 };

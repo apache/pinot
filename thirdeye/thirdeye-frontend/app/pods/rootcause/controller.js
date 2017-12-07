@@ -47,7 +47,7 @@ export default Ember.Controller.extend({
 
   activeTab: null, // ""
 
-  lastShare: null, // ""
+  timeseriesMode: null, // ""
 
   //
   // session data
@@ -70,7 +70,8 @@ export default Ember.Controller.extend({
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
       filteredUrns: new Set(),
-      activeTab: ROOTCAUSE_TAB_DIMENSIONS
+      activeTab: ROOTCAUSE_TAB_DIMENSIONS,
+      timeseriesMode: 'absolute'
     });
   },
 
@@ -282,6 +283,10 @@ export default Ember.Controller.extend({
 
     onFilter(urns) {
       this.set('filteredUrns', new Set(urns));
+    },
+
+    onChart(timeseriesMode) {
+      this.set('timeseriesMode',timeseriesMode);
     },
 
     chartOnHover(urns, timestamp) {
