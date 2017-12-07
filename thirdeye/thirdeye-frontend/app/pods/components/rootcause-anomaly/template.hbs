@@ -5,10 +5,6 @@
         <span>Is this a true anomaly?</span>
         <a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
       </h3>
-      <div class="rootcause-anomaly__status">
-        <span class="rootcause-anomaly__label--bold">Status: </span>
-        {{status}}
-      </div>
       <div class="rootcause-anomaly__dropdown">
         {{#power-select
           options=options
@@ -24,6 +20,7 @@
         </label>
         {{textarea
           placeholder="Enter a comment"
+          id="feedback-comment"
           class="rootcause-anomaly__form"
           value=comment}}
       </div>
