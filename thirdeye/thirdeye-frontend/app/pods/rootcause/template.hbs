@@ -66,25 +66,21 @@
         </div>
       </div>
       <div class="card-container__body">
-        <div class="row">
-          <div class="col-xs-3">
-            {{rootcause-legend
-              entities=entities
-              selectedUrns=selectedUrns
-              invisibleUrns=invisibleUrns
-              onVisibility=(action "onVisibility")
-              onSelection=(action "onSelection")
-            }}
-          </div>
-          <div class="col-xs-9">
-            {{rootcause-chart
-              entities=entities
-              selectedUrns=chartSelectedUrns
-              timeseries=timeseries
-              context=context
-              onHover=(action "chartOnHover")
-            }}
-          </div>
+        <div class="rootcause-wrapper">
+          {{rootcause-legend
+            entities=entities
+            selectedUrns=selectedUrns
+            invisibleUrns=invisibleUrns
+            onVisibility=(action "onVisibility")
+            onSelection=(action "onSelection")
+          }}
+          {{rootcause-chart
+            entities=entities
+            selectedUrns=chartSelectedUrns
+            timeseries=timeseries
+            context=context
+            onHover=(action "chartOnHover")
+          }}
         </div>
 
         <div class="row">

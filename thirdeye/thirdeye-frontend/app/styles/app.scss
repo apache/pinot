@@ -45,6 +45,8 @@ body {
 @import 'components/te-modal';
 @import 'components/rootcause-anomaly';
 @import 'components/te-tooltip';
+@import 'components/rootcause-legend';
+@import 'components/rootcause-chart';
 
 // Pod Pages
 @import 'ember-power-select/themes/bootstrap';
@@ -55,3 +57,4 @@ body {
 @import 'pods/rca';
 @import 'pods/events';
 @import 'pods/login';
+@import 'pods/rootcause';
