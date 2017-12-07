@@ -1,9 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Range;
-import com.google.common.collect.RangeSet;
-import com.google.common.collect.TreeRangeSet;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
@@ -26,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -34,11 +30,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
 import org.quartz.SchedulerException;
@@ -88,14 +81,14 @@ public class DetectionJobScheduler implements Runnable {
   public void run() {
 
     // read all anomaly functions
-    LOG.debug("Reading all anomaly functions");
+    LOG.info("Reading all anomaly functions");
     List<AnomalyFunctionDTO> anomalyFunctions = DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions();
 
     // for each active anomaly function
     for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
 
       try {
-        LOG.info("Calculating the detection entries for function {}: {}", anomalyFunction.getId(), anomalyFunction);
+        LOG.info("Function: {}", anomalyFunction);
         long functionId = anomalyFunction.getId();
         String dataset = anomalyFunction.getCollection();
         DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
@@ -105,12 +98,12 @@ public class DetectionJobScheduler implements Runnable {
         // find last entry into detectionStatus table, for this function
         DetectionStatusDTO lastEntryForFunction = DAO_REGISTRY.getDetectionStatusDAO().
             findLatestEntryForFunctionId(functionId);
-        LOG.debug("Function: {} Dataset: {} Last entry is {}", functionId, dataset, lastEntryForFunction);
+        LOG.info("Function: {} Dataset: {} Last entry is {}", functionId, dataset, lastEntryForFunction);
 
         // calculate entries from last entry to current time
         Map<String, Long> newEntries = DetectionJobSchedulerUtils.getNewEntries(currentDateTime, lastEntryForFunction,
             anomalyFunction, datasetConfig, dateTimeZone);
-        LOG.debug("Function: {} Dataset: {} Creating {} new entries {}", functionId, dataset, newEntries.size(), newEntries);
+        LOG.info("Function: {} Dataset: {} Creating {} new entries {}", functionId, dataset, newEntries.size(), newEntries);
 
         // create these entries
         for (Entry<String, Long> entry : newEntries.entrySet()) {
@@ -127,23 +120,23 @@ public class DetectionJobScheduler implements Runnable {
             findAllInTimeRangeForFunctionAndDetectionRun(currentDateTime.minusDays(3).getMillis(),
                 currentDateTime.getMillis(), functionId, false);
         Collections.sort(entriesInLast3Days);
-        LOG.debug("Function: {} Dataset: {} Entries in last 3 days {}", functionId, dataset, entriesInLast3Days);
+        LOG.info("Function: {} Dataset: {} Entries in last 3 days {}", functionId, dataset, entriesInLast3Days);
 
         // for each entry, collect startTime and endTime
         List<Long> startTimes = new ArrayList<>();
         List<Long> endTimes = new ArrayList<>();
         List<DetectionStatusDTO> detectionStatusToUpdate = new ArrayList<>();
-        RangeSet<Long> skippedMonitoringTimeRange = TreeRangeSet.create();
 
         for (DetectionStatusDTO detectionStatus : entriesInLast3Days) {
+
           try {
-            LOG.debug("Function: {} Dataset: {} Entry : {}", functionId, dataset, detectionStatus);
+            LOG.info("Function: {} Dataset: {} Entry : {}", functionId, dataset, detectionStatus);
 
             long dateToCheck = detectionStatus.getDateToCheckInMS();
             // check availability for monitoring window - delay
             long endTime = dateToCheck - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowDelay(), anomalyFunction.getWindowDelayUnit());
             long startTime = endTime - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
-            LOG.debug("Function: {} Dataset: {} Checking start:{} {} to end:{} {}", functionId, dataset, startTime, new DateTime(startTime, dateTimeZone), endTime, new DateTime(endTime, dateTimeZone));
+            LOG.info("Function: {} Dataset: {} Checking start:{} {} to end:{} {}", functionId, dataset, startTime, new DateTime(startTime, dateTimeZone), endTime, new DateTime(endTime, dateTimeZone));
 
             boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig, anomalyFunction);
             if (pass) {
@@ -151,30 +144,13 @@ public class DetectionJobScheduler implements Runnable {
               endTimes.add(endTime);
               detectionStatusToUpdate.add(detectionStatus);
             } else {
-              skippedMonitoringTimeRange.add(Range.closedOpen(startTime, endTime));
+              LOG.warn("Function: {} Dataset: {} Data incomplete for monitoring window {} ({}) to {} ({}), skipping anomaly detection",
+                  functionId, dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
+              // TODO: Send email to owners/dev team
             }
           } catch (Exception e) {
             LOG.error("Function: {} Dataset: {} Exception in preparing entry {}", functionId, dataset, detectionStatus, e);
           }
-        }
-        Set<Range<Long>> skippedMonitoringRanges = skippedMonitoringTimeRange.asRanges();
-        if (CollectionUtils.isNotEmpty(skippedMonitoringRanges)) {
-          DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyy/MM/dd HH:mmZZ");
-          StringBuilder sb = new StringBuilder();
-          String rangeSeparator = "[";
-          for (Range<Long> skippedMonitoringRange : skippedMonitoringRanges) {
-            long startTimestamp = skippedMonitoringRange.lowerEndpoint();
-            long endTimestamp = skippedMonitoringRange.upperEndpoint();
-            String timeRangeString = String
-                .format("%s-%s (%s-%s)", dtf.print(new DateTime(startTimestamp)), dtf.print(new DateTime(endTimestamp)),
-                    startTimestamp, endTimestamp);
-            sb.append(rangeSeparator).append(timeRangeString);
-            rangeSeparator = ", ";
-          }
-          String skippedTimerangesString = sb.append("]").toString();
-          LOG.warn("Skipping anomaly detection on function: {} Dataset: {}: Data incomplete for monitoring windows: {}",
-              functionId, dataset, skippedTimerangesString);
-          // TODO: Send email to owners/dev team
         }
 
         // If any time periods found, for which detection needs to be run
@@ -268,26 +244,24 @@ public class DetectionJobScheduler implements Runnable {
      */
     if (anomalyFunction.isRequiresCompletenessCheck()) {
 
-      LOG.debug("Function: {} Dataset: {} Checking for completeness of time range {}({}) to {}({})",
+      LOG.info("Function: {} Dataset: {} Checking for completeness of time range {}({}) to {}({})",
           anomalyFunction.getId(), dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
 
       List<DataCompletenessConfigDTO> incompleteTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
           findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, false);
-      if (CollectionUtils.isNotEmpty(incompleteTimePeriods)) {
-        LOG.debug("Function: {} Dataset: {} Incomplete periods {}", anomalyFunction.getId(), dataset, incompleteTimePeriods);
-      }
+      LOG.info("Function: {} Dataset: {} Incomplete periods {}", anomalyFunction.getId(), dataset, incompleteTimePeriods);
 
       if (incompleteTimePeriods.size() == 0) { // nothing incomplete
         // find complete buckets
         List<DataCompletenessConfigDTO> completeTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
             findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, true);
-        LOG.debug("Function: {} Dataset: {} Complete periods {}", anomalyFunction.getId(), dataset, completeTimePeriods);
+        LOG.info("Function: {} Dataset: {} Complete periods {}", anomalyFunction.getId(), dataset, completeTimePeriods);
         long expectedCompleteBuckets = DetectionJobSchedulerUtils.getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
-        LOG.debug("Function: {} Dataset: {} Num complete periods: {} Expected num buckets:{}",
+        LOG.info("Function: {} Dataset: {} Num complete periods: {} Expected num buckets:{}",
             anomalyFunction.getId(), dataset, completeTimePeriods.size(), expectedCompleteBuckets);
 
         if (completeTimePeriods.size() == expectedCompleteBuckets) { // complete matches expected
-          LOG.debug("Function: {} Dataset: {}  Found complete time range {}({}) to {}({})",
+          LOG.info("Function: {} Dataset: {}  Found complete time range {}({}) to {}({})",
               anomalyFunction.getId(), dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
           pass = true;
         }

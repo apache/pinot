@@ -4,25 +4,22 @@ import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import org.joda.time.DateTimeZone;
 
 public class TimeSpec {
   private static final TimeGranularity DEFAULT_TIME_GRANULARITY= new TimeGranularity(1, TimeUnit.DAYS);
-  private String columnName = "timestamp";
+  private String columnName;
   private TimeGranularity dataGranularity = DEFAULT_TIME_GRANULARITY;
   private String format = SINCE_EPOCH_FORMAT; //sinceEpoch or yyyyMMdd
-  private DateTimeZone timezone = DEFAULT_TIMEZONE;
   public static String SINCE_EPOCH_FORMAT  = TimeFormat.EPOCH.toString();
-  public static DateTimeZone DEFAULT_TIMEZONE = DateTimeZone.UTC;
+  public static String DEFAULT_TIMEZONE = "UTC";
 
   public TimeSpec() {
   }
 
-  public TimeSpec(String columnName, TimeGranularity dataGranularity, String format, DateTimeZone timezone) {
+  public TimeSpec(String columnName, TimeGranularity dataGranularity, String format) {
     this.columnName = columnName;
     this.dataGranularity = dataGranularity;
     this.format = format;
-    this.timezone = timezone;
   }
 
   @JsonProperty
@@ -38,10 +35,5 @@ public class TimeSpec {
   @JsonProperty
   public String getFormat() {
     return format;
-  }
-
-  @JsonProperty
-  public DateTimeZone getTimezone() {
-    return timezone;
   }
 }

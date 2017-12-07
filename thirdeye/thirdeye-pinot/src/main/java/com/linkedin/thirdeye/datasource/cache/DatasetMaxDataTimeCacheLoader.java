@@ -64,7 +64,7 @@ public class DatasetMaxDataTimeCacheLoader extends CacheLoader<String, Long> {
       }
     });
     reloadExecutor.execute(reloadTask);
-    LOGGER.debug("Passively refreshing max data time of collection: {}", dataset);
+    LOGGER.info("Passively refreshing max data time of collection: {}", dataset);
     return reloadTask;
   }
 

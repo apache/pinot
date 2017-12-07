@@ -43,7 +43,7 @@ public class UITimeSeriesResponseParser extends BaseTimeSeriesResponseParser {
     Map<String, Double> metricThresholds = ThirdEyeUtils.getMetricThresholdsMap(metricFunctions);
     List<TimeSeriesRow> rows = new ArrayList<>();
 
-    Map<Long, List<Double>> metricSums = Collections.emptyMap();
+    Map<Integer, List<Double>> metricSums = Collections.emptyMap();
     if (doRollUp) {
       metricSums = ResponseParserUtils.getMetricSumsByTime(response);
     }
@@ -100,8 +100,7 @@ public class UITimeSeriesResponseParser extends BaseTimeSeriesResponseParser {
       if (doRollUp) {
         // check if rows pass threshold
         for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-          long timestamp = ranges.get(timeBucketId).lowerEndpoint().getMillis();
-          if (checkMetricSums(thresholdRows.get(timeBucketId), metricSums.get(timestamp), metricThresholds)) {
+          if (checkMetricSums(thresholdRows.get(timeBucketId), metricSums.get(timeBucketId), metricThresholds)) {
             passedThreshold = true;
             break;
           }
