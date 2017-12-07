@@ -1,0 +1,79 @@
+.te-tooltip {
+  background-color: white;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 6px 9px 0 rgba(0,0,0,0.2);
+
+  &__header {
+    border-bottom: 1px solid app-shade(black, 0.15);
+    padding: 8px 16px;
+    margin: 0;
+    font-size: 14px;
+    color: app-shade(black, 0.9);
+    line-height: 20px;
+  }
+
+  &__body {
+    padding: 16px;
+    max-width: 250px;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    line-height: 20px;
+    color: app-shade(black, 9);
+    
+    &--indent {
+      margin-left: 20px;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    &--small {
+      font-size: 12px;
+      line-height: 16px;
+      color: app-shade(black, 6);
+    }
+  }
+
+  &__label {
+    font-size: 14px;
+    line-height: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__value {
+    flex-grow: 1;
+    text-align: right;
+    margin-left: 8px;
+    white-space: nowrap;
+
+    &--positive {
+      color: $te-green;
+      &::after {
+        content: "%"
+      }
+    }
+    &--negative {
+      color: $te-red;
+      &::after {
+        content: "%"
+      }
+    }
+    &--neutral {
+      color: app-shade(black, 9);
+    }
+  }
+
+  &__events {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid app-shade(black, 0.15);
+    &--hidden {
+      display: none;
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import d3 from 'd3';
 import moment from 'moment';
+import buildTooltip from 'thirdeye-frontend/helpers/build-tooltip';
 import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
@@ -30,19 +31,30 @@ export default Ember.Component.extend({
     show: false
   },
 
+  buildTooltip: buildTooltip,
+
   tooltip: Ember.computed(
     'onHover',
     function () {
-      const { onHover } = this.getProperties('onHover');
-
       return {
-        format: {
-          title: (d) => {
-            const t = moment(d);
-            this._onHover(t.valueOf());
-            return t.format('MM/DD hh:mm a');
-          },
-          value: (val, ratio, id) => d3.format('.3s')(val)
+        grouped: true,
+        contents: (items, defaultTitleFormat, defaultValueFormat, color) => {
+          const t = moment(items[0].x);
+          const hoverUrns = this._onHover(t.valueOf());
+
+          const {
+            entities,
+            timeseries
+          } = this.getProperties('entities', 'timeseries');
+
+          const tooltip = this.buildTooltip.create();
+
+          return tooltip.compute({
+            entities,
+            timeseries,
+            hoverUrns,
+            hoverTimestamp: t.valueOf()
+          });
         }
       };
     }
@@ -372,6 +384,7 @@ export default Ember.Component.extend({
       const outputUrns = new Set([...metricUrns, ...metricUrns.map(toMetricUrn), ...eventUrns]);
 
       onHover(outputUrns, d);
+      return outputUrns;
     }
   }
 });
