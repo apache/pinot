@@ -51,6 +51,17 @@ export function checkStatus(response, mode = 'get', recoverBlank = false) {
   }
 }
 
+/**
+ * Pluralizes and formats the anomaly range duration string
+ * @param {Number} time
+ * @param {String} unit
+ * @returns {String}
+ */
+export function pluralizeTime(time, unit) {
+  const unitStr = time > 1 ? unit + 's' : unit;
+  return time ? time + ' ' + unitStr : '';
+}
+
 export function isIterable(obj) {
   if (obj == null || _.isString(obj)) {
     return false;
@@ -217,4 +228,4 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor });
+export default Ember.Helper.helper({ checkStatus, pluralizeTime, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor });

@@ -37,10 +37,10 @@ export default Ember.Controller.extend({
    * Mapping table column names to corresponding prop keys
    */
   sortMap: {
-    'start': 'anomalyStart',
-    'score': 'severityScore',
-    'change': 'changeRate',
-    'resolution': 'anomalyFeedback'
+    start: 'anomalyStart',
+    score: 'severityScore',
+    change: 'changeRate',
+    resolution: 'anomalyFeedback'
   },
 
   /**
@@ -98,9 +98,7 @@ export default Ember.Controller.extend({
     'pagesNum',
     'pageSize',
     function() {
-      const pagesNum = this.get('pagesNum');
-      const pageSize = this.get('pageSize');
-
+      const { pagesNum, pageSize } = this.getProperties('pagesNum', 'pageSize');
       return Math.min(pagesNum, pageSize/2);
     }
   ),
@@ -109,13 +107,12 @@ export default Ember.Controller.extend({
    * Total Number of pages to display
    */
   pagesNum: Ember.computed(
-    'filteredAnomalies.length',
+    'filteredAnomalies',
     'pageSize',
     function() {
-      const numAlerts = this.get('filteredAnomalies').length;
-      const pageSize = this.get('pageSize');
-
-      return Math.ceil(numAlerts/pageSize);
+      const { filteredAnomalies, pageSize } = this.getProperties('filteredAnomalies', 'pageSize');
+      const anomalyCount = filteredAnomalies.length || 0;
+      return Math.ceil(anomalyCount/pageSize);
     }
   ),
 
@@ -126,11 +123,13 @@ export default Ember.Controller.extend({
     'pages',
     'currentPage',
     'paginationSize',
-    'pageNums',
+    'pagesNum',
     function() {
-      const size = this.get('paginationSize');
-      const currentPage = this.get('currentPage');
-      const max = this.get('pagesNum');
+      const {
+        currentPage,
+        pagesNum: max,
+        paginationSize: size
+      } = this.getProperties('currentPage', 'pagesNum', 'paginationSize');
       const step = Math.floor(size / 2);
 
       if (max === 1) { return; }
@@ -153,14 +152,11 @@ export default Ember.Controller.extend({
     'loadedWoWData',
     'selectedSortMode',
     function() {
-      const pageSize = this.get('pageSize');
-      const pageNumber = this.get('currentPage');
-      const sortOrder = this.get('selectedSortMode');
       let anomalies = this.get('filteredAnomalies');
+      const { pageSize, currentPage, selectedSortMode } = this.getProperties('pageSize', 'currentPage', 'selectedSortMode');
 
-      if (sortOrder) {
-        let sortKey = sortOrder.split(':')[0];
-        let sortDir = sortOrder.split(':')[1];
+      if (selectedSortMode) {
+        let [ sortKey, sortDir ] = selectedSortMode.split(':');
 
         if (sortDir === 'up') {
           anomalies = anomalies.sortBy(this.get('sortMap')[sortKey]);
@@ -169,7 +165,7 @@ export default Ember.Controller.extend({
         }
       }
 
-      return anomalies.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
+      return anomalies.slice((currentPage - 1) * pageSize, currentPage * pageSize);
     }
   ),
 
@@ -296,14 +292,14 @@ export default Ember.Controller.extend({
 
       // Filter for selected dimension
       if (targetDimension !== 'All Dimensions') {
-        anomalies = anomalies.filter(data => {
+        anomalies = anomalies.filter((data) => {
           return targetDimension === `${data.dimensionList[0].dimensionKey}:${data.dimensionList[0].dimensionVal}`;
         });
       }
 
       // Filter for selected resolution
       if (targetResolution !== 'All Resolutions') {
-        anomalies = anomalies.filter(data => {
+        anomalies = anomalies.filter((data) => {
           return targetResolution === data.anomalyFeedback;
         });
       }
@@ -376,24 +372,24 @@ export default Ember.Controller.extend({
 
   /**
    * Downloads data that is not critical for the initial page load
+   * TODO: Should we move all requests to the route?
    * @method fetchDeferredAnomalyData
    * @return {Promise}
    */
   fetchDeferredAnomalyData() {
-    const anomalies = this.get('anomalyData');
-    const existingOption = this.get('baselineOptions')[0];
     const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
+    const { anomalyData, baselineOptions } = this.getProperties('anomalyData', 'baselineOptions');
     const newWowList = wowOptions.map((item) => {
       return { name: item, isActive: false };
     });
 
     return this.fetchCombinedAnomalyChangeData()
       .then((wowData) => {
-        anomalies.forEach((anomaly) => {
+        anomalyData.forEach((anomaly) => {
           anomaly.wowData = wowData[anomaly.anomalyId] || {};
         });
         // Display rest of options once data is loaded ('2week', 'Last Week')
-        this.set('baselineOptions', [existingOption, ...newWowList]);
+        this.set('baselineOptions', [baselineOptions[0], ...newWowList]);
         return fetch(this.get('metricDataUrl')).then(checkStatus);
       })
       .then((metricData) => {
@@ -562,23 +558,23 @@ export default Ember.Controller.extend({
 
       // Save anomaly feedback
       this.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value)
-      .then((res) => {
-        // We make a call to ensure our new response got saved
-        this.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status)
         .then((res) => {
-          const filterMap = res.searchFilters ? res.searchFilters.statusFilterMap : null;
-          if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
-            Ember.set(anomalyRecord, 'anomalyFeedback', selectedResponse);
-            Ember.set(anomalyRecord, 'showResponseSaved', true);
-          } else {
-            throw new Error('Response not saved');
-          }
-        }) // verifyAnomalyFeedback
-      }) // updateAnomalyFeedback
-      .catch((err) => {
-        Ember.set(anomalyRecord, 'showResponseFailed', true);
-        Ember.set(anomalyRecord, 'showResponseSaved', false);
-      });
+          // We make a call to ensure our new response got saved
+          this.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status)
+            .then((res) => {
+              const filterMap = res.searchFilters ? res.searchFilters.statusFilterMap : null;
+              if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
+                Ember.set(anomalyRecord, 'anomalyFeedback', selectedResponse);
+                Ember.set(anomalyRecord, 'showResponseSaved', true);
+              } else {
+                throw new Error('Response not saved');
+              }
+            }) // verifyAnomalyFeedback
+        }) // updateAnomalyFeedback
+        .catch((err) => {
+          Ember.set(anomalyRecord, 'showResponseFailed', true);
+          Ember.set(anomalyRecord, 'showResponseSaved', false);
+        });
     },
 
     /**
@@ -608,8 +604,7 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onBaselineOptionClick(wowObj) {
-      const displayedAnomalies = this.get('anomalyData');
-      const baselineOptions = this.get('baselineOptions');
+      const { anomalyData, baselineOptions } = this.getProperties('anomalyData', 'baselineOptions');
       const isValidSelection = !wowObj.isActive;
       let newOptions = baselineOptions.map((val) => {
         return { name: val.name, isActive: false };
@@ -621,7 +616,7 @@ export default Ember.Controller.extend({
 
       // Set new values for each anomaly
       if (isValidSelection) {
-        for (var anomaly of displayedAnomalies) {
+        for (var anomaly of anomalyData) {
           const wow = anomaly.wowData;
           const wowDetails = _.find(wow.compareResults, { 'compareMode': wowObj.name });
           let curr = anomaly.current;
@@ -688,7 +683,7 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onClickAlertSubscribe() {
-      // Set user as watcher for this alert
+      // TODO: Set user as watcher for this alert
     },
 
     /**

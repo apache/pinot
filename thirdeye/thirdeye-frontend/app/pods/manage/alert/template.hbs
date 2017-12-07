@@ -1,4 +1,4 @@
-<section class="te-alert-page__top te-search-results">
+<section class="te-page__top te-search-results">
   <div class="container">
     <div class="te-search-results__header">
       <div class="te-search-results__title-group">
@@ -20,11 +20,11 @@
       <div class="col-xs-12 col-sm-5">
         <li class="te-search-results__row">
           {{!-- Todo: Dry this out --}}
-          <div class="te-search-results__option-solo">Metric</div>
+          <div class="te-search-results__option te-search-results__option--solo">Metric</div>
           <div class="te-search-results__value-solo" title={{alertData.metric}}>{{alertData.metric}}</div>
         </li>
         <li class="te-search-results__row">
-          <div class="te-search-results__option-solo">Dataset</div>
+          <div class="te-search-results__option te-search-results__option--solo">Dataset</div>
           <div class="te-search-results__value-solo" title={{alertData.collection}}>
             <span class="{{unless alertData.collection 'te-search-results__prop--missing' 'te-search-results__prop'}}">
               {{if alertData.collection alertData.collection 'N/A'}}
@@ -32,7 +32,7 @@
           </div>
         </li>
         <li class="te-search-results__row">
-          <div class="te-search-results__option-solo">Filtered by</div>
+          <div class="te-search-results__option te-search-results__option--solo">Filtered by</div>
           <div class="te-search-results__value-solo" title={{alertData.filters}}>
             <span class="{{unless alertData.filters 'te-search-results__prop--missing' 'te-search-results__prop'}}">
               {{if alertData.filters alertData.filters 'N/A'}}
@@ -40,7 +40,7 @@
           </div>
         </li>
         <li class="te-search-results__row">
-          <div class="te-search-results__option-solo">Breakdown by</div>
+          <div class="te-search-results__option te-search-results__option--solo">Breakdown by</div>
           <div class="te-search-results__value-solo" title={{alertData.exploreDimensions}}>
             <span class="{{unless alertData.exploreDimensions 'te-search-results__prop--missing' 'te-search-results__prop'}}">
               {{if alertData.exploreDimensions alertData.exploreDimensions 'N/A'}}
@@ -50,7 +50,7 @@
       </div>
       <div class="col-xs-12 col-sm-7">
         <li class="te-search-results__row">
-          <div class="te-search-results__option-solo">Owner</div>
+          <div class="te-search-results__option te-search-results__option--solo">Owner</div>
           <div class="te-search-results__value-solo" title={{alertData.createdBy}}>
             <span class="{{unless alertData.createdBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
               {{if alertData.createdBy alertData.createdBy 'N/A'}}
@@ -58,7 +58,7 @@
           </div>
         </li>
         <li class="te-search-results__row">
-          <div class="te-search-results__option-solo">Application</div>
+          <div class="te-search-results__option te-search-results__option--solo">Application</div>
           <div class="te-search-results__value-solo" title={{alertData.application}}>
             <span class="{{unless alertData.application 'te-search-results__prop--missing' 'te-search-results__prop'}}">
               {{if alertData.application alertData.application 'N/A'}}
@@ -66,11 +66,11 @@
           </div>
         </li>
         <li class="te-search-results__row">
-          <div class="te-search-results__option-solo">Anomaly Pattern</div>
+          <div class="te-search-results__option te-search-results__option--solo">Anomaly Pattern</div>
           <div class="te-search-results__value-solo" title={{alertData.pattern}}>{{alertData.pattern}}</div>
         </li>
         <li class="te-search-results__row">
-          <div class="te-search-results__option-solo">Mailing List</div>
+          <div class="te-search-results__option te-search-results__option--solo">Mailing List</div>
           <div class="te-search-results__value-solo" title={{alertData.group}}>
             <span class="{{unless alertData.group 'te-search-results__prop--missing' 'te-search-results__prop'}}">
               {{if alertData.group alertData.group 'N/A'}}
@@ -82,20 +82,20 @@
   </div>
 </section>
 
-<section class="te-alert-page-bottom">
+<section class="te-page__bottom">
   <div class="container">
     {{#if (not isReplayPending)}}
       {{!-- {{#if filteredAnomalies}} --}}
-        <div class="te-alert-page-selectors">
+        <div class="te-pill-selectors">
           {{!-- Date range selector --}}
-          <div class="te-alert-page-selectors__label">Showing</div>
+          <div class="te-pill-selectors__label">Showing</div>
           <ul class="te-alert-page-hzlist">
             {{#each timeRangeOptions as |range|}}
               <li class="te-alert-page-hzlist__item {{if range.isActive "te-alert-page-hzlist__item--active"}}" {{action "onRangeOptionClick" range}}>
                 {{range.name}}
                 {{#if (eq range.name "Custom")}}
                   : {{date-range-picker
-                    class="te-alert-page-selectors__range-picker"
+                    class="te-pill-selectors__range-picker"
                     timePicker=false
                     timePicker24Hour=true
                     timePickerIncrement=timePickerIncrement
@@ -115,23 +115,23 @@
           </ul>
         </div>
 
-        <div class="te-alert-page-cards te-content-block">
+        <div class="te-horizontal-cards te-content-block">
           <h4 class="te-alert-page__subtitle">Alert Performance</h4>
-          <a class="te-alert-page-selectors__side-link" href="#">Customize sensitivity</a>
-          <div class="te-alert-page-cards__container">
+          <a class="te-pill-selectors__side-link" href="#">Customize sensitivity</a>
+          <div class="te-horizontal-cards__container">
             {{!-- Alert anomaly stats cards --}}
             {{#each anomalyStats as |card|}}
-              <ul class="te-alert-page-cards__card">
-                <li class="te-alert-page-cards__card-title">{{card.title}}</li>
-                <li class="te-alert-page-cards__card-value">{{card.value}}
-                  <div class="te-alert-page-cards__card-tooltip">
+              <ul class="te-horizontal-cards__card">
+                <li class="te-horizontal-cards__card-title">{{card.title}}</li>
+                <li class="te-horizontal-cards__card-value">{{card.value}}
+                  <div class="te-horizontal-cards__card-tooltip">
                     <span>
                       <i class="glyphicon glyphicon-question-sign"></i>
                       {{#tooltip-on-element}}{{card.text}}{{/tooltip-on-element}}
                     </span>
                   </div>
                 </li>
-                <li class="te-alert-page-cards__card-text">
+                <li class="te-horizontal-cards__card-text">
                   {{#if card.projected}}
                     Projected: <strong>{{card.projected}}</strong>
                   {{/if}}
@@ -141,13 +141,13 @@
           </div>
         </div>
 
-        <div class="te-alert-page-anomalies te-content-block">
-          <h4 class="te-alert-page__subtitle">Anomalies over time ({{filteredAnomalies.length}})</h4>
-          <a class="te-alert-page-selectors__side-link te-alert-page-selectors__side-link--high" href="#">Report missing anomaly</a>
+        <div class="te-content-block">
+          <h4>Anomalies over time ({{filteredAnomalies.length}})</h4>
+          <a class="te-pill-selectors__side-link te-pill-selectors__side-link--high" href="#">Report missing anomaly</a>
 
-          <div class="te-alert-page-selectors">
+          <div class="te-pill-selectors">
             {{!-- Dimension selector --}}
-            <div class="te-alert-page-selectors__range-picker col-md-3">
+            <div class="te-pill-selectors__range-picker col-md-3">
               {{#power-select
                 triggerId="select-dimension"
                 triggerClass="te-form__select"
@@ -161,7 +161,7 @@
               {{/power-select}}
             </div>
             {{!-- Resolution selector --}}
-            <div class="te-alert-page-selectors__range-picker col-md-3">
+            <div class="te-pill-selectors__range-picker col-md-3">
               {{#power-select
                 triggerId="select-resolution"
                 triggerClass="te-form__select"
@@ -177,7 +177,7 @@
           </div>
 
           {{!-- Alert anomaly graph --}}
-          <div class="te-alert-page-anomalies__graph col-xs-12">
+          <div class="te-graph-container col-xs-12">
             <div class="te-graph-alert {{if (not isGraphReady) 'te-graph-alert--pending'}}">
               {{#if isMetricDataLoading}}
                 <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
@@ -205,8 +205,8 @@
 
           {{#if filteredAnomalies}}
             {{!-- Baseline type selector --}}
-            <div class="te-alert-page-selectors">
-              <div class="te-alert-page-selectors__label">Baseline</div>
+            <div class="te-pill-selectors">
+              <div class="te-pill-selectors__label">Baseline</div>
               <ul class="te-alert-page-hzlist">
                 {{#each baselineOptions as |baseline|}}
                   <li class="te-alert-page-hzlist__item {{if baseline.isActive "te-alert-page-hzlist__item--active"}}" {{action "onBaselineOptionClick" baseline}}>
@@ -221,33 +221,33 @@
           {{/if}}
 
             {{!-- Alert anomaly table --}}
-            <table class="te-alert-page-anomalies__table">
+            <table class="te-anomaly-table">
               {{#if filteredAnomalies}}
               <thead>
-                <tr class="te-alert-page-anomalies__table-row te-alert-page-anomalies__table--head">
-                   <th class="te-alert-page-anomalies__table--cell-head">
-                    <a class="te-alert-page-anomalies__table--cell-link" {{action "toggleSortDirection" "start"}}>
+                <tr class="te-anomaly-table__row te-anomaly-table__head">
+                   <th class="te-anomaly-table__cell-head">
+                    <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
                       Start/Duration (PDT)
-                      <i class="te-alert-page-anomalies__glyph glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                      <i class="te-anomaly-table__glyph glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                     </a>
                    </th>
-                   <th class="te-alert-page-anomalies__table--cell-head">Dimensions</th>
-                   <th class="te-alert-page-anomalies__table--cell-head">
-                    <a class="te-alert-page-anomalies__table--cell-link" {{action "toggleSortDirection" "score"}}>
+                   <th class="te-anomaly-table__cell-head">Dimensions</th>
+                   <th class="te-anomaly-table__cell-head">
+                    <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "score"}}>
                       Severity Score
-                      <i class="te-alert-page-anomalies__glyph glyphicon {{if sortColumnScoreUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                      <i class="te-anomaly-table__glyph glyphicon {{if sortColumnScoreUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                     </a>
                    </th>
-                   <th class="te-alert-page-anomalies__table--cell-head">
-                    <a class="te-alert-page-anomalies__table--cell-link" {{action "toggleSortDirection" "change"}}>
+                   <th class="te-anomaly-table__cell-head">
+                    <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
                       Current/WoW
-                      <i class="te-alert-page-anomalies__glyph glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                      <i class="te-anomaly-table__glyph glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                     </a>
                    </th>
-                   <th class="te-alert-page-anomalies__table--cell-head">
-                    <a class="te-alert-page-anomalies__table--cell-link" {{action "toggleSortDirection" "resolution"}}>
+                   <th class="te-anomaly-table__cell-head">
+                    <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "resolution"}}>
                       Resolution
-                      <i class="te-alert-page-anomalies__glyph glyphicon {{if sortColumnResolutionUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                      <i class="te-anomaly-table__glyph glyphicon {{if sortColumnResolutionUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                     </a>
                  </th>
                 </tr>
@@ -257,17 +257,17 @@
               {{/if}}
               <tbody>
                 {{#each paginatedFilteredAnomalies as |anomaly|}}
-                  <tr class="te-alert-page-anomalies__table-row te-alert-page-anomalies__table--body">
-                     <td class="te-alert-page-anomalies__table--cell">
-                      <ul class="te-alert-page-anomalies__table-list">
-                        <li class="te-alert-page-anomalies__table-list--stronger">{{anomaly.startDateStr}}</li>
-                        <li class="te-alert-page-anomalies__table-list--lighter">{{anomaly.durationStr}}</li>
+                  <tr class="te-anomaly-table__row">
+                     <td class="te-anomaly-table__cell">
+                      <ul class="te-anomaly-table__list">
+                        <li class="te-anomaly-table__list--stronger">{{anomaly.startDateStr}}</li>
+                        <li class="te-anomaly-table__list--lighter">{{anomaly.durationStr}}</li>
                       </ul>
                      </td>
-                     <td class="te-alert-page-anomalies__table--cell">
-                      <ul class="te-alert-page-anomalies__table-list">
+                     <td class="te-anomaly-table__cell">
+                      <ul class="te-anomaly-table__list">
                        {{#each anomaly.dimensionList as |dimension|}}
-                          <li class="te-alert-page-anomalies__table-list--smaller">
+                          <li class="te-anomaly-table__list--smaller">
                             {{dimension.dimensionKey}}: {{dimension.dimensionVal}}
                           </li>
                        {{else}}
@@ -275,25 +275,25 @@
                        {{/each}}
                       </ul>
                      </td>
-                     <td class="te-alert-page-anomalies__table--cell">{{anomaly.severityScore}}</td>
-                     <td class="te-alert-page-anomalies__table--cell">
-                      <ul class="te-alert-page-anomalies__table-list">
+                     <td class="te-anomaly-table__cell">{{anomaly.severityScore}}</td>
+                     <td class="te-anomaly-table__cell">
+                      <ul class="te-anomaly-table__list">
                         <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
-                        <li class="te-alert-page-anomalies__table-list--warning">({{anomaly.shownChangeRate}}%)</li>
+                        <li class="te-anomaly-table__list--warning">({{anomaly.shownChangeRate}}%)</li>
                       </ul>
                      </td>
-                     <td class="te-alert-page-anomalies__table--cell">
+                     <td class="te-anomaly-table__cell">
                         {{#if anomaly.showResponseSaved}}
-                          <i class="te-alert-page-anomalies__glyph--status glyphicon glyphicon-ok-circle"></i>
+                          <i class="te-anomaly-table__glyph--status glyphicon glyphicon-ok-circle"></i>
                         {{/if}}
 
                         {{#if anomaly.showResponseFailed}}
-                          <i class="te-alert-page-anomalies__glyph--status glyphicon glyphicon-remove-circle"></i>
+                          <i class="te-anomaly-table__glyph--status glyphicon glyphicon-remove-circle"></i>
                         {{/if}}
 
                         {{#power-select
                           triggerId=anomaly.anomalyId
-                          triggerClass="te-alert-page-anomalies__table-select"
+                          triggerClass="te-anomaly-table__select"
                           options=responseOptions
                           searchEnabled=false
                           selected=anomaly.anomalyFeedback
@@ -303,7 +303,7 @@
                           {{response}}
                         {{/power-select}}
 
-                        <a target="_blank" class="te-alert-page-anomalies__table-link" href="http://thirdeye.corp.linkedin.com/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds={{anomaly.anomalyId}}">investigate</a>
+                        <a target="_blank" class="te-anomaly-table__link" href="/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds={{anomaly.anomalyId}}">investigate</a>
                      </td>
                   </tr>
                 {{/each}}

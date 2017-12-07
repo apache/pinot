@@ -7,12 +7,13 @@ import Ember from 'ember';
 import fetch from 'fetch';
 import moment from 'moment';
 import _ from 'lodash';
-import { checkStatus, checkStatusPost } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, pluralizeTime } from 'thirdeye-frontend/helpers/utils';
 
 /**
  * Shorthand for setting date defaults
  */
 const buildDate = (unit, type) => moment().subtract(unit, type).endOf('day').utc();
+const dateFormat = 'YYYY-MM-DD';
 
 /**
  * Basic alert page defaults
@@ -53,17 +54,6 @@ const parseProps = (filters) => {
 };
 
 /**
- * Pluralizes and formats the anomaly range duration string
- * @param {Number} time
- * @param {String} unit
- * @returns {String}
- */
-const pluralTimeString = (time, unit) => {
-  const unitStr = time > 1 ? unit + 's' : unit;
-  return time ? time + ' ' + unitStr : '';
-};
-
-/**
  * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
  * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
  * @param {Array} anomalyIds - list of all found anomaly ids
@@ -88,6 +78,41 @@ const fetchCombinedAnomalies = (anomalyIds) => {
 };
 
 /**
+ * Derives start/end timestamps based on queryparams and user-selected time range with certain fall-backs/defaults
+ * @param {String} bucketUnit - is requested range from an hourly or minutely metric?
+ * @param {String} duration - the model's processed query parameter for duration ('1m', '2w', etc)
+ * @param {String} start - the model's processed query parameter for startDate
+ * @param {String} end - the model's processed query parameter for endDate
+ * @returns {Object}
+ */
+const processRangeParams = (bucketUnit, duration, start, end) => {
+  // To avoid loading too much data, override our time span defaults based on whether the metric is 'minutely'
+  const isMetricMinutely = bucketUnit.toLowerCase().includes('minute');
+  const defaultQueryUnit = isMetricMinutely ? 'week' : 'month';
+  const defaultQuerySize = isMetricMinutely ? 2 : 1;
+
+  // We also allow a 'duration' query param to set the time range. For example, duration=15d (last 15 days)
+  const qsRegexMatch = duration.match(new RegExp(/^(\d)+([d|m|w])$/i));
+  const durationMatch = duration && qsRegexMatch ? qsRegexMatch : [];
+
+  // If the duration string is recognized, we use it. Otherwise, we fall back on the defaults above
+  const querySize = durationMatch && durationMatch.length ? durationMatch[1] : defaultQuerySize;
+  const queryUnit = durationMatch && durationMatch.length ? durationMap[durationMatch[2].toLowerCase()] : defaultQueryUnit;
+
+  // If duration = 'custom', we know the user is requesting specific start/end times.
+  // In this case, we will use those instead of our parsed duration & defaults
+  const isCustomDate = duration === 'custom';
+  const baseStart = isCustomDate ? moment(parseInt(start, 10)) : buildDate(querySize, queryUnit);
+  const baseEnd = isCustomDate ? moment(parseInt(end, 10)) : endDateDefault;
+
+  // These resulting timestamps are used for our graph and anomaly queries
+  const startStamp = baseStart.valueOf();
+  const endStamp = baseEnd.valueOf();
+
+  return { startStamp, endStamp, baseStart, baseEnd };
+};
+
+/**
  * Setup for query param behavior
  */
 const queryParamsConfig = {
@@ -106,6 +131,21 @@ export default Ember.Route.extend({
     duration: queryParamsConfig,
     startDate: queryParamsConfig,
     endDate: queryParamsConfig
+  },
+
+  beforeModel(transition) {
+    const target = transition.targetName;
+    const { duration, startDate } = transition.queryParams;
+    const id = transition.params[target].alertId;
+
+    // Default to 1 month of anomalies to show if no dates present in query params
+    if (!duration || !startDate) {
+      this.transitionTo(target, id, { queryParams: {
+        duration: durationDefault,
+        startDate: startDateDefault,
+        endDate: endDateDefault
+      }});
+    }
   },
 
   model(params) {
@@ -138,6 +178,7 @@ export default Ember.Route.extend({
   afterModel(model) {
     this._super(model);
 
+    // Pull alert properties into context
     const {
       metric: metricName,
       collection: dataset,
@@ -148,44 +189,30 @@ export default Ember.Route.extend({
       id
     } = model.alert;
 
-    let qsDuration = model.duration;
-    let qsStartDate = model.startDate;
-    let qsEndDate = model.endDate;
+    // Derive start/end time ranges based on querystring input with fallback on default '1 month'
+    const { startStamp, endStamp, baseStart, baseEnd } = processRangeParams(
+      bucketUnit,
+      model.duration,
+      model.startDate,
+      model.endDate
+    );
 
-    // Default to 1 month of anomalies to show if no dates present in query params
-    if (!qsDuration || !qsStartDate) {
-      this.transitionTo({ queryParams: {
-        duration: durationDefault,
-        startDate: startDateDefault,
-        endDate: endDateDefault
-      }});
+    // Placeholder for incoming alert metrics
+    const alertEvalMetrics = {
+      eval: {},
+      mttd: {},
+      projected: {}
     }
 
-    // Form start/end time ranges based on querystring input with fallback on default '1 month'
-    const isCustomDate = qsDuration === 'custom';
-    const isMetricMinutely = bucketUnit.toLowerCase().includes('minute');
-    const qsRegexMatch = qsDuration.match(new RegExp(/^(\d)+([d|m|w])$/i));
-    const durationMatch = qsDuration && qsRegexMatch ? qsRegexMatch : [];
-    const defaultQueryUnit = isMetricMinutely ? 'week' : 'month';
-    const defaultQuerySize = isMetricMinutely ? 2 : 1;
-    const querySize = durationMatch && durationMatch.length ? durationMatch[1] : defaultQuerySize;
-    const queryUnit = durationMatch && durationMatch.length ? durationMap[durationMatch[2].toLowerCase()] : defaultQueryUnit;
-    const baseStart = isCustomDate ? moment(parseInt(qsStartDate, 10)) : buildDate(querySize, queryUnit);
-    const baseEnd = isCustomDate ? moment(parseInt(qsEndDate, 10)) : endDateDefault;
-    const startDate = baseStart.utc().format("YYYY-MM-DD");
-    const endDate = baseEnd.utc().format("YYYY-MM-DD");
-    const startStamp = baseStart.valueOf();
-    const endStamp = baseEnd.valueOf();
+    // Set initial value for metricId for early transition cases
     let metricId = '';
 
     // TODO: remove placeholders for alertEval/mttd/projected
-    Object.assign(model, { startStamp, endStamp, alertEval: {}, mttd: {}, projected: {} });
+    Object.assign(model, { startStamp, endStamp, alertEvalMetrics });
     return fetch(`/data/autocomplete/metric?name=${dataset}::${metricName}`).then(checkStatus)
-
       // Fetch the metric Id for the current alert
       .then((metricsByName) => {
-        const metric = metricsByName.pop();
-        metricId = metric.id;
+        metricId = metricsByName.length ? metricsByName.pop().id : '';
         return fetch(`/data/maxDataTime/metricId/${metricId}`).then(checkStatus);
       })
 
@@ -193,6 +220,8 @@ export default Ember.Route.extend({
       // Note: In the event of custom date selection, the end date might be less than maxTime
       .then((maxTime) => {
         const dimension = exploreDimensions || 'All';
+        const startDate = baseStart.utc().format(dateFormat);
+        const endDate = baseEnd.utc().format(dateFormat);
         const currentEnd = moment(maxTime).isValid() ? moment(maxTime).valueOf() : buildDate(1, 'day').valueOf();
         const formattedFilters = JSON.stringify(parseProps(filters));
         const baselineStart = moment(startStamp).subtract(1, 'week').valueOf();
@@ -245,9 +274,6 @@ export default Ember.Route.extend({
       replay,
       replayId,
       duration,
-      alertEval,
-      mttd,
-      projected,
       startStamp,
       endStamp,
       loadError,
@@ -255,6 +281,7 @@ export default Ember.Route.extend({
       totalAnomalies,
       anomalyDataUrl,
       anomalyMetrics,
+      alertEvalMetrics,
       anomalies
     } = model;
 
@@ -339,7 +366,7 @@ export default Ember.Route.extend({
       const days = anomalyDuration.get("days");
       const hours = anomalyDuration.get("hours");
       const minutes = anomalyDuration.get("minutes");
-      const durationArr = [pluralTimeString(days, 'day'), pluralTimeString(hours, 'hour'), pluralTimeString(minutes, 'minute')];
+      const durationArr = [pluralizeTime(days, 'day'), pluralizeTime(hours, 'hour'), pluralizeTime(minutes, 'minute')];
 
       // Placeholder: ChangeRate will not be calculated on front-end
       const changeRate = (curr && base) ? ((curr - base) / base * 100).toFixed(2) : 0;
@@ -397,12 +424,10 @@ export default Ember.Route.extend({
       dimensionOptions,
       alertData: alert,
       emailData: email,
-      evalData: alertEval,
-      mttdData: mttd,
-      projectedData: projected,
       anomalyResponseObj,
       filterData: filters,
       anomalyData: anomalies,
+      evalData: alertEvalMetrics,
       activeRangeStart: startStamp,
       activeRangeEnd: endStamp,
       isGraphReady: false
