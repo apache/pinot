@@ -10,8 +10,9 @@ export default Ember.Component.extend({
 
   onFeedback: null, // func (urn, feedback, comment)
 
-  selected: 'Select a status',
-
+  /**
+   * Options to populate anomaly dropdown
+   */
   options: [
     'ANOMALY',
     'ANOMALY_NEW_TREND',
@@ -97,10 +98,7 @@ export default Ember.Component.extend({
       }
 
       // TODO reload anomaly entity instead
-      this.setProperties({
-        status,
-        selected: status
-      });
+      this.setProperties({ status });
     }
   }
 });
