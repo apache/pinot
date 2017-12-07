@@ -511,6 +511,11 @@ public class ValidationManagerTest {
     }
 
     @Override
+    public String getSegmentPushStatus() {
+      return null;
+    }
+
+    @Override
     public String getIndexDir() {
       return _indexDir;
     }

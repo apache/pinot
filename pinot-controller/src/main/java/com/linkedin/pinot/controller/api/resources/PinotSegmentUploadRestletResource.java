@@ -267,6 +267,11 @@ public class PinotSegmentUploadRestletResource {
 
   private SuccessResponse uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr, HttpHeaders headers,
       Request request) {
+    // If match header can check if the modification of a resource that the user wants to upload will not override
+    // another change that has been done since the original resource was fetched.
+    // If the request cannot be fulfilled, the 412 (Precondition Failed) response is returned.
+    String crc = headers.getHeaderString(HttpHeaders.IF_MATCH);
+
     File tempTarredSegmentFile = null;
     File tempSegmentDir = null;
 
@@ -366,7 +371,7 @@ public class PinotSegmentUploadRestletResource {
         String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
         LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentMetadata.getName(),
             clientAddress);
-        uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider);
+        uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider, crc);
         return new SuccessResponse("success"); // Current APIs return an empty status string on success.
       } else {
         // Some problem happened, sent back a simple line of text.
@@ -385,7 +390,7 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private PinotResourceManagerResponse uploadSegment(File indexDir, SegmentMetadata segmentMetadata,
-      File tempTarredSegmentFile, String downloadUrl, FileUploadPathProvider provider)
+      File tempTarredSegmentFile, String downloadUrl, FileUploadPathProvider provider, String crc)
       throws IOException, JSONException {
     String tableName = segmentMetadata.getTableName();
     String segmentName = segmentMetadata.getName();
@@ -417,7 +422,7 @@ public class PinotSegmentUploadRestletResource {
         downloadUrl = ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
       }
       // TODO: this will read table configuration again from ZK. We should optimize that
-      response = _pinotHelixResourceManager.addSegment(segmentMetadata, downloadUrl);
+      response = _pinotHelixResourceManager.addSegment(segmentMetadata, downloadUrl, crc);
     }
 
     if (!response.isSuccessful()) {

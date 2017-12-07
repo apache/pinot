@@ -289,6 +289,7 @@ public class CommonConstants {
       public static final String DOWNLOAD_URL = "segment.offline.download.url";
       public static final String PUSH_TIME = "segment.offline.push.time";
       public static final String REFRESH_TIME = "segment.offline.refresh.time";
+      public static final String SEGMENT_PUSH_STATUS = "segment.push.status";
     }
 
     public static final String SEGMENT_NAME = "segment.name";

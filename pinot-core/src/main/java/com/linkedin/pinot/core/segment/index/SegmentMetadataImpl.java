@@ -93,6 +93,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _segmentStartTime;
   private long _segmentEndTime;
   private List<String> _optimizations;
+  private String _segmentPushStatus;
 
   /**
    * Load segment metadata in any segment version.
@@ -497,6 +498,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String getName() {
     return _segmentName;
+  }
+
+  @Override
+  public String getSegmentPushStatus() {
+    return _segmentPushStatus;
   }
 
   @Override

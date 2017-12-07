@@ -69,6 +69,11 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
+  public String getSegmentPushStatus() {
+    return null;
+  }
+
+  @Override
   public String getTableName() {
     return _resourceName;
   }
