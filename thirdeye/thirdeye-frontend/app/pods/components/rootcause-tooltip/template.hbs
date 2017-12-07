@@ -6,8 +6,8 @@
   {{#each urns as |urn|}}
     <div class="row">
       <div class="col-xs-2">
-        <div class="color-box color-box--{{get colors urn}}"></div>
-        {{get labels urn}}<br/>{{get values urn}}</div>
+        <div class="color-box color-box--{{get-safe colors urn}}"></div>
+        {{get-safe labels urn}}<br/>{{get-safe values urn}}</div>
     </div>
   {{/each}}
 </div>

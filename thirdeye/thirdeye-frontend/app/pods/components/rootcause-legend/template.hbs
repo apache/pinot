@@ -13,7 +13,7 @@
           type="checkbox"
           checked=(set-has-not invisibleUrns urn)
           click=(action "toggleVisibility" urn)}}
-        <div class="color-box color-box--{{get colors urn}}" />
+        <div class="color-box color-box--{{get-safe colors urn}}" />
         {{label}}
         <a {{action "removeUrn" urn}}>[X]</a>
       </li>
@@ -32,7 +32,7 @@
           type="checkbox"
           checked=(set-has-not invisibleUrns urn)
           click=(action "toggleVisibility" urn)}}
-        <div class="color-box color-box--{{get colors urn}}" />
+        <div class="color-box color-box--{{get-safe colors urn}}" />
         {{label}}
         <a {{action "removeUrn" urn}}>[X]</a>
       </li>

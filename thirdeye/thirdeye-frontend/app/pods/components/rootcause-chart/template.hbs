@@ -7,7 +7,7 @@ mode
 {{#if isSplit}}
   {{#each splitUrns as |urn|}}
     <div>
-      <h4>{{get splitLabels urn}}</h4>
+      <h4>{{get-safe splitLabels urn}}</h4>
       {{timeseries-chart
         series=(get splitSeries urn)
         tooltip=tooltip
