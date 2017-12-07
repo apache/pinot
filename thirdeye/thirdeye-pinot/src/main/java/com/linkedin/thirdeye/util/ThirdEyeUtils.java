@@ -18,7 +18,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang.StringUtils;
-import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -201,9 +200,8 @@ public abstract class ThirdEyeUtils {
    */
   public static TimeSpec getTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
     String timeFormat = getTimeFormatString(datasetConfig);
-    String timezone = datasetConfig.getTimezone();
     TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
-        new TimeGranularity(datasetConfig.bucketTimeGranularity()), timeFormat, DateTimeZone.forID(timezone));
+        new TimeGranularity(datasetConfig.bucketTimeGranularity()), timeFormat);
     return timespec;
   }
 
@@ -219,10 +217,8 @@ public abstract class ThirdEyeUtils {
    */
   public static TimeSpec getTimestampTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
     String timeFormat = getTimeFormatString(datasetConfig);
-    String timezone = datasetConfig.getTimezone();
     TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
-        new TimeGranularity(datasetConfig.getTimeDuration(), datasetConfig.getTimeUnit()), timeFormat,
-        DateTimeZone.forID(timezone));
+        new TimeGranularity(datasetConfig.getTimeDuration(), datasetConfig.getTimeUnit()), timeFormat);
     return timespec;
   }
 
