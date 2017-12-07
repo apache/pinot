@@ -81,7 +81,7 @@ public class InPredicateEvaluatorFactory {
     int[] _matchingDictIds;
 
     DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary) {
-      String[] values = inPredicate.getInRange();
+      String[] values = inPredicate.getValues();
       _matchingDictIdSet = new IntOpenHashSet();
       for (String value : values) {
         int dictId = dictionary.indexOf(value);
@@ -119,7 +119,7 @@ public class InPredicateEvaluatorFactory {
     final IntSet _matchingValues;
 
     IntRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
-      String[] values = inPredicate.getInRange();
+      String[] values = inPredicate.getValues();
       _matchingValues = new IntOpenHashSet(values.length);
       for (String value : values) {
         _matchingValues.add(Integer.parseInt(value));
@@ -141,7 +141,7 @@ public class InPredicateEvaluatorFactory {
     final LongSet _matchingValues;
 
     LongRawValueBasedInPredicateEvaluator(InPredicate predicate) {
-      String[] values = predicate.getInRange();
+      String[] values = predicate.getValues();
       _matchingValues = new LongOpenHashSet(values.length);
       for (String value : values) {
         _matchingValues.add(Long.parseLong(value));
@@ -163,7 +163,7 @@ public class InPredicateEvaluatorFactory {
     final FloatSet _matchingValues;
 
     FloatRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
-      String[] values = inPredicate.getInRange();
+      String[] values = inPredicate.getValues();
       _matchingValues = new FloatOpenHashSet(values.length);
       for (String value : values) {
         _matchingValues.add(Float.parseFloat(value));
@@ -185,7 +185,7 @@ public class InPredicateEvaluatorFactory {
     final DoubleSet _matchingValues;
 
     DoubleRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
-      String[] values = inPredicate.getInRange();
+      String[] values = inPredicate.getValues();
       _matchingValues = new DoubleOpenHashSet(values.length);
       for (String value : values) {
         _matchingValues.add(Double.parseDouble(value));
@@ -207,7 +207,7 @@ public class InPredicateEvaluatorFactory {
     final Set<String> _matchingValues;
 
     StringRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
-      String[] values = inPredicate.getInRange();
+      String[] values = inPredicate.getValues();
       _matchingValues = new HashSet<>(values.length);
       Collections.addAll(_matchingValues, values);
     }
