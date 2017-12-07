@@ -35,11 +35,13 @@ import com.linkedin.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKey
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.util.TestDataRecordReader;
+import com.linkedin.pinot.util.GenericRowRecordReader;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -74,7 +76,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
   @BeforeClass
   private void setup() throws Exception {
-    GenericRow[] segmentData = new GenericRow[NUM_ROWS];
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     int value = _random.nextInt(MAX_STEP_LENGTH);
 
     // Generate random values for the segment.
@@ -93,12 +95,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
         }
         map.put(multiValueColumn, values);
       }
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      segmentData[i] = genericRow;
+      GenericRow row = new GenericRow();
+      row.init(map);
+      rows.add(row);
     }
-    for (int i = UNIQUE_ROWS; i < NUM_ROWS; i += UNIQUE_ROWS) {
-      System.arraycopy(segmentData, 0, segmentData, i, UNIQUE_ROWS);
+    for (int i = UNIQUE_ROWS; i < NUM_ROWS; i++) {
+      rows.add(rows.get(i % UNIQUE_ROWS));
     }
 
     // Create an index segment with the random values.
@@ -118,7 +120,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new TestDataRecordReader(schema, segmentData));
+    driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
 
     IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);

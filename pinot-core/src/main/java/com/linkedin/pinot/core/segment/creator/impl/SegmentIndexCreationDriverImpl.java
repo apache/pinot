@@ -97,7 +97,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(RecordReaderFactory.get(config)));
+    init(config, new RecordReaderSegmentCreationDataSource(RecordReaderFactory.getRecordReader(config)));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) throws Exception {
@@ -534,11 +534,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return new File(new File(config.getOutDir()), segmentName);
   }
 
-  private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow) {
-    readRow = GenericRow.createOrReuseRow(readRow);
-    readRow = recordReader.next(readRow);
-    transformedRow = GenericRow.createOrReuseRow(transformedRow);
-    return extractor.transform(readRow, transformedRow);
+  private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow) throws IOException {
+    return extractor.transform(recordReader.next(readRow), transformedRow);
   }
 
   public SegmentPreIndexStatsContainer getSegmentStats() {

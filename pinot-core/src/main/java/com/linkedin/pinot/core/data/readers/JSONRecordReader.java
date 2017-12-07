@@ -18,8 +18,8 @@ package com.linkedin.pinot.core.data.readers;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import java.io.FileReader;
-import java.io.Reader;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,31 +28,26 @@ import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.map.ObjectMapper;
 
 
-public class JSONRecordReader extends BaseRecordReader {
-  private final String _dataFile;
+/**
+ * Record reader for JSON file.
+ */
+public class JSONRecordReader implements RecordReader {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private final Schema _schema;
+  private final JsonParser _parser;
 
-  JsonParser _parser;
-  Iterator<Map> _iterator;
+  private Iterator<Map> _iterator;
 
-  public JSONRecordReader(String dataFile, Schema schema) {
-    super();
-    super.initNullCounters(schema);
-    _dataFile = dataFile;
+  public JSONRecordReader(File dataFile, Schema schema) throws IOException {
     _schema = schema;
-  }
-
-  @Override
-  public void init() throws Exception {
-    final Reader reader = new FileReader(_dataFile);
-    _parser = new JsonFactory().createJsonParser(reader);
-    _iterator = new ObjectMapper().readValues(_parser, Map.class);
-  }
-
-  @Override
-  public void rewind() throws Exception {
-    _parser.close();
-    init();
+    _parser = new JsonFactory().createJsonParser(RecordReaderUtils.getFileReader(dataFile));
+    try {
+      _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
+    } catch (Exception e) {
+      _parser.close();
+      throw e;
+    }
   }
 
   @Override
@@ -61,42 +56,44 @@ public class JSONRecordReader extends BaseRecordReader {
   }
 
   @Override
+  public GenericRow next() throws IOException {
+    return next(new GenericRow());
+  }
+
+  @Override
+  public GenericRow next(GenericRow reuse) throws IOException {
+    Map record = _iterator.next();
+
+    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      Object jsonValue = record.get(fieldName);
+
+      Object value;
+      if (fieldSpec.isSingleValueField()) {
+        String token = jsonValue != null ? jsonValue.toString() : null;
+        value = RecordReaderUtils.convertToDataType(token, fieldSpec);
+      } else {
+        value = RecordReaderUtils.convertToDataTypeArray((ArrayList) jsonValue, fieldSpec);
+      }
+
+      reuse.putField(fieldName, value);
+    }
+
+    return reuse;
+  }
+
+  @Override
+  public void rewind() throws IOException {
+    _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
+  }
+
+  @Override
   public Schema getSchema() {
     return _schema;
   }
 
   @Override
-  public GenericRow next() {
-    return next(new GenericRow());
-  }
-
-  @Override
-  public GenericRow next(GenericRow row) {
-    Map<String, Object> record = _iterator.next();
-
-    for (final FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String column = fieldSpec.getName();
-      Object data = record.get(column);
-
-      Object value;
-      if (fieldSpec.isSingleValueField()) {
-        String token = (data != null) ? data.toString() : null;
-        if (token == null || token.isEmpty()) {
-          incrementNullCountFor(fieldSpec.getName());
-        }
-        value = RecordReaderUtils.convertToDataType(token, fieldSpec);
-      } else {
-        value = RecordReaderUtils.convertToDataTypeArray((ArrayList) data, fieldSpec);
-      }
-
-      row.putField(column, value);
-    }
-
-    return row;
-  }
-
-  @Override
-  public void close() throws Exception {
+  public void close() throws IOException {
     _parser.close();
   }
 }

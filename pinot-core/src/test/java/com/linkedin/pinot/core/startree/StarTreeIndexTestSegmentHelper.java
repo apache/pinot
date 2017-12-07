@@ -23,11 +23,10 @@ import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.startree.hll.HllConfig;
-import com.linkedin.pinot.util.TestUtils;
+import com.linkedin.pinot.util.GenericRowRecordReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,7 +56,7 @@ public class StarTreeIndexTestSegmentHelper {
   }
 
   private static Schema buildSegment(String segmentDirName, String segmentName, HllConfig hllConfig) throws Exception {
-    final int rows = (int) MathUtils.factorial(NUM_DIMENSIONS) * 100;
+    int numRows = (int) MathUtils.factorial(NUM_DIMENSIONS) * 100;
     Schema schema = new Schema();
 
     for (int i = 0; i < NUM_DIMENSIONS; i++) {
@@ -82,13 +81,13 @@ public class StarTreeIndexTestSegmentHelper {
     config.setSegmentName(segmentName);
     config.setHllConfig(hllConfig);
 
-    final List<GenericRow> data = new ArrayList<>();
-    for (int row = 0; row < rows; row++) {
+    List<GenericRow> rows = new ArrayList<>(numRows);
+    for (int rowId = 0; rowId < numRows; rowId++) {
       HashMap<String, Object> map = new HashMap<>();
       // Dim columns.
       for (int i = 0; i < NUM_DIMENSIONS / 2; i++) {
         String dimName = schema.getDimensionFieldSpecs().get(i).getName();
-        map.put(dimName, dimName + "-v" + row % (NUM_DIMENSIONS - i));
+        map.put(dimName, dimName + "-v" + rowId % (NUM_DIMENSIONS - i));
       }
       // Random values make cardinality of d3, d4 column values larger to better test hll
       for (int i = NUM_DIMENSIONS / 2; i < NUM_DIMENSIONS; i++) {
@@ -103,16 +102,15 @@ public class StarTreeIndexTestSegmentHelper {
       }
 
       // Time column.
-      map.put(TIME_COLUMN_NAME, row % 7);
+      map.put(TIME_COLUMN_NAME, rowId % 7);
 
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);
-      data.add(genericRow);
+      rows.add(genericRow);
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader reader = new TestUtils.GenericRowRecordReader(schema, data);
-    driver.init(config, reader);
+    driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
 
     LOGGER.info("Built segment {} at {}", segmentName, segmentDirName);

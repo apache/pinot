@@ -18,34 +18,44 @@ package com.linkedin.pinot.util;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import java.util.Map;
-import org.apache.commons.lang.mutable.MutableLong;
+import java.io.IOException;
+import java.util.List;
 
 
-public class TestDataRecordReader implements RecordReader {
-  final Schema _schema;
-  final GenericRow[] _segmentData;
-  final int _numRows;
-  int index = 0;
+/**
+ * Utility class for reading generic row records.
+ */
+public class GenericRowRecordReader implements RecordReader {
+  private final List<GenericRow> _rows;
+  private final int _numRows;
+  private final Schema _schema;
 
-  public TestDataRecordReader(Schema schema, GenericRow[] segmentData) {
+  private int _nextRowId = 0;
+
+  public GenericRowRecordReader(List<GenericRow> rows, Schema schema) {
+    _rows = rows;
+    _numRows = rows.size();
     _schema = schema;
-    _segmentData = segmentData;
-    _numRows = segmentData.length;
-  }
-
-  @Override
-  public void init() throws Exception {
-  }
-
-  @Override
-  public void rewind() throws Exception {
-    index = 0;
   }
 
   @Override
   public boolean hasNext() {
-    return index < _numRows;
+    return _nextRowId < _numRows;
+  }
+
+  @Override
+  public GenericRow next() throws IOException {
+    return _rows.get(_nextRowId++);
+  }
+
+  @Override
+  public GenericRow next(GenericRow reuse) throws IOException {
+    return next();
+  }
+
+  @Override
+  public void rewind() throws IOException {
+    _nextRowId = 0;
   }
 
   @Override
@@ -54,21 +64,6 @@ public class TestDataRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() {
-    return _segmentData[index++];
-  }
-
-  @Override
-  public GenericRow next(GenericRow row) {
-    return next();
-  }
-
-  @Override
-  public Map<String, MutableLong> getNullCountMap() {
-    return null;
-  }
-
-  @Override
-  public void close() throws Exception {
+  public void close() throws IOException {
   }
 }

@@ -15,6 +15,24 @@
  */
 package com.linkedin.pinot.core.segment.index.creator;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
+import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.segment.store.ColumnIndexType;
+import com.linkedin.pinot.core.segment.store.SegmentDirectory;
+import com.linkedin.pinot.util.GenericRowRecordReader;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,24 +45,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.TestRecordReader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
-import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 
 
 /**
@@ -215,8 +215,8 @@ public class RawIndexCreatorTest {
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
 
-    final List<GenericRow> rows = new ArrayList<>();
-    for (int row = 0; row < NUM_ROWS; row++) {
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    for (int i = 0; i < NUM_ROWS; i++) {
       HashMap<String, Object> map = new HashMap<>();
 
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -231,14 +231,14 @@ public class RawIndexCreatorTest {
       rows.add(genericRow);
     }
 
+    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader reader = new TestRecordReader(rows, schema);
-    driver.init(config, reader);
+    driver.init(config, recordReader);
     driver.build();
     _segmentDirectory = SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap);
     _segmentReader = _segmentDirectory.createReader();
-    reader.rewind();
-    return reader;
+    recordReader.rewind();
+    return recordReader;
   }
 
   /**
