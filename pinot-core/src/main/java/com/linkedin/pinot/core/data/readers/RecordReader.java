@@ -17,67 +17,39 @@ package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import java.util.Map;
-import org.apache.commons.lang.mutable.MutableLong;
+import java.io.Closeable;
+import java.io.IOException;
 
 
 /**
- * Generic interface to implement any new file format in which
- * input data can be read and converted into segments.
- *
- *
+ * The <code>RecordReader</code> interface is used to read records from various file formats into {@link GenericRow}s.
+ * Pinot segments will be generated from {@link GenericRow}s.
  */
-
-public interface RecordReader {
-
-  /**
-   *
-   * @throws Exception
-   */
-  public void init() throws Exception;
+public interface RecordReader extends Closeable {
 
   /**
-   * Rewind is called in case we need to iterate through
-   * the input data again.. Once such case would be when
-   * we need to create a dictionary. Cannot call this if
-   * close is called first
-   *
-   * @throws Exception
+   * Return <code>true</code> if more records remain to be read.
    */
-  public void rewind() throws Exception;
+  boolean hasNext();
 
   /**
-   *
-   * @return
+   * Get the next record.
    */
-  public boolean hasNext();
+  GenericRow next() throws IOException;
 
   /**
-   *
-   * @return
+   * Get the next record. Re-use the given row if possible to reduce garbage.
+   * <p>The passed in row should be returned by previous call to {@link #next()}.
    */
-  public Schema getSchema();
+  GenericRow next(GenericRow reuse) throws IOException;
 
   /**
-   *
-   * @return
+   * Rewind the reader to start reading from the first record again.
    */
-  public GenericRow next();
+  void rewind() throws IOException;
 
   /**
-   *
-   * @return
+   * Get the Pinot schema.
    */
-  public GenericRow next(GenericRow row);
-
-  /**
-   * Get the map of fields that have null values.
-   */
-  public Map<String, MutableLong> getNullCountMap();
-
-  /**
-   *
-   * @throws Exception
-   */
-  public void close() throws Exception;
+  Schema getSchema();
 }

@@ -26,10 +26,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -59,32 +57,26 @@ public final class Schema {
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
-  private List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
+  private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
 
   // Json ignored fields
   private final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
-  private final Set<String> _dimensionSet = new HashSet<>();
-  private final Set<String> _metricSet = new HashSet<>();
-  private final Set<String> _dateTimeSet = new HashSet<>();
-  private final List<String> _dimensionList = new ArrayList<>();
-  private final List<String> _metricList = new ArrayList<>();
-  private final List<String> _dateTimeList = new ArrayList<>();
+  private final List<String> _dimensionNames = new ArrayList<>();
+  private final List<String> _metricNames = new ArrayList<>();
+  private final List<String> _dateTimeNames = new ArrayList<>();
 
   @Nonnull
-  public static Schema fromFile(@Nonnull File schemaFile)
-      throws IOException {
+  public static Schema fromFile(@Nonnull File schemaFile) throws IOException {
     return MAPPER.readValue(schemaFile, Schema.class);
   }
 
   @Nonnull
-  public static Schema fromString(@Nonnull String schemaString)
-      throws IOException {
+  public static Schema fromString(@Nonnull String schemaString) throws IOException {
     return MAPPER.readValue(schemaString, Schema.class);
   }
 
   @Nonnull
-  public static Schema fromInputSteam(@Nonnull InputStream schemaInputStream)
-      throws IOException {
+  public static Schema fromInputSteam(@Nonnull InputStream schemaInputStream) throws IOException {
     return MAPPER.readValue(schemaInputStream, Schema.class);
   }
 
@@ -137,7 +129,6 @@ public final class Schema {
     }
   }
 
-
   @Nonnull
   public List<DateTimeFieldSpec> getDateTimeFieldSpecs() {
     return _dateTimeFieldSpecs;
@@ -184,28 +175,18 @@ public final class Schema {
     FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
       case DIMENSION:
-        if (!_dimensionSet.contains(columnName)) {
-          _dimensionSet.add(columnName);
-          _dimensionList.add(columnName);
-        }
+        _dimensionNames.add(columnName);
         _dimensionFieldSpecs.add((DimensionFieldSpec) fieldSpec);
         break;
       case METRIC:
-        if (!_metricSet.contains(columnName)) {
-          _metricSet.add(columnName);
-          _metricList.add(columnName);
-        }
+        _metricNames.add(columnName);
         _metricFieldSpecs.add((MetricFieldSpec) fieldSpec);
         break;
       case TIME:
-        Preconditions.checkState(_timeFieldSpec == null, "Already defined the time column: " + _timeFieldSpec);
         _timeFieldSpec = (TimeFieldSpec) fieldSpec;
         break;
       case DATE_TIME:
-        if (!_dateTimeSet.contains(columnName)) {
-          _dateTimeSet.add(columnName);
-          _dateTimeList.add(columnName);
-        }
+        _dateTimeNames.add(columnName);
         _dateTimeFieldSpecs.add((DateTimeFieldSpec) fieldSpec);
         break;
       default:
@@ -219,6 +200,38 @@ public final class Schema {
   // For third-eye backward compatible.
   public void addField(@Nonnull String columnName, @Nonnull FieldSpec fieldSpec) {
     addField(fieldSpec);
+  }
+
+  public boolean removeField(String columnName) {
+    FieldSpec existingFieldSpec = _fieldSpecMap.remove(columnName);
+    if (existingFieldSpec != null) {
+      FieldType fieldType = existingFieldSpec.getFieldType();
+      switch (fieldType) {
+        case DIMENSION:
+          int index = _dimensionNames.indexOf(columnName);
+          _dimensionNames.remove(index);
+          _dimensionFieldSpecs.remove(index);
+          break;
+        case METRIC:
+          index = _metricNames.indexOf(columnName);
+          _metricNames.remove(index);
+          _metricFieldSpecs.remove(index);
+          break;
+        case TIME:
+          _timeFieldSpec = null;
+          break;
+        case DATE_TIME:
+          index = _dateTimeNames.indexOf(columnName);
+          _dateTimeNames.remove(index);
+          _dateTimeFieldSpecs.remove(index);
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
+      }
+      return true;
+    } else {
+      return false;
+    }
   }
 
   public boolean hasColumn(@Nonnull String columnName) {
@@ -273,7 +286,6 @@ public final class Schema {
     return null;
   }
 
-
   @JsonIgnore
   @Nullable
   public DateTimeFieldSpec getDateTimeSpec(@Nonnull String dateTimeName) {
@@ -287,19 +299,19 @@ public final class Schema {
   @JsonIgnore
   @Nonnull
   public List<String> getDimensionNames() {
-    return _dimensionList;
+    return _dimensionNames;
   }
 
   @JsonIgnore
   @Nonnull
   public List<String> getMetricNames() {
-    return _metricList;
+    return _metricNames;
   }
 
   @JsonIgnore
   @Nonnull
   public List<String> getDateTimeNames() {
-    return _dateTimeList;
+    return _dateTimeNames;
   }
 
   @JsonIgnore
@@ -577,5 +589,4 @@ public final class Schema {
   public int hashCode() {
     return EqualityUtils.hashCodeOf(_schemaName.hashCode(), _fieldSpecMap);
   }
-
 }

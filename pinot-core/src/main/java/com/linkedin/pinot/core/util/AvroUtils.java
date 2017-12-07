@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.utils;
+package com.linkedin.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
@@ -21,12 +21,11 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.readers.AvroRecordReader;
+import com.linkedin.pinot.core.data.GenericRow;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,18 +33,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-/**
- *
- * Aug 19, 2014
- */
 public class AvroUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
+  private AvroUtils() {
+  }
 
   private static final String COUNT = "count";
   private static final String METRIC = "met";
@@ -67,7 +62,6 @@ public class AvroUtils {
     }
   }
 
-
   /**
    * This is just a refactor of the original code that had the hard-coded logic for deducing
    * if a column is dimension/metric/time. This is used only for testing purposes.
@@ -76,7 +70,7 @@ public class AvroUtils {
    * @return Hash map containing column names as keys and field type (dim/metric/time) as value.
    */
   private static Map<String, FieldSpec.FieldType> getDefaultFieldTypes(org.apache.avro.Schema avroSchema) {
-    Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<String, FieldSpec.FieldType>();
+    Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
 
     for (final Field field : avroSchema.getFields()) {
       FieldSpec.FieldType fieldType;
@@ -108,20 +102,12 @@ public class AvroUtils {
       Map<String, FieldSpec.FieldType> fieldTypes, TimeUnit timeUnit) {
     Schema pinotSchema = new Schema();
 
-    for (final Field field : avroSchema.getFields()) {
+    for (Field field : avroSchema.getFields()) {
       String fieldName = field.name();
-      FieldSpec.DataType dataType;
-
-      try {
-        dataType = AvroRecordReader.getColumnType(field);
-      } catch (UnsupportedOperationException e) {
-        LOGGER.warn("Unsupported field type for field {} schema {}, using String instead.", fieldName, field.schema());
-        dataType = FieldSpec.DataType.STRING;
-      }
+      FieldSpec.DataType dataType = extractFieldDataType(field);
+      boolean isSingleValueField = isSingleValueField(field);
 
       FieldSpec.FieldType fieldType = fieldTypes.get(fieldName);
-      boolean isSingleValueField = AvroRecordReader.isSingleValueField(field);
-
       switch (fieldType) {
         case DIMENSION:
           pinotSchema.addField(new DimensionFieldSpec(fieldName, dataType, isSingleValueField));
@@ -149,8 +135,8 @@ public class AvroUtils {
    * @param avroSchemaFileName Name of the text file containing avro schema.
    * @return PinotSchema equivalent of avro schema.
    */
-  public static Schema getPinotSchemaFromAvroSchemaFile(String avroSchemaFileName, Map<String,
-      FieldSpec.FieldType> fieldTypes, TimeUnit timeUnit) throws IOException {
+  public static Schema getPinotSchemaFromAvroSchemaFile(String avroSchemaFileName,
+      Map<String, FieldSpec.FieldType> fieldTypes, TimeUnit timeUnit) throws IOException {
     File avroSchemaFile = new File(avroSchemaFileName);
     if (!avroSchemaFile.exists()) {
       throw new FileNotFoundException();
@@ -160,21 +146,121 @@ public class AvroUtils {
     return getPinotSchemaFromAvroSchema(avroSchema, fieldTypes, timeUnit);
   }
 
-  public static List<String> getAllColumnsInAvroFile(File avroFile) throws IOException {
-    final List<String> ret = new ArrayList<String>();
-    final DataFileStream<GenericRecord> reader = getAvroReader(avroFile);
-    for (final Field f : reader.getSchema().getFields()) {
-      ret.add(f.name());
-    }
-    reader.close();
-    return ret;
-  }
-
+  /**
+   * Get the Avro file reader for the given file.
+   */
   public static DataFileStream<GenericRecord> getAvroReader(File avroFile) throws IOException {
-    if(avroFile.getName().endsWith("gz"))
-      return new DataFileStream<GenericRecord>(new GZIPInputStream(new FileInputStream(avroFile)), new GenericDatumReader<GenericRecord>());
-    else
-      return new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+    if (avroFile.getName().endsWith(".gz")) {
+      return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)),
+          new GenericDatumReader<GenericRecord>());
+    } else {
+      return new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+    }
   }
 
+  /**
+   * Return whether the Avro field is a single-value field.
+   */
+  public static boolean isSingleValueField(Field field) {
+    try {
+      org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
+      return fieldSchema.getType() != org.apache.avro.Schema.Type.ARRAY;
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while extracting non-null schema from field: " + field.name(), e);
+    }
+  }
+
+  /**
+   * Extract the data type stored in Pinot for the given Avro field.
+   */
+  public static FieldSpec.DataType extractFieldDataType(Field field) {
+    try {
+      org.apache.avro.Schema fieldSchema = extractSupportedSchema(field.schema());
+      org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
+      if (fieldType == org.apache.avro.Schema.Type.ARRAY) {
+        return FieldSpec.DataType.valueOf(extractSupportedSchema(fieldSchema.getElementType()).getType());
+      } else {
+        return FieldSpec.DataType.valueOf(fieldType);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while extracting data type from field: " + field.name(), e);
+    }
+  }
+
+  /**
+   * Helper method to extract the supported Avro schema from the given Avro field schema.
+   * <p>Currently we support INT/LONG/FLOAT/DOUBLE/BOOLEAN/STRING/ENUM
+   */
+  private static org.apache.avro.Schema extractSupportedSchema(org.apache.avro.Schema fieldSchema) {
+    org.apache.avro.Schema.Type fieldType = fieldSchema.getType();
+    if (fieldType == org.apache.avro.Schema.Type.UNION) {
+      org.apache.avro.Schema nonNullSchema = null;
+      for (org.apache.avro.Schema childFieldSchema : fieldSchema.getTypes()) {
+        if (childFieldSchema.getType() != org.apache.avro.Schema.Type.NULL) {
+          if (nonNullSchema == null) {
+            nonNullSchema = childFieldSchema;
+          } else {
+            throw new IllegalStateException("More than one non-null schema in UNION schema");
+          }
+        }
+      }
+      if (nonNullSchema != null) {
+        return extractSupportedSchema(nonNullSchema);
+      } else {
+        throw new IllegalStateException("Cannot find non-null schema in UNION schema");
+      }
+    } else if (fieldType == org.apache.avro.Schema.Type.RECORD) {
+      List<Field> recordFields = fieldSchema.getFields();
+      Preconditions.checkState(recordFields.size() == 1, "Not one field in the RECORD schema");
+      return extractSupportedSchema(recordFields.get(0).schema());
+    } else {
+      return fieldSchema;
+    }
+  }
+
+  /**
+   * Fill the data in a {@link GenericRecord} to a {@link GenericRow}.
+   */
+  public static void fillGenericRow(GenericRecord from, GenericRow to, Schema schema) {
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      Object avroValue = from.get(fieldName);
+      if (fieldSpec.isSingleValueField()) {
+        to.putField(fieldName, transformAvroValueToObject(avroValue, fieldSpec));
+      } else {
+        to.putField(fieldName, transformAvroArrayToObjectArray((GenericData.Array) avroValue, fieldSpec));
+      }
+    }
+  }
+
+  /**
+   * Transform a single-value Avro value into an object in Pinot format.
+   */
+  public static Object transformAvroValueToObject(Object avroValue, FieldSpec fieldSpec) {
+    if (avroValue == null) {
+      return fieldSpec.getDefaultNullValue();
+    }
+    if (avroValue instanceof GenericData.Record) {
+      return transformAvroValueToObject(((GenericData.Record) avroValue).get(0), fieldSpec);
+    }
+    if (fieldSpec.getDataType() == FieldSpec.DataType.STRING) {
+      return avroValue.toString();
+    }
+    return avroValue;
+  }
+
+  /**
+   * Transform an Avro array into an object array in Pinot format.
+   */
+  public static Object[] transformAvroArrayToObjectArray(GenericData.Array avroArray, FieldSpec fieldSpec) {
+    if (avroArray == null || avroArray.size() == 0) {
+      return new Object[]{fieldSpec.getDefaultNullValue()};
+    }
+    int numValues = avroArray.size();
+    Object[] objects = new Object[numValues];
+    for (int i = 0; i < numValues; i++) {
+      objects[i] = transformAvroValueToObject(avroArray.get(i), fieldSpec);
+    }
+    return objects;
+  }
 }

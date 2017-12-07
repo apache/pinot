@@ -15,20 +15,17 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.core.data.GenericRow;
 import java.util.Arrays;
 import java.util.Map;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 
 
 public class KafkaJSONMessageDecoder implements KafkaMessageDecoder<byte[]> {
@@ -79,14 +76,14 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder<byte[]> {
           array[i] = stringToDataType(dimensionSpec, jsonArray.getString(i));
         }
         if (array.length == 0) {
-          entry = new Object[] { AvroRecordReader.getDefaultNullValue(dimensionSpec) };
+          entry = new Object[]{dimensionSpec.getDefaultNullValue()};
         } else {
           entry = array;
         }
       }
       destination.putField(columnName, entry);
     } else {
-      Object entry = AvroRecordReader.getDefaultNullValue(dimensionSpec);
+      Object entry = dimensionSpec.getDefaultNullValue();
       destination.putField(columnName, entry);
     }
   }
@@ -98,7 +95,7 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder<byte[]> {
 
   private Object stringToDataType(FieldSpec spec, String inString) {
     if (inString == null) {
-      return AvroRecordReader.getDefaultNullValue(spec);
+      return spec.getDefaultNullValue();
     }
 
     try {
@@ -118,8 +115,9 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder<byte[]> {
           return null;
       }
     } catch (NumberFormatException e) {
-      Object nullValue = AvroRecordReader.getDefaultNullValue(spec);
-      LOGGER.warn("Failed to parse {} as a value of type {} for column {}, defaulting to {}", inString, spec.getDataType(), spec.getName(), nullValue, e);
+      Object nullValue = spec.getDefaultNullValue();
+      LOGGER.warn("Failed to parse {} as a value of type {} for column {}, defaulting to {}", inString,
+          spec.getDataType(), spec.getName(), nullValue, e);
       return nullValue;
     }
   }

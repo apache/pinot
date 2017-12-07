@@ -42,11 +42,8 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
   }
 
   @Override
-  public void convert()
-      throws Exception {
-    PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
-    try {
-      recordReader.init();
+  public void convert() throws Exception {
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir))) {
       Schema avroSchema = buildAvroSchemaFromPinotSchema(recordReader.getSchema());
 
       try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<Record>(avroSchema))) {
@@ -68,8 +65,6 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
           recordWriter.append(record);
         }
       }
-    } finally {
-      recordReader.close();
     }
   }
 
