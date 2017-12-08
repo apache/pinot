@@ -32,6 +32,20 @@ export default Ember.Component.extend({
     }
   ),
 
+  start: Ember.computed(
+    'anomaly',
+    function() {
+      return moment(this.get('anomaly.start')).format('dddd, MMMM Do YYYY');
+    }
+  ),
+
+  end: Ember.computed(
+    'anomaly',
+    function () {
+      return moment(this.get('anomaly.end')).format('dddd, MMMM Do YYYY');
+    }
+  ),
+
   functionName: Ember.computed('anomaly', function () {
     return this.get('anomaly').attributes.function[0];
   }),
@@ -53,12 +67,12 @@ export default Ember.Component.extend({
   }),
 
   baseline: Ember.computed('anomaly', function () {
-    return parseFloat(this.get('anomaly').attributes.baseline[0]);
+    return parseFloat(this.get('anomaly').attributes.baseline[0]).toFixed(3);
   }),
 
   change: Ember.computed('anomaly', function () {
     const attr = this.get('anomaly').attributes;
-    return parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1;
+    return (parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1).toFixed(3);
   }),
 
   status: Ember.computed('anomaly', function () {
