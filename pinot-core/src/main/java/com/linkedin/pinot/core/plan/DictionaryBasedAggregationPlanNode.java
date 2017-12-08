@@ -65,8 +65,8 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
 
   @Override
   public Operator run() {
-    return new DictionaryBasedAggregationOperator(_aggregationFunctionContexts, _indexSegment.getSegmentMetadata(),
-        _dictionaryMap);
+    return new DictionaryBasedAggregationOperator(_aggregationFunctionContexts,
+        _indexSegment.getSegmentMetadata().getTotalRawDocs(), _dictionaryMap);
   }
 
   @Override

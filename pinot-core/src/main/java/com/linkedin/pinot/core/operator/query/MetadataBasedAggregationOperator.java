@@ -22,8 +22,12 @@ import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -67,12 +71,27 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
       AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
       AggregationFunctionFactory.AggregationFunctionType functionType =
           AggregationFunctionFactory.AggregationFunctionType.valueOf(function.getName().toUpperCase());
+      String column = aggregationFunctionContext.getAggregationColumns()[0];
 
-      // TODO: Add support for more aggregation functions that can be served with metadata.
+      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) _segmentMetadata;
       AggregationResultHolder resultHolder;
       switch (functionType) {
         case COUNT:
           resultHolder = new DoubleAggregationResultHolder(totalRawDocs);
+          break;
+        case MIN:
+          String minValue = segmentMetadata.getColumnMetadataFor(column).getMinValue().toString();
+          resultHolder = new DoubleAggregationResultHolder(Double.valueOf(minValue));
+          break;
+        case MAX:
+          String maxValue = segmentMetadata.getColumnMetadataFor(column).getMaxValue().toString();
+          resultHolder = new DoubleAggregationResultHolder(Double.valueOf(maxValue));
+          break;
+        case MINMAXRANGE:
+          String minValueRange = segmentMetadata.getColumnMetadataFor(column).getMinValue().toString();
+          String maxValueRange = segmentMetadata.getColumnMetadataFor(column).getMaxValue().toString();
+          resultHolder = new ObjectAggregationResultHolder();
+          resultHolder.setValue(new MinMaxRangePair(Double.valueOf(minValueRange), Double.valueOf(maxValueRange)));
           break;
 
         default:
