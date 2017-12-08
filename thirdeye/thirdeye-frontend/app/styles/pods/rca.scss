@@ -160,12 +160,8 @@
 
 }
 
-.rootcause-header__buttons {
-  vertical-align: middle;
-
-  &--text {
-    display: inline-block;
-  }
+.rootcause-header__side {
+  text-align: right;
 }
 
 .rootcause-header-textarea {
@@ -179,8 +175,7 @@
 }
 
 .rootcause-header-button {
-  float: right;
-  margin: 2px $te-nav-link-spacing 0 0;
+  margin: 2px 0 0 0;
   cursor: pointer;
   background: none;
   padding: 2px 15px;

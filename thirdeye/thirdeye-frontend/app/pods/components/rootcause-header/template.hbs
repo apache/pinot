@@ -1,23 +1,24 @@
-<div class="row">
-  <div class="col-xs-6">
-    {{textarea-autosize placeholder="Enter investigation title ..." value=sessionName cols=32 rows=1 maxlen=80 class="rootcause-header__major rootcause-header-textarea" key-press="onChange"}}
-  </div>
-  <div class="col-xs-6">
-    <div class="rootcause-header__buttons">
-      <span class="rootcause-header__buttons--text">
-        {{#if sessionId}}
-          (Session {{#link-to "rootcause" (query-params sessionId=sessionId)}}{{sessionId}}{{/link-to}}{{#if sessionModified}}, modified{{/if}})
-        {{else}}
-          (unsaved)
-        {{/if}}
-      </span>
-      <button {{action "onCopy"}} class="rootcause-header-button">Save Copy</button>
+<div class="conteiner">
+  <div class="row">
+    <div class="col-xs-10">
+      {{textarea-autosize placeholder="Enter investigation title ..." value=sessionName cols=50 rows=1 maxlen=80 class="rootcause-header__major rootcause-header-textarea" key-press="onChange"}}
+    </div>
+    <div class="col-xs-2 rootcause-header__side">
+      <button {{action "onCopy"}} class="rootcause-header-button">Save Copy</button><br/>
       <button {{action "onSave"}} class="rootcause-header-button">Save</button>
     </div>
   </div>
-</div>
-<div class="row">
-  <div class="col-xs-12">
-    {{textarea-autosize placeholder="Take notes or summarize the results here ..." value=sessionText cols=80 rows=1 class="rootcause-header__minor rootcause-header-textarea" key-press="onChange"}}
+  <div class="row">
+    <div class="col-xs-10">
+      {{textarea-autosize placeholder="Take notes or summarize the results here ..." value=sessionText cols=130 rows=1 class="rootcause-header__minor rootcause-header-textarea" key-press="onChange"}}
+    </div>
+    <div class="col-xs-2 rootcause-header__side">
+      {{#if sessionId}}
+        {{#link-to "rootcause" (query-params sessionId=sessionId)}}{{sessionId}}{{/link-to}}<br/>
+        {{#if sessionModified}}(modified){{/if}}
+      {{else}}
+        (unsaved)
+      {{/if}}
+    </div>
   </div>
 </div>
