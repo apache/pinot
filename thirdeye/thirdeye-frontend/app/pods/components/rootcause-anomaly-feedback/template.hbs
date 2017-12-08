@@ -1,0 +1,22 @@
+{{#if anomaly}}
+  <div class="card-container card-container--box-shadow">
+    <div class="card-container__body">
+      <h3 class="rootcause-anomaly__title">Is this a true anomaly?</h3>
+      <div class="rootcause-anomaly__dropdown">
+        {{#power-select
+          options=options
+          selected=status
+          onchange=(action "onFeedback")
+          as |option|}}
+          {{option}}
+        {{/power-select}}
+      </div>
+      <p class="rootcause-anomaly__note"><a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a></p>
+      <p class="rootcause-anomaly__note--italicize">Your feedback improves the accuracy of future alerts.</p>
+    </div>
+  </div>
+
+{{else}}
+  <div>Loading anomaly info ...</div>
+
+{{/if}}
