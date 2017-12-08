@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
@@ -79,6 +80,7 @@ public class TestPrecisionRecallEvaluator {
     MergedAnomalyResultDTO userReportAnomaly = new MergedAnomalyResultDTO();
     userReportAnomaly.setNotified(false);
     userReportAnomaly.setFeedback(positiveFeedback);
+    userReportAnomaly.setAnomalyResultSource(AnomalyResultSource.USER_LABELED_ANOMALY);
     return new Object[][]{{anomalyResultDTOS, notifiedTrueAnomaly, notifiedFalseAnomaly, userReportAnomaly}};
   }
 }
