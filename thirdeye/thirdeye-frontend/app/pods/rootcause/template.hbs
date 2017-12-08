@@ -62,12 +62,14 @@
           <div class="col-xs-9">
             <div class="container container-fluid">
               <div class="row">
-                {{rootcause-chart-toolbar
-                  context=context
-                  timeseriesMode=timeseriesMode
-                  onContext=(action "onContext")
-                  onChart=(action "onChart")
-                }}
+                <div class="col-xs-9">
+                  {{rootcause-chart-toolbar
+                    context=context
+                    timeseriesMode=timeseriesMode
+                    onContext=(action "onContext")
+                    onChart=(action "onChart")
+                  }}
+                </div>
               </div>
               <div class="row">
                 <div class="col-xs-9">
