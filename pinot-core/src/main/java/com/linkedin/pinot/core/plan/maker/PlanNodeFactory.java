@@ -19,6 +19,7 @@ import java.util.List;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
 import com.linkedin.pinot.core.plan.AggregationPlanNode;
@@ -103,6 +104,9 @@ public class PlanNodeFactory {
         && !indexSegment.getSegmentMetadata().hasStarTree()) {
       String column = aggregationInfo.getAggregationParams().get("column");
       SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) indexSegment.getSegmentMetadata();
+      if (segmentMetadata.getColumnMetadataMap() == null) {
+        return false;
+      }
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata.getMaxValue() != null && columnMetadata.getMinValue() != null) {
         return true;
@@ -146,7 +150,8 @@ public class PlanNodeFactory {
         || aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MIN.getName())
         || aggregationType.equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGE.getName())) {
       String column = aggregationInfo.getAggregationParams().get("column");
-      if (indexSegment.getSegmentMetadata().hasDictionary(column)) {
+      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) indexSegment.getSegmentMetadata();
+      if (segmentMetadata.getColumnMetadataMap() != null && segmentMetadata.hasDictionary(column)) {
         return true;
       }
     }
