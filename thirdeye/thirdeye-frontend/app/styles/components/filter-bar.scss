@@ -1,28 +1,47 @@
 .filter-bar {
-
   background-color: white;
   border: 1px solid $te-grey--border;
+  color: app-shade(black, 0.85);
 
   &__group {
-    border-top: 1px solid $te-grey--border;
+    &:not(:first-of-type) {
+      border-top: 1px solid $te-grey--border;
+    }
   }
-
+  
   &__group-title {
     padding: 15px $te-default-element-spacing;
     margin-top: 0px;
     margin-bottom: 0px;
     font-size: 16px;
     border-left: 3px solid transparent;
-
+    display:flex;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    cursor: pointer;
+    
     &--active {
-      border-left: 3px solid $te-blue-6;
-      font-weight: bold;
+      border-left: 3px solid $te-blue-5;
+      font-weight: 600;
     }
+  }
+
+  &__indicator {
+    display: flex;
+    align-items: center;
+  }
+
+  &__header {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
 
   &__group-toggle {
-    float: right;
+    margin-left: 4px;
     color: app-shade(black, 3);
     font-weight: 300;
   }
@@ -49,7 +68,6 @@ $colors:
 "green" $te-green,
 "pink" $te-pink;
 
-.filter-bar__group-circle,
 .entity-indicator {
   display: inline-block;
   margin-right: 10px;
