@@ -1,10 +1,14 @@
 <div class="filter-bar">
   {{#each filterBlocks as |block|}}
     <section class="filter-bar__group">
-      <h5 class="filter-bar__group-title {{if block.isHidden "" "filter-bar__group-title--active "}}">
-        <div class="filter-bar__group-circle filter-bar__group-circle--{{block.color}}"></div>
-        {{block.header}}
-        <a class="filter-bar__group-toggle" {{action 'selectEventType' block.eventType}}>
+      <h5 class="filter-bar__group-title {{if block.isHidden "" "filter-bar__group-title--active "}}" {{action 'selectEventType' block.eventType}}>
+        <div class="filter-bar__indicator">
+          <span class="entity-indicator entity-indicator--{{block.color}}"></span>
+        </div>
+        <div class="filter-bar__header">
+          <span>{{block.header}}</span>
+        </div>
+        <a class="filter-bar__group-toggle">
           <i class="glyphicon {{if block.isHidden " glyphicon-menu-up " "glyphicon-menu-down "}}"></i>
         </a>
       </h5>
