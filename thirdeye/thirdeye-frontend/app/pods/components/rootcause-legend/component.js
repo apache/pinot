@@ -12,6 +12,8 @@ export default Ember.Component.extend({
 
   onSelection: null, // function (Set, bool)
 
+  classNames: ['rootcause-legend'],
+
   validUrns: Ember.computed(
     'entities',
     'selectedUrns',
@@ -33,12 +35,26 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Parses the validUrns and builds out 
+   * a Mapping of event Types to a mapping of urns
+   * @type {Object}
+   */
   events: Ember.computed(
     'entities',
     'validUrns',
     function () {
       const { entities, validUrns } = this.getProperties('entities', 'validUrns');
-      return filterPrefix(validUrns, 'thirdeye:event:').reduce((agg, urn) => { agg[urn] = entities[urn].label; return agg; }, {});
+      return filterPrefix(validUrns, 'thirdeye:event:')
+        .reduce((agg, urn) => { 
+          const type = urn.split(':')[2];
+          agg[type] = agg[type] || {};
+          Object.assign(agg[type], {
+            [urn]: entities[urn].label
+          });
+
+          return agg;
+        }, {});
     }
   ),
 

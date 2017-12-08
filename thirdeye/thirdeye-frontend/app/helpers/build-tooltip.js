@@ -96,8 +96,12 @@ const getValues = (hoverUrns, hoverTimestamp, lookup) => {
  */
 const getColors = (entities, hoverUrns) => {
   return filterPrefix(hoverUrns, ['thirdeye:metric:', 'thirdeye:event:']).reduce((agg, urn) => {
-    agg[urn] = entities[urn].color;
-    return agg;
+    const entity = entities[urn];
+    if (entity) {
+      agg[urn] = entity.color;
+
+      return agg;
+    }
   }, {});
 };
 
@@ -128,7 +132,7 @@ export default Helper.extend({
           ${metricUrns.map((urn) => {
             return `
               <div class="te-tooltip__item">
-                <div>
+                <div class="te-tooltip__indicator">
                   <span class="entity-indicator entity-indicator--flat entity-indicator--${colors[urn]}"></span>
                 </div>
                 <span class="te-tooltip__label">${labels[urn]}</span>

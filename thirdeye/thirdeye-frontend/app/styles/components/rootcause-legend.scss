@@ -24,13 +24,18 @@
   &__indicator {
     margin-right: 10px;
     line-height: 14px;
+    outline: none;
+
+    &--flush {
+      margin-right: 0;
+    }
   }
 
   &__list {
-    margin-bottom: 4px;
     list-style: none;
-    margin-left: 0;
-    padding-left: 0;
+    padding: 8px 0px 4px 0px;
+    margin: 0;
+    border-bottom: 1px solid app-shade(black, 0.15);
   }
 
   &__label-group {
@@ -38,7 +43,7 @@
     cursor: pointer;
     text-decoration: none;
     flex-wrap: nowrap;
-    word-break: break-all;
+    word-break: break-word;
     &--inactive {
       color: app-shade(black, 0.15);
       transition: color 0.2s ease-in; 
@@ -46,12 +51,19 @@
   }
 
   &__remove-icon {
+    background-color: white;
+    border-color: app-shade(black, 0.55);
+    color: app-shade(black, 0.55);
     visibility: hidden;
     text-decoration: none;
     cursor: pointer;
+
     &:hover,
+    &:focus,
     &:active,
-    &:focus {
+    a:hover, {
+      border-color: app-shade(black, 0.75);
+      color: app-shade(black, 0.75);
       text-decoration: none;
     }
   }

@@ -1,5 +1,4 @@
 import Ember from 'ember';
-import d3 from 'd3';
 import moment from 'moment';
 import buildTooltip from 'thirdeye-frontend/helpers/build-tooltip';
 import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
@@ -22,6 +21,8 @@ export default Ember.Component.extend({
 
   timeseriesMode: null, // 'absolute', 'relative', 'log'
 
+  classNames: ['rootcause-chart'],
+
   init() {
     this._super(...arguments);
     this.set('timeseriesMode', TIMESERIES_MODE_ABSOLUTE);
@@ -31,6 +32,9 @@ export default Ember.Component.extend({
     show: false
   },
 
+  /**
+   * Adding the buildTooltip Template helper to the this context
+   */
   buildTooltip: buildTooltip,
 
   tooltip: Ember.computed(
