@@ -38,6 +38,7 @@ export default Ember.Component.extend({
   /**
    * Parses the validUrns and builds out 
    * a Mapping of event Types to a mapping of urns
+   * @type {Object}
    */
   events: Ember.computed(
     'entities',
