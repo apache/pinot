@@ -32,6 +32,20 @@ export default Ember.Component.extend({
     }
   ),
 
+  start: Ember.computed(
+    'anomaly',
+    function() {
+      return moment(this.get('anomaly.start')).format('dddd, MMMM Do YYYY');
+    }
+  ),
+
+  end: Ember.computed(
+    'anomaly',
+    function () {
+      return moment(this.get('anomaly.end')).format('dddd, MMMM Do YYYY');
+    }
+  ),
+
   functionName: Ember.computed('anomaly', function () {
     return this.get('anomaly').attributes.function[0];
   }),
