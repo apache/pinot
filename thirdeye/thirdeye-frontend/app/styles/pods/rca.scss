@@ -147,26 +147,6 @@
   }
 }
 
-.color-box {
-  display: inline-block;
-  height: 0.8em;
-  width: 0.8em;
-  border: 1px solid black;
+.rootcause-chart-container-fluid {
+  padding: 0px;
 }
-
-$colors:
-  "blue" $te-blue,
-  "orange" $te-orange,
-  "teal" $te-teal,
-  "purple" $te-purple,
-  "red" $te-red,
-  "green" $te-green,
-  "pink" $te-pink;
-
-// creates color-box--"color" classes
-@each $i in $colors {
-  .color-box--#{nth($i, 1)} {
-    background: nth($i, 2);
-  }
-};
-

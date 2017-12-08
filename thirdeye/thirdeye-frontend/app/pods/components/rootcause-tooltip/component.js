@@ -74,10 +74,12 @@ export default Component.extend({
     function () {
       const { entities, hoverUrns } = this.getProperties('entities', 'hoverUrns');
 
-      return filterPrefix(hoverUrns, ['thirdeye:metric:', 'thirdeye:event:']).reduce((agg, urn) => {
-        agg[urn] = entities[stripTail(urn)].color;
-        return agg;
-      }, {});
+      return filterPrefix(hoverUrns, ['thirdeye:metric:', 'thirdeye:event:'])
+        .filter(urn => entities[stripTail(urn)])
+        .reduce((agg, urn) => {
+          agg[urn] = entities[stripTail(urn)].color;
+          return agg;
+        }, {});
     }
   ),
 

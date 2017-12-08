@@ -48,6 +48,46 @@
 
   <div class="row">
     <div class="card-container card-container--box-shadow">
+      <div class="card-container__body">
+        <div class="row">
+          <div class="col-xs-3">
+            {{rootcause-legend
+              entities=entities
+              selectedUrns=selectedUrns
+              invisibleUrns=invisibleUrns
+              onVisibility=(action "onVisibility")
+              onSelection=(action "onSelection")
+            }}
+          </div>
+          <div class="col-xs-9">
+            <div class="rootcause-chart-container-fluid">
+              <div class="row">
+                {{rootcause-chart-toolbar
+                  context=context
+                  timeseriesMode=timeseriesMode
+                  onContext=(action "onContext")
+                  onChart=(action "onChart")
+                }}
+              </div>
+              <div class="row">
+                {{rootcause-chart
+                  entities=entities
+                  selectedUrns=chartSelectedUrns
+                  timeseries=timeseries
+                  timeseriesMode=timeseriesMode
+                  context=context
+                  onHover=(action "chartOnHover")
+                }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card-container card-container--box-shadow">
       <div class="card-container__header">
         <div class="card-container__subnav">
           <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
@@ -66,23 +106,6 @@
         </div>
       </div>
       <div class="card-container__body">
-        <div class="rootcause-wrapper">
-          {{rootcause-legend
-            entities=entities
-            selectedUrns=selectedUrns
-            invisibleUrns=invisibleUrns
-            onVisibility=(action "onVisibility")
-            onSelection=(action "onSelection")
-          }}
-          {{rootcause-chart
-            entities=entities
-            selectedUrns=chartSelectedUrns
-            timeseries=timeseries
-            context=context
-            onHover=(action "chartOnHover")
-          }}
-        </div>
-
         <div class="row">
           <div class="col-xs-12">
             {{#if (eq activeTab "dimensions")}}

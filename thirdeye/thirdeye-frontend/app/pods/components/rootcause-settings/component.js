@@ -47,8 +47,6 @@ export default Ember.Component.extend({
   onChange: null,
   onSelection: null,
   urnString: null,
-  anomalyRangeStart: null,
-  anomalyRangeEnd: null,
   analysisRangeStart: null,
   analysisRangeEnd: null,
 
@@ -88,101 +86,16 @@ export default Ember.Component.extend({
   }),
 
   /**
-   * Formatted analysis start date
-   * @return {String}
-   */
-  datePickerAnalysisRangeStart: Ember.computed('analysisRangeStart', {
-    get() {
-      const start = this.get('analysisRangeStart');
-
-      return moment(start).format(serverDateFormat);
-    }
-  }),
-
-  /**
-   * Formatted analysis end date
-   * @return {String}
-   */
-  datePickerAnalysisRangeEnd: Ember.computed('analysisRangeEnd', {
-    get() {
-      const end = this.get('analysisRangeEnd');
-
-      return moment(end).format(serverDateFormat);
-    }
-  }),
-
-  /**
-   * Selected Granularity
-   * @type {String}
-   */
-  granularity: '1_HOURS',
-
-  /**
-   * Granularities Options
-   * @type {String[]}
-   */
-  granularityOptions: Ember.computed.reads('config.granularityOptions'),
-
-  /**
-   * Compare Mode Options
-   * @type {String[]}
-   */
-  compareModeOptions: Ember.computed.reads('config.compareModeOptions'),
-
-  /**
    * filter options
    * @type {Object}
    */
   filterOptions: {},
 
   /**
-   * Selected Compare Mode
-   * @type {String}
-   */
-  compareMode: 'WoW',
-
-  /**
-   * Predefined Custom Ranges for
-   * the display region
-   * @type {Object}
-   */
-  predefinedAnalysisRanges: {
-    'Last 3 days': [
-      moment().subtract(2, 'days').startOf('day'),
-      moment().endOf('day')
-    ],
-    'Last 7 days': [
-      moment().subtract(6, 'days').startOf('day'),
-      moment().endOf('day')
-    ],
-    'Last 14 days': [
-      moment().subtract(13, 'days').startOf('day'),
-      moment().endOf('day')
-    ]
-  },
-
-  /**
    * Selected filters
    * @type {String} - a JSON string
    */
   filters: JSON.stringify({}),
-
-  /**
-   * Indicates the unit of the granularity
-   * @type {String}
-   */
-  granularityUnit: Ember.computed('granularity', function () {
-    const granularity = this.get('granularity');
-    const units = ['MINUTES', 'HOURS', 'DAYS'];
-
-    for (let i = 0; i < units.length; i++) {
-      if (granularity.endsWith(units[i])) {
-        return units[i];
-      }
-    }
-
-    return 'MINUTES';
-  }),
 
   /**
    * Selected primary metric(s)
@@ -235,8 +148,6 @@ export default Ember.Component.extend({
       otherUrns,
       anomalyRangeStart: anomalyRange[0], anomalyRangeEnd: anomalyRange[1],
       analysisRangeStart: analysisRange[0], analysisRangeEnd: analysisRange[1],
-      granularity,
-      compareMode,
       filters
     });
   },
@@ -257,32 +168,25 @@ export default Ember.Component.extend({
       const {
         anomalyRangeStart,
         anomalyRangeEnd,
-        analysisRangeStart,
-        analysisRangeEnd,
-        granularity,
         filters,
-        compareMode,
-        otherUrns
+        otherUrns,
+        context
       } = this.getProperties(
         'otherUrns',
-        'granularity',
         'filters',
         'anomalyRangeStart',
         'anomalyRangeEnd',
-        'compareMode',
-        'analysisRangeStart',
-        'analysisRangeEnd');
+        'context');
       const onChange = this.get('onChange');
 
+      const filterUrns = _filterToUrn(filters);
 
-      if (onChange != null) {
-        const filterUrns = _filterToUrn(filters);
-        const urns = new Set([...otherUrns, ...filterUrns]);
-        const anomalyRange = [parseInt(anomalyRangeStart), parseInt(anomalyRangeEnd)];
-        const analysisRange = [parseInt(analysisRangeStart), parseInt(analysisRangeEnd)];
-        const newContext = { urns, anomalyRange, analysisRange, granularity, compareMode };
-        onChange(newContext);
-      }
+      const newContext = Object.assign({}, context, {
+        urns: new Set([...otherUrns, ...filterUrns]),
+        anomalyRange: [moment(anomalyRangeStart).valueOf(), moment(anomalyRangeEnd).valueOf()]
+      });
+
+      onChange(newContext);
     },
 
     /**
@@ -300,47 +204,6 @@ export default Ember.Component.extend({
         anomalyRangeStart,
         anomalyRangeEnd
       });
-      this.send('updateContext');
-    },
-
-    /**
-     * Sets the new display date in ms
-     * @method setDisplayDateRange
-     * @param {String} start  - stringified start date
-     * @param {String} end    - stringified end date
-     * @return {undefined}
-     */
-    setDisplayDateRange(start, end) {
-      const analysisRangeStart = moment(start).valueOf();
-      const analysisRangeEnd = moment(end).endOf('day').valueOf();
-
-      this.setProperties({
-        analysisRangeStart,
-        analysisRangeEnd
-      });
-      this.send('updateContext');
-    },
-
-
-    /**
-     * Updates the compare mode
-     * @method onModeChange
-     * @param {String} compareMode baseline compare mode
-     * @return {undefined}
-     */
-    onModeChange(compareMode) {
-      this.set('compareMode', compareMode);
-      this.send('updateContext');
-    },
-
-    /**
-     * Updates the granularity
-     * @method onGranularityChange
-     * @param {String} granularity the selected granularity
-     * @return {undefined}
-     */
-    onGranularityChange(granularity) {
-      this.set('granularity', granularity);
       this.send('updateContext');
     },
 
