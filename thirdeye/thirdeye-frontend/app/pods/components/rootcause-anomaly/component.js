@@ -1,5 +1,6 @@
 import Ember from 'ember';
 import moment from 'moment';
+import { humanizeFloat } from 'thirdeye-frontend/helpers/utils'
 
 export default Ember.Component.extend({
   // TODO implement anomaly feedback
@@ -32,20 +33,6 @@ export default Ember.Component.extend({
     }
   ),
 
-  start: Ember.computed(
-    'anomaly',
-    function() {
-      return moment(this.get('anomaly.start')).format('dddd, MMMM Do YYYY');
-    }
-  ),
-
-  end: Ember.computed(
-    'anomaly',
-    function () {
-      return moment(this.get('anomaly.end')).format('dddd, MMMM Do YYYY');
-    }
-  ),
-
   functionName: Ember.computed('anomaly', function () {
     return this.get('anomaly').attributes.function[0];
   }),
@@ -63,7 +50,7 @@ export default Ember.Component.extend({
   }),
 
   current: Ember.computed('anomaly', function () {
-    return parseFloat(this.get('anomaly').attributes.current[0]);
+    return parseFloat(this.get('anomaly').attributes.current[0]).toFixed(3);
   }),
 
   baseline: Ember.computed('anomaly', function () {
@@ -72,7 +59,7 @@ export default Ember.Component.extend({
 
   change: Ember.computed('anomaly', function () {
     const attr = this.get('anomaly').attributes;
-    return (parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1).toFixed(3);
+    return (parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1);
   }),
 
   status: Ember.computed('anomaly', function () {
@@ -91,24 +78,24 @@ export default Ember.Component.extend({
     return dimNames.sort().map(dimName => dimValues[dimName]).join(', ');
   }),
 
-  comment: Ember.computed('anomaly', function () {
-    const attr = this.get('anomaly.attributes.comment.firstObject');
-    return attr || [];
-  }),
-
   issueType: null, // TODO
 
-  actions: {
-    onFeedback(status) {
-      const { onFeedback, anomalyUrn, comment } =
-        this.getProperties('onFeedback', 'anomalyUrn','comment');
-
-      if (onFeedback) {
-        onFeedback(anomalyUrn, status, comment);
-      }
-
-      // TODO reload anomaly entity instead
-      this.setProperties({ status });
+  metricFormatted: Ember.computed(
+    'dataset',
+    'metric',
+    'dimensions',
+    function () {
+      const { dataset, metric, dimensions } =
+        this.getProperties('dataset', 'metric', 'dimensions');
+      const dimensionsString = dimensions ? ` (${dimensions})` : '';
+      return `${dataset}::${metric}${dimensionsString}`
     }
-  }
+  ),
+
+  changeFormatted: Ember.computed('change', function () {
+    const change = this.get('change');
+    const prefix = change > 0 ? '+' : '';
+    return `${prefix}${humanizeFloat(change * 100)}%`;
+  })
+
 });

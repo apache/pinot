@@ -19,7 +19,7 @@
 <div class="container">
   {{#if anomalyUrn}}
     <div class="row">
-      {{rootcause-anomaly
+      {{rootcause-anomaly-feedback
         entities=entities
         anomalyUrn=anomalyUrn
         onFeedback=(action "onFeedback")
@@ -47,6 +47,15 @@
       onSelection=(action "onSelection")
     }}
   </div>
+
+  {{#if anomalyUrn}}
+    <div class="row">
+      {{rootcause-anomaly
+        entities=entities
+        anomalyUrn=anomalyUrn
+      }}
+    </div>
+  {{/if}}
 
   <div class="row">
     <div class="card-container card-container--box-shadow">

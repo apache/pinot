@@ -62,6 +62,15 @@ export function pluralizeTime(time, unit) {
   return time ? time + ' ' + unitStr : '';
 }
 
+/**
+ * Formatter for the human-readable floating point numbers numbers
+ */
+export function humanizeFloat(f) {
+  if (Number.isNaN(f)) { return '-'; }
+  const fixed = Math.max(3 - Math.max(Math.floor(Math.log10(f)) + 1, 0), 0);
+  return f.toFixed(fixed);
+};
+
 export function isIterable(obj) {
   if (obj == null || _.isString(obj)) {
     return false;
@@ -228,4 +237,4 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, pluralizeTime, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor });
+export default Ember.Helper.helper({ checkStatus, pluralizeTime, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor, humanizeFloat });

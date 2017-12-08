@@ -1,17 +1,8 @@
 import Helper from '@ember/component/helper';
 import { htmlSafe } from '@ember/string';
-import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, stripTail } from 'thirdeye-frontend/helpers/utils';
+import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, stripTail, humanizeFloat } from 'thirdeye-frontend/helpers/utils';
 import moment from 'moment';
 import d3 from 'd3';
-
-/**
- * Formatter for the tooltip numbers
- */
-const format = (f) => {
-  if (Number.isNaN(f)) { return '-'; }
-  const fixed = Math.max(3 - Math.max(Math.floor(Math.log10(f)) + 1, 0), 0);
-  return f.toFixed(fixed);
-};
 
 /**
  * Massages the hovered urns
@@ -81,9 +72,9 @@ const getValues = (hoverUrns, hoverTimestamp, lookup) => {
     };
 
     values[urn] = {
-      current: d3.format('.3s')(format(current)),
-      baseline: d3.format('.3s')(format(baseline)),
-      delta: `${change > 0 ? '+' : ''}${format(change * 100)}`,
+      current: d3.format('.3s')(humanizeFloat(current)),
+      baseline: d3.format('.3s')(humanizeFloat(baseline)),
+      delta: `${change > 0 ? '+' : ''}${humanizeFloat(change * 100)}`,
       color: color(change)
     };
   });

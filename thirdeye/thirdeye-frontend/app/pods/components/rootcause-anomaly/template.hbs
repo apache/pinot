@@ -1,60 +1,15 @@
 {{#if anomaly}}
   <div class="card-container card-container--box-shadow">
     <div class="card-container__body">
-      <h3 class="rootcause-anomaly__title">
-        <span>Is this a true anomaly?</span>
-        <a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
-      </h3>
-      <div class="rootcause-anomaly__dropdown">
-        {{#power-select
-          options=options
-          selected=status
-          onchange=(action "onFeedback")
-          as |option|}}
-          {{option}}
-        {{/power-select}}
-      </div>
-      <div class="rootcause-anomaly__comment">
-        <label for="feedback-comment">
-          <span>Comment</span> (optional)
-        </label>
-        {{textarea
-          placeholder="Enter a comment"
-          id="feedback-comment"
-          class="rootcause-anomaly__form"
-          value=comment}}
-      </div>
-      <p class="rootcause-anomaly__note--italicize">Your feedback improves the accuracy of future alerts.</p>
-    </div>
-  </div>
-
-  <div class="card-container card-container--box-shadow">
-    <div class="card-container__body">
-      <div class="rootcause-anomaly__info">
-        <label>Anomaly: </label>
-        <span>{{functionName}}</span>
-      </div>
-      <div class="rootcause-anomaly__info">
-        <label>Anomaly Id: </label>
-        <span>#{{anomalyId}}</span>
-      </div>
-      <div class="rootcause-anomaly__info">
-        <label>Metric: </label>
-        <span>{{metric}} ({{dimensions}})</span>
-      </div>
-      <div class="rootcause-anomaly__info">
-        <label>Dataset: </label>
-        <span>{{dataset}}</span>
+      <div class="row">
+        <div class="col-xs-12">
+          <label>Anomaly</label>
+          <span>{{functionName}} #{{anomalyId}}</span>
+          <label>on metric </label>
+          <span>{{metricFormatted}}</span>
+        </div>
       </div>
       <div class="row">
-        <div class="col-xs-3 rootcause-anomaly__stats">
-          <label class="rootcause-anomaly__stats-label">Start</label>
-          <span class="rootcause-anomaly__stats__value">{{start}}</span>
-        </div>
-        <div class="col-xs-3 rootcause-anomaly__stats">
-          <label class="rootcause-anomaly__stats-label">End</label>
-          <span class="rootcause-anomaly__stats__value">{{end}}</span>
-        </div>
         <div class="col-xs-2 rootcause-anomaly__stats">
           <label class="rootcause-anomaly__stats-label">Duration</label>
           <span class="rootcause-anomaly__stats__value">{{duration}}</span>
@@ -69,7 +24,7 @@
         </div>
         <div class="col-xs-2 rootcause-anomaly__stats">
           <label class="rootcause-anomaly__stats-label">Change</label>
-          <span class="rootcause-anomaly__stats__value">{{change}}</span>
+          <span class="rootcause-anomaly__stats__value">{{changeFormatted}}</span>
         </div>
         <div class="col-xs-2 rootcause-anomaly__stats">
           <label class="rootcause-anomaly__stats-label">Status</label>
