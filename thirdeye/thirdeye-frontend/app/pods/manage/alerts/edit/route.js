@@ -37,19 +37,27 @@ export default Ember.Route.extend({
 
   afterModel(model) {
     const {
+      id,
       metric: metricName,
       collection: dataset,
       exploreDimensions,
       filters,
       bucketSize,
       bucketUnit,
-      id
-    } = model.function;
+      properties: alertProps
+     } = model.function;
 
     let metricId = '';
     let metricDataUrl = '';
     let metricDimensionURl = '';
     let selectedAppName = '';
+
+    // Add a parsed properties array to the model
+    const propsArray = alertProps.split(';').map((prop) => {
+      let p = prop.split('=');
+      return { name: p[0], value: decodeURIComponent(p[1]) }
+    });
+    Object.assign(model, { propsArray });
 
     return fetch(`/data/autocomplete/metric?name=${dataset}::${metricName}`).then(checkStatus)
       .then((metricsByName) => {
@@ -134,6 +142,7 @@ export default Ember.Route.extend({
       metricName: model.function.metric,
       granularity: model.function.bucketSize + '_' + model.function.bucketUnit,
       alertFilters: model.function.filters,
+      alertProps: model.propsArray,
       alertConfigGroups: model.allConfigGroups,
       alertFunctionName: model.function.functionName,
       alertId: model.function.id,

@@ -32,6 +32,7 @@ export default Ember.Controller.extend({
   isAlertNameDuplicate: false,
   isFetchingDimensions: false,
   isDimensionFetchDone: false,
+  isProcessingForm: false,
   isEmailError: false,
   isDuplicateEmail: false,
   showGraphLegend: false,
@@ -102,19 +103,25 @@ export default Ember.Controller.extend({
    */
   patternsOfInterest: ['Up and Down', 'Up only', 'Down only'],
 
+  /**
+   * Options for sensitivity field, previously 'Robust', 'Medium', 'Sensitive'
+   */
+  sensitivityOptions: ['Robust (Low)', 'Medium', 'Sensitive (High)'],
 
   /**
-   * Options for sensitivity field
+   * Mapping user readable pattern and sensitivity to DB values
    */
-  sensitivityOptions: ['Robust', 'Medium', 'Sensitive'],
-
-  /**
-   * Mapping user readable sensitivity to be values
-   */
-  sensitivityMapping: {
-    Robust: 'LOW',
-    Medium: 'MEDIUM',
-    Sensitive: 'HIGH'
+  optionMap: {
+    pattern: {
+      'Up and Down': 'UP,DOWN',
+      'Up only': 'UP',
+      'Down only': 'DOWN'
+    },
+    sensitivity: {
+      'Robust (Low)': 'LOW',
+      'Medium': 'MEDIUM',
+      'Sensitive (High)': 'HIGH'
+    }
   },
 
   /**
@@ -144,23 +151,12 @@ export default Ember.Controller.extend({
 
       if (!selectedSensitivity) {
         const isDailyOrHourly = ['DAYS', 'HOURS'].includes(selectedGranularity);
-        selectedSensitivity = isDailyOrHourly
-          ? 'Sensitive'
-          : 'Medium';
+        selectedSensitivity = isDailyOrHourly ? 'Sensitive (High)' : 'Medium';
       }
 
-      return this.sensitivityMapping[selectedSensitivity];
+      return this.optionMap.sensitivity[selectedSensitivity];
     }
   ),
-
-  /**
-   * Mapping user readable pattern to be values
-   */
-  patternMapping: {
-    'Up and Down': 'UP,DOWN',
-    'Up only': 'UP',
-    'Down only': 'DOWN'
-  },
 
   weeklyEffectOptions: [true, false],
   /**
@@ -496,8 +492,7 @@ export default Ember.Controller.extend({
     const recipients = this.get('selectedConfigGroup.recipients');
     const sensitivity = this.get('sensitivityWithDefault');
     const selectedPattern = this.get('selectedPattern');
-    const pattern = this.patternMapping[selectedPattern];
-
+    const pattern = this.optionMap.pattern[selectedPattern];
 
     const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
       `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${pattern}&sensitivity=${sensitivity}` +
@@ -717,10 +712,15 @@ export default Ember.Controller.extend({
     'selectedMetricOption',
     'selectedDimension',
     'selectedFilters',
+    'selectedPattern',
     'selectedGranularity',
+    'sensitivityWithDefault',
     function() {
       let gkey = '';
+      let mergedProps = {};
       const granularity = this.get('graphConfig.granularity').toLowerCase();
+      const pattern = encodeURIComponent(this.get('selectedPattern'));
+      const sensitivity = encodeURIComponent(this.get('sensitivityWithDefault'));
       const selectedFilter = this.get('selectedFilters');
       const selectedDimension = this.get('selectedDimension');
       const weeklyEffect = this.get('selectedWeeklyEffect');
@@ -770,6 +770,11 @@ export default Ember.Controller.extend({
       }
       if (Ember.isPresent(selectedDimension)) {
         settingsByGranularity.common.exploreDimension = selectedDimension;
+      }
+
+      // Append extra props to preserve in the alert record
+      if (gkey) {
+        settingsByGranularity[gkey].properties += `;pattern=${pattern};sensitivity=${sensitivity}`;
       }
 
       return Object.assign(settingsByGranularity.common, settingsByGranularity[gkey]);
@@ -871,6 +876,7 @@ export default Ember.Controller.extend({
       selectedGroupRecipients: null,
       isCreateAlertSuccess: null,
       isCreateAlertError: false,
+      isProcessingForm: false,
       isCreateGroupSuccess: false,
       isReplayStatusSuccess: false,
       isReplayStarted: false,
