@@ -30,39 +30,47 @@
 
   <div class="card-container card-container--box-shadow">
     <div class="card-container__body">
-      <div class="row">
-        <span>
-          <div>{{functionName}}: Anomaly #{{anomalyId}}</div>
-          <div>{{metric}} ({{dimensions}})</div>
-          <div>{{dataset}}</div>
-        </span>
+      <div class="rootcause-anomaly__info">
+        <label>Anomaly: </label>
+        <span>{{functionName}}</span>
       </div>
-
+      <div class="rootcause-anomaly__info">
+        <label>Anomaly Id: </label>
+        <span>#{{anomalyId}}</span>
+      </div>
+      <div class="rootcause-anomaly__info">
+        <label>Metric: </label>
+        <span>{{metric}} ({{dimensions}})</span>
+      </div>
+      <div class="rootcause-anomaly__info">
+        <label>Dataset: </label>
+        <span>{{dataset}}</span>
+      </div>
       <div class="row">
-        <div class="col-xs-2">
-          <label class="te-label">Duration</label>
-          <span>{{duration}}</span>
+        <div class="col-xs-2 rootcause-anomaly__stats">
+          <label class="rootcause-anomaly__stats-label">Duration</label>
+          <span class="rootcause-anomaly__stats__value">{{duration}}</span>
         </div>
-        <div class="col-xs-2">
-          <label class="te-label">Current Avg</label>
-          <span>{{current}}</span>
+        <div class="col-xs-2 rootcause-anomaly__stats">
+          <label class="rootcause-anomaly__stats-label">Current Avg</label>
+          <span class="rootcause-anomaly__stats__value">{{current}}</span>
         </div>
-        <div class="col-xs-2">
-          <label class="te-label">Baseline Avg</label>
-          <span>{{baseline}}</span>
+        <div class="col-xs-2 rootcause-anomaly__stats">
+          <label class="rootcause-anomaly__stats-label">Baseline Avg</label>
+          <span class="rootcause-anomaly__stats__value">{{baseline}}</span>
         </div>
-        <div class="col-xs-2">
-          <label class="te-label">Change</label>
-          <span>{{change}}</span>
+        <div class="col-xs-2 rootcause-anomaly__stats">
+          <label class="rootcause-anomaly__stats-label">Change</label>
+          <span class="rootcause-anomaly__stats__value">{{change}}</span>
         </div>
-        <div class="col-xs-2">
-          <label class="te-label">Status</label>
-          <span>{{status}}</span>
+        <div class="col-xs-2 rootcause-anomaly__stats">
+          <label class="rootcause-anomaly__stats-label">Status</label>
+          <span class="rootcause-anomaly__stats__value">{{status}}</span>
         </div>
         {{#if issueType}}
           <div class="col-xs-2">
-            <label class="te-label">Issue Type</label>
-            <span>{{issueType}}</span>
+            <label class="rootcause-anomaly__stats-label">Issue Type</label>
+            <span class="rootcause-anomaly__stats__value">{{issueType}}</span>
           </div>
         {{/if}}
       </div>
