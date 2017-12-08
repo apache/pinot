@@ -30,6 +30,8 @@ import org.apache.avro.SchemaBuilder.RecordBuilder;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.Predicate;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -132,7 +134,31 @@ public class ThirdeyeAvroUtils {
     if (field == null) {
       throw new IllegalStateException("Field " + fieldname + " does not exist in schema");
     }
-    return AvroRecordReader.getColumnType(field).toString();
+
+    final Schema.Type type = field.schema().getType();
+    if (type == Schema.Type.ARRAY) {
+      throw new RuntimeException("TODO: validate correctness after commit b19a0965044d3e3f4f1541cc4cd9ea60b96a4b99");
+    }
+
+    return DataType.valueOf(extractSchemaFromUnionIfNeeded(field.schema()).getType()).toString();
+  }
+
+  /**
+   * Helper removed from AvroRecordReader in b19a0965044d3e3f4f1541cc4cd9ea60b96a4b99
+   *
+   * @param fieldSchema
+   * @return
+   */
+  private static org.apache.avro.Schema extractSchemaFromUnionIfNeeded(org.apache.avro.Schema fieldSchema) {
+    if ((fieldSchema).getType() == Schema.Type.UNION) {
+      fieldSchema = ((org.apache.avro.Schema) CollectionUtils.find(fieldSchema.getTypes(), new Predicate() {
+        @Override
+        public boolean evaluate(Object object) {
+          return ((org.apache.avro.Schema) object).getType() != Schema.Type.NULL;
+        }
+      }));
+    }
+    return fieldSchema;
   }
 
   /**
