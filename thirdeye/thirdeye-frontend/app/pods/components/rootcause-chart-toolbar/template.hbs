@@ -1,4 +1,4 @@
-<div class="col-xs-2">
+<div class="col-xs-4">
   {{date-range-picker
     class="te-range-picker"
     start=analysisRangeStart
@@ -18,7 +18,7 @@
     searchEnabled=false
     triggerId="select-granularity"
     onchange=(action "onGranularity")
-  as |granularity|
+    as |granularity|
   }}
     {{granularity}}
   {{/power-select}}
@@ -30,7 +30,7 @@
     searchEnabled=false
     triggerId="select-compare-mode"
     onchange=(action "onCompareMode")
-  as |mode|
+    as |mode|
   }}
     {{mode}}
   {{/power-select}}
@@ -42,7 +42,7 @@
     searchEnabled=false
     triggerId="select-timeseries-mode"
     onchange=(action "onTimeseriesMode")
-  as |mode|
+    as |mode|
   }}
     {{mode}}
   {{/power-select}}

@@ -60,28 +60,24 @@
             }}
           </div>
           <div class="col-xs-9">
-            <div class="container container-fluid">
+            <div class="rootcause-chart-container-fluid">
               <div class="row">
-                <div class="col-xs-9">
-                  {{rootcause-chart-toolbar
-                    context=context
-                    timeseriesMode=timeseriesMode
-                    onContext=(action "onContext")
-                    onChart=(action "onChart")
-                  }}
-                </div>
+                {{rootcause-chart-toolbar
+                  context=context
+                  timeseriesMode=timeseriesMode
+                  onContext=(action "onContext")
+                  onChart=(action "onChart")
+                }}
               </div>
               <div class="row">
-                <div class="col-xs-9">
-                  {{rootcause-chart
-                    entities=entities
-                    selectedUrns=chartSelectedUrns
-                    timeseries=timeseries
-                    timeseriesMode=timeseriesMode
-                    context=context
-                    onHover=(action "chartOnHover")
-                  }}
-                </div>
+                {{rootcause-chart
+                  entities=entities
+                  selectedUrns=chartSelectedUrns
+                  timeseries=timeseries
+                  timeseriesMode=timeseriesMode
+                  context=context
+                  onHover=(action "chartOnHover")
+                }}
               </div>
             </div>
           </div>

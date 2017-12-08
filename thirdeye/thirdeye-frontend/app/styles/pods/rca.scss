@@ -147,30 +147,6 @@
   }
 }
 
-.container-fluid {
+.rootcause-chart-container-fluid {
   padding: 0px;
 }
-
-.color-circle {
-  display: inline-block;
-  height: 10px;
-  width: 10px;
-  border-radius: 50px;
-}
-
-$colors:
-  "blue" $te-blue,
-  "orange" $te-orange,
-  "teal" $te-teal,
-  "purple" $te-purple,
-  "red" $te-red,
-  "green" $te-green,
-  "pink" $te-pink;
-
-// creates color-circle--"color" classes
-@each $i in $colors {
-  .color-circle--#{nth($i, 1)} {
-    background: nth($i, 2);
-  }
-};
-

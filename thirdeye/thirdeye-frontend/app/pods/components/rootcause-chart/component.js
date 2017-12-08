@@ -32,6 +32,10 @@ export default Ember.Component.extend({
     show: false
   },
 
+  subchart: {
+    show: true
+  },
+
   /**
    * Adding the buildTooltip Template helper to the this context
    */
@@ -82,7 +86,7 @@ export default Ember.Component.extend({
         },
         x: {
           type: 'timeseries',
-          show: true, // TODO false prevents function call, other option?
+          show: true,
           min: analysisRange[0],
           max: analysisRange[1],
           tick: {
@@ -129,6 +133,10 @@ export default Ember.Component.extend({
   //
   // split view logic
   //
+
+  splitSubchart: {
+    show: false
+  },
 
   splitSeries: Ember.computed(
     'entities',
