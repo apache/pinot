@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -65,9 +64,7 @@ public class SegmentFetcherFactory {
   // We should call init only once.
   // We should be able to override an existing class from conf (i.e. instantiate and call init for the new class).
   // A config for a protocol may not specify the class name, but specify other configs params (used in init())
-  public static void initSegmentFetcherFactory(Configuration pinotHelixProperties) {
-    Configuration segmentFetcherFactoryConfig =
-        pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+  public static void initSegmentFetcherFactory(Configuration segmentFetcherFactoryConfig) {
 
     // Iterate through the configs to fill the map with any new configured classes or Overridden classes.
     Iterator segmentFetcherFactoryConfigIterator = segmentFetcherFactoryConfig.getKeys();
