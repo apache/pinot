@@ -300,7 +300,7 @@ public class PerfBenchmarkDriver {
    * @param segmentMetadata segment metadata.
    */
   public void addSegment(SegmentMetadata segmentMetadata) {
-    _helixResourceManager.addSegment(segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+    _helixResourceManager.addNewSegment(segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {

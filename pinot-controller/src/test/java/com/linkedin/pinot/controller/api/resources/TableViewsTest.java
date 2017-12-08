@@ -58,7 +58,7 @@ public class TableViewsTest extends ControllerTest {
             .setNumReplicas(2)
             .build();
     _helixResourceManager.addTable(tableConfig);
-    _helixResourceManager.addSegment(new SimpleSegmentMetadata(OFFLINE_TABLE_NAME), "downloadUrl");
+    _helixResourceManager.addNewSegment(new SimpleSegmentMetadata(OFFLINE_TABLE_NAME), "downloadUrl");
 
     // Create the hybrid table
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME)
