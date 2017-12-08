@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.minion.executor;
 
+import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.minion.MinionContext;
+import java.io.InputStream;
 import javax.annotation.Nonnull;
 
 
@@ -31,5 +33,11 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   @Override
   public void cancel() {
     _cancelled = true;
+  }
+
+  @Override
+  public int uploadSegment(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
+      FileUploadUtils.SendFileMethod httpMethod, String crc) {
+    return FileUploadUtils.sendFile(uri, fileName, inputStream, lengthInBytes, FileUploadUtils.SendFileMethod.POST, crc);
   }
 }

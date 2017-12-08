@@ -16,7 +16,9 @@
 package com.linkedin.pinot.minion.executor;
 
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.minion.MinionContext;
+import java.io.InputStream;
 import javax.annotation.Nonnull;
 
 
@@ -39,4 +41,10 @@ public interface PinotTaskExecutor {
    * Try to cancel the task.
    */
   void cancel();
+
+  /**
+   * Try to upload segment with crc
+   */
+  int uploadSegment(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
+      FileUploadUtils.SendFileMethod httpMethod, String crc);
 }

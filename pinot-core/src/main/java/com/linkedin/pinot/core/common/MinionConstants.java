@@ -23,6 +23,7 @@ public class MinionConstants {
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
+  public static final String CRC_KEY = "crc";
 
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
 

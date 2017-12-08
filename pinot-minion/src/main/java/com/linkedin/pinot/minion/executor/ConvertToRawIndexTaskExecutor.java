@@ -42,6 +42,7 @@ public class ConvertToRawIndexTaskExecutor extends BaseTaskExecutor {
     String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String downloadURL = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
+    String crc = configs.get(MinionConstants.CRC_KEY);
 
     LOGGER.info("Start executing ConvertToRawIndexTask on table: {}, segment: {} with downloadURL: {}, uploadURL: {}",
         tableName, segmentName, downloadURL, uploadURL);
@@ -86,9 +87,8 @@ public class ConvertToRawIndexTaskExecutor extends BaseTaskExecutor {
       }
 
       // Upload the converted tarred segment file
-      FileUploadUtils.sendFile(uploadURL, convertedTarredSegmentFile.getName(),
-          new FileInputStream(convertedTarredSegmentFile), convertedTarredSegmentFile.length(),
-          FileUploadUtils.SendFileMethod.POST);
+      uploadSegment(uploadURL, convertedTarredSegmentFile.getName(), new FileInputStream(convertedTarredSegmentFile),
+          convertedTarredSegmentFile.length(), FileUploadUtils.SendFileMethod.POST, crc);
 
       LOGGER.info("Done executing ConvertToRawIndexTask on table: {}, segment: {}", tableName, segmentName);
     } catch (TaskCancelledException e) {
