@@ -146,7 +146,7 @@ export default Ember.Controller.extend({
   ),
 
   /**
-   * Mapping alertFilters's pattern to human readable strings
+   * Mapping alertFilter's pattern to human readable strings
    * @returns {String}
    */
   pattern: Ember.computed('alertProps', function() {
@@ -364,7 +364,7 @@ export default Ember.Controller.extend({
       metricDimensions: null,
       metricName: null,
       granularity: null,
-      alertFilterss: null,
+      alertFilters: null,
       alertConfigGroups: null,
       alertFunctionName: null,
       alertId: null,
