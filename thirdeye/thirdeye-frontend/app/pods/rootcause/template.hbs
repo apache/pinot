@@ -1,3 +1,21 @@
+{{!-- TODO: replace with loading spinner --}}
+{{#if isLoading}}
+  <p>loading
+    {{#if isLoadingEntities}}
+      | ENTITIES
+    {{/if}}
+    {{#if isLoadingTimeseries}}
+      | TIMESERIES
+    {{/if}}
+    {{#if isLoadingAggregates}}
+      | AGGREGATES
+    {{/if}}
+    {{#if isLoadingBreakdowns}}
+      | BREAKDOWNS
+    {{/if}}
+  </p>
+{{/if}}
+
 <div class="container">
   {{#if anomalyUrn}}
     <div class="row">
@@ -10,33 +28,15 @@
   {{/if}}
 
   <div class="row">
-    {{!-- TODO: replace with loading spinner --}}
-    {{#if isLoading}}
-    <p>loading
-      {{#if isLoadingEntities}}
-        | ENTITIES
-      {{/if}}
-      {{#if isLoadingTimeseries}}
-        | TIMESERIES
-      {{/if}}
-      {{#if isLoadingAggregates}}
-        | AGGREGATES
-      {{/if}}
-      {{#if isLoadingBreakdowns}}
-        | BREAKDOWNS
-      {{/if}}
-    </p>
-  {{/if}}
-
-    <p>session | <a {{action "onSessionSave"}}>save</a> | <a {{action "onSessionSaveCopy"}}>save copy</a>
-      {{#if sessionId}}
-        | {{#link-to "rootcause" (query-params sessionId=sessionId)}}{{sessionId}}{{/link-to}}
-      {{/if}}
-    </p>
-
-    <h2 class="te-title te-title--rootcause">{{sessionName}} [edit?]</h2>
-
-    <p>{{#if sessionId}}(Session {{sessionId}}) {{/if}}{{sessionText}} [edit?]</p>
+    {{rootcause-header
+      sessionId=sessionId
+      sessionName=sessionName
+      sessionText=sessionText
+      sessionModified=sessionModified
+      onChange=(action "onSessionChange")
+      onSave=(action "onSessionSave")
+      onCopy=(action "onSessionCopy")
+    }}
 
     {{rootcause-settings
       context=context

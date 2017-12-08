@@ -57,6 +57,8 @@ export default Ember.Controller.extend({
 
   sessionText: null, // ""
 
+  sessionModified: null, // true
+
   //
   // static component config
   //
@@ -263,6 +265,7 @@ export default Ember.Controller.extend({
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
       this.set('selectedUrns', new Set(selectedUrns));
+      this.set('sessionModified', true);
     },
 
     onVisibility(updates) {
@@ -279,6 +282,7 @@ export default Ember.Controller.extend({
      */
     onContext(context) {
       this.set('context', context);
+      this.set('modified', true);
     },
 
     onFilter(urns) {
@@ -293,15 +297,20 @@ export default Ember.Controller.extend({
       this.setProperties({ hoverUrns: new Set(urns), hoverTimestamp: timestamp });
     },
 
+    onSessionChange(name, text) {
+      console.log('onSessionChange(name, text)');
+      this.setProperties({ sessionName: name, sessionText: text, sessionModified: true });
+    },
+
     onSessionSave() {
       const jsonString = JSON.stringify(this._makeSession());
 
       return fetch(`/session/`, { method: 'POST', body: jsonString })
         .then(checkStatus)
-        .then(res => this.set('sessionId', res));
+        .then(res => this.setProperties({ sessionId: res, sessionModified: false }));
     },
 
-    onSessionSaveCopy() {
+    onSessionCopy() {
       const { sessionId } = this.getProperties('sessionId');
 
       const session = this._makeSession();
@@ -312,7 +321,7 @@ export default Ember.Controller.extend({
 
       return fetch(`/session/`, { method: 'POST', body: jsonString })
         .then(checkStatus)
-        .then(res => this.set('sessionId', res));
+        .then(res => this.setProperties({ sessionId: res, sessionModified: false }));
     },
 
     onFeedback(anomalyUrn, feedback, comment) {

@@ -150,3 +150,48 @@
 .rootcause-chart-container-fluid {
   padding: 0px;
 }
+
+.rootcause-header__major {
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.rootcause-header__minor {
+
+}
+
+.rootcause-header__buttons {
+  vertical-align: middle;
+
+  &--text {
+    display: inline-block;
+  }
+}
+
+.rootcause-header-textarea {
+  resize: none;
+  border: none;
+  background: none;
+
+  &:hover {
+    background-color: white;
+  }
+}
+
+.rootcause-header-button {
+  float: right;
+  margin: 2px $te-nav-link-spacing 0 0;
+  cursor: pointer;
+  background: none;
+  padding: 2px 15px;
+  border-radius: 3px;
+  border: 1px solid $te-nav-item-color;
+  color: $te-nav-item-color;
+  letter-spacing: $te-nav-letter-spacing;
+  background-color:  $te-nav-background;
+
+  &:hover {
+    border-color: white;
+    color: white;
+  }
+}

@@ -309,6 +309,10 @@ asynckit@^0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/asynckit/-/asynckit-0.4.0.tgz#c79ed97f7f34cb8f2ba1bc9790bcc366474b4b79"
 
+autosize@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/autosize/-/autosize-4.0.0.tgz#7a0599b1ba84d73bd7589b0d9da3870152c69237"
+
 aws-sign2@~0.6.0:
   version "0.6.0"
   resolved "https://registry.yarnpkg.com/aws-sign2/-/aws-sign2-0.6.0.tgz#14342dd38dbcc94d0e5b87d763cd63612c0e794f"
@@ -2540,6 +2544,21 @@ ember-cli-test-loader@^2.2.0:
   dependencies:
     ember-cli-babel "^6.8.1"
 
+ember-cli-text-support-mixins@^1.1.2:
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/ember-cli-text-support-mixins/-/ember-cli-text-support-mixins-1.1.2.tgz#727e79246d9331a325c93474886beefba3ab2a32"
+  dependencies:
+    ember-cli-babel "^6.3.0"
+    ember-cli-node-assets "^0.2.2"
+
+ember-cli-textarea-autosize@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/ember-cli-textarea-autosize/-/ember-cli-textarea-autosize-1.1.0.tgz#0c0cfc88b9691aa9ab94bbf8948a062c75ad5a9c"
+  dependencies:
+    ember-cli-babel "^6.3.0"
+    ember-cli-htmlbars "^2.0.1"
+    ember-cli-node-assets "^0.2.2"
+
 ember-cli-uglify@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/ember-cli-uglify/-/ember-cli-uglify-2.0.0.tgz#b096727d7d1718acc9bfe5d1bc81ce26cafdf6ca"
@@ -4351,6 +4370,10 @@ jsprim@^1.2.2:
     extsprintf "1.0.2"
     json-schema "0.2.3"
     verror "1.3.6"
+
+keyevent@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/keyevent/-/keyevent-1.1.0.tgz#9c0e0118a22fd83d4d23f6713a10701391ca6060"
 
 kind-of@^3.0.2:
   version "3.2.2"

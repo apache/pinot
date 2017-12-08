@@ -171,6 +171,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let selectedUrns = new Set();
     let sessionName = 'New Investigation (' + moment().format(dateFormat) + ')';
     let sessionText = '';
+    let sessionModified = true;
 
     // metric-initialized context
     if (metricId && metricUrn) {
@@ -220,12 +221,14 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       selectedUrns = new Set(session.selectedUrns);
       sessionName = session.name;
       sessionText = session.text;
+      sessionModified = false;
     }
 
     controller.setProperties({
       sessionId,
       sessionName,
       sessionText,
+      sessionModified,
       settingsConfig,
       selectedUrns,
       context
