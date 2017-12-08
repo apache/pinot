@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
@@ -85,7 +86,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir) throws Exception {
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      throws Exception {
     docIdCounter = 0;
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
@@ -175,9 +177,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
+        // TODO: make this configurable.
+        ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.SNAPPY;
+
         // Initialize forward index creator
         _forwardIndexCreatorMap.put(columnName,
-            getRawIndexCreatorForColumn(_indexDir, columnName, fieldSpec.getDataType(), totalDocs,
+            getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
                 indexCreationInfo.getLegnthOfLongestEntry()));
       }
     }
@@ -253,14 +258,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void seal() throws ConfigurationException, IOException {
+  public void seal()
+      throws ConfigurationException, IOException {
     for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
     }
     writeMetadata();
   }
 
-  void writeMetadata() throws ConfigurationException {
+  void writeMetadata()
+      throws ConfigurationException {
     PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
@@ -456,31 +463,36 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @return
    * @throws IOException
    */
-  public static SingleValueRawIndexCreator getRawIndexCreatorForColumn(File file, String column,
-      FieldSpec.DataType dataType, int totalDocs, int lengthOfLongestEntry) throws IOException {
+  public static SingleValueRawIndexCreator getRawIndexCreatorForColumn(File file,
+      ChunkCompressorFactory.CompressionType compressionType, String column, FieldSpec.DataType dataType, int totalDocs,
+      int lengthOfLongestEntry)
+      throws IOException {
 
     SingleValueRawIndexCreator indexCreator;
     switch (dataType) {
       case INT:
-        indexCreator =
-            new SingleValueFixedByteRawIndexCreator(file, column, totalDocs, V1Constants.Numbers.INTEGER_SIZE);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs,
+            V1Constants.Numbers.INTEGER_SIZE);
         break;
 
       case LONG:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, column, totalDocs, V1Constants.Numbers.LONG_SIZE);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs,
+            V1Constants.Numbers.LONG_SIZE);
         break;
 
       case FLOAT:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, column, totalDocs, V1Constants.Numbers.FLOAT_SIZE);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs,
+            V1Constants.Numbers.FLOAT_SIZE);
         break;
 
       case DOUBLE:
-        indexCreator =
-            new SingleValueFixedByteRawIndexCreator(file, column, totalDocs, V1Constants.Numbers.DOUBLE_SIZE);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs,
+            V1Constants.Numbers.DOUBLE_SIZE);
         break;
 
       case STRING:
-        indexCreator = new SingleValueVarByteRawIndexCreator(file, column, totalDocs, lengthOfLongestEntry);
+        indexCreator =
+            new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, lengthOfLongestEntry);
         break;
 
       default:
@@ -491,7 +503,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     for (SegmentDictionaryCreator dictionaryCreator : _dictionaryCreatorMap.values()) {
       dictionaryCreator.close();
     }

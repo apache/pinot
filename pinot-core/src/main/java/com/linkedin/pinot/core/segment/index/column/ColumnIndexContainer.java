@@ -16,8 +16,6 @@
 package com.linkedin.pinot.core.segment.index.column;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
@@ -146,17 +144,15 @@ public final class ColumnIndexContainer {
 
   private static SingleColumnSingleValueReader loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
       FieldSpec.DataType dataType) throws IOException {
-    // TODO: Make compression/decompression configurable.
-    ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor("snappy");
 
     switch (dataType) {
       case INT:
       case LONG:
       case FLOAT:
       case DOUBLE:
-        return new FixedByteChunkSingleValueReader(forwardIndexBuffer, decompressor);
+        return new FixedByteChunkSingleValueReader(forwardIndexBuffer);
       case STRING:
-        return new VarByteChunkSingleValueReader(forwardIndexBuffer, decompressor);
+        return new VarByteChunkSingleValueReader(forwardIndexBuffer);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }

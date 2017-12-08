@@ -20,19 +20,15 @@ import java.nio.ByteBuffer;
 
 
 /**
- * Interface to compress a chunk of data.
+ * A pass-through implementation of {@link ChunkDecompressor}, that simply returns the input data without
+ * performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
+ * of compression.
  */
-public interface ChunkCompressor {
-
-  /**
-   * This method compresses the given data. The output compressed ByteBuffer is returned ready for read.
-   *
-   * @param inUncompressed Input data to be compressed.
-   * @param outCompressed Output compressed data.
-   * @return Size of the compressed output data.
-   *
-   * @throws IOException
-   */
-  int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
-      throws IOException;
+public class PassThroughDecompressor implements ChunkDecompressor {
+  @Override
+  public int decompress(ByteBuffer inCompressed, ByteBuffer outDecompressed)
+      throws IOException {
+    outDecompressed.put(inCompressed);
+    return inCompressed.limit();
+  }
 }

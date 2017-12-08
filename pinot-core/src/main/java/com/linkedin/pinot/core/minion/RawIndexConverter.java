@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -79,7 +80,8 @@ public class RawIndexConverter {
    * TODO: support V3 format
    */
   public RawIndexConverter(@Nonnull File originalIndexDir, @Nonnull File convertedIndexDir,
-      @Nullable String columnsToConvert) throws Exception {
+      @Nullable String columnsToConvert)
+      throws Exception {
     FileUtils.copyDirectory(originalIndexDir, convertedIndexDir);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v1);
@@ -93,7 +95,8 @@ public class RawIndexConverter {
   }
 
   @SuppressWarnings("unchecked")
-  public boolean convert() throws Exception {
+  public boolean convert()
+      throws Exception {
     String segmentName = _originalSegmentMetadata.getName();
     String tableName = _originalSegmentMetadata.getTableName();
     LOGGER.info("Start converting segment: {} in table: {}", segmentName, tableName);
@@ -173,7 +176,8 @@ public class RawIndexConverter {
     return rawIndexSize <= dictionaryBasedIndexSize * CONVERSION_THRESHOLD;
   }
 
-  private void convertColumn(FieldSpec fieldSpec) throws Exception {
+  private void convertColumn(FieldSpec fieldSpec)
+      throws Exception {
     String columnName = fieldSpec.getName();
     LOGGER.info("Converting column: {}", columnName);
 
@@ -192,7 +196,8 @@ public class RawIndexConverter {
     FieldSpec.DataType dataType = fieldSpec.getDataType();
     int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getStringColumnMaxLength();
     try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(
-        _convertedIndexDir, columnName, dataType, _originalSegmentMetadata.getTotalDocs(), lengthOfLongestEntry)) {
+        _convertedIndexDir, ChunkCompressorFactory.CompressionType.SNAPPY, columnName, dataType,
+        _originalSegmentMetadata.getTotalDocs(), lengthOfLongestEntry)) {
       BlockSingleValIterator iterator = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
       int docId = 0;
       while (iterator.hasNext()) {
