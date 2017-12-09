@@ -1,10 +1,11 @@
 .rootcause-legend {
-  // border: 1px solid black;
   flex-basis: 200px;
   min-width: 200px;
   padding: 12px 18px;
   border-right: 1px solid app-shade(black, 0.15);
   overflow: scroll;
+  display: flex;
+  flex-direction: column;
 
   &__item {
     display: flex;
@@ -15,6 +16,10 @@
     margin-bottom: 4px;
 
     &:hover {
+      .entity-indicator {
+        transform: scale(1.2);
+        transition: transform 0.2s ease-in; 
+      }
       .rootcause-legend__remove-icon {
         visibility: visible;
       }

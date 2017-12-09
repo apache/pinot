@@ -1,5 +1,6 @@
 import Ember from 'ember';
 import moment from 'moment';
+import d3 from 'd3';
 import buildTooltip from 'thirdeye-frontend/helpers/build-tooltip';
 import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
 
@@ -77,7 +78,10 @@ export default Ember.Component.extend({
 
       return {
         y: {
-          show: true
+          show: true,
+          tick: {
+            format: d3.format('.2s')
+          }
         },
         y2: {
           show: false,
