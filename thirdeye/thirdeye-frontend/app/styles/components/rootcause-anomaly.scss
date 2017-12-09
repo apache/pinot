@@ -60,4 +60,15 @@
   &__stats-value {
     font-size: 16px;
   }
+
+  &-toggle {
+    margin-left: 4px;
+    color: app-shade(black, 3);
+    font-weight: 300;
+  }
+
+  &-icon {
+    float: right;
+    margin-right: 8px;
+  }
 }

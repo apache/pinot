@@ -3,13 +3,16 @@ import moment from 'moment';
 import { humanizeFloat } from 'thirdeye-frontend/helpers/utils'
 
 export default Ember.Component.extend({
-  // TODO implement anomaly feedback
-
   entities: null, // {}
 
   anomalyUrn: null, // ""
 
   onFeedback: null, // func (urn, feedback, comment)
+
+  //
+  // internal
+  //
+  isHidden: false,
 
   /**
    * Options to populate anomaly dropdown
@@ -123,6 +126,11 @@ export default Ember.Component.extend({
 
       // TODO reload anomaly entity instead
       this.setProperties({ status });
+    },
+
+    toggleHidden() {
+      const { isHidden } = this.getProperties('isHidden');
+      this.setProperties({ isHidden: !isHidden });
     }
   }
 });
