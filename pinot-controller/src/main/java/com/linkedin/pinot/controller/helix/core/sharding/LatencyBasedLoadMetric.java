@@ -16,11 +16,14 @@
 package com.linkedin.pinot.controller.helix.core.sharding;
 
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,7 +39,7 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
      *  map to maintain server specific costs.
      */
     private Map<String,Long> serverLatencyMap;
-    private static final String COST_FILE = "D:\\target\\result.txt";
+    private static final String COST_FILE = "latencyTrainedData/latency_load.csv";
 
     public LatencyBasedLoadMetric (){
         this.tableLatencyMap = new HashMap<>();
@@ -45,9 +48,15 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
     }
 
     private void fillTableCosts(){
-        logger.info("Latency Based Load metric reading trained cost file");
-        String line = null;
-        try (BufferedReader br = new BufferedReader(new FileReader(COST_FILE))) {
+        try{
+            File trained_cost_file = new File("latency_load"+System.currentTimeMillis());
+            logger.info("Latency Based Load metric reading trained cost file");
+            String line = null;
+            ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
+            URL resource = classLoader.getResource(COST_FILE);
+            com.google.common.base.Preconditions.checkNotNull(resource);
+            FileUtils.copyURLToFile(resource, trained_cost_file);
+            BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
 
             while ((line = br.readLine()) != null) {
                 String[] info = line.split(",");
@@ -88,7 +97,7 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
         return serverLatencyCost ;
     }
 
-    /*public static void main(String args[]){
+  /*  public static void main(String args[]){
         LatencyBasedLoadMetric l = new LatencyBasedLoadMetric();
         System.out.println(l.computeInstanceMetric(null,null,"S1","t1"));
     }*/
