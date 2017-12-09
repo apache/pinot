@@ -70,11 +70,16 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
 
     List<String> dimensionStrings = new ArrayList<>();
     for (Map.Entry<String, String> entry : dto.getDimensions().entrySet()) {
-      dimensionStrings.add(entry.getKey() + "=" + entry.getValue());
+      dimensionStrings.add(entry.getValue());
       attributes.put(entry.getKey(), entry.getValue());
     }
 
-    String label = String.format("%s (%s)", func.getFunctionName(), StringUtils.join(dimensionStrings, ", "));
+    String dimensionString = "";
+    if (!dimensionStrings.isEmpty()) {
+      dimensionString = String.format(" (%s)", StringUtils.join(dimensionStrings, ", "));
+    }
+
+    String label = String.format("%s%s", func.getFunctionName(), dimensionString);
     String link = String.format("thirdeye#investigate?anomalyId=%d", dto.getId());
 
     RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, dto.getStartTime(), dto.getEndTime(), null);
