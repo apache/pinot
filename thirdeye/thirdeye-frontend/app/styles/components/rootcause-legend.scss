@@ -1,11 +1,15 @@
 .rootcause-legend {
   flex-basis: 200px;
   min-width: 200px;
-  padding: 12px 18px;
   border-right: 1px solid app-shade(black, 0.15);
   overflow: scroll;
   display: flex;
   flex-direction: column;
+  position: relative;
+
+  &__wrapper {
+    position: absolute;
+  }
 
   &__item {
     display: flex;
@@ -18,7 +22,7 @@
     &:hover {
       .entity-indicator {
         transform: scale(1.2);
-        transition: transform 0.2s ease-in; 
+        transition: transform 0.1s ease-in; 
       }
       .rootcause-legend__remove-icon {
         visibility: visible;
@@ -36,10 +40,17 @@
     }
   }
 
+  &__buttons {
+    position: sticky;
+    background-color: white;
+    top: 0;
+    padding: 12px;
+  }
+
   &__list {
     list-style: none;
-    padding: 8px 0px 4px 0px;
-    margin: 0;
+    padding: 0px 0 4px 0;
+    margin: 12px;
     border-bottom: 1px solid app-shade(black, 0.15);
   }
 
@@ -51,7 +62,7 @@
     word-break: break-word;
     &--inactive {
       color: app-shade(black, 0.15);
-      transition: color 0.2s ease-in; 
+      transition: color 0.1s ease-in; 
     }
   }
 

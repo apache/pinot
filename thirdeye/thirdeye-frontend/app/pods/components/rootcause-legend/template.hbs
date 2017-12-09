@@ -1,56 +1,57 @@
-<div class="rootcause-legend__buttons">
-  <button {{action "visibleMetrics"}}>metrics</button> |
-  <button {{action "visibleEvents"}}>events</button> |
-  <button {{action "visibleAll"}}>all</button> |
-  <button {{action "visibleNone"}}>none</button> |
-  <button {{action "visibleInvert"}}>invert</button>
-</div>
+<div class="rootcause-legend__wrapper">
+  <div class="rootcause-legend__buttons">
+    <button {{action "visibleMetrics"}}>metrics</button> |
+    <button {{action "visibleEvents"}}>events</button> |
+    <button {{action "visibleAll"}}>all</button> |
+    <button {{action "visibleNone"}}>none</button> |
+    <button {{action "visibleInvert"}}>invert</button>
+  </div>
 
-<div class="rootcause_legend__lists">
-  <div class="rootcause_legend__list-wrapper">
-    {{#if hasMetrics}}
-      <ul class="rootcause-legend__list">
-        {{#each-in metrics as |urn label|}}
-          <li class="rootcause-legend__item">
-            <div class="rootcause-legend__label-group {{if (set-has invisibleUrns urn) 'rootcause-legend__label-group--inactive'}}" {{action "toggleVisibility" urn}}>
-              <div class="rootcause-legend__indicator">
-                <span class="entity-indicator entity-indicator--{{get-safe colors urn}} entity-indicator--square {{if (set-has invisibleUrns urn) 'entity-indicator--inactive'}}"></span>
+  {{#if hasMetrics}}
+    <ul class="rootcause-legend__list">
+      {{#each-in metrics as |urn label|}}
+        <li class="rootcause-legend__item">
+          <div class="rootcause-legend__label-group {{if (set-has invisibleUrns urn) 'rootcause-legend__label-group--inactive'}}" {{action "toggleVisibility" urn}}>
+            <div class="rootcause-legend__indicator">
+              <span class="entity-indicator entity-indicator--{{get-safe colors urn}} entity-indicator--square {{if (set-has invisibleUrns urn) 'entity-indicator--inactive'}}">
                 {{tooltip-on-element text="Toggle view"}}
+              </span>
+            </div>
+            <span class="rootcause-legend__label">{{label}}</span>
+          </div>
+          <a class="rootcause-legend__remove-icon" {{action "removeUrn" urn}}>
+            <i class="glyphicon glyphicon-remove">
+              {{tooltip-on-element text='Remove metric'}}
+            </i>
+          </a>
+        </li>
+      {{/each-in}}
+    </ul>
+  {{/if}}
+
+  {{#if hasEvents}}
+    {{#each-in events as |type eventList|}}
+      <ul class="rootcause-legend__list">
+        {{#each-in eventList as |urn label|}}
+          <li class="rootcause-legend__item">
+            <div class="rootcause-legend__label-group {{if (set-has invisibleUrns urn) 'rootcause-legend__label-group--inactive'}}" {{action
+              "toggleVisibility" urn}}>
+              <div class="rootcause-legend__indicator rootcause-legend__indicator--flush">
+                <span class="entity-indicator entity-indicator--{{get-safe colors urn}} {{if (set-has invisibleUrns urn) 'entity-indicator--inactive'}}">
+                  {{tooltip-on-element text="Toggle view"}}
+                </span>
               </div>
               <span class="rootcause-legend__label">{{label}}</span>
             </div>
             <a class="rootcause-legend__remove-icon" {{action "removeUrn" urn}}>
-              <i class="glyphicon glyphicon-remove"></i>
-              {{tooltip-on-element
-                text='Remove metric'}}
+              <i class="glyphicon glyphicon-remove">
+                {{tooltip-on-element text='Remove event'}}
+              </i>
             </a>
           </li>
         {{/each-in}}
       </ul>
-    {{/if}}
-
-    {{#if hasEvents}}
-      {{#each-in events as |type eventList|}}
-        <ul class="rootcause-legend__list">
-          {{#each-in eventList as |urn label|}}
-            <li class="rootcause-legend__item">
-              <div class="rootcause-legend__label-group {{if (set-has invisibleUrns urn) 'rootcause-legend__label-group--inactive'}}" {{action
-                "toggleVisibility" urn}}>
-                <div class="rootcause-legend__indicator rootcause-legend__indicator--flush">
-                  <span class="entity-indicator entity-indicator--{{get-safe colors urn}} {{if (set-has invisibleUrns urn) 'entity-indicator--inactive'}}"></span>
-                  {{tooltip-on-element text="Toggle view"}}
-                </div>
-                <span class="rootcause-legend__label">{{label}}</span>
-              </div>
-              <a class="rootcause-legend__remove-icon" {{action "removeUrn" urn}}>
-                <i class="glyphicon glyphicon-remove"></i>
-                {{tooltip-on-element
-                  text='Remove event'}}
-              </a>
-            </li>
-          {{/each-in}}
-        </ul>
-      {{/each-in}}
-    {{/if}}
-  </div>
+    {{/each-in}}
+  {{/if}}
 </div>
+
