@@ -19,7 +19,7 @@
 <div class="container">
   {{#if anomalyUrn}}
     <div class="row">
-      {{rootcause-anomaly-feedback
+      {{rootcause-anomaly
         entities=entities
         anomalyUrn=anomalyUrn
         onFeedback=(action "onFeedback")
@@ -38,24 +38,6 @@
       onCopy=(action "onSessionCopy")
     }}
   </div>
-
-  <div class="row">
-    {{rootcause-settings
-      context=context
-      config=settingsConfig
-      onChange=(action "onContext")
-      onSelection=(action "onSelection")
-    }}
-  </div>
-
-  {{#if anomalyUrn}}
-    <div class="row">
-      {{rootcause-anomaly
-        entities=entities
-        anomalyUrn=anomalyUrn
-      }}
-    </div>
-  {{/if}}
 
   <div class="row">
     <div class="card-container card-container--box-shadow">
@@ -87,6 +69,15 @@
   </div>
 
   <div class="row">
+    {{rootcause-settings
+      context=context
+      config=settingsConfig
+      onChange=(action "onContext")
+      onSelection=(action "onSelection")
+    }}
+  </div>
+
+  <div class="row">
     <div class="card-container card-container--box-shadow">
       <div class="card-container__header">
         <div class="card-container__subnav">
@@ -95,13 +86,13 @@
           </a>
         </div>
         <div class="card-container__subnav">
-          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
-            Metrics
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
+            Events
           </a>
         </div>
         <div class="card-container__subnav">
-          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
-            Events
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
+            Metrics
           </a>
         </div>
       </div>

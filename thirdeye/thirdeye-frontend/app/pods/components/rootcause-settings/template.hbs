@@ -3,7 +3,7 @@
     <section class="rca-summary">
       <div class="row">
         <div class="col-xs-3">
-          <label class="te-label" for="select-anomaly-region">Anomaly Range:
+          <label class="te-label" for="select-anomaly-region">Comparison Range:
             <span>
               <i class="glyphicon glyphicon-question-sign"></i>
               {{#tooltip-on-element}}
@@ -26,14 +26,14 @@
             applyAction=(action "setAnomalyDateRange")
           }}
         </div>
-        <div class="col-xs-6">
-          <label class="te-label" for="select-filters">Primary metric: </label>
+        <div class="col-xs-5">
+          <label class="te-label" for="select-filters">Search related to metric: </label>
           {{rootcause-metric-select
             selectedUrn=primaryMetricUrn
             onSelection=(action "onMetricSelection")
           }}
         </div>
-        <div class="col-xs-3">
+        <div class="col-xs-4">
           <label class="te-label" for="select-filters">Filters: </label>
           {{filter-select
             selected=filters

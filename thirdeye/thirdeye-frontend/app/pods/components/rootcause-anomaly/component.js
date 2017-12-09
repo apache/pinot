@@ -83,19 +83,46 @@ export default Ember.Component.extend({
   metricFormatted: Ember.computed(
     'dataset',
     'metric',
-    'dimensions',
     function () {
-      const { dataset, metric, dimensions } =
-        this.getProperties('dataset', 'metric', 'dimensions');
-      const dimensionsString = dimensions ? ` (${dimensions})` : '';
-      return `${dataset}::${metric}${dimensionsString}`
+      const { dataset, metric } =
+        this.getProperties('dataset', 'metric');
+      return `${dataset}::${metric}`;
     }
   ),
+
+  dimensionsFormatted: Ember.computed('anomaly', function () {
+    const dimensions = this.get('dimensions');
+    return dimensions ? ` (${dimensions})` : '';
+  }),
 
   changeFormatted: Ember.computed('change', function () {
     const change = this.get('change');
     const prefix = change > 0 ? '+' : '';
     return `${prefix}${humanizeFloat(change * 100)}%`;
-  })
+  }),
 
+  startFormatted: Ember.computed('anomaly', function () {
+    return moment(this.get('anomaly').start).format('MMM D YYYY, hh:mm a');
+  }),
+
+  endFormatted: Ember.computed('anomaly', function () {
+    return moment(this.get('anomaly').end).format('MMM D YYYY, hh:mm a');
+  }),
+
+  isNeedFeedback: Ember.computed('status', function () {
+    return this.get('status') === 'NO_FEEDBACK';
+  }),
+
+  actions: {
+    onFeedback(status) {
+      const { onFeedback, anomalyUrn } = this.getProperties('onFeedback', 'anomalyUrn');
+
+      if (onFeedback) {
+        onFeedback(anomalyUrn, status, '');
+      }
+
+      // TODO reload anomaly entity instead
+      this.setProperties({ status });
+    }
+  }
 });

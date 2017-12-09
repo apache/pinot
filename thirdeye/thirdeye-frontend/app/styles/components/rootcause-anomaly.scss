@@ -1,6 +1,11 @@
 .rootcause-anomaly {
-  &__title {
+  &-row {
+    vertical-align: middle;
+  }
 
+  &__title {
+    font-weight: bold;
+    font-size: 24px;
   }
 
   &__label {

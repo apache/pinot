@@ -34,6 +34,10 @@ export default Ember.Component.extend({
     return this.get('anomaly').attributes.status[0];
   }),
 
+  isNeedFeedback: Ember.computed('status', function () {
+    return this.get('status') === 'NO_FEEDBACK';
+  }),
+
   actions: {
     onFeedback(status) {
       const { onFeedback, anomalyUrn } = this.getProperties('onFeedback', 'anomalyUrn');

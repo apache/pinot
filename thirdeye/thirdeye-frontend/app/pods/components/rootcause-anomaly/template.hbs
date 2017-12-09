@@ -2,14 +2,56 @@
   <div class="card-container card-container--box-shadow">
     <div class="card-container__body">
       <div class="row">
-        <div class="col-xs-12">
-          <label>Anomaly</label>
-          <span>{{functionName}} #{{anomalyId}}</span>
-          <label>on metric </label>
-          <span>{{metricFormatted}}</span>
+        {{#if isNeedFeedback}}
+          <div class="col-xs-4">
+            <span class="rootcause-anomaly__title">Is this a true anomaly?</span>
+          </div>
+        {{/if}}
+        <div class="col-xs-2">
+          {{#power-select
+            options=options
+            selected=status
+            onchange=(action "onFeedback")
+          as |option|}}
+            {{option}}
+          {{/power-select}}
+        </div>
+        <div class="col-xs-4">
+          <span class="rootcause-anomaly__note"><a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a></span>
+        </div>
+      </div>
+      {{#if isNeedFeedback}}
+        <div class="row">
+          <div class="col-xs-4">
+            <span class="rootcause-anomaly__note--italicize">Your feedback improves the accuracy of future alerts.</span>
+          </div>
+        </div>
+      {{/if}}
+    </div>
+    <div class="card-container__body">
+      <div class="row">
+        <div class="col-xs-1">
+          Alert:
+        </div>
+        <div class="col-xs-11">
+          <label class="rootcause-anomaly__stats-label">{{functionName}}</label>
+          <span>#{{anomalyId}}</span>
         </div>
       </div>
       <div class="row">
+        <div class="col-xs-1">
+          Metric:
+        </div>
+        <div class="col-xs-11">
+          <label class="rootcause-anomaly__stats-label">{{metricFormatted}}</label>
+          <span>{{dimensionsFormatted}}</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-xs-2 rootcause-anomaly__stats">
+          <label class="rootcause-anomaly__stats-label">{{startFormatted}}</label>
+          <span class="rootcause-anomaly__stats__value">{{endFormatted}}</span>
+        </div>
         <div class="col-xs-2 rootcause-anomaly__stats">
           <label class="rootcause-anomaly__stats-label">Duration</label>
           <span class="rootcause-anomaly__stats__value">{{duration}}</span>
@@ -25,10 +67,6 @@
         <div class="col-xs-2 rootcause-anomaly__stats">
           <label class="rootcause-anomaly__stats-label">Change</label>
           <span class="rootcause-anomaly__stats__value">{{changeFormatted}}</span>
-        </div>
-        <div class="col-xs-2 rootcause-anomaly__stats">
-          <label class="rootcause-anomaly__stats-label">Status</label>
-          <span class="rootcause-anomaly__stats__value">{{status}}</span>
         </div>
         {{#if issueType}}
           <div class="col-xs-2">
