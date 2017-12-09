@@ -2,5 +2,12 @@
   border: 1px solid app-shade(black, 0.15);
   border-radius: 2px;
   display: flex;
-  max-height: 350px;
+
+  &__chart {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex-grow: 1;
+    padding-top: 12px;
+  }
 }

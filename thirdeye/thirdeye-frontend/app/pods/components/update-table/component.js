@@ -5,7 +5,8 @@ import modelsTable from 'ember-models-table/components/models-table';
  * the table's selected items should reflect this
  */
 export default modelsTable.extend({
-
+  // Necessary to avoid displaying a warning in console (false positive)
+  multipleSelected: true,
   /**
    * Overriding ember-models-table API
    * Allows preselectedItems to listen to changes, rather than only being assigned on init
