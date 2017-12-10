@@ -18,7 +18,10 @@ package com.linkedin.pinot.minion.executor;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.minion.MinionContext;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import javax.annotation.Nonnull;
+import org.apache.commons.httpclient.Header;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
@@ -37,7 +40,17 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
 
   @Override
   public int uploadSegment(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
-      FileUploadUtils.SendFileMethod httpMethod, String crc) {
-    return FileUploadUtils.sendFile(uri, fileName, inputStream, lengthInBytes, FileUploadUtils.SendFileMethod.POST, crc);
+      FileUploadUtils.SendFileMethod httpMethod, String originalSegmentCrc) {
+    List<Header> headers = new ArrayList<>();
+    Header header = new Header("If-Match", originalSegmentCrc);
+
+    // A pragma header is an implementation specific field that may have various effects along the
+    // request response chain. We will tell the controller minion is sending the segment.
+    Header minionHeader = new Header("Pragma", "Minion");
+
+    headers.add(header);
+    headers.add(minionHeader);
+
+    return FileUploadUtils.sendFile(uri, fileName, inputStream, lengthInBytes, FileUploadUtils.SendFileMethod.POST, headers);
   }
 }

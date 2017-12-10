@@ -23,7 +23,12 @@ public class MinionConstants {
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
-  public static final String CRC_KEY = "crc";
+  /**
+   * When minion downloads a segment to do work on, we will save that CRC. We will send that to the controller in an
+   * If-Match header when we upload the segment to ensure that the minion-completed segment hasn't been replaced by
+   * hadoop while minion has been working on it.
+   */
+  public static final String ORIGINAL_SEGMENT_CRC_KEY = "crc";
 
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
 

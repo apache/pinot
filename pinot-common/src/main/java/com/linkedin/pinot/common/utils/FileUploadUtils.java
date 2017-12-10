@@ -25,6 +25,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.httpclient.Header;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
@@ -96,11 +98,22 @@ public class FileUploadUtils {
   public static int sendFile(final String host, final String port, final String path, final String fileName,
       final InputStream inputStream, final long lengthInBytes, SendFileMethod httpMethod) {
     return sendFile("http://" + host + ":" + port + "/" + path, fileName, inputStream, lengthInBytes,
-        httpMethod, null);
+        httpMethod, new ArrayList<Header>());
   }
 
+  /**
+   * This method is useful only for segment push to the controller, as only controller will take the IF_MATCH header
+   * @param uri
+   * @param fileName
+   * @param inputStream
+   * @param lengthInBytes
+   * @param httpMethod
+   * @param headers Contains If-Match header with originalSegmentCrc and Pragma header to tell the controller the request
+   *                is coming from Minion
+   * @return
+   */
   public static int sendFile(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
-      SendFileMethod httpMethod, String crc) {
+      SendFileMethod httpMethod, List<Header> headers) {
     EntityEnclosingMethod method = null;
     try {
       method = httpMethod.forUri(uri);
@@ -121,8 +134,10 @@ public class FileUploadUtils {
         }
       })};
       method.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
-      Header header = new Header("If-Match", crc);
-      method.addRequestHeader(header);
+
+      for (Header header: headers) {
+        method.setRequestHeader(header);
+      }
 
       FILE_UPLOAD_HTTP_CLIENT.executeMethod(method);
       if (method.getStatusCode() >= 400) {

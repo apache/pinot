@@ -46,5 +46,5 @@ public interface PinotTaskExecutor {
    * Try to upload segment with crc
    */
   int uploadSegment(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
-      FileUploadUtils.SendFileMethod httpMethod, String crc);
+      FileUploadUtils.SendFileMethod httpMethod, String originalSegmentCrc);
 }
