@@ -85,9 +85,10 @@ export default Ember.Controller.extend({
     'timeseriesService',
     'aggregatesService',
     'breakdownsService',
+    'activeTab',
     function () {
-      const { context, entities, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService } =
-        this.getProperties('context', 'entities', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
+      const { context, entities, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, activeTab } =
+        this.getProperties('context', 'entities', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'activeTab');
 
       if (!context || !selectedUrns) {
         return;
@@ -95,12 +96,20 @@ export default Ember.Controller.extend({
 
       entitiesService.request(context, selectedUrns);
       timeseriesService.request(context, selectedUrns);
-      breakdownsService.request(context, selectedUrns);
 
-      const metricUrns = new Set(filterPrefix(Object.keys(entities), 'thirdeye:metric:'));
-      const currentUrns = [...metricUrns].map(toCurrentUrn);
-      const baselineUrns = [...metricUrns].map(toBaselineUrn);
-      aggregatesService.request(context, new Set(currentUrns.concat(baselineUrns)));
+      if (activeTab === ROOTCAUSE_TAB_DIMENSIONS) {
+        const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
+        const currentUrns = [...metricUrns].map(toCurrentUrn);
+        const baselineUrns = [...metricUrns].map(toBaselineUrn);
+        breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns)));
+      }
+
+      if (activeTab === ROOTCAUSE_TAB_METRICS) {
+        const metricUrns = new Set(filterPrefix(Object.keys(entities), 'thirdeye:metric:'));
+        const currentUrns = [...metricUrns].map(toCurrentUrn);
+        const baselineUrns = [...metricUrns].map(toBaselineUrn);
+        aggregatesService.request(context, new Set(currentUrns.concat(baselineUrns)));
+      }
     }
   ),
 
@@ -148,6 +157,18 @@ export default Ember.Controller.extend({
       if (!anomalyUrns) { return false; }
 
       return anomalyUrns[0];
+    }
+  ),
+
+  metricUrn: Ember.computed(
+    'context',
+    function () {
+      const { context } = this.getProperties('context');
+      const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+
+      if (!metricUrns) { return false; }
+
+      return metricUrns[0];
     }
   ),
 

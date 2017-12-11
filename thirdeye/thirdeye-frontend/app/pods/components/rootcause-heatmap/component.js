@@ -16,16 +16,20 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 const ROOTCAUSE_ROLLUP_RANGE_DEFAULT = [0, 10];
 
 export default Ember.Component.extend({
+  //
+  // external
+  //
   entities: null, // {}
 
   breakdowns: null, // {}
 
-  selectedUrns: null, // Set
+  selectedUrn: null, // Set
 
   onSelection: null, // func (updates)
 
-  currentUrn: null, // ""
-
+  //
+  // internal
+  //
   rollupRange: null, // ""
 
   mode: null, // ""
@@ -36,29 +40,17 @@ export default Ember.Component.extend({
     this.setProperties({ rollupRange: {}, mode: ROOTCAUSE_ROLLUP_MODE_CHANGE});
   },
 
-  labels: Ember.computed(
-    'selectedUrns',
-    'entities',
-    function () {
-      const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
-      return filterPrefix(selectedUrns, 'thirdeye:metric:').reduce((agg, urn) => {
-        agg[urn] = toMetricLabel(urn, entities);
-        return agg;
-      }, {});
-    }
-  ),
-
   current: Ember.computed(
     'breakdowns',
-    'currentUrn',
+    'selectedUrn',
     function () {
-      const { breakdowns, currentUrn } =
-        this.getProperties('breakdowns', 'currentUrn');
+      const { breakdowns, selectedUrn } =
+        this.getProperties('breakdowns', 'selectedUrn');
 
-      if (!currentUrn) {
+      if (!selectedUrn) {
         return {};
       }
-      const breakdown = breakdowns[toCurrentUrn(currentUrn)];
+      const breakdown = breakdowns[toCurrentUrn(selectedUrn)];
 
       if (!breakdown) {
         return {};
@@ -69,15 +61,15 @@ export default Ember.Component.extend({
 
   baseline: Ember.computed(
     'breakdowns',
-    'currentUrn',
+    'selectedUrn',
     function () {
-      const { breakdowns, currentUrn } =
-        this.getProperties('breakdowns', 'currentUrn');
+      const { breakdowns, selectedUrn } =
+        this.getProperties('breakdowns', 'selectedUrn');
 
-      if (!currentUrn) {
+      if (!selectedUrn) {
         return {};
       }
-      const breakdown = breakdowns[toBaselineUrn(currentUrn)];
+      const breakdown = breakdowns[toBaselineUrn(selectedUrn)];
 
       if (!breakdown) {
         return {};
@@ -245,25 +237,24 @@ export default Ember.Component.extend({
 
   actions: {
     onHeatmapClick(role, dimName, dimValue) {
-      const { rollupRange, selectedUrns, onSelection, currentUrn } =
-        this.getProperties('rollupRange', 'selectedUrns', 'onSelection', 'currentUrn');
+      const { rollupRange, selectedUrn, onSelection, currentUrn } =
+        this.getProperties('rollupRange', 'selectedUrn', 'onSelection', 'currentUrn');
 
       // scrolling
       const range = rollupRange[dimName] || ROOTCAUSE_ROLLUP_RANGE_DEFAULT;
-      if (role == ROOTCAUSE_ROLE_HEAD) {
+      if (role === ROOTCAUSE_ROLE_HEAD) {
         rollupRange[dimName] = range.map(v => v - 10);
         this.set('rollupRange', Object.assign({}, rollupRange));
       }
-      if (role == ROOTCAUSE_ROLE_TAIL) {
+      if (role === ROOTCAUSE_ROLE_TAIL) {
         rollupRange[dimName] = range.map(v => v + 10);
         this.set('rollupRange', Object.assign({}, rollupRange));
       }
 
       // selection
-      if (role == ROOTCAUSE_ROLE_VALUE) {
-        const metricUrn = appendTail(currentUrn, `${dimName}=${dimValue}`);
-        const state = !selectedUrns.has(metricUrn);
-        const updates = { [metricUrn]: state, [toBaselineUrn(metricUrn)]: state, [toCurrentUrn(metricUrn)]: state };
+      if (role === ROOTCAUSE_ROLE_VALUE) {
+        const metricUrn = appendTail(selectedUrn, `${dimName}=${dimValue}`);
+        const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
         if (onSelection) {
           onSelection(updates);
         }

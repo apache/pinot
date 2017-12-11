@@ -26,8 +26,9 @@
   <label class="te-label" for="select-filters">Search related to metric: </label>
   {{rootcause-metric-select
     selectedUrn=primaryMetricUrn
-    onSelection=(action "onMetricSelection")
+    onSelection=(action "onMetricContext")
   }}
+  <a {{action "onMetricChart"}}>add to chart</a>
 </div>
 <div class="col-xs-4">
   <label class="te-label" for="select-filters">Filters: </label>

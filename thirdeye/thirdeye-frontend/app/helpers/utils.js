@@ -119,9 +119,14 @@ export function appendTail(urn, tail) {
   }
 
   const existingTail = extractTail(urn);
-  const tailString = [...makeIterable(tail), ...existingTail].sort().join(':');
+  const tailString = [...new Set([...makeIterable(tail), ...existingTail])].sort().join(':');
   const appendString = tailString ? `:${tailString}` : '';
   return `${stripTail(urn)}${appendString}`;
+}
+
+export function appendFilters(urn, filters) {
+  const tail = filters.map(t => `${t[0]}=${t[1]}`);
+  return appendTail(urn, tail);
 }
 
 export function toCurrentUrn(urn) {
@@ -237,4 +242,4 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, pluralizeTime, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor, humanizeFloat });
+export default Ember.Helper.helper({ checkStatus, pluralizeTime, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendFilters, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor, humanizeFloat });

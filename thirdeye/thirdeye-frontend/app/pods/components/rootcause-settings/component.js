@@ -19,7 +19,7 @@
 import Ember from 'ember';
 import moment from 'moment';
 import fetch from 'fetch';
-import { toFilters, toFilterMap, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { toFilters, toFilterMap, filterPrefix, toCurrentUrn, toBaselineUrn, appendFilters } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash'
 
 // TODO: move this to a utils file (DRYER)
@@ -224,12 +224,8 @@ export default Ember.Component.extend({
      * @param {Object} updates metric selection/deselection
      * @return {undefined}
      */
-    onMetricSelection(updates) {
+    onMetricContext(updates) {
       const { onSelection, otherUrns } = this.getProperties('onSelection', 'otherUrns');
-
-      if (onSelection) {
-        onSelection(updates);
-      }
 
       const selected = filterPrefix(Object.keys(updates), 'thirdeye:metric:').filter(urn => updates[urn]);
 
@@ -238,6 +234,30 @@ export default Ember.Component.extend({
 
       this.set('otherUrns', newOtherUrns);
       this.send('updateContext');
+    },
+
+    /**
+     * Adds current primary metric selection to chart (including filters)
+     * @returns {undefined}
+     */
+    onMetricChart() {
+      const { onSelection, context } = this.getProperties('onSelection', 'context');
+
+      const filterUrns = filterPrefix(context.urns, 'thirdeye:dimension:');
+      const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+
+      const appendedUrns = metricUrns.map(urn => appendFilters(urn, toFilters(filterUrns)));
+
+      const currentUrns = appendedUrns.map(toCurrentUrn);
+      const baselineUrns = appendedUrns.map(toBaselineUrn);
+      const allUrns = new Set([...appendedUrns, ...currentUrns, ...baselineUrns]);
+
+      const updates = [...allUrns].reduce((agg, urn) => {
+        agg[urn] = true;
+        return agg;
+      }, {});
+
+      onSelection(updates);
     }
   }
 });
