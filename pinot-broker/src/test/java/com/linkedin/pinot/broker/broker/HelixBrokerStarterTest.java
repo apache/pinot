@@ -238,7 +238,7 @@ public class HelixBrokerStarterTest {
   private void addOneSegment(String tableName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(tableName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotResourceManager.addSegment(segmentMetadata, "http://localhost:something");
+    _pinotResourceManager.addNewSegment(segmentMetadata, "http://localhost:something");
   }
 
 }

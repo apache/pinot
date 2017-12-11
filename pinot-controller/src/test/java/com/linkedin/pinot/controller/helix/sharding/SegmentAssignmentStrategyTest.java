@@ -391,7 +391,7 @@ public class SegmentAssignmentStrategyTest {
   private void addOneSegment(String tableName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(tableName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotHelixResourceManager.addSegment(segmentMetadata, "downloadUrl");
+    _pinotHelixResourceManager.addNewSegment(segmentMetadata, "downloadUrl");
   }
 
   private void addOneSegmentWithPartitionInfo(String tableName, String segmentName, String columnName,
@@ -408,6 +408,6 @@ public class SegmentAssignmentStrategyTest {
     when(meta.getTableName()).thenReturn(tableName);
     when(meta.getName()).thenReturn(segmentName);
     when(meta.getCrc()).thenReturn("0");
-    _pinotHelixResourceManager.addSegment(meta, "downloadUrl");
+    _pinotHelixResourceManager.addNewSegment(meta, "downloadUrl");
   }
 }

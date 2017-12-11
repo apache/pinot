@@ -1458,7 +1458,37 @@ public class PinotHelixResourceManager {
   }
 
   @Nonnull
-  public PinotResourceManagerResponse addSegment(@Nonnull SegmentMetadata segmentMetadata,
+  public PinotResourceManagerResponse addNewSegment(@Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull String downloadUrl) {
+    String segmentName = segmentMetadata.getName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+    PinotResourceManagerResponse res = new PinotResourceManagerResponse();
+    // NOTE: must first set the segment ZK metadata before trying to update ideal state because server will need the
+    // segment ZK metadata to download and load the segment
+    OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
+    offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
+    offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
+    offlineSegmentZKMetadata.setPushTime(System.currentTimeMillis());
+    ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
+    LOGGER.info("Added segment {} of table {} to propertystore", segmentName, offlineTableName);
+    res.status = ResponseStatus.success;
+
+    try {
+      addNewOfflineSegment(segmentMetadata);
+    } catch (final Exception e) {
+      LOGGER.error("Caught exception while adding segment {} of table {}", segmentName, offlineTableName, e);
+      res.status = ResponseStatus.failure;
+      res.message = e.getMessage();
+    }
+    return res;
+  }
+
+  public OfflineSegmentZKMetadata getOfflineSegmentZkMetadata(String offlineTableName, String segmentName) {
+    return ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentName);
+  }
+
+  @Nonnull
+  public PinotResourceManagerResponse refreshSegment(@Nonnull SegmentMetadata segmentMetadata,
       @Nonnull String downloadUrl) {
     PinotResourceManagerResponse res = new PinotResourceManagerResponse();
 
@@ -1472,60 +1502,43 @@ public class PinotHelixResourceManager {
 
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
           ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentName);
-      if (offlineSegmentZKMetadata != null) {
-        // Segment exists, check whether need to refresh
 
-        if (ifRefreshAnExistedSegment(segmentMetadata, offlineSegmentZKMetadata, offlineTableName, segmentName)) {
-          // NOTE: must first set the segment ZK metadata before trying to refresh because server will pick up the
-          // latest segment ZK metadata and compare with local segment metadata to decide whether to download the new
-          // segment or load from local
-          offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
-          offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
-          offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
-          ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
-          LOGGER.info("Refresh segment {} of table {} to propertystore ", segmentName, offlineTableName);
-
-          boolean success = true;
-          if (shouldSendMessage(offlineSegmentZKMetadata)) {
-            // Send a message to the servers to update the segment.
-            // We return success even if we are not able to send messages (which can happen if no servers are alive).
-            // For segment validation errors we would have returned earlier.
-            sendSegmentRefreshMessage(offlineSegmentZKMetadata);
-          } else {
-            // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
-            success = updateExistedSegment(offlineSegmentZKMetadata);
-          }
-          if (success) {
-            res.status = ResponseStatus.success;
-          } else {
-            LOGGER.error("Failed to refresh segment {} of table {}, marking crc and creation time as invalid",
-                segmentName, offlineTableName);
-            offlineSegmentZKMetadata.setCrc(-1L);
-            offlineSegmentZKMetadata.setCreationTime(-1L);
-            ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
-          }
-        } else {
-          String msg = "Not refreshing identical segment " + segmentName + "of table " + offlineTableName
-              + " with creation time " + segmentMetadata.getIndexCreationTime() + " and crc "
-              + segmentMetadata.getCrc();
-          LOGGER.info(msg);
-          res.status = ResponseStatus.success;
-          res.message = msg;
-        }
-      } else {
-        // Segment does not exist, add new segment
-
-        // NOTE: must first set the segment ZK metadata before trying to update ideal state because server will need the
-        // segment ZK metadata to download and load the segment
-        offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
+      if (ifRefreshAnExistedSegment(segmentMetadata, offlineSegmentZKMetadata, offlineTableName, segmentName)) {
+        // NOTE: must first set the segment ZK metadata before trying to refresh because server will pick up the
+        // latest segment ZK metadata and compare with local segment metadata to decide whether to download the new
+        // segment or load from local
         offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
         offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
-        offlineSegmentZKMetadata.setPushTime(System.currentTimeMillis());
+        offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
         ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
-        LOGGER.info("Added segment {} of table {} to propertystore", segmentName, offlineTableName);
+        LOGGER.info("Refresh segment {} of table {} to propertystore ", segmentName, offlineTableName);
 
-        addNewOfflineSegment(segmentMetadata);
+        boolean success = true;
+        if (shouldSendMessage(offlineSegmentZKMetadata)) {
+          // Send a message to the servers to update the segment.
+          // We return success even if we are not able to send messages (which can happen if no servers are alive).
+          // For segment validation errors we would have returned earlier.
+          sendSegmentRefreshMessage(offlineSegmentZKMetadata);
+        } else {
+          // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
+          success = updateExistedSegment(offlineSegmentZKMetadata);
+        }
+        if (success) {
+          res.status = ResponseStatus.success;
+        } else {
+          LOGGER.error("Failed to refresh segment {} of table {}, marking crc and creation time as invalid",
+              segmentName, offlineTableName);
+          offlineSegmentZKMetadata.setCrc(-1L);
+          offlineSegmentZKMetadata.setCreationTime(-1L);
+          ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
+        }
+      } else {
+        String msg = "Not refreshing identical segment " + segmentName + "of table " + offlineTableName
+            + " with creation time " + segmentMetadata.getIndexCreationTime() + " and crc "
+            + segmentMetadata.getCrc();
+        LOGGER.info(msg);
         res.status = ResponseStatus.success;
+        res.message = msg;
       }
     } catch (final Exception e) {
       LOGGER.error("Caught exception while adding segment {} of table {}", segmentName, offlineTableName, e);

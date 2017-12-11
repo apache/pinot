@@ -184,7 +184,7 @@ public class PinotResourceManagerTest {
   private void addOneSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotHelixResourceManager.addSegment(segmentMetadata, "downloadUrl");
+    _pinotHelixResourceManager.addNewSegment(segmentMetadata, "downloadUrl");
   }
 
   private void deleteOneSegment(String resource, String segment) {

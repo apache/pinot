@@ -96,6 +96,6 @@ public class ControllerSentinelTestV2 extends ControllerTest {
 
   private void addOneOfflineSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
-    _helixResourceManager.addSegment(segmentMetadata, "downloadUrl");
+    _helixResourceManager.addNewSegment(segmentMetadata, "downloadUrl");
   }
 }

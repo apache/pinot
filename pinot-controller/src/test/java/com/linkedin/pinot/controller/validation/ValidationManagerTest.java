@@ -161,7 +161,7 @@ public class ValidationManagerTest {
   public void testPushTimePersistence() throws Exception {
     DummyMetadata metadata = new DummyMetadata(TEST_TABLE_NAME);
 
-    _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
+    _pinotHelixResourceManager.addNewSegment(metadata, "http://dummy/");
 
     Thread.sleep(1000);
 
@@ -179,7 +179,7 @@ public class ValidationManagerTest {
 
     // Refresh the segment
     metadata.setCrc("anotherfakecrc");
-    _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
+    _pinotHelixResourceManager.refreshSegment(metadata, "http://dummy/");
 
     Thread.sleep(1000);
 

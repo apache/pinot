@@ -122,7 +122,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
 
   private SegmentMetadata addOneSegment(String resourceName) {
     final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
-    _helixResourceManager.addSegment(segmentMetadata, "downloadUrl");
+    _helixResourceManager.addNewSegment(segmentMetadata, "downloadUrl");
     return segmentMetadata;
   }
 }

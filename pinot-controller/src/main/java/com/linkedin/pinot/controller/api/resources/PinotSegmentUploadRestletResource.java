@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -407,24 +408,40 @@ public class PinotSegmentUploadRestletResource {
 
     PinotResourceManagerResponse response;
     if (!isSegmentTimeValid(segmentMetadata)) {
-      response = new PinotResourceManagerResponse("Invalid segment start/end time", false);
-    } else {
-      // Move tarred segment file to data directory when there is no external download URL
-      if (downloadUrl == null) {
-        File tarredSegmentFile = new File(new File(provider.getBaseDataDir(), tableName), segmentName);
-        FileUtils.deleteQuietly(tarredSegmentFile);
-        FileUtils.moveFile(tempTarredSegmentFile, tarredSegmentFile);
-        downloadUrl = ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
-      }
-      // TODO: this will read table configuration again from ZK. We should optimize that
-      response = _pinotHelixResourceManager.addSegment(segmentMetadata, downloadUrl);
+      String errStr = "Invalid segment start/end time";
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.NOT_ACCEPTABLE);
     }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+    OfflineSegmentZKMetadata offlineSegmentZKMetadata = _pinotHelixResourceManager.getOfflineSegmentZkMetadata(
+        offlineTableName, segmentName);
+
+    if (offlineSegmentZKMetadata == null) {
+      // Creating new segment, not refreshing
+      downloadUrl = moveSegmentToPermanentDirectory(provider, tableName, segmentName, tempTarredSegmentFile);
+      _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
+      response = PinotResourceManagerResponse.SUCCESS_RESPONSE;
+      return response;
+    }
+    if (downloadUrl == null) {
+      downloadUrl = moveSegmentToPermanentDirectory(provider, tableName, segmentName, tempTarredSegmentFile);
+    }
+    // TODO: this will read table configuration again from ZK. We should optimize that
+    response = _pinotHelixResourceManager.refreshSegment(segmentMetadata, downloadUrl);
 
     if (!response.isSuccessful()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, "Error uploading segment", Response.Status.INTERNAL_SERVER_ERROR);
     }
     return response;
+  }
+
+  private String moveSegmentToPermanentDirectory(FileUploadPathProvider provider, String tableName, String segmentName, File tempTarredSegmentFile) throws IOException{
+    // Move tarred segment file to data directory when there is no external download URL
+    File tarredSegmentFile = new File(new File(provider.getBaseDataDir(), tableName), segmentName);
+    FileUtils.deleteQuietly(tarredSegmentFile);
+    FileUtils.moveFile(tempTarredSegmentFile, tarredSegmentFile);
+    return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
   }
 
   private String getDownloadUri(FileUploadUtils.FileUploadType uploadType, HttpHeaders headers, String segmentJsonStr) throws Exception {
