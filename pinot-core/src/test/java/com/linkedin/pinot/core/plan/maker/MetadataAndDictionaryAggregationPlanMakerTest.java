@@ -51,7 +51,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 
 
-public class PlanNodeFactoryTest {
+public class MetadataAndDictionaryAggregationPlanMakerTest {
 
   private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_201711219_20171120";
@@ -60,6 +60,7 @@ public class PlanNodeFactoryTest {
   private static final File INDEX_DIR_STARTREE = new File(FileUtils.getTempDirectory(), "StarTreeSegmentPlanNodeFactoryTest");
 
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private static final InstancePlanMakerImplV2 PLAN_MAKER = new InstancePlanMakerImplV2();
   private IndexSegment _indexSegment = null;
   private IndexSegment _starTreeIndexSegment = null;
 
@@ -153,21 +154,21 @@ public class PlanNodeFactoryTest {
     FileUtils.deleteQuietly(INDEX_DIR_STARTREE);
   }
 
-  @Test(dataProvider = "testPlanNodeFactoryDataProvider")
-  public void testPlanNodeFactory(String query, Class<? extends PlanNode> planNodeClass,
+  @Test(dataProvider = "testPlanNodeMakerDataProvider")
+  public void testInstancePlanMakerForMetadataAndDictionaryPlan(String query, Class<? extends PlanNode> planNodeClass,
       Class<? extends PlanNode> starTreePlanNodeClass) {
 
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
-    PlanNode plan = PlanNodeFactory.getPlanNode(brokerRequest, _indexSegment, 10, 10);
+    PlanNode plan = PLAN_MAKER.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     Assert.assertTrue(planNodeClass.isInstance(plan));
 
-    plan = PlanNodeFactory.getPlanNode(brokerRequest, _starTreeIndexSegment, 10, 10);
+   plan = PLAN_MAKER.makeInnerSegmentPlan(_starTreeIndexSegment, brokerRequest);
     Assert.assertTrue(starTreePlanNodeClass.isInstance(plan));
   }
 
 
-  @DataProvider(name = "testPlanNodeFactoryDataProvider")
-  public Object[][] provideTestPlanNodeFactoryData() {
+  @DataProvider(name = "testPlanNodeMakerDataProvider")
+  public Object[][] provideTestPlanNodeMakerData() {
 
     List<Object[]> entries = new ArrayList<>();
     entries.add(new Object[] {
@@ -244,8 +245,8 @@ public class PlanNodeFactoryTest {
       boolean expectedIsFitForMetadata, boolean expectedIsFitForDictionary) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
 
-    boolean isFitForMetadataBasedPlan = PlanNodeFactory.isFitForMetadataBasedPlan(brokerRequest, indexSegment);
-    boolean isFitForDictionaryBasedPlan = PlanNodeFactory.isFitForDictionaryBasedPlan(brokerRequest, indexSegment);
+    boolean isFitForMetadataBasedPlan = PLAN_MAKER.isFitForMetadataBasedPlan(brokerRequest, indexSegment);
+    boolean isFitForDictionaryBasedPlan = PLAN_MAKER.isFitForDictionaryBasedPlan(brokerRequest, indexSegment);
     Assert.assertEquals(isFitForMetadataBasedPlan, expectedIsFitForMetadata);
     Assert.assertEquals(isFitForDictionaryBasedPlan, expectedIsFitForDictionary);
 
