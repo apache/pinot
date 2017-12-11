@@ -471,17 +471,6 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
     Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
 
-    pqlQuery = "SELECT max(DaysSinceEpoch) FROM " + DEFAULT_TABLE_NAME;
-    response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), 0);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
-
-    pqlStarTreeQuery = "SELECT max(DaysSinceEpoch) FROM " + STAR_TREE_TABLE_NAME;
-    response = postQuery(pqlStarTreeQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter") > 0, true);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
 
     // group by present in query: not answered by MetadataBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME + " GROUP BY DaysSinceEpoch";
@@ -501,13 +490,6 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     pqlQuery = "SELECT COUNT(*),MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     response = postQuery(pqlQuery);
     Assert.assertEquals(response.getLong("numEntriesScannedPostFilter") > 0, true);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
-
-    // mixed aggregation functions in query: all answered by MetadataBasedAggregationOperator
-    pqlQuery = "SELECT COUNT(*),MAX(DaysSinceEpoch) FROM " + DEFAULT_TABLE_NAME;
-    response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), 0);
     Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
     Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
 

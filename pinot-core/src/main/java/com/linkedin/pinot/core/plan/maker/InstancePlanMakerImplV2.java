@@ -158,13 +158,27 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       return true;
     }
 
+    /** This code tries to get max and min value from segment metadata
+     * By default metadata is generated only for time column.
+     * In case of star tree, the min max values are incorrect,
+     * as those values are read from the dictionary during segment load time
+     * Also, in case of realtime, this metadata is not generated at all
+     * Keeping this code for reference, but not using it for now,
+     * until all the edge cases are fixed
+     */
+    //isMetadataBasedMinMax(aggFuncType, indexSegment, aggregationInfo);
+    return false;
+  }
+
+  private static boolean isMetadataBasedMinMax(AggregationFunctionType aggFuncType,
+      IndexSegment indexSegment, AggregationInfo aggregationInfo) {
     // Use minValue and maxValue from metadata, in non star tree cases
     // minValue and maxValue is generated from dictionary on segment load, so it won't be correct in case of star tree
     if (aggFuncType.isOfType(AggregationFunctionType.MAX, AggregationFunctionType.MIN, AggregationFunctionType.MINMAXRANGE)
         && !indexSegment.getSegmentMetadata().hasStarTree()) {
       String column = aggregationInfo.getAggregationParams().get("column");
       SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) indexSegment.getSegmentMetadata();
-      if (segmentMetadata.getColumnMetadataMap() == null) {
+      if (segmentMetadata == null || segmentMetadata.getColumnMetadataMap() == null) {
         return false;
       }
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
@@ -208,8 +222,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     AggregationFunctionType aggFuncType = AggregationFunctionType.valueOf(aggregationInfo.getAggregationType().toUpperCase());
     if (aggFuncType.isOfType(AggregationFunctionType.MAX, AggregationFunctionType.MIN, AggregationFunctionType.MINMAXRANGE)) {
       String column = aggregationInfo.getAggregationParams().get("column");
-      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) indexSegment.getSegmentMetadata();
-      if (segmentMetadata.getColumnMetadataMap() != null && segmentMetadata.hasDictionary(column)) {
+      if (indexSegment.getDataSource(column).getDataSourceMetadata().hasDictionary()) {
         return true;
       }
     }
