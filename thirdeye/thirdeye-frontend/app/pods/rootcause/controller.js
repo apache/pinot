@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toColor, checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toColor, checkStatus, toFilters, appendFilters } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import CryptoJS from 'cryptojs';
@@ -281,56 +281,138 @@ export default Ember.Controller.extend({
   //
 
   actions: {
+    /**
+     * Updates selected urns.
+     *
+     * @param {object} updates dictionary with urns to add and remove (true adds, false removes, omitted keys are left as is)
+     * @returns {undefined}
+     */
     onSelection(updates) {
       const { selectedUrns } = this.getProperties('selectedUrns');
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
-      this.set('selectedUrns', new Set(selectedUrns));
-      this.set('sessionModified', true);
+
+      this.setProperties({
+        selectedUrns: new Set(selectedUrns),
+        sessionModified: true
+      });
     },
 
+    /**
+     * Updates visible urns.
+     *
+     * @param {object} updates dictionary with urns to show and hide (true shows, false hides, omitted keys are left as is)
+     * @returns {undefined}
+     */
     onVisibility(updates) {
       const { invisibleUrns } = this.getProperties('invisibleUrns');
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => invisibleUrns.delete(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => invisibleUrns.add(urn));
-      this.set('invisibleUrns', new Set(invisibleUrns));
+
+      this.setProperties({ invisibleUrns: new Set(invisibleUrns) });
     },
 
     /**
-     * Handles the rootcause_setting change event
-     * and updates query params and context
-     * @param {Object} newParams new parameters to update
+     * Sets the rootcause search context
+     *
+     * @param {Object} context new context
+     * @returns {undefined}
      */
     onContext(context) {
-      this.set('context', context);
-      this.set('modified', true);
+      this.setProperties({ context, sessionModified: true });
     },
 
+    /**
+     * Sets the urns to be displayed in the (event) entity table
+     *
+     * @param {Iterable} urns filtered urns to be displayed
+     * @returns {undefined}
+     */
     onFilter(urns) {
-      this.set('filteredUrns', new Set(urns));
+      this.setProperties({ filteredUrns: new Set(urns) });
     },
 
+    /**
+     * Sets the display mode for timeseries
+     *
+     * @param {String} timeseriesMode
+     * @returns {undefined}
+     */
     onChart(timeseriesMode) {
-      this.set('timeseriesMode',timeseriesMode);
+      this.setProperties({ timeseriesMode });
     },
 
+    /**
+     * Sets the hover selection for the chart tooltip
+     *
+     * @param {Iterable} urns urns hovered over
+     * @param {Int} timestamp hover timestamp
+     * @returns {undefined}
+     */
     chartOnHover(urns, timestamp) {
-      this.setProperties({ hoverUrns: new Set(urns), hoverTimestamp: timestamp });
+      this.setProperties({
+        hoverUrns: new Set(urns),
+        hoverTimestamp: timestamp
+      });
     },
 
+    /**
+     * Updates selected urns for the heatmap (appends selected filters as tail).
+     * @see onSelection(updates)
+     *
+     * @param {updates}
+     * @returns {undefined}
+     */
+    heatmapOnSelection(updates) {
+      const { context } = this.getProperties('context');
+
+      const filters = toFilters(context.urns);
+
+      const newUpdates = Object.keys(updates).reduce((agg, urn) => {
+        const urnAugmented = appendFilters(urn, filters);
+        agg[urnAugmented] = updates[urn];
+        return agg;
+      }, {});
+
+      this.send('onSelection', newUpdates);
+    },
+
+    /**
+     * Sets the session name and text
+     *
+     * @param {String} name session name/title
+     * @param {String} text session summary
+     * @returns {undefined}
+     */
     onSessionChange(name, text) {
-      console.log('onSessionChange(name, text)');
-      this.setProperties({ sessionName: name, sessionText: text, sessionModified: true });
+      this.setProperties({
+        sessionName: name,
+        sessionText: text,
+        sessionModified: true
+      });
     },
 
+    /**
+     * Saves the session to the backend. Overrides existing session, if any.
+     *
+     * @returns {undefined}
+     */
     onSessionSave() {
       const jsonString = JSON.stringify(this._makeSession());
 
       return fetch(`/session/`, { method: 'POST', body: jsonString })
         .then(checkStatus)
-        .then(res => this.setProperties({ sessionId: res, sessionModified: false }));
+        .then(res => this.setProperties({
+          sessionId: res,
+          sessionModified: false
+        }));
     },
 
+    /**
+     * Saves a dedicated copy the session to the backend and updates the session id.
+     *
+     * @returns {undefined}
+     */
     onSessionCopy() {
       const { sessionId } = this.getProperties('sessionId');
 
@@ -342,9 +424,19 @@ export default Ember.Controller.extend({
 
       return fetch(`/session/`, { method: 'POST', body: jsonString })
         .then(checkStatus)
-        .then(res => this.setProperties({ sessionId: res, sessionModified: false }));
+        .then(res => this.setProperties({
+          sessionId: res,
+          sessionModified: false
+        }));
     },
 
+    /**
+     * Saves the anomaly feedback o the backend. Overrides existing feedback, if any.
+     *
+     * @param {String} anomalyUrn anomaly entity urn
+     * @param {String} feedback anomaly feedback type string
+     * @param {String} comment anomaly comment
+     */
     onFeedback(anomalyUrn, feedback, comment) {
       const id = anomalyUrn.split(':')[3];
       const jsonString = JSON.stringify({ feedbackType: feedback, comment });

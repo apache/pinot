@@ -1,8 +1,4 @@
 .rootcause-anomaly {
-  &-row {
-    vertical-align: middle;
-  }
-
   &__title {
     font-weight: bold;
     font-size: 24px;
@@ -61,13 +57,7 @@
     font-size: 16px;
   }
 
-  &-toggle {
-    margin-left: 4px;
-    color: app-shade(black, 3);
-    font-weight: 300;
-  }
-
-  &-icon {
+  &--icon {
     float: right;
     margin-right: 8px;
   }

@@ -1,0 +1,41 @@
+.rootcause-header {
+  &__major {
+    font-size: 32px;
+    font-weight: bold;
+  }
+
+  &__minor {
+
+  }
+
+  &__side {
+    text-align: right;
+  }
+
+  &--textarea {
+    resize: none;
+    border: none;
+    background: none;
+
+    &:hover {
+      background-color: white;
+    }
+  }
+
+  &--button {
+    margin: 2px 0 0 0;
+    cursor: pointer;
+    background: none;
+    padding: 2px 15px;
+    border-radius: 3px;
+    border: 1px solid $te-nav-item-color;
+    color: $te-nav-item-color;
+    letter-spacing: $te-nav-letter-spacing;
+    background-color:  $te-nav-background;
+
+    &:hover {
+      border-color: white;
+      color: white;
+    }
+  }
+}

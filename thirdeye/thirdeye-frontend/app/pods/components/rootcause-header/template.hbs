@@ -1,16 +1,16 @@
-<div class="conteiner">
+<div class="container">
   <div class="row">
     <div class="col-xs-10">
-      {{textarea-autosize placeholder="Enter investigation title ..." value=sessionName cols=50 rows=1 maxlen=80 class="rootcause-header__major rootcause-header-textarea" key-press="onChange"}}
+      {{textarea-autosize placeholder="Enter investigation title ..." value=sessionName cols=50 rows=1 maxlen=80 class="rootcause-header__major rootcause-header--textarea" key-press="onChange"}}
     </div>
     <div class="col-xs-2 rootcause-header__side">
-      <button {{action "onCopy"}} class="rootcause-header-button">Save Copy</button><br/>
-      <button {{action "onSave"}} class="rootcause-header-button">Save</button>
+      <button {{action "onCopy"}} class="rootcause-header--button">Save Copy</button><br/>
+      <button {{action "onSave"}} class="rootcause-header--button">Save</button>
     </div>
   </div>
   <div class="row">
     <div class="col-xs-10">
-      {{textarea-autosize placeholder="Take notes or summarize the results here ..." value=sessionText cols=130 rows=1 class="rootcause-header__minor rootcause-header-textarea" key-press="onChange"}}
+      {{textarea-autosize placeholder="Take notes or summarize the results here ..." value=sessionText cols=130 rows=1 class="rootcause-header__minor rootcause-header--textarea" key-press="onChange"}}
     </div>
     <div class="col-xs-2 rootcause-header__side">
       {{#if sessionId}}
