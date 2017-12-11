@@ -293,6 +293,13 @@ public class CommonConstants {
       public static final String DOWNLOAD_URL = "segment.offline.download.url";
       public static final String PUSH_TIME = "segment.offline.push.time";
       public static final String REFRESH_TIME = "segment.offline.refresh.time";
+      /**
+       * This field will be populated only for use cases that are refreshing segments and
+       * have minion configured. It will contain COMMITTING + System.currentMillis(), time right
+       * before any permanent changes happen to the segment, aka, right before
+       * the segment is moved to its permanent directory.
+       */
+      public static final String SEGMENT_PUSH_STATUS = "segment.push.status";
     }
 
     public static final String SEGMENT_NAME = "segment.name";
