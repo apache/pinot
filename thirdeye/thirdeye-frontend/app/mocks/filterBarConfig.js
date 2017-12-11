@@ -11,23 +11,6 @@
  */
 export default [
   {
-    header: "Anomalies",
-    eventType: "anomaly",
-    color: "teal",
-    inputs: [
-      {
-        label: "dataset",
-        labelMapping: "dataset",
-        type: "dropdown"
-      },
-      {
-        label: "metric",
-        labelMapping: "metric",
-        type: "dropdown"
-      }
-    ]
-  },
-  {
     header: "Holidays",
     eventType: "holiday",
     color: "green",
@@ -101,6 +84,23 @@ export default [
       {
         label: "fabrics",
         labelMapping: "fabrics",
+        type: "dropdown"
+      }
+    ]
+  },
+  {
+    header: "Anomalies",
+    eventType: "anomaly",
+    color: "teal",
+    inputs: [
+      {
+        label: "dataset",
+        labelMapping: "dataset",
+        type: "dropdown"
+      },
+      {
+        label: "metric",
+        labelMapping: "metric",
         type: "dropdown"
       }
     ]

@@ -3,7 +3,7 @@
     <span>
       <i class="glyphicon glyphicon-question-sign"></i>
       {{#tooltip-on-element}}
-        Typically, this is your anomaly region. It's highlighted in orange in the graph below.
+        Typically, this is your anomaly region. It's highlighted in orange in the graph above.
       {{/tooltip-on-element}}
     </span>
   </label>
@@ -23,7 +23,14 @@
   }}
 </div>
 <div class="col-xs-5">
-  <label class="te-label" for="select-filters">Search related to metric: </label>
+  <label class="te-label" for="select-filters">Context metric:
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        This metric is used to display and rank items in the view below.
+      {{/tooltip-on-element}}
+    </span>
+  </label>
   {{rootcause-metric-select
     selectedUrn=primaryMetricUrn
     onSelection=(action "onMetricContext")
