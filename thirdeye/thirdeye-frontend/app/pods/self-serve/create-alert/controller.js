@@ -714,6 +714,7 @@ export default Ember.Controller.extend({
     'selectedFilters',
     'selectedPattern',
     'selectedGranularity',
+    'selectedWeeklyEffect',
     'sensitivityWithDefault',
     function() {
       let gkey = '';
@@ -721,9 +722,13 @@ export default Ember.Controller.extend({
       const granularity = this.get('graphConfig.granularity').toLowerCase();
       const pattern = encodeURIComponent(this.get('selectedPattern'));
       const sensitivity = encodeURIComponent(this.get('sensitivityWithDefault'));
-      const selectedFilter = this.get('selectedFilters');
-      const selectedDimension = this.get('selectedDimension');
-      const weeklyEffect = this.get('selectedWeeklyEffect');
+
+      const {
+        selectedFilters,
+        selectedDimension,
+        selectedWeeklyEffect: weeklyEffect
+      } = this.getProperties('selectedFilters', 'selectedDimension', 'selectedWeeklyEffect');
+
       const settingsByGranularity = {
         common: {
           functionName: this.get('alertFunctionName') || this.get('alertFunctionName').trim(),
@@ -765,8 +770,8 @@ export default Ember.Controller.extend({
       if (granularity.includes('day')) { gkey = 'day'; }
 
       // Add filter and dimension choices if available
-      if (Ember.isPresent(selectedFilter)) {
-        settingsByGranularity.common.filters = selectedFilter;
+      if (Ember.isPresent(selectedFilters)) {
+        settingsByGranularity.common.filters = selectedFilters;
       }
       if (Ember.isPresent(selectedDimension)) {
         settingsByGranularity.common.exploreDimension = selectedDimension;
@@ -774,7 +779,7 @@ export default Ember.Controller.extend({
 
       // Append extra props to preserve in the alert record
       if (gkey) {
-        settingsByGranularity[gkey].properties += `;pattern=${pattern};sensitivity=${sensitivity}`;
+        settingsByGranularity[gkey].properties += `;pattern=${encodeURIComponent(pattern)};sensitivity=${encodeURIComponent(sensitivity)}`;
       }
 
       return Object.assign(settingsByGranularity.common, settingsByGranularity[gkey]);

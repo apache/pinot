@@ -54,8 +54,8 @@ export default Ember.Route.extend({
 
     // Add a parsed properties array to the model
     const propsArray = alertProps.split(';').map((prop) => {
-      let p = prop.split('=');
-      return { name: p[0], value: decodeURIComponent(p[1]) }
+      const [ name, value ] = prop.split('=');
+      return { name, value: decodeURIComponent(value) };
     });
     Object.assign(model, { propsArray });
 

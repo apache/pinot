@@ -152,7 +152,7 @@ export default Ember.Controller.extend({
   pattern: Ember.computed('alertProps', function() {
     const props = this.get('alertProps');
     const patternObj = props.find(prop => prop.name === 'pattern');
-    const pattern = patternObj ? patternObj.value : 'Up and Down';
+    const pattern = patternObj ? decodeURIComponent(patternObj.value) : 'Up and Down';
 
     return pattern;
   }),
@@ -174,7 +174,7 @@ export default Ember.Controller.extend({
   sensitivity: Ember.computed('alertProps', function() {
     const props = this.get('alertProps');
     const sensitivityObj = props.find(prop => prop.name === 'sensitivity');
-    const sensitivity = sensitivityObj ? sensitivityObj.value : 'MEDIUM';
+    const sensitivity = sensitivityObj ? decodeURIComponent(sensitivityObj.value) : 'MEDIUM';
 
     const sensitivityMapping = {
       LOW: 'Robust (Low)',
