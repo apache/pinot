@@ -22,6 +22,11 @@ export default Ember.Component.extend({
 
   sortMode: null, // ""
 
+  /**
+   * loading status for component
+   */
+  isLoading: false,
+
   init() {
     this._super(...arguments);
     this.setProperties({ sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });

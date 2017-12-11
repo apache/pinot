@@ -35,7 +35,9 @@
     selectedUrn=primaryMetricUrn
     onSelection=(action "onMetricContext")
   }}
-  <a {{action "onMetricChart"}}>add to chart</a>
+  {{#if primaryMetricUrn}}
+    <a class="thirdeye-link" {{action "onMetricChart"}}>+ add to chart</a>
+  {{/if}}
 </div>
 <div class="col-xs-4">
   <label class="te-label" for="select-filters">Filters: </label>
