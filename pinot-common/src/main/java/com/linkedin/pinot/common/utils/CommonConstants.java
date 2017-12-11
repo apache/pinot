@@ -308,6 +308,15 @@ public class CommonConstants {
     public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
     public static final String OPTIMIZATIONS = "segment.optimizations";
+    /**
+     * This field will be populated only for use cases that are refreshing segments and
+     * have minion configured. It will contain COMMITTING + human readable timestamp in UTC, time right
+     * before any permanent changes happen to the segment, aka, right before
+     * the segment is moved to its permanent directory. For example. it will say something like
+     * COMMITTING-20171210T09:31:55.765
+     */
+    public static final String SEGMENT_PUSH_STATUS = "segment.push.status";
+    public static final String CUSTOM_FIELDS = "custom.fields";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
