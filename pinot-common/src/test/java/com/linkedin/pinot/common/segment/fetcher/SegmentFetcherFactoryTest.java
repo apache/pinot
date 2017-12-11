@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.io.File;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -47,7 +48,7 @@ public class SegmentFetcherFactoryTest {
     SegmentFetcherFactory.getPreloadSegmentFetchers().put("https", mockHttpsFetcher);
     SegmentFetcherFactory.getPreloadSegmentFetchers().put(replacableProto, replacableFetcher);
 
-    SegmentFetcherFactory.initSegmentFetcherFactory(conf);
+    SegmentFetcherFactory.initSegmentFetcherFactory(conf.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
     ArgumentCaptor<Configuration> captor = ArgumentCaptor.forClass(Configuration.class);
     verify(mockHdfsFetcher).init(captor.capture());
     Assert.assertEquals(captor.getValue().getString("hadoop.conf.path"), "file:///somewhere/folder");

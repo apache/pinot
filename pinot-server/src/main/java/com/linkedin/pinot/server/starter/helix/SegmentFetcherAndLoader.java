@@ -74,8 +74,10 @@ public class SegmentFetcherAndLoader {
       // Keep the default value
     }
     _segmentLoadMinRetryDelayMs = minRetryDelayMillis;
+    Configuration segmentFetcherFactoryConfig =
+        pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
-    SegmentFetcherFactory.initSegmentFetcherFactory(pinotHelixProperties);
+    SegmentFetcherFactory.initSegmentFetcherFactory(segmentFetcherFactoryConfig);
   }
 
   public void addOrReplaceOfflineSegment(String tableName, String segmentId, boolean retryOnFailure) {
