@@ -3,7 +3,7 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
-import { toCurrentUrn, toBaselineUrn, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const queryParamsConfig = {
@@ -171,6 +171,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let selectedUrns = new Set();
     let sessionName = 'New Investigation (' + moment().format(dateFormat) + ')';
     let sessionText = '';
+    let sessionModified = true;
 
     // metric-initialized context
     if (metricId && metricUrn) {
@@ -189,14 +190,16 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     if (anomalyId && anomalyUrn && anomalyContext) {
       const contextUrns = anomalyContext.map(e => e.urn);
 
-      const metricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
+      const baseMetricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
       const dimensionUrns = filterPrefix(contextUrns, 'thirdeye:dimension:');
+
+      const metricUrns = baseMetricUrns.map(urn => appendFilters(urn, toFilters(dimensionUrns)));
 
       const anomalyRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:anomaly:');
       const analysisRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:analysis:');
 
       context = {
-        urns: new Set([...metricUrns, ...dimensionUrns, anomalyUrn]),
+        urns: new Set([...baseMetricUrns, ...dimensionUrns, anomalyUrn]),
         anomalyRange: _.slice(anomalyRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10)), // thirdeye:timerange:anomaly:{start}:{end}
         analysisRange: _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10)), // thirdeye:timerange:analysis:{start}:{end}
         granularity,
@@ -220,12 +223,14 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       selectedUrns = new Set(session.selectedUrns);
       sessionName = session.name;
       sessionText = session.text;
+      sessionModified = false;
     }
 
     controller.setProperties({
       sessionId,
       sessionName,
       sessionText,
+      sessionModified,
       settingsConfig,
       selectedUrns,
       context

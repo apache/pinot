@@ -1,47 +1,47 @@
-<div class="card-container card-container--box-shadow">
-  <div class="card-container__body">
-    <section class="rca-summary">
-      <div class="row">
-        <div class="col-xs-3">
-          <label class="te-label" for="select-anomaly-region">Anomaly Range:
-            <span>
-              <i class="glyphicon glyphicon-question-sign"></i>
-              {{#tooltip-on-element}}
-                Typically, this is your anomaly region. It's highlighted in orange in the graph below.
-              {{/tooltip-on-element}}
-            </span>
-          </label>
-          {{date-range-picker
-            class="te-range-picker"
-            timePicker=true
-            timePicker24Hour=true
-            timePickerIncrement=5
-            start=datePickerAnomalyRangeStart
-            end=datePickerAnomalyRangeEnd
-            maxDate=datePickerMaxDate
-            ranges=anomalyRanges
-            showCustomRangeLabel=false
-            format="MMM D, hh:mm a"
-            serverFormat="YYYY-MM-DD HH:mm"
-            applyAction=(action "setAnomalyDateRange")
-          }}
-        </div>
-        <div class="col-xs-6">
-          <label class="te-label" for="select-filters">Primary metric: </label>
-          {{rootcause-metric-select
-            selectedUrn=primaryMetricUrn
-            onSelection=(action "onMetricSelection")
-          }}
-        </div>
-        <div class="col-xs-3">
-          <label class="te-label" for="select-filters">Filters: </label>
-          {{filter-select
-            selected=filters
-            options=filterOptions
-            onChange=(action "onFiltersChange")
-          }}
-        </div>
-      </div>
-    </section>
-  </div>
+<div class="col-xs-3">
+  <label class="te-label" for="select-anomaly-region">Comparison Range:
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        Typically, this is your anomaly region. It's highlighted in orange in the graph above.
+      {{/tooltip-on-element}}
+    </span>
+  </label>
+  {{date-range-picker
+    class="te-range-picker"
+    timePicker=true
+    timePicker24Hour=true
+    timePickerIncrement=5
+    start=datePickerAnomalyRangeStart
+    end=datePickerAnomalyRangeEnd
+    maxDate=datePickerMaxDate
+    ranges=anomalyRanges
+    showCustomRangeLabel=false
+    format="MMM D, hh:mm a"
+    serverFormat="YYYY-MM-DD HH:mm"
+    applyAction=(action "setAnomalyDateRange")
+  }}
+</div>
+<div class="col-xs-5">
+  <label class="te-label" for="select-filters">Context metric:
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        This metric is used to display and rank items in the view below.
+      {{/tooltip-on-element}}
+    </span>
+  </label>
+  {{rootcause-metric-select
+    selectedUrn=primaryMetricUrn
+    onSelection=(action "onMetricContext")
+  }}
+  <a {{action "onMetricChart"}}>add to chart</a>
+</div>
+<div class="col-xs-4">
+  <label class="te-label" for="select-filters">Filters: </label>
+  {{filter-select
+    selected=filters
+    options=filterOptions
+    onChange=(action "onFiltersChange")
+  }}
 </div>

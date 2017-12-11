@@ -1,14 +1,18 @@
 import Ember from 'ember';
 import moment from 'moment';
+import { humanizeFloat } from 'thirdeye-frontend/helpers/utils'
 
 export default Ember.Component.extend({
-  // TODO implement anomaly feedback
-
   entities: null, // {}
 
   anomalyUrn: null, // ""
 
   onFeedback: null, // func (urn, feedback, comment)
+
+  //
+  // internal
+  //
+  isHidden: false,
 
   /**
    * Options to populate anomaly dropdown
@@ -32,20 +36,6 @@ export default Ember.Component.extend({
     }
   ),
 
-  start: Ember.computed(
-    'anomaly',
-    function() {
-      return moment(this.get('anomaly.start')).format('dddd, MMMM Do YYYY');
-    }
-  ),
-
-  end: Ember.computed(
-    'anomaly',
-    function () {
-      return moment(this.get('anomaly.end')).format('dddd, MMMM Do YYYY');
-    }
-  ),
-
   functionName: Ember.computed('anomaly', function () {
     return this.get('anomaly').attributes.function[0];
   }),
@@ -63,7 +53,7 @@ export default Ember.Component.extend({
   }),
 
   current: Ember.computed('anomaly', function () {
-    return parseFloat(this.get('anomaly').attributes.current[0]);
+    return parseFloat(this.get('anomaly').attributes.current[0]).toFixed(3);
   }),
 
   baseline: Ember.computed('anomaly', function () {
@@ -72,7 +62,7 @@ export default Ember.Component.extend({
 
   change: Ember.computed('anomaly', function () {
     const attr = this.get('anomaly').attributes;
-    return (parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1).toFixed(3);
+    return (parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1);
   }),
 
   status: Ember.computed('anomaly', function () {
@@ -91,24 +81,56 @@ export default Ember.Component.extend({
     return dimNames.sort().map(dimName => dimValues[dimName]).join(', ');
   }),
 
-  comment: Ember.computed('anomaly', function () {
-    const attr = this.get('anomaly.attributes.comment.firstObject');
-    return attr || [];
+  issueType: null, // TODO
+
+  metricFormatted: Ember.computed(
+    'dataset',
+    'metric',
+    function () {
+      const { dataset, metric } =
+        this.getProperties('dataset', 'metric');
+      return `${dataset}::${metric}`;
+    }
+  ),
+
+  dimensionsFormatted: Ember.computed('anomaly', function () {
+    const dimensions = this.get('dimensions');
+    return dimensions ? ` (${dimensions})` : '';
   }),
 
-  issueType: null, // TODO
+  changeFormatted: Ember.computed('change', function () {
+    const change = this.get('change');
+    const prefix = change > 0 ? '+' : '';
+    return `${prefix}${humanizeFloat(change * 100)}%`;
+  }),
+
+  startFormatted: Ember.computed('anomaly', function () {
+    return moment(this.get('anomaly').start).format('MMM D YYYY, hh:mm a');
+  }),
+
+  endFormatted: Ember.computed('anomaly', function () {
+    return moment(this.get('anomaly').end).format('MMM D YYYY, hh:mm a');
+  }),
+
+  isNeedFeedback: Ember.computed('status', function () {
+    return this.get('status') === 'NO_FEEDBACK';
+  }),
 
   actions: {
     onFeedback(status) {
-      const { onFeedback, anomalyUrn, comment } =
-        this.getProperties('onFeedback', 'anomalyUrn','comment');
+      const { onFeedback, anomalyUrn } = this.getProperties('onFeedback', 'anomalyUrn');
 
       if (onFeedback) {
-        onFeedback(anomalyUrn, status, comment);
+        onFeedback(anomalyUrn, status, '');
       }
 
       // TODO reload anomaly entity instead
       this.setProperties({ status });
+    },
+
+    toggleHidden() {
+      const { isHidden } = this.getProperties('isHidden');
+      this.setProperties({ isHidden: !isHidden });
     }
   }
 });

@@ -1,9 +1,4 @@
-urns
-{{#each-in labels as |urn label|}}
-  | <button {{action (mut currentUrn) urn}}>{{label}}</button>
-{{/each-in}}
-
-mode
+color
 | <button {{action (mut mode) "change"}}>change</button>
 | <button {{action (mut mode) "contributionDiff"}}>contribution diff</button>
 | <button {{action (mut mode) "contributionToDiff"}}>contribution to diff</button>

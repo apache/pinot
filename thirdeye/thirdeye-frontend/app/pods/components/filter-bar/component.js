@@ -111,9 +111,7 @@ export default Ember.Component.extend({
    */
   didReceiveAttrs() {
     const { filteredUrns, onFilter } = this.getProperties('filteredUrns', 'onFilter');
-    if (onFilter) {
-      onFilter(filteredUrns);
-    }
+    onFilter(filteredUrns);
   },
 
   /**
@@ -127,9 +125,7 @@ export default Ember.Component.extend({
     'filteredUrns',
     function() {
       const { filteredUrns, onFilter } = this.getProperties('filteredUrns', 'onFilter');
-      if (onFilter) {
-        onFilter(filteredUrns);
-      }
+      onFilter(filteredUrns);
     }
   ),
 
@@ -150,40 +146,32 @@ export default Ember.Component.extend({
   attributesMap: Ember.computed(
     'entities',
     function () {
-      let filteredEvents = this.get('entities');
+      let entities = this.get('entities');
       let map = {};
-      if (!_.isEmpty(filteredEvents)) {
+      if (!_.isEmpty(entities)) {
         // Iterate through each event
-        Object.keys(filteredEvents).forEach(key => {
-          const event = filteredEvents[key];
+        Object.keys(entities).forEach(key => {
+          const event = entities[key];
           const eventType = event.eventType;
+          if (!(eventType in map)) {
+            map[eventType] = {};
+          }
+
           // Iterate through each property of event's attributes object
           Object.keys(event.attributes).forEach(attr => {
             // Check if the attribute is in the config file
             if (this.isInConfig(attr)) {
-              // If map has a key of eventType (i.e. holidays, GCN, Lix)
-              if (map.hasOwnProperty(eventType)) {
-                // If eventType object in map doesn't have this attribute, add values to existing value set
-                if (map[eventType].hasOwnProperty(attr)) {
-                  let attrSet = map[eventType][attr];
-                  let values = event.attributes[attr];
-                  values.forEach(val => attrSet.add(val));
-                }
-                // If eventType object in map does have this attribute, create a set with those values
-                else {
-                  // Create set and add values there
-                  map[eventType][attr] = new Set(event.attr);
-                }
+              if (!(attr in map[eventType])) {
+                map[eventType][attr] = new Set();
               }
-              // If map doesn't have a key of eventType (i.e. holidays, GCN, Lix)
-              else {
-                let obj = { [attr]: new Set() };
-                map[eventType] = obj;
-              }
+              const attrSet = map[eventType][attr];
+
+              event.attributes[attr].forEach(val => attrSet.add(val));
             }
           });
         });
       }
+
       return map;
     }
   ),

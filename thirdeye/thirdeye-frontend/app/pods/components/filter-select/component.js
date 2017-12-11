@@ -119,7 +119,7 @@ export default Ember.Component.extend({
   maxNumFilters: 25,
 
   // Maximum total filter to display
-  maxTotalFilters: 100,
+  maxTotalFilters: 500,
 
   triggerId: '',
   noMatchesMessage: '',

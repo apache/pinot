@@ -1,3 +1,21 @@
+{{!-- TODO: replace with loading spinner --}}
+{{#if isLoading}}
+  <p>loading
+    {{#if isLoadingEntities}}
+      | ENTITIES
+    {{/if}}
+    {{#if isLoadingTimeseries}}
+      | TIMESERIES
+    {{/if}}
+    {{#if isLoadingAggregates}}
+      | AGGREGATES
+    {{/if}}
+    {{#if isLoadingBreakdowns}}
+      | BREAKDOWNS
+    {{/if}}
+  </p>
+{{/if}}
+
 <div class="container">
   {{#if anomalyUrn}}
     <div class="row">
@@ -10,39 +28,14 @@
   {{/if}}
 
   <div class="row">
-    {{!-- TODO: replace with loading spinner --}}
-    {{#if isLoading}}
-    <p>loading
-      {{#if isLoadingEntities}}
-        | ENTITIES
-      {{/if}}
-      {{#if isLoadingTimeseries}}
-        | TIMESERIES
-      {{/if}}
-      {{#if isLoadingAggregates}}
-        | AGGREGATES
-      {{/if}}
-      {{#if isLoadingBreakdowns}}
-        | BREAKDOWNS
-      {{/if}}
-    </p>
-  {{/if}}
-
-    <p>session | <a {{action "onSessionSave"}}>save</a> | <a {{action "onSessionSaveCopy"}}>save copy</a>
-      {{#if sessionId}}
-        | {{#link-to "rootcause" (query-params sessionId=sessionId)}}{{sessionId}}{{/link-to}}
-      {{/if}}
-    </p>
-
-    <h2 class="te-title te-title--rootcause">{{sessionName}} [edit?]</h2>
-
-    <p>{{#if sessionId}}(Session {{sessionId}}) {{/if}}{{sessionText}} [edit?]</p>
-
-    {{rootcause-settings
-      context=context
-      config=settingsConfig
-      onChange=(action "onContext")
-      onSelection=(action "onSelection")
+    {{rootcause-header
+      sessionId=sessionId
+      sessionName=sessionName
+      sessionText=sessionText
+      sessionModified=sessionModified
+      onChange=(action "onSessionChange")
+      onSave=(action "onSessionSave")
+      onCopy=(action "onSessionCopy")
     }}
   </div>
 
@@ -84,17 +77,25 @@
           </a>
         </div>
         <div class="card-container__subnav">
-          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
-            Metrics
-          </a>
-        </div>
-        <div class="card-container__subnav">
           <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
             Events
           </a>
         </div>
+        <div class="card-container__subnav">
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
+            Metrics
+          </a>
+        </div>
       </div>
       <div class="card-container__body">
+        <div class="row">
+          {{rootcause-settings
+            context=context
+            config=settingsConfig
+            onChange=(action "onContext")
+            onSelection=(action "onSelection")
+          }}
+        </div>
         <div class="row">
           <div class="col-xs-12">
             {{#if (eq activeTab "dimensions")}}
@@ -102,22 +103,13 @@
               {{rootcause-heatmap
                 entities=entities
                 breakdowns=breakdowns
-                selectedUrns=selectedUrns
-                onSelection=(action "onSelection")
+                selectedUrn=metricUrn
+                onSelection=(action "heatmapOnSelection")
               }}
             {{/if}}
 
             {{#if (eq activeTab "metrics")}}
               <h3>Metrics</h3>
-              <div class="col-xs-3">
-                Select user-defined metric:
-              </div>
-              <div class="col-xs-8">
-                {{rootcause-metric-select
-                  onSelection=(action "onSelection")
-                }}
-              </div>
-
               {{rootcause-metrics
                 entities=entities
                 aggregates=aggregates
