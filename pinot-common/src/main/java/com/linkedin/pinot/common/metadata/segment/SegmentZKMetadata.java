@@ -24,10 +24,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.*;
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {
@@ -47,6 +51,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private long _creationTime = -1;
   private SegmentPartitionMetadata _partitionMetadata = null;
   private List<String> _optimizations;
+  private String _segmentPushStatus;
+  private Map<String, String> _customFields;
 
   public SegmentZKMetadata() {
   }
@@ -77,6 +83,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
           _segmentName, e);
     }
     _optimizations = znRecord.getListField(CommonConstants.Segment.OPTIMIZATIONS);
+    _segmentPushStatus = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_PUSH_STATUS);
+    _customFields = znRecord.getMapField(CommonConstants.Segment.CUSTOM_FIELDS);
   }
 
   public String getSegmentName() {
@@ -175,6 +183,22 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _optimizations = optimizations;
   }
 
+  public Map<String, String> getCustomFields() {
+    return _customFields;
+  }
+
+  public void setCustomFields(Map<String, String> customFields) {
+    _customFields = customFields;
+  }
+
+  public String getSegmentPushStatus() {
+    return _segmentPushStatus;
+  }
+
+  public void setSegmentPushStatus(String segmentPushStatus) {
+    _segmentPushStatus = segmentPushStatus;
+  }
+
   @Override
   public boolean equals(Object segmentMetadata) {
     if (isSameReference(this, segmentMetadata)) {
@@ -197,7 +221,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
         && isEqual(_crc, metadata._crc)
         && isEqual(_creationTime, metadata._creationTime)
         && isEqual(_partitionMetadata, metadata._partitionMetadata)
-        && isEqual(_optimizations, metadata._optimizations);
+        && isEqual(_optimizations, metadata._optimizations)
+        && isEqual(_segmentPushStatus, metadata._segmentPushStatus)
+        && isEqual(_customFields, metadata._customFields);
   }
 
   @Override
@@ -214,6 +240,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     result = hashCodeOf(result, _creationTime);
     result = hashCodeOf(result, _partitionMetadata);
     result = hashCodeOf(result, _optimizations);
+    result = hashCodeOf(result, _segmentPushStatus);
+    result = hashCodeOf(result, _customFields);
     return result;
   }
 
@@ -249,6 +277,12 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     if (_optimizations != null) {
       znRecord.setListField(CommonConstants.Segment.OPTIMIZATIONS, _optimizations);
     }
+    if (_segmentPushStatus != null) {
+      znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_PUSH_STATUS, _segmentPushStatus);
+    }
+    if (_customFields != null) {
+      znRecord.setMapField(CommonConstants.Segment.CUSTOM_FIELDS, _customFields);
+    }
     return znRecord;
   }
 
@@ -280,6 +314,20 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
             _segmentName, e);
       }
     }
+
+    if (_segmentPushStatus == null) {
+      configMap.put(CommonConstants.Segment.SEGMENT_PUSH_STATUS, null);
+    } else {
+      configMap.put(CommonConstants.Segment.SEGMENT_PUSH_STATUS, _segmentPushStatus);
+    }
+
+    if (_customFields == null) {
+      configMap.put(CommonConstants.Segment.CUSTOM_FIELDS, null);
+    } else {
+      JSONObject jsonObject = new JSONObject(_customFields);
+      configMap.put(CommonConstants.Segment.CUSTOM_FIELDS, jsonObject.toString());
+    }
+
     return configMap;
   }
 }
