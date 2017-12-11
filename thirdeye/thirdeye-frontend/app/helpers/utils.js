@@ -15,6 +15,18 @@ const metricColors = [
 ];
 
 // TODO load from config
+// colors mapping for charts
+const colorMapping = {
+  blue: '#0091CA',
+  green: '#469A1F',
+  red: '#FF2C33',
+  purple: '#827BE9',
+  orange: '#E55800',
+  teal: '#0E95A0',
+  pink: '#FF1B90'
+};
+
+// TODO load from config
 // colors for events
 const eventColorMapping = {
   holiday: 'green',
@@ -242,4 +254,25 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({ checkStatus, pluralizeTime, isIterable, makeIterable, filterObject, toCurrentUrn, toBaselineUrn, toMetricUrn, stripTail, extractTail, appendFilters, appendTail, hasPrefix, filterPrefix, toBaselineRange, toFilters, toFilterMap, findLabelMapping, toMetricLabel, toColor, humanizeFloat });
+export default Ember.Helper.helper({
+  checkStatus,
+  pluralizeTime,
+  isIterable,
+  makeIterable,
+  filterObject,
+  toCurrentUrn,
+  toBaselineUrn,
+  toMetricUrn,
+  stripTail,
+  extractTail,
+  appendTail,
+  hasPrefix,
+  filterPrefix,
+  toBaselineRange,
+  toFilters,
+  toFilterMap,
+  findLabelMapping,
+  toMetricLabel,
+  toColor,
+  humanizeFloat
+});
