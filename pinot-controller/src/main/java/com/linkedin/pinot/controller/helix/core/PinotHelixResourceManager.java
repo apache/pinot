@@ -1462,7 +1462,6 @@ public class PinotHelixResourceManager {
       @Nonnull String downloadUrl) {
     String segmentName = segmentMetadata.getName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
-    // Segment does not exist, add new segment
     PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     // NOTE: must first set the segment ZK metadata before trying to update ideal state because server will need the
     // segment ZK metadata to download and load the segment

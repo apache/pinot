@@ -409,7 +409,7 @@ public class PinotSegmentUploadRestletResource {
     PinotResourceManagerResponse response;
     if (!isSegmentTimeValid(segmentMetadata)) {
       String errStr = "Invalid segment start/end time";
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.FORBIDDEN);
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.NOT_ACCEPTABLE);
     }
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
