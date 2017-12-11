@@ -281,34 +281,9 @@ public class FileUploadUtils {
     try {
       httpget = new GetMethod(url);
       int responseCode = FILE_UPLOAD_HTTP_CLIENT.executeMethod(httpget);
-      if (responseCode >= 400) {
-        long contentLength = httpget.getResponseContentLength();
-        if (contentLength > 0) {
-          InputStream responseBodyAsStream = httpget.getResponseBodyAsStream();
-          // don't read more than 1000 bytes
-          byte[] buffer = new byte[(int) Math.min(contentLength, 1000)];
-          responseBodyAsStream.read(buffer);
-          LOGGER.error("Error response from url:{} \n {}", url, new String(buffer));
-        }
-        String errMsg = "Received error response from server while downloading file. url:" + url
-            + " response code:" + responseCode;
-        if (responseCode >= 500) {
-          // Caller may retry.
-          throw new RuntimeException(errMsg);
-        } else {
-          throw new PermanentDownloadException(errMsg);
-        }
-      } else {
-        long ret = httpget.getResponseContentLength();  // Expected to be -1 if there is no content-length header.
-        BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(file));
-        IOUtils.copyLarge(httpget.getResponseBodyAsStream(), output);
-        IOUtils.closeQuietly(output);
-        if (ret != -1 && ret != file.length()) {
-          // The content-length header was present and does not match the file length.
-          throw new RuntimeException("File length " + file.length() + " does not match content length " + ret);
-        }
-        return ret;
-      }
+      long contentLength = httpget.getResponseContentLength();
+      InputStream is = httpget.getResponseBodyAsStream();
+      return storeFile(url, file, responseCode, contentLength, is);
     } catch (Exception ex) {
       LOGGER.error("Caught exception", ex);
       throw ex;
@@ -316,6 +291,35 @@ public class FileUploadUtils {
       if (httpget != null) {
         httpget.releaseConnection();
       }
+    }
+  }
+
+  public static long storeFile(String url, File file, int responseCode, long contentLength, InputStream is)
+      throws IOException {
+    if (responseCode >= 400) {
+      if (contentLength > 0) {
+        // don't read more than 1000 bytes
+        byte[] buffer = new byte[(int) Math.min(contentLength, 1000)];
+        is.read(buffer);
+        LOGGER.error("Error response from url:{} \n {}", url, new String(buffer));
+      }
+      String errMsg = "Received error response from server while downloading file. url:" + url
+          + " response code:" + responseCode;
+      if (responseCode >= 500) {
+        // Caller may retry.
+        throw new RuntimeException(errMsg);
+      } else {
+        throw new PermanentDownloadException(errMsg);
+      }
+    } else {
+      BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(file));
+      IOUtils.copyLarge(is, output);
+      IOUtils.closeQuietly(output);
+      if (contentLength != -1 && contentLength != file.length()) {
+        // The content-length header was present and does not match the file length.
+        throw new RuntimeException("File length " + file.length() + " does not match content length " + contentLength);
+      }
+      return contentLength;
     }
   }
 
