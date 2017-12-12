@@ -9,10 +9,7 @@ export default Ember.Component.extend({
 
   onFeedback: null, // func (urn, feedback, comment)
 
-  //
-  // internal
-  //
-  isHidden: false,
+  isHiddenUser: null,
 
   /**
    * Options to populate anomaly dropdown
@@ -116,6 +113,18 @@ export default Ember.Component.extend({
     return this.get('status') === 'NO_FEEDBACK';
   }),
 
+  isHidden: Ember.computed(
+    'isNeedFeedback',
+    'isHiddenUser',
+    function () {
+      const { isNeedFeedback, isHiddenUser } = this.getProperties('isNeedFeedback', 'isHiddenUser');
+      if (isHiddenUser === null) {
+        return !isNeedFeedback;
+      }
+      return isHiddenUser;
+    }
+  ),
+
   actions: {
     onFeedback(status) {
       const { onFeedback, anomalyUrn } = this.getProperties('onFeedback', 'anomalyUrn');
@@ -130,7 +139,7 @@ export default Ember.Component.extend({
 
     toggleHidden() {
       const { isHidden } = this.getProperties('isHidden');
-      this.setProperties({ isHidden: !isHidden });
+      this.setProperties({ isHiddenUser: !isHidden });
     }
   }
 });
