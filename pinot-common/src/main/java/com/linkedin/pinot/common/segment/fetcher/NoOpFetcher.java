@@ -22,8 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // This class is provided as a means to override any standard fetchers that will not be used
-// in a given Pinot installation, because
-//
+// in a given Pinot installation.
 public class NoOpFetcher implements SegmentFetcher {
   public static Logger LOGGER = LoggerFactory.getLogger(NoOpFetcher.class);
 
