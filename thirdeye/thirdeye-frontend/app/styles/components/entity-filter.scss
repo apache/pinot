@@ -62,11 +62,13 @@
       }
     }
   }
+
+  .btn span.glyphicon {
+  opacity: 0;
+  }
+  .btn.active span.glyphicon {
+    opacity: 1;
+  }
 }
 
-.btn span.glyphicon {
-  opacity: 0;
-}
-.btn.active span.glyphicon {
-  opacity: 1;
-}
+

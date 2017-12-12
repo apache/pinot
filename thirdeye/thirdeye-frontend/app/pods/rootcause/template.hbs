@@ -41,28 +41,26 @@
 
   <div class="row">
     <div class="card-container card-container--box-shadow">
-      <div class="card-container__body">
-        <div class="rootcause-wrapper">
-          {{rootcause-legend
+      <div class="rootcause-wrapper">
+        {{rootcause-legend
+          entities=entities
+          selectedUrns=selectedUrns
+          invisibleUrns=invisibleUrns
+          onVisibility=(action "onVisibility")
+          onSelection=(action "onSelection")}}
+        <div class="rootcause-wrapper__chart">
+          {{rootcause-chart-toolbar
+            context=context
+            timeseriesMode=timeseriesMode
+            onContext=(action "onContext")
+            onChart=(action "onChart")}}
+          {{rootcause-chart
             entities=entities
-            selectedUrns=selectedUrns
-            invisibleUrns=invisibleUrns
-            onVisibility=(action "onVisibility")
-            onSelection=(action "onSelection")}}
-          <div class="rootcause-wrapper__chart">
-            {{rootcause-chart-toolbar
-              context=context
-              timeseriesMode=timeseriesMode
-              onContext=(action "onContext")
-              onChart=(action "onChart")}}
-            {{rootcause-chart
-              entities=entities
-              selectedUrns=chartSelectedUrns
-              timeseries=timeseries
-              timeseriesMode=timeseriesMode
-              context=context
-              onHover=(action "chartOnHover")}}
-          </div>
+            selectedUrns=chartSelectedUrns
+            timeseries=timeseries
+            timeseriesMode=timeseriesMode
+            context=context
+            onHover=(action "chartOnHover")}}
         </div>
       </div>
     </div>
