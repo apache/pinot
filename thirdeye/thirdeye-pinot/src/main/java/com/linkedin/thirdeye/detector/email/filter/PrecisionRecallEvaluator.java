@@ -6,7 +6,9 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 
@@ -187,6 +189,21 @@ public class PrecisionRecallEvaluator {
 
   public Properties toProperties() {
     Properties evals = new Properties();
+    evals.put(RESPONSE_RATE, getResponseRate());
+    evals.put(PRECISION, getPrecision());
+    evals.put(WEIGHTED_PRECISION, getWeightedPrecision());
+    evals.put(RECALL, getRecall());
+    evals.put(TOTALALERTS, getTotalAlerts());
+    evals.put(TOTALRESPONSES, getTotalResponses());
+    evals.put(TRUEANOMALIES, getTrueAnomalies());
+    evals.put(FALSEALARM, getFalseAlarm());
+    evals.put(NEWTREND, getTrueAnomalyNewTrend());
+    evals.put(USER_REPORT, getUserReportAnomaly());
+    return evals;
+  }
+
+  public Map<String, Number> toNumberMap() {
+    Map<String, Number> evals = new HashMap<>();
     evals.put(RESPONSE_RATE, getResponseRate());
     evals.put(PRECISION, getPrecision());
     evals.put(WEIGHTED_PRECISION, getWeightedPrecision());
