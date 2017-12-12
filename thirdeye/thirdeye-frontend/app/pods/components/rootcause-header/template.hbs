@@ -1,7 +1,7 @@
 <div class="container">
   <div class="row">
     <div class="col-xs-10">
-      {{textarea-autosize placeholder="Enter investigation title ..." value=sessionName cols=50 rows=1 maxlen=80 class="rootcause-header__major rootcause-header--textarea" key-press="onChange"}}
+      {{textarea-autosize placeholder="Enter investigation title ..." value=name cols=50 rows=1 maxlen=80 class="rootcause-header__major rootcause-header--textarea" key-press="onChange"}}
     </div>
     <div class="col-xs-2 rootcause-header__side">
       <button {{action "onCopy"}} class="rootcause-header--button">Save Copy</button><br/>
@@ -10,7 +10,7 @@
   </div>
   <div class="row">
     <div class="col-xs-10">
-      {{textarea-autosize placeholder="Take notes or summarize the results here ..." value=sessionText cols=130 rows=1 class="rootcause-header__minor rootcause-header--textarea" key-press="onChange"}}
+      {{textarea-autosize placeholder="Take notes or summarize the results here ..." value=text cols=130 rows=1 class="rootcause-header__minor rootcause-header--textarea" key-press="onChange"}}
     </div>
     <div class="col-xs-2 rootcause-header__side">
       {{#if sessionId}}
@@ -18,6 +18,9 @@
         {{#if sessionModified}}(modified){{/if}}
       {{else}}
         (unsaved)
+      {{/if}}
+      {{#if undoMessage}}
+        <button {{action "onUndo"}} class="rootcause-header--button">Undo last</button>
       {{/if}}
     </div>
   </div>
