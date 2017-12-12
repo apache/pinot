@@ -177,7 +177,7 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
       return DEFAULT_FINAL_RESULT;
     } else {
       Collections.sort(intermediateResult);
-      return intermediateResult.get(intermediateResult.size() * _percentile / 100);
+      return intermediateResult.get((int) ((long) intermediateResult.size() * _percentile / 100));
     }
   }
 }
