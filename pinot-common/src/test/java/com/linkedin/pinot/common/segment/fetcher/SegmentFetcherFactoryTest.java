@@ -63,7 +63,7 @@ public class SegmentFetcherFactoryTest {
   public void testGetSegmentFetcherBasedOnURI() throws Exception {
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("hdfs:///something/wer") instanceof HdfsSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
-    Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://") instanceof HttpSegmentFetcher);
+    Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://") instanceof HttpsSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("file://a/asdf/wer/fd/e") instanceof LocalFileSegmentFetcher);
 
     Assert.assertNull(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));

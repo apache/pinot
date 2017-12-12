@@ -34,7 +34,7 @@ public class SegmentFetcherFactory {
   static {
     instantiateSegmentFetcher("file", LocalFileSegmentFetcher.class);
     instantiateSegmentFetcher("http", HttpSegmentFetcher.class);
-    instantiateSegmentFetcher("https", HttpSegmentFetcher.class);
+    instantiateSegmentFetcher("https", HttpsSegmentFetcher.class);
     instantiateSegmentFetcher("hdfs", "com.linkedin.pinot.common.segment.fetcher.HdfsSegmentFetcher");
   }
 
