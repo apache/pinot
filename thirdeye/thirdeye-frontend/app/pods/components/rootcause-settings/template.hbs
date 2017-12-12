@@ -38,7 +38,14 @@
   <a {{action "onMetricChart"}}>add to chart</a>
 </div>
 <div class="col-xs-4">
-  <label class="te-label" for="select-filters">Filters: </label>
+  <label class="te-label" for="select-filters">Context filters:
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        These filters enable drill-down into specific dimensions of the context metric and the timeseries above (if applicable).
+      {{/tooltip-on-element}}
+    </span>
+  </label>
   {{filter-select
     selected=filters
     options=filterOptions
