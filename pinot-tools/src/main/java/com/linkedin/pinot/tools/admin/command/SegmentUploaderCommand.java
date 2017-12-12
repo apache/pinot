@@ -131,7 +131,7 @@ public class SegmentUploaderCommand extends AbstractBaseAdminCommand implements 
 
             /* Spawning thread for the table */
             Thread t = new Thread(new SegmentUploaderCommand().set_controllerHost(_controllerHost)
-                    .set_controllerPort(_controllerPort).addTable(SchemaInfo.TABLE_DEFINITIONS.get(i))
+                    .set_controllerPort(_controllerPort)
                     .set_segDir(PARENT_FOLDER + SEG_DIR + SchemaInfo.DATA_DIRS.get(i))
                     .set_uploadPeriod(segmentUploadPeriod));
             t.start();

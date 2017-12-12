@@ -23,7 +23,7 @@ import org.apache.helix.model.IdealState;
 public class SegmentCountMetric implements ServerLoadMetric {
   @Override
   public long computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState,
-      String instance) {
+                                    String instance, String tableName) {
     //We use idealState to count number of segments for instances
     if (idealState != null) {
       long numOfSegments = 0;

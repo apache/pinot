@@ -43,10 +43,10 @@ public final class SchemaInfo {
             "new_data/adsSchemaAnnotation.json", "new_data/articlesSchemaAnnotation.json", "new_data/viewsSchemaAnnotation.json");
 
     /* Number of records to generate for each table */
-    public static final List<Integer> NUM_RECORDS = Arrays.asList(1000000, 1000, 1000, 1000);
+    public static final List<Integer> NUM_RECORDS = Arrays.asList(7500, 1000, 1000, 1000);
 
     /* Number of segments to generate using NUM_RECORDS for each table */
-    public static final List<Integer> NUM_SEGMENTS = Arrays.asList(4, 4, 4, 4);
+    public static final List<Integer> NUM_SEGMENTS = Arrays.asList(20, 4, 4, 4);
 
     /* Names of directory to store the AVRO data for each table */
     public static final List<String> DATA_DIRS = Arrays.asList("jobs", "ads", "articles", "views");

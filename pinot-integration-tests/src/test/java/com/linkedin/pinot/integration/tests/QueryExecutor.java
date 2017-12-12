@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 public abstract class QueryExecutor {
     Properties config;
     private PostQueryCommand postQueryCommand;
+    private int testDuration;
 
     public static QueryExecutor getInstance(){
         return null;
@@ -39,6 +40,9 @@ public abstract class QueryExecutor {
     public static List<QueryExecutor> getTableExecutors() {
         List<QueryExecutor> queryExecutors = new ArrayList<>();
         queryExecutors.add(JobQueryExecutor.getInstance());
+        queryExecutors.add(AdsQueryExecutor.getInstance());
+        queryExecutors.add(ArticlesQueryExecutor.getInstance());
+        queryExecutors.add(ViewsQueryExecutor.getInstance());
         return queryExecutors;
     }
 
@@ -49,7 +53,7 @@ public abstract class QueryExecutor {
         QueryTask queryTask = getTask(config);
         queryTask.setPostQueryCommand(this.postQueryCommand);
         threadPool.execute(queryTask);
-        threadPool.awaitTermination(1, TimeUnit.MINUTES);
+        threadPool.awaitTermination(this.testDuration, TimeUnit.SECONDS);
         threadPool.shutdownNow();
     }
 
@@ -75,4 +79,8 @@ public abstract class QueryExecutor {
     public abstract String getConfigFile();
 
     public abstract QueryTask getTask(Properties config);
+
+    public void setTestDuration(int testDuration) {
+        this.testDuration = testDuration;
+    }
 }

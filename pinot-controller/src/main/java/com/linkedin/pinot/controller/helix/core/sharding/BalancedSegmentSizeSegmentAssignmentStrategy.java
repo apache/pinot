@@ -33,8 +33,8 @@ public class BalancedSegmentSizeSegmentAssignmentStrategy implements SegmentAssi
       int numReplicas, String tenantName) {
     //We create a SegmentSizeMetric and pass it to BalancedLoadAssignmentStrategy
     //This means BalancedSegmentSizeSegmentAssignmentStrategy
-    //ServerLoadMetric serverLoadMetric = new SegmentSizeMetric();
-    ServerLoadMetric serverLoadMetric = new LatencyBasedLoadMetric();
+    ServerLoadMetric serverLoadMetric = new SegmentSizeMetric();
+    //ServerLoadMetric serverLoadMetric = new LatencyBasedLoadMetric();
     BalancedLoadAssignmentStrategy balancedLoadAssignmentStrategy = new BalancedLoadAssignmentStrategy(serverLoadMetric);
     return balancedLoadAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
         segmentMetadata, numReplicas, tenantName);

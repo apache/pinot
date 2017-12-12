@@ -31,7 +31,7 @@ public class SegmentSizeMetric implements ServerLoadMetric {
 
   @Override
   public long computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState,
-      String instance) {
+      String instance, String tableName) {
     ServerPerfMetricsReader serverPerfMetricsReader =
         new ServerPerfMetricsReader(executor, connectionManager, helixResourceManager);
     ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 300);

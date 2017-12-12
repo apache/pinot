@@ -85,7 +85,7 @@ public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy
         // We Do not add servers, that are not tagged, to the map.
         // By this approach, new segments will not be allotted to the server if tags changed.
         for (String instanceName : allTaggedInstances) {
-          long reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName);
+          long reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName,tableName);
           if (reportedMetric != -1) {
             reportedLoadMetricPerInstanceMap.put(instanceName, reportedMetric);
           } else {
@@ -119,6 +119,11 @@ public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy
     }
     LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
         + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
+
+    if(_serverLoadMetric.getClass().equals(LatencyBasedLoadMetric.class))
+      for(String selectedInstance : selectedInstances){
+        ((LatencyBasedLoadMetric) _serverLoadMetric).addCostToServerMap(selectedInstance,reportedLoadMetricPerInstanceMap.get(selectedInstance));
+    }
     return selectedInstances;
   }
 }
