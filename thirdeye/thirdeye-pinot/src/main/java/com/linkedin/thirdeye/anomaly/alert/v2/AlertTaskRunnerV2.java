@@ -182,7 +182,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     // apply filtration rule
     results = AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
 
-    // only anomalies detected by default scheduler are sent
+    // only anomalies detected by default scheduler are sent; the anomalies detected during replay or given by users will not be sent
     Iterator<MergedAnomalyResultDTO> mergedAnomalyIterator = results.iterator();
     while (mergedAnomalyIterator.hasNext()) {
       MergedAnomalyResultDTO anomaly = mergedAnomalyIterator.next();
