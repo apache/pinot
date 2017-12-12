@@ -102,6 +102,15 @@ public class AggregationFunctionFactory {
     public String getName() {
       return _name;
     }
+
+    public boolean isOfType(AggregationFunctionType... aggregationFunctionTypes) {
+      for (AggregationFunctionType aggFuncType : aggregationFunctionTypes) {
+        if (this.equals(aggFuncType)) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   /**
