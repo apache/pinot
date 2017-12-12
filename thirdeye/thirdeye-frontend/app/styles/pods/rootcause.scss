@@ -10,3 +10,27 @@
     padding-top: 12px;
   }
 }
+
+.rootcause-chart-container-fluid {
+  padding: 0px;
+}
+
+.rootcause-message {
+  margin-top: 12px;
+  padding-left: 8px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: bold;
+
+  &__error {
+    background-color: lighten($te-red, 40%);
+  }
+
+  &__warning {
+    background-color: lighten($te-orange, 40%);
+  }
+
+  &__info {
+    background-color: lighten($te-blue, 40%);
+  }
+}
