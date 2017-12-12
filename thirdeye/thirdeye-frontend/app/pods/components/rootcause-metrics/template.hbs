@@ -17,7 +17,14 @@
           <span class="rootcause-metric__name">{{get-safe metrics urn}}</span>
           <span class="rootcause-metric__dataset">{{get-safe datasets urn}}</span>
         </div>
-        <span class="rootcause-metric__change rootcause-metric__change--{{color-delta (get-safe changes urn)}}">{{get-safe changesFormatted urn}}</span>
+        {{#if isLoading}}
+          <div class="spinner-wrapper spinner-wrapper--card">
+              {{ember-spinner}}
+          </div>
+        {{/if}}
+          <span class="rootcause-metric__change rootcause-metric__change--{{color-delta (get-safe changes urn)}}">
+            {{get-safe changesFormatted urn}}
+          </span>
       </div>
     {{else}}
       No Metrics.
