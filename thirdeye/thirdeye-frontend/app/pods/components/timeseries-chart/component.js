@@ -48,6 +48,19 @@ export default Ember.Component.extend({
     }
   },
 
+  /**
+   * Converts color strings into their rgba equivalent
+   */
+  colorMapping: {
+    blue: '#0091CA',
+    green: '#469A1F',
+    red: '#FF2C33',
+    purple: '#827BE9',
+    orange: '#E55800',
+    teal: '#0E95A0',
+    pink: '#FF1B90'
+  },
+
   subchart: { // on init only
     show: true
   },
@@ -59,6 +72,7 @@ export default Ember.Component.extend({
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
+    const colorMapping = this.get('colorMapping');
     const { axis, legend, tooltip } = this.getProperties('axis', 'legend', 'tooltip');
 
     const addedKeys = Object.keys(series).filter(sid => !cache[sid]);
@@ -91,7 +105,7 @@ export default Ember.Component.extend({
     const columns = values.concat(timestamps);
 
     const colors = {};
-    loadKeys.filter(sid => series[sid].color).forEach(sid => colors[sid] = series[sid].color);
+    loadKeys.filter(sid => series[sid].color).forEach(sid => colors[sid] = colorMapping[series[sid].color]);
 
     const types = {};
     loadKeys.filter(sid => series[sid].type).forEach(sid => types[sid] = series[sid].type);
