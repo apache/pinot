@@ -23,8 +23,6 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
@@ -151,9 +149,7 @@ public class RawIndexCreatorTest {
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-
-    ChunkDecompressor uncompressor = ChunkCompressorFactory.getDecompressor("snappy");
-    VarByteChunkSingleValueReader rawIndexReader = new VarByteChunkSingleValueReader(indexBuffer, uncompressor);
+    VarByteChunkSingleValueReader rawIndexReader = new VarByteChunkSingleValueReader(indexBuffer);
 
     _recordReader.rewind();
     ChunkReaderContext context = rawIndexReader.createContext();
@@ -176,8 +172,7 @@ public class RawIndexCreatorTest {
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
 
-    FixedByteChunkSingleValueReader rawIndexReader = new FixedByteChunkSingleValueReader(indexBuffer,
-        ChunkCompressorFactory.getDecompressor("snappy"));
+    FixedByteChunkSingleValueReader rawIndexReader = new FixedByteChunkSingleValueReader(indexBuffer);
 
     _recordReader.rewind();
     for (int row = 0; row < NUM_ROWS; row++) {

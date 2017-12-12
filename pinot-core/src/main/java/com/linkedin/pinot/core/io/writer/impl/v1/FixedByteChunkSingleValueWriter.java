@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressor;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import java.io.File;
 import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
@@ -34,6 +34,9 @@ import javax.annotation.concurrent.NotThreadSafe;
  *   <li> Integer: Total number of chunks. </li>
  *   <li> Integer: Number of docs per chunk. </li>
  *   <li> Integer: Length of entry (in bytes). </li>
+ *   <li> Integer: Total number of docs (version 2 onwards). </li>
+ *   <li> Integer: Compression type enum value (version 2 onwards). </li>
+ *   <li> Integer: Start offset of data header (version 2 onwards). </li>
  *   <li> Integer array: Integer offsets for all chunks in the data .</li>
  * </ul>
  *
@@ -47,24 +50,25 @@ import javax.annotation.concurrent.NotThreadSafe;
 @NotThreadSafe
 public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
 
-  private static final int VERSION = 1;
+  private static final int CURRENT_VERSION = 2;
   private int _chunkDataOffset;
 
   /**
    * Constructor for the class.
    *
    * @param file File to write to.
-   * @param compressor Compressor for compressing individual chunks of data.
+   * @param compressionType Type of compression to use.
    * @param totalDocs Total number of docs to write.
    * @param numDocsPerChunk Number of documents per chunk.
    * @param sizeOfEntry Size of entry (in bytes).
    * @throws IOException
    */
-  public FixedByteChunkSingleValueWriter(File file, ChunkCompressor compressor, int totalDocs, int numDocsPerChunk,
-      int sizeOfEntry)
+  public FixedByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType,
+      int totalDocs, int numDocsPerChunk, int sizeOfEntry)
       throws IOException {
 
-    super(file, compressor, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry, VERSION);
+    super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
+        CURRENT_VERSION);
     _chunkDataOffset = 0;
   }
 
