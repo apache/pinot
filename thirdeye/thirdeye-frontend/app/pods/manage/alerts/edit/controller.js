@@ -149,24 +149,20 @@ export default Ember.Controller.extend({
    * Mapping alertFilter's pattern to human readable strings
    * @returns {String}
    */
-  pattern: Ember.computed('alertFilter.pattern', function() {
-    const pattern = this.getWithDefault('alertFilter.pattern', 'UP,DOWN');
+  pattern: Ember.computed('alertProps', function() {
+    const props = this.get('alertProps');
+    const patternObj = props.find(prop => prop.name === 'pattern');
+    const pattern = patternObj ? decodeURIComponent(patternObj.value) : 'Up and Down';
 
-    const patternMapping = {
-      'UP,DOWN': 'Up and Down',
-      UP: 'Up only',
-      DOWN: 'Down Only'
-    };
-
-    return patternMapping[pattern];
+    return pattern;
   }),
 
   /**
    * Extracting Weekly Effect from alert Filter
    * @returns {String}
    */
-  weeklyEffect: Ember.computed('alertFilter.weeklyEffectModeled', function() {
-    const weeklyEffect = this.getWithDefault('alertFilter.weeklyEffectModeled', true);
+  weeklyEffect: Ember.computed('alertFilters.weeklyEffectModeled', function() {
+    const weeklyEffect = this.getWithDefault('alertFilters.weeklyEffectModeled', true);
 
     return weeklyEffect;
   }),
@@ -175,12 +171,15 @@ export default Ember.Controller.extend({
    * Extracting sensitivity from alert Filter and maps it to human readable values
    * @returns {String}
    */
-  sensitivity: Ember.computed('alertFilter.userDefinedPattern', function() {
-    const sensitivity = this.getWithDefault('alertFilter.userDefinedPattern', 'MEDIUM');
+  sensitivity: Ember.computed('alertProps', function() {
+    const props = this.get('alertProps');
+    const sensitivityObj = props.find(prop => prop.name === 'sensitivity');
+    const sensitivity = sensitivityObj ? decodeURIComponent(sensitivityObj.value) : 'MEDIUM';
+
     const sensitivityMapping = {
-      LOW: 'Robust',
+      LOW: 'Robust (Low)',
       MEDIUM: 'Medium',
-      HIGHT: 'Sensitive'
+      HIGH: 'Sensitive (High)'
     };
 
     return sensitivityMapping[sensitivity];
