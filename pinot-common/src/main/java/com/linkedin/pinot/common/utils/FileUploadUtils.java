@@ -108,7 +108,7 @@ public class FileUploadUtils {
    * @param inputStream
    * @param lengthInBytes
    * @param httpMethod
-   * @param headers Contains If-Match header with originalSegmentCrc and Pragma header to tell the controller the request
+   * @param headers Contains If-Match header with originalSegmentCrc and User-Agent header to tell the controller the request
    *                is coming from Minion
    * @return
    */
@@ -136,7 +136,7 @@ public class FileUploadUtils {
       method.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
 
       for (Header header: headers) {
-        method.setRequestHeader(header);
+        method.addRequestHeader(header);
       }
 
       FILE_UPLOAD_HTTP_CLIENT.executeMethod(method);
