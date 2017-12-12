@@ -3,7 +3,15 @@ color
 | <button {{action (mut mode) "contributionDiff"}}>contribution diff</button>
 | <button {{action (mut mode) "contributionToDiff"}}>contribution to diff</button>
 
-{{heatmap-chart
-  cells=cells
-  onHeatmapClick=(action "onHeatmapClick")
-}}
+{{#if hasCurrent}}
+  {{#if hasBaseline}}
+    {{heatmap-chart
+      cells=cells
+      onHeatmapClick=(action "onHeatmapClick")
+    }}
+  {{else}}
+    <div class="rootcause-message rootcause-message__warning">No data for baseline range</div>
+  {{/if}}
+{{else}}
+  <div class="rootcause-message rootcause-message__warning">No data for comparison range</div>
+{{/if}}

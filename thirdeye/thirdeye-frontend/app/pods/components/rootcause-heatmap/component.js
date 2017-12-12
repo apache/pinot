@@ -78,6 +78,20 @@ export default Ember.Component.extend({
     }
   ),
 
+  hasCurrent: Ember.computed(
+    'current',
+    function () {
+      return Object.keys(this.get('current')).length > 0;
+    }
+  ),
+
+  hasBaseline: Ember.computed(
+    'baseline',
+    function () {
+      return Object.keys(this.get('baseline')).length > 0;
+    }
+  ),
+
   _dataRollup: Ember.computed(
     'current',
     'baseline',
