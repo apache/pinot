@@ -2,6 +2,8 @@ import Ember from 'ember';
 import moment from 'moment';
 import { humanizeFloat } from 'thirdeye-frontend/helpers/utils'
 
+const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
+
 export default Ember.Component.extend({
   entities: null, // {}
 
@@ -9,7 +11,7 @@ export default Ember.Component.extend({
 
   onFeedback: null, // func (urn, feedback, comment)
 
-  isHiddenUser: null,
+  isHiddenUser: ROOTCAUSE_HIDDEN_DEFAULT,
 
   /**
    * Options to populate anomaly dropdown
@@ -109,17 +111,17 @@ export default Ember.Component.extend({
     return moment(this.get('anomaly').end).format('MMM D YYYY, hh:mm a');
   }),
 
-  isNeedFeedback: Ember.computed('status', function () {
+  requiresFeedback: Ember.computed('status', function () {
     return this.get('status') === 'NO_FEEDBACK';
   }),
 
   isHidden: Ember.computed(
-    'isNeedFeedback',
+    'requiresFeedback',
     'isHiddenUser',
     function () {
-      const { isNeedFeedback, isHiddenUser } = this.getProperties('isNeedFeedback', 'isHiddenUser');
-      if (isHiddenUser === null) {
-        return !isNeedFeedback;
+      const { requiresFeedback, isHiddenUser } = this.getProperties('requiresFeedback', 'isHiddenUser');
+      if (isHiddenUser === ROOTCAUSE_HIDDEN_DEFAULT) {
+        return !requiresFeedback;
       }
       return isHiddenUser;
     }
