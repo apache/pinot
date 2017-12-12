@@ -9,6 +9,8 @@ const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
 const ROOTCAUSE_TAB_EVENTS = "events";
 
+const ROOTCAUSE_UNDO_MERGE_TIMEOUT = 1000; // seconds
+
 // TODO: Update module import to comply by new Ember standards
 
 export default Ember.Controller.extend({
@@ -49,6 +51,8 @@ export default Ember.Controller.extend({
 
   timeseriesMode: null, // ""
 
+  undoLog: null, // []
+
   //
   // session data
   //
@@ -73,7 +77,8 @@ export default Ember.Controller.extend({
       hoverUrns: new Set(),
       filteredUrns: new Set(),
       activeTab: ROOTCAUSE_TAB_DIMENSIONS,
-      timeseriesMode: 'absolute'
+      timeseriesMode: 'absolute',
+      undoLog: []
     });
   },
 
@@ -257,6 +262,17 @@ export default Ember.Controller.extend({
     }
   ),
 
+  undoMessage: Ember.computed(
+    'undoLog',
+    function () {
+      const { undoLog } = this.getProperties('undoLog');
+
+      if (_.isEmpty(undoLog)) { return false; }
+
+      return undoLog[undoLog.length - 1].message;
+    }
+  ),
+
   _makeSession() {
     const { context, selectedUrns, sessionId, sessionName, sessionText } =
       this.getProperties('context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText');
@@ -276,11 +292,65 @@ export default Ember.Controller.extend({
     };
   },
 
+  _setPropertiesUndo(properties, action, message) {
+    const beforeImage = this.getProperties(...Object.keys(properties));
+    const { undoLog } = this.getProperties('undoLog');
+
+    const timestamp = moment().valueOf();
+
+    // merge checkpoint if last action is the same within a time window
+    if (!_.isEmpty(undoLog)) {
+      const lastLog = undoLog[undoLog.length - 1];
+      if (lastLog.action === action &&
+          lastLog.message === message &&
+          lastLog.timestamp >= timestamp - ROOTCAUSE_UNDO_MERGE_TIMEOUT) {
+
+        const newLogEntry = Object.assign({}, lastLog, { timestamp });
+        const newUndoLog = [..._.slice(undoLog, 0, undoLog.length - 1), newLogEntry];
+
+        this.setProperties(Object.assign({}, properties, { undoLog: newUndoLog }));
+        return;
+      }
+    }
+
+    const logEntry = {
+      beforeImage,
+      timestamp,
+      action,
+      message
+    };
+
+    const newUndoLog = [...undoLog, logEntry];
+
+    if (!_.isEqual(beforeImage, properties)) {
+      this.setProperties(Object.assign({}, properties, { undoLog: newUndoLog }));
+    }
+  },
+
+  _undoLast() {
+    const { undoLog } = this.getProperties('undoLog');
+
+    if (_.isEmpty(undoLog)) { return; }
+
+    const { beforeImage } = undoLog[undoLog.length - 1];
+
+    const newUndoLog = _.slice(undoLog, 0, undoLog.length - 1);
+
+    this.setProperties(Object.assign({}, beforeImage, { undoLog: newUndoLog }));
+  },
+
   //
   // Actions
   //
 
   actions: {
+    /**
+     * Undoes the last tracked user action.
+     */
+    onUndo() {
+      this._undoLast();
+    },
+
     /**
      * Updates selected urns.
      *
@@ -289,13 +359,15 @@ export default Ember.Controller.extend({
      */
     onSelection(updates) {
       const { selectedUrns } = this.getProperties('selectedUrns');
-      Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
-      Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
 
-      this.setProperties({
-        selectedUrns: new Set(selectedUrns),
+      const newSelectedUrns = new Set(selectedUrns);
+      Object.keys(updates).filter(urn => updates[urn]).forEach(urn => newSelectedUrns.add(urn));
+      Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => newSelectedUrns.delete(urn));
+
+      this._setPropertiesUndo({
+        selectedUrns: newSelectedUrns,
         sessionModified: true
-      });
+      }, 'onSelection', 'Select metrics');
     },
 
     /**
@@ -306,10 +378,12 @@ export default Ember.Controller.extend({
      */
     onVisibility(updates) {
       const { invisibleUrns } = this.getProperties('invisibleUrns');
-      Object.keys(updates).filter(urn => updates[urn]).forEach(urn => invisibleUrns.delete(urn));
-      Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => invisibleUrns.add(urn));
 
-      this.setProperties({ invisibleUrns: new Set(invisibleUrns) });
+      const newInvisibleUrns = new Set(invisibleUrns);
+      Object.keys(updates).filter(urn => updates[urn]).forEach(urn => newInvisibleUrns.delete(urn));
+      Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => newInvisibleUrns.add(urn));
+
+      this.setProperties({ invisibleUrns: newInvisibleUrns });
     },
 
     /**
@@ -319,7 +393,7 @@ export default Ember.Controller.extend({
      * @returns {undefined}
      */
     onContext(context) {
-      this.setProperties({ context, sessionModified: true });
+      this._setPropertiesUndo({ context, sessionModified: true }, 'onContext', 'Update analysis context');
     },
 
     /**
@@ -385,11 +459,11 @@ export default Ember.Controller.extend({
      * @returns {undefined}
      */
     onSessionChange(name, text) {
-      this.setProperties({
+      this._setPropertiesUndo({
         sessionName: name,
         sessionText: text,
         sessionModified: true
-      });
+      }, 'onSessionChange', 'Update analysis summary');
     },
 
     /**

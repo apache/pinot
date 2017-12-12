@@ -9,9 +9,25 @@ export default Component.extend({
 
   sessionModified: null, // true
 
+  undoMessage: null, // ""
+
   onSave: null, // func(sessionName, sessionText)
 
   onCopy: null, // func(sessionName, sessionText)
+
+  onUndo: null, // func()
+
+  //
+  // internal
+  //
+  name: null, // internal to avoid data-binding
+
+  text: null, // internal to avoid data-binding
+
+  didReceiveAttrs() {
+    const { sessionName, sessionText } = this.getProperties('sessionName', 'sessionText');
+    this.setProperties({ name: sessionName, text: sessionText });
+  },
 
   actions: {
     onSave() {
@@ -24,10 +40,15 @@ export default Component.extend({
       onCopy();
     },
 
+    onUndo() {
+      const { onUndo } = this.getProperties('onUndo');
+      onUndo();
+    },
+
     onChange() {
-      const { sessionName, sessionText, onChange } =
-        this.getProperties('sessionName', 'sessionText', 'onChange');
-      onChange(sessionName, sessionText);
+      const { name, text, onChange } =
+        this.getProperties('name', 'text', 'onChange');
+      onChange(name, text);
     }
   }
 });
