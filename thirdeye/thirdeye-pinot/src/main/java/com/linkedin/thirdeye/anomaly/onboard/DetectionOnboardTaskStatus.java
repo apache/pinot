@@ -4,8 +4,11 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 
 public class DetectionOnboardTaskStatus {
-  private TaskConstants.TaskStatus taskStatus;
-  private String message;
+  private TaskConstants.TaskStatus taskStatus = TaskConstants.TaskStatus.WAITING;
+  private String message = "";
+
+  public DetectionOnboardTaskStatus() {
+  }
 
   public DetectionOnboardTaskStatus(TaskConstants.TaskStatus taskStatus, String message) {
     this.setTaskStatus(taskStatus);

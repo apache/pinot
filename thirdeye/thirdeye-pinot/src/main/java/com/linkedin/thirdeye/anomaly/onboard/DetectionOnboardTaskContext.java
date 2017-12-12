@@ -2,26 +2,30 @@ package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.MapConfiguration;
 
 public class DetectionOnboardTaskContext {
-  private boolean abortAtFailure = true;
-  private ImmutableMap<String, String> properties = ImmutableMap.of();
+  private Configuration configuration = new MapConfiguration(Collections.emptyMap());
+  private DetectionOnboardExecutionContext executionContext = new DetectionOnboardExecutionContext();
 
-  public boolean isAbortAtFailure() {
-    return abortAtFailure;
+  public Configuration getConfiguration() {
+    return configuration;
   }
 
-  public void setAbortAtFailure(boolean abortAtFailure) {
-    this.abortAtFailure = abortAtFailure;
+  public void setConfiguration(Configuration configuration) {
+    Preconditions.checkNotNull(configuration);
+    this.configuration = configuration;
   }
 
-  public Map<String, String> getProperties() {
-    return properties;
+  public DetectionOnboardExecutionContext getExecutionContext() {
+    return executionContext;
   }
 
-  public void setProperties(Map<String, String> properties) {
-    Preconditions.checkNotNull(properties);
-    this.properties = ImmutableMap.copyOf(properties);
+  public void setExecutionContext(DetectionOnboardExecutionContext executionContext) {
+    Preconditions.checkNotNull(executionContext);
+    this.executionContext = executionContext;
   }
 }

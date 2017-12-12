@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.StringUtils;
 
@@ -10,7 +8,7 @@ public class DetectionOnboardJobContext {
   private String jobName;
   private long jobId;
   private Configuration configuration;
-  private Map<String, Object> executionResult = new HashMap<>();
+  private DetectionOnboardExecutionContext executionContext = new DetectionOnboardExecutionContext();
 
   public DetectionOnboardJobContext(String jobName, long jobId, Configuration configuration) {
     setJobName(jobName);
@@ -45,13 +43,12 @@ public class DetectionOnboardJobContext {
     this.configuration = configuration;
   }
 
-  public void addExecutionResult(String tag, Object result) {
-    Preconditions.checkNotNull(tag);
-    executionResult.put(tag, result);
+  public DetectionOnboardExecutionContext getExecutionContext() {
+    return executionContext;
   }
 
-  public Object getExecutionResult(String tag) {
-    Preconditions.checkNotNull(tag);
-    return executionResult.get(tag);
+  public void setExecutionContext(DetectionOnboardExecutionContext executionContext) {
+    Preconditions.checkNotNull(executionContext);
+    this.executionContext = executionContext;
   }
 }

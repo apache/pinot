@@ -11,7 +11,7 @@ public class DetectionOnboardJob {
 
   public Configuration generateConfiguration(Map<String, String> properties) {
     Preconditions.checkNotNull(properties);
-    //TODO: convert properties to configuration for tasks
+    //TODO: convert properties to configuration for individual tasks
     Configuration configuration = new MapConfiguration(properties);
     return configuration;
   }

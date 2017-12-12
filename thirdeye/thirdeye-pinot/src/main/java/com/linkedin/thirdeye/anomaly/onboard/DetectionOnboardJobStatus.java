@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
@@ -18,8 +19,9 @@ public class DetectionOnboardJobStatus {
     this.jobStatus = jobStatus;
   }
 
-  public void addTaskStatus(TaskConstants.TaskStatus taskStatus, String message) {
-    taskStatuses.add(new DetectionOnboardTaskStatus(taskStatus, message));
+  public void addTaskStatus(DetectionOnboardTaskStatus taskStatus) {
+    Preconditions.checkNotNull(taskStatus);
+    taskStatuses.add(taskStatus);
   }
 
   public List<DetectionOnboardTaskStatus> getTaskStatuses() {
