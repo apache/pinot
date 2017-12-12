@@ -35,8 +35,8 @@ public class NettyServerWorkload {
     protected int threads = THREADS;
     protected ExecutorService threadPool = Executors.newFixedThreadPool(THREADS);
     protected AsynchronousFileChannel log;
-    public static final long CAPTURE_WINDOW = 1000;
-    public static final long FLUSH_WINDOW = 4;
+    public static final long CAPTURE_WINDOW = 10000;
+    public static final long FLUSH_WINDOW = 5;
     private final Map<String, ServerLoadMetrics> avgLoadMap;
 
     public NettyServerWorkload(){
