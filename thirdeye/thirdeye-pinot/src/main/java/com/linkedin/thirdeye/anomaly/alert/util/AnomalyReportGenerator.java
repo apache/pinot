@@ -285,15 +285,15 @@ public class AnomalyReportGenerator {
       String imgPath = null;
       String cid = "";
       if (anomalyReports.size() == 1) {
-        AnomalyReportDTO singleAnomaly = anomalyReports.get(0);
-        try {
-          imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
-          if (StringUtils.isNotBlank(imgPath)) {
-            cid = email.embed(new File(imgPath));
-          }
-        } catch (Exception e) {
-          LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
-        }
+//        AnomalyReportDTO singleAnomaly = anomalyReports.get(0);
+//        try {
+//          imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
+//          if (StringUtils.isNotBlank(imgPath)) {
+//            cid = email.embed(new File(imgPath));
+//          }
+//        } catch (Exception e) {
+//          LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
+//        }
       }
       templateData.put("cid", cid);
 
