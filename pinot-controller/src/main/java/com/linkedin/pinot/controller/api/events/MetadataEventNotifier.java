@@ -15,15 +15,11 @@
  */
 package com.linkedin.pinot.controller.api.events;
 
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 
+public interface MetadataEventNotifier {
+  void notifyOnSchemaEvents(Schema schema, SchemaEventType eventType);
 
-public class DefaultMetadataChangeNotifier implements MetadataChangeNotifier {
-  public void notifyOnSchemaEvents(Schema oldSchema, Schema newSchema) {
-
-  }
-
-  public void notifyOnSegmentFlush(String kafkaTopic, String tableName, long offset) {
-
-  }
+  void notifyOnSegmentFlush(TableConfig tableConfig);
 }
