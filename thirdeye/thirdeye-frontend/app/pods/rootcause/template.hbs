@@ -17,22 +17,6 @@
 {{/if}}
 
 <div class="container">
-  {{#if anomalyUrn}}
-    <div class="row">
-      {{rootcause-anomaly
-        entities=entities
-        anomalyUrn=anomalyUrn
-        onFeedback=(action "onFeedback")
-      }}
-    </div>
-  {{/if}}
-
-  {{!-- {{#if isLoading}}
-    <div class="spinner-wrapper">
-      {{ember-spinner}}
-    </div>
-  {{/if}} --}}
-
   <div class="row">
     {{rootcause-header
       sessionId=sessionId
@@ -44,6 +28,16 @@
       onCopy=(action "onSessionCopy")
     }}
   </div>
+
+  {{#if anomalyUrn}}
+    <div class="row">
+      {{rootcause-anomaly
+        entities=entities
+        anomalyUrn=anomalyUrn
+        onFeedback=(action "onFeedback")
+      }}
+    </div>
+  {{/if}}
 
   <div class="row">
     <div class="card-container card-container--box-shadow">
@@ -138,7 +132,7 @@
                     onFilter=(action "onFilter")}}
                 </div>
                 <div class="col-xs-9">
-                  {{#if isLoadingEntities}} 
+                  {{#if isLoadingEntities}}
                     <div class="spinner-wrapper spinner-wrapper--card">
                       {{ember-spinner}}
                     </div>
