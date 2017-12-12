@@ -14,8 +14,11 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class DetectionOnBoardJobRunner implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnBoardJobRunner.class);
+  private static final int TIME_OUT_SIZE = 5;
+  private static final TimeUnit TIME_OUT_UNIT = TimeUnit.MINUTES;
   private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
   private final DetectionOnboardJobContext jobContext;

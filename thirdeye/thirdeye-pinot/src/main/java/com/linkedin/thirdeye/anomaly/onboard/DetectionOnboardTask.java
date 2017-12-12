@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
-
 public interface DetectionOnboardTask {
 
   /**

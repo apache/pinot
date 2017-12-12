@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
 import java.io.IOException;
 import java.io.InputStream;
@@ -204,6 +205,33 @@ public class AutoOnboardPinotMetricsUtils {
     @Override
     public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
       return true;
+    }
+  }
+
+  public static void main(String[] args) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("zookeeperUrl", "zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster");
+    properties.put("clusterName", "mpSprintDemoCluster");
+    properties.put("controllerHost", "lca1-app0367.stg.linkedin.com");
+    properties.put("controllerPort", "10611");
+    properties.put("controllerConnectionScheme", "https");
+
+    DataSourceConfig config = new DataSourceConfig();
+    config.setClassName(PinotThirdEyeDataSource.class.getName());
+    config.setProperties(properties);
+    config.setAutoLoadClassName(AutoOnboardPinotDataSource.class.getName());
+
+    try {
+      AutoOnboardPinotMetricsUtils utils = new AutoOnboardPinotMetricsUtils(config);
+      System.out.println(utils.getAllTablesFromPinot());
+    } catch (NoSuchAlgorithmException e) {
+      e.printStackTrace();
+    } catch (KeyStoreException e) {
+      e.printStackTrace();
+    } catch (KeyManagementException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
 }

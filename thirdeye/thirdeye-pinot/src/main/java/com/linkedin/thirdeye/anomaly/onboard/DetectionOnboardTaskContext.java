@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
-import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
 
