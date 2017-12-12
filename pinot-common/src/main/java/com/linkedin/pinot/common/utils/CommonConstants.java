@@ -257,6 +257,7 @@ public class CommonConstants {
   }
 
   public static class Minion {
+    public static final String MINION_HEADER = "Pinot-Minion-";
     public static final String INSTANCE_PREFIX = "Minion_";
     public static final String INSTANCE_TYPE = "minion";
     public static final String UNTAGGED_INSTANCE = "minion_untagged";
