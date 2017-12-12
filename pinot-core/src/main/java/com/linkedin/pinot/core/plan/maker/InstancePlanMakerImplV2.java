@@ -128,8 +128,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   /**
    * Helper method to identify if query is fit to be be served purely based on metadata.
-   * Currently count queries without any filters, and min max queries if the segment has min max in
-   * metadata, are supported.
+   * Currently count queries without any filters are supported.
+   * The code for supporting max and min is also in place, but disabled
+   * It would have worked only for time columns and offline and non star tree cases.
+   *
    * @param brokerRequest Broker request
    * @param indexSegment
    * @return True if query can be served using metadata, false otherwise.
