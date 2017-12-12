@@ -112,11 +112,21 @@ export default Ember.Component.extend({
       .data(nodes)
       .enter()
       .append('svg:g')
-      .attr('class', 'cell')
+      .attr('class', function(d) {
+        // apply custom classes
+        let className = 'heatmap-chart__cell'
+        if (d && d.role !== 'value') {
+          className += ' heatmap-chart__cell--icon'
+        }
+        return className;
+      })
       .attr('transform', d => `translate(${d.x},${d.y})`);
 
     // tooltip
     cell.on('mousemove', (d) => {
+      if (d && d.role !== 'value') {
+        return;
+      }
       const tooltipWidth = 200;
       const xPosition = d3.event.pageX - (tooltipWidth + 20);
       const yPosition = d3.event.pageY + 5;
@@ -147,6 +157,14 @@ export default Ember.Component.extend({
       .attr('text-anchor', 'middle')
       .text((d) => {
         const text = d.label || '';
+        // return icon if head or tail
+        if (d.role !== 'value' && d.label) {
+          const iconMapping = {
+            head: '&#xe079',
+            tail: '&#xe080'
+          };
+          return iconMapping[d.role];
+        }
 
         //each character takes up 7 pixels on an average
         const estimatedTextLength = text.length * 7;
@@ -156,7 +174,13 @@ export default Ember.Component.extend({
           return text;
         }
       })
-      .style('fill', d => getTextColor(d.actualValue));
+      .style('fill', (d) => {
+        // return default color for icons
+        if (d.role !== 'value') {
+          return 'rgba(0,0,0,0.45)';
+        }
+        return getTextColor(d.actualValue)
+      });
 
     cell.on('click', get(this, 'heatmapClickHandler').bind(this));
   },
