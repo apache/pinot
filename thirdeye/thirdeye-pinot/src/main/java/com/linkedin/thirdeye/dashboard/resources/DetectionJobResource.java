@@ -756,7 +756,7 @@ public class DetectionJobResource {
     LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
         evaluator.getWeightedPrecision(), evaluator.getRecall());
 
-    Map<String, Double> evaluatorValues = evaluator.toDoubleMap();
+    Map<String, Number> evaluatorValues = evaluator.toNumberMap();
     try {
       String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
       return Response.ok(propertiesJson).build();
@@ -796,7 +796,7 @@ public class DetectionJobResource {
     AlertFilter alertFilter = alertFilterFactory.fromSpec(alertFilterParams);
     PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
 
-    Map<String, Double> evaluatorValues = evaluator.toDoubleMap();
+    Map<String, Number> evaluatorValues = evaluator.toNumberMap();
     try {
       String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
       return Response.ok(propertiesJson).build();

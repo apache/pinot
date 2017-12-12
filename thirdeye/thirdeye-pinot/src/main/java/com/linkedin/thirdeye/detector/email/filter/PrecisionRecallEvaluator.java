@@ -202,18 +202,18 @@ public class PrecisionRecallEvaluator {
     return evals;
   }
 
-  public Map<String, Double> toDoubleMap() {
-    Map<String, Double> evals = new HashMap<>();
+  public Map<String, Number> toNumberMap() {
+    Map<String, Number> evals = new HashMap<>();
     evals.put(RESPONSE_RATE, getResponseRate());
     evals.put(PRECISION, getPrecision());
     evals.put(WEIGHTED_PRECISION, getWeightedPrecision());
     evals.put(RECALL, getRecall());
-    evals.put(TOTALALERTS, (double) getTotalAlerts());
-    evals.put(TOTALRESPONSES, (double) getTotalResponses());
-    evals.put(TRUEANOMALIES, (double) getTrueAnomalies());
-    evals.put(FALSEALARM, (double) getFalseAlarm());
-    evals.put(NEWTREND, (double) getTrueAnomalyNewTrend());
-    evals.put(USER_REPORT, (double) getUserReportAnomaly());
+    evals.put(TOTALALERTS, getTotalAlerts());
+    evals.put(TOTALRESPONSES, getTotalResponses());
+    evals.put(TRUEANOMALIES, getTrueAnomalies());
+    evals.put(FALSEALARM, getFalseAlarm());
+    evals.put(NEWTREND, getTrueAnomalyNewTrend());
+    evals.put(USER_REPORT, getUserReportAnomaly());
     return evals;
   }
 
