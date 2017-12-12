@@ -1,15 +1,19 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 
@@ -64,6 +68,8 @@ import com.linkedin.thirdeye.util.SeverityComputationUtil;
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionJobResource {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
@@ -745,7 +751,26 @@ public class DetectionJobResource {
     LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
         evaluator.getWeightedPrecision(), evaluator.getRecall());
 
-    return Response.ok(evaluator.toProperties().toString()).build();
+    Properties properties = evaluator.toProperties();
+    Map<String, Double> mapProperties = new HashMap<>();
+    for (Object key : properties.keySet()) {
+      String keyString = key.toString();
+      Object property = properties.get(keyString);
+      if (property != null) {
+        try {
+          mapProperties.put(keyString, Double.parseDouble(property.toString()));
+        } catch (Exception e) {
+          LOG.error("Evaluator's properties should all be Doubles; however, {} is not a double value.", keyString);
+        }
+      }
+    }
+    try {
+      String propertiesJson = OBJECT_MAPPER.writeValueAsString(mapProperties);
+      return Response.ok(propertiesJson).build();
+    } catch (JsonProcessingException e) {
+      LOG.error("Failed to covert property to Json String. Property: {}.", properties.toString(), e);
+      return Response.serverError().build();
+    }
   }
 
   /**
