@@ -7,7 +7,9 @@ const { get } = Ember;
 
 // TODO: move to utils file
 const getBackgroundColor = function (factor = 0) {
-  const opacity = Math.abs(factor / 0.25);
+  if (Number.isNaN(factor)) { return 'rgba(0,0,0,0)'; }
+
+  const opacity = Math.min(Math.abs(factor / 0.25), 1.0);
   const color = factor > 0 ? '0,0,234' : '234,0,0';
 
   return `rgba(${color},${opacity})`;
@@ -15,7 +17,9 @@ const getBackgroundColor = function (factor = 0) {
 
 // TODO: move to utils file
 const getTextColor = function (factor = 0) {
-  const opacity = Math.abs(factor / 0.25);
+  if (Number.isNaN(factor)) { return 'rgba(0,0,0,255)'; }
+
+  const opacity = Math.min(Math.abs(factor / 0.25), 1.0);
 
   return opacity < 0.5 ? '#000000' : '#ffffff';
 };
