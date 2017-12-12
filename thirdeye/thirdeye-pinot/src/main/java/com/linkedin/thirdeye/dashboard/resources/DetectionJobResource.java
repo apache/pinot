@@ -7,13 +7,11 @@ import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilte
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 
