@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import java.util.Map;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
@@ -11,6 +12,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,17 +37,16 @@ public class DetectionOnboardResource {
 
     // Invoke backend function
     Map<String, String> properties = OBJECT_MAPPER.convertValue(jsonPayload, Map.class);
-    Long jobId = detectionOnboardService.createDetectionOnboardingJob(jobName, properties);
-    if (jobId != null) {
-      return getDetectionOnboardingJobStatus(jobId);
-    } else {
-      return createErrorDetectionOnboardingJobStatus();
-    }
-  }
+    // TODO: Dynamically create different type of Detection Onboard Job?
+    DetectionOnboardJobStatus detectionOnboardingJob =
+        detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName), properties);
 
-  private String createErrorDetectionOnboardingJobStatus() {
-    // TODO: create an empty DetectionOnboardingJobStatus that contains error messages
-    return null;
+    try {
+      return OBJECT_MAPPER.writeValueAsString(detectionOnboardingJob);
+    } catch (JsonProcessingException e) {
+      LOG.error("Failed to convert job status to a json string.", e);
+      return ExceptionUtils.getStackTrace(e);
+    }
   }
 
   @GET
@@ -53,14 +54,18 @@ public class DetectionOnboardResource {
   public String getDetectionOnboardingJobStatus(@QueryParam("jobId") long jobId) {
     DetectionOnboardJobStatus detectionOnboardingJobStatus =
         detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
+    // Create StatusNotFound message
     if (detectionOnboardingJobStatus == null) {
-      // TODO: create a "JobNotFound" status and return that one
+      detectionOnboardingJobStatus = new DetectionOnboardJobStatus();
+      detectionOnboardingJobStatus.setJobId(jobId);
+      detectionOnboardingJobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
+      detectionOnboardingJobStatus.setMessage(String.format("Unable to find job id: %d", jobId));
     }
     try {
       return OBJECT_MAPPER.writeValueAsString(detectionOnboardingJobStatus);
     } catch (JsonProcessingException e) {
       LOG.error("Failed to convert job status to a json string.", e);
-      return e.toString();
+      return ExceptionUtils.getStackTrace(e);
     }
   }
 }

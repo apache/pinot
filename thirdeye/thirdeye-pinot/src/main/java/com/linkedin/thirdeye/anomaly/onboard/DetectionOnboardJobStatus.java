@@ -8,15 +8,35 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DetectionOnboardJobStatus {
-  private JobConstants.JobStatus jobStatus;
+  private long jobId = -1;
+  private JobConstants.JobStatus jobStatus = JobConstants.JobStatus.FAILED;
+  private String message = "";
   private List<DetectionOnboardTaskStatus> taskStatuses = new ArrayList<>();
+
+  public long getJobId() {
+    return jobId;
+  }
+
+  public void setJobId(long jobId) {
+    this.jobId = jobId;
+  }
 
   public JobConstants.JobStatus getJobStatus() {
     return jobStatus;
   }
 
   public void setJobStatus(JobConstants.JobStatus jobStatus) {
+    Preconditions.checkNotNull(jobStatus);
     this.jobStatus = jobStatus;
+  }
+
+  public String getMessage() {
+    return message;
+  }
+
+  public void setMessage(String message) {
+    Preconditions.checkNotNull(message);
+    this.message = message;
   }
 
   public void addTaskStatus(DetectionOnboardTaskStatus taskStatus) {
