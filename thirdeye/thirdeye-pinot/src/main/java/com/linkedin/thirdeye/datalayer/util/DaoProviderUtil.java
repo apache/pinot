@@ -142,8 +142,8 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(ApplicationIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, AlertSnapshotIndex.class,
             convertCamelCaseToUnderscore(AlertSnapshotIndex.class.getSimpleName()));
-//        entityMappingHolder.register(conn, RootcauseSessionIndex.class,
-//            convertCamelCaseToUnderscore(RootcauseSessionIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, RootcauseSessionIndex.class,
+            convertCamelCaseToUnderscore(RootcauseSessionIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
