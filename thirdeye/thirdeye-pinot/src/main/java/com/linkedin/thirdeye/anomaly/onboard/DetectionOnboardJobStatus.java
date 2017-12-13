@@ -9,7 +9,7 @@ import java.util.List;
 
 public class DetectionOnboardJobStatus {
   private long jobId = -1;
-  private JobConstants.JobStatus jobStatus = JobConstants.JobStatus.FAILED;
+  private JobConstants.JobStatus jobStatus = JobConstants.JobStatus.SCHEDULED;
   private String message = "";
   private List<DetectionOnboardTaskStatus> taskStatuses = new ArrayList<>();
 
