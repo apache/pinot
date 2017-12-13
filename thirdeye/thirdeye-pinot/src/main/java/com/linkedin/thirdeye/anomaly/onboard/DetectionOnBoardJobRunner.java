@@ -50,8 +50,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
     Preconditions.checkNotNull(jobStatus);
 
     for (DetectionOnboardTask task : tasks) {
-      DetectionOnboardTaskStatus taskStatus = new DetectionOnboardTaskStatus();
-      taskStatus.setTaskStatus(TaskConstants.TaskStatus.WAITING);
+      DetectionOnboardTaskStatus taskStatus = new DetectionOnboardTaskStatus(TaskConstants.TaskStatus.WAITING, "");
       jobStatus.addTaskStatus(taskStatus);
 
       // Construct Task context and configuration
@@ -72,11 +71,12 @@ public class DetectionOnBoardJobRunner implements Runnable {
         taskStatus.setMessage(returnedTaskStatus.getMessage());
       } catch (TimeoutException e) {
         taskStatus.setTaskStatus(TaskConstants.TaskStatus.TIMEOUT);
-        LOG.error("Task {} is timed out.", task.getTaskName());
+        LOG.warn("Task {} is timed out.", task.getTaskName());
       } catch (InterruptedException e) {
         taskStatus.setTaskStatus(TaskConstants.TaskStatus.FAILED);
+        taskStatus.setMessage("Job execution is interrupted.");
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
-        taskStatus.setMessage(String.format("Job execution is interrupted: %s", ExceptionUtils.getStackTrace(e)));
+        jobStatus.setMessage(String.format("Job execution is interrupted: %s", ExceptionUtils.getStackTrace(e)));
         LOG.error("Job execution is interrupted.", e);
         return; // Stop executing the job because the thread to execute the job is interrupted.
       } catch (Exception e) {

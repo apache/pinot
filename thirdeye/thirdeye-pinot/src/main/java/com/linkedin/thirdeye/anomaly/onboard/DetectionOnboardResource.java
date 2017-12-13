@@ -2,8 +2,11 @@ package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
@@ -25,21 +28,34 @@ public class DetectionOnboardResource {
   private DetectionOnboardService detectionOnboardService;
 
   public DetectionOnboardResource(DetectionOnboardService detectionOnboardService) {
+    Preconditions.checkNotNull(detectionOnboardService);
     this.detectionOnboardService = detectionOnboardService;
   }
 
   @POST
   @Path("/create-job")
   public String createDetectionOnboardingJob(@NotNull @QueryParam("jobName") String jobName,
-      @QueryParam("payload") String jsonPayload) {
+      @QueryParam("payload") String jsonPayload) throws IOException {
 
     // Check user's input
+    if (jsonPayload == null) {
+      jsonPayload = "";
+    }
 
     // Invoke backend function
-    Map<String, String> properties = OBJECT_MAPPER.convertValue(jsonPayload, Map.class);
-    // TODO: Dynamically create different type of Detection Onboard Job?
-    DetectionOnboardJobStatus detectionOnboardingJob =
-        detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName), properties);
+    DetectionOnboardJobStatus detectionOnboardingJob;
+    try {
+      Map<String, String> properties = OBJECT_MAPPER.readValue(jsonPayload, HashMap.class);
+      // TODO: Dynamically create different type of Detection Onboard Job?
+      long jobId =
+          detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName), properties);
+      detectionOnboardingJob = detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
+    } catch (Exception e) {
+      detectionOnboardingJob = new DetectionOnboardJobStatus();
+      detectionOnboardingJob.setJobStatus(JobConstants.JobStatus.FAILED);
+      detectionOnboardingJob
+          .setMessage(String.format("Failed to create job %s. %s", jobName, ExceptionUtils.getStackTrace(e)));
+    }
 
     try {
       return OBJECT_MAPPER.writeValueAsString(detectionOnboardingJob);

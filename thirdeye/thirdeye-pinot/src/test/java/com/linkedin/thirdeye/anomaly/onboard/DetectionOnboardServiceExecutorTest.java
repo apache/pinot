@@ -3,9 +3,8 @@ package com.linkedin.thirdeye.anomaly.onboard;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
 import org.testng.Assert;
@@ -29,45 +28,50 @@ public class DetectionOnboardServiceExecutorTest {
 
   @Test
   public void testCreate() throws InterruptedException {
-    Map<String, String> properties = new HashMap<>();
-    properties.put("task1.property1", "value11");
-    properties.put("task1.property2", "value12");
-    properties.put("task2.property1", "value21");
-
-    DetectionOnboardJobStatus detectionJobStatus =
-        executor.createDetectionOnboardingJob(new MockedDetectionOnboardJob("MockedOnboardJob"), properties);
+    long jobId = executor.createDetectionOnboardingJob(new DummyDetectionOnboardJob("NormalOnboardJob"),
+        Collections.<String, String>emptyMap());
     Thread.sleep(1000);
-    JobConstants.JobStatus jobStatus = detectionJobStatus.getJobStatus();
+    JobConstants.JobStatus jobStatus = executor.getDetectionOnboardingJobStatus(jobId).getJobStatus();
     Assert.assertTrue(
         JobConstants.JobStatus.COMPLETED.equals(jobStatus) || JobConstants.JobStatus.SCHEDULED.equals(jobStatus));
   }
 
-  @Test(dependsOnMethods = "testCreate")
+  @Test(dependsOnMethods = "testCreate", expectedExceptions = IllegalArgumentException.class)
   public void testDuplicateJobs() {
-    DetectionOnboardJobStatus duplicateDetectionJobStatus = executor
-        .createDetectionOnboardingJob(new MockedDetectionOnboardJob("MockedOnboardJob"),
-            Collections.<String, String>emptyMap());
-    JobConstants.JobStatus jobStatus = duplicateDetectionJobStatus.getJobStatus();
-    Assert.assertEquals(jobStatus, JobConstants.JobStatus.FAILED);
-    Assert.assertNotNull(duplicateDetectionJobStatus.getMessage());
+    executor.createDetectionOnboardingJob(new DummyDetectionOnboardJob("NormalOnboardJob"),
+        Collections.<String, String>emptyMap());
   }
 
-  @Test
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDuplicateTasks() {
+    executor.createDetectionOnboardingJob(new DuplicateTaskDetectionOnboardJob("DuplicateTaskOnboardJob"),
+        Collections.<String, String>emptyMap());
+  }
+
+  @Test(expectedExceptions = RejectedExecutionException.class)
   public void testSubmitAfterShutdown() throws InterruptedException {
     DetectionOnboardServiceExecutor executor = new DetectionOnboardServiceExecutor();
     executor.start();
     executor.shutdown();
-    DetectionOnboardJobStatus detectionJobStatus = executor
-        .createDetectionOnboardingJob(new MockedDetectionOnboardJob("MockedOnboardJob"),
-            Collections.<String, String>emptyMap());
-    JobConstants.JobStatus jobStatus = detectionJobStatus.getJobStatus();
-    Assert.assertEquals(jobStatus, JobConstants.JobStatus.FAILED);
-    Assert.assertNotNull(detectionJobStatus.getMessage());
+    executor.createDetectionOnboardingJob(new DummyDetectionOnboardJob("NormalOnboardJob"),
+        Collections.<String, String>emptyMap());
   }
 
-  static class MockedDetectionOnboardJob extends BaseDetectionOnboardJob {
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testNullTaskList() {
+    executor.createDetectionOnboardingJob(new NullTaskListDetectionOnboardJob("NullTaskListJob"),
+        Collections.<String, String>emptyMap());
+  }
 
-    public MockedDetectionOnboardJob(String jobName) {
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testNullConfiguration() {
+    executor.createDetectionOnboardingJob(new NullConfigurationDetectionOnboardJob("NullConfigurationJob"),
+        Collections.<String, String>emptyMap());
+  }
+
+  static class DummyDetectionOnboardJob extends BaseDetectionOnboardJob {
+
+    public DummyDetectionOnboardJob(String jobName) {
       super(jobName);
     }
 
@@ -79,22 +83,74 @@ public class DetectionOnboardServiceExecutorTest {
     @Override
     public List<DetectionOnboardTask> getTasks() {
       List<DetectionOnboardTask> taskList = new ArrayList<>();
-      taskList.add(new MockedDetectionOnboardTask("task1"));
-      taskList.add(new MockedDetectionOnboardTask("task2"));
+      taskList.add(new DummyDetectionOnboardTask("task1"));
+      taskList.add(new DummyDetectionOnboardTask("task2"));
       return taskList;
     }
   }
 
-  static class MockedDetectionOnboardTask extends BaseDetectionOnboardTask {
+  static class DummyDetectionOnboardTask extends BaseDetectionOnboardTask {
 
-    public MockedDetectionOnboardTask(String taskName) {
+    public DummyDetectionOnboardTask(String taskName) {
       super(taskName);
     }
 
     @Override
-    public void run() {
-      DetectionOnboardExecutionContext executionContext = this.getTaskContext().getExecutionContext();
-      executionContext.setExecutionResult(getTaskName(), getTaskContext().getConfiguration());
+    public void run() { }
+  }
+
+  static class DuplicateTaskDetectionOnboardJob extends BaseDetectionOnboardJob {
+
+    public DuplicateTaskDetectionOnboardJob(String jobName) {
+      super(jobName);
+    }
+
+    @Override
+    public Configuration getTaskConfiguration() {
+      return new MapConfiguration(properties);
+    }
+
+    @Override
+    public List<DetectionOnboardTask> getTasks() {
+      List<DetectionOnboardTask> taskList = new ArrayList<>();
+      taskList.add(new DummyDetectionOnboardTask("task"));
+      taskList.add(new DummyDetectionOnboardTask("task"));
+      return taskList;
     }
   }
+
+  static class NullTaskListDetectionOnboardJob extends BaseDetectionOnboardJob {
+
+    public NullTaskListDetectionOnboardJob(String jobName) {
+      super(jobName);
+    }
+
+    @Override
+    public Configuration getTaskConfiguration() {
+      return new MapConfiguration(properties);
+    }
+
+    @Override
+    public List<DetectionOnboardTask> getTasks() {
+      return null;
+    }
+  }
+
+  static class NullConfigurationDetectionOnboardJob extends BaseDetectionOnboardJob {
+
+    public NullConfigurationDetectionOnboardJob(String jobName) {
+      super(jobName);
+    }
+
+    @Override
+    public Configuration getTaskConfiguration() {
+      return null;
+    }
+
+    @Override
+    public List<DetectionOnboardTask> getTasks() {
+      return Collections.emptyList();
+    }
+  }
+
 }

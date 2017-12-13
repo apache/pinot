@@ -2,8 +2,10 @@ package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.MapConfiguration;
 
 public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
 
@@ -14,12 +16,12 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   // TODO: Implement this method
   @Override
   public Configuration getTaskConfiguration() {
-    throw new UnsupportedOperationException();
+    return new MapConfiguration(Collections.emptyMap());
   }
 
   // TODO: Implement this method
   @Override
   public List<DetectionOnboardTask> getTasks() {
-    throw new UnsupportedOperationException();
+    return Collections.emptyList();
   }
 }
