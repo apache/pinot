@@ -57,12 +57,7 @@ public class DetectionOnboardResource {
           .setMessage(String.format("Failed to create job %s. %s", jobName, ExceptionUtils.getStackTrace(e)));
     }
 
-    try {
-      return OBJECT_MAPPER.writeValueAsString(detectionOnboardingJob);
-    } catch (JsonProcessingException e) {
-      LOG.error("Failed to convert job status to a json string.", e);
-      return ExceptionUtils.getStackTrace(e);
-    }
+    return detectionOnboardJobStatusToJsonString(detectionOnboardingJob);
   }
 
   @GET
@@ -77,6 +72,10 @@ public class DetectionOnboardResource {
       detectionOnboardingJobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
       detectionOnboardingJobStatus.setMessage(String.format("Unable to find job id: %d", jobId));
     }
+    return detectionOnboardJobStatusToJsonString(detectionOnboardingJobStatus);
+  }
+
+  private String detectionOnboardJobStatusToJsonString(DetectionOnboardJobStatus detectionOnboardingJobStatus) {
     try {
       return OBJECT_MAPPER.writeValueAsString(detectionOnboardingJobStatus);
     } catch (JsonProcessingException e) {

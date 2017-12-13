@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -13,14 +14,21 @@ import org.testng.annotations.Test;
 public class DetectionOnboardResourceTest {
   public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private DetectionOnboardServiceExecutor executor;
   private DetectionOnboardResource detectionOnboardResource;
 
   @BeforeClass
-  public void testCreate() {
-    DetectionOnboardServiceExecutor detectionOnboardServiceExecutor = new DetectionOnboardServiceExecutor();
-    detectionOnboardServiceExecutor.start();
-    detectionOnboardResource = new DetectionOnboardResource(detectionOnboardServiceExecutor);
+  public void initResource() {
+    executor = new DetectionOnboardServiceExecutor();
+    executor.start();
+    detectionOnboardResource = new DetectionOnboardResource(executor);
   }
+
+  @AfterClass
+  public void shutdownResource() {
+    executor.shutdown();
+  }
+
 
   @Test
   public void testCreateJob() throws IOException {
@@ -28,11 +36,23 @@ public class DetectionOnboardResourceTest {
 
     String propertiesJson = OBJECT_MAPPER.writeValueAsString(properties);
     String normalJobStatusJson = detectionOnboardResource.createDetectionOnboardingJob("NormalJob", propertiesJson);
-    DetectionOnboardJobStatus onboardJobStatus =
-        OBJECT_MAPPER.readValue(normalJobStatusJson, DetectionOnboardJobStatus.class);
-    JobConstants.JobStatus jobStatus = onboardJobStatus.getJobStatus();
-    Assert.assertTrue(
-        JobConstants.JobStatus.COMPLETED.equals(jobStatus) || JobConstants.JobStatus.SCHEDULED.equals(jobStatus));
+    long jobId;
+    {
+      DetectionOnboardJobStatus onboardJobStatus =
+          OBJECT_MAPPER.readValue(normalJobStatusJson, DetectionOnboardJobStatus.class);
+      JobConstants.JobStatus jobStatus = onboardJobStatus.getJobStatus();
+      Assert.assertTrue(
+          JobConstants.JobStatus.COMPLETED.equals(jobStatus) || JobConstants.JobStatus.SCHEDULED.equals(jobStatus));
+      jobId = onboardJobStatus.getJobId();
+    }
+
+    {
+      DetectionOnboardJobStatus onboardJobStatus = OBJECT_MAPPER
+          .readValue(detectionOnboardResource.getDetectionOnboardingJobStatus(jobId), DetectionOnboardJobStatus.class);
+      JobConstants.JobStatus jobStatus = onboardJobStatus.getJobStatus();
+      Assert.assertTrue(
+          JobConstants.JobStatus.COMPLETED.equals(jobStatus) || JobConstants.JobStatus.SCHEDULED.equals(jobStatus));
+    }
   }
 
   @Test(dependsOnMethods = "testCreateJob")
@@ -44,6 +64,15 @@ public class DetectionOnboardResourceTest {
     String normalJobStatusJson = detectionOnboardResource.createDetectionOnboardingJob("NormalJob", propertiesJson);
     DetectionOnboardJobStatus onboardJobStatus =
         OBJECT_MAPPER.readValue(normalJobStatusJson, DetectionOnboardJobStatus.class);
+    Assert.assertEquals(onboardJobStatus.getJobStatus(), JobConstants.JobStatus.FAILED);
+    Assert.assertNotNull(onboardJobStatus.getMessage());
+  }
+
+  @Test
+  public void testNonexistJobId() throws IOException {
+    DetectionOnboardJobStatus onboardJobStatus = OBJECT_MAPPER
+        .readValue(detectionOnboardResource.getDetectionOnboardingJobStatus(-1L), DetectionOnboardJobStatus.class);
+    JobConstants.JobStatus jobStatus = onboardJobStatus.getJobStatus();
     Assert.assertEquals(onboardJobStatus.getJobStatus(), JobConstants.JobStatus.FAILED);
     Assert.assertNotNull(onboardJobStatus.getMessage());
   }
