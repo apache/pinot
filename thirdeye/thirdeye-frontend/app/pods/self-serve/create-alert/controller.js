@@ -7,7 +7,7 @@ import fetch from 'fetch';
 import Ember from 'ember';
 import moment from 'moment';
 import _ from 'lodash';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
 import { task, timeout } from 'ember-concurrency';
 
 export default Ember.Controller.extend({
@@ -349,7 +349,7 @@ export default Ember.Controller.extend({
     const dimension = selectedDimension || 'All';
     const currentEnd = moment(maxTime).isValid()
       ? moment(maxTime).valueOf()
-      : moment().subtract(1, 'day').endOf('day').valueOf();
+      : buildDateEod(1, 'day').valueOf();
     const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
     const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
     const baselineEnd = moment(currentEnd).subtract(1, 'week');
@@ -519,8 +519,9 @@ export default Ember.Controller.extend({
    * @return {Ember.RSVP.Promise}
    */
   triggerReplay(newFuncId) {
-    const startTime = moment().subtract(1, 'month').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
-    const endTime = moment().subtract(1, 'day').endOf('day').utc().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
+    const replayDateFormat = "YYYY-MM-DDTHH:mm:ss.SSS[Z]";
+    const startTime = buildDateEod(1, 'month').format(replayDateFormat);
+    const endTime = buildDateEod(1, 'day').format(replayDateFormat);
     const that = this;
 
     // Set banner to 'pending' state

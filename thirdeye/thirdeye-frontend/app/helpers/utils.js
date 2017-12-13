@@ -254,6 +254,44 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
+/**
+ * Helps with shorthand for repetitive date generation
+ */
+export function buildDateEod(unit, type) {
+  return moment().subtract(unit, type).endOf('day').utc();
+}
+
+/**
+ * Parses stringified object from payload
+ * @param {String} filters
+ * @returns {Object}
+ */
+export function parseProps(filters) {
+  filters = filters || '';
+
+  return filters.split(';')
+    .filter(prop => prop)
+    .map(prop => prop.split('='))
+    .reduce(function (aggr, prop) {
+      const [ propName, value ] = prop;
+      aggr[propName] = value;
+      return aggr;
+    }, {});
+}
+
+/**
+ * Preps post object and stringifies post data
+ * @param {Object} data to post
+ * @returns {Object}
+ */
+export function postProps(postData) {
+  return {
+    method: 'post',
+    body: JSON.stringify(postData),
+    headers: { 'content-type': 'Application/Json' }
+  };
+}
+
 export default Ember.Helper.helper({
   checkStatus,
   pluralizeTime,
@@ -274,5 +312,8 @@ export default Ember.Helper.helper({
   findLabelMapping,
   toMetricLabel,
   toColor,
-  humanizeFloat
+  humanizeFloat,
+  buildDateEod,
+  parseProps,
+  postProps
 });

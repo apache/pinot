@@ -61,6 +61,21 @@ body {
       width: 49%;
     }
   }
+
+  &__list {
+    list-style: none;
+  }
+
+  &__list-label {
+    display: inline-block;
+    padding-left: 10px;
+    font-weight: normal;
+    font-size: 15px;
+  }
+
+  &__radio {
+    padding-left: 10px;
+  }
 }
 
 
@@ -375,6 +390,10 @@ body {
   color: app-shade(black, 0.7);
   padding: 24px 0;
 
+  &--slim {
+    padding: 24px 0 0 0;
+  }
+
   &__list {
     list-style: none;
     font-weight: normal;
@@ -518,41 +537,17 @@ body {
   display: none;
 }
 
-.te-button {
-  border-radius: 2px;
-  border: 1px solid $te-link-blue;
-  margin: 0 1px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  background: none;
-  padding: 2px 15px;
-  letter-spacing: 0.3px;
-  color: $te-link-blue;
+.te-topcard-subnav {
+  display: flex;
+  border-top: 1px solid app-shade(black, 1);
+  padding-top: 12px;
+  margin: 25px 0 13px 0;
 
-  &--cancel {
-    background-color: white;
-    a {
-      color: $te-link-blue;
-    }
-    &:hover,
-    a:hover {
-      color: $te-link-blue;
-      text-decoration: none;
-    }
-  }
+  &__item {
+    margin: 0 14px;
 
-  &--submit {
-    background-color: $te-button-blue;
-    color: white;
-    &:hover,
-    a:hover {
-      color: white;
-      text-decoration: none;
+    &:first-child {
+      margin-left: 0;
     }
-  }
-
-  &--sub {
-    border: none;
   }
 }
