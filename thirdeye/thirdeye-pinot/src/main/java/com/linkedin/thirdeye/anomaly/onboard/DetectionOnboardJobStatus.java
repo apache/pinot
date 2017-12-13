@@ -28,6 +28,7 @@ public class DetectionOnboardJobStatus {
     this.setMessage(message);
   }
 
+
   public long getJobId() {
     return jobId;
   }

@@ -81,6 +81,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
         taskStatus.setMessage("Job execution is interrupted.");
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
         jobStatus.setMessage(String.format("Job execution is interrupted: %s", ExceptionUtils.getStackTrace(e)));
+
         LOG.error("Job execution is interrupted.", e);
         return; // Stop executing the job because the thread to execute the job is interrupted.
       } catch (Exception e) {

@@ -27,5 +27,6 @@ public interface DetectionOnboardJob {
    *
    * @return the list of tasks of this job.
    */
+
   List<DetectionOnboardTask> getTasks();
 }
