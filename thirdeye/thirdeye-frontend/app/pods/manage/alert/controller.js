@@ -3,7 +3,6 @@
  * @module manage/alert
  * @exports manage/alert
  */
-import fetch from 'fetch';
 import Ember from 'ember';
 
 export default Ember.Controller.extend({

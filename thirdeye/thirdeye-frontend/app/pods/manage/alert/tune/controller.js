@@ -3,6 +3,8 @@
  * @module manage/alert/tune
  * @exports manage/alert/tune
  */
+import fetch from 'fetch';
+import Ember from 'ember';
 import Controller from '@ember/controller';
 
 export default Controller.extend({

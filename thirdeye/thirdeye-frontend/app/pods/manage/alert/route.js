@@ -5,7 +5,6 @@
  */
 import Ember from 'ember';
 import RSVP from 'rsvp';
-import moment from 'moment';
 import fetch from 'fetch';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
 

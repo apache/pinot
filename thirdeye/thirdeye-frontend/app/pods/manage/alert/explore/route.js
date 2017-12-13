@@ -127,7 +127,7 @@ export default Ember.Route.extend({
     // Prepare endpoints for eval, mttd, projected metrics calls
     const isoStart = moment(Number(startDate)).toISOString();
     const isoEnd = moment(Number(endDate)).toISOString();
-    const tuneParams = `start=${isoStart}&end=${isoEnd}&autotunetype=AUTOTUNE`
+    const tuneParams = `start=${isoStart}&end=${isoEnd}&autotunetype=AUTOTUNE`;
     const autoTuneUrl = `/detection-job/autotune/filter/${id}?${tuneParams}`;
     const evalUrl = `/detection-job/eval/projected/${id}`;
     const mttdUrl = `/detection-job/eval/mttd/${id}`;
@@ -172,8 +172,7 @@ export default Ember.Route.extend({
       exploreDimensions,
       filters,
       bucketSize,
-      bucketUnit,
-      windowUnit
+      bucketUnit
     } = alertData;
 
     // Derive start/end time ranges based on querystring input with fallback on default '1 month'
@@ -259,7 +258,6 @@ export default Ember.Route.extend({
       metricDataUrl,
       totalAnomalies,
       anomalyDataUrl,
-      anomalyMetrics,
       alertEvalMetrics,
       allConfigGroups,
       allAppNames,

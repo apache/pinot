@@ -370,7 +370,6 @@ export default Ember.Controller.extend({
    */
   checkReplayStatus(jobId) {
     const checkStatusUrl = `/thirdeye-admin/job-info/job/${jobId}/status`;
-    const timerStart = moment();
 
     fetch(checkStatusUrl).then(checkStatus).then((status) => {
       if (status.toLowerCase() === 'completed') {
@@ -430,7 +429,6 @@ export default Ember.Controller.extend({
    */
   triggerReplay(functionId) {
     const emailData = this.get('emailData')[0];
-    const subject = `Anomaly results processed for ${functionId}`;
     const startTime = buildDateEod(1, 'month').format("YYYY-MM-DD");
     const endTime = buildDateEod(1, 'day').format("YYYY-MM-DD");
     const granularity = this.get('alertData.windowUnit').toLowerCase();
@@ -520,7 +518,6 @@ export default Ember.Controller.extend({
    */
   reportAnomaly(id, data) {
     const reportUrl = `/anomalies/reportAnomaly/${id}`;
-    const updateUrl = `/anomalies/reportAnomaly/${id}`;
     const requiredProps = [data.startTime, data.endTime, data.feedbackType];
     const missingData = !requiredProps.every(prop => Ember.isPresent(prop));
 
@@ -529,11 +526,11 @@ export default Ember.Controller.extend({
     } else {
       data.startTime = moment(data.startTime).utc().valueOf();
       data.endTime = moment(data.endTime).utc().valueOf();
-      return fetch(url, postProps(data)).then((res) => checkStatus(res, 'post'))
+      return fetch(reportUrl, postProps(data)).then((res) => checkStatus(res, 'post'))
         .then((saveResult) => {
           const updateUrl = `/anomalies/updateFeedbackRange/${data.startTime}/${data.endTime}/${id}`;
           return fetch(updateUrl, postProps(data)).then((res) => checkStatus(res, 'post'));
-        })
+        });
     }
   },
 
@@ -559,7 +556,7 @@ export default Ember.Controller.extend({
      * @param {Object} selectedObj - the user-selected dimension to filter by
      */
     onSelectDimension(selectedObj) {
-      this.set('selectedDimension' , selectedObj);
+      this.set('selectedDimension', selectedObj);
     },
 
     /**
@@ -595,7 +592,7 @@ export default Ember.Controller.extend({
               } else {
                 return Promise.reject(new Error('Response not saved'));
               }
-            }) // verifyAnomalyFeedback
+            }); // verifyAnomalyFeedback
         }) // updateAnomalyFeedback
         .catch((err) => {
           Ember.set(anomalyRecord, 'showResponseFailed', true);

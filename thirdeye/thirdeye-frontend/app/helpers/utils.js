@@ -81,7 +81,7 @@ export function humanizeFloat(f) {
   if (Number.isNaN(f)) { return '-'; }
   const fixed = Math.max(3 - Math.max(Math.floor(Math.log10(f)) + 1, 0), 0);
   return f.toFixed(fixed);
-};
+}
 
 export function isIterable(obj) {
   if (obj == null || _.isString(obj)) {

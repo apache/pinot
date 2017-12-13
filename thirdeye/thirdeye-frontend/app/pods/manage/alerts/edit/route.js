@@ -26,7 +26,7 @@ export default Ember.Route.extend({
       bucketSize,
       bucketUnit,
       properties: alertProps
-     } = model.function;
+    } = model.function;
 
     let metricId = '';
     let metricDataUrl = '';
