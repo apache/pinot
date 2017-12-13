@@ -129,7 +129,7 @@ export default function() {
    * Returns the first email config
    */
   this.get(`/thirdeye/email/function/${anomalyFunction[0].id}`, () => {
-    return alertConfig[0];
+    return alertConfig;
   });
 
   /**
@@ -137,5 +137,12 @@ export default function() {
    */
   this.get(`/timeseries/compare/${metric[0].id}/***`, () => {
     return timeseriesCompare;
+  });
+
+  /**
+   * Post request for editing alert
+   */
+  this.post(`/thirdeye/***`, (db, request) => {
+    debugger;
   });
 }
