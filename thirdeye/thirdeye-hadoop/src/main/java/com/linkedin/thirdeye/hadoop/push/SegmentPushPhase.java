@@ -71,7 +71,7 @@ public class SegmentPushPhase  extends Configured {
     hosts = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_HOSTS).split(ThirdEyeConstants.FIELD_SEPARATOR);
     port = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_PORT);
     tablename = getAndCheck(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString());
-    segmentPushUDFClass = getAndCheck(SEGMENT_PUSH_UDF_CLASS.toString());
+    segmentPushUDFClass = props.getProperty(SEGMENT_PUSH_UDF_CLASS.toString(), DefaultSegmentPushUDF.class.getCanonicalName());
 
     Path path = new Path(segmentPath);
     FileStatus[] fileStatusArr = fs.globStatus(path);
