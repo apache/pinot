@@ -25,18 +25,6 @@
 </div>
 <div class="col-xs-2">
   {{#power-select
-    selected=compareMode
-    options=compareModeOptions
-    searchEnabled=false
-    triggerId="select-compare-mode"
-    onchange=(action "onCompareMode")
-    as |mode|
-  }}
-    {{mode}}
-  {{/power-select}}
-</div>
-<div class="col-xs-2">
-  {{#power-select
     selected=timeseriesMode
     options=timeseriesModeOptions
     searchEnabled=false
