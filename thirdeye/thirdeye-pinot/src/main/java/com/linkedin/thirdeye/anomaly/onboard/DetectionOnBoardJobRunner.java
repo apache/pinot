@@ -65,7 +65,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
       try {
         task.setTaskContext(taskContext);
         taskStatus.setTaskStatus(TaskConstants.TaskStatus.RUNNING);
-        Future<DetectionOnboardTaskStatus> taskFuture = executorService.submit(task);
+        Future<DetectionOnboardTaskStatus> taskFuture = executorService.submit(new DetectionOnboardTaskRunner(task));
         // Wait until time out
         DetectionOnboardTaskStatus returnedTaskStatus = taskFuture.get(taskTimeOutSize, taskTimeOutUnit);
         taskStatus.setTaskStatus(returnedTaskStatus.getTaskStatus());

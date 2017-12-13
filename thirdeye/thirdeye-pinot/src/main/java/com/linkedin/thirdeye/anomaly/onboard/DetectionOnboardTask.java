@@ -1,8 +1,7 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
-import java.util.concurrent.Callable;
 
-public interface DetectionOnboardTask extends Callable<DetectionOnboardTaskStatus> {
+public interface DetectionOnboardTask {
 
   String getTaskName();
 
