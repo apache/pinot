@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import javax.validation.constraints.NotNull;
@@ -43,7 +42,7 @@ public class DetectionOnboardResource {
   @POST
   @Path("/create-job")
   public String createDetectionOnboardingJob(@NotNull @QueryParam("jobName") String jobName,
-      @QueryParam("payload") String jsonPayload) throws IOException {
+      @QueryParam("payload") String jsonPayload) {
 
     // Check user's input
     if (jsonPayload == null) {
@@ -73,7 +72,6 @@ public class DetectionOnboardResource {
    *
    * @return the job status in JSON string.
    */
-
   @GET
   @Path("/get-status")
   public String getDetectionOnboardingJobStatus(@QueryParam("jobId") long jobId) {
