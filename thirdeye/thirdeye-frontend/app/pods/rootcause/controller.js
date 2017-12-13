@@ -2,8 +2,8 @@ import Ember from 'ember';
 import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toColor, checkStatus, toFilters, appendFilters } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
-import CryptoJS from 'cryptojs';
 import _ from 'lodash';
+import fetch from 'fetch';
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
