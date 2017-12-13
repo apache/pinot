@@ -198,10 +198,18 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       const anomalyRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:anomaly:');
       const analysisRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:analysis:');
 
+      // thirdeye:timerange:anomaly:{start}:{end}
+      const anomalyRange = _.slice(anomalyRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
+
+      // thirdeye:timerange:analysis:{start}:{end}
+      // align to local end of day
+      const rawAnalysisRange = _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
+      const analysisRange = [moment(rawAnalysisRange[0]).endOf('day').valueOf(), moment(rawAnalysisRange[1]).endOf('day').valueOf()];
+
       context = {
         urns: new Set([...baseMetricUrns, ...dimensionUrns, anomalyUrn]),
-        anomalyRange: _.slice(anomalyRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10)), // thirdeye:timerange:anomaly:{start}:{end}
-        analysisRange: _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10)), // thirdeye:timerange:analysis:{start}:{end}
+        anomalyRange,
+        analysisRange,
         granularity,
         compareMode
       };
