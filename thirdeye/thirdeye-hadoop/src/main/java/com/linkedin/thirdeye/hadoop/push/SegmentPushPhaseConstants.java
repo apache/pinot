@@ -21,6 +21,7 @@ package com.linkedin.thirdeye.hadoop.push;
 public enum SegmentPushPhaseConstants {
 
   SEGMENT_PUSH_INPUT_PATH("segment.push.input.path"),
+  SEGMENT_PUSH_UDF_CLASS("segment.push.udf.class"),
   SEGMENT_PUSH_CONTROLLER_HOSTS("segment.push.controller.hosts"),
   SEGMENT_PUSH_CONTROLLER_PORT("segment.push.controller.port");
 
