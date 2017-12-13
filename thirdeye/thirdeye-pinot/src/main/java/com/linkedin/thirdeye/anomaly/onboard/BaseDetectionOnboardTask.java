@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 
 public abstract class BaseDetectionOnboardTask implements DetectionOnboardTask {
   private final String taskName;
@@ -8,7 +9,8 @@ public abstract class BaseDetectionOnboardTask implements DetectionOnboardTask {
 
   public BaseDetectionOnboardTask(String taskName) {
     Preconditions.checkNotNull(taskName);
-    this.taskName = taskName;
+    Preconditions.checkArgument(StringUtils.isNotBlank(taskName.trim()));
+    this.taskName = taskName.trim();
   }
 
   @Override

@@ -32,10 +32,18 @@ public class DetectionOnboardResource {
     this.detectionOnboardService = detectionOnboardService;
   }
 
+  /**
+   * Create a job with the given name and properties.
+   *
+   * @param jobName     the unique name for the job.
+   * @param jsonPayload a map of properties in JSON string.
+   *
+   * @return Job status in JSON string.
+   */
   @POST
   @Path("/create-job")
   public String createDetectionOnboardingJob(@NotNull @QueryParam("jobName") String jobName,
-      @QueryParam("payload") String jsonPayload) throws IOException {
+      @QueryParam("payload") String jsonPayload) {
 
     // Check user's input
     if (jsonPayload == null) {
@@ -43,23 +51,30 @@ public class DetectionOnboardResource {
     }
 
     // Invoke backend function
-    DetectionOnboardJobStatus detectionOnboardingJob;
+    DetectionOnboardJobStatus detectionOnboardingJobStatus;
     try {
       Map<String, String> properties = OBJECT_MAPPER.readValue(jsonPayload, HashMap.class);
       // TODO: Dynamically create different type of Detection Onboard Job?
       long jobId =
           detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName), properties);
-      detectionOnboardingJob = detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
+      detectionOnboardingJobStatus = detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
     } catch (Exception e) {
-      detectionOnboardingJob = new DetectionOnboardJobStatus();
-      detectionOnboardingJob.setJobStatus(JobConstants.JobStatus.FAILED);
-      detectionOnboardingJob
+      detectionOnboardingJobStatus = new DetectionOnboardJobStatus();
+      detectionOnboardingJobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
+      detectionOnboardingJobStatus
           .setMessage(String.format("Failed to create job %s. %s", jobName, ExceptionUtils.getStackTrace(e)));
     }
 
-    return detectionOnboardJobStatusToJsonString(detectionOnboardingJob);
+    return detectionOnboardJobStatusToJsonString(detectionOnboardingJobStatus);
   }
 
+  /**
+   * Returns the job status in JSON string.
+   *
+   * @param jobId the id of the job.
+   *
+   * @return the job status in JSON string.
+   */
   @GET
   @Path("/get-status")
   public String getDetectionOnboardingJobStatus(@QueryParam("jobId") long jobId) {
@@ -75,6 +90,14 @@ public class DetectionOnboardResource {
     return detectionOnboardJobStatusToJsonString(detectionOnboardingJobStatus);
   }
 
+  /**
+   * Converts job status to a JSON string or returns the plain text of any exception that is thrown during the
+   * conversion.
+   *
+   * @param detectionOnboardingJobStatus the job status to be converted to a JSON string.
+   *
+   * @return the JSON string of the given job status.
+   */
   private String detectionOnboardJobStatusToJsonString(DetectionOnboardJobStatus detectionOnboardingJobStatus) {
     try {
       return OBJECT_MAPPER.writeValueAsString(detectionOnboardingJobStatus);

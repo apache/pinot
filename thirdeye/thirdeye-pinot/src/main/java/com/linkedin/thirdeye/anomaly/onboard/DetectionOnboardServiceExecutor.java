@@ -32,6 +32,14 @@ public class DetectionOnboardServiceExecutor implements DetectionOnboardService 
     AnomalyUtils.safelyShutdownExecutionService(executorService, DetectionOnboardServiceExecutor.class);
   }
 
+  /**
+   * Creates and submits the job to executor.
+   *
+   * @param job the job to be executed.
+   * @param properties the properties to initialize the job.
+   *
+   * @return the job ID if the job is created successfully; otherwise, an exception is thrown.
+   */
   @Override
   public long createDetectionOnboardingJob(DetectionOnboardJob job, Map<String, String> properties) {
     Preconditions.checkNotNull(detectionOnboardJobStatus, "Job executor is not initialized");
@@ -76,6 +84,13 @@ public class DetectionOnboardServiceExecutor implements DetectionOnboardService 
     return jobId;
   }
 
+  /**
+   * Checks if the list of tasks contains duplicate task name.
+   *
+   * @param tasks the list of tasks.
+   *
+   * @return true if more than two tasks have the same name.
+   */
   private boolean hasDuplicateTaskName(List<DetectionOnboardTask> tasks) {
     Set<String> taskNames = new HashSet<>();
     for (DetectionOnboardTask task : tasks) {
