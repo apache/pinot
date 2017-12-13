@@ -241,7 +241,6 @@ public class DetectionOnBoardJobRunnerTest {
 
     public LogConfigDetectionOnboardJob(String jobName, Map<String, String> properties) {
       super(jobName, properties);
-    }
 
     @Override
     public Configuration getTaskConfiguration() {

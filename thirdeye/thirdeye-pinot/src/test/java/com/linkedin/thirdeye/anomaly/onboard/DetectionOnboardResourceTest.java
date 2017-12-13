@@ -76,5 +76,4 @@ public class DetectionOnboardResourceTest {
     Assert.assertEquals(onboardJobStatus.getJobStatus(), JobConstants.JobStatus.UNKNOWN);
     Assert.assertNotNull(onboardJobStatus.getMessage());
   }
-
 }
