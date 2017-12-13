@@ -15,10 +15,7 @@
  */
 package com.linkedin.thirdeye.hadoop.push;
 
-import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_HOSTS;
-import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_PORT;
-import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_INPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_UDF_CLASS;
+import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.*;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -66,6 +63,8 @@ public class SegmentPushPhase  extends Configured {
     Configuration configuration = new Configuration();
     FileSystem fs = FileSystem.get(configuration);
 
+    long startTime = System.currentTimeMillis();
+
     String segmentPath = getAndSetConfiguration(configuration, SEGMENT_PUSH_INPUT_PATH);
     LOGGER.info("Segment path : {}", segmentPath);
     hosts = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_HOSTS).split(ThirdEyeConstants.FIELD_SEPARATOR);
@@ -82,8 +81,12 @@ public class SegmentPushPhase  extends Configured {
         pushOneTarFile(fs, fileStatus.getPath());
       }
     }
+    long endTime = System.currentTimeMillis();
 
     if (uploadSuccess && segmentName != null) {
+      props.setProperty(SEGMENT_PUSH_START_TIME.toString(), String.valueOf(startTime));
+      props.setProperty(SEGMENT_PUSH_END_TIME.toString(), String.valueOf(endTime));
+
       segmentPushControllerAPIs = new SegmentPushControllerAPIs(hosts, port);
       LOGGER.info("Deleting segments overlapping to {} from table {}  ", segmentName, tablename);
       segmentPushControllerAPIs.deleteOverlappingSegments(tablename, segmentName);
