@@ -207,31 +207,4 @@ public class AutoOnboardPinotMetricsUtils {
       return true;
     }
   }
-
-  public static void main(String[] args) {
-    Map<String, String> properties = new HashMap<>();
-    properties.put("zookeeperUrl", "zk-lva1-pinot.corp.linkedin.com:12913/pinot-cluster");
-    properties.put("clusterName", "mpSprintDemoCluster");
-    properties.put("controllerHost", "lca1-app0367.stg.linkedin.com");
-    properties.put("controllerPort", "10611");
-    properties.put("controllerConnectionScheme", "https");
-
-    DataSourceConfig config = new DataSourceConfig();
-    config.setClassName(PinotThirdEyeDataSource.class.getName());
-    config.setProperties(properties);
-    config.setAutoLoadClassName(AutoOnboardPinotDataSource.class.getName());
-
-    try {
-      AutoOnboardPinotMetricsUtils utils = new AutoOnboardPinotMetricsUtils(config);
-      System.out.println(utils.getAllTablesFromPinot());
-    } catch (NoSuchAlgorithmException e) {
-      e.printStackTrace();
-    } catch (KeyStoreException e) {
-      e.printStackTrace();
-    } catch (KeyManagementException e) {
-      e.printStackTrace();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
 }
