@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import javax.validation.constraints.NotNull;
