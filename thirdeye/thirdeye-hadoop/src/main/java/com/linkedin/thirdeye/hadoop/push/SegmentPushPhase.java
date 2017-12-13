@@ -18,9 +18,12 @@ package com.linkedin.thirdeye.hadoop.push;
 import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_HOSTS;
 import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_CONTROLLER_PORT;
 import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_INPUT_PATH;
+import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.SEGMENT_PUSH_UDF_CLASS;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Constructor;
 import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
@@ -49,7 +52,7 @@ public class SegmentPushPhase  extends Configured {
   private String tablename;
   private boolean uploadSuccess = true;
   private String segmentName = null;
-
+  private String segmentPushUDFClass;
   SegmentPushControllerAPIs segmentPushControllerAPIs;
 
 
@@ -68,6 +71,7 @@ public class SegmentPushPhase  extends Configured {
     hosts = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_HOSTS).split(ThirdEyeConstants.FIELD_SEPARATOR);
     port = getAndSetConfiguration(configuration, SEGMENT_PUSH_CONTROLLER_PORT);
     tablename = getAndCheck(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString());
+    segmentPushUDFClass = props.getProperty(SEGMENT_PUSH_UDF_CLASS.toString(), DefaultSegmentPushUDF.class.getCanonicalName());
 
     Path path = new Path(segmentPath);
     FileStatus[] fileStatusArr = fs.globStatus(path);
@@ -83,6 +87,15 @@ public class SegmentPushPhase  extends Configured {
       segmentPushControllerAPIs = new SegmentPushControllerAPIs(hosts, port);
       LOGGER.info("Deleting segments overlapping to {} from table {}  ", segmentName, tablename);
       segmentPushControllerAPIs.deleteOverlappingSegments(tablename, segmentName);
+
+      try {
+        LOGGER.info("Initializing SegmentPushUDFClass:{}", segmentPushUDFClass);
+        Constructor<?> constructor = Class.forName(segmentPushUDFClass).getConstructor();
+        SegmentPushUDF segmentPushUDF = (SegmentPushUDF) constructor.newInstance();
+        segmentPushUDF.emitCustomEvents(props);
+      } catch (Exception e) {
+        throw new IOException(e);
+      }
     }
 
   }
