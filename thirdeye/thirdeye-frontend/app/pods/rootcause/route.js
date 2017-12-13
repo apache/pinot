@@ -203,8 +203,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
       // thirdeye:timerange:analysis:{start}:{end}
       // align to local end of day
-      const rawAnalysisRange = _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
-      const analysisRange = [moment(rawAnalysisRange[0]).endOf('day').valueOf(), moment(rawAnalysisRange[1]).endOf('day').valueOf()];
+      const [rawStart, rawEnd] = _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
+      const analysisRange = [moment(rawStart).startOf('day').add(1, 'day').valueOf(), moment(rawEnd).endOf('day').valueOf()];
 
       context = {
         urns: new Set([...baseMetricUrns, ...dimensionUrns, anomalyUrn]),
