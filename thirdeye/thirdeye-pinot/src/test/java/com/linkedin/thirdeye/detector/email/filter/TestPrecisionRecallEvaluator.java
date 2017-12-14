@@ -1,10 +1,19 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import java.util.ArrayList;
 import java.util.List;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -13,6 +22,23 @@ import static org.junit.Assert.*;
 
 
 public class TestPrecisionRecallEvaluator {
+  private static String TEST = "test";
+  private DAOTestBase testDAOProvider;
+  private MergedAnomalyResultManager mergedAnomalyDAO;
+  private AnomalyFunctionManager anomalyFunctionDAO;
+
+  @BeforeClass
+  void beforeClass() {
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    mergedAnomalyDAO = daoRegistry.getMergedAnomalyResultDAO();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    testDAOProvider.cleanup();
+  }
 
   @Test(dataProvider = "provideMockAnomalies")
   public void testSystemPrecisionAndRecall(List<MergedAnomalyResultDTO> anomalyResultDTOS, MergedAnomalyResultDTO notifiedTrueAnomaly,
@@ -65,22 +91,32 @@ public class TestPrecisionRecallEvaluator {
     AnomalyFeedbackDTO negativeFeedback = new AnomalyFeedbackDTO();
     positiveFeedback.setFeedbackType(ANOMALY);
     negativeFeedback.setFeedbackType(NOT_ANOMALY);
+    AnomalyFunctionDTO anomalyFunction = DaoTestUtils.getTestFunctionSpec(TEST, TEST);
+    long functionId = anomalyFunctionDAO.save(anomalyFunction);
     for (int i = 0; i < totalAnomalies; i++) {
       MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
       anomaly.setFeedback(null);
       anomaly.setNotified(true);
+      anomaly.setFunction(anomalyFunction);
       anomalyResultDTOS.add(anomaly);
+      mergedAnomalyDAO.save(anomaly);
     }
     MergedAnomalyResultDTO notifiedTrueAnomaly = new MergedAnomalyResultDTO();
     notifiedTrueAnomaly.setNotified(true);
     notifiedTrueAnomaly.setFeedback(positiveFeedback);
+    notifiedTrueAnomaly.setFunction(anomalyFunction);
+    mergedAnomalyDAO.save(notifiedTrueAnomaly);
     MergedAnomalyResultDTO notifiedFalseAnomaly = new MergedAnomalyResultDTO();
     notifiedFalseAnomaly.setNotified(true);
     notifiedFalseAnomaly.setFeedback(negativeFeedback);
+    notifiedFalseAnomaly.setFunction(anomalyFunction);
+    mergedAnomalyDAO.save(notifiedFalseAnomaly);
     MergedAnomalyResultDTO userReportAnomaly = new MergedAnomalyResultDTO();
     userReportAnomaly.setNotified(false);
     userReportAnomaly.setFeedback(positiveFeedback);
     userReportAnomaly.setAnomalyResultSource(AnomalyResultSource.USER_LABELED_ANOMALY);
+    userReportAnomaly.setFunction(anomalyFunction);
+    mergedAnomalyDAO.save(userReportAnomaly);
     return new Object[][]{{anomalyResultDTOS, notifiedTrueAnomaly, notifiedFalseAnomaly, userReportAnomaly}};
   }
 }
