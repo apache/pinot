@@ -55,7 +55,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
 
       // Construct Task context and configuration
       Configuration taskConfig = jobContext.getConfiguration().subset(task.getTaskName());
-      final boolean abortAtFailure = taskConfig.getBoolean("abortAtFailure", true);
+      final boolean abortOnFailure = taskConfig.getBoolean("abortOnFailure", true);
       DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext();
       taskContext.setConfiguration(taskConfig);
       taskContext.setExecutionContext(jobContext.getExecutionContext());
@@ -71,7 +71,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
         taskStatus.setMessage(returnedTaskStatus.getMessage());
       } catch (TimeoutException e) {
         taskStatus.setTaskStatus(TaskConstants.TaskStatus.TIMEOUT);
-        LOG.warn("Task {} is timed out.", task.getTaskName());
+        LOG.warn("Task {} timed out.", task.getTaskName());
       } catch (InterruptedException e) {
         taskStatus.setTaskStatus(TaskConstants.TaskStatus.FAILED);
         taskStatus.setMessage("Job execution is interrupted.");
@@ -85,7 +85,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
         LOG.error("Encountered unknown error while running job {}.", jobContext.getJobName(), e);
       }
 
-      if (abortAtFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
+      if (abortOnFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
         LOG.error("Failed to execute job {}.", jobContext.getJobName());
         return;

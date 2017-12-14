@@ -6,7 +6,8 @@ public class JobConstants {
     SCHEDULED,
     COMPLETED,
     FAILED,
-    TIMEOUT
+    TIMEOUT,
+    UNKNOWN
   };
 
 

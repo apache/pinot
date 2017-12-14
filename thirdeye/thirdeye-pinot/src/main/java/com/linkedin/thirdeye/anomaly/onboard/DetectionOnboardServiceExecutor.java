@@ -1,17 +1,14 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.Configuration;
 
@@ -36,18 +33,16 @@ public class DetectionOnboardServiceExecutor implements DetectionOnboardService 
    * Creates and submits the job to executor.
    *
    * @param job the job to be executed.
-   * @param properties the properties to initialize the job.
    *
    * @return the job ID if the job is created successfully; otherwise, an exception is thrown.
    */
   @Override
-  public long createDetectionOnboardingJob(DetectionOnboardJob job, Map<String, String> properties) {
+  public long createDetectionOnboardingJob(DetectionOnboardJob job) {
     Preconditions.checkNotNull(detectionOnboardJobStatus, "Job executor is not initialized");
     Preconditions.checkNotNull(jobNameToId, "Job executor is not initialized");
     Preconditions.checkNotNull(executorService, "Job executor is not initialized");
     Preconditions.checkNotNull(job, "Job cannot be null.");
     Preconditions.checkNotNull(job.getName(), "Job name cannot be null.");
-    Preconditions.checkNotNull(properties, String.format("Job %s has null property.", job.getName()));
 
     final long jobId = jobIdCounter.getAndIncrement();
 
@@ -59,10 +54,7 @@ public class DetectionOnboardServiceExecutor implements DetectionOnboardService 
     if (previousJobId != null) {
       throw new IllegalArgumentException(String.format("Cannot create duplicated job: %s", jobName));
     } else {
-      // Initialize the job
-      // TODO: Decide if we should throw exception or create a job status with job status = failed.
-      ImmutableMap<String, String> immutableProperties = ImmutableMap.copyOf(properties);
-      job.initialize(immutableProperties);
+      // Initialize the tasks and their configuration
       Configuration configuration = job.getTaskConfiguration();
       Preconditions.checkNotNull(configuration, String.format("Job %s returns a null configuration.", jobName));
 

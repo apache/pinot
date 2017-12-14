@@ -56,7 +56,7 @@ public class DetectionOnboardResource {
       Map<String, String> properties = OBJECT_MAPPER.readValue(jsonPayload, HashMap.class);
       // TODO: Dynamically create different type of Detection Onboard Job?
       long jobId =
-          detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName), properties);
+          detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName, properties));
       detectionOnboardingJobStatus = detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
     } catch (Exception e) {
       detectionOnboardingJobStatus = new DetectionOnboardJobStatus();
@@ -84,7 +84,7 @@ public class DetectionOnboardResource {
     if (detectionOnboardingJobStatus == null) {
       detectionOnboardingJobStatus = new DetectionOnboardJobStatus();
       detectionOnboardingJobStatus.setJobId(jobId);
-      detectionOnboardingJobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
+      detectionOnboardingJobStatus.setJobStatus(JobConstants.JobStatus.UNKNOWN);
       detectionOnboardingJobStatus.setMessage(String.format("Unable to find job id: %d", jobId));
     }
     return detectionOnboardJobStatusToJsonString(detectionOnboardingJobStatus);

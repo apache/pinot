@@ -1,17 +1,15 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
-import java.util.Map;
 
 public interface DetectionOnboardService {
   /**
    * Creates and submit the job to executor service.
    *
    * @param job the job to be executed.
-   * @param properties the properties to initialize the job.
    *
    * @return The job ID.
    */
-  long createDetectionOnboardingJob(DetectionOnboardJob job, Map<String, String> properties);
+  long createDetectionOnboardingJob(DetectionOnboardJob job);
 
   /**
    * Returns the execution status of the job.

@@ -145,31 +145,31 @@ public class ThirdEyeAnomalyApplication
 
       @Override
       public void stop() throws Exception {
-        if (config.isWorker() && taskDriver != null) {
+        if (taskDriver != null) {
           taskDriver.shutdown();
         }
-        if (config.isScheduler() && detectionJobScheduler != null) {
+        if (detectionJobScheduler != null) {
           detectionJobScheduler.shutdown();
         }
-        if (config.isMonitor() && monitorJobScheduler != null) {
+        if (monitorJobScheduler != null) {
           monitorJobScheduler.shutdown();
         }
-        if (config.isAlert() && alertJobSchedulerV2 != null) {
+        if (alertJobSchedulerV2 != null) {
           alertJobSchedulerV2.shutdown();
         }
-        if (config.isAutoload() && autoOnboardService != null) {
+        if (autoOnboardService != null) {
           autoOnboardService.shutdown();
         }
-        if (config.isDataCompleteness() && dataCompletenessScheduler != null) {
+        if (dataCompletenessScheduler != null) {
           dataCompletenessScheduler.shutdown();
         }
-        if (config.isClassifier() && classificationJobScheduler != null) {
+        if (classificationJobScheduler != null) {
           classificationJobScheduler.shutdown();
         }
         if (config.isPinotProxy()) {
           // Do nothing
         }
-        if (config.isDetectionOnboard() && detectionOnboardServiceExecutor != null) {
+        if (detectionOnboardServiceExecutor != null) {
           detectionOnboardServiceExecutor.shutdown();
         }
       }

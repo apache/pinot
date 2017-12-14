@@ -13,13 +13,6 @@ public interface DetectionOnboardJob {
   String getName();
 
   /**
-   * Initialize this job with the given properties.
-   *
-   * @param properties the properties to initialize the job.
-   */
-  void initialize(Map<String, String> properties);
-
-  /**
    * Returns the configuration for the tasks in this job execution. The configuration should be built from the
    * properties map that is given in the initialized method. The property for each task in the built configuration
    * should has the corresponding task's name. Assume that a job has two tasks with names: "task1" and "task2",

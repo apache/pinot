@@ -10,7 +10,7 @@ public abstract class BaseDetectionOnboardTask implements DetectionOnboardTask {
   public BaseDetectionOnboardTask(String taskName) {
     Preconditions.checkNotNull(taskName);
     Preconditions.checkArgument(StringUtils.isNotBlank(taskName.trim()));
-    this.taskName = taskName.trim();
+    this.taskName = taskName;
   }
 
   @Override

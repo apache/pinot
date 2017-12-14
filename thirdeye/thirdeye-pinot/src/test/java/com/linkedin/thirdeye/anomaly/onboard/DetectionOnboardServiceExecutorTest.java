@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
@@ -28,8 +29,8 @@ public class DetectionOnboardServiceExecutorTest {
 
   @Test
   public void testCreate() throws InterruptedException {
-    long jobId = executor.createDetectionOnboardingJob(new DummyDetectionOnboardJob("NormalOnboardJob"),
-        Collections.<String, String>emptyMap());
+    long jobId = executor.createDetectionOnboardingJob(
+        new DummyDetectionOnboardJob("NormalOnboardJob", Collections.<String, String>emptyMap()));
     Thread.sleep(1000);
     JobConstants.JobStatus jobStatus = executor.getDetectionOnboardingJobStatus(jobId).getJobStatus();
     Assert.assertTrue(
@@ -38,14 +39,14 @@ public class DetectionOnboardServiceExecutorTest {
 
   @Test(dependsOnMethods = "testCreate", expectedExceptions = IllegalArgumentException.class)
   public void testDuplicateJobs() {
-    executor.createDetectionOnboardingJob(new DummyDetectionOnboardJob("NormalOnboardJob"),
-        Collections.<String, String>emptyMap());
+    executor.createDetectionOnboardingJob(
+        new DummyDetectionOnboardJob("NormalOnboardJob", Collections.<String, String>emptyMap()));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDuplicateTasks() {
-    executor.createDetectionOnboardingJob(new DuplicateTaskDetectionOnboardJob("DuplicateTaskOnboardJob"),
-        Collections.<String, String>emptyMap());
+    executor.createDetectionOnboardingJob(
+        new DuplicateTaskDetectionOnboardJob("DuplicateTaskOnboardJob", Collections.<String, String>emptyMap()));
   }
 
   @Test(expectedExceptions = RejectedExecutionException.class)
@@ -53,26 +54,26 @@ public class DetectionOnboardServiceExecutorTest {
     DetectionOnboardServiceExecutor executor = new DetectionOnboardServiceExecutor();
     executor.start();
     executor.shutdown();
-    executor.createDetectionOnboardingJob(new DummyDetectionOnboardJob("NormalOnboardJob"),
-        Collections.<String, String>emptyMap());
+    executor.createDetectionOnboardingJob(
+        new DummyDetectionOnboardJob("NormalOnboardJob", Collections.<String, String>emptyMap()));
   }
 
   @Test(expectedExceptions = NullPointerException.class)
   public void testNullTaskList() {
-    executor.createDetectionOnboardingJob(new NullTaskListDetectionOnboardJob("NullTaskListJob"),
-        Collections.<String, String>emptyMap());
+    executor.createDetectionOnboardingJob(
+        new NullTaskListDetectionOnboardJob("NullTaskListJob", Collections.<String, String>emptyMap()));
   }
 
   @Test(expectedExceptions = NullPointerException.class)
   public void testNullConfiguration() {
-    executor.createDetectionOnboardingJob(new NullConfigurationDetectionOnboardJob("NullConfigurationJob"),
-        Collections.<String, String>emptyMap());
+    executor.createDetectionOnboardingJob(
+        new NullConfigurationDetectionOnboardJob("NullConfigurationJob", Collections.<String, String>emptyMap()));
   }
 
   static class DummyDetectionOnboardJob extends BaseDetectionOnboardJob {
 
-    public DummyDetectionOnboardJob(String jobName) {
-      super(jobName);
+    public DummyDetectionOnboardJob(String jobName, Map<String, String> properties) {
+      super(jobName, properties);
     }
 
     @Override
@@ -101,8 +102,8 @@ public class DetectionOnboardServiceExecutorTest {
 
   static class DuplicateTaskDetectionOnboardJob extends BaseDetectionOnboardJob {
 
-    public DuplicateTaskDetectionOnboardJob(String jobName) {
-      super(jobName);
+    public DuplicateTaskDetectionOnboardJob(String jobName, Map<String, String> properties) {
+      super(jobName, properties);
     }
 
     @Override
@@ -121,8 +122,8 @@ public class DetectionOnboardServiceExecutorTest {
 
   static class NullTaskListDetectionOnboardJob extends BaseDetectionOnboardJob {
 
-    public NullTaskListDetectionOnboardJob(String jobName) {
-      super(jobName);
+    public NullTaskListDetectionOnboardJob(String jobName, Map<String, String> properties) {
+      super(jobName, properties);
     }
 
     @Override
@@ -138,8 +139,8 @@ public class DetectionOnboardServiceExecutorTest {
 
   static class NullConfigurationDetectionOnboardJob extends BaseDetectionOnboardJob {
 
-    public NullConfigurationDetectionOnboardJob(String jobName) {
-      super(jobName);
+    public NullConfigurationDetectionOnboardJob(String jobName, Map<String, String> properties) {
+      super(jobName, properties);
     }
 
     @Override

@@ -69,11 +69,11 @@ public class DetectionOnboardResourceTest {
   }
 
   @Test
-  public void testNonexistJobId() throws IOException {
+  public void testNonExistingJobId() throws IOException {
     DetectionOnboardJobStatus onboardJobStatus = OBJECT_MAPPER
         .readValue(detectionOnboardResource.getDetectionOnboardingJobStatus(-1L), DetectionOnboardJobStatus.class);
     JobConstants.JobStatus jobStatus = onboardJobStatus.getJobStatus();
-    Assert.assertEquals(onboardJobStatus.getJobStatus(), JobConstants.JobStatus.FAILED);
+    Assert.assertEquals(onboardJobStatus.getJobStatus(), JobConstants.JobStatus.UNKNOWN);
     Assert.assertNotNull(onboardJobStatus.getMessage());
   }
 

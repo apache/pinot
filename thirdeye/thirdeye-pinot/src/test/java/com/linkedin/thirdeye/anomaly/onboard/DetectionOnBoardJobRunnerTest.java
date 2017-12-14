@@ -26,8 +26,7 @@ public class DetectionOnBoardJobRunnerTest {
   public void testNormalRun() {
     final String jobName = "normalJob";
 
-    DetectionOnboardJob onboardJob = new NormalDetectionOnboardJob(jobName);
-    onboardJob.initialize(Collections.<String, String>emptyMap());
+    DetectionOnboardJob onboardJob = new NormalDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
     DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
@@ -62,8 +61,7 @@ public class DetectionOnBoardJobRunnerTest {
     properties.put("task1.property2", "value12");
     properties.put("task2.property1", "value21");
 
-    DetectionOnboardJob onboardJob = new LogConfigDetectionOnboardJob(jobName);
-    onboardJob.initialize(properties);
+    DetectionOnboardJob onboardJob = new LogConfigDetectionOnboardJob(jobName, properties);
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
     DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
@@ -101,8 +99,7 @@ public class DetectionOnBoardJobRunnerTest {
   public void testAbortAtTimeOut() {
     final String jobName = "abortAtTimeOutJob";
 
-    DetectionOnboardJob onboardJob = new TimeOutDetectionOnboardJob(jobName);
-    onboardJob.initialize(Collections.<String, String>emptyMap());
+    DetectionOnboardJob onboardJob = new TimeOutDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
     DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
@@ -124,11 +121,10 @@ public class DetectionOnBoardJobRunnerTest {
   }
 
   @Test
-  public void testAbortAtFailure() {
-    final String jobName = "abortAtFailureJob";
+  public void testAbortOnFailure() {
+    final String jobName = "abortOnFailureJob";
 
-    DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName);
-    onboardJob.initialize(Collections.<String, String>emptyMap());
+    DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
     DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
@@ -150,14 +146,13 @@ public class DetectionOnBoardJobRunnerTest {
   }
 
   @Test
-  public void testContinueAtFailure() {
-    final String jobName = "continueAtFailureJob";
+  public void testContinueOnFailure() {
+    final String jobName = "continueOnFailureJob";
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("faultyTask.abortAtFailure", "false");
+    properties.put("faultyTask.abortOnFailure", "false");
 
-    DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName);
-    onboardJob.initialize(properties);
+    DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName, properties);
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
     DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
@@ -180,8 +175,8 @@ public class DetectionOnBoardJobRunnerTest {
   }
 
   static class TimeOutDetectionOnboardJob extends BaseDetectionOnboardJob {
-    public TimeOutDetectionOnboardJob(String jobName) {
-      super(jobName);
+    public TimeOutDetectionOnboardJob(String jobName, Map<String, String> properties) {
+      super(jobName, properties);
     }
 
     @Override
@@ -202,8 +197,8 @@ public class DetectionOnBoardJobRunnerTest {
     static final String TASK1_NAME = "task1";
     static final String TASK2_NAME = "task2";
 
-    public NormalDetectionOnboardJob(String jobName) {
-      super(jobName);
+    public NormalDetectionOnboardJob(String jobName, Map<String, String> properties) {
+      super(jobName, properties);
     }
 
     @Override
@@ -239,8 +234,8 @@ public class DetectionOnBoardJobRunnerTest {
     static final String TASK1_NAME = "task1";
     static final String TASK2_NAME = "task2";
 
-    public LogConfigDetectionOnboardJob(String jobName) {
-      super(jobName);
+    public LogConfigDetectionOnboardJob(String jobName, Map<String, String> properties) {
+      super(jobName, properties);
     }
 
     @Override
@@ -285,8 +280,8 @@ public class DetectionOnBoardJobRunnerTest {
   }
 
   static class HasFailureDetectionOnboardJob extends BaseDetectionOnboardJob {
-    public HasFailureDetectionOnboardJob(String jobName) {
-      super(jobName);
+    public HasFailureDetectionOnboardJob(String jobName, Map<String, String> properties) {
+      super(jobName, properties);
     }
 
     @Override
