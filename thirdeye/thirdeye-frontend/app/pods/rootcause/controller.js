@@ -357,27 +357,6 @@ export default Ember.Controller.extend({
     },
 
     /**
-     * Updates selected urns for the heatmap (appends selected filters as tail).
-     * @see onSelection(updates)
-     *
-     * @param {updates}
-     * @returns {undefined}
-     */
-    heatmapOnSelection(updates) {
-      const { context } = this.getProperties('context');
-
-      const filters = toFilters(context.urns);
-
-      const newUpdates = Object.keys(updates).reduce((agg, urn) => {
-        const urnAugmented = appendFilters(urn, filters);
-        agg[urnAugmented] = updates[urn];
-        return agg;
-      }, {});
-
-      this.send('onSelection', newUpdates);
-    },
-
-    /**
      * Sets the session name and text
      *
      * @param {String} name session name/title
@@ -442,6 +421,82 @@ export default Ember.Controller.extend({
       const jsonString = JSON.stringify({ feedbackType: feedback, comment });
 
       return fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
+    },
+
+    /**
+     * Selects a new primary urn for the search context.
+     *
+     * @param {object} updates (see onSelection, extracts "thirdeye:metric:" only)
+     * @returns {undefined}
+     */
+    onPrimaryChange(updates) {
+      const { context } = this.getProperties('context');
+
+      const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
+      const nonMetricUrns = [...context.urns].filter(urn => !urn.startsWith('thirdeye:metric:'));
+
+      const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...metricUrns]) });
+
+      this.send('onContext', newContext);
+    },
+
+    /**
+     * Updates selected urns by adding the current primary metric.
+     *
+     * @returns {undefined}
+     */
+    onPrimarySelection() {
+      const { context } = this.getProperties('context');
+
+      const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+      const currentUrns = metricUrns.map(toCurrentUrn);
+      const baselineUrns = metricUrns.map(toBaselineUrn);
+
+      const updates = [...metricUrns, ...currentUrns, ...baselineUrns].reduce((agg, urn) => {
+        agg[urn] = true;
+      return agg;
+    }, {});
+
+      this.send('onSelection', updates);
+    },
+
+    /**
+     * Selects a new anomalyRange and compareMode for the search context.
+     *
+     * @param {Int} start anomaly range start (in millis)
+     * @param {Int} end anomaly range end (in millis)
+     * @param {String} compareMode
+     */
+    onComparisonChange(start, end, compareMode) {
+      const { context } = this.getProperties('context');
+
+      const newContext = Object.assign({}, context, {
+        anomalyRange: [start, end],
+        compareMode
+      });
+
+      this.send('onContext', newContext);
+    },
+
+    /**
+     * Updates selected urns for the heatmap (appends selected filters as tail).
+     * @see onSelection(updates)
+     *
+     * @param {Object} updates
+     * @returns {undefined}
+     */
+    heatmapOnSelection(updates) {
+      const { context } = this.getProperties('context');
+
+      const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
+      const nonMetricUrns = [...context.urns].filter(urn => !urn.startsWith('thirdeye:metric:'));
+
+      const filters = toFilters(Object.keys(updates));
+      const newMetricUrns = metricUrns.map(urn => appendFilters(urn, filters));
+
+      const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...newMetricUrns]) });
+
+      this.send('onContext', newContext);
     }
   }
 });

@@ -11,7 +11,9 @@ export default Ember.Component.extend({
   //
   // internal
   //
-  baseUrn: null,
+  baseUrn: null, // ""
+
+  baseUrnCache: null, // ""
 
   filterMap: {},
 
@@ -20,7 +22,7 @@ export default Ember.Component.extend({
   didReceiveAttrs() {
     this._super(...arguments);
 
-    const { selectedUrn } = this.getProperties('selectedUrn');
+    const { selectedUrn, baseUrnCache } = this.getProperties('selectedUrn', 'baseUrnCache');
 
     if (!selectedUrn || !selectedUrn.startsWith('thirdeye:metric:')) {
       this.setProperties({
@@ -34,24 +36,17 @@ export default Ember.Component.extend({
     const baseUrn = stripTail(selectedUrn);
     const filterMap = toFilterMap(toFilters(selectedUrn));
 
+    if (!_.isEqual(baseUrn, baseUrnCache)) {
+      this._fetchFilters(baseUrn);
+      this.setProperties({ baseUrnCache: baseUrn });
+    }
+
     this.setProperties({ baseUrn, filterMap });
   },
 
-  filterOptionsObserver: Ember.observer('baseUrn', function () {
-    const { baseUrn } = this.getProperties('baseUrn');
-
-    if (!baseUrn) { return; }
-
-    const id = baseUrn.split(':')[2];
-
-    return fetch(`/data/autocomplete/filters/metric/${id}`)
-      .then(checkStatus)
-      .then(res => this.setProperties({ filterOptions: res, filterMap: this._pruneFilters(res) }));
-  }),
-
   filters: Ember.computed('filterMap', {
     get() {
-      const {filterMap} = this.getProperties('filterMap');
+      const { filterMap } = this.getProperties('filterMap');
       return JSON.stringify(filterMap);
     },
     set() {
@@ -75,6 +70,16 @@ export default Ember.Component.extend({
     });
 
     return newFilterMap;
+  },
+
+  _fetchFilters(baseUrn) {
+    if (!baseUrn) { return; }
+
+    const id = baseUrn.split(':')[2];
+
+    return fetch(`/data/autocomplete/filters/metric/${id}`)
+        .then(checkStatus)
+        .then(res => this.setProperties({ filterOptions: res, filterMap: this._pruneFilters(res) }));
   },
 
   actions: {
@@ -102,9 +107,7 @@ export default Ember.Component.extend({
 
       const metricUrn = appendFilters(baseUrn, fromFilterMap(filterMap));
 
-      this.setProperties({ selectedUrn: metricUrn });
-
-      const updates = [metricUrn, toBaselineUrn(metricUrn), toCurrentUrn(metricUrn)];
+      const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
 
       onSelection(updates);
     }

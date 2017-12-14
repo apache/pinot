@@ -207,7 +207,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       const analysisRange = [moment(rawStart).startOf('day').add(1, 'day').valueOf(), moment(rawEnd).endOf('day').valueOf()];
 
       context = {
-        urns: new Set([...baseMetricUrns, ...dimensionUrns, anomalyUrn]),
+        urns: new Set([...metricUrns, anomalyUrn]),
         anomalyRange,
         analysisRange,
         granularity,

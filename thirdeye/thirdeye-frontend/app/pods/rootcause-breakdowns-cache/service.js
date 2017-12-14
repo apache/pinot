@@ -83,8 +83,7 @@ export default Ember.Service.extend({
   _fetchSlice(urn, range, context) {
     const metricId = urn.split(':')[3];
     const metricFilters = toFilters([urn]);
-    const contextFilters = toFilters(filterPrefix(context.urns, 'thirdeye:dimension:'));
-    const filters = toFilterMap(metricFilters.concat(contextFilters));
+    const filters = toFilterMap(metricFilters);
 
     const filterString = encodeURIComponent(JSON.stringify(filters));
 

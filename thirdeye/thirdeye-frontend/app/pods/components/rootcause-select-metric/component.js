@@ -9,7 +9,11 @@ export default Ember.Component.extend({
 
   onSelection: null, // function (metricUrn)
 
+  placeholder: 'Search for a Metric',
 
+  //
+  // internal
+  //
   mostRecentSearch: null, // promise
 
   selectedUrnCache: null, // ""
@@ -26,8 +30,6 @@ export default Ember.Component.extend({
         .then(res => res.json());
   }),
 
-  placeholder: 'Search for a Metric',
-
   didReceiveAttrs() {
     this._super(...arguments);
 
@@ -43,7 +45,7 @@ export default Ember.Component.extend({
           .then(res => this.set('selectedMetric', res));
 
       } else {
-        this.set('selectedMetric', undefined);
+        this.set('selectedMetric', null);
       }
     }
   },

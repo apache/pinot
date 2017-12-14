@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, filterObject, filterPrefix, toBaselineRange, stripTail } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterObject, filterPrefix, toBaselineRange, stripTail, toFilters } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -102,8 +102,13 @@ export default Ember.Service.extend({
   },
 
   _makeUrl(framework, context) {
-    const baseUrns = filterPrefix(context.urns, ['thirdeye:metric:', 'thirdeye:dimension:']).map(stripTail);
-    const urnString = baseUrns.join(',');
+    const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+
+    // TODO support long format metric urns in backend
+    const baseMetricUrns = metricUrns.map(stripTail);
+    const dimensionUrns = toFilters(metricUrns).map(t => `thirdeye:dimension:${t[0]}:${t[1]}:provided`);
+
+    const urnString = [...baseMetricUrns, ...dimensionUrns].join(',');
     const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
       `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
