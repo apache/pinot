@@ -32,6 +32,7 @@ import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -491,6 +492,7 @@ public class AnomaliesResource {
    * @param startTime start time utc (in millis)
    * @param endTime end time utc (in millis)
    * @param functionId anomaly function id
+   * @param dimensionMapJSONString if specified, only update feedback of the anomalies on the same dimension
    * @param feedbackType feedback type
    */
   @POST
@@ -499,6 +501,7 @@ public class AnomaliesResource {
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
       @PathParam("functionId") Long functionId,
+      @QueryParam("dimensionMap") String dimensionMapJSONString,
       @QueryParam("feedbackType") String feedbackType) {
 
     if (functionId == null) {
@@ -517,12 +520,17 @@ public class AnomaliesResource {
       throw new IllegalArgumentException("Must provide feedbackType");
     }
 
+    DimensionMap dimension = new DimensionMap();
+    if (StringUtils.isNotEmpty(dimensionMapJSONString)) {
+      dimension = new DimensionMap(dimensionMapJSONString);
+    }
     // fetch anomalies
     List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.findByFunctionId(functionId, false);
 
     // apply feedback
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (anomaly.getStartTime() < endTime && startTime < anomaly.getEndTime()) {
+      if (anomaly.getStartTime() < endTime && startTime < anomaly.getEndTime()
+          && anomaly.getDimensions().equals(dimension)) {
         LOG.info("Updating feedback for anomaly id {}", anomaly.getId());
 
         AnomalyFeedback feedback = anomaly.getFeedback();
