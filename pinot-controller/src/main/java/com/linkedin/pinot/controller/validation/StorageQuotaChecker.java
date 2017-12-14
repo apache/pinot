@@ -66,9 +66,14 @@ public class StorageQuotaChecker {
     Preconditions.checkNotNull(segmentFile);
     Preconditions.checkNotNull(tableNameWithType);
     Preconditions.checkNotNull(segmentName);
-    Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be > 0, input: %s", timeoutMsec);
-    Preconditions.checkArgument(segmentFile.exists(), "Segment file: %s does not exist", segmentFile);
-    Preconditions.checkArgument(segmentFile.isDirectory(), "Segment file: %s is not a directory", segmentFile);
+    try {
+      Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be > 0, input: %s", timeoutMsec);
+      Preconditions.checkArgument(segmentFile.exists(), "Segment file: %s does not exist", segmentFile);
+      Preconditions.checkArgument(segmentFile.isDirectory(), "Segment file: %s is not a directory", segmentFile);
+    } catch(IllegalArgumentException e) {
+      LOGGER.info("IllegalArgumentException: " + e);
+      return new QuotaCheckerResponse(false, "Invalid API call: " + e);
+    }
 
     // 1. Read table config
     // 2. read table size from all the servers
