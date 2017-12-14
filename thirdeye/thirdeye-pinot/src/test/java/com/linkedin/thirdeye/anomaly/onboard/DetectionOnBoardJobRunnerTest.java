@@ -46,10 +46,10 @@ public class DetectionOnBoardJobRunnerTest {
 
     // Check execution context
     DetectionOnboardExecutionContext executionContext = jobContext.getExecutionContext();
-    String task1Result = (String) executionContext.getExcutionResult(NormalDetectionOnboardJob.TASK1_NAME);
+    String task1Result = (String) executionContext.getExecutionResult(NormalDetectionOnboardJob.TASK1_NAME);
     Assert.assertEquals(task1Result, NormalDetectionOnboardJob.TASK1_NAME + NormalDetectionOnboardTask.VALUE_POSTFIX);
 
-    String task2Result = (String) executionContext.getExcutionResult(NormalDetectionOnboardJob.TASK2_NAME);
+    String task2Result = (String) executionContext.getExecutionResult(NormalDetectionOnboardJob.TASK2_NAME);
     Assert.assertEquals(task2Result, NormalDetectionOnboardJob.TASK2_NAME + NormalDetectionOnboardTask.VALUE_POSTFIX);
   }
 
@@ -80,7 +80,7 @@ public class DetectionOnBoardJobRunnerTest {
     DetectionOnboardExecutionContext executionContext = jobContext.getExecutionContext();
     {
       Configuration task1Result =
-          (Configuration) executionContext.getExcutionResult(LogConfigDetectionOnboardJob.TASK1_NAME);
+          (Configuration) executionContext.getExecutionResult(LogConfigDetectionOnboardJob.TASK1_NAME);
       Map<String, String> expectedTask1Property = new HashMap<>();
       expectedTask1Property.put("property1", "value11");
       expectedTask1Property.put("property2", "value12");
@@ -89,7 +89,7 @@ public class DetectionOnBoardJobRunnerTest {
     }
     {
       Configuration task2Result =
-          (Configuration) executionContext.getExcutionResult(LogConfigDetectionOnboardJob.TASK2_NAME);
+          (Configuration) executionContext.getExecutionResult(LogConfigDetectionOnboardJob.TASK2_NAME);
       Map<String, String> expectedTask2Property = new HashMap<>();
       expectedTask2Property.put("property1", "value21");
       Configuration expectedTask1Config = new MapConfiguration(expectedTask2Property);
