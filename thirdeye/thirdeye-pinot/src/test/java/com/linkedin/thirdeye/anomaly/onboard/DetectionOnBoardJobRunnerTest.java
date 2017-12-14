@@ -24,15 +24,16 @@ public class DetectionOnBoardJobRunnerTest {
 
   @Test
   public void testNormalRun() {
+    final int jobId = 1;
     final String jobName = "normalJob";
 
     DetectionOnboardJob onboardJob = new NormalDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
-    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
+    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
 
-    DetectionOnboardJobStatus jobStatus = new DetectionOnboardJobStatus();
-    jobStatus.setJobStatus(JobConstants.JobStatus.SCHEDULED);
+    DetectionOnboardJobStatus jobStatus =
+        new DetectionOnboardJobStatus(jobId, jobName, JobConstants.JobStatus.SCHEDULED, "");
 
     // Submit the job to executor
     DetectionOnBoardJobRunner jobRunner = new DetectionOnBoardJobRunner(jobContext, tasks, jobStatus);
@@ -54,6 +55,7 @@ public class DetectionOnBoardJobRunnerTest {
 
   @Test
   public void testTaskConfig() {
+    final int jobId = 1;
     final String jobName = "normalJob";
 
     Map<String, String> properties = new HashMap<>();
@@ -64,10 +66,10 @@ public class DetectionOnBoardJobRunnerTest {
     DetectionOnboardJob onboardJob = new LogConfigDetectionOnboardJob(jobName, properties);
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
-    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
+    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
 
-    DetectionOnboardJobStatus jobStatus = new DetectionOnboardJobStatus();
-    jobStatus.setJobStatus(JobConstants.JobStatus.SCHEDULED);
+    DetectionOnboardJobStatus jobStatus =
+        new DetectionOnboardJobStatus(jobId, jobName, JobConstants.JobStatus.SCHEDULED, "");
 
     // Submit the job to executor
     DetectionOnBoardJobRunner jobRunner = new DetectionOnBoardJobRunner(jobContext, tasks, jobStatus);
@@ -97,15 +99,16 @@ public class DetectionOnBoardJobRunnerTest {
 
   @Test
   public void testAbortAtTimeOut() {
+    final int jobId = 1;
     final String jobName = "abortAtTimeOutJob";
 
     DetectionOnboardJob onboardJob = new TimeOutDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
-    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
+    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
 
-    DetectionOnboardJobStatus jobStatus = new DetectionOnboardJobStatus();
-    jobStatus.setJobStatus(JobConstants.JobStatus.SCHEDULED);
+    DetectionOnboardJobStatus jobStatus =
+        new DetectionOnboardJobStatus(jobId, jobName, JobConstants.JobStatus.SCHEDULED, "");
 
     // Submit the job to executor
     DetectionOnBoardJobRunner jobRunner =
@@ -122,15 +125,16 @@ public class DetectionOnBoardJobRunnerTest {
 
   @Test
   public void testAbortOnFailure() {
+    final int jobId = 1;
     final String jobName = "abortOnFailureJob";
 
     DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
-    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
+    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
 
-    DetectionOnboardJobStatus jobStatus = new DetectionOnboardJobStatus();
-    jobStatus.setJobStatus(JobConstants.JobStatus.SCHEDULED);
+    DetectionOnboardJobStatus jobStatus =
+        new DetectionOnboardJobStatus(jobId, jobName, JobConstants.JobStatus.SCHEDULED, "");
 
     // Submit the job to executor
     DetectionOnBoardJobRunner jobRunner =
@@ -147,6 +151,7 @@ public class DetectionOnBoardJobRunnerTest {
 
   @Test
   public void testContinueOnFailure() {
+    final int jobId = 1;
     final String jobName = "continueOnFailureJob";
 
     Map<String, String> properties = new HashMap<>();
@@ -155,10 +160,10 @@ public class DetectionOnBoardJobRunnerTest {
     DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName, properties);
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
-    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, 1, configuration);
+    DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
 
-    DetectionOnboardJobStatus jobStatus = new DetectionOnboardJobStatus();
-    jobStatus.setJobStatus(JobConstants.JobStatus.SCHEDULED);
+    DetectionOnboardJobStatus jobStatus =
+        new DetectionOnboardJobStatus(jobId, jobName, JobConstants.JobStatus.SCHEDULED, "");
 
     // Submit the job to executor
     DetectionOnBoardJobRunner jobRunner =

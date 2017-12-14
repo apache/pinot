@@ -62,10 +62,8 @@ public class DetectionOnboardServiceExecutor implements DetectionOnboardService 
       Preconditions.checkNotNull(tasks, "Job %s returns a null task list.", jobName);
       Preconditions.checkArgument(!hasDuplicateTaskName(tasks), "Job %s contains duplicate task name.", jobName);
 
-      DetectionOnboardJobStatus jobStatus = new DetectionOnboardJobStatus();
-      jobStatus.setJobId(jobId);
-      jobStatus.setJobStatus(JobConstants.JobStatus.SCHEDULED);
-      DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobName, jobId, configuration);
+      DetectionOnboardJobStatus jobStatus = new DetectionOnboardJobStatus(jobId, jobName, JobConstants.JobStatus.SCHEDULED, "");
+      DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
       DetectionOnBoardJobRunner jobRunner = new DetectionOnBoardJobRunner(jobContext, tasks, jobStatus);
 
       // Submit the job to executor

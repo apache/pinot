@@ -10,7 +10,7 @@ public class DetectionOnboardJobContext {
   private Configuration configuration;
   private DetectionOnboardExecutionContext executionContext = new DetectionOnboardExecutionContext();
 
-  public DetectionOnboardJobContext(String jobName, long jobId, Configuration configuration) {
+  public DetectionOnboardJobContext(long jobId, String jobName, Configuration configuration) {
     setJobName(jobName);
     setJobId(jobId);
     setConfiguration(configuration);

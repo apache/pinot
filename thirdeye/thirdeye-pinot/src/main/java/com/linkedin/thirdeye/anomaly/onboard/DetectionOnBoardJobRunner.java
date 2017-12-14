@@ -50,7 +50,8 @@ public class DetectionOnBoardJobRunner implements Runnable {
     Preconditions.checkNotNull(jobStatus);
 
     for (DetectionOnboardTask task : tasks) {
-      DetectionOnboardTaskStatus taskStatus = new DetectionOnboardTaskStatus(TaskConstants.TaskStatus.WAITING, "");
+      DetectionOnboardTaskStatus taskStatus =
+          new DetectionOnboardTaskStatus(task.getTaskName(), TaskConstants.TaskStatus.WAITING, "");
       jobStatus.addTaskStatus(taskStatus);
 
       // Construct Task context and configuration

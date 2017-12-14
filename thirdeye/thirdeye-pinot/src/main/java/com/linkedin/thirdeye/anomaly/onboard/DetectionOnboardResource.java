@@ -59,10 +59,8 @@ public class DetectionOnboardResource {
           detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName, properties));
       detectionOnboardingJobStatus = detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
     } catch (Exception e) {
-      detectionOnboardingJobStatus = new DetectionOnboardJobStatus();
-      detectionOnboardingJobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
-      detectionOnboardingJobStatus
-          .setMessage(String.format("Failed to create job %s. %s", jobName, ExceptionUtils.getStackTrace(e)));
+      detectionOnboardingJobStatus = new DetectionOnboardJobStatus(-1, jobName, JobConstants.JobStatus.FAILED,
+          String.format("Failed to create job %s. %s", jobName, ExceptionUtils.getStackTrace(e)));
     }
 
     return detectionOnboardJobStatusToJsonString(detectionOnboardingJobStatus);
@@ -82,10 +80,8 @@ public class DetectionOnboardResource {
         detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
     // Create StatusNotFound message
     if (detectionOnboardingJobStatus == null) {
-      detectionOnboardingJobStatus = new DetectionOnboardJobStatus();
-      detectionOnboardingJobStatus.setJobId(jobId);
-      detectionOnboardingJobStatus.setJobStatus(JobConstants.JobStatus.UNKNOWN);
-      detectionOnboardingJobStatus.setMessage(String.format("Unable to find job id: %d", jobId));
+      detectionOnboardingJobStatus = new DetectionOnboardJobStatus(jobId, "Unknown Job", JobConstants.JobStatus.UNKNOWN,
+          String.format("Unable to find job id: %d", jobId));
     }
     return detectionOnboardJobStatusToJsonString(detectionOnboardingJobStatus);
   }

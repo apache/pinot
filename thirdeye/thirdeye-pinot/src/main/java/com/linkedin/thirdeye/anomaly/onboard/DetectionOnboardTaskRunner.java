@@ -19,7 +19,7 @@ public class DetectionOnboardTaskRunner implements Callable<DetectionOnboardTask
 
   @Override
   public DetectionOnboardTaskStatus call() throws Exception {
-    DetectionOnboardTaskStatus taskStatus = new DetectionOnboardTaskStatus();
+    DetectionOnboardTaskStatus taskStatus = new DetectionOnboardTaskStatus(task.getTaskName());
     taskStatus.setTaskStatus(TaskConstants.TaskStatus.RUNNING);
 
     try {
