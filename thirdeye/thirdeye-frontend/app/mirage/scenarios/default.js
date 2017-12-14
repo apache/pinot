@@ -11,4 +11,8 @@ export default function(server) {
    * Creates a mock anomaly on server start
    */
   server.createList('anomaly', 1);
+
+  const fixtures = ['alertConfigs', 'anomalyFunctions', 'entityApplications', 'metrics', 'queryRelatedMetrics',
+                      'timeseriesCompares'];
+  server.loadFixtures(...fixtures);
 }

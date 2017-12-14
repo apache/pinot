@@ -112,6 +112,13 @@ export default function() {
   });
 
   /**
+   * Returns information about the second alert in anomalyFunction mock data
+   */
+  this.get(`/onboard/function/${anomalyFunction[1].id}`, () => {
+    return anomalyFunction[1];
+  });
+
+  /**
    * Returns metric information about the first alert
    */
   this.get('/data/autocomplete/***', () => {
@@ -129,7 +136,7 @@ export default function() {
    * Returns the first email config
    */
   this.get(`/thirdeye/email/function/${anomalyFunction[0].id}`, () => {
-    return alertConfig;
+    return [alertConfig[0]];
   });
 
   /**
