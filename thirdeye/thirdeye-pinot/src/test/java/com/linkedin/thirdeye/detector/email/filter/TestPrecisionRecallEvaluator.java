@@ -22,7 +22,7 @@ import static org.junit.Assert.*;
 
 
 public class TestPrecisionRecallEvaluator {
-  private static String TEST = "test";
+  private static final String TEST = "test";
   private DAOTestBase testDAOProvider;
   private MergedAnomalyResultManager mergedAnomalyDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;

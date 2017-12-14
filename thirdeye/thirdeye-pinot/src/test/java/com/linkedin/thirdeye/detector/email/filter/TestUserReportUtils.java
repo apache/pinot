@@ -25,7 +25,7 @@ public class TestUserReportUtils {
   private DAOTestBase testDAOProvider;
   private MergedAnomalyResultManager mergedAnomalyDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private static String TEST = "test";
+  private static final String TEST = "test";
 
   @BeforeClass
   void beforeClass() {
