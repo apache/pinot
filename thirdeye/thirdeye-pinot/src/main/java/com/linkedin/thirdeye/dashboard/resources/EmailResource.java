@@ -52,6 +52,14 @@ public class EmailResource {
     if (Strings.isNullOrEmpty(alertConfigDTO.getFromAddress())) {
       alertConfigDTO.setFromAddress(thirdeyeConfiguration.getFailureToAddress());
     }
+    if (Strings.isNullOrEmpty(alertConfigDTO.getRecipients())) {
+      LOG.error("Unable to proceed user request with empty recipients: {}", alertConfigDTO);
+      return Response.status(Response.Status.BAD_REQUEST).entity("Empty field on recipients").build();
+    }
+    if (Strings.isNullOrEmpty(alertConfigDTO.getCronExpression())) {
+      LOG.error("Unable to proceed user request with empty cron: {}", alertConfigDTO);
+      return Response.status(Response.Status.BAD_REQUEST).entity("Empty field on cron").build();
+    }
     Long id = alertDAO.save(alertConfigDTO);
     return Response.ok(id).build();
   }
