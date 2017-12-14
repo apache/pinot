@@ -576,7 +576,7 @@ public class DetectionJobResource {
    * @param holidayEnds: holidayEnds in in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @param features: a list of features separated by comma, ex: weight,score.
    *                Note that, the feature must be a existing field name in MergedAnomalyResult or a pre-set feature name
-   * @param pattern: user customization on pattern
+   * @param pattern: users' customization on pattern. Format can be one of them: "UP", "DOWN" or "UP,DOWN"
    * @param mttd: mttd string to specify severity on minimum-time-to-detection. Format example: "window_size_in_hour=2.5;weight=0.3"
    * @return HTTP response of request: a list of autotune config id
    */
@@ -763,8 +763,8 @@ public class DetectionJobResource {
   @GET
   @Path("/eval/filter/{functionId}")
   public Response evaluateAlertFilterByFunctionId(@PathParam("functionId") long id,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso,
+      @QueryParam("start") @NotNull String startTimeIso,
+      @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("isProjected") @DefaultValue("false") String isProjected,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
@@ -813,7 +813,7 @@ public class DetectionJobResource {
   @GET
   @Path("/eval/autotune/{autotuneId}")
   public Response evaluateAlertFilterByAutoTuneId(@PathParam("autotuneId") long id,
-      @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
+      @QueryParam("start") @NotNull  String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
