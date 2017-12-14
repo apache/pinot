@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardServiceExecutor;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
@@ -43,6 +45,7 @@ public class ThirdEyeAnomalyApplication
   private AnomalyClassifierFactory anomalyClassifierFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
   private ClassificationJobScheduler classificationJobScheduler = null;
+  private DetectionOnboardServiceExecutor detectionOnboardServiceExecutor = null;
   private EmailResource emailResource = null;
 
   public static void main(final String[] args) throws Exception {
@@ -133,33 +136,41 @@ public class ThirdEyeAnomalyApplication
         if (config.isPinotProxy()) {
           environment.jersey().register(new PinotDataSourceResource());
         }
+        if (config.isDetectionOnboard()) {
+          detectionOnboardServiceExecutor = new DetectionOnboardServiceExecutor();
+          detectionOnboardServiceExecutor.start();
+          environment.jersey().register(new DetectionOnboardResource(detectionOnboardServiceExecutor));
+        }
       }
 
       @Override
       public void stop() throws Exception {
-        if (config.isWorker()) {
+        if (taskDriver != null) {
           taskDriver.shutdown();
         }
-        if (config.isScheduler()) {
+        if (detectionJobScheduler != null) {
           detectionJobScheduler.shutdown();
         }
-        if (config.isMonitor()) {
+        if (monitorJobScheduler != null) {
           monitorJobScheduler.shutdown();
         }
-        if (config.isAlert()) {
+        if (alertJobSchedulerV2 != null) {
           alertJobSchedulerV2.shutdown();
         }
-        if (config.isAutoload()) {
+        if (autoOnboardService != null) {
           autoOnboardService.shutdown();
         }
-        if (config.isDataCompleteness()) {
+        if (dataCompletenessScheduler != null) {
           dataCompletenessScheduler.shutdown();
         }
-        if (config.isClassifier()) {
+        if (classificationJobScheduler != null) {
           classificationJobScheduler.shutdown();
         }
         if (config.isPinotProxy()) {
           // Do nothing
+        }
+        if (detectionOnboardServiceExecutor != null) {
+          detectionOnboardServiceExecutor.shutdown();
         }
       }
     });
