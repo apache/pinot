@@ -80,6 +80,8 @@ public class DetectionJobResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
   public static final String AUTOTUNE_FEATURE_KEY = "features";
+  public static final String AUTOTUNE_PATTERN_KEY = "pattern";
+  public static final String AUTOTUNE_MTTD_KEY = "mttd";
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -574,6 +576,8 @@ public class DetectionJobResource {
    * @param holidayEnds: holidayEnds in in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @param features: a list of features separated by comma, ex: weight,score.
    *                Note that, the feature must be a existing field name in MergedAnomalyResult or a pre-set feature name
+   * @param pattern: user customization on pattern
+   * @param mttd: mttd string to specify severity on minimum-time-to-detection. Format example: "window_size_in_hour=2.5;weight=0.3"
    * @return HTTP response of request: a list of autotune config id
    */
   @POST
@@ -584,7 +588,9 @@ public class DetectionJobResource {
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds,
-      @QueryParam("tuningFeatures") String features) {
+      @QueryParam("tuningFeatures") String features,
+      @QueryParam("mttd") String mttd,
+      @QueryParam("pattern") String pattern) {
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
@@ -609,13 +615,33 @@ public class DetectionJobResource {
 
     // create alert filter auto tune
     AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO();
+    Properties autotuneProperties = autotuneConfig.getTuningProps();
+
+    // if new feature set being specified
     if (StringUtils.isNotBlank(features)) {
-      Properties autotuneProperties = autotuneConfig.getTuningProps();
-      String previousFetrues = autotuneProperties.getProperty(AUTOTUNE_FEATURE_KEY);
-      LOG.info("The previous features for autotune is {}; now change to {}", previousFetrues, features);
+      String previousFeatures = autotuneProperties.getProperty(AUTOTUNE_FEATURE_KEY);
+      LOG.info("The previous features for autotune is {}; now change to {}", previousFeatures, features);
       autotuneProperties.setProperty(AUTOTUNE_FEATURE_KEY, features);
       autotuneConfig.setTuningProps(autotuneProperties);
     }
+
+    // if new pattern being specified
+    if (StringUtils.isNotBlank(pattern)) {
+      String previousPattern = autotuneProperties.getProperty(AUTOTUNE_PATTERN_KEY);
+      LOG.info("The previous pattern for autotune is {}; now changed to {}", previousPattern, pattern);
+      autotuneProperties.setProperty(AUTOTUNE_PATTERN_KEY, pattern);
+      autotuneConfig.setTuningProps(autotuneProperties);
+    }
+
+    // if new mttd requirement specified
+    if (StringUtils.isNotBlank(mttd)) {
+      String previousMttd = autotuneProperties.getProperty(AUTOTUNE_MTTD_KEY);
+      LOG.info("The previous mttd for autotune is {}; now changed to {}", previousMttd, mttd);
+      autotuneProperties.setProperty(AUTOTUNE_MTTD_KEY, mttd);
+      autotuneConfig.setTuningProps(autotuneProperties);
+    }
+
+
     BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
@@ -725,10 +751,12 @@ public class DetectionJobResource {
 
 
   /**
-   * The endpoint to evaluate alert filter
+   * The endpoint to evaluate system performance. The evaluation will be based on sent and non sent anomalies
    * @param id: function ID
    * @param startTimeIso: startTime of merged anomaly ex: 2016-5-23T00:00:00Z
    * @param endTimeIso: endTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param isProjected: Boolean to indicate is to return projected performance for current alert filter.
+   *                   If "true", return projected performance for current alert filter
    * @return feedback summary, precision and recall as json object
    * @throws Exception when data has no positive label or model has no positive prediction
    */
@@ -737,6 +765,7 @@ public class DetectionJobResource {
   public Response evaluateAlertFilterByFunctionId(@PathParam("functionId") long id,
       @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso,
+      @QueryParam("isProjected") @DefaultValue("false") String isProjected,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
@@ -748,13 +777,18 @@ public class DetectionJobResource {
     List<MergedAnomalyResultDTO> anomalyResultDTOS =
         getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
 
-    // create alert filter and evaluator
-    AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-    //evaluate current alert filter (calculate current precision and recall)
-    PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
+    PrecisionRecallEvaluator evaluator;
+    if (Boolean.valueOf(isProjected)) {
+      // create alert filter and evaluator
+      AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+      //evaluate current alert filter (calculate current precision and recall)
+      evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
 
-    LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
-        evaluator.getWeightedPrecision(), evaluator.getRecall());
+      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
+          evaluator.getWeightedPrecision(), evaluator.getRecall());
+    } else {
+      evaluator = new PrecisionRecallEvaluator(anomalyResultDTOS);
+    }
 
     Map<String, Number> evaluatorValues = evaluator.toNumberMap();
     try {
@@ -776,7 +810,7 @@ public class DetectionJobResource {
    * @param holidayEnds: holiday ends time to remove merged anomlaies in ISO format. ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @return HTTP response of evaluation results
    */
-  @POST
+  @GET
   @Path("/eval/autotune/{autotuneId}")
   public Response evaluateAlertFilterByAutoTuneId(@PathParam("autotuneId") long id,
       @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
@@ -1125,6 +1159,31 @@ public class DetectionJobResource {
       @QueryParam("severity") @NotNull double severity) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+    double alertFilterMTTDInHour = alertFilter.getAlertFilterMTTD(severity);
+    TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
+    int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
+    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize, detectionUnit);
+    return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
+  }
+
+  /**
+   * Get Minimum Time to Detection for Autotuned (Preview) Alert Filter.
+   * This endpoint evaluate both alert filter's MTTD and bucket size for function and returns the maximum of the two as MTTD
+   * @param id autotune Id to be evaluated
+   * @param severity severity value
+   * @return minimum time to detection in HOUR
+   */
+  @GET
+  @Path("/eval/projected/mttd/{autotuneId}")
+  public Response getProjectedMTTD (@PathParam("autotuneId") @NotNull long id,
+      @QueryParam("severity") @NotNull double severity) {
+    //Initiate tuned alert filter
+    AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(id);
+    Map<String, String> tunedParams = target.getConfiguration();
+    BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(tunedParams);
+    // Get current function
+    long functionId = target.getFunctionId();
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionId);
     double alertFilterMTTDInHour = alertFilter.getAlertFilterMTTD(severity);
     TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
