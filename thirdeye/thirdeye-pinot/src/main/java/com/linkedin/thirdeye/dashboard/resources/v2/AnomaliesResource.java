@@ -1108,7 +1108,7 @@ public class AnomaliesResource {
     return newFilterSet;
   }
 
-  private static Multimap<String, String> generateFilterSetWithDimensionMap(DimensionMap dimensionMap,
+  public static Multimap<String, String> generateFilterSetWithDimensionMap(DimensionMap dimensionMap,
       Multimap<String, String> filterSet) {
 
     Multimap<String, String> newFilterSet = HashMultimap.create();
