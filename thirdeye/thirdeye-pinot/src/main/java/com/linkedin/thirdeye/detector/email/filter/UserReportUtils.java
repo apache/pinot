@@ -25,8 +25,8 @@ public class UserReportUtils {
       MergedAnomalyResultDTO userReportAnomaly) {
     MergedAnomalyResultManager mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     List<MergedAnomalyResultDTO> systemAnomalies = mergedAnomalyDAO.findByFunctionId(userReportAnomaly.getFunction().getId(), false);
-    long startTM = userReportAnomaly.getStartTime();
-    long endTM = userReportAnomaly.getEndTime();
+    long startTime = userReportAnomaly.getStartTime();
+    long endTime = userReportAnomaly.getEndTime();
     long qualifiedRegion = 0;
     Collections.sort(systemAnomalies, new Comparator<MergedAnomalyResultDTO>() {
           @Override
@@ -36,13 +36,13 @@ public class UserReportUtils {
         });
     for (MergedAnomalyResultDTO anomalyResult : systemAnomalies) {
       if (anomalyResult.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION)
-          && anomalyResult.getEndTime() >= startTM && anomalyResult.getStartTime() <= endTM &&
+          && anomalyResult.getEndTime() >= startTime && anomalyResult.getStartTime() <= endTime &&
           anomalyResult.getDimensions().equals(userReportAnomaly.getDimensions())) {
         if (alertFilter.isQualified(anomalyResult)) {
           qualifiedRegion += anomalyResult.getEndTime() - anomalyResult.getStartTime();
         }
       }
     }
-    return qualifiedRegion >= (endTM - startTM) * 0.5;
+    return qualifiedRegion >= (endTime - startTime) * 0.5;
   }
 }
