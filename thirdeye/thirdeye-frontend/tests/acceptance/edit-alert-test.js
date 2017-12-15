@@ -10,15 +10,9 @@ const ALERT_NAME = `#anomaly-form-function-name`;
 const STATUS = '.te-toggle--form span';
 
 test('visiting /manage/alerts/edit and checking that fields render correctly', assert => {
-  visit('/manage/alerts');
-
-  andThen(() => {
-    assert.equal(
-      currentURL(),
-      '/manage/alerts',
-      'manage alerts url is correct');
-    click(find(EDIT_BUTTON).get(1));
-  });
+  let alert = server.create('alert');
+  debugger;
+  visit(`/manage/alerts/${alert.id}`);
 
   andThen(() => {
     assert.equal(

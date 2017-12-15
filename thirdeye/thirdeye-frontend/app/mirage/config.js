@@ -86,8 +86,8 @@ export default function() {
   /**
    * Mocks a list of alerts, displayed in the /manage/alerts page
    */
-  this.get('/thirdeye/entity/ANOMALY_FUNCTION', () => {
-    return anomalyFunction;
+  this.get('/thirdeye/entity/ANOMALY_FUNCTION', (schema) => {
+    return schema.alerts.all().models;
   });
 
   /**
@@ -107,16 +107,10 @@ export default function() {
   /**
    * Returns information about the first alert in anomalyFunction mock data
    */
-  this.get(`/onboard/function/${anomalyFunction[0].id}`, () => {
-    return anomalyFunction[0];
+  this.get(`/onboard/function/:id`, (schema, request) => {
+    return schema.alerts.find(request.params.id);
   });
 
-  /**
-   * Returns information about the second alert in anomalyFunction mock data
-   */
-  this.get(`/onboard/function/${anomalyFunction[1].id}`, () => {
-    return anomalyFunction[1];
-  });
 
   /**
    * Returns metric information about the first alert
@@ -149,7 +143,11 @@ export default function() {
   /**
    * Post request for editing alert
    */
-  this.post(`/thirdeye/***`, (db, request) => {
-    debugger;
+  this.post(`/thirdeye/entity`, (db, request) => {
+    let params = request.queryParams && request.queryParams.entityType;
+
+    if (params === 'ANOMALY_FUNCTION') {
+      debugger;
+    }
   });
 }

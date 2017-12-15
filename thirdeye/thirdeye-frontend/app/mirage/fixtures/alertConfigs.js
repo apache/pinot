@@ -3,7 +3,7 @@
  */
 export default [
   {
-    "id": 1,
+    "id": 10,
     "version": 0,
     "createdBy": null,
     "updatedBy": null,
@@ -13,7 +13,7 @@ export default [
     "active": true,
     "emailConfig": {
       "anomalyWatermark": 0,
-      "functionIds": [10]
+      "functionIds": [1]
     },
     "reportConfigCollection": {
       "enabled": true,
@@ -30,7 +30,7 @@ export default [
     "recipients": "simba@disney.com",
     "fromAddress": "mufasa@disney.com"
   }, {
-    "id": 2,
+    "id": 20,
     "version": 0,
     "createdBy": null,
     "updatedBy": null,
@@ -40,7 +40,7 @@ export default [
     "active": true,
     "emailConfig": {
       "anomalyWatermark": 0,
-      "functionIds": [20]
+      "functionIds": [2]
     },
     "reportConfigCollection": {
       "enabled": true,
