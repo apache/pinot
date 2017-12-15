@@ -57,26 +57,35 @@ public class SegmentFetcherFactoryTest {
     Assert.assertEquals(((TestSegmentFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called, 1);
     ReplacedFetcher fetcher = (ReplacedFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get(replacableProto);
     Assert.assertEquals(fetcher.getInitCalled(), 1);
+    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
   }
 
   @Test
   public void testGetSegmentFetcherBasedOnURI() throws Exception {
+    Configuration configuration = new PropertiesConfiguration();
+    configuration.addProperty("https.ssl.server.enable-verification", "false");
+    SegmentFetcherFactory.initSegmentFetcherFactory(configuration);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("hdfs:///something/wer") instanceof HdfsSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://") instanceof HttpsSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("file://a/asdf/wer/fd/e") instanceof LocalFileSegmentFetcher);
-
     Assert.assertNull(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
+    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
   }
 
   @Test
   public void testGetSegmentFetcherBasedOnURIFailed() throws Exception {
+    Configuration configuration = new PropertiesConfiguration();
+    SegmentFetcherFactory.initSegmentFetcherFactory(configuration);
+    // If HttpsSegmentFetcher is not configured correctly, it fails to initialize.
+    Assert.assertNull(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://"));
     try {
       SegmentFetcherFactory.getSegmentFetcherBasedOnURI("");
     } catch (UnsupportedOperationException ex) {
       return;
     }
     Assert.fail();
+    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
   }
 
   public static class ReplacedFetcher implements SegmentFetcher {
