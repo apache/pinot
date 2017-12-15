@@ -50,7 +50,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_ZOOKEPER_UPDATE_FAILURES("failures", false),
   LLC_KAFKA_DATA_LOSS("dataLoss", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
-  NUMBER_TASKS_SUBMITTED("tasks", false);
+  NUMBER_TASKS_SUBMITTED("tasks", false),
+  NUMBER_SEGMENT_COMMIT_TIMEOUT_EXCEEDED("OfflineSegmentCommitTimeouts", true);
 
 
   private final String brokerMeterName;

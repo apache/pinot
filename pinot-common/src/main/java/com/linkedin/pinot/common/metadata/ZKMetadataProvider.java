@@ -142,6 +142,13 @@ public class ZKMetadataProvider {
         partitionMappingZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
+  public static boolean setOfflineSegmentZKMetadataOnlyIfCorrectVersion(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata, int version) {
+    return propertyStore.set(constructPropertyStorePathForSegment(
+        TableNameBuilder.OFFLINE.tableNameWithType(offlineSegmentZKMetadata.getTableName()),
+        offlineSegmentZKMetadata.getSegmentName()), offlineSegmentZKMetadata.toZNRecord(), version, AccessOption.PERSISTENT);
+  }
+
   public static void setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
     propertyStore.set(constructPropertyStorePathForSegment(
@@ -166,6 +173,15 @@ public class ZKMetadataProvider {
       return null;
     }
     return new OfflineSegmentZKMetadata(znRecord);
+  }
+
+  @Nullable
+  public static ZNRecord getOfflineSegmentMetadataZnRecord(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull String tableName, @Nonnull String segmentName) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForSegment(offlineTableName, segmentName), null,
+        AccessOption.PERSISTENT);
+    return znRecord;
   }
 
   @Nullable
