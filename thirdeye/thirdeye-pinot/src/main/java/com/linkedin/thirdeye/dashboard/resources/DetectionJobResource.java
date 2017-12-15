@@ -82,6 +82,7 @@ public class DetectionJobResource {
   public static final String AUTOTUNE_FEATURE_KEY = "features";
   public static final String AUTOTUNE_PATTERN_KEY = "pattern";
   public static final String AUTOTUNE_MTTD_KEY = "mttd";
+  private static final String COMMA_SEPARATOR = ",";
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -1189,5 +1190,31 @@ public class DetectionJobResource {
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
     double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize, detectionUnit);
     return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
+  }
+
+  /**
+   * Given autotuneId and a list of anomalies, return the anomaly ids that qualified for alert filter
+   * @param autotuneId
+   * @param anomalyIdsString comma split anomaly id string
+   * @return Array list of anomaly id that pass the alert filter in autotune
+   */
+  @GET
+  @Path("/eval/projected/anomalies/{autotuneId}")
+  public ArrayList<Long> getPreviewedAnomaliesByAutoTuneId (@PathParam("autotuneId") @NotNull long autotuneId,
+      @QueryParam("anomalyIds") String anomalyIdsString) {
+    String[] anomalyIds = anomalyIdsString.split(COMMA_SEPARATOR);
+    //Initiate tuned alert filter
+    AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(autotuneId);
+    Map<String, String> tunedParams = target.getConfiguration();
+    BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(tunedParams);
+    ArrayList<Long> idList = new ArrayList<>();
+    for (String anomalyId : anomalyIds) {
+      Long id = Long.valueOf(anomalyId);
+      MergedAnomalyResultDTO anomaly = mergedAnomalyResultDAO.findById(id, false);
+      if (alertFilter.isQualified(anomaly)) {
+        idList.add(id);
+      }
+    }
+    return idList;
   }
 }

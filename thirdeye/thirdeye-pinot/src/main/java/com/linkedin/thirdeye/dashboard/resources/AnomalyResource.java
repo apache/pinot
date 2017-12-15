@@ -952,7 +952,8 @@ public class AnomalyResource {
   @Path("anomaly-function/{id}/anomalies")
   public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId, @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso, @QueryParam("type") @DefaultValue("merged") String anomalyType,
-      @QueryParam("apply-alert-filter") @DefaultValue("false") boolean applyAlertFiler) {
+      @QueryParam("apply-alert-filter") @DefaultValue("false") boolean applyAlertFiler,
+      @QueryParam("useNotified") @DefaultValue("false") boolean useNotified) {
 
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
@@ -994,7 +995,10 @@ public class AnomalyResource {
       }
 
       for (MergedAnomalyResultDTO dto : mergedResults) {
-        idList.add(dto.getId());
+        // if use notified flag, only keep anomalies isNotified == true
+        if ( (useNotified && dto.isNotified()) || !useNotified) {
+          idList.add(dto.getId());
+        }
       }
     }
 
