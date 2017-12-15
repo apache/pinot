@@ -1,5 +1,4 @@
 import queryRelatedMetrics from 'thirdeye-frontend/mocks/queryRelatedMetrics';
-import anomalyFunction from 'thirdeye-frontend/mocks/anomalyFunction';
 import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
 import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import metric from 'thirdeye-frontend/mocks/metric';
@@ -129,8 +128,8 @@ export default function() {
   /**
    * Returns the first email config
    */
-  this.get(`/thirdeye/email/function/${anomalyFunction[0].id}`, () => {
-    return [alertConfig[0]];
+  this.get(`/thirdeye/email/function/:id`, (schema, request) => {
+    return [alertConfig[request.params.id]];
   });
 
   /**

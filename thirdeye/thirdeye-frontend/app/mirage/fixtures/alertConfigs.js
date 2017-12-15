@@ -3,7 +3,7 @@
  */
 export default [
   {
-    "id": 10,
+    "id": 1,
     "version": 0,
     "createdBy": null,
     "updatedBy": null,
@@ -30,7 +30,7 @@ export default [
     "recipients": "simba@disney.com",
     "fromAddress": "mufasa@disney.com"
   }, {
-    "id": 20,
+    "id": 2,
     "version": 0,
     "createdBy": null,
     "updatedBy": null,
