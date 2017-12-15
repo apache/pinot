@@ -1,0 +1,13 @@
+<div class="col-xs-4">
+  {{rootcause-select-metric
+    selectedUrn=baseUrn
+    onSelection=(action "onMetric")
+  }}
+</div>
+<div class="col-xs-6">
+  {{filter-select
+    selected=filters
+    options=filterOptions
+    onChange=(action "onFilters")
+  }}
+</div>

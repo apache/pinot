@@ -213,6 +213,16 @@ export function toFilters(urns) {
   return [...dimensionFilters, ...metricFilters, ...frontendMetricFilters].sort();
 }
 
+export function fromFilterMap(filterMap) {
+  const filters = [];
+  Object.keys(filterMap).forEach(key => {
+    [...filterMap[key]].forEach(value => {
+      filters.push([key, value]);
+    })
+  });
+  return filters;
+}
+
 export function toFilterMap(filters) {
   const filterMap = {};
   filters.forEach(t => {
@@ -274,5 +284,7 @@ export default Ember.Helper.helper({
   findLabelMapping,
   toMetricLabel,
   toColor,
-  humanizeFloat
+  humanizeFloat,
+  fromFilterMap,
+  appendFilters
 });

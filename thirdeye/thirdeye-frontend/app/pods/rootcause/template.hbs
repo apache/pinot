@@ -1,21 +1,3 @@
-{{!-- TODO: replace with loading spinner --}}
-{{#if isLoading}}
-  <p>loading
-    {{#if isLoadingEntities}}
-      | ENTITIES
-    {{/if}}
-    {{#if isLoadingTimeseries}}
-      | TIMESERIES
-    {{/if}}
-    {{#if isLoadingAggregates}}
-      | AGGREGATES
-    {{/if}}
-    {{#if isLoadingBreakdowns}}
-      | BREAKDOWNS
-    {{/if}}
-  </p>
-{{/if}}
-
 <div class="container">
   <div class="row">
     {{rootcause-header
@@ -47,20 +29,46 @@
           selectedUrns=selectedUrns
           invisibleUrns=invisibleUrns
           onVisibility=(action "onVisibility")
-          onSelection=(action "onSelection")}}
-        <div class="rootcause-wrapper__chart">
-          {{rootcause-chart-toolbar
-            context=context
-            timeseriesMode=timeseriesMode
-            onContext=(action "onContext")
-            onChart=(action "onChart")}}
-          {{rootcause-chart
-            entities=entities
-            selectedUrns=chartSelectedUrns
-            timeseries=timeseries
-            timeseriesMode=timeseriesMode
-            context=context
-            onHover=(action "chartOnHover")}}
+          onSelection=(action "onSelection")
+        }}
+        <div class="container rootcause-wrapper__chart">
+              {{rootcause-chart-toolbar
+                context=context
+                timeseriesMode=timeseriesMode
+                onContext=(action "onContext")
+                onChart=(action "onChart")
+              }}
+              {{#if isLoadingTimeseries}}
+                <div class="spinner-wrapper spinner-wrapper--card">
+                  {{ember-spinner}}
+                </div>
+              {{/if}}
+              {{rootcause-chart
+                entities=entities
+                selectedUrns=chartSelectedUrns
+                timeseries=timeseries
+                timeseriesMode=timeseriesMode
+                context=context
+                onHover=(action "chartOnHover")
+              }}
+        </div>
+      </div>
+      <div class="container">
+        <div class="row">
+          <div class="col-xs-2">
+            Comparison settings
+            <span>
+              <i class="glyphicon glyphicon-question-sign"></i>
+              {{#tooltip-on-element}}
+                Typically, this is your anomaly region. It's highlighted in orange in the graph above. It also affects the data in views below.
+              {{/tooltip-on-element}}
+            </span>
+          </div>
+          {{rootcause-select-comparison-range
+            range=context.anomalyRange
+            compareMode=context.compareMode
+            onChange=(action "onComparisonChange")
+          }}
         </div>
       </div>
     </div>
@@ -68,6 +76,18 @@
 
   <div class="row">
     <div class="card-container card-container--box-shadow">
+      <div class="card-container__body">
+        <div class="row">
+          {{rootcause-select-metric-dimension
+            selectedUrn=metricUrn
+            onSelection=(action "onPrimaryChange")
+          }}
+          <div class="col-2-xs">
+            <a {{action "onPrimarySelection"}}>+ add to chart</a>
+          </div>
+        </div>
+      </div>
+
       <div class="card-container__header">
         <div class="card-container__subnav">
           <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
@@ -75,29 +95,21 @@
           </a>
         </div>
         <div class="card-container__subnav">
-          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
-            Events
-          </a>
-        </div>
-        <div class="card-container__subnav">
           <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
             Metrics
           </a>
         </div>
-      </div>
-      <div class="card-container__body">
-        <div class="row">
-          {{rootcause-settings
-            context=context
-            config=settingsConfig
-            onChange=(action "onContext")
-            onSelection=(action "onSelection")
-          }}
+        <div class="card-container__subnav">
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
+            Events
+          </a>
         </div>
+      </div>
+
+      <div class="card-container__body">
         <div class="row">
           <div class="col-xs-12">
             {{#if (eq activeTab "dimensions")}}
-              <h3>Dimensions</h3>
               {{#if isLoadingBreakdowns}}
                 <div class="spinner-wrapper spinner-wrapper--card">
                   {{ember-spinner}}
@@ -112,10 +124,13 @@
             {{/if}}
 
             {{#if (eq activeTab "metrics")}}
-              <h3>Metrics</h3>
+              {{#if isLoadingAggregates}}
+                <div class="spinner-wrapper spinner-wrapper--card">
+                  {{ember-spinner}}
+                </div>
+              {{/if}}
               {{rootcause-metrics
                 entities=entities
-                isLoading=isLoadingAggregates
                 aggregates=aggregates
                 selectedUrns=selectedUrns
                 onSelection=(action "onSelection")
@@ -123,7 +138,6 @@
             {{/if}}
 
             {{#if (eq activeTab "events")}}
-              <h3>Events</h3>
               <div class="row">
                 <div class="col-xs-3">
                   {{filter-bar
