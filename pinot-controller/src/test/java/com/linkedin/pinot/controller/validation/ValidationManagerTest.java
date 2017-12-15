@@ -179,7 +179,7 @@ public class ValidationManagerTest {
 
     // Refresh the segment
     metadata.setCrc("anotherfakecrc");
-    _pinotHelixResourceManager.refreshSegment(metadata, "http://dummy/");
+    _pinotHelixResourceManager.refreshSegment(metadata, offlineSegmentZKMetadata, "http://dummy/");
 
     Thread.sleep(1000);
 

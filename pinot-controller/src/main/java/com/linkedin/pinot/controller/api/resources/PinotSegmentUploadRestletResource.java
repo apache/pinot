@@ -51,6 +51,8 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLDecoder;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +76,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -367,7 +370,7 @@ public class PinotSegmentUploadRestletResource {
         String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
         LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentMetadata.getName(),
             clientAddress);
-        uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider);
+        uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider, headers);
         return new SuccessResponse("success"); // Current APIs return an empty status string on success.
       } else {
         // Some problem happened, sent back a simple line of text.
@@ -386,7 +389,7 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private PinotResourceManagerResponse uploadSegment(File indexDir, SegmentMetadata segmentMetadata,
-      File tempTarredSegmentFile, String downloadUrl, FileUploadPathProvider provider)
+      File tempTarredSegmentFile, String downloadUrl, FileUploadPathProvider provider, HttpHeaders headers)
       throws IOException, JSONException {
     String tableName = segmentMetadata.getTableName();
     String segmentName = segmentMetadata.getName();
@@ -413,27 +416,138 @@ public class PinotSegmentUploadRestletResource {
     }
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata = _pinotHelixResourceManager.getOfflineSegmentZkMetadata(
-        offlineTableName, segmentName);
+    ZNRecord znRecord = _pinotHelixResourceManager.getOfflineSegmentMetadataZnRecord(offlineTableName, segmentName);
 
-    if (offlineSegmentZKMetadata == null) {
+    if (znRecord == null) {
       // Creating new segment, not refreshing
       downloadUrl = moveSegmentToPermanentDirectory(provider, tableName, segmentName, tempTarredSegmentFile);
       _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
       response = PinotResourceManagerResponse.SUCCESS_RESPONSE;
       return response;
     }
-    if (downloadUrl == null) {
-      downloadUrl = moveSegmentToPermanentDirectory(provider, tableName, segmentName, tempTarredSegmentFile);
-    }
-    // TODO: this will read table configuration again from ZK. We should optimize that
-    response = _pinotHelixResourceManager.refreshSegment(segmentMetadata, downloadUrl);
 
-    if (!response.isSuccessful()) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, "Error uploading segment", Response.Status.INTERNAL_SERVER_ERROR);
+    final OfflineSegmentZKMetadata originalOfflineSegmentZkMetadata = new OfflineSegmentZKMetadata(znRecord);
+
+    long minionExpectedCrc = -1L;
+    boolean isMinionConfigured = offlineTableConfig.getTaskConfig() != null;
+    boolean minionHeaderPresent = headers.getHeaderString(HttpHeaders.USER_AGENT).contains(CommonConstants.Minion.MINION_HEADER);
+    boolean metadataRewritten = false;
+    if (isMinionConfigured) {
+      // Minion configured use case so that we write to zk sparingly
+      String segmentPushStatus = originalOfflineSegmentZkMetadata.getSegmentPushStatus();
+      SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd'T'HH:mm:ss.SSS");
+
+      if (segmentPushStatus != null) {
+        Date originalSegmentHumanReadableTime = getHumanReadableTimeFromSegmentPushStatus(segmentPushStatus, sdf);
+        if (tooLate(originalSegmentHumanReadableTime)) {
+          LOGGER.error("Segment was not properly committed, replacing segment {} for table {}", segmentName,
+              tableName);
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_SEGMENT_COMMIT_TIMEOUT_EXCEEDED, 1L);
+        } else {
+          throw new ControllerApplicationException(LOGGER, "Please retry later, segment upload in progress", Response.Status.INTERNAL_SERVER_ERROR);
+        }
+      }
+
+      if (minionHeaderPresent) {
+        try {
+          minionExpectedCrc = Long.parseLong(headers.getHeaderString(HttpHeaders.IF_MATCH));
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Could not parse crc {}", minionExpectedCrc, e);
+          throw new ControllerApplicationException(LOGGER, "Invalid crc sent from minion", Response.Status.NOT_ACCEPTABLE);
+        }
+      }
+
+      Date dt = new Date();
+      String currentHumanReadableTime = sdf.format(dt);
+      OfflineSegmentZKMetadata offlineSegmentZKMetadataWithPushStatus = new OfflineSegmentZKMetadata(znRecord);
+      offlineSegmentZKMetadataWithPushStatus.setSegmentPushStatus("COMMITTING-" + currentHumanReadableTime);
+
+      if (!_pinotHelixResourceManager
+          .updateZkMetadataAtomically(offlineSegmentZKMetadataWithPushStatus, znRecord.getVersion())) {
+        // Write committing status to zk
+        throw new ControllerApplicationException(LOGGER, "Retry later. ZK update failed.", Response.Status.INTERNAL_SERVER_ERROR);
+      }
     }
-    return response;
+
+    try {
+      if (downloadUrl == null) {
+        downloadUrl = moveSegmentToPermanentDirectory(provider, tableName, segmentName, tempTarredSegmentFile);
+      }
+
+      if (shouldRefreshSegment(segmentMetadata, originalOfflineSegmentZkMetadata, offlineTableName, segmentName,
+          minionExpectedCrc, minionHeaderPresent)) {
+        // If refreshSegment returns without an exception, it should have already written to zk, so we don't need to
+        // write segmentPushStatus.
+        response = _pinotHelixResourceManager.refreshSegment(segmentMetadata, originalOfflineSegmentZkMetadata, downloadUrl);
+        metadataRewritten = true;
+      } else {
+        response = PinotResourceManagerResponse.SUCCESS_RESPONSE;
+      }
+
+      if (!response.isSuccessful()) {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+        throw new ControllerApplicationException(LOGGER, "Error uploading segment", Response.Status.INTERNAL_SERVER_ERROR);
+      }
+      return response;
+    } finally {
+      if (isMinionConfigured && !metadataRewritten) {
+        originalOfflineSegmentZkMetadata.setSegmentPushStatus(null);
+        _pinotHelixResourceManager.updateZkMetadata(originalOfflineSegmentZkMetadata);
+      }
+    }
+  }
+
+  private Date getHumanReadableTimeFromSegmentPushStatus(String segmentPushStatus, SimpleDateFormat simpleDateFormat) throws ControllerApplicationException {
+    String date = segmentPushStatus.split("-")[1];
+    try {
+      return simpleDateFormat.parse(date);
+    } catch (ParseException e) {
+      LOGGER.warn("Could not parse segmentPushStatus {} using format {}", segmentPushStatus, simpleDateFormat);
+      throw new ControllerApplicationException(LOGGER, "Could not parse segmentPushStatus", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  private boolean tooLate(Date date) {
+    long timeoutMillis = _controllerConf.getSegmentCommitTimeoutMillis();
+    long currentMillis = System.currentTimeMillis();
+    if (currentMillis - date.getTime() >= timeoutMillis) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  private boolean shouldRefreshSegment(@Nonnull SegmentMetadata newSegmentMetadata,
+      @Nonnull OfflineSegmentZKMetadata existedSegmentZKMetadata, @Nonnull String offlineTableName,
+      @Nonnull String segmentName, long minionExpectedCrc, boolean minionHeaderPresent) {
+    long newCreationTime = newSegmentMetadata.getIndexCreationTime();
+    long existedCreationTime = existedSegmentZKMetadata.getCreationTime();
+    long newCrc = Long.valueOf(newSegmentMetadata.getCrc());
+    long existedCrc = existedSegmentZKMetadata.getCrc();
+
+    // We are skipping this check for minion because we set the creation time to be the same for all minion
+    // generated segments, so it would always reject the minion segment.
+    if (!minionHeaderPresent) {
+      // Check segment creation time
+      if (newCreationTime <= existedCreationTime) {
+        LOGGER.info("Reject segment: {} in table: {} because of older or same creation time, new: {}, existed: {}",
+            segmentName, offlineTableName, newCreationTime, existedCreationTime);
+        return false;
+      }
+
+      // TODO: Optimize this to only change refresh time if crc is same after changing crc of other minion tasks on data update
+      if (newCrc == existedCrc) {
+        LOGGER.info("Reject segment: {} in table: {} because of same CRC: {}", segmentName, offlineTableName, newCrc);
+        return false;
+      }
+    } else {
+      if (minionExpectedCrc != existedCrc) {
+        // segment has been replaced since minion ran, please rebuild and repush
+        throw new ControllerApplicationException(LOGGER, "Please rebuild and repush segment", Response.Status.PRECONDITION_FAILED);
+      }
+    }
+
+    return true;
   }
 
   private String moveSegmentToPermanentDirectory(FileUploadPathProvider provider, String tableName, String segmentName, File tempTarredSegmentFile) throws IOException{
