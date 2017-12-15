@@ -143,10 +143,10 @@ public class ZKMetadataProvider {
   }
 
   public static boolean setOfflineSegmentZKMetadataOnlyIfCorrectVersion(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata, int version) {
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata, int expectedVersion) {
     return propertyStore.set(constructPropertyStorePathForSegment(
         TableNameBuilder.OFFLINE.tableNameWithType(offlineSegmentZKMetadata.getTableName()),
-        offlineSegmentZKMetadata.getSegmentName()), offlineSegmentZKMetadata.toZNRecord(), version, AccessOption.PERSISTENT);
+        offlineSegmentZKMetadata.getSegmentName()), offlineSegmentZKMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);
   }
 
   public static void setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,

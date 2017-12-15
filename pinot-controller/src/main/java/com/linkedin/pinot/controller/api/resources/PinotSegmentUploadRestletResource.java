@@ -51,6 +51,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLDecoder;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -435,11 +436,10 @@ public class PinotSegmentUploadRestletResource {
       // Minion configured use case so that we write to zk sparingly
       String segmentPushStatus = originalOfflineSegmentZkMetadata.getSegmentPushStatus();
       SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd'T'HH:mm:ss.SSS");
-      Date dt = new Date();
-      String currentHumanReadableTime = sdf.format(dt);
 
       if (segmentPushStatus != null) {
-        if (tooLate(dt)) {
+        Date originalSegmentHumanReadableTime = getHumanReadableTimeFromSegmentPushStatus(segmentPushStatus, sdf);
+        if (tooLate(originalSegmentHumanReadableTime)) {
           LOGGER.error("Segment was not properly committed, replacing segment {} for table {}", segmentName,
               tableName);
           _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_SEGMENT_COMMIT_TIMEOUT_EXCEEDED, 1L);
@@ -457,6 +457,8 @@ public class PinotSegmentUploadRestletResource {
         }
       }
 
+      Date dt = new Date();
+      String currentHumanReadableTime = sdf.format(dt);
       OfflineSegmentZKMetadata offlineSegmentZKMetadataWithPushStatus = new OfflineSegmentZKMetadata(znRecord);
       offlineSegmentZKMetadataWithPushStatus.setSegmentPushStatus("COMMITTING-" + currentHumanReadableTime);
 
@@ -495,6 +497,16 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
+  private Date getHumanReadableTimeFromSegmentPushStatus(String segmentPushStatus, SimpleDateFormat simpleDateFormat) throws ControllerApplicationException {
+    String date = segmentPushStatus.split("-")[1];
+    try {
+      return simpleDateFormat.parse(date);
+    } catch (ParseException e) {
+      LOGGER.warn("Could not parse segmentPushStatus {} using format {}", segmentPushStatus, simpleDateFormat);
+      throw new ControllerApplicationException(LOGGER, "Could not parse segmentPushStatus", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   private boolean tooLate(Date date) {
     long timeoutMillis = _controllerConf.getSegmentCommitTimeoutMillis();
     long currentMillis = System.currentTimeMillis();
@@ -528,11 +540,11 @@ public class PinotSegmentUploadRestletResource {
         LOGGER.info("Reject segment: {} in table: {} because of same CRC: {}", segmentName, offlineTableName, newCrc);
         return false;
       }
-    }
-
-    if (minionExpectedCrc != -1L && minionExpectedCrc != existedCrc) {
-      // segment has been replaced since minion ran, please rebuild and repush
-      throw new ControllerApplicationException(LOGGER, "Please rebuild and repush segment", Response.Status.PRECONDITION_FAILED);
+    } else {
+      if (minionExpectedCrc != existedCrc) {
+        // segment has been replaced since minion ran, please rebuild and repush
+        throw new ControllerApplicationException(LOGGER, "Please rebuild and repush segment", Response.Status.PRECONDITION_FAILED);
+      }
     }
 
     return true;
