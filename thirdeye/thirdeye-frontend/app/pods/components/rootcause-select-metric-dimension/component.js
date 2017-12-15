@@ -50,7 +50,7 @@ export default Ember.Component.extend({
       return JSON.stringify(filterMap);
     },
     set() {
-      // ignore
+      // ignore, prevent CP override by filter-select
     }
   }),
 

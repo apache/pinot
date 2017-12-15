@@ -38,13 +38,13 @@ export default Ember.Component.extend({
     }
   }),
 
-  startFormatted: Ember.computed('start', {
+  startFormatted: Ember.computed('range', {
     get() {
       return moment(this.get('range')[0]).format(serverDateFormat);
     }
   }),
 
-  endFormatted: Ember.computed('end', {
+  endFormatted: Ember.computed('range', {
     get() {
       return moment(this.get('range')[1]).format(serverDateFormat);
     }
