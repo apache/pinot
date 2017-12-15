@@ -37,8 +37,8 @@ export default Ember.Component.extend({
     const filterMap = toFilterMap(toFilters(selectedUrn));
 
     if (!_.isEqual(baseUrn, baseUrnCache)) {
-      this._fetchFilters(baseUrn);
       this.setProperties({ baseUrnCache: baseUrn });
+      this._fetchFilters(baseUrn, filterMap);
     }
 
     this.setProperties({ baseUrn, filterMap });
@@ -54,10 +54,9 @@ export default Ember.Component.extend({
     }
   }),
 
-  _pruneFilters(filterOptions) {
-    const { filterMap } = this.getProperties('filterMap');
-
+  _pruneFilters(filterOptions, filterMap) {
     const newFilterMap = {};
+
     Object.keys(filterMap).forEach(key => {
       const options = new Set(filterOptions[key] || []);
       newFilterMap[key] = new Set();
@@ -72,14 +71,15 @@ export default Ember.Component.extend({
     return newFilterMap;
   },
 
-  _fetchFilters(baseUrn) {
+  _fetchFilters(baseUrn, filterMap) {
     if (!baseUrn) { return; }
 
     const id = baseUrn.split(':')[2];
 
     return fetch(`/data/autocomplete/filters/metric/${id}`)
-        .then(checkStatus)
-        .then(res => this.setProperties({ filterOptions: res, filterMap: this._pruneFilters(res) }));
+      .then(checkStatus)
+      .then(res => this.setProperties({ filterOptions: res, filterMap: this._pruneFilters(res, filterMap) }))
+      .then(res => this.send('onSelect'));
   },
 
   actions: {
