@@ -21,6 +21,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -498,27 +499,11 @@ public class AnomaliesResource {
   @POST
   @Path(value = "/updateFeedbackRange/{startTime}/{endTime}/{functionId}")
   public void updateFeedbackForAnomalyFunctionAndTimeRange(
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime,
-      @PathParam("functionId") Long functionId,
-      @QueryParam("dimensionMap") String dimensionMapJSONString,
-      @QueryParam("feedbackType") String feedbackType) {
-
-    if (functionId == null) {
-      throw new IllegalArgumentException("Must provide functionId");
-    }
-
-    if (startTime == null) {
-      throw new IllegalArgumentException("Must provide startTime");
-    }
-
-    if (endTime == null) {
-      throw new IllegalArgumentException("Must provide endTime");
-    }
-
-    if (feedbackType == null) {
-      throw new IllegalArgumentException("Must provide feedbackType");
-    }
+      @PathParam("startTime") @NotNull Long startTime,
+      @PathParam("endTime") @NotNull Long endTime,
+      @PathParam("functionId") @NotNull Long functionId,
+      @QueryParam("dimensionMap") @DefaultValue("") String dimensionMapJSONString,
+      @QueryParam("feedbackType") @NotNull String feedbackType) {
 
     DimensionMap dimension = new DimensionMap();
     if (StringUtils.isNotEmpty(dimensionMapJSONString)) {
