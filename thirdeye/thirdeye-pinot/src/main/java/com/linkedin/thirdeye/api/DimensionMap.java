@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Collection;
@@ -15,6 +17,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ObjectUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,24 +43,29 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
   }
 
   /**
-   * Constructs a dimension map from a json string; if the given string is not in Json format, then this method
-   * falls back to parse Java's map string format, which is {key1=value1,key2=value2}.
+   * Constructs a dimension map from a json string; if the given string is not in Json format, then this method falls
+   * back to parse Java's map string format, which is {key1=value1,key2=value2}.
    *
    * @param value the json string that represents this dimension map.
    */
   public DimensionMap(String value) {
-    try {
-      sortedDimensionMap = OBJECT_MAPPER.readValue(value, TreeMap.class);
-    } catch (IOException e) {
-      try { // Fall back to Java's map string, which is {key=value}.
-        value = value.substring(1, value.length() - 1); // Remove curly brackets
-        String[] keyValuePairs = value.split(",");
-        for (String pair : keyValuePairs) {
-          String[] entry = pair.split("=");
-          sortedDimensionMap.put(entry[0].trim(), entry[1].trim());
+    Preconditions.checkNotNull(value); // We do not allow null pointers flying around the code.
+    if (!Strings.isNullOrEmpty(value)) { // Empty string produces empty dimension map.
+      try {
+        sortedDimensionMap = OBJECT_MAPPER.readValue(value, TreeMap.class);
+      } catch (IOException e) {
+        try { // Fall back to Java's map string, which is {key=value} (including curly brackets).
+          value = value.substring(1, value.length() - 1); // Remove curly brackets
+          String[] keyValuePairs = value.split(",");
+          for (String pair : keyValuePairs) {
+            String[] entry = pair.split("=");
+            sortedDimensionMap.put(entry[0].trim(), entry[1].trim());
+          }
+        } catch (Exception finalE) {
+          throw new IllegalArgumentException(String
+              .format("Failed to initialize dimension map from this string: \"{%s}\": %s", value,
+                  ExceptionUtils.getStackTrace(finalE)));
         }
-      } catch (Exception finalE) {
-        LOG.error("Failed to initialize dimension map from this string: {}", value);
       }
     }
   }
