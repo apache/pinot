@@ -21,12 +21,18 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.mockito.ArgumentCaptor;
 import org.testng.Assert;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 public class SegmentFetcherFactoryTest {
+
+  @BeforeTest
+  public void setUp() {
+    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
+  }
 
   @Test
   public void testInitSegmentFetcherFactory() throws Exception {
@@ -57,7 +63,6 @@ public class SegmentFetcherFactoryTest {
     Assert.assertEquals(((TestSegmentFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called, 1);
     ReplacedFetcher fetcher = (ReplacedFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get(replacableProto);
     Assert.assertEquals(fetcher.getInitCalled(), 1);
-    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
   }
 
   @Test
@@ -70,7 +75,6 @@ public class SegmentFetcherFactoryTest {
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://") instanceof HttpsSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("file://a/asdf/wer/fd/e") instanceof LocalFileSegmentFetcher);
     Assert.assertNull(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
-    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
   }
 
   @Test
@@ -85,7 +89,6 @@ public class SegmentFetcherFactoryTest {
       return;
     }
     Assert.fail();
-    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
   }
 
   public static class ReplacedFetcher implements SegmentFetcher {
