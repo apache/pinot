@@ -1193,14 +1193,14 @@ public class DetectionJobResource {
   }
 
   /**
-   * Given autotuneId and a list of anomalies, return the anomaly ids that qualified for alert filter
+   * Given autotuneId and a list of anomalies, return the anomaly Ids that qualified for alert filter
    * @param autotuneId
-   * @param anomalyIdsString comma split anomaly id string
+   * @param anomalyIdsString String with comma separated anomaly Ids
    * @return Array list of anomaly id that pass the alert filter in autotune
    */
   @GET
   @Path("/eval/projected/anomalies/{autotuneId}")
-  public ArrayList<Long> getPreviewedAnomaliesByAutoTuneId (@PathParam("autotuneId") @NotNull long autotuneId,
+  public ArrayList<Long> getPreviewedAnomaliesByAutoTuneId (@PathParam("autotuneId") long autotuneId,
       @QueryParam("anomalyIds") String anomalyIdsString) {
     String[] anomalyIds = anomalyIdsString.split(COMMA_SEPARATOR);
     //Initiate tuned alert filter
@@ -1209,9 +1209,9 @@ public class DetectionJobResource {
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(tunedParams);
     ArrayList<Long> idList = new ArrayList<>();
     for (String anomalyId : anomalyIds) {
-      Long id = Long.valueOf(anomalyId);
-      MergedAnomalyResultDTO anomaly = mergedAnomalyResultDAO.findById(id, false);
-      if (alertFilter.isQualified(anomaly)) {
+      long id = Long.valueOf(anomalyId);
+      MergedAnomalyResultDTO dto = mergedAnomalyResultDAO.findById(id, false);
+      if (alertFilter.isQualified(dto)) {
         idList.add(id);
       }
     }
