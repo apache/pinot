@@ -129,6 +129,7 @@ export default function() {
    * Returns the first email config
    */
   this.get(`/thirdeye/email/function/:id`, (schema, request) => {
+    debugger;
     return [alertConfig[request.params.id]];
   });
 
@@ -142,11 +143,13 @@ export default function() {
   /**
    * Post request for editing alert
    */
-  this.post(`/thirdeye/entity`, (db, request) => {
+  this.post(`/thirdeye/entity`, (schema, request) => {
     let params = request.queryParams && request.queryParams.entityType;
 
     if (params === 'ANOMALY_FUNCTION') {
-      debugger;
+      let requestBody = JSON.parse(request.requestBody);
+      let id = requestBody.id;
+      return schema.db.alerts.update(id, requestBody);
     }
   });
 }
