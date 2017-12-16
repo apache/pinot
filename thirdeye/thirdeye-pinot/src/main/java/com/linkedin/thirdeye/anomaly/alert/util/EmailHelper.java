@@ -157,6 +157,7 @@ public abstract class EmailHelper {
 
     Period baselinePeriod = getBaselinePeriod(compareMode);
     ContributorViewRequest request = new ContributorViewRequest();
+    request.setCollection(collection);
 
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metric, metricAggFunction, collection);
