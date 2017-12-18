@@ -104,7 +104,7 @@ export default function() {
   });
 
   /**
-   * Returns information about the first alert in anomalyFunction mock data
+   * Returns information about an alert by id in anomalyFunction mock data
    */
   this.get(`/onboard/function/:id`, (schema, request) => {
     return schema.alerts.find(request.params.id);
@@ -126,7 +126,7 @@ export default function() {
   });
 
   /**
-   * Returns the first email config by id
+   * Returns the email config by id
    */
   this.get(`/thirdeye/email/function/:id`, (schema, request) => {
     return [alertConfig[request.params.id]];
