@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
@@ -52,8 +53,6 @@ public class MetricAnalysisPipeline extends Pipeline {
 
   private static final String PROP_STRATEGY = "strategy";
   private static final String PROP_STRATEGY_DEFAULT = STRATEGY_THRESHOLD;
-
-  private static final String PRE_TOTAL = "total:";
 
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
@@ -123,7 +122,7 @@ public class MetricAnalysisPipeline extends Pipeline {
 
     // generate requests
     List<TimeSeriesRequestContainer> requestList = new ArrayList<>();
-    requestList.addAll(makeRequests(metrics, trainingBaselineStart, testCurrentEnd, filters, PRE_TOTAL));
+    requestList.addAll(makeRequests(metrics, trainingBaselineStart, testCurrentEnd, filters));
 
     LOG.info("Requesting {} time series", requestList.size());
     List<ThirdEyeRequest> thirdeyeRequests = new ArrayList<>();
@@ -170,14 +169,12 @@ public class MetricAnalysisPipeline extends Pipeline {
     Set<MetricEntity> output = new HashSet<>();
     for(MetricEntity me : metrics) {
       try {
-        String id = makeIdentifier(me.getUrn(), PRE_TOTAL);
-
-        if(!responses.containsKey(id)) {
+        if(!responses.containsKey(me.getUrn())) {
           LOG.warn("Did not receive response for '{}'. Skipping.", me.getUrn());
           continue;
         }
 
-        DataFrame timeseries = responses.get(id);
+        DataFrame timeseries = responses.get(me.getUrn());
         if (timeseries.isEmpty()) {
           LOG.warn("No data for '{}'. Skipping.", me.getUrn());
           continue;
@@ -260,22 +257,21 @@ public class MetricAnalysisPipeline extends Pipeline {
     }
   }
 
-  private List<TimeSeriesRequestContainer> makeRequests(Collection<MetricEntity> metrics, long start, long end, Multimap<String, String> filters, String prefix) {
+  private List<TimeSeriesRequestContainer> makeRequests(Collection<MetricEntity> metrics, long start, long end, Multimap<String, String> filters) {
     List<TimeSeriesRequestContainer> requests = new ArrayList<>();
-    for(MetricEntity e : metrics) {
-      String id = makeIdentifier(e.getUrn(), prefix);
-      MetricSlice slice = MetricSlice.from(e.getId(), start, end, filters);
+    for(MetricEntity me : metrics) {
+      Multimap<String, String> jointFilters = ArrayListMultimap.create();
+      jointFilters.putAll(filters);
+      jointFilters.putAll(me.getFilters());
+
+      MetricSlice slice = MetricSlice.from(me.getId(), start, end, jointFilters);
       try {
-        requests.add(DataFrameUtils.makeTimeSeriesRequestAligned(slice, id, this.metricDAO, this.datasetDAO));
+        requests.add(DataFrameUtils.makeTimeSeriesRequestAligned(slice, me.getUrn(), this.metricDAO, this.datasetDAO));
       } catch (Exception ex) {
-        LOG.warn(String.format("Could not make request for '%s'. Skipping.", id), ex);
+        LOG.warn(String.format("Could not make request for '%s'. Skipping.", me.getUrn()), ex);
       }
     }
     return requests;
-  }
-
-  private static String makeIdentifier(String urn, String prefix) {
-    return prefix + urn;
   }
 
   private static ScoringStrategyFactory parseStrategyFactory(String strategy) {
