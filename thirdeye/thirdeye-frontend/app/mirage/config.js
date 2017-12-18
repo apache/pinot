@@ -126,10 +126,9 @@ export default function() {
   });
 
   /**
-   * Returns the first email config
+   * Returns the first email config by id
    */
   this.get(`/thirdeye/email/function/:id`, (schema, request) => {
-    debugger;
     return [alertConfig[request.params.id]];
   });
 
