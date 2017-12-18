@@ -12,8 +12,4 @@ export default function(server) {
    */
   server.createList('anomaly', 1);
   server.createList('alert', 1);
-
-  const fixtures = ['alertConfigs', 'entityApplications', 'metrics', 'queryRelatedMetrics',
-                      'timeseriesCompares'];
-  server.loadFixtures(...fixtures);
 }

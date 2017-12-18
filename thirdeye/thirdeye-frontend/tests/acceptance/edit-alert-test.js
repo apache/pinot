@@ -11,6 +11,7 @@ const EDIT_LINK = '/manage/alerts/edit';
 const STATUS_TOGGLER = '.x-toggle-btn';
 const SUBMIT_BUTTON = '.te-button--submit';
 
+// TODO: Update the syntax to use async/await http://rwjblue.com/2017/10/30/async-await-configuration-adventure/
 test(`visiting ${EDIT_LINK} and checking that fields render correctly and edit is successful`, assert => {
   let alert = server.create('alert');
   visit(`/manage/alerts/${alert.id}`);

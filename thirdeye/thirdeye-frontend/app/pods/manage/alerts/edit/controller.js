@@ -525,7 +525,7 @@ export default Ember.Controller.extend({
       const originalConfigGroup = this.get('model.originalConfigGroup');
       const newApplication = this.get('selectedApplication.application');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
-      const existingEmailsArr = !_.isEmpty(oldEmails) ? oldEmails.replace(/ /g, '').split(',') : [];
+      const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
       const cleanRecipientsArr = newRecipientsArr.filter(e => String(e).trim()).join(',');
       const postConfigBody = newGroupName ? this.get('newConfigGroupObj') : this.get('selectedConfigGroup');
