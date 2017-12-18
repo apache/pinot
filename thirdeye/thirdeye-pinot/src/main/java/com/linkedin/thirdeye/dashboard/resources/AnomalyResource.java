@@ -974,11 +974,11 @@ public class AnomalyResource {
     LOG.info("Retrieving {} anomaly results for function {} in the time range: {} -- {}", anomalyType, functionId,
         startTimeIso, endTimeIso);
 
-    ArrayList<Long> idList = new ArrayList<>();
+    ArrayList<Long> anomalyIdList = new ArrayList<>();
     if (anomalyType.equals("raw")) {
       List<RawAnomalyResultDTO> rawDTO = rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime, endTime, functionId);
       for (RawAnomalyResultDTO dto : rawDTO) {
-        idList.add(dto.getId());
+        anomalyIdList.add(dto.getId());
       }
     } else if (anomalyType.equals("merged")) {
       List<MergedAnomalyResultDTO> mergedResults =
@@ -994,15 +994,15 @@ public class AnomalyResource {
         }
       }
 
-      for (MergedAnomalyResultDTO dto : mergedResults) {
+      for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
         // if use notified flag, only keep anomalies isNotified == true
-        if ( (useNotified && dto.isNotified()) || !useNotified) {
-          idList.add(dto.getId());
+        if ( (useNotified && mergedAnomaly.isNotified()) || !useNotified) {
+          anomalyIdList.add(mergedAnomaly.getId());
         }
       }
     }
 
-    return idList;
+    return anomalyIdList;
   }
 
   // Activate anomaly function

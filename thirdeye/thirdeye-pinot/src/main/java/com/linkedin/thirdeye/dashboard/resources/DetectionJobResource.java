@@ -1226,12 +1226,12 @@ public class DetectionJobResource {
     Map<String, String> tunedParams = target.getConfiguration();
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(tunedParams);
     // Apply tuned alert filter to anomalies
-    ArrayList<Long> idList = new ArrayList<>();
-    for (MergedAnomalyResultDTO dto : mergedResults) {
-      if (alertFilter.isQualified(dto)) {
-        idList.add(dto.getId());
+    ArrayList<Long> anomalyIdList = new ArrayList<>();
+    for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
+      if (alertFilter.isQualified(mergedAnomaly)) {
+        anomalyIdList.add(mergedAnomaly.getId());
       }
     }
-    return idList;
+    return anomalyIdList;
   }
 }
