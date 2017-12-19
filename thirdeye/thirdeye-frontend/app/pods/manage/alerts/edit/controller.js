@@ -558,7 +558,6 @@ export default Ember.Controller.extend({
       return fetch(alertUrl, postProps)
         .then((res) => checkStatus(res, 'post'))
         .then((saveAlertResponse) => {
-
           // Step 2: If any edits were made to the Notification Group, prep a POST object to save Config entity
           if (this.get('isEditedConfigGroup')) {
 

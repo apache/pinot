@@ -1,5 +1,4 @@
 import queryRelatedMetrics from 'thirdeye-frontend/mocks/queryRelatedMetrics';
-import anomalyFunction from 'thirdeye-frontend/mocks/anomalyFunction';
 import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
 import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import metric from 'thirdeye-frontend/mocks/metric';
@@ -86,8 +85,8 @@ export default function() {
   /**
    * Mocks a list of alerts, displayed in the /manage/alerts page
    */
-  this.get('/thirdeye/entity/ANOMALY_FUNCTION', () => {
-    return anomalyFunction;
+  this.get('/thirdeye/entity/ANOMALY_FUNCTION', (schema) => {
+    return schema.alerts.all().models;
   });
 
   /**
@@ -105,11 +104,12 @@ export default function() {
   });
 
   /**
-   * Returns information about the first alert in anomalyFunction mock data
+   * Returns information about an alert by id in anomalyFunction mock data
    */
-  this.get(`/onboard/function/${anomalyFunction[0].id}`, () => {
-    return anomalyFunction[0];
+  this.get(`/onboard/function/:id`, (schema, request) => {
+    return schema.alerts.find(request.params.id);
   });
+
 
   /**
    * Returns metric information about the first alert
@@ -126,10 +126,10 @@ export default function() {
   });
 
   /**
-   * Returns the first email config
+   * Returns the email config by id
    */
-  this.get(`/thirdeye/email/function/${anomalyFunction[0].id}`, () => {
-    return alertConfig[0];
+  this.get(`/thirdeye/email/function/:id`, (schema, request) => {
+    return [alertConfig[request.params.id]];
   });
 
   /**
@@ -137,5 +137,18 @@ export default function() {
    */
   this.get(`/timeseries/compare/${metric[0].id}/***`, () => {
     return timeseriesCompare;
+  });
+
+  /**
+   * Post request for editing alert
+   */
+  this.post(`/thirdeye/entity`, (schema, request) => {
+    const params = request.queryParams && request.queryParams.entityType;
+
+    if (params === 'ANOMALY_FUNCTION') {
+      const requestBody = JSON.parse(request.requestBody);
+      const id = requestBody.id;
+      return schema.db.alerts.update(id, requestBody);
+    }
   });
 }
