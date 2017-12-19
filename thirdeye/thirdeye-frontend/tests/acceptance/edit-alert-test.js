@@ -13,7 +13,7 @@ const SUBMIT_BUTTON = '.te-button--submit';
 
 // TODO: Update the syntax to use async/await http://rwjblue.com/2017/10/30/async-await-configuration-adventure/
 test(`visiting ${EDIT_LINK} and checking that fields render correctly and edit is successful`, assert => {
-  let alert = server.create('alert');
+  const alert = server.create('alert');
   visit(`/manage/alerts/${alert.id}`);
 
   andThen(() => {
@@ -38,11 +38,11 @@ test(`visiting ${EDIT_LINK} and checking that fields render correctly and edit i
       find(STATUS).get(0).innerText,
       'Active',
       'alert status is correct');
-
-    fillIn(ALERT_NAME, 'test_function_2');
-    click(STATUS_TOGGLER);
-    click(SUBMIT_BUTTON);
   });
+
+  fillIn(ALERT_NAME, 'test_function_2');
+  click(STATUS_TOGGLER);
+  click(SUBMIT_BUTTON);
 
   andThen(() => {
     assert.equal(

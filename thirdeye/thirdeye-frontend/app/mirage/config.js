@@ -143,11 +143,11 @@ export default function() {
    * Post request for editing alert
    */
   this.post(`/thirdeye/entity`, (schema, request) => {
-    let params = request.queryParams && request.queryParams.entityType;
+    const params = request.queryParams && request.queryParams.entityType;
 
     if (params === 'ANOMALY_FUNCTION') {
-      let requestBody = JSON.parse(request.requestBody);
-      let id = requestBody.id;
+      const requestBody = JSON.parse(request.requestBody);
+      const id = requestBody.id;
       return schema.db.alerts.update(id, requestBody);
     }
   });
