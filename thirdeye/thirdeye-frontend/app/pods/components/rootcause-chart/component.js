@@ -322,8 +322,8 @@ export default Ember.Component.extend({
   },
 
   _makeSeries(urn) {
-    const { entities, timeseries, timeseriesMode, _eventValues } =
-      this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues');
+    const { entities, timeseries, timeseriesMode, _eventValues, context } =
+      this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues', 'context');
 
     if (hasPrefix(urn, 'frontend:metric:current:')) {
       const metricEntity = entities[toMetricUrn(stripTail(urn))];
@@ -351,8 +351,11 @@ export default Ember.Component.extend({
 
     } else if (hasPrefix(urn, 'thirdeye:event:')) {
       const val = _eventValues[urn];
+      const endRange = context.analysisRange[1];
+      let end = entities[urn].end <= 0 ? endRange : entities[urn].start;
+
       return {
-        timestamps: [entities[urn].start, entities[urn].end || entities[urn].start],
+        timestamps: [entities[urn].start, end],
         values: [val, val],
         color: entities[urn].color,
         type: 'line',
