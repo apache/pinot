@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, filterPrefix, toBaselineRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, toBaselineRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -104,7 +104,7 @@ export default Ember.Service.extend({
   _handleError(urn, error) {
     const { errors, pending } = this.getProperties('errors', 'pending');
 
-    const newError = { urn, error };
+    const newError = urn;
     const newErrors = new Set([...errors, newError]);
 
     const newPending = new Set(pending);

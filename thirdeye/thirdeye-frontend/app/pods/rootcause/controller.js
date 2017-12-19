@@ -9,6 +9,11 @@ const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
 const ROOTCAUSE_TAB_EVENTS = "events";
 
+const ROOTCAUSE_SERVICE_ENTITIES = "entities";
+const ROOTCAUSE_SERVICE_TIMESERIES = "timeseries";
+const ROOTCAUSE_SERVICE_AGGREGATES = "aggregates";
+const ROOTCAUSE_SERVICE_BREAKDOWNS = "breakdowns";
+
 // TODO: Update module import to comply by new Ember standards
 
 export default Ember.Controller.extend({
@@ -217,57 +222,27 @@ export default Ember.Controller.extend({
     }
   ),
 
-  isLoadingEntities: Ember.computed(
-    'entitiesService.pending',
-    function () {
-      return this.get('entitiesService.pending').size > 0;
-    }
-  ),
+  isLoadingEntities: Ember.computed.gt('entitiesService.pending.size', 0),
 
-  isLoadingTimeseries: Ember.computed(
-    'timeseriesService.pending',
-    function () {
-      return this.get('timeseriesService.pending').size > 0;
-    }
-  ),
+  isLoadingTimeseries: Ember.computed.gt('timeseriesService.pending.size', 0),
 
-  isLoadingAggregates: Ember.computed(
-    'aggregatesService.pending',
-    function () {
-      return this.get('aggregatesService.pending').size > 0;
-    }
-  ),
+  isLoadingAggregates: Ember.computed.gt('aggregatesService.pending.size', 0),
 
-  isLoadingBreakdowns: Ember.computed(
-    'breakdownsService.pending',
-    function () {
-      return this.get('breakdownsService.pending').size > 0;
-    }
-  ),
+  isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
 
-  isLoading: Ember.computed(
-    'isLoadingEntities',
-    'isLoadingTimeseries',
-    'isLoadingAggregates',
-    'isLoadingBreakdowns',
-    function () {
-      const { isLoadingEntities, isLoadingTimeseries, isLoadingAggregates, isLoadingBreakdowns } =
-        this.getProperties('isLoadingEntities', 'isLoadingTimeseries', 'isLoadingAggregates', 'isLoadingBreakdowns');
-      return isLoadingEntities || isLoadingTimeseries || isLoadingAggregates || isLoadingBreakdowns;
-    }
-  ),
+  hasErrorsEntities: Ember.computed.gt('entitiesService.errors.size', 0),
 
-  hasErrors: Ember.computed(
-    'entitiesService.errors',
-    'timeseriesService.errors',
-    'aggregatesService.errors',
-    'breakdownsService.errors',
-    function () {
-      return this.get('entitiesService.errors.size')
-        || this.get('timeseriesService.errors.size')
-        || this.get('aggregatesService.errors.size')
-        || this.get('breakdownsService.errors.size');
-    }
+  hasErrorsTimeseries: Ember.computed.gt('timeseriesService.errors.size', 0),
+
+  hasErrorsAggregates: Ember.computed.gt('aggregatesService.errors.size', 0),
+
+  hasErrorsBreakdowns: Ember.computed.gt('breakdownsService.errors.size', 0),
+
+  hasErrors: Ember.computed.or(
+    'hasErrorsEntities',
+    'hasErrorsTimeseries',
+    'hasErrorsAggregates',
+    'hasErrorsBreakdowns'
   ),
 
   _makeSession() {
@@ -515,14 +490,28 @@ export default Ember.Controller.extend({
     /**
      * Clears error logs of data services
      */
-    clearErrors() {
+    clearErrors(type) {
       const { entitiesService, timeseriesService, aggregatesService, breakdownsService } =
         this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
 
-      entitiesService.clearErrors();
-      timeseriesService.clearErrors();
-      aggregatesService.clearErrors();
-      breakdownsService.clearErrors();
+      switch(type) {
+        case ROOTCAUSE_SERVICE_ENTITIES:
+          entitiesService.clearErrors();
+          break;
+
+        case ROOTCAUSE_SERVICE_TIMESERIES:
+          timeseriesService.clearErrors();
+          break;
+
+        case ROOTCAUSE_SERVICE_AGGREGATES:
+          aggregatesService.clearErrors();
+          break;
+
+        case ROOTCAUSE_SERVICE_BREAKDOWNS:
+          breakdownsService.clearErrors();
+          break;
+
+      }
     }
   }
 });

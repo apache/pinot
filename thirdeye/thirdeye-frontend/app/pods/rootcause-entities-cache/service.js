@@ -141,7 +141,7 @@ export default Ember.Service.extend({
   _handleError(framework, error) {
     const { errors, pending } = this.getProperties('errors', 'pending');
 
-    const newError = { framework, error };
+    const newError = framework;
     const newErrors = new Set([...errors, newError]);
 
     const newPending = new Set(pending);
