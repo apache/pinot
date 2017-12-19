@@ -22,6 +22,14 @@ export default Ember.Component.extend({
     }
   },
 
+  /**
+   * default height property for the chart
+   * May be overridden
+   */
+  height: {
+    height: 400
+  },
+
   tooltip: {
     format: {
       title: (d) => moment(d).format('MM/DD hh:mm a'),
@@ -168,6 +176,7 @@ export default Ember.Component.extend({
     config.legend = diffConfig.legend;
     config.subchart = this.get('subchart');
     config.zoom = this.get('zoom');
+    config.size = this.get('height');
 
     this.set('_chart', c3.generate(config));
     this._updateCache();

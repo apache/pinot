@@ -42,6 +42,13 @@ export default Ember.Component.extend({
    */
   buildTooltip: buildTooltip,
 
+  /**
+   * custom height for split mode
+   */
+  splitChartHeight: {
+    height: 200
+  },
+
   tooltip: Ember.computed(
     'onHover',
     function () {
