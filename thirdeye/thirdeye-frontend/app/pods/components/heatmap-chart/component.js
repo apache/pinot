@@ -112,14 +112,7 @@ export default Ember.Component.extend({
       .data(nodes)
       .enter()
       .append('svg:g')
-      .attr('class', function(d) {
-        // apply custom classes
-        let className = 'heatmap-chart__cell'
-        if (d && d.role !== 'value') {
-          className += ' heatmap-chart__cell--icon'
-        }
-        return className;
-      })
+      .attr('class', 'heatmap-chart__cell')
       .attr('transform', d => `translate(${d.x},${d.y})`);
 
     // tooltip
@@ -157,14 +150,6 @@ export default Ember.Component.extend({
       .attr('text-anchor', 'middle')
       .text((d) => {
         const text = d.label || '';
-        // return icon if head or tail
-        if (d.role !== 'value' && d.label) {
-          const iconMapping = {
-            head: '&#xe079',
-            tail: '&#xe080'
-          };
-          return iconMapping[d.role];
-        }
 
         //each character takes up 7 pixels on an average
         const estimatedTextLength = text.length * 7;
