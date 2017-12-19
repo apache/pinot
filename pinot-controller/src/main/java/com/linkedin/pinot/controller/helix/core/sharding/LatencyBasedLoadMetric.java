@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class LatencyBasedLoadMetric implements ServerLoadMetric {
@@ -51,22 +52,23 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
         try{
             File trained_cost_file = new File("latency_load"+System.currentTimeMillis());
             logger.info("Latency Based Load metric reading trained cost file");
-            String line = null;
             ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
             URL resource = classLoader.getResource(COST_FILE);
             com.google.common.base.Preconditions.checkNotNull(resource);
             FileUtils.copyURLToFile(resource, trained_cost_file);
-            BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
-
-            while ((line = br.readLine()) != null) {
-                String[] info = line.split(",");
-                Long cost = 0l;
-                if(this.tableLatencyMap.containsKey(info[0])){
-                    cost = this.tableLatencyMap.get(info[0]);
+            List<String> lines =  FileUtils.readLines(trained_cost_file);
+            //BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
+            if(lines!=null) {
+                for (String line : lines) {
+                    String[] info = line.split(",");
+                    Long cost = 0l;
+                    if (this.tableLatencyMap.containsKey(info[0])) {
+                        cost = this.tableLatencyMap.get(info[0]);
+                    }
+                    cost = cost + Long.valueOf(info[2]);
+                    this.tableLatencyMap.put(info[0], cost);
+                    logger.info("Latency Based cost added for tableName : " + info[0] + " cost :" + cost);
                 }
-                cost = cost + Long.valueOf(info[2]);
-                this.tableLatencyMap.put(info[0],cost);
-                logger.info("Latency Based cost added for tableName : "+info[0]+" cost :"+cost);
             }
         }catch (Exception e){
             e.printStackTrace();
