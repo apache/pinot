@@ -36,9 +36,17 @@ export default Ember.Component.extend({
     'records',
     function () {
       let values = Object.values(this.get('records'));
+      let format = 'ddd, MMM Do YYYY hh:mm A';
+
       values.forEach((value) => {
-        value.start = moment(value.start).format('dddd, MMMM Do YYYY');
-        value.end = moment(value.end).format('dddd, MMMM Do YYYY');
+        value.start = moment(value.start).format(format);
+
+        // If this is an ongoing event
+        if (value.end <= 0) {
+          value.end = 'ongoing';
+        } else {
+          value.end = moment(value.end).format(format);
+        }
       });
       return values;
     }

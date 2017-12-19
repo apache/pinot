@@ -13,13 +13,6 @@ export default [
     className: 'events-table__column'
   },
   {
-    propertyName: 'eventType',
-    title: 'Type',
-    filterWithSelect: true,
-    sortFilterOptions: true,
-    className: 'events-table__column--compact'
-  },
-  {
     propertyName: 'start',
     title: 'Start',
     className: 'events-table__column--compact',
