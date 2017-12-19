@@ -12,7 +12,7 @@ const EDIT_LINK = '/manage/alerts/edit';
 const STATUS_TOGGLER = '.x-toggle-btn';
 const SUBMIT_BUTTON = '.te-button--submit';
 
-test(`visiting ${EDIT_LINK} and checking that fields render correctly and edit is successful`, assert => {
+test(`visiting ${EDIT_LINK} and checking that fields render correctly and edit is successful`, async (assert) => {
   const alert = server.create('alert');
   await visit(`/manage/alerts/${alert.id}`);
 
