@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
+import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -82,6 +83,7 @@ public class DetectionJobResource {
   public static final String AUTOTUNE_FEATURE_KEY = "features";
   public static final String AUTOTUNE_PATTERN_KEY = "pattern";
   public static final String AUTOTUNE_MTTD_KEY = "mttd";
+  private static final String COMMA_SEPARATOR = ",";
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -1189,5 +1191,47 @@ public class DetectionJobResource {
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
     double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize, detectionUnit);
     return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
+  }
+
+  /**
+   * Given autotuneId and a list of anomalies, return the anomaly Ids that qualified for alert filter
+   * @param autotuneId
+   * @param startTimeIso Start time of the monitoring window in ISO format
+   * @param endTimeIso End time of the monitoring window in ISO format
+   * @return Array list of anomaly id that pass the alert filter in autotune
+   */
+  @GET
+  @Path("/eval/projected/anomalies/{autotuneId}")
+  public ArrayList<Long> getPreviewedAnomaliesByAutoTuneId (@PathParam("autotuneId") long autotuneId,
+      @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso) {
+    long startTime;
+    long endTime;
+    try {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+    } catch (Exception e) {
+      throw new WebApplicationException(
+          "Unable to parse strings, " + startTimeIso + " and " + endTimeIso + ", in ISO DateTime format", e);
+    }
+
+    // Initiate tuned alert filter
+    AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(autotuneId);
+    // Get function Id belongs to this autotune
+    long functionId = target.getFunctionId();
+    // Fetch anomalies within the time range
+    List<MergedAnomalyResultDTO> mergedResults =
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId, false);
+    // Initiate alert filter to BaseAlertFilter
+    Map<String, String> tunedParams = target.getConfiguration();
+    BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(tunedParams);
+    // Apply tuned alert filter to anomalies
+    ArrayList<Long> anomalyIdList = new ArrayList<>();
+    for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
+      if (alertFilter.isQualified(mergedAnomaly)) {
+        anomalyIdList.add(mergedAnomaly.getId());
+      }
+    }
+    return anomalyIdList;
   }
 }
