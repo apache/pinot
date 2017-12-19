@@ -51,11 +51,12 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
     private void fillTableCosts(){
         try{
             File trained_cost_file = new File("latency_load"+System.currentTimeMillis());
-            logger.info("Latency Based Load metric reading trained cost file");
+
             ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
             URL resource = classLoader.getResource(COST_FILE);
             com.google.common.base.Preconditions.checkNotNull(resource);
             FileUtils.copyURLToFile(resource, trained_cost_file);
+            logger.info("Latency Based Load metric reading trained cost file:"+trained_cost_file.getAbsolutePath());
             List<String> lines =  FileUtils.readLines(new File(trained_cost_file.getAbsolutePath()));
             //BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
             if(lines!=null) {
