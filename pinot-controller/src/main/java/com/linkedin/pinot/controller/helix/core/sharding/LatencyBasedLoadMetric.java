@@ -56,7 +56,7 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
             URL resource = classLoader.getResource(COST_FILE);
             com.google.common.base.Preconditions.checkNotNull(resource);
             FileUtils.copyURLToFile(resource, trained_cost_file);
-            List<String> lines =  FileUtils.readLines(trained_cost_file);
+            List<String> lines =  FileUtils.readLines(new File(trained_cost_file.getAbsolutePath()));
             //BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
             if(lines!=null) {
                 for (String line : lines) {
