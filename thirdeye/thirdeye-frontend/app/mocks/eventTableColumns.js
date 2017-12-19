@@ -13,21 +13,16 @@ export default [
     className: 'events-table__column'
   },
   {
-    propertyName: 'eventType',
-    title: 'Type',
-    filterWithSelect: true,
-    sortFilterOptions: true,
-    className: 'events-table__column--compact'
-  },
-  {
-    propertyName: 'start',
+    propertyName: 'humanStart',
     title: 'Start',
+    sortedBy: 'start',
     className: 'events-table__column--compact',
     disableFiltering: true
   },
   {
-    propertyName: 'end',
+    propertyName: 'humanEnd',
     title: 'End',
+    sortedBy: 'end',
     className: 'events-table__column--compact',
     disableFiltering: true
   }
