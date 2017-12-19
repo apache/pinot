@@ -36,7 +36,7 @@ export default Ember.Component.extend({
     'records',
     function () {
       let values = Object.values(this.get('records'));
-      let format = 'ddd, MMM Do YYYY hh:mm A';
+      let format = 'ddd, MMM DD hh:mm A';
 
       values.forEach((value) => {
         value.start = moment(value.start).format(format);
