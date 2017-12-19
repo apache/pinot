@@ -10,8 +10,14 @@ export default Ember.Service.extend({
 
   pending: null, // Set
 
+  errors: null, // Set({ urn, error })
+
   init() {
-    this.setProperties({breakdowns: {}, context: {}, pending: {}});
+    this.setProperties({breakdowns: {}, context: {}, pending: new Set(), errors: new Set() });
+  },
+
+  clearErrors() {
+    this.setProperties({ errors: new Set() });
   },
 
   request(requestContext, urns) {
@@ -91,6 +97,19 @@ export default Ember.Service.extend({
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractBreakdowns(res, urn))
-      .then(res => this._complete(context, res));
+      .then(res => this._complete(context, res))
+      .catch(error => this._handleError(urn, error));
+  },
+
+  _handleError(urn, error) {
+    const { errors, pending } = this.getProperties('errors', 'pending');
+
+    const newError = { urn, error };
+    const newErrors = new Set([...errors, newError]);
+
+    const newPending = new Set(pending);
+    newPending.delete(urn);
+
+    this.setProperties({ errors: newErrors, pending: newPending });
   }
 });

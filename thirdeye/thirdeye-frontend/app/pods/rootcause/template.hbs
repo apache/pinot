@@ -1,3 +1,23 @@
+{{#if hasErrors}}
+  <div class="alert alert-danger alert-dismissable fade in">
+    <a class="close" data-dismiss="alert" {{action "clearErrors"}}>&times;</a>
+    <ul>
+      {{#if entitiesService.errors.size}}
+        <li>Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e.framework}}</strong>{{/each}}</li>
+      {{/if}}
+      {{#if timeseriesService.errors.size}}
+        <li>Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e.urn}}</strong>{{/each}}</li>
+      {{/if}}
+      {{#if aggregatesService.errors.size}}
+      <li>Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e.urn}}</strong>{{/each}}</li>
+      {{/if}}
+      {{#if breakdownsService.errors.size}}
+      <li>Could not load dimension:{{#each breakdownsService.errors as |e|}} <strong>{{e.urn}}</strong>{{/each}}</li>
+      {{/if}}
+    </ul>
+  </div>
+{{/if}}
+
 <div class="container">
   <div class="row">
     {{rootcause-header

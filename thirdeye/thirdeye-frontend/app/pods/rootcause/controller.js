@@ -257,6 +257,19 @@ export default Ember.Controller.extend({
     }
   ),
 
+  hasErrors: Ember.computed(
+    'entitiesService.errors',
+    'timeseriesService.errors',
+    'aggregatesService.errors',
+    'breakdownsService.errors',
+    function () {
+      return this.get('entitiesService.errors.size')
+        || this.get('timeseriesService.errors.size')
+        || this.get('aggregatesService.errors.size')
+        || this.get('breakdownsService.errors.size');
+    }
+  ),
+
   _makeSession() {
     const { context, selectedUrns, sessionId, sessionName, sessionText } =
       this.getProperties('context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText');
@@ -497,6 +510,19 @@ export default Ember.Controller.extend({
       const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...newMetricUrns]) });
 
       this.send('onContext', newContext);
+    },
+
+    /**
+     * Clears error logs of data services
+     */
+    clearErrors() {
+      const { entitiesService, timeseriesService, aggregatesService, breakdownsService } =
+        this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
+
+      entitiesService.clearErrors();
+      timeseriesService.clearErrors();
+      aggregatesService.clearErrors();
+      breakdownsService.clearErrors();
     }
   }
 });
