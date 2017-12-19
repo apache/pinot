@@ -50,7 +50,7 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
 
     private void fillTableCosts(){
         try{
-            File trained_cost_file = new File("latency_load"+System.currentTimeMillis());
+            File trained_cost_file = new File("latency_load"+System.currentTimeMillis()+".log");
 
             ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
             URL resource = classLoader.getResource(COST_FILE);
