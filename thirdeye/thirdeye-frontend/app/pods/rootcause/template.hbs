@@ -74,6 +74,38 @@
     </div>
   </div>
 
+  {{#if hasErrors}}
+    <div class="row">
+      {{#if hasErrorsEntities}}
+        <div class="alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "entities"}}>&times;</a>
+          Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+
+      {{#if hasErrorsTimeseries}}
+        <div class="alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "timeseries"}}>&times;</a>
+          Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+
+      {{#if hasErrorsAggregates}}
+        <div class="alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "aggregates"}}>&times;</a>
+          Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+
+      {{#if hasErrorsBreakdowns}}
+        <div class="alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "breakdowns"}}>&times;</a>
+          Could not load dimensions:{{#each breakdownsService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+    </div>
+  {{/if}}
+
   <div class="row">
     <div class="card-container card-container--box-shadow">
       <div class="card-container__body">
@@ -115,6 +147,7 @@
                   {{ember-spinner}}
                 </div>
               {{/if}}
+
               {{rootcause-heatmap
                 entities=entities
                 breakdowns=breakdowns
@@ -129,6 +162,7 @@
                   {{ember-spinner}}
                 </div>
               {{/if}}
+
               {{rootcause-metrics
                 entities=entities
                 aggregates=aggregates
@@ -145,12 +179,14 @@
                     entities=eventFilterEntities
                     onFilter=(action "onFilter")}}
                 </div>
+
                 <div class="col-xs-9">
                   {{#if isLoadingEntities}}
                     <div class="spinner-wrapper spinner-wrapper--card">
                       {{ember-spinner}}
                     </div>
                   {{/if}}
+
                   {{rootcause-table
                     entities=eventTableEntities
                     columns=eventTableColumns

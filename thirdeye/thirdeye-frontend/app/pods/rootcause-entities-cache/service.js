@@ -12,9 +12,15 @@ export default Ember.Service.extend({
 
   pending: null, // Set
 
+  errors: null, // Set({ frameowrk, error })
+
   init() {
     this._super(...arguments);
-    this.setProperties({ entities: {}, context: {}, pending: new Set(), nativeUrns: new Set() });
+    this.setProperties({ entities: {}, context: {}, pending: new Set(), nativeUrns: new Set(), errors: new Set() });
+  },
+
+  clearErrors() {
+    this.setProperties({ errors: new Set() });
   },
 
   request(requestContext, urns) {
@@ -30,7 +36,8 @@ export default Ember.Service.extend({
         fetch(this._makeIdentityUrl(requestNativeUrns))
           .then(checkStatus)
           .then(this._jsonToEntities)
-          .then(incoming => this._complete(requestContext, urns, incoming, 'identity'));
+          .then(incoming => this._complete(requestContext, urns, incoming, 'identity'))
+          .catch(error => this._handleError('identity', error));
       }
     }
 
@@ -50,7 +57,8 @@ export default Ember.Service.extend({
         fetch(this._makeUrl(framework, requestContext))
           .then(checkStatus)
           .then(this._jsonToEntities)
-          .then(incoming => this._complete(requestContext, urns, incoming, framework));
+          .then(incoming => this._complete(requestContext, urns, incoming, framework))
+          .catch(error => this._handleError(framework, error));
       });
     }
   },
@@ -128,5 +136,17 @@ export default Ember.Service.extend({
       return {};
     }
     return res.reduce((agg, e) => { agg[e.urn] = e; return agg; }, {});
+  },
+
+  _handleError(framework, error) {
+    const { errors, pending } = this.getProperties('errors', 'pending');
+
+    const newError = framework;
+    const newErrors = new Set([...errors, newError]);
+
+    const newPending = new Set(pending);
+    newPending.delete(framework);
+
+    this.setProperties({ errors: newErrors, pending: newPending });
   }
 });
