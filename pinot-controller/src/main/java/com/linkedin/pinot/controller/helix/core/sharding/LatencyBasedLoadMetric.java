@@ -66,22 +66,31 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
                 }
                 cost = cost + Long.valueOf(info[2]);
                 this.tableLatencyMap.put(info[0],cost);
+                logger.info("Latency Based cost added for tableName : "+info[0]+" cost :"+cost);
             }
         }catch (Exception e){
             e.printStackTrace();
         }
     }
 
-    public void addCostToServerMap(String instance, Long cost){
-        logger.info("Latency Based Load metric: Adding cost to server : "+instance);
+    public void addCostToServerMap(String instance, Long cost, PinotHelixResourceManager helixResourceManager){
+        logger.info("Latency Based Load metric: Adding cost to server : "+instance + " cost:"+cost);
         this.serverLatencyMap.put(instance,cost);
+        helixResourceManager.setServerLatencyMap(this.serverLatencyMap);
+        for(String key : helixResourceManager.getServerLatencyMap().keySet()){
+            logger.info("Post Server Latency Map Entry "+key + " cost:"+helixResourceManager.getServerLatencyMap().get(key));
+        }
+
     }
     @Override
     public long computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName) {
  /*       ServerLatencyMetricReader serverlatencyMetricsReader =
                 new ServerLatencyMetricReader(executor, connectionManager, helixResourceManager);
 */
-
+        for(String key : helixResourceManager.getServerLatencyMap().keySet()){
+            logger.info("Pre Server Latency Map Entry "+key + " cost:"+helixResourceManager.getServerLatencyMap().get(key));
+        }
+        this.serverLatencyMap = helixResourceManager.getServerLatencyMap();
         //ServerLoadMetrics serverLatencyInfo = serverlatencyMetricsReader.getServerLatencyMetrics(instance, tableName,true, 300);
         // Will Add logic to read from the model file.
         long tableLatencyCost = 0L;

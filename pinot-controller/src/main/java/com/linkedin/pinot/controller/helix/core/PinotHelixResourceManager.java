@@ -109,6 +109,7 @@ public class PinotHelixResourceManager {
   private final Map<String, SegmentAssignmentStrategy> _segmentAssignmentStrategyMap = new HashMap<>();
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
+  private Map<String, Long> _serverLatencyMap = new HashMap<>();
 
   private final String _helixZkURL;
   private final String _helixClusterName;
@@ -2250,5 +2251,12 @@ public class PinotHelixResourceManager {
       endpointToInstance.put(instance, hostnameSplit[1] + ":" + port);
     }
     return endpointToInstance;
+  }
+
+  public Map<String,Long> getServerLatencyMap(){
+    return this._serverLatencyMap;
+  }
+  public void setServerLatencyMap(Map<String,Long> latencyMap){
+    this._serverLatencyMap = latencyMap;
   }
 }

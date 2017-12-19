@@ -122,7 +122,7 @@ public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy
 
     if(_serverLoadMetric.getClass().equals(LatencyBasedLoadMetric.class))
       for(String selectedInstance : selectedInstances){
-        ((LatencyBasedLoadMetric) _serverLoadMetric).addCostToServerMap(selectedInstance,reportedLoadMetricPerInstanceMap.get(selectedInstance));
+        ((LatencyBasedLoadMetric) _serverLoadMetric).addCostToServerMap(selectedInstance,reportedLoadMetricPerInstanceMap.get(selectedInstance),helixResourceManager);
     }
     return selectedInstances;
   }
