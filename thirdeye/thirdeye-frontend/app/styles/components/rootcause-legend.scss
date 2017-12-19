@@ -1,6 +1,6 @@
 .rootcause-legend {
   flex-basis: 200px;
-  min-width: 200px;
+  min-width: 25%;
   border-right: 1px solid app-shade(black, 0.15);
   overflow: scroll;
   display: flex;
@@ -9,6 +9,10 @@
 
   &__wrapper {
     position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
   }
 
   &__item {
