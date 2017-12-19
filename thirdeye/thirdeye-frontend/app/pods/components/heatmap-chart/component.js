@@ -2,7 +2,6 @@ import Ember from 'ember';
 import _ from 'lodash';
 import d3 from 'd3';
 
-
 const { get } = Ember;
 
 // TODO: move to utils file
@@ -26,6 +25,11 @@ const getTextColor = function (factor = 0) {
 
 export default Ember.Component.extend({
   cells: null, // {}
+
+  /**
+   * ID Selector of the tooltip
+   */
+  tooltipId: '#heatmap-tooltip',
 
   /**
    * Bubbles the click up to the parent component
@@ -58,8 +62,9 @@ export default Ember.Component.extend({
    */
   _buildHeatmap() {
     const {
-      cells
-    } = this.getProperties('cells');
+      cells,
+      tooltipId
+    } = this.getProperties('cells', 'tooltipId');
 
     const dimensions = Object.keys(cells);
     if (!dimensions.length) { return; }
@@ -100,14 +105,14 @@ export default Ember.Component.extend({
         .nodes({ name: '0', children: children })
         .filter((node) => !node.children);
 
-      this._createCell(div, nodes);
+      this._createCell(div, nodes, tooltipId);
     });
   },
 
   /**
    * Builds an individual cell based on the provided div and nodes
    */
-  _createCell(div, nodes) {
+  _createCell(div, nodes, tooltipId) {
     const cell = div.selectAll('g')
       .data(nodes)
       .enter()
@@ -124,16 +129,16 @@ export default Ember.Component.extend({
       const xPosition = d3.event.pageX - (tooltipWidth + 20);
       const yPosition = d3.event.pageY + 5;
 
-      d3.select('#tooltip')
+      d3.select(`${tooltipId}`)
         .style('left', xPosition + 'px')
         .style('top', yPosition + 'px');
-      d3.select('#tooltip #heading')
+      d3.select(`${tooltipId} #heading`)
         .text(d.name);
-      d3.select('#tooltip #currentValue')
-        .text(d.actualValue);
-      d3.select('#tooltip').classed('hidden', false);
+      d3.select(`${tooltipId} #currentValue`)
+        .text(d3.format('.2%')(d.actualValue));
+      d3.select(`${tooltipId}`).classed('hidden', false);
     }).on('mouseout', function () {
-      d3.select('#tooltip').classed('hidden', true);
+      d3.select(`${tooltipId}`).classed('hidden', true);
     });
 
     // colored background

@@ -27,7 +27,8 @@
   justify-content: space-between;
 }
 
-#tooltip {
+#tooltip,
+#heatmap-tooltip {
   position: absolute;
   width: 220px;
   height: auto;
@@ -40,13 +41,14 @@
   -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
   box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
   pointer-events: none;
+
+  &.hidden {
+    display: none;
+  }
+  
+  & p {
+    margin: 0;
+    font-size: 13px;
+  }
 }
 
-#tooltip.hidden {
-  display: none;
-}
-
-#tooltip p {
-  margin: 0;
-  font-size: 13px;
-}
