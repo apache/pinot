@@ -32,25 +32,25 @@
           onSelection=(action "onSelection")
         }}
         <div class="container rootcause-wrapper__chart">
-              {{rootcause-chart-toolbar
-                context=context
-                timeseriesMode=timeseriesMode
-                onContext=(action "onContext")
-                onChart=(action "onChart")
-              }}
-              {{#if isLoadingTimeseries}}
-                <div class="spinner-wrapper spinner-wrapper--card">
-                  {{ember-spinner}}
-                </div>
-              {{/if}}
-              {{rootcause-chart
-                entities=entities
-                selectedUrns=chartSelectedUrns
-                timeseries=timeseries
-                timeseriesMode=timeseriesMode
-                context=context
-                onHover=(action "chartOnHover")
-              }}
+          {{rootcause-chart-toolbar
+            context=context
+            timeseriesMode=timeseriesMode
+            onContext=(action "onContext")
+            onChart=(action "onChart")
+          }}
+          {{#if isLoadingTimeseries}}
+            <div class="spinner-wrapper spinner-wrapper--card">
+              {{ember-spinner}}
+            </div>
+          {{/if}}
+          {{rootcause-chart
+            entities=entities
+            selectedUrns=chartSelectedUrns
+            timeseries=timeseries
+            timeseriesMode=timeseriesMode
+            context=context
+            onHover=(action "chartOnHover")
+          }}
         </div>
       </div>
       <div class="container">
