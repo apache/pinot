@@ -336,14 +336,18 @@ create table if not exists rootcause_session_index (
     name varchar(256),
     owner varchar(32),
     previousId bigint(20),
+    anomalyId bigint(20),
     anomaly_range_start bigint(8),
     anomaly_range_end bigint(8),
     created bigint(8),
+    updated bigint(8),
     version int(10)
 ) ENGINE=InnoDB;
 create index rootcause_session_name_idx on rootcause_session_index(name);
 create index rootcause_session_owner_idx on rootcause_session_index(owner);
 create index rootcause_session_previousId_idx on rootcause_session_index(previousId);
+create index rootcause_session_anomalyId_idx on rootcause_session_index(anomalyId);
 create index rootcause_session_anomaly_range_start_idx on rootcause_session_index(anomaly_range_start);
 create index rootcause_session_anomaly_range_end_idx on rootcause_session_index(anomaly_range_end);
 create index rootcause_session_created_idx on rootcause_session_index(created);
+create index rootcause_session_updated_idx on rootcause_session_index(updated);
