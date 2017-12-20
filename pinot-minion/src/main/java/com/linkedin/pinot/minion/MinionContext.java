@@ -17,26 +17,46 @@ package com.linkedin.pinot.minion;
 
 import com.linkedin.pinot.minion.metrics.MinionMetrics;
 import java.io.File;
-import javax.annotation.Nonnull;
 
 
 /**
- * The <code>MinionContext</code> class contains all minion related context.
+ * The <code>MinionContext</code> class is a singleton class which contains all minion related context.
  */
 public class MinionContext {
-  private final File _dataDir;
-  private final MinionMetrics _minionMetrics;
+  private static final MinionContext INSTANCE = new MinionContext();
 
-  public MinionContext(@Nonnull File dataDir, @Nonnull MinionMetrics minionMetrics) {
-    _dataDir = dataDir;
-    _minionMetrics = minionMetrics;
+  private MinionContext() {
   }
+
+  public static MinionContext getInstance() {
+    return INSTANCE;
+  }
+
+  private File _dataDir;
+  private MinionMetrics _minionMetrics;
+  private String _minionVersion;
 
   public File getDataDir() {
     return _dataDir;
   }
 
+  public void setDataDir(File dataDir) {
+    _dataDir = dataDir;
+  }
+
   public MinionMetrics getMinionMetrics() {
     return _minionMetrics;
+  }
+
+  public void setMinionMetrics(MinionMetrics minionMetrics) {
+    _minionMetrics = minionMetrics;
+  }
+
+  public String getMinionVersion() {
+    return _minionVersion;
+  }
+
+  public void setMinionVersion(String minionVersion) {
+    _minionVersion = minionVersion;
   }
 }

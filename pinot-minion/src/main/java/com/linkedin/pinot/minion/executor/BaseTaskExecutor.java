@@ -15,53 +15,16 @@
  */
 package com.linkedin.pinot.minion.executor;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.minion.MinionContext;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import javax.annotation.Nonnull;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.params.DefaultHttpParams;
-import org.apache.commons.httpclient.params.HttpParams;
-import org.apache.http.HttpHeaders;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
-  protected MinionContext _minionContext;
+  protected static final MinionContext MINION_CONTEXT = MinionContext.getInstance();
+
   protected boolean _cancelled = false;
-
-  private final String SPACE = " ";
-  // TODO: Get jar version
-  private static final String VERSION = "1.0";
-  private static final String USER_AGENT_PARAM = "http.useragent";
-  private static final String SLASH = "/";
-
-  @Override
-  public void setMinionContext(@Nonnull MinionContext minionContext) {
-    _minionContext = minionContext;
-  }
 
   @Override
   public void cancel() {
     _cancelled = true;
-  }
-
-  @Override
-  public int uploadSegment(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
-      FileUploadUtils.SendFileMethod httpMethod, String originalSegmentCrc, String jobType) {
-    List<Header> headers = new ArrayList<>();
-    Header ifMatchHeader = new Header(HttpHeaders.IF_MATCH, originalSegmentCrc);
-    HttpParams httpParams = DefaultHttpParams.getDefaultParams();
-    String userAgentParameter = String.valueOf(httpParams.getParameter(USER_AGENT_PARAM));
-
-    userAgentParameter += SPACE + CommonConstants.Minion.MINION_HEADER + jobType + SLASH + VERSION;
-    Header minionHeader = new Header(HttpHeaders.USER_AGENT, userAgentParameter);
-
-    headers.add(ifMatchHeader);
-    headers.add(minionHeader);
-
-    return FileUploadUtils.sendFile(uri, fileName, inputStream, lengthInBytes, FileUploadUtils.SendFileMethod.POST, headers);
   }
 }
