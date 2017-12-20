@@ -18,6 +18,7 @@ package com.linkedin.pinot.minion;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
@@ -100,6 +101,9 @@ public class MinionStarter {
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
     MinionMetrics minionMetrics = new MinionMetrics(metricsRegistry);
     minionMetrics.initializeGlobalMeters();
+
+    LOGGER.info("initializing segment fetchers for all protocols");
+    SegmentFetcherFactory.initSegmentFetcherFactory(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
 
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
