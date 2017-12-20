@@ -51,19 +51,6 @@
             context=context
             onHover=(action "chartOnHover")
           }}
-        </div>
-      </div>
-      <div class="container">
-        <div class="row">
-          <div class="col-xs-2">
-            Comparison settings
-            <span>
-              <i class="glyphicon glyphicon-question-sign"></i>
-              {{#tooltip-on-element}}
-                Typically, this is your anomaly region. It's highlighted in orange in the graph above. It also affects the data in views below.
-              {{/tooltip-on-element}}
-            </span>
-          </div>
           {{rootcause-select-comparison-range
             range=context.anomalyRange
             compareMode=context.compareMode

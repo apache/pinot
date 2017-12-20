@@ -1,37 +1,48 @@
-<div class="col-xs-2">
-  {{date-range-picker
-    class="te-range-picker"
-    start=analysisRangeStart
-    end=analysisRangeEnd
-    maxDate=analysisRangeMax
-    ranges=analysisRangePredefined
-    showCustomRangeLabel=false
-    format="MMM D"
-    serverFormat="YYYY-MM-DD HH:mm"
-    applyAction=(action "onAnalysisRange")
-  }}
-</div>
-<div class="col-xs-2">
-  {{#power-select
-    selected=granularity
-    options=granularityOptions
-    searchEnabled=false
-    triggerId="select-granularity"
-    onchange=(action "onGranularity")
-    as |granularity|
-  }}
-    {{granularity}}
-  {{/power-select}}
-</div>
-<div class="col-xs-2">
-  {{#power-select
-    selected=timeseriesMode
-    options=timeseriesModeOptions
-    searchEnabled=false
-    triggerId="select-timeseries-mode"
-    onchange=(action "onTimeseriesMode")
-    as |mode|
-  }}
-    {{mode}}
-  {{/power-select}}
+<div class="row">
+  <div class="col-xs-2">
+    Time-series
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        These settings affect only the display of time-series. To change the comparison region and mode, use the "comparison" settings below.
+      {{/tooltip-on-element}}
+    </span>
+  </div>
+  <div class="col-xs-4">
+    {{date-range-picker
+      class="te-range-picker"
+      start=analysisRangeStart
+      end=analysisRangeEnd
+      maxDate=analysisRangeMax
+      ranges=analysisRangePredefined
+      showCustomRangeLabel=false
+      format="MMM D"
+      serverFormat="YYYY-MM-DD HH:mm"
+      applyAction=(action "onAnalysisRange")
+    }}
+  </div>
+  <div class="col-xs-2">
+    {{#power-select
+      selected=granularity
+      options=granularityOptions
+      searchEnabled=false
+      triggerId="select-granularity"
+      onchange=(action "onGranularity")
+      as |granularity|
+    }}
+      {{granularity}}
+    {{/power-select}}
+  </div>
+  <div class="col-xs-2">
+    {{#power-select
+      selected=timeseriesMode
+      options=timeseriesModeOptions
+      searchEnabled=false
+      triggerId="select-timeseries-mode"
+      onchange=(action "onTimeseriesMode")
+      as |mode|
+    }}
+      {{mode}}
+    {{/power-select}}
+  </div>
 </div>
