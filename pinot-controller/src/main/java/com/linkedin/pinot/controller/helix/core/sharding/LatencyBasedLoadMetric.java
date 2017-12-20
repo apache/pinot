@@ -59,21 +59,24 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
             logger.info("Latency Based Load metric reading trained cost file:"+trained_cost_file.getAbsolutePath());
             List<String> lines =  FileUtils.readLines(new File(trained_cost_file.getAbsolutePath()));
             //BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
-            if(lines!=null) {
+
                 for (String line : lines) {
                     String[] info = line.split(",");
                     Long cost = 0l;
                     if (this.tableLatencyMap.containsKey(info[0])) {
                         cost = this.tableLatencyMap.get(info[0]);
                     }
-                    cost = cost + Long.valueOf(info[2]);
+                    cost = cost + (long)(double)Double.valueOf(info[2]);
                     this.tableLatencyMap.put(info[0], cost);
                     logger.info("Latency Based cost added for tableName : " + info[0] + " cost :" + cost);
                 }
-            }
+
         }catch (Exception e){
             e.printStackTrace();
         }
+
+        //tableLatencyMap.put("Job_OFFLINE",(long)(37.99312352282242));
+
     }
 
     public void addCostToServerMap(String instance, Long cost, PinotHelixResourceManager helixResourceManager){
@@ -109,8 +112,7 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
         return serverLatencyCost ;
     }
 
-  /*  public static void main(String args[]){
-        LatencyBasedLoadMetric l = new LatencyBasedLoadMetric();
-        System.out.println(l.computeInstanceMetric(null,null,"S1","t1"));
+  /*public static void main(String args[]){
+        System.out.println((long)(double)Double.valueOf(("37.4564545435")));
     }*/
 }
