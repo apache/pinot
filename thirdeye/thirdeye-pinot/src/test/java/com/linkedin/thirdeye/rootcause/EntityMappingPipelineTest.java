@@ -229,7 +229,17 @@ public class EntityMappingPipelineTest {
     }
 
     @Override
+    public List<EntityToEntityMappingDTO> findByFromURNs(Set<String> fromURNs) {
+      throw new AssertionError("not implemented");
+    }
+
+    @Override
     public List<EntityToEntityMappingDTO> findByToURN(String toURN) {
+      throw new AssertionError("not implemented");
+    }
+
+    @Override
+    public List<EntityToEntityMappingDTO> findByToURNs(Set<String> toURNs) {
       throw new AssertionError("not implemented");
     }
 

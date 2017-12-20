@@ -22,7 +22,7 @@ import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+// TODO handle MetricEntity tail
 /**
  * The EntityMappingPipeline is a generic implementation for emitting Entities based on
  * association with incoming Entities. For example, it may be used to generate "similar" metrics

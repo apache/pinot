@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -40,4 +42,47 @@ public class MetricEntityTest {
   public void testFiltersLongFail() {
     MetricEntity.fromURN("thirdeye:metric:12345:key=value=1", 1.0);
   }
+
+  @Test
+  public void testCreateWithFilter() {
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    filters.put("key", "value");
+    filters.put("key", "otherValue");
+    filters.put("anotherKey", "otherValue");
+
+    MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters);
+
+    Assert.assertEquals(e.getUrn(), "thirdeye:metric:123:anotherKey=otherValue:key=value:key=otherValue");
+  }
+
+  @Test
+  public void testSetFilters() {
+    Multimap<String, String> filters1 = ArrayListMultimap.create();
+    filters1.put("key", "otherValue");
+    filters1.put("anotherKey", "otherValue");
+
+    Multimap<String, String> filters2 = ArrayListMultimap.create();
+    filters2.put("key", "value");
+
+    MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters1);
+    Assert.assertEquals(e.getUrn(), "thirdeye:metric:123:anotherKey=otherValue:key=otherValue");
+
+    MetricEntity aug = e.withFilters(filters2);
+    Assert.assertEquals(aug.getUrn(), "thirdeye:metric:123:key=value");
+  }
+
+  @Test
+  public void testRemoveFilters() {
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    filters.put("key", "value");
+    filters.put("key", "otherValue");
+    filters.put("anotherKey", "otherValue");
+
+    MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters);
+    Assert.assertEquals(e.getUrn(), "thirdeye:metric:123:anotherKey=otherValue:key=value:key=otherValue");
+
+    MetricEntity drop = e.withoutFilters();
+    Assert.assertEquals(drop.getUrn(), "thirdeye:metric:123");
+  }
+
 }
