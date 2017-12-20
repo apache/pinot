@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.LongSeries;
@@ -54,6 +55,9 @@ public class MetricAnalysisPipeline extends Pipeline {
   private static final String PROP_STRATEGY = "strategy";
   private static final String PROP_STRATEGY_DEFAULT = STRATEGY_THRESHOLD;
 
+  private static final String PROP_GRANULARITY = "granularity";
+  private static final String PROP_GRANULARITY_DEFAULT = "15_MINUTES";
+
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
   private static final String COL_CURRENT = "current";
@@ -63,6 +67,7 @@ public class MetricAnalysisPipeline extends Pipeline {
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final ScoringStrategyFactory strategyFactory;
+  private final TimeGranularity granularity;
 
   /**
    * Constructor for dependency injection
@@ -70,16 +75,18 @@ public class MetricAnalysisPipeline extends Pipeline {
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
    * @param strategyFactory scoring strategy for differences
+   * @param granularity time series target granularity
    * @param cache query cache
    * @param metricDAO metric config DAO
    * @param datasetDAO datset config DAO
    */
-  public MetricAnalysisPipeline(String outputName, Set<String> inputNames, ScoringStrategyFactory strategyFactory, QueryCache cache, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
+  public MetricAnalysisPipeline(String outputName, Set<String> inputNames, ScoringStrategyFactory strategyFactory, TimeGranularity granularity, QueryCache cache, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     super(outputName, inputNames);
     this.cache = cache;
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.strategyFactory = strategyFactory;
+    this.granularity = granularity;
   }
 
   /**
@@ -95,6 +102,7 @@ public class MetricAnalysisPipeline extends Pipeline {
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     this.strategyFactory = parseStrategyFactory(MapUtils.getString(properties, PROP_STRATEGY, PROP_STRATEGY_DEFAULT));
+    this.granularity = TimeGranularity.fromString(MapUtils.getString(properties, PROP_GRANULARITY, PROP_GRANULARITY_DEFAULT));
   }
 
   @Override
@@ -264,7 +272,7 @@ public class MetricAnalysisPipeline extends Pipeline {
       jointFilters.putAll(filters);
       jointFilters.putAll(me.getFilters());
 
-      MetricSlice slice = MetricSlice.from(me.getId(), start, end, jointFilters);
+      MetricSlice slice = MetricSlice.from(me.getId(), start, end, jointFilters, this.granularity);
       try {
         requests.add(DataFrameUtils.makeTimeSeriesRequestAligned(slice, me.getUrn(), this.metricDAO, this.datasetDAO));
       } catch (Exception ex) {
