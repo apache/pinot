@@ -11,5 +11,7 @@ public interface RootcauseSessionManager extends AbstractManager<RootcauseSessio
   List<RootcauseSessionDTO> findByOwner(String owner);
   List<RootcauseSessionDTO> findByAnomalyRange(long start, long end);
   List<RootcauseSessionDTO> findByCreatedRange(long start, long end);
+  List<RootcauseSessionDTO> findByUpdatedRange(long start, long end);
   List<RootcauseSessionDTO> findByPreviousId(long id);
+  List<RootcauseSessionDTO> findByAnomalyId(long id);
 }

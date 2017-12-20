@@ -22,8 +22,10 @@ public class RootcauseSessionBean extends AbstractBean {
   private Long analysisRangeStart;
   private Long analysisRangeEnd;
   private Long created;
+  private Long updated;
   private Set<String> contextUrns;
   private Set<String> selectedUrns;
+  private Long anomalyId;
 
   public String getName() {
     return name;
@@ -113,6 +115,14 @@ public class RootcauseSessionBean extends AbstractBean {
     this.created = created;
   }
 
+  public Long getUpdated() {
+    return updated;
+  }
+
+  public void setUpdated(Long updated) {
+    this.updated = updated;
+  }
+
   public Set<String> getContextUrns() {
     return contextUrns;
   }
@@ -129,6 +139,14 @@ public class RootcauseSessionBean extends AbstractBean {
     this.selectedUrns = selectedUrns;
   }
 
+  public Long getAnomalyId() {
+    return anomalyId;
+  }
+
+  public void setAnomalyId(Long anomalyId) {
+    this.anomalyId = anomalyId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -143,13 +161,13 @@ public class RootcauseSessionBean extends AbstractBean {
         && Objects.equals(previousId, that.previousId) && Objects.equals(anomalyRangeStart, that.anomalyRangeStart)
         && Objects.equals(anomalyRangeEnd, that.anomalyRangeEnd) && Objects.equals(analysisRangeStart,
         that.analysisRangeStart) && Objects.equals(analysisRangeEnd, that.analysisRangeEnd) && Objects.equals(created,
-        that.created) && Objects.equals(contextUrns,
-        that.contextUrns) && Objects.equals(selectedUrns, that.selectedUrns);
+        that.created) && Objects.equals(updated, that.updated) && Objects.equals(contextUrns, that.contextUrns)
+        && Objects.equals(selectedUrns, that.selectedUrns) && Objects.equals(anomalyId, that.anomalyId);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(name, text, owner, compareMode, granularity, previousId, anomalyRangeStart, anomalyRangeEnd,
-        analysisRangeStart, analysisRangeEnd, created, contextUrns, selectedUrns);
+        analysisRangeStart, analysisRangeEnd, created, updated, contextUrns, selectedUrns, anomalyId);
   }
 }

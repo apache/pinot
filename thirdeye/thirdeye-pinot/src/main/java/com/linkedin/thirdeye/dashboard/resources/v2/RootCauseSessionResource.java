@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.datalayer.bao.RootcauseSessionManager;
 import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.rootcause.impl.AnomalyEventEntity;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,13 +52,15 @@ public class RootCauseSessionResource {
 
   @POST
   @Path("/")
-  public Long post(
-      String jsonString) throws IOException {
+  public Long post(String jsonString) throws IOException {
     RootcauseSessionDTO session = this.mapper.readValue(jsonString, new TypeReference<RootcauseSessionDTO>() {});
+
+    session.setUpdated(DateTime.now().getMillis());
 
     if (session.getId() == null) {
       session.setCreated(DateTime.now().getMillis());
       session.setOwner(ThirdEyeAuthFilter.getCurrentPrincipal().getName());
+      session.setAnomalyId(extractAnomalyId(session.getContextUrns()));
 
     } else {
       RootcauseSessionDTO existing = this.sessionDAO.findById(session.getId());
@@ -78,10 +81,13 @@ public class RootCauseSessionResource {
       @QueryParam("name") String namesString,
       @QueryParam("owner") String ownersString,
       @QueryParam("previousId") String previousIdsString,
+      @QueryParam("anomalyId") String anomalyIdsString,
       @QueryParam("anomalyRangeStart") Long anomalyRangeStart,
       @QueryParam("anomalyRangeEnd") Long anomalyRangeEnd,
       @QueryParam("createdRangeStart") Long createdRangeStart,
-      @QueryParam("createdRangeEnd") Long createdRangeEnd) {
+      @QueryParam("createdRangeEnd") Long createdRangeEnd,
+      @QueryParam("updatedRangeStart") Long updatedRangeStart,
+      @QueryParam("updatedRangeEnd") Long updatedRangeEnd) {
 
     List<Predicate> predicates = new ArrayList<>();
 
@@ -101,6 +107,10 @@ public class RootCauseSessionResource {
       predicates.add(Predicate.IN("previousId", split(previousIdsString)));
     }
 
+    if (!StringUtils.isBlank(anomalyIdsString)) {
+      predicates.add(Predicate.IN("anomalyId", split(anomalyIdsString)));
+    }
+
     if (anomalyRangeStart != null) {
       predicates.add(Predicate.GT("anomalyRangeEnd", anomalyRangeStart));
     }
@@ -115,6 +125,14 @@ public class RootCauseSessionResource {
 
     if (createdRangeEnd != null) {
       predicates.add(Predicate.LT("created", createdRangeEnd));
+    }
+
+    if (updatedRangeStart != null) {
+      predicates.add(Predicate.GE("updated", updatedRangeStart));
+    }
+
+    if (updatedRangeEnd != null) {
+      predicates.add(Predicate.LT("updated", updatedRangeEnd));
     }
 
     if (predicates.isEmpty()) {
@@ -179,6 +197,24 @@ public class RootCauseSessionResource {
     if (other.getSelectedUrns() != null)
       session.setSelectedUrns(other.getSelectedUrns());
 
+    if (other.getUpdated() != null)
+      session.setUpdated(other.getUpdated());
+
     return session;
+  }
+
+  /**
+   * Returns the first anomaly entity id from a set of URNs, or {@code null} if none can be found.
+   *
+   * @param urns urns to scan
+   * @return first anomaly entity id, or null
+   */
+  private static Long extractAnomalyId(Iterable<String> urns) {
+    for (String urn : urns) {
+      if (AnomalyEventEntity.TYPE.isType(urn)) {
+        return AnomalyEventEntity.fromURN(urn, 1.0).getId();
+      }
+    }
+    return null;
   }
 }
