@@ -359,7 +359,7 @@ export default Ember.Component.extend({
     } else if (hasPrefix(urn, 'thirdeye:event:')) {
       const val = _eventValues[urn];
       const endRange = context.analysisRange[1];
-      let end = entities[urn].end <= 0 ? endRange : entities[urn].start;
+      const end = entities[urn].end <= 0 ? endRange : entities[urn].end;
 
       return {
         timestamps: [entities[urn].start, end],
