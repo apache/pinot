@@ -1,7 +1,7 @@
 {{#if isSplit}}
   {{#each splitUrns as |urn|}}
-    <div>
-      <h4>{{get-safe splitLabels urn}}</h4>
+    <div class="row">
+      <h4 class="rootcause-chart--split__header">{{get-safe splitLabels urn}}</h4>
       {{timeseries-chart
         series=(get splitSeries urn)
         tooltip=tooltip
@@ -13,11 +13,13 @@
     </div>
   {{/each}}
 {{else}}
-  {{timeseries-chart
-    series=series
-    tooltip=tooltip
-    legend=legend
-    axis=axis
-    subchart=subchart
-  }}
+  <div class="row">
+    {{timeseries-chart
+      series=series
+      tooltip=tooltip
+      legend=legend
+      axis=axis
+      subchart=subchart
+    }}
+  </div>
 {{/if}}
