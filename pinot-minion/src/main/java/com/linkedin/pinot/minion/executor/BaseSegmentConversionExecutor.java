@@ -113,7 +113,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       // segment will not be submitted again
       Header ifMatchHeader = new Header(HttpHeaders.IF_MATCH, originalSegmentCrc);
       String minionUserAgentParameter =
-          CommonConstants.Minion.HTTP_TASK_TYPE_HEADER_PREFIX + taskType + "/" + MINION_CONTEXT.getMinionVersion();
+          CommonConstants.Minion.HTTP_TASK_TYPE_HEADER_PREFIX + taskType + CommonConstants.Minion.MINION_HEADER_SEPARATOR + MINION_CONTEXT.getMinionVersion();
       String defaultUserAgentParameter =
           DefaultHttpParams.getDefaultParams().getParameter(HttpMethodParams.USER_AGENT).toString();
       String userAgentParameter = defaultUserAgentParameter + " " + minionUserAgentParameter;

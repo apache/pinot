@@ -30,6 +30,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.PinotUserAgentHeader;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -54,6 +55,7 @@ import java.net.URLDecoder;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -426,12 +428,14 @@ public class PinotSegmentUploadRestletResource {
       return response;
     }
 
-    final OfflineSegmentZKMetadata originalOfflineSegmentZkMetadata = new OfflineSegmentZKMetadata(znRecord);
+    OfflineSegmentZKMetadata originalOfflineSegmentZkMetadata = new OfflineSegmentZKMetadata(znRecord);
 
     long minionExpectedCrc = -1L;
     boolean isMinionConfigured = offlineTableConfig.getTaskConfig() != null;
-    boolean minionHeaderPresent = headers.getHeaderString(HttpHeaders.USER_AGENT).contains(CommonConstants.Minion.HTTP_TASK_TYPE_HEADER_PREFIX);
+    String userAgentHeader = headers.getHeaderString(HttpHeaders.USER_AGENT);
+    boolean minionHeaderPresent = userAgentHeader.contains(CommonConstants.Minion.MINION_HEADER_PREFIX);
     boolean metadataRewritten = false;
+
     if (isMinionConfigured) {
       // Minion configured use case so that we write to zk sparingly
       String segmentPushStatus = originalOfflineSegmentZkMetadata.getSegmentPushStatus();
@@ -449,6 +453,18 @@ public class PinotSegmentUploadRestletResource {
       }
 
       if (minionHeaderPresent) {
+        final String taskType = PinotUserAgentHeader.getTaskType(userAgentHeader);
+
+        // Upload comes from minion, adding task segment modification time
+        if (originalOfflineSegmentZkMetadata.getTaskSegmentModificationTime() != null) {
+          originalOfflineSegmentZkMetadata.getTaskSegmentModificationTime()
+              .put(taskType, String.valueOf(System.currentTimeMillis()));
+        } else {
+          Map<String, String> taskSegmentModificationTime = new HashMap<>();
+          taskSegmentModificationTime.put(taskType, String.valueOf(System.currentTimeMillis()));
+          originalOfflineSegmentZkMetadata.setTaskSegmentModificationTime(taskSegmentModificationTime);
+        }
+
         try {
           minionExpectedCrc = Long.parseLong(headers.getHeaderString(HttpHeaders.IF_MATCH));
         } catch (NumberFormatException e) {
