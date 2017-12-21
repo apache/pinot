@@ -318,7 +318,10 @@ public class CommonConstants {
      * COMMITTING-20171210T09:31:55.765
      */
     public static final String SEGMENT_PUSH_STATUS = "segment.push.status";
-    public static final String CUSTOM_FIELDS = "custom.fields";
+    /**
+     * This field will be a map of minion task type : time task ran in millis.
+     */
+    public static final String TASK_SEGMENT_MODIFICATION_TIME = "task.segment.modification.time";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
