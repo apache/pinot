@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
@@ -12,6 +13,7 @@ import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,7 +85,7 @@ public class MetricMappingPipeline extends Pipeline {
       Set<DatasetEntity> datasets = new MaxScoreSet<>();
 
       // metric
-      metrics.add(me);
+      // NOTE: native metric added via native dataset
 
       // dataset
       datasets.add(de);
@@ -95,7 +97,8 @@ public class MetricMappingPipeline extends Pipeline {
 
         // metric-related metrics
         if (MetricEntity.TYPE.isType(urn)) {
-          metrics.add(MetricEntity.fromURN(urn, me.getScore() * mapping.getScore()));
+          MetricEntity m = MetricEntity.fromURN(urn, me.getScore() * mapping.getScore());
+          metrics.add(m.withFilters(pruneFilters(filters, m.getId())));
         }
 
         // metric-related datasets
@@ -124,7 +127,8 @@ public class MetricMappingPipeline extends Pipeline {
 
         // related-dataset-native metrics
         for (MetricConfigDTO nativeMetric : nativeMetrics) {
-          metrics.add(MetricEntity.fromMetric(relatedDataset.getScore(), nativeMetric.getId()));
+          MetricEntity m = MetricEntity.fromMetric(relatedDataset.getScore(), nativeMetric.getId());
+          metrics.add(m.withFilters(pruneFilters(filters, m.getId())));
         }
 
         // related-dataset-related metrics
@@ -132,7 +136,8 @@ public class MetricMappingPipeline extends Pipeline {
         List<EntityToEntityMappingDTO> relatedMetrics = this.mappingDAO.findByFromURN(relatedDataset.getUrn());
         for (EntityToEntityMappingDTO relatedMetric : relatedMetrics) {
           if (MetricEntity.TYPE.isType(relatedMetric.getToURN())) {
-            metrics.add(MetricEntity.fromURN(relatedMetric.getToURN(), relatedDataset.getScore() * relatedMetric.getScore()));
+            MetricEntity m = MetricEntity.fromURN(relatedMetric.getToURN(), relatedDataset.getScore() * relatedMetric.getScore());
+            metrics.add(m.withFilters(pruneFilters(filters, m.getId())));
           }
         }
       }
@@ -141,5 +146,34 @@ public class MetricMappingPipeline extends Pipeline {
     }
 
     return new PipelineResult(context, output);
+  }
+
+  /**
+   * Prunes filter set to only allow dimensions that are available in a metrics own dataset
+   *
+   * @param metricId metric id
+   * @return pruned filter multimap
+   */
+  private Multimap<String, String> pruneFilters(Multimap<String, String> filters, long metricId) {
+    MetricConfigDTO metric = this.metricDAO.findById(metricId);
+    if (metric == null) {
+      LOG.warn("Could not resolve metric id {} while pruning filters", metricId);
+      return ArrayListMultimap.create();
+    }
+
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    if (dataset == null) {
+      LOG.warn("Could not resolve dataset '{}' for metric id {} while pruning filters", metric.getDataset(), metricId);
+      return ArrayListMultimap.create();
+    }
+
+    Multimap<String, String> output = ArrayListMultimap.create();
+    Set<String> validKeys = new HashSet<>(dataset.getDimensions());
+    for (Map.Entry<String, String> entry : filters.entries()) {
+      if (validKeys.contains(entry.getKey())) {
+        output.put(entry.getKey(), entry.getValue());
+      }
+    }
+    return output;
   }
 }

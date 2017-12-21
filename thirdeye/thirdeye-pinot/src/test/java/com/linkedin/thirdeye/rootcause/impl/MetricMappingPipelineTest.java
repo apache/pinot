@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -36,10 +38,12 @@ public class MetricMappingPipelineTest {
         makeMetric(106, "z"), // dataset-related-dataset related metric
         makeMetric(107, "z")); // unrelated
     List<DatasetConfigDTO> datasets = Arrays.asList(
-        makeDataset("a"), // native
-        makeDataset("b"), // related to metric
-        makeDataset("c"), // related to dataset
-        makeDataset("d")); // unrelated
+        makeDataset("a", Arrays.asList("L", "M", "N")), // native
+        makeDataset("b", Arrays.asList("L", "M")), // related to metric
+        makeDataset("c", Arrays.asList("M", "N")), // related to dataset
+        makeDataset("x", Arrays.asList("L")), // related to dataset
+        makeDataset("y", Arrays.asList("M")), // related to dataset
+        makeDataset("z", Arrays.asList("N"))); // related to dataset
     List<EntityToEntityMappingDTO> mappings = Arrays.asList(
         makeMapping("thirdeye:metric:100", "thirdeye:metric:101"),
         makeMapping("thirdeye:metric:100", "thirdeye:dataset:b"),
@@ -64,6 +68,7 @@ public class MetricMappingPipelineTest {
 
     List<MetricEntity> result = getSorted(pipeline.run(context));
 
+    Assert.assertEquals(result.size(), 7);
     assertEquals(result.get(0), "thirdeye:metric:100", 1.0);
     assertEquals(result.get(1), "thirdeye:metric:101", 0.9);
     assertEquals(result.get(2), "thirdeye:metric:102", 0.9);
@@ -73,6 +78,30 @@ public class MetricMappingPipelineTest {
     assertEquals(result.get(6), "thirdeye:metric:106", 0.81);
   }
 
+  @Test
+  public void testExploreMetricsWithFilters() {
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    filters.put("invalid", "0");
+    filters.put("L", "1");
+    filters.put("L", "2");
+    filters.put("M", "3");
+    filters.put("N", "4");
+
+    Set<Entity> input = Collections.singleton((Entity) MetricEntity.fromMetric(1.0, 100, filters));
+    PipelineContext context = new PipelineContext(Collections.singletonMap("INPUT", input));
+
+    List<MetricEntity> result = getSorted(pipeline.run(context));
+
+    Assert.assertEquals(result.size(), 7);
+    assertEquals(result.get(0), "thirdeye:metric:100:L=1:L=2:M=3:N=4", 1.0);
+    assertEquals(result.get(1), "thirdeye:metric:101:L=1:L=2", 0.9);
+    assertEquals(result.get(2), "thirdeye:metric:102:L=1:L=2", 0.9);
+    assertEquals(result.get(3), "thirdeye:metric:103:L=1:L=2:M=3", 0.9);
+    assertEquals(result.get(4), "thirdeye:metric:104:M=3", 0.81);
+    assertEquals(result.get(5), "thirdeye:metric:105:M=3:N=4", 0.9);
+    assertEquals(result.get(6), "thirdeye:metric:106:N=4", 0.81);
+  }
+
   private static MetricConfigDTO makeMetric(long id, String dataset) {
     MetricConfigDTO dto = new MetricConfigDTO();
     dto.setId(id);
@@ -80,9 +109,10 @@ public class MetricMappingPipelineTest {
     return dto;
   }
 
-  private static DatasetConfigDTO makeDataset(String dataset) {
+  private static DatasetConfigDTO makeDataset(String dataset, List<String> dimensions) {
     DatasetConfigDTO dto = new DatasetConfigDTO();
     dto.setDataset(dataset);
+    dto.setDimensions(dimensions);
     return dto;
   }
 
