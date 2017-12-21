@@ -225,6 +225,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   @Override
   public List<DetectionOnboardTask> getTasks() {
     List<DetectionOnboardTask> detectionOnboardTasks = new ArrayList<>();
+    detectionOnboardTasks.add(new DataPreparationOnboardingTask());
     detectionOnboardTasks.add(new FunctionCreationOnboardingTask());
     detectionOnboardTasks.add(new FunctionReplayOnboardingTask());
     detectionOnboardTasks.add(new AlertFilterAutoTuneOnboardingTask());
