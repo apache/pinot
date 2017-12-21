@@ -199,8 +199,9 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   public static class TestTaskExecutor extends BaseTaskExecutor {
     @Override
     public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
-      Assert.assertTrue(_minionContext.getDataDir().exists());
-      Assert.assertNotNull(_minionContext.getMinionMetrics());
+      Assert.assertTrue(MINION_CONTEXT.getDataDir().exists());
+      Assert.assertNotNull(MINION_CONTEXT.getMinionMetrics());
+      Assert.assertNotNull(MINION_CONTEXT.getMinionVersion());
 
       Assert.assertTrue(pinotTaskConfig.getTaskType().equals(TestTaskGenerator.TASK_TYPE));
       Map<String, String> configs = pinotTaskConfig.getConfigs();

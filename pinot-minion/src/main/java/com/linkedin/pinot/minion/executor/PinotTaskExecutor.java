@@ -28,23 +28,12 @@ import javax.annotation.Nonnull;
 public interface PinotTaskExecutor {
 
   /**
-   * Set the minion context.
-   */
-  void setMinionContext(@Nonnull MinionContext minionContext);
-
-  /**
    * Execute the task based on the given {@link PinotTaskConfig}.
    */
-  void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig);
+  void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception;
 
   /**
    * Try to cancel the task.
    */
   void cancel();
-
-  /**
-   * Try to upload segment with crc
-   */
-  int uploadSegment(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
-      FileUploadUtils.SendFileMethod httpMethod, String originalSegmentCrc, String jobType);
 }

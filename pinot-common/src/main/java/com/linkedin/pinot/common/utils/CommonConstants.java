@@ -257,11 +257,11 @@ public class CommonConstants {
   }
 
   public static class Minion {
-    public static final String MINION_HEADER = "Pinot-Minion-";
     public static final String INSTANCE_PREFIX = "Minion_";
     public static final String INSTANCE_TYPE = "minion";
     public static final String UNTAGGED_INSTANCE = "minion_untagged";
     public static final String METRICS_PREFIX = "pinot.minion.";
+    public static final String HTTP_TASK_TYPE_HEADER_PREFIX = "Pinot-Minion-";
 
     // Config keys
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
