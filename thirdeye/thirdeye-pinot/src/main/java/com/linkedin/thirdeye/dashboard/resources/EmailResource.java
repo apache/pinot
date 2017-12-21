@@ -36,21 +36,37 @@ public class EmailResource {
   private final AlertConfigManager alertDAO;
   private final ApplicationManager appDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private ThirdEyeConfiguration thirdeyeConfiguration = null;
   private AlertFilterFactory alertFilterFactory;
+  private String failureToAddress;
+  private String failureFromAddress;
+  private String phantonJsPath;
+  private String rootDir;
+  private String dashboardHost;
 
-  public EmailResource(ThirdEyeConfiguration thirdEyeConfiguration) {
+  public EmailResource(ThirdEyeConfiguration thirdEyeConfig) {
+    this(thirdEyeConfig.getSmtpConfiguration(), new AlertFilterFactory(thirdEyeConfig.getAlertFilterConfigPath()),
+        thirdEyeConfig.getFailureFromAddress(), thirdEyeConfig.getFailureToAddress(), thirdEyeConfig.getDashboardHost(),
+        thirdEyeConfig.getPhantomJsPath(), thirdEyeConfig.getRootDir());
+  }
+
+  public EmailResource(SmtpConfiguration smtpConfiguration, AlertFilterFactory alertFilterFactory,
+      String failureFromAddress, String failureToAddress,
+      String dashboardHost, String phantonJsPath, String rootDir) {
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.appDAO = DAO_REGISTRY.getApplicationDAO();
-    this.thirdeyeConfiguration = thirdEyeConfiguration;
-    this.alertFilterFactory = new AlertFilterFactory(this.thirdeyeConfiguration.getAlertFilterConfigPath());
+    this.alertFilterFactory = alertFilterFactory;
+    this.failureFromAddress = failureFromAddress;
+    this.failureToAddress = failureToAddress;
+    this.dashboardHost = dashboardHost;
+    this.phantonJsPath = phantonJsPath;
+    this.rootDir = rootDir;
   }
 
   @POST
   @Path("alert")
   public Response createAlertConfig(AlertConfigDTO alertConfigDTO) {
     if (Strings.isNullOrEmpty(alertConfigDTO.getFromAddress())) {
-      alertConfigDTO.setFromAddress(thirdeyeConfiguration.getFailureToAddress());
+      alertConfigDTO.setFromAddress(failureToAddress);
     }
     if (Strings.isNullOrEmpty(alertConfigDTO.getRecipients())) {
       LOG.error("Unable to proceed user request with empty recipients: {}", alertConfigDTO);
@@ -182,8 +198,8 @@ public class EmailResource {
    */
   private SmtpConfiguration getSmtpConfiguration(String smtpHost, Integer smtpPort) {
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
-    if (thirdeyeConfiguration.getSmtpConfiguration() != null) {
-      smtpConfiguration = thirdeyeConfiguration.getSmtpConfiguration();
+    if (smtpConfiguration != null) {
+      smtpConfiguration = smtpConfiguration;
     } else {
       if (Strings.isNullOrEmpty(smtpHost)) {
         return null;
@@ -212,8 +228,8 @@ public class EmailResource {
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
     configuration.setSmtpConfiguration(getSmtpConfiguration(smtpHost, smtpPort));
     configuration.setDashboardHost(teHost);
-    configuration.setPhantomJsPath(thirdeyeConfiguration.getPhantomJsPath());
-    configuration.setRootDir(thirdeyeConfiguration.getRootDir());
+    configuration.setPhantomJsPath(phantonJsPath);
+    configuration.setRootDir(rootDir);
 
     AlertConfigDTO dummyAlertConfig = new AlertConfigDTO();
     dummyAlertConfig.setName(alertName);
@@ -268,7 +284,7 @@ public class EmailResource {
     }
 
     if(Strings.isNullOrEmpty(teHost)) {
-      teHost = thirdeyeConfiguration.getDashboardHost();
+      teHost = dashboardHost;
     }
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
@@ -352,11 +368,11 @@ public class EmailResource {
     }
 
     if(Strings.isNullOrEmpty(teHost)) {
-      teHost = thirdeyeConfiguration.getDashboardHost();
+      teHost = dashboardHost;
     }
 
     if (Strings.isNullOrEmpty(fromAddr)) {
-      fromAddr = thirdeyeConfiguration.getFailureFromAddress();
+      fromAddr = failureFromAddress;
     }
 
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
@@ -439,11 +455,11 @@ public class EmailResource {
     }
 
     if (Strings.isNullOrEmpty(fromAddr)) {
-      fromAddr = thirdeyeConfiguration.getFailureFromAddress();
+      fromAddr = failureFromAddress;
     }
 
     if (Strings.isNullOrEmpty(toAddr)) {
-      toAddr = thirdeyeConfiguration.getFailureToAddress();
+      toAddr = failureToAddress;
     }
 
     HtmlEmail email = new HtmlEmail();

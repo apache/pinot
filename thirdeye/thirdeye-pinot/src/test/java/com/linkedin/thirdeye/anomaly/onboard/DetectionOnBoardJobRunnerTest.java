@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.anomaly.onboard;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +26,7 @@ public class DetectionOnBoardJobRunnerTest {
     final int jobId = 1;
     final String jobName = "normalJob";
 
-    DetectionOnboardJob onboardJob = new NormalDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
+    DetectionOnboardJob onboardJob = new NormalDetectionOnboardJob(jobName, OnboardingTaskTestUtils.getJobProperties());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
     DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
@@ -58,7 +57,7 @@ public class DetectionOnBoardJobRunnerTest {
     final int jobId = 1;
     final String jobName = "normalJob";
 
-    Map<String, String> properties = new HashMap<>();
+    Map<String, String> properties = OnboardingTaskTestUtils.getJobProperties();
     properties.put("task1.property1", "value11");
     properties.put("task1.property2", "value12");
     properties.put("task2.property1", "value21");
@@ -102,7 +101,7 @@ public class DetectionOnBoardJobRunnerTest {
     final int jobId = 1;
     final String jobName = "abortAtTimeOutJob";
 
-    DetectionOnboardJob onboardJob = new TimeOutDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
+    DetectionOnboardJob onboardJob = new TimeOutDetectionOnboardJob(jobName, OnboardingTaskTestUtils.getJobProperties());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
     DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
@@ -128,7 +127,7 @@ public class DetectionOnBoardJobRunnerTest {
     final int jobId = 1;
     final String jobName = "abortOnFailureJob";
 
-    DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName, Collections.<String, String>emptyMap());
+    DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName, OnboardingTaskTestUtils.getJobProperties());
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
     Configuration configuration = onboardJob.getTaskConfiguration();
     DetectionOnboardJobContext jobContext = new DetectionOnboardJobContext(jobId, jobName, configuration);
@@ -154,8 +153,8 @@ public class DetectionOnBoardJobRunnerTest {
     final int jobId = 1;
     final String jobName = "continueOnFailureJob";
 
-    Map<String, String> properties = new HashMap<>();
-    properties.put("faultyTask.abortOnFailure", "false");
+    Map<String, String> properties = OnboardingTaskTestUtils.getJobProperties();
+    properties.put("faultyTask.abortAtFailure", "false");
 
     DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName, properties);
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();

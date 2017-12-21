@@ -3,10 +3,12 @@ package com.linkedin.thirdeye.anomaly.onboard;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
-import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
@@ -15,6 +17,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,9 +30,12 @@ public class DetectionOnboardResource {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private DetectionOnboardService detectionOnboardService;
+  private Configuration systemConfig;
 
-  public DetectionOnboardResource(DetectionOnboardService detectionOnboardService) {
+  public DetectionOnboardResource(DetectionOnboardService detectionOnboardService, Configuration systemConfig) {
     Preconditions.checkNotNull(detectionOnboardService);
+    Preconditions.checkNotNull(systemConfig);
+    this.systemConfig = systemConfig;
     this.detectionOnboardService = detectionOnboardService;
   }
 
@@ -54,6 +61,14 @@ public class DetectionOnboardResource {
     DetectionOnboardJobStatus detectionOnboardingJobStatus;
     try {
       Map<String, String> properties = OBJECT_MAPPER.readValue(jsonPayload, HashMap.class);
+
+      // Put System Configuration into properties
+      Iterator<String> systemConfigKeyIterator = systemConfig.getKeys();
+      while (systemConfigKeyIterator.hasNext()) {
+        String systemConfigKey = systemConfigKeyIterator.next();
+        properties.put(systemConfigKey, systemConfig.getString(systemConfigKey));
+      }
+
       // TODO: Dynamically create different type of Detection Onboard Job?
       long jobId =
           detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName, properties));
@@ -101,5 +116,25 @@ public class DetectionOnboardResource {
       LOG.error("Failed to convert job status to a json string.", e);
       return ExceptionUtils.getStackTrace(e);
     }
+  }
+
+  public static Configuration toSystemConfiguration(ThirdEyeAnomalyConfiguration thirdeyeConfigs) {
+    Preconditions.checkNotNull(thirdeyeConfigs);
+    SmtpConfiguration smtpConfiguration = thirdeyeConfigs.getSmtpConfiguration();
+    Preconditions.checkNotNull(smtpConfiguration);
+
+    Map<String, String> systemConfig = new HashMap<>();
+    systemConfig.put(DefaultDetectionOnboardJob.FUNCTION_FACTORY, thirdeyeConfigs.getFunctionConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY, thirdeyeConfigs.getAlertFilterConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY, thirdeyeConfigs.getFilterAutotuneConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.SMTP_HOST, smtpConfiguration.getSmtpHost());
+    systemConfig.put(DefaultDetectionOnboardJob.SMTP_PORT, Integer.toString(smtpConfiguration.getSmtpPort()));
+    systemConfig.put(DefaultDetectionOnboardJob.THIRDEYE_HOST, thirdeyeConfigs.getDashboardHost());
+    systemConfig.put(DefaultDetectionOnboardJob.PHANTON_JS_PATH, thirdeyeConfigs.getPhantomJsPath());
+    systemConfig.put(DefaultDetectionOnboardJob.ROOT_DIR, thirdeyeConfigs.getRootDir());
+    systemConfig.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER, thirdeyeConfigs.getFailureFromAddress());
+    systemConfig.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER, thirdeyeConfigs.getFailureToAddress());
+
+    return new MapConfiguration(systemConfig);
   }
 }

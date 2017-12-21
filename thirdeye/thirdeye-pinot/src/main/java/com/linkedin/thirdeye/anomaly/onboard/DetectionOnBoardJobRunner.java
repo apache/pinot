@@ -14,6 +14,7 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class DetectionOnBoardJobRunner implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnBoardJobRunner.class);
   private final ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -56,7 +57,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
 
       // Construct Task context and configuration
       Configuration taskConfig = jobContext.getConfiguration().subset(task.getTaskName());
-      final boolean abortOnFailure = taskConfig.getBoolean("abortOnFailure", true);
+      final boolean abortOnFailure = taskConfig.getBoolean("abortAtFailure", true);
       DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext();
       taskContext.setConfiguration(taskConfig);
       taskContext.setExecutionContext(jobContext.getExecutionContext());
@@ -78,6 +79,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
         taskStatus.setMessage("Job execution is interrupted.");
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
         jobStatus.setMessage(String.format("Job execution is interrupted: %s", ExceptionUtils.getStackTrace(e)));
+
         LOG.error("Job execution is interrupted.", e);
         return; // Stop executing the job because the thread to execute the job is interrupted.
       } catch (Exception e) {
