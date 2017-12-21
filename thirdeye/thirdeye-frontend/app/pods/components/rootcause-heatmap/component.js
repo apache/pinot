@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import { getProperties, computed } from '@ember/object';
 import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendTail } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
@@ -15,6 +16,12 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 
 const ROOTCAUSE_ROLLUP_RANGE = [0, 20];
 
+const ROOTCAUSE_MODE_MAPPING = {
+  'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
+  'Change in Contribution': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF,
+  'Contribution to Overall Change': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_TO_DIFF
+};
+
 export default Ember.Component.extend({
   //
   // external
@@ -30,12 +37,39 @@ export default Ember.Component.extend({
   //
   // internal
   //
-  mode: null, // ""
+
+  /**
+   * Selected heatmap mode
+   */
+  selectedMode: null, // ""
+  /**
+   * Lists out all heatmap mode options
+   */
+  modeOptions: Object.keys(ROOTCAUSE_MODE_MAPPING),
+  /**
+   * Mapping of human readable to mode option
+   */
+  modeMapping: ROOTCAUSE_MODE_MAPPING,
+
+  /**
+   * Computes the correct mode option based on the
+   * selected human readable option
+   * @type {String}
+   */
+  mode: computed('selectedMode', function() {
+    const {
+      selectedMode,
+      modeMapping
+    } = getProperties(this, 'selectedMode', 'modeMapping');
+
+    return modeMapping[selectedMode];
+  }),
+
 
   init() {
     this._super(...arguments);
 
-    this.setProperties({ mode: ROOTCAUSE_ROLLUP_MODE_CHANGE });
+    this.setProperties({ selectedMode: ROOTCAUSE_ROLLUP_MODE_CHANGE });
   },
 
   current: Ember.computed(

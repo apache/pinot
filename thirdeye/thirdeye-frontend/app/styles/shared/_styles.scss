@@ -70,11 +70,15 @@ body {
 
 .te-label {
   font-weight: normal;
-  color:  app-shade(black, 7);
+  color:  app-shade(black, 9);
   margin-bottom: 12px;
 
   &--flush {
     margin-bottom: 0;
+  }
+
+  &--small {
+    margin-bottom: 2px;
   }
 }
 
