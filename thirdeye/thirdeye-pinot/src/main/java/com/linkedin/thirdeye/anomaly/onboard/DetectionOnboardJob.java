@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 
 public interface DetectionOnboardJob {
@@ -13,16 +12,6 @@ public interface DetectionOnboardJob {
   String getName();
 
   /**
-<<<<<<< HEAD
-=======
-   * Initialize this job with the given properties.
-   *
-   * @param properties the properties to initialize the job.
-   */
-  void initialize(Map<String, String> properties);
-
-  /**
->>>>>>> Add JavaDoc
    * Returns the configuration for the tasks in this job execution. The configuration should be built from the
    * properties map that is given in the initialized method. The property for each task in the built configuration
    * should has the corresponding task's name. Assume that a job has two tasks with names: "task1" and "task2",
