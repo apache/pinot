@@ -193,12 +193,6 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     Assert.assertEquals(_helixResourceManager.getAllServerTenantNames(), Collections.singleton("TestTenant"));
   }
 
-  @Override
-  @Test
-  public void testSegmentListApi() {
-    // Tested in HybridClusterIntegrationTest
-  }
-
   @AfterClass
   public void tearDown() throws Exception {
     stopMinion();

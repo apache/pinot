@@ -16,19 +16,31 @@
 package com.linkedin.pinot.minion.executor;
 
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.core.minion.RawIndexConverter;
+import com.linkedin.pinot.core.minion.SegmentPurger;
 import java.io.File;
 import javax.annotation.Nonnull;
 
 
-public class ConvertToRawIndexTaskExecutor extends BaseSegmentConversionExecutor {
+public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
 
   @Override
   protected File convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
       @Nonnull File workingDir) throws Exception {
-    new RawIndexConverter(originalIndexDir, workingDir,
-        pinotTaskConfig.getConfigs().get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
-    return workingDir;
+    String rawTableName =
+        TableNameBuilder.extractRawTableName(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY));
+    SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
+    SegmentPurger.RecordPurger recordPurger = null;
+    if (recordPurgerFactory != null) {
+      recordPurger = recordPurgerFactory.getRecordPurger(rawTableName);
+    }
+    SegmentPurger.RecordModifierFactory recordModifierFactory = MINION_CONTEXT.getRecordModifierFactory();
+    SegmentPurger.RecordModifier recordModifier = null;
+    if (recordModifierFactory != null) {
+      recordModifier = recordModifierFactory.getRecordModifier(rawTableName);
+    }
+
+    return new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier).purgeSegment();
   }
 }

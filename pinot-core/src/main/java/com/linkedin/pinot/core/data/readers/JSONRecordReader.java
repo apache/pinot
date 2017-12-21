@@ -56,12 +56,12 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() throws IOException {
+  public GenericRow next() {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) throws IOException {
+  public GenericRow next(GenericRow reuse) {
     Map record = _iterator.next();
 
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {

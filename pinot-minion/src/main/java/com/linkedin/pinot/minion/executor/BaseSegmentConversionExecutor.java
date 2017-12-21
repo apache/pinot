@@ -49,9 +49,15 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
 
   /**
    * Convert the segment based on the given {@link PinotTaskConfig}.
+   *
+   * @param pinotTaskConfig Task config
+   * @param originalIndexDir Index directory for the original segment
+   * @param workingDir Working directory for the converted segment
+   * @return Index directory for the converted segment
+   * @throws Exception
    */
-  protected abstract void convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
-      @Nonnull File convertedIndexDir) throws Exception;
+  protected abstract File convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
+      @Nonnull File workingDir) throws Exception;
 
   @Override
   public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception {
@@ -82,10 +88,9 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       File indexDir = files[0];
 
       // Convert the segment
-      File convertedSegmentDir = new File(tempDataDir, "convertedSegmentDir");
-      Preconditions.checkState(convertedSegmentDir.mkdir());
-      File convertedIndexDir = new File(convertedSegmentDir, segmentName);
-      convert(pinotTaskConfig, indexDir, convertedIndexDir);
+      File workingDir = new File(tempDataDir, "workingDir");
+      Preconditions.checkState(workingDir.mkdir());
+      File convertedIndexDir = convert(pinotTaskConfig, indexDir, workingDir);
 
       // Tar the converted segment
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
@@ -114,7 +119,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       String userAgentParameter = defaultUserAgentParameter + " " + minionUserAgentParameter;
       Header userAgentHeader = new Header(HttpHeaders.USER_AGENT, userAgentParameter);
       List<Header> httpHeaders = Arrays.asList(ifMatchHeader, userAgentHeader);
-      FileUploadUtils.sendFile(uploadURL, convertedSegmentDir.getName(),
+      FileUploadUtils.sendFile(uploadURL, segmentName,
           new FileInputStream(convertedTarredSegmentFile), convertedTarredSegmentFile.length(),
           FileUploadUtils.SendFileMethod.POST, httpHeaders);
 

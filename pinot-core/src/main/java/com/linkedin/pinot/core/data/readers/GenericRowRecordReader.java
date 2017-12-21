@@ -13,17 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.util;
+package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import java.io.IOException;
 import java.util.List;
 
 
 /**
- * Utility class for reading generic row records.
+ * Record reader for list of {@link GenericRow}.
  */
 public class GenericRowRecordReader implements RecordReader {
   private final List<GenericRow> _rows;
@@ -44,17 +42,17 @@ public class GenericRowRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() throws IOException {
+  public GenericRow next() {
     return _rows.get(_nextRowId++);
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) throws IOException {
+  public GenericRow next(GenericRow reuse) {
     return next();
   }
 
   @Override
-  public void rewind() throws IOException {
+  public void rewind() {
     _nextRowId = 0;
   }
 
@@ -64,6 +62,6 @@ public class GenericRowRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
   }
 }
