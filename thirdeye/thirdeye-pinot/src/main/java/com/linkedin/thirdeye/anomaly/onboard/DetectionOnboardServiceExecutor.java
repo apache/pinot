@@ -1,8 +1,14 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
+import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -18,6 +24,9 @@ public class DetectionOnboardServiceExecutor implements DetectionOnboardService 
   private ConcurrentHashMap<String, Long> jobNameToId;
   private AtomicLong jobIdCounter = new AtomicLong();
   private ExecutorService executorService;
+
+  public DetectionOnboardServiceExecutor() {
+  }
 
   public void start() {
     detectionOnboardJobStatus = new ConcurrentHashMap<>();

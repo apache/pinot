@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
@@ -30,6 +31,9 @@ import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.MapConfiguration;
+
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
@@ -108,8 +112,7 @@ public class ThirdEyeAnomalyApplication
           detectionJobScheduler = new DetectionJobScheduler();
           detectionJobScheduler.start();
           environment.jersey().register(
-              new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory,
-                  emailResource));
+              new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {
@@ -137,9 +140,12 @@ public class ThirdEyeAnomalyApplication
           environment.jersey().register(new PinotDataSourceResource());
         }
         if (config.isDetectionOnboard()) {
+          // TODO: convert ThirdeyeAnomalyConfig to Configuration
+          Configuration systemConfig = DetectionOnboardResource.toSystemConfiguration(config);
+
           detectionOnboardServiceExecutor = new DetectionOnboardServiceExecutor();
           detectionOnboardServiceExecutor.start();
-          environment.jersey().register(new DetectionOnboardResource(detectionOnboardServiceExecutor));
+          environment.jersey().register(new DetectionOnboardResource(detectionOnboardServiceExecutor, systemConfig));
         }
       }
 
