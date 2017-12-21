@@ -7,21 +7,12 @@
             <span class="rootcause-anomaly__title">Is this a true anomaly?</span>
           </div>
         {{/if}}
-        <div class="col-xs-2">
-          {{#power-select
-            options=options
-            selected=status
-            onchange=(action "onFeedback")
-          as |option|}}
-            {{option}}
-          {{/power-select}}
-        </div>
-        <div class="col-xs-5">
+        <div class="col-xs-7">
           <span class="rootcause-anomaly__note"><a href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a></span>
         </div>
-        <div class="col rootcause-anomaly--icon">
-          <i class="glyphicon {{if isHidden " glyphicon-menu-up " "glyphicon-menu-down "}}" {{action "toggleHidden"}}></i>
-        </div>
+      </div>
+      <div class="rootcause-anomaly__icon">
+        <i class="glyphicon {{if isHidden " glyphicon-menu-up " "glyphicon-menu-down "}}" {{action "toggleHidden"}}></i>
       </div>
       {{#if requiresFeedback}}
         <div class="row">
@@ -30,6 +21,19 @@
           </div>
         </div>
       {{/if}}
+      <div class="rootcause-anomaly__radio-button-list">
+        {{#each options as |option|}}
+          <div class="rootcause-anomaly__radio-button-item">
+            {{#radio-button
+              value=option
+              groupValue=status
+              changed=(action "onFeedback")}}
+              <span>{{get optionsMapping option}}</span>
+            {{/radio-button}}
+          </div>
+        {{/each}}
+      </div>
+
     </div>
 
     {{#unless isHidden}}

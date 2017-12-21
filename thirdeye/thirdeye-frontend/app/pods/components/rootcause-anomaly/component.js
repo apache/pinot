@@ -4,6 +4,17 @@ import { humanizeFloat } from 'thirdeye-frontend/helpers/utils'
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
 
+/**
+ * Maps the status from the db to something human readable to display on the form
+ * @type {Object}
+ */
+const ANOMALY_OPTIONS_MAPPING = {
+  'ANOMALY': 'Yes (True Anomaly)',
+  'ANOMALY_NEW_TREND': 'Yes (But New Trend)',
+  'NOT_ANOMALY': 'No (False Alarm)',
+  'NO_FEEDBACK': 'To Be Determined'
+};
+
 export default Ember.Component.extend({
   entities: null, // {}
 
@@ -14,14 +25,15 @@ export default Ember.Component.extend({
   isHiddenUser: ROOTCAUSE_HIDDEN_DEFAULT,
 
   /**
-   * Options to populate anomaly dropdown
+   * Array of human readable anomaly options for users to select
    */
-  options: [
-    'ANOMALY',
-    'ANOMALY_NEW_TREND',
-    'NOT_ANOMALY',
-    'NO_FEEDBACK'
-  ],
+  options: Object.keys(ANOMALY_OPTIONS_MAPPING),
+
+  /**
+   * A mapping of the status and a more human readable version
+   * @type {Object}
+   */
+  optionsMapping: ANOMALY_OPTIONS_MAPPING,
 
   anomaly: Ember.computed(
     'entities',
