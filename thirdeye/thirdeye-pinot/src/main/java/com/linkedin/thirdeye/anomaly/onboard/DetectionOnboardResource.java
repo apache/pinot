@@ -125,9 +125,9 @@ public class DetectionOnboardResource {
     Preconditions.checkNotNull(smtpConfiguration);
 
     Map<String, String> systemConfig = new HashMap<>();
-    systemConfig.put(DefaultDetectionOnboardJob.FUNCTION_CONFIG, thirdeyeConfigs.getFunctionConfigPath());
-    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_CONFIG, thirdeyeConfigs.getAlertFilterConfigPath());
-    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_CONFIG, thirdeyeConfigs.getFilterAutotuneConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.FUNCTION_FACTORY, thirdeyeConfigs.getFunctionConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY, thirdeyeConfigs.getAlertFilterConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY, thirdeyeConfigs.getFilterAutotuneConfigPath());
     systemConfig.put(DefaultDetectionOnboardJob.SMTP_HOST, smtpConfiguration.getSmtpHost());
     systemConfig.put(DefaultDetectionOnboardJob.SMTP_PORT, Integer.toString(smtpConfiguration.getSmtpPort()));
     systemConfig.put(DefaultDetectionOnboardJob.THIRDEYE_HOST, thirdeyeConfigs.getDashboardHost());

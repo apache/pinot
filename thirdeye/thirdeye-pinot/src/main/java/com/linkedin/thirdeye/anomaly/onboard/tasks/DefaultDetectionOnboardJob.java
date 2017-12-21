@@ -21,10 +21,9 @@ import org.apache.commons.configuration.MapConfiguration;
 public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ABORT_AT_FAILURE = "abortAtFailure";
 
-  public static final String FUNCTION_CONFIG = "functionConfig";
-  public static final String ALERT_FILTER_CONFIG = "alertFilterConfig";
-  public static final String ALERT_FILTER_AUTOTUNE_CONFIG = "alertFilterAutotuneConfig";
-
+  public static final String FUNCTION_FACTORY = "functionFactory";
+  public static final String ALERT_FILTER_FACTORY = "alertFilterFactory";
+  public static final String ALERT_FILTER_AUTOTUNE_FACTORY = "alertFilterAutotuneFactory";
   public static final String FUNCTION_NAME = "functionName";
   public static final String COLLECTION_NAME = "collection";
   public static final String METRIC_NAME = "metric";
@@ -78,9 +77,9 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
    */
   @Override
   public Configuration getTaskConfiguration() {
-    Preconditions.checkNotNull(this.properties.get(FUNCTION_CONFIG));
-    Preconditions.checkNotNull(this.properties.get(ALERT_FILTER_CONFIG));
-    Preconditions.checkNotNull(this.properties.get(ALERT_FILTER_AUTOTUNE_CONFIG));
+    Preconditions.checkNotNull(this.properties.get(FUNCTION_FACTORY));
+    Preconditions.checkNotNull(this.properties.get(ALERT_FILTER_FACTORY));
+    Preconditions.checkNotNull(this.properties.get(ALERT_FILTER_AUTOTUNE_FACTORY));
     Preconditions.checkNotNull(this.properties.get(FUNCTION_NAME));
     Preconditions.checkNotNull(this.properties.get(COLLECTION_NAME));
     Preconditions.checkNotNull(this.properties.get(METRIC_NAME));
@@ -100,11 +99,12 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
 
     Map<String, String> taskConfigs = new HashMap<>();
 
-    taskConfigs.put(FUNCTION_CONFIG, this.properties.get(FUNCTION_CONFIG));
-    taskConfigs.put(ALERT_FILTER_CONFIG, this.properties.get(ALERT_FILTER_CONFIG));
-    taskConfigs.put(ALERT_FILTER_AUTOTUNE_CONFIG, this.properties.get(ALERT_FILTER_AUTOTUNE_CONFIG));
+    String taskPrefix = DataPreparationOnboardingTask.TASK_NAME + ".";
+    taskConfigs.put(taskPrefix + FUNCTION_FACTORY, this.properties.get(FUNCTION_FACTORY));
+    taskConfigs.put(taskPrefix + ALERT_FILTER_FACTORY, this.properties.get(ALERT_FILTER_FACTORY));
+    taskConfigs.put(taskPrefix + ALERT_FILTER_AUTOTUNE_FACTORY, this.properties.get(ALERT_FILTER_AUTOTUNE_FACTORY));
 
-    String taskPrefix = FunctionCreationOnboardingTask.TASK_NAME + ".";
+    taskPrefix = FunctionCreationOnboardingTask.TASK_NAME + ".";
     taskConfigs.put(taskPrefix + ABORT_AT_FAILURE, Boolean.TRUE.toString());
     taskConfigs.put(taskPrefix + FUNCTION_NAME, this.properties.get(FUNCTION_NAME));
     taskConfigs.put(taskPrefix + COLLECTION_NAME, this.properties.get(COLLECTION_NAME));

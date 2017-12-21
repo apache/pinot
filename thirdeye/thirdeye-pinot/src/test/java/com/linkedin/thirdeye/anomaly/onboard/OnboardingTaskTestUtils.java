@@ -13,9 +13,9 @@ public class OnboardingTaskTestUtils {
   public static Map<String, String> getJobProperties(){
     Map<String, String> properties = new HashMap<>();
     properties.put(
-        DefaultDetectionOnboardJob.FUNCTION_CONFIG, ClassLoader.getSystemResource("sample-functions.properties").getPath());
-    properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_CONFIG, ClassLoader.getSystemResource("sample-alertfilter.properties").getPath());
-    properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_CONFIG, ClassLoader.getSystemResource("sample-alertfilter-autotune.properties").getPath());
+        DefaultDetectionOnboardJob.FUNCTION_FACTORY, ClassLoader.getSystemResource("sample-functions.properties").getPath());
+    properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY, ClassLoader.getSystemResource("sample-alertfilter.properties").getPath());
+    properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY, ClassLoader.getSystemResource("sample-alertfilter-autotune.properties").getPath());
     properties.put(DefaultDetectionOnboardJob.FUNCTION_NAME, "Normal Function");
     properties.put(DefaultDetectionOnboardJob.COLLECTION_NAME, "test");
     properties.put(DefaultDetectionOnboardJob.METRIC_NAME, "test");

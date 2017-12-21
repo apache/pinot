@@ -28,10 +28,6 @@ public class DetectionOnBoardJobRunner implements Runnable {
   private final int taskTimeOutSize;
   private final TimeUnit taskTimeOutUnit;
 
-  private AnomalyFunctionFactory anomalyFunctionFactory;
-  private AlertFilterFactory alertFilterFactory;
-  private AlertFilterAutotuneFactory alertFilterAutotuneFactory;
-
   public DetectionOnBoardJobRunner(DetectionOnboardJobContext jobContext, List<DetectionOnboardTask> tasks,
       DetectionOnboardJobStatus jobStatus) {
     this(jobContext, tasks, jobStatus, 5, TimeUnit.MINUTES);
@@ -49,18 +45,6 @@ public class DetectionOnBoardJobRunner implements Runnable {
     this.jobStatus = jobStatus;
     this.taskTimeOutSize = taskTimeOutSize;
     this.taskTimeOutUnit = taskTimeOutUnit;
-
-    Configuration configuration = jobContext.getConfiguration();
-    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.ALERT_FILTER_CONFIG));
-    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.FUNCTION_CONFIG));
-    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_CONFIG));
-
-    anomalyFunctionFactory = new AnomalyFunctionFactory(configuration
-        .getString(DefaultDetectionOnboardJob.FUNCTION_CONFIG));
-    alertFilterFactory = new AlertFilterFactory(configuration
-        .getString(DefaultDetectionOnboardJob.ALERT_FILTER_CONFIG));
-    alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(configuration
-        .getString(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_CONFIG));
   }
 
   @Override
@@ -77,8 +61,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
       // Construct Task context and configuration
       Configuration taskConfig = jobContext.getConfiguration().subset(task.getTaskName());
       final boolean abortAtFailure = taskConfig.getBoolean("abortAtFailure", true);
-      DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext(anomalyFunctionFactory,
-          alertFilterFactory, alertFilterAutotuneFactory);
+      DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext();
       taskContext.setConfiguration(taskConfig);
       taskContext.setExecutionContext(jobContext.getExecutionContext());
 
