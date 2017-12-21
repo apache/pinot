@@ -49,8 +49,9 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
       try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<Record>(avroSchema))) {
         recordWriter.create(avroSchema, new File(_outputFile));
 
+        GenericRow row = new GenericRow();
         while (recordReader.hasNext()) {
-          GenericRow row = recordReader.next();
+          row = recordReader.next(row);
           Record record = new Record(avroSchema);
 
           for (String field : row.getFieldNames()) {

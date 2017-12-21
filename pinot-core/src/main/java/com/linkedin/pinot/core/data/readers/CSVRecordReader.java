@@ -111,12 +111,12 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() throws IOException {
+  public GenericRow next() {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) throws IOException {
+  public GenericRow next(GenericRow reuse) {
     CSVRecord record = _iterator.next();
 
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
@@ -157,7 +157,7 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind() throws IOException {
+  public void rewind() {
     _iterator = _parser.iterator();
   }
 

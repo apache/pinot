@@ -40,8 +40,9 @@ public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
   public void convert() throws Exception {
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
         BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
+      GenericRow row = new GenericRow();
       while (recordReader.hasNext()) {
-        GenericRow row = recordReader.next();
+        row = recordReader.next(row);
         JSONObject record = new JSONObject();
 
         for (String field : row.getFieldNames()) {

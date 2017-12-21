@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import java.io.IOException;
 
 
 /**
@@ -57,12 +56,12 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() throws IOException {
+  public GenericRow next() {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) throws IOException {
+  public GenericRow next(GenericRow reuse) {
     if (_sortedDocIdIterationOrder == null) {
       return _realtimeSegment.getRawValueRowAt(_nextDocId++, reuse);
     } else {
@@ -71,7 +70,7 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind() throws IOException {
+  public void rewind() {
     _nextDocId = 0;
   }
 
@@ -81,6 +80,6 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
   }
 }

@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
@@ -30,7 +31,6 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import com.linkedin.pinot.util.GenericRowRecordReader;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;

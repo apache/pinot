@@ -48,15 +48,17 @@ public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
   public void convert() throws Exception {
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
         BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
+      GenericRow row = new GenericRow();
+
       if (_withHeader) {
-        GenericRow row = recordReader.next();
+        row = recordReader.next(row);
         recordWriter.write(StringUtils.join(row.getFieldNames(), _delimiter));
         recordWriter.newLine();
         recordReader.rewind();
       }
 
       while (recordReader.hasNext()) {
-        GenericRow row = recordReader.next();
+        row = recordReader.next(row);
         String[] fields = row.getFieldNames();
         List<String> record = new ArrayList<>(fields.length);
 
