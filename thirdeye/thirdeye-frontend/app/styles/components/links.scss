@@ -51,7 +51,13 @@
   padding-left: 0;
   padding-right: 0;
   font-size: 16px;
-  color: app-shade(black, 7);
+  color: app-shade(black, 9);
+}
+
+.thirdeye-link--settings {
+  padding: 0;
+  line-height: 28px;
+  white-space: nowrap;
 }
 
 .thirdeye-link--active,

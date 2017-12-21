@@ -52,12 +52,26 @@
   &--padded {
     padding: 24px;
   }
+
+  &--space-around {
+    margin: 24px;
+  }
+
   &--box-shadow {
-    border: none;
+    border-color: transparent;
     box-shadow:
       0 0 0 1px app-shade(black, 0.1),
       0 2px 3px 0 app-shade(black, 0.2);
   }
+
+  &__row {
+    padding: 12px $te-spacing-lg;
+    &--flex {
+      display: flex;
+      align-items: flex-end;
+    }
+  }
+
   &__header {
     display: flex;
     border-bottom: 1px solid $te-grey--border;
