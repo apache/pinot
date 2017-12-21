@@ -1,4 +1,8 @@
 .rootcause-chart {
   flex-grow: 1;
   min-height: 400px;
+
+  &__title {
+    padding-left: 16px;
+  }
 }

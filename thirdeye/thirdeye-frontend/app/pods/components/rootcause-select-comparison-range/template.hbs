@@ -1,4 +1,12 @@
 <div class="col-xs-4">
+  <label class="rootcause-label">Analysis period
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        Typically, this is your anomaly period. It is highlighted in orange in the graph above. It also affects the data in views below.
+      {{/tooltip-on-element}}
+    </span>
+  </label>
   {{date-range-picker
     class="te-range-picker"
     timePicker=true
@@ -15,6 +23,14 @@
   }}
 </div>
 <div class="col-xs-2">
+  <label class="rootcause-label">Baseline
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        This is the compare mode for computing the baseline in the charts above and below. For example, "Wo2W" uses data from the analysis period shifted by two weeks.
+      {{/tooltip-on-element}}
+    </span>
+  </label>
   {{#power-select
     selected=compareModeFormatted
     options=compareModeOptions

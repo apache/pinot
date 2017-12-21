@@ -35,3 +35,10 @@
     background-color: lighten($te-blue, 40%);
   }
 }
+
+.rootcause-label {
+  &__list {
+    padding-left: 8px;
+    margin-left: 8px;
+  }
+}
