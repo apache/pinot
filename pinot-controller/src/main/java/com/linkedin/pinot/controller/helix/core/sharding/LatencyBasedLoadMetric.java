@@ -79,8 +79,14 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
 
     }
 
-    public void addCostToServerMap(String instance, Long cost, PinotHelixResourceManager helixResourceManager){
+    public void addCostToServerMap(String instance, Long cost, PinotHelixResourceManager helixResourceManager, String tableName){
         logger.info("Latency Based Load metric: Adding cost to server : "+instance + " cost:"+cost);
+        if (tableLatencyMap.containsKey(tableName)){
+            if(cost == 0){
+                cost = tableLatencyMap.get(tableName);
+                logger.info("Setting Server Latency first time Map Entry "+instance + " cost:"+cost);
+            }
+        }
         this.serverLatencyMap.put(instance,cost);
         helixResourceManager.setServerLatencyMap(this.serverLatencyMap);
         for(String key : helixResourceManager.getServerLatencyMap().keySet()){
