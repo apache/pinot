@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardJob;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnBoardJobRunner;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -19,7 +20,7 @@ import org.apache.commons.configuration.MapConfiguration;
  * the status-check functionality.
  */
 public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
-  public static final String ABORT_AT_FAILURE = "abortAtFailure";
+  public static final String ABORT_ON_FAILURE = DetectionOnBoardJobRunner.ABORT_ON_FAILURE;
 
   public static final String FUNCTION_FACTORY = "functionFactory";
   public static final String ALERT_FILTER_FACTORY = "alertFilterFactory";
@@ -100,12 +101,13 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     Map<String, String> taskConfigs = new HashMap<>();
 
     String taskPrefix = DataPreparationOnboardingTask.TASK_NAME + ".";
+    taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.TRUE.toString());
     taskConfigs.put(taskPrefix + FUNCTION_FACTORY, this.properties.get(FUNCTION_FACTORY));
     taskConfigs.put(taskPrefix + ALERT_FILTER_FACTORY, this.properties.get(ALERT_FILTER_FACTORY));
     taskConfigs.put(taskPrefix + ALERT_FILTER_AUTOTUNE_FACTORY, this.properties.get(ALERT_FILTER_AUTOTUNE_FACTORY));
 
     taskPrefix = FunctionCreationOnboardingTask.TASK_NAME + ".";
-    taskConfigs.put(taskPrefix + ABORT_AT_FAILURE, Boolean.TRUE.toString());
+    taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.TRUE.toString());
     taskConfigs.put(taskPrefix + FUNCTION_NAME, this.properties.get(FUNCTION_NAME));
     taskConfigs.put(taskPrefix + COLLECTION_NAME, this.properties.get(COLLECTION_NAME));
     taskConfigs.put(taskPrefix + METRIC_NAME, this.properties.get(METRIC_NAME));
@@ -161,7 +163,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     }
 
     taskPrefix = FunctionReplayOnboardingTask.TASK_NAME + ".";
-    taskConfigs.put(taskPrefix + ABORT_AT_FAILURE, Boolean.FALSE.toString());
+    taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.FALSE.toString());
     if (this.properties.containsKey(PERIOD)) {
       taskConfigs.put (taskPrefix + PERIOD, this.properties.get(PERIOD));
     }
@@ -182,7 +184,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     }
 
     taskPrefix = AlertFilterAutoTuneOnboardingTask.TASK_NAME + ".";
-    taskConfigs.put(taskPrefix + ABORT_AT_FAILURE, Boolean.FALSE.toString());
+    taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.FALSE.toString());
     if (this.properties.containsKey(PERIOD)) {
       taskConfigs.put (taskPrefix + PERIOD, this.properties.get(PERIOD));
     }
@@ -200,7 +202,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     }
 
     taskPrefix = NotificationOnboardingTask.TASK_NAME + ".";
-    taskConfigs.put(taskPrefix + ABORT_AT_FAILURE, Boolean.TRUE.toString());
+    taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.TRUE.toString());
     if (this.properties.containsKey(START)) {
       taskConfigs.put (taskPrefix + START, this.properties.get(START));
     }

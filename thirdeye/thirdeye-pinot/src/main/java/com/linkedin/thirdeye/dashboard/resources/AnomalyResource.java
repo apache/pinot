@@ -315,7 +315,7 @@ public class AnomalyResource {
       @NotNull @QueryParam("properties") String properties, @QueryParam("isActive") boolean isActive) throws Exception {
 
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
-        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(properties)) {
+        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || properties == null) {
       throw new UnsupportedOperationException(
           "Received null for one of the mandatory params: " + "dataset " + dataset + ", functionName " + functionName
               + ", metric " + metric + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", properties"

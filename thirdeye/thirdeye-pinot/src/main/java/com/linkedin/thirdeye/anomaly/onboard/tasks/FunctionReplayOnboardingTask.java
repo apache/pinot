@@ -2,12 +2,15 @@ package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import java.util.Map;
+import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
@@ -57,24 +60,33 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
     Preconditions.checkNotNull(alertFilterFactory);
     Preconditions.checkNotNull(alertFilterAutotuneFactory);
 
-    DetectionJobResource detectionJobResource = new DetectionJobResource(new DetectionJobScheduler(),
+    DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
+    DetectionJobResource detectionJobResource = new DetectionJobResource(detectionJobScheduler,
         alertFilterFactory, alertFilterAutotuneFactory);
     AnomalyFunctionDTO anomalyFunction = (AnomalyFunctionDTO) executionContext.getExecutionResult(ANOMALY_FUNCTION);
     long functionId = anomalyFunction.getId();
     Period backfillPeriod = Period.parse(taskConfiguration.getString(BACKFILL_PERIOD, DEFAULT_BACKFILL_PERIOD));
-    DateTime start = DateTime.parse(taskConfiguration.getString(BACKFILL_START, DateTime.now().toString()));
-    DateTime end = DateTime.parse(taskConfiguration.getString(BACKFILL_END, DateTime.now().minus(backfillPeriod).toString()));
+    DateTime start = DateTime.parse(taskConfiguration.getString(BACKFILL_START, DateTime.now().minus(backfillPeriod).toString()));
+    DateTime end = DateTime.parse(taskConfiguration.getString(BACKFILL_END, DateTime.now().toString()));
     executionContext.setExecutionResult(BACKFILL_START, start);
     executionContext.setExecutionResult(BACKFILL_END, end);
 
     try {
-      detectionJobResource.generateAnomaliesInRange(functionId, start.toString(), end.toString(),
+      Response response = detectionJobResource.generateAnomaliesInRange(functionId, start.toString(), end.toString(),
           Boolean.toString(taskConfiguration.getBoolean(BACKFILL_FORCE, DEFAULT_BACKFILL_FORCE)),
           taskConfiguration.getBoolean(BACKFILL_SPEEDUP, DEFAULT_BACKFILL_SPEEDUP),
           taskConfiguration.getBoolean(BACKFILL_REMOVE_ANOMALY_IN_WINDOW, DEFAULT_BACKFILL_REMOVE_ANOMALY_IN_WINDOW));
+      Map<Long, Long> functionIdToJobIdMap = (Map<Long, Long>) response.getEntity();
+      for (long jobId : functionIdToJobIdMap.values()) {
+        JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
+        if (jobStatus.equals(JobStatus.FAILED) || jobStatus.equals(JobStatus.TIMEOUT)) {
+          throw new InterruptedException("Get Job Status: " + jobStatus);
+        }
+      }
+
     } catch (Exception e) {
       throw new UnsupportedOperationException(String.format("Unable to create detection job for %d from %s to %s",
-          functionId, start.toString(), end.toString()));
+          functionId, start.toString(), end.toString()), e);
     }
   }
 }

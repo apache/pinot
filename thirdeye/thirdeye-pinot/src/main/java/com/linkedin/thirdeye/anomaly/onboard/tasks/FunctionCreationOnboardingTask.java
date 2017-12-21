@@ -107,6 +107,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     Preconditions.checkNotNull(configuration.getString(METRIC_NAME));
     Preconditions.checkNotNull(configuration.getString(WINDOW_SIZE));
     Preconditions.checkNotNull(configuration.getString(WINDOW_UNIT));
+    Preconditions.checkNotNull(configuration.getString(PROPERTIES));
     Preconditions.checkArgument(configuration.containsKey(ALERT_ID) || configuration.containsKey(ALERT_NAME));
     if (!configuration.containsKey(ALERT_ID)) {
       Preconditions.checkNotNull(configuration.getString(ALERT_TO));
