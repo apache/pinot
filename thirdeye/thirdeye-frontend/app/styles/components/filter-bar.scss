@@ -8,7 +8,7 @@
       border-top: 1px solid $te-grey--border;
     }
   }
-  
+
   &__group-title {
     padding: 15px $te-default-element-spacing;
     margin-top: 0px;
@@ -19,7 +19,7 @@
     flex-wrap: nowrap;
     justify-content: space-between;
     cursor: pointer;
-    
+
     &--active {
       border-left: 3px solid $te-blue-5;
       font-weight: 600;
@@ -60,13 +60,22 @@
 
 // creates filter-bar__group-color--"color" classes
 $colors:
-"blue" $te-blue,
-"orange" $te-orange,
-"teal" $te-teal,
-"purple" $te-purple,
-"red" $te-red,
-"green" $te-green,
-"pink" $te-pink;
+  "blue" $te-blue,
+  "orange" $te-orange,
+  "teal" $te-teal,
+  "purple" $te-purple,
+  "red" $te-red,
+  "green" $te-green,
+  "pink" $te-pink,
+  "grey" $te-grey,
+  "light-blue" $te-light-blue,
+  "light-orange" $te-light-orange,
+  "light-teal" $te-light-teal,
+  "light-purple" $te-light-purple,
+  "light-red" $te-light-red,
+  "light-green" $te-light-green,
+  "light-pink" $te-light-pink,
+  "light-grey" $te-light-grey;
 
 .entity-indicator {
   display: inline-block;
@@ -96,6 +105,6 @@ $colors:
 
   &--inactive {
     background-color: app-shade(black, 1);
-    transition: background-color 0.2s ease-in; 
+    transition: background-color 0.2s ease-in;
   }
 }

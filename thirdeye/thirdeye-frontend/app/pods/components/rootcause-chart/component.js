@@ -2,7 +2,7 @@ import Ember from 'ember';
 import moment from 'moment';
 import d3 from 'd3';
 import buildTooltip from 'thirdeye-frontend/helpers/build-tooltip';
-import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
+import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel, colorMapping } from 'thirdeye-frontend/helpers/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -36,6 +36,8 @@ export default Ember.Component.extend({
   subchart: {
     show: true
   },
+
+  colorMapping: colorMapping,
 
   /**
    * Adding the buildTooltip Template helper to the this context
@@ -349,8 +351,8 @@ export default Ember.Component.extend({
       const series = {
         timestamps: timeseries[urn].timestamps,
         values: timeseries[urn].values,
-        color: metricEntity ? metricEntity.color : 'none',
-        type: 'scatter',
+        color: metricEntity ? 'light-' + metricEntity.color : 'none',
+        type: 'line',
         axis: 'y'
       };
 

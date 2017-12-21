@@ -3,12 +3,13 @@
     <div>
       <h4>{{get-safe splitLabels urn}}</h4>
       {{timeseries-chart
-        series=(get splitSeries urn)
+        series=(get-safe splitSeries urn)
         tooltip=tooltip
         legend=legend
         axis=axis
         subchart=splitSubchart
         height=splitChartHeight
+        colorMapping=colorMapping
       }}
     </div>
   {{/each}}
@@ -19,5 +20,6 @@
     legend=legend
     axis=axis
     subchart=subchart
+    colorMapping=colorMapping
   }}
 {{/if}}
