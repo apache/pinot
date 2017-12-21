@@ -110,7 +110,6 @@ public class DetectionOnboardResource {
    * @return the JSON string of the given job status.
    */
   private String detectionOnboardJobStatusToJsonString(DetectionOnboardJobStatus detectionOnboardingJobStatus) {
-
     try {
       return OBJECT_MAPPER.writeValueAsString(detectionOnboardingJobStatus);
     } catch (JsonProcessingException e) {

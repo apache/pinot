@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
+
 public interface DetectionOnboardService {
   /**
    * Creates and submit the job to executor service.

@@ -2,11 +2,7 @@ package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,7 +57,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
 
       // Construct Task context and configuration
       Configuration taskConfig = jobContext.getConfiguration().subset(task.getTaskName());
-      final boolean abortAtFailure = taskConfig.getBoolean("abortAtFailure", true);
+      final boolean abortOnFailure = taskConfig.getBoolean("abortAtFailure", true);
       DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext();
       taskContext.setConfiguration(taskConfig);
       taskContext.setExecutionContext(jobContext.getExecutionContext());
@@ -92,7 +88,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
         LOG.error("Encountered unknown error while running job {}.", jobContext.getJobName(), e);
       }
 
-      if (abortAtFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
+      if (abortOnFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
         LOG.error("Failed to execute job {}.", jobContext.getJobName());
         return;
