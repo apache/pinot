@@ -84,7 +84,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
     _optimizations = znRecord.getListField(CommonConstants.Segment.OPTIMIZATIONS);
     _segmentPushStatus = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_PUSH_STATUS);
-    _taskSegmentModificationTime = znRecord.getMapField(CommonConstants.Segment.CUSTOM_FIELDS);
+    _taskSegmentModificationTime = znRecord.getMapField(CommonConstants.Segment.TASK_SEGMENT_MODIFICATION_TIME);
   }
 
   public String getSegmentName() {
@@ -281,7 +281,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
       znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_PUSH_STATUS, _segmentPushStatus);
     }
     if (_taskSegmentModificationTime != null) {
-      znRecord.setMapField(CommonConstants.Segment.CUSTOM_FIELDS, _taskSegmentModificationTime);
+      znRecord.setMapField(CommonConstants.Segment.TASK_SEGMENT_MODIFICATION_TIME, _taskSegmentModificationTime);
     }
     return znRecord;
   }
@@ -322,10 +322,10 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
 
     if (_taskSegmentModificationTime == null) {
-      configMap.put(CommonConstants.Segment.CUSTOM_FIELDS, null);
+      configMap.put(CommonConstants.Segment.TASK_SEGMENT_MODIFICATION_TIME, null);
     } else {
       JSONObject jsonObject = new JSONObject(_taskSegmentModificationTime);
-      configMap.put(CommonConstants.Segment.CUSTOM_FIELDS, jsonObject.toString());
+      configMap.put(CommonConstants.Segment.TASK_SEGMENT_MODIFICATION_TIME, jsonObject.toString());
     }
 
     return configMap;
