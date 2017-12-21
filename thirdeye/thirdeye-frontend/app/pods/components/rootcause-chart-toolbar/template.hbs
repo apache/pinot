@@ -1,4 +1,12 @@
-<div class="col-xs-2">
+<div class="col-xs-4">
+  <label class="rootcause-label">Display period
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
+      {{/tooltip-on-element}}
+    </span>
+  </label>
   {{date-range-picker
     class="te-range-picker"
     start=analysisRangeStart
@@ -12,6 +20,14 @@
   }}
 </div>
 <div class="col-xs-2">
+  <label class="rootcause-label">Granularity
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        This is the data granularity for displaying metrics. If a metric's data source does not have sufficient resolution, we show the metric at the highest available granularity.
+      {{/tooltip-on-element}}
+    </span>
+  </label>
   {{#power-select
     selected=granularity
     options=granularityOptions
@@ -24,6 +40,20 @@
   {{/power-select}}
 </div>
 <div class="col-xs-2">
+  <label class="rootcause-label">Chart mode
+    <span>
+      <i class="glyphicon glyphicon-question-sign"></i>
+      {{#tooltip-on-element}}
+        The display mode controls the transformation of metric values (y-axis).
+        <ul class="rootcause-label__list">
+          <li>"absolute" displays the raw values</li>
+          <li>"relative" computes the ratio from the first data point of each metric</li>
+          <li>"log" applies a log10 transformation</li>
+          <li>"split" shows separate charts for each metric</li>
+        </ul>
+      {{/tooltip-on-element}}
+    </span>
+  </label>
   {{#power-select
     selected=timeseriesMode
     options=timeseriesModeOptions
