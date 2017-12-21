@@ -151,4 +151,19 @@ export default function() {
       return schema.db.alerts.update(id, requestBody);
     }
   });
+
+  /**
+   * Get request to retrieve an anomaly reports
+   */
+  this.get(`/session/:id`, (schema, request) => {
+    return {};
+  });
+
+  /**
+   * Post request for saving anomaly reports
+   */
+  this.post(`/session`, (schema, request) => {
+    const hardCodedId = 1234567;
+    return hardCodedId;
+  });
 }
