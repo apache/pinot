@@ -21,8 +21,6 @@ import org.slf4j.LoggerFactory;
 
 public class DetectionOnBoardJobRunner implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnBoardJobRunner.class);
-  private static final int TIME_OUT_SIZE = 5;
-  private static final TimeUnit TIME_OUT_UNIT = TimeUnit.MINUTES;
   private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
   private final DetectionOnboardJobContext jobContext;
@@ -30,10 +28,6 @@ public class DetectionOnBoardJobRunner implements Runnable {
   private final DetectionOnboardJobStatus jobStatus;
   private final int taskTimeOutSize;
   private final TimeUnit taskTimeOutUnit;
-
-  private AnomalyFunctionFactory anomalyFunctionFactory;
-  private AlertFilterFactory alertFilterFactory;
-  private AlertFilterAutotuneFactory alertFilterAutotuneFactory;
 
   public DetectionOnBoardJobRunner(DetectionOnboardJobContext jobContext, List<DetectionOnboardTask> tasks,
       DetectionOnboardJobStatus jobStatus) {
@@ -52,18 +46,6 @@ public class DetectionOnBoardJobRunner implements Runnable {
     this.jobStatus = jobStatus;
     this.taskTimeOutSize = taskTimeOutSize;
     this.taskTimeOutUnit = taskTimeOutUnit;
-
-    Configuration configuration = jobContext.getConfiguration();
-    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.ALERT_FILTER_CONFIG));
-    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.FUNCTION_CONFIG));
-    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_CONFIG));
-
-    anomalyFunctionFactory = new AnomalyFunctionFactory(configuration
-        .getString(DefaultDetectionOnboardJob.FUNCTION_CONFIG));
-    alertFilterFactory = new AlertFilterFactory(configuration
-        .getString(DefaultDetectionOnboardJob.ALERT_FILTER_CONFIG));
-    alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(configuration
-        .getString(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_CONFIG));
   }
 
   @Override
@@ -80,8 +62,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
       // Construct Task context and configuration
       Configuration taskConfig = jobContext.getConfiguration().subset(task.getTaskName());
       final boolean abortAtFailure = taskConfig.getBoolean("abortAtFailure", true);
-      DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext(anomalyFunctionFactory,
-          alertFilterFactory, alertFilterAutotuneFactory);
+      DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext();
       taskContext.setConfiguration(taskConfig);
       taskContext.setExecutionContext(jobContext.getExecutionContext());
 

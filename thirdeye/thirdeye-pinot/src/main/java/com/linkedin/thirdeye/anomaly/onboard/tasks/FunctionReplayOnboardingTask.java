@@ -1,10 +1,13 @@
 package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.commons.configuration.Configuration;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
@@ -16,6 +19,8 @@ import org.joda.time.Period;
 public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
   public static final String TASK_NAME = "FunctionReplay";
 
+  public static final String ALERT_FILTER_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY;
+  public static final String ALERT_FILTER_AUTOTUNE_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY;
   public static final String ANOMALY_FUNCTION = DefaultDetectionOnboardJob.ANOMALY_FUNCTION;
   public static final String BACKFILL_PERIOD = DefaultDetectionOnboardJob.PERIOD;
   public static final String BACKFILL_START = DefaultDetectionOnboardJob.START;
@@ -39,11 +44,21 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
    */
   @Override
   public void run() {
-    DetectionJobResource detectionJobResource = new DetectionJobResource(new DetectionJobScheduler(),
-        taskContext.getAlertFilterFactory(), taskContext.getAlertFilterAutotuneFactory());
     Configuration taskConfiguration = taskContext.getConfiguration();
     DetectionOnboardExecutionContext executionContext = taskContext.getExecutionContext();
 
+    Preconditions.checkNotNull(executionContext.getExecutionResult(ALERT_FILTER_FACTORY));
+    Preconditions.checkNotNull(executionContext.getExecutionResult(ALERT_FILTER_AUTOTUNE_FACTORY));
+
+    AlertFilterFactory alertFilterFactory = (AlertFilterFactory) executionContext.getExecutionResult(ALERT_FILTER_FACTORY);
+    AlertFilterAutotuneFactory alertFilterAutotuneFactory = (AlertFilterAutotuneFactory)
+        executionContext.getExecutionResult(ALERT_FILTER_AUTOTUNE_FACTORY);
+
+    Preconditions.checkNotNull(alertFilterFactory);
+    Preconditions.checkNotNull(alertFilterAutotuneFactory);
+
+    DetectionJobResource detectionJobResource = new DetectionJobResource(new DetectionJobScheduler(),
+        alertFilterFactory, alertFilterAutotuneFactory);
     AnomalyFunctionDTO anomalyFunction = (AnomalyFunctionDTO) executionContext.getExecutionResult(ANOMALY_FUNCTION);
     long functionId = anomalyFunction.getId();
     Period backfillPeriod = Period.parse(taskConfiguration.getString(BACKFILL_PERIOD, DEFAULT_BACKFILL_PERIOD));

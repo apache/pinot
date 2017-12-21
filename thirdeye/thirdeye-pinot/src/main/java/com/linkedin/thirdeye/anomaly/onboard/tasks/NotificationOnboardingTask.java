@@ -4,9 +4,11 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.commons.configuration.Configuration;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -21,6 +23,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
 
   public static final String TASK_NAME = "Notification";
 
+  public static final String ALERT_FILTER_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY;
   public static final String ANOMALY_FUNCTION = DefaultDetectionOnboardJob.ANOMALY_FUNCTION;
   public static final String NOTIFICATION_START = DefaultDetectionOnboardJob.START;
   public static final String NOTIFICATION_END = DefaultDetectionOnboardJob.END;
@@ -45,6 +48,12 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     Configuration taskConfigs = taskContext.getConfiguration();
     DetectionOnboardExecutionContext executionContext = taskContext.getExecutionContext();
 
+    Preconditions.checkNotNull(executionContext.getExecutionResult(ALERT_FILTER_FACTORY));
+
+    AlertFilterFactory alertFilterFactory = (AlertFilterFactory) executionContext.getExecutionResult(ALERT_FILTER_FACTORY);
+
+    Preconditions.checkNotNull(alertFilterFactory);
+
     Preconditions.checkNotNull(executionContext.getExecutionResult(ANOMALY_FUNCTION));
     Preconditions.checkNotNull(executionContext.getExecutionResult(NOTIFICATION_START));
     Preconditions.checkNotNull(executionContext.getExecutionResult(NOTIFICATION_END));
@@ -66,7 +75,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     smtpConfiguration.setSmtpHost(taskConfigs.getString(SMTP_HOST));
     smtpConfiguration.setSmtpPort(taskConfigs.getInt(SMTP_PORT));
-    EmailResource emailResource = new EmailResource(smtpConfiguration, taskContext.getAlertFilterFactory(),
+    EmailResource emailResource = new EmailResource(smtpConfiguration, alertFilterFactory,
         taskConfigs.getString(DEFAULT_ALERT_SENDER), taskConfigs.getString(DEFAULT_ALERT_RECEIVER),
         taskConfigs.getString(THIRDEYE_HOST), taskConfigs.getString(PHANTON_JS_PATH), taskConfigs.getString(ROOT_DIR));
     String subject = new StringBuilder(

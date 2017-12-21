@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTaskContext;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
@@ -37,6 +38,8 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
 
   public static final String TASK_NAME = "FunctionAlertCreation";
 
+  public static final String FUNCTION_FACTORY = DefaultDetectionOnboardJob.FUNCTION_FACTORY;
+  public static final String ALERT_FILTER_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY;
   public static final String FUNCTION_NAME = DefaultDetectionOnboardJob.FUNCTION_NAME;
   public static final String COLLECTION_NAME = DefaultDetectionOnboardJob.COLLECTION_NAME;
   public static final String METRIC_NAME = DefaultDetectionOnboardJob.METRIC_NAME;
@@ -87,6 +90,16 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     DetectionOnboardExecutionContext executionContext = taskContext.getExecutionContext();
     Configuration configuration = taskContext.getConfiguration();
 
+    Preconditions.checkNotNull(executionContext.getExecutionResult(FUNCTION_FACTORY));
+    Preconditions.checkNotNull(executionContext.getExecutionResult(ALERT_FILTER_FACTORY));
+
+    AnomalyFunctionFactory anomalyFunctionFactory = (AnomalyFunctionFactory)
+        executionContext.getExecutionResult(FUNCTION_FACTORY);
+    AlertFilterFactory alertFilterFactory = (AlertFilterFactory) executionContext.getExecutionResult(ALERT_FILTER_FACTORY);
+
+    Preconditions.checkNotNull(anomalyFunctionFactory);
+    Preconditions.checkNotNull(alertFilterFactory);
+
     // Assert if null
     Preconditions.checkNotNull(taskContext);
     Preconditions.checkNotNull(configuration.getString(FUNCTION_NAME));
@@ -98,13 +111,6 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     if (!configuration.containsKey(ALERT_ID)) {
       Preconditions.checkNotNull(configuration.getString(ALERT_TO));
     }
-
-    Preconditions.checkNotNull(executionContext);
-    AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
-    Preconditions.checkNotNull(anomalyFunctionFactory);
-
-    AlertFilterFactory alertFilterFactory = taskContext.getAlertFilterFactory();
-    Preconditions.checkNotNull(alertFilterFactory);
 
     // update datasetConfig
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(configuration.getString(COLLECTION_NAME));
