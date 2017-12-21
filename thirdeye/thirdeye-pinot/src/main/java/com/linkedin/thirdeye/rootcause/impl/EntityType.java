@@ -44,13 +44,15 @@ public final class EntityType {
     if (values[values.length - 1] instanceof Map) {
       Map<String, String> tailValues = (Map<String, String>) values[values.length - 1];
       Object[] headValues = Arrays.copyOf(values, values.length - 1);
-      return this.prefix + StringUtils.join(headValues, ":") + ":" + makeTail(tailValues.entrySet());
+      String tail = tailValues.isEmpty() ? "" :  ":" + makeTail(tailValues.entrySet());
+      return this.prefix + StringUtils.join(headValues, ":") + tail;
     }
 
     if (values[values.length - 1] instanceof Multimap) {
       Multimap<String, String> tailValues = (Multimap<String, String>) values[values.length - 1];
       Object[] headValues = Arrays.copyOf(values, values.length - 1);
-      return this.prefix + StringUtils.join(headValues, ":") + ":" + makeTail(tailValues.entries());
+      String tail = tailValues.isEmpty() ? "" :  ":" + makeTail(tailValues.entries());
+      return this.prefix + StringUtils.join(headValues, ":") + tail;
     }
 
     return this.prefix + StringUtils.join(values, ":");
