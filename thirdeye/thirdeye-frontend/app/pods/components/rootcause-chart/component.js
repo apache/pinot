@@ -237,9 +237,7 @@ export default Ember.Component.extend({
 
   _makeChartSeries(urns) {
     const { context } = this.getProperties('context');
-
-    const { anomalyRange, compareMode } = context;
-    const baselineRange = toBaselineRange(anomalyRange, compareMode);
+    const { anomalyRange } = context;
 
     const series = {};
     [...urns].forEach(urn => {
@@ -251,13 +249,6 @@ export default Ember.Component.extend({
       values: [0, 0],
       type: 'region',
       color: 'orange'
-    };
-
-    series['baselineRange'] = {
-      timestamps: baselineRange,
-      values: [0, 0],
-      type: 'region',
-      color: 'blue'
     };
 
     return series;
