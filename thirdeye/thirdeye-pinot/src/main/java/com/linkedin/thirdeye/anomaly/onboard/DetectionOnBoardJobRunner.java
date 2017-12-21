@@ -2,7 +2,11 @@ package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
+import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,6 +31,10 @@ public class DetectionOnBoardJobRunner implements Runnable {
   private final int taskTimeOutSize;
   private final TimeUnit taskTimeOutUnit;
 
+  private AnomalyFunctionFactory anomalyFunctionFactory;
+  private AlertFilterFactory alertFilterFactory;
+  private AlertFilterAutotuneFactory alertFilterAutotuneFactory;
+
   public DetectionOnBoardJobRunner(DetectionOnboardJobContext jobContext, List<DetectionOnboardTask> tasks,
       DetectionOnboardJobStatus jobStatus) {
     this(jobContext, tasks, jobStatus, 5, TimeUnit.MINUTES);
@@ -44,6 +52,18 @@ public class DetectionOnBoardJobRunner implements Runnable {
     this.jobStatus = jobStatus;
     this.taskTimeOutSize = taskTimeOutSize;
     this.taskTimeOutUnit = taskTimeOutUnit;
+
+    Configuration configuration = jobContext.getConfiguration();
+    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.ALERT_FILTER_CONFIG));
+    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.FUNCTION_CONFIG));
+    Preconditions.checkNotNull(configuration.getString(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_CONFIG));
+
+    anomalyFunctionFactory = new AnomalyFunctionFactory(configuration
+        .getString(DefaultDetectionOnboardJob.FUNCTION_CONFIG));
+    alertFilterFactory = new AlertFilterFactory(configuration
+        .getString(DefaultDetectionOnboardJob.ALERT_FILTER_CONFIG));
+    alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(configuration
+        .getString(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_CONFIG));
   }
 
   @Override
@@ -59,8 +79,9 @@ public class DetectionOnBoardJobRunner implements Runnable {
 
       // Construct Task context and configuration
       Configuration taskConfig = jobContext.getConfiguration().subset(task.getTaskName());
-      final boolean abortOnFailure = taskConfig.getBoolean("abortOnFailure", true);
-      DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext();
+      final boolean abortAtFailure = taskConfig.getBoolean("abortAtFailure", true);
+      DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext(anomalyFunctionFactory,
+          alertFilterFactory, alertFilterAutotuneFactory);
       taskContext.setConfiguration(taskConfig);
       taskContext.setExecutionContext(jobContext.getExecutionContext());
 
@@ -90,7 +111,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
         LOG.error("Encountered unknown error while running job {}.", jobContext.getJobName(), e);
       }
 
-      if (abortOnFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
+      if (abortAtFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
         LOG.error("Failed to execute job {}.", jobContext.getJobName());
         return;
