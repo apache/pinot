@@ -56,6 +56,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.lang.math.NumberUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
@@ -531,14 +533,22 @@ public class ClusterIntegrationTestUtils {
             return;
           }
 
-          // Fuzzy compare expected value and actual value
-          double expectedValue = Double.parseDouble(h2Value);
           String pinotValue = pinotResultSetGroup.getResultSet(aggregationIndex).getString(0);
-          double actualValue = Double.parseDouble(pinotValue);
-          if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
-            String failureMessage =
-                "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue;
-            failure(pqlQuery, sqlQueries, failureMessage);
+          // Fuzzy compare expected value and actual value
+          if (NumberUtils.isNumber(h2Value) && NumberUtils.isNumber(pinotValue)) {
+            double expectedValue = Double.parseDouble(h2Value);
+            double actualValue = Double.parseDouble(pinotValue);
+            if (!DoubleMath.fuzzyEquals(actualValue, expectedValue, 1.0)) {
+              String failureMessage =
+                  "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue;
+              failure(pqlQuery, sqlQueries, failureMessage);
+            }
+          } else {
+            if (StringUtils.compare(h2Value, pinotValue) != 0) {
+              String failureMessage =
+                  "Value: " + aggregationIndex + " does not match, expected: " + h2Value + ", got: " + pinotValue;
+              failure(pqlQuery, sqlQueries, failureMessage);
+            }
           }
         }
 

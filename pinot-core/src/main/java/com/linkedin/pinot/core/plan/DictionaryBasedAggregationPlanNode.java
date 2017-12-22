@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
 
   private final Map<String, Dictionary> _dictionaryMap;
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
+  private final Map<String, FieldSpec.DataType> _dataTypeMap;
   private IndexSegment _indexSegment;
 
   /**
@@ -50,12 +52,16 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
   public DictionaryBasedAggregationPlanNode(IndexSegment indexSegment, List<AggregationInfo> aggregationInfos) {
     _indexSegment = indexSegment;
     _dictionaryMap = new HashMap<>();
-
+    _dataTypeMap = new HashMap<>();
     _aggregationFunctionContexts =
         AggregationFunctionUtils.getAggregationFunctionContexts(aggregationInfos, indexSegment.getSegmentMetadata());
 
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
       String column = aggregationFunctionContext.getAggregationColumns()[0];
+
+      if (!_dataTypeMap.containsKey(column)) {
+        _dataTypeMap.put(column, _indexSegment.getDataSource(column).getDataSourceMetadata().getDataType());
+      }
 
       if (!_dictionaryMap.containsKey(column)) {
           _dictionaryMap.put(column, _indexSegment.getDataSource(column).getDictionary());
@@ -66,7 +72,7 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
   @Override
   public Operator run() {
     return new DictionaryBasedAggregationOperator(_aggregationFunctionContexts,
-        _indexSegment.getSegmentMetadata().getTotalRawDocs(), _dictionaryMap);
+        _indexSegment.getSegmentMetadata().getTotalRawDocs(), _dictionaryMap, _dataTypeMap);
   }
 
   @Override

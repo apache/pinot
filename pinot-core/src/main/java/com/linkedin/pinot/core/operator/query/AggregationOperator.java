@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -23,6 +24,7 @@ import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationExecutor;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 
@@ -36,12 +38,15 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private final TransformExpressionOperator _transformOperator;
   private final long _numTotalRawDocs;
   private ExecutionStatistics _executionStatistics;
+  private final Map<String, FieldSpec.DataType> _dataTypeMap;
 
   public AggregationOperator(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull TransformExpressionOperator transformOperator, long numTotalRawDocs) {
+      @Nonnull TransformExpressionOperator transformOperator, long numTotalRawDocs,
+      Map<String, FieldSpec.DataType> dataTypeMap) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _transformOperator = transformOperator;
     _numTotalRawDocs = numTotalRawDocs;
+    _dataTypeMap = dataTypeMap;
   }
 
   @Override
@@ -49,7 +54,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     int numDocsScanned = 0;
 
     // Perform aggregation on all the blocks.
-    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctionContexts);
+    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctionContexts, _dataTypeMap);
     aggregationExecutor.init();
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {

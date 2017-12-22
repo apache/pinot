@@ -292,7 +292,28 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
 
     // string
-    // TODO: add test cases for string column when we add support for min and max on string datatype columns
+    pqlQuery = "SELECT MAX(CancellationCode) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery =  "SELECT MAX(CancellationCode) FROM "+ STAR_TREE_TABLE_NAME;
+    sqlQuery = "SELECT MAX(CancellationCode) FROM " + DEFAULT_TABLE_NAME;
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT MIN(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(Carrier) FROM " + STAR_TREE_TABLE_NAME;
+    sqlQuery = "SELECT MIN(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT MIN(Carrier), MAX(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(Carrier), MAX(Carrier) FROM " + STAR_TREE_TABLE_NAME;
+    sqlQuery1 = "SELECT MIN(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    sqlQuery2 = "SELECT MAX(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
+    testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
+    pqlQuery = "SELECT MIN(Carrier), COUNT(*) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(Carrier), COUNT(*) FROM " + STAR_TREE_TABLE_NAME;
+    sqlQuery1 = "SELECT MIN(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    sqlQuery2 = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME;
+    testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
+    testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
 
     // Non dictionary columns
     // int
@@ -384,9 +405,6 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     sqlQuery2 = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
     testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
-
-    // string
-    // TODO: add test cases for string column when we add support for min and max on string datatype columns
 
     // Check execution stats
     JSONObject response;

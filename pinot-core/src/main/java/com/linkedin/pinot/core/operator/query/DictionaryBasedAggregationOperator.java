@@ -15,21 +15,21 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.AggregationResultHolderFactory;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Aggregation operator that utilizes dictionary for serving aggregation queries.
@@ -46,6 +46,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final Map<String, Dictionary> _dictionaryMap;
+  private final Map<String, FieldSpec.DataType> _dataTypeMap;
   private final long _totalRawDocs;
   private ExecutionStatistics _executionStatistics;
 
@@ -54,12 +55,13 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
    * @param aggregationFunctionContexts Aggregation function contexts.
    * @param totalRawDocs total raw docs from segmet metadata
    * @param dictionaryMap Map of column to its dictionary.
+   * @param dataTypeMap Map of column to its datatype
    */
-  public DictionaryBasedAggregationOperator(
-      AggregationFunctionContext[] aggregationFunctionContexts, long totalRawDocs,
-      Map<String, Dictionary> dictionaryMap) {
+  public DictionaryBasedAggregationOperator(AggregationFunctionContext[] aggregationFunctionContexts, long totalRawDocs,
+      Map<String, Dictionary> dictionaryMap, Map<String, FieldSpec.DataType> dataTypeMap) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _dictionaryMap = dictionaryMap;
+    _dataTypeMap = dataTypeMap;
     _totalRawDocs = totalRawDocs;
   }
 
@@ -74,15 +76,27 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
           AggregationFunctionFactory.AggregationFunctionType.valueOf(function.getName().toUpperCase());
       String column = aggregationFunctionContext.getAggregationColumns()[0];
       Dictionary dictionary = _dictionaryMap.get(column);
-      AggregationResultHolder resultHolder;
+      FieldSpec.DataType dataType = _dataTypeMap.get(column);
+      AggregationResultHolder resultHolder = AggregationResultHolderFactory.getAggregationResultHolder(functionType, dataType);
       switch (functionType) {
       case MAX:
-        resultHolder = new DoubleAggregationResultHolder(dictionary.getDoubleValue(dictionary.length() - 1));
+        if (dataType.equals(FieldSpec.DataType.STRING)) {
+          resultHolder.setValue(dictionary.getStringValue(dictionary.length() - 1));
+        } else {
+          resultHolder.setValue(dictionary.getDoubleValue(dictionary.length() - 1));
+        }
         break;
       case MIN:
-        resultHolder = new DoubleAggregationResultHolder(dictionary.getDoubleValue(0));
+        if (dataType.equals(FieldSpec.DataType.STRING)) {
+          resultHolder.setValue(dictionary.getStringValue(0));
+        } else {
+          resultHolder.setValue(dictionary.getDoubleValue(0));
+        }
         break;
       case MINMAXRANGE:
+        if (!dataType.isNumber()) {
+          throw new UnsupportedOperationException("minmaxrange function cannot be applied to type " + dataType);
+        }
         double max = dictionary.getDoubleValue(dictionary.length() - 1);
         double min = dictionary.getDoubleValue(0);
         resultHolder = new ObjectAggregationResultHolder();

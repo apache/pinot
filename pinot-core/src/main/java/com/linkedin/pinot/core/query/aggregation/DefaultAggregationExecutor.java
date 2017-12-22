@@ -16,12 +16,15 @@
 package com.linkedin.pinot.core.query.aggregation;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory.AggregationFunctionType;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -31,6 +34,7 @@ import java.util.List;
 public class DefaultAggregationExecutor implements AggregationExecutor {
   private final int _numAggrFunc;
   private final AggregationFunctionContext[] _aggrFuncContextArray;
+  private final Map<String, FieldSpec.DataType> _dataTypeMap;
 
   // Array of result holders, one for each aggregation.
   private final AggregationResultHolder[] _resultHolderArray;
@@ -38,13 +42,15 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
   boolean _inited = false;
   boolean _finished = false;
 
-  public DefaultAggregationExecutor(AggregationFunctionContext[] aggrFuncContextArray) {
+  public DefaultAggregationExecutor(AggregationFunctionContext[] aggrFuncContextArray,
+      Map<String, FieldSpec.DataType> dataTypeMap) {
     Preconditions.checkNotNull(aggrFuncContextArray);
     Preconditions.checkArgument(aggrFuncContextArray.length > 0);
 
     _numAggrFunc = aggrFuncContextArray.length;
     _aggrFuncContextArray = aggrFuncContextArray;
     _resultHolderArray = new AggregationResultHolder[_numAggrFunc];
+    _dataTypeMap = dataTypeMap;
   }
 
   @Override
@@ -54,7 +60,11 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     }
 
     for (int i = 0; i < _numAggrFunc; i++) {
-      _resultHolderArray[i] = _aggrFuncContextArray[i].getAggregationFunction().createAggregationResultHolder();
+      String functionName = _aggrFuncContextArray[i].getAggregationFunction().getName().toUpperCase();
+      AggregationFunctionType aggregationFunctionType = AggregationFunctionType.valueOf(functionName);
+      FieldSpec.DataType dataType = _dataTypeMap.get(_aggrFuncContextArray[i].getAggregationColumns()[0]);
+      _resultHolderArray[i] =
+          AggregationResultHolderFactory.getAggregationResultHolder(aggregationFunctionType, dataType);
     }
     _inited = true;
   }
@@ -90,7 +100,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     Preconditions.checkState(aggregationColumns.length == 1);
     int length = transformBlock.getNumDocs();
 
-    if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+    if (!aggregationFunction.getName().equals(AggregationFunctionType.COUNT.getName())) {
       BlockValSet blockValSet = transformBlock.getBlockValueSet(aggregationColumns[0]);
       aggregationFunction.aggregate(length, resultHolder, blockValSet);
     } else {

@@ -21,6 +21,7 @@ package com.linkedin.pinot.core.query.aggregation;
  */
 public class DoubleAggregationResultHolder implements AggregationResultHolder {
   double _value;
+  double _defaultValue;
 
   /**
    * Constructor for the class.
@@ -28,6 +29,7 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
    */
   public DoubleAggregationResultHolder(double defaultValue) {
     _value = defaultValue;
+    _defaultValue = defaultValue;
   }
 
   /**
@@ -66,5 +68,23 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
   @Override
   public <T> T getResult() {
     throw new RuntimeException("Method 'getResult' not supported for class " + getClass().getName());
+  }
+
+  /**
+   * Returns default double value
+   * @return
+   */
+  @Override
+  public double getDefaultDoubleValue() {
+    return _defaultValue;
+  }
+
+  /**
+   * Returns the default value
+   * @return
+   */
+  @Override
+  public <T> T getDefaultValue() {
+    throw new RuntimeException("Method 'getDefaultValue' not supported for class " + getClass().getName());
   }
 }

@@ -44,4 +44,17 @@ public interface AggregationResultHolder {
    * @return
    */
   <T> T getResult();
+
+  /**
+   * Returns default double value
+   * @return
+   */
+  double getDefaultDoubleValue();
+
+  /**
+   * Returns the default value
+   * @param <T>
+   * @return
+   */
+  <T> T getDefaultValue();
 }

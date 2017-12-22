@@ -19,7 +19,15 @@ package com.linkedin.pinot.core.query.aggregation;
  * AggregationResultHolder interface implementation for result type 'object'.
  */
 public class ObjectAggregationResultHolder implements AggregationResultHolder {
+  Object _defaultValue;
   Object _value;
+
+  public ObjectAggregationResultHolder() {
+  }
+
+  public ObjectAggregationResultHolder(Object defaultValue) {
+    _defaultValue = defaultValue;
+  }
 
   /**
    * {@inheritDoc}
@@ -27,7 +35,7 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
    */
   @Override
   public void setValue(double value) {
-    throw new RuntimeException("Method 'setValue' (with double value) not supported for class " + getClass().getName());
+    _value = value;
   }
 
   /**
@@ -56,5 +64,23 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
   @SuppressWarnings("unchecked")
   public <T> T getResult() {
     return (T) _value;
+  }
+
+  /**
+   * Returns default double value
+   * @return
+   */
+  @Override
+  public double getDefaultDoubleValue() {
+    throw new RuntimeException("Method 'getDefaultDoubleValue' not supported for class " + getClass().getName());
+  }
+
+  /**
+   * Returns the default value
+   * @return
+   */
+  @Override
+  public <T> T getDefaultValue() {
+    return (T) _defaultValue;
   }
 }

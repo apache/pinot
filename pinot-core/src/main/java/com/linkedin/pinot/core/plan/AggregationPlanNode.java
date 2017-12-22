@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -22,8 +23,13 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.query.AggregationOperator;
 import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory.AggregationFunctionType;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,21 +44,34 @@ public class AggregationPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfos;
+  private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final TransformPlanNode _transformPlanNode;
+  private final Map<String, FieldSpec.DataType> _dataTypeMap;
 
   public AggregationPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
     _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
+    _dataTypeMap = new HashMap<>();
+    _aggregationFunctionContexts =
+        AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, _indexSegment.getSegmentMetadata());
+    for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
+      if (!aggregationFunctionContext.getAggregationFunction()
+          .getName()
+          .equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+        String column = aggregationFunctionContext.getAggregationColumns()[0];
+        if (!_dataTypeMap.containsKey(column)) {
+          _dataTypeMap.put(column, _indexSegment.getDataSource(column).getDataSourceMetadata().getDataType());
+        }
+      }
+    }
   }
 
   @Override
   public Operator run() {
     TransformExpressionOperator transformOperator = (TransformExpressionOperator) _transformPlanNode.run();
-    SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
-    return new AggregationOperator(
-        AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata), transformOperator,
-        segmentMetadata.getTotalRawDocs());
+    return new AggregationOperator(_aggregationFunctionContexts, transformOperator,
+        _indexSegment.getSegmentMetadata().getTotalRawDocs(), _dataTypeMap);
   }
 
   @Override

@@ -127,8 +127,10 @@ public class DefaultAggregationExecutorTest {
   @Test
   void testAggregation() {
     Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+    Map<String, FieldSpec.DataType> dataTypeMap = new HashMap<>();
     for (String column : _indexSegment.getColumnNames()) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
+      dataTypeMap.put(column, _indexSegment.getDataSource(column).getDataSourceMetadata().getDataType());
     }
     int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     MatchEntireSegmentOperator matchEntireSegmentOperator = new MatchEntireSegmentOperator(totalRawDocs);
@@ -147,7 +149,7 @@ public class DefaultAggregationExecutorTest {
       aggrFuncContextArray[i] = AggregationFunctionContext.instantiate(aggregationInfo);
       aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
     }
-    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggrFuncContextArray);
+    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggrFuncContextArray, dataTypeMap);
     aggregationExecutor.init();
     aggregationExecutor.aggregate(transformBlock);
     aggregationExecutor.finish();
