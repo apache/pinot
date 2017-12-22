@@ -63,7 +63,6 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String ALERT_APPLICATION = DefaultDetectionOnboardJob.ALERT_APPLICATION;
   public static final String DEFAULT_ALERT_RECEIVER = DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS;
 
-  public static final String DEFAULT_CRON_EXPRESSION = "0 0 0 * * ?"; // Everyday
   public static final Boolean DEFAULT_IS_ACTIVE = true;
   public static final String DEFAULT_METRIC_FUNCTION = "SUM";
   public static final String DEFAULT_WINDOW_DELAY = "0";
@@ -106,6 +105,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     Preconditions.checkNotNull(configuration.getString(FUNCTION_NAME));
     Preconditions.checkNotNull(configuration.getString(COLLECTION_NAME));
     Preconditions.checkNotNull(configuration.getString(METRIC_NAME));
+    Preconditions.checkNotNull(configuration.getString(CRON_EXPRESSION));
     Preconditions.checkNotNull(configuration.getString(WINDOW_SIZE));
     Preconditions.checkNotNull(configuration.getString(WINDOW_UNIT));
     Preconditions.checkNotNull(configuration.getString(PROPERTIES));
@@ -136,7 +136,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
           configuration.getString(METRIC_FUNCTION, DEFAULT_METRIC_FUNCTION),
           getFunctionTypeByTimeGranularity(dataGranularity), configuration.getString(WINDOW_SIZE), configuration.getString(WINDOW_UNIT),
           configuration.getString(WINDOW_DELAY, DEFAULT_WINDOW_DELAY),
-          configuration.getString(CRON_EXPRESSION, DEFAULT_CRON_EXPRESSION), configuration.getString(WINDOW_DELAY_UNIT),
+          configuration.getString(CRON_EXPRESSION), configuration.getString(WINDOW_DELAY_UNIT),
           configuration.getString(EXPLORE_DIMENSION), configuration.getString(FILTERS),
           configuration.getString(DATA_GRANULARITY), configuration.getString(PROPERTIES),
           configuration.getBoolean(IS_ACTIVE, DEFAULT_IS_ACTIVE));

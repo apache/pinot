@@ -94,6 +94,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
             METRIC_NAME,
             WINDOW_SIZE,
             WINDOW_UNIT,
+            CRON_EXPRESSION,
             SMTP_HOST,
             SMTP_PORT,
             DEFAULT_ALERT_RECEIVER_ADDRESS,

@@ -23,7 +23,8 @@ public class OnboardingTaskTestUtils {
     properties.put(DefaultDetectionOnboardJob.METRIC_NAME, "test");
     properties.put(DefaultDetectionOnboardJob.WINDOW_SIZE, "1");
     properties.put(DefaultDetectionOnboardJob.WINDOW_UNIT, "DAYS");
-    properties.put(DefaultDetectionOnboardJob.FUNCTION_PROPERTIES, "");
+    properties.put(DefaultDetectionOnboardJob.CRON_EXPRESSION, "0 0/5 * 1/1 * ? *");
+    properties.put(DefaultDetectionOnboardJob.FUNCTION_PROPERTIES, "metricTimezone=America/Los_Angeles;");
     properties.put(DefaultDetectionOnboardJob.ALERT_NAME, "Normal Alert");
     properties.put(DefaultDetectionOnboardJob.ALERT_TO, "test@test.com");
     properties.put(DefaultDetectionOnboardJob.SMTP_HOST, "test.com");
