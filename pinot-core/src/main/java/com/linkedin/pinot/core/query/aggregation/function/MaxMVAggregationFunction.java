@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -39,49 +40,105 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    double max = aggregationResultHolder.getDoubleResult();
-    for (int i = 0; i < length; i++) {
-      for (double value : valuesArray[i]) {
-        if (value > max) {
-          max = value;
+    FieldSpec.DataType dataType = blockValSets[0].getValueType();
+    switch (dataType) {
+      case FLOAT:
+      case INT:
+      case LONG:
+      case SHORT:
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        double maxDouble = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < length; i++) {
+          for (double value : doubleValuesArray[i]) {
+            if (value > maxDouble) {
+              maxDouble = value;
+            }
+          }
         }
-      }
+        setAggregationResult(aggregationResultHolder, maxDouble);
+        break;
+
+      case STRING:
+        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        String maxString = null;
+        for (int i = 0; i < length; i++) {
+          for (String value : stringValuesArray[i]) {
+            if (maxString == null || value.compareTo(maxString) > 0) {
+              maxString = value;
+            }
+          }
+        }
+        setAggregationResult(aggregationResultHolder, maxString);
+        break;
+
+      default:
+        throw new IllegalArgumentException("Maxmv operation not supported on datatype " + dataType);
     }
-    aggregationResultHolder.setValue(max);
   }
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      double max = groupByResultHolder.getDoubleResult(groupKey);
-      for (double value : valuesArray[i]) {
-        if (value > max) {
-          max = value;
+    FieldSpec.DataType dataType = blockValSets[0].getValueType();
+    switch (dataType) {
+      case FLOAT:
+      case INT:
+      case LONG:
+      case SHORT:
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          double maxDouble = findMaxDouble(doubleValuesArray[i].length, doubleValuesArray[i]);
+          setGroupByResult(groupKeyArray[i], groupByResultHolder, maxDouble);
         }
-      }
-      groupByResultHolder.setValueForKey(groupKey, max);
+        break;
+
+      case STRING:
+        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          String maxString = findMaxString(stringValuesArray[i].length, stringValuesArray[i]);
+          setGroupByResult(groupKeyArray[i], groupByResultHolder, maxString);
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Maxmv operation not supported on datatype " + dataType);
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        double max = groupByResultHolder.getDoubleResult(groupKey);
-        for (double value : values) {
-          if (value > max) {
-            max = value;
+    FieldSpec.DataType dataType = blockValSets[0].getValueType();
+    switch (dataType) {
+      case FLOAT:
+      case INT:
+      case LONG:
+      case SHORT:
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          double maxDouble = findMaxDouble(doubleValuesArray[i].length, doubleValuesArray[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            setGroupByResult(groupKey, groupByResultHolder, maxDouble);
           }
         }
-        groupByResultHolder.setValueForKey(groupKey, max);
-      }
+        break;
+
+      case STRING:
+        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          String maxString = findMaxString(stringValuesArray[i].length, stringValuesArray[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            setGroupByResult(groupKey, groupByResultHolder, maxString);
+          }
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Maxmv operation not supported on datatype " + dataType);
     }
   }
+
 }

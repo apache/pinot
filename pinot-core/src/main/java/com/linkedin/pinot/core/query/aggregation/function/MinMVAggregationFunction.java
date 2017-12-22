@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -39,49 +40,105 @@ public class MinMVAggregationFunction extends MinAggregationFunction {
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    double min = aggregationResultHolder.getDoubleResult();
-    for (int i = 0; i < length; i++) {
-      for (double value : valuesArray[i]) {
-        if (value < min) {
-          min = value;
+    FieldSpec.DataType dataType = blockValSets[0].getValueType();
+    switch (dataType) {
+      case FLOAT:
+      case INT:
+      case LONG:
+      case SHORT:
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        double minDouble = Double.POSITIVE_INFINITY;
+        for (int i = 0; i < length; i++) {
+          for (double value : doubleValuesArray[i]) {
+            if (value < minDouble) {
+              minDouble = value;
+            }
+          }
         }
-      }
+        setAggregationResult(aggregationResultHolder, minDouble);
+        break;
+
+      case STRING:
+        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        String minString = null;
+        for (int i = 0; i < length; i++) {
+          for (String value : stringValuesArray[i]) {
+            if (minString == null || value.compareTo(minString) < 0) {
+              minString = value;
+            }
+          }
+        }
+        setAggregationResult(aggregationResultHolder, minString);
+        break;
+
+      default:
+        throw new IllegalArgumentException("Minmv operation not supported on datatype " + dataType);
     }
-    aggregationResultHolder.setValue(min);
   }
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      double min = groupByResultHolder.getDoubleResult(groupKey);
-      for (double value : valuesArray[i]) {
-        if (value < min) {
-          min = value;
+    FieldSpec.DataType dataType = blockValSets[0].getValueType();
+    switch (dataType) {
+      case FLOAT:
+      case INT:
+      case LONG:
+      case SHORT:
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          double minDouble = findMinDouble(doubleValuesArray[i].length, doubleValuesArray[i]);
+          setGroupByResult(groupKeyArray[i], groupByResultHolder, minDouble);
         }
-      }
-      groupByResultHolder.setValueForKey(groupKey, min);
+        break;
+
+      case STRING:
+        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          String minString = findMinString(stringValuesArray[i].length, stringValuesArray[i]);
+          setGroupByResult(groupKeyArray[i], groupByResultHolder, minString);
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Minmv operation not supported on datatype " + dataType);
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        double min = groupByResultHolder.getDoubleResult(groupKey);
-        for (double value : values) {
-          if (value < min) {
-            min = value;
+    FieldSpec.DataType dataType = blockValSets[0].getValueType();
+    switch (dataType) {
+      case FLOAT:
+      case INT:
+      case LONG:
+      case SHORT:
+      case DOUBLE:
+        double[][] doubleValuesArray = blockValSets[0].getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          double minDouble = findMinDouble(doubleValuesArray[i].length, doubleValuesArray[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            setGroupByResult(groupKey, groupByResultHolder, minDouble);
           }
         }
-        groupByResultHolder.setValueForKey(groupKey, min);
-      }
+        break;
+
+      case STRING:
+        String[][] stringValuesArray = blockValSets[0].getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          String minString = findMinString(stringValuesArray[i].length, stringValuesArray[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            setGroupByResult(groupKey, groupByResultHolder, minString);
+          }
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Minmv operation not supported on datatype " + dataType);
     }
   }
+
 }

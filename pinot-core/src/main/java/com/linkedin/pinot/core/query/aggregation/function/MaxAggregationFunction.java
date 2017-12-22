@@ -67,31 +67,41 @@ public class MaxAggregationFunction implements AggregationFunction<Comparable, C
       case SHORT:
       case DOUBLE:
         double[] doubleValueArray = blockValSets[0].getDoubleValuesSV();
-        double maxDouble = -Double.MAX_VALUE;
-        for (int i = 0; i < length; i++) {
-          double value = doubleValueArray[i];
-          if (value > maxDouble) {
-            maxDouble = value;
-          }
-        }
+        double maxDouble = findMaxDouble(length, doubleValueArray);
         setAggregationResult(aggregationResultHolder, maxDouble);
         break;
 
       case STRING:
         String[] stringValueArray = blockValSets[0].getStringValuesSV();
-        String maxString = null;
-        for (int i = 0; i < length; i++) {
-          String value = stringValueArray[i];
-          if (maxString == null || value.compareTo(maxString) > 0) {
-            maxString = value;
-          }
-        }
+        String maxString = findMaxString(length, stringValueArray);
         setAggregationResult(aggregationResultHolder, maxString);
         break;
 
       default:
         throw new IllegalArgumentException("Max operation not supported on datatype " + dataType);
     }
+  }
+
+  protected double findMaxDouble(int length, double[] doubleValueArray) {
+    double maxDouble = Double.NEGATIVE_INFINITY;
+    for (int i = 0; i < length; i++) {
+      double value = doubleValueArray[i];
+      if (value > maxDouble) {
+        maxDouble = value;
+      }
+    }
+    return maxDouble;
+  }
+
+  protected String findMaxString(int length, String[] stringValueArray) {
+    String maxString = null;
+    for (int i = 0; i < length; i++) {
+      String value = stringValueArray[i];
+      if (maxString == null || value.compareTo(maxString) > 0) {
+        maxString = value;
+      }
+    }
+    return maxString;
   }
 
   protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, Comparable maxValue) {

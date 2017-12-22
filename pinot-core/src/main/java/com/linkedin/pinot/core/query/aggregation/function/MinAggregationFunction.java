@@ -67,31 +67,41 @@ public class MinAggregationFunction implements AggregationFunction<Comparable, C
       case SHORT:
       case DOUBLE:
         double[] doubleValueArray = blockValSets[0].getDoubleValuesSV();
-        double minDouble = Double.MAX_VALUE;
-        for (int i = 0; i < length; i++) {
-          double value = doubleValueArray[i];
-          if (value < minDouble) {
-            minDouble = value;
-          }
-        }
+        double minDouble = findMinDouble(length, doubleValueArray);
         setAggregationResult(aggregationResultHolder, minDouble);
         break;
 
       case STRING:
         String[] stringValueArray = blockValSets[0].getStringValuesSV();
-        String minString = null;
-        for (int i = 0; i < length; i++) {
-          String value = stringValueArray[i];
-          if (minString == null || value.compareTo(minString) < 0) {
-            minString = value;
-          }
-        }
+        String minString = findMinString(length, stringValueArray);
         setAggregationResult(aggregationResultHolder, minString);
         break;
 
       default:
         throw new IllegalArgumentException("Min operation not supported on datatype " + dataType);
     }
+  }
+
+  protected double findMinDouble(int length, double[] doubleValueArray) {
+    double minDouble = Double.POSITIVE_INFINITY;
+    for (int i = 0; i < length; i++) {
+      double value = doubleValueArray[i];
+      if (value < minDouble) {
+        minDouble = value;
+      }
+    }
+    return minDouble;
+  }
+
+  protected String findMinString(int length, String[] stringValueArray) {
+    String minString = null;
+    for (int i = 0; i < length; i++) {
+      String value = stringValueArray[i];
+      if (minString == null || value.compareTo(minString) < 0) {
+        minString = value;
+      }
+    }
+    return minString;
   }
 
   protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, Comparable minValue) {
