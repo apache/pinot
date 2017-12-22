@@ -8,6 +8,9 @@ import org.apache.commons.configuration.MapConfiguration;
 
 
 public class OnboardingTaskTestUtils {
+  public static String TEST_COLLECTION = "test_dataset";
+  public static String TEST_METRIC = "test_metric";
+
   /**
    * Generate a default job properties for all onboarding tests
    * @return a job properties
@@ -19,11 +22,11 @@ public class OnboardingTaskTestUtils {
     properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY_PATH, ClassLoader.getSystemResource("sample-alertfilter.properties").getPath());
     properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY_PATH, ClassLoader.getSystemResource("sample-alertfilter-autotune.properties").getPath());
     properties.put(DefaultDetectionOnboardJob.FUNCTION_NAME, "Normal Function");
-    properties.put(DefaultDetectionOnboardJob.COLLECTION_NAME, "test");
-    properties.put(DefaultDetectionOnboardJob.METRIC_NAME, "test");
+    properties.put(DefaultDetectionOnboardJob.COLLECTION_NAME, TEST_COLLECTION);
+    properties.put(DefaultDetectionOnboardJob.METRIC_NAME, TEST_METRIC);
     properties.put(DefaultDetectionOnboardJob.WINDOW_SIZE, "1");
     properties.put(DefaultDetectionOnboardJob.WINDOW_UNIT, "DAYS");
-    properties.put(DefaultDetectionOnboardJob.CRON_EXPRESSION, "0 0/5 * 1/1 * ? *");
+    properties.put(DefaultDetectionOnboardJob.CRON_EXPRESSION, "0 0 0 1/1 * ? *");
     properties.put(DefaultDetectionOnboardJob.FUNCTION_PROPERTIES, "metricTimezone=America/Los_Angeles;");
     properties.put(DefaultDetectionOnboardJob.ALERT_NAME, "Normal Alert");
     properties.put(DefaultDetectionOnboardJob.ALERT_TO, "test@test.com");

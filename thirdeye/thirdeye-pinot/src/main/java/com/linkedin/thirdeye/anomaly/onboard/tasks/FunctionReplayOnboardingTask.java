@@ -97,7 +97,7 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
     Response response = null;
     try {
       LOG.info("Running replay task for {} from {} to {}", anomalyFunction, start, end);
-      detectionJobResource.generateAnomaliesInRange(functionId, start.toString(), end.toString(),
+      response = detectionJobResource.generateAnomaliesInRange(functionId, start.toString(), end.toString(),
           Boolean.toString(taskConfiguration.getBoolean(BACKFILL_FORCE, DEFAULT_BACKFILL_FORCE)),
           taskConfiguration.getBoolean(BACKFILL_SPEEDUP, DEFAULT_BACKFILL_SPEEDUP),
           taskConfiguration.getBoolean(BACKFILL_REMOVE_ANOMALY_IN_WINDOW, DEFAULT_BACKFILL_REMOVE_ANOMALY_IN_WINDOW));

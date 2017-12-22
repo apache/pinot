@@ -27,7 +27,7 @@ public class TestOnboardingTasks {
   private JobManager jobDAO;
 
   @BeforeClass
-  private void beforeClass(){
+  public void beforeClass(){
     daoTestBase = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
@@ -35,25 +35,28 @@ public class TestOnboardingTasks {
     alertConfigDAO = daoRegistry.getAlertConfigDAO();
     jobDAO = daoRegistry.getJobDAO();
     context = OnboardingTaskTestUtils.getDetectionTaskContext();
+    initDataset();
+  }
 
+  public void initDataset(){
     // Prepare for data
     DatasetConfigDTO datasetConfig = new DatasetConfigDTO();
-    datasetConfig.setDataset("test");
+    datasetConfig.setDataset(OnboardingTaskTestUtils.TEST_COLLECTION);
     datasetConfig.setTimeColumn("Date");
     datasetConfig.setTimeUnit(TimeUnit.DAYS);
     datasetConfig.setTimeDuration(1);
     datasetConfig.setTimeFormat("SIMPLE_DATE_FORMAT:yyyyMMdd");
     datasetConfig.setTimezone("US/Pacific");
     datasetConfigDAO.save(datasetConfig);
+    Assert.assertNotNull(datasetConfigDAO.findByDataset(OnboardingTaskTestUtils.TEST_COLLECTION));
   }
-
-  @AfterClass
-  private void afterClass(){
+  @AfterClass(alwaysRun = true)
+  public void afterClass(){
     daoTestBase.cleanup();
   }
 
   @Test
-  public void testDataPreparationOnboardingTask(){
+  public void testOnboardingTasks() throws Exception{
     DetectionOnboardTask task = new DataPreparationOnboardingTask();
     task.setTaskContext(context);
     task.run();
@@ -62,30 +65,21 @@ public class TestOnboardingTasks {
     Assert.assertNotNull(executionContext.getExecutionResult(DefaultDetectionOnboardJob.FUNCTION_FACTORY));
     Assert.assertNotNull(executionContext.getExecutionResult(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY));
     Assert.assertNotNull(executionContext.getExecutionResult(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY));
-  }
 
-  @Test(dependsOnMethods = {"testDataPreparationOnboardingTask"})
-  public void testFunctionCreationOnboardingTask(){
-    DetectionOnboardTask task = new FunctionCreationOnboardingTask();
+    task = new FunctionCreationOnboardingTask();
     task.setTaskContext(context);
     task.run();
 
     Assert.assertEquals(1, anomalyFunctionDAO.findAll().size());
     Assert.assertEquals(1, alertConfigDAO.findAll().size());
-  }
 
-  @Test(dependsOnMethods = {"testFunctionCreationOnboardingTask"})
-  public void testFunctionReplayOnboardingTask() throws Exception{
-    FunctionReplayOnboardingTask task = new FunctionReplayOnboardingTask();
-    task.setTaskContext(context);
-    task.initDetectionJob();
+    FunctionReplayOnboardingTask replayTask = new FunctionReplayOnboardingTask();
+    replayTask.setTaskContext(context);
+    replayTask.initDetectionJob();
 
     Assert.assertEquals(1, jobDAO.findAll().size());
-  }
 
-  @Test(dependsOnMethods = {"testFunctionReplayOnboardingTask"})
-  public void testAlertFilterAutoTuneOnboardingTask() {
-    final DetectionOnboardTask task = new AlertFilterAutoTuneOnboardingTask();
+    task = new AlertFilterAutoTuneOnboardingTask();
     task.setTaskContext(context);
     task.run();
   }
