@@ -8,7 +8,7 @@
       border-top: 1px solid $te-grey--border;
     }
   }
-
+  
   &__group-title {
     padding: 15px $te-default-element-spacing;
     margin-top: 0px;
@@ -19,7 +19,6 @@
     flex-wrap: nowrap;
     justify-content: space-between;
     cursor: pointer;
-
     &--active {
       border-left: 3px solid $te-blue-5;
       font-weight: 600;

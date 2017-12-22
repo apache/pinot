@@ -1,16 +1,54 @@
 <div class="container">
   <div class="row">
     <div class="col-xs-10">
-      {{textarea-autosize placeholder="Enter investigation title ..." value=sessionName cols=50 rows=1 maxlen=80 class="rootcause-header__major rootcause-header--textarea" key-press="onChange"}}
+      {{#unless isTitleEditMode}}
+        <div class="rootcause-header__title">
+          <h3 class="rootcause-header__major">
+            {{sessionName}}
+          </h3>
+          <a class="thirdeye-link thirdeye-link--vertical-centered" {{action (mut isTitleEditMode) true}}>
+            <span>
+              <i class="glyphicon glyphicon-pencil"></i>
+            </span>
+            {{#tooltip-on-element}}
+              Edit title
+            {{/tooltip-on-element}}
+          </a>
+        </div>
+      {{else}}
+        {{textarea-autosize
+          placeholder="Enter investigation title ..."
+          value=sessionName
+          cols=50
+          rows=1
+          maxlen=80
+          class="rootcause-header__major rootcause-header--textarea"
+          key-press="onChange"}}
+      {{/unless}}
     </div>
     <div class="col-xs-2 rootcause-header__side">
-      <button {{action "onCopy"}} class="rootcause-header--button">Save Copy</button><br/>
-      <button {{action "onSave"}} class="rootcause-header--button">Save</button>
+      {{!-- hiding save copy for now --}}
+      {{!-- <button {{action "onCopy"}} class="te-button">Save Copy</button><br/> --}}
+      <button {{action "onSave"}} class="te-button">Save</button>
     </div>
   </div>
   <div class="row">
     <div class="col-xs-10">
-      {{textarea-autosize placeholder="Take notes or summarize the results here ..." value=sessionText cols=130 rows=1 class="rootcause-header__minor rootcause-header--textarea" key-press="onChange"}}
+      {{#unless showComment}}
+        <a class="thirdeye-link" {{action (mut showComment) true}}>
+          <span><i class="glyphicon glyphicon-plus"></i></span> 
+          <span>New comment</span>
+          {{#tooltip-on-element}} Add a comment {{/tooltip-on-element}} 
+        </a>
+      {{else}}
+        {{textarea-autosize
+          placeholder="Take notes or summarize the results here ..."
+          value=sessionText
+          cols=130
+          rows=1
+          class="rootcause-header__minor rootcause-header--textarea"
+          key-press="onChange"}}
+      {{/unless}}
     </div>
     <div class="col-xs-2 rootcause-header__side">
       {{#if sessionId}}

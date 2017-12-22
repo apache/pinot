@@ -30,6 +30,11 @@
     padding: 0;
     line-height: 24px;
   }
+
+  &--vertical-centered {
+    display: flex;
+    align-items: center;
+  }
 }
 
 .thirdeye-link-secondary {
