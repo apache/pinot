@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -13,10 +15,14 @@ import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,18 +37,31 @@ import org.slf4j.LoggerFactory;
 public class MetricMappingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricMappingPipeline.class);
 
+  private static final String MAPPING_DIMENSIONS = "DIMENSION_TO_DIMENSION";
+
+  private static final String PROP_INCLUDE_FILTERS = "includeFilters";
+  private static final boolean PROP_INCLUDE_FILTERS_DEFAULT = true;
+
+  private static final String PROP_EXCLUDE_METRICS = "excludeMetrics";
+  private static final Set<String> PROP_EXCLUDE_METRICS_DEFAULT = Collections.singleton("__COUNT");
+
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final EntityToEntityMappingManager mappingDAO;
 
+  private final boolean includeFilters;
+  private final Set<String> excludeMetrics;
+
   /**
    * Constructor for dependency injection
    */
-  public MetricMappingPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EntityToEntityMappingManager mappingDAO) {
+  public MetricMappingPipeline(String outputName, Set<String> inputNames, boolean includeFilters, Set<String> excludeMetrics, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EntityToEntityMappingManager mappingDAO) {
     super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.mappingDAO = mappingDAO;
+    this.includeFilters = includeFilters;
+    this.excludeMetrics = excludeMetrics;
   }
 
   /**
@@ -50,13 +69,20 @@ public class MetricMappingPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param ignore configuration properties (ignored)
+   * @param properties configuration properties ({@code PROP_INCLUDE_FILTERS}, {@code PROP_EXCLUDE_METRICS})
    */
-  public MetricMappingPipeline(String outputName, Set<String> inputNames, Map<String, Object> ignore) {
+  public MetricMappingPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.mappingDAO = DAORegistry.getInstance().getEntityToEntityMappingDAO();
+    this.includeFilters = MapUtils.getBooleanValue(properties, PROP_INCLUDE_FILTERS, PROP_INCLUDE_FILTERS_DEFAULT);
+
+    if (properties.containsKey(PROP_EXCLUDE_METRICS)) {
+      this.excludeMetrics = new HashSet<>((Collection<String>) properties.get(PROP_EXCLUDE_METRICS));
+    } else {
+      this.excludeMetrics = PROP_EXCLUDE_METRICS_DEFAULT;
+    }
   }
 
   @Override
@@ -65,8 +91,6 @@ public class MetricMappingPipeline extends Pipeline {
     Set<MetricEntity> output = new MaxScoreSet<>();
 
     for (MetricEntity me : input) {
-      Multimap<String, String> filters = me.getFilters();
-
       MetricConfigDTO metric = this.metricDAO.findById(me.getId());
       if (metric == null) {
         LOG.warn("Could not resolve metric id {}. Skipping.", me.getId());
@@ -77,6 +101,11 @@ public class MetricMappingPipeline extends Pipeline {
       if (dataset == null) {
         LOG.warn("Could not resolve metric id {} dataset '{}'. Skipping.", me.getId(), metric.getDataset());
         continue;
+      }
+
+      Multimap<String, String> filters = ArrayListMultimap.create();
+      if (this.includeFilters) {
+        filters = fetchTransitiveHull(me.getFilters());
       }
 
       DatasetEntity de = DatasetEntity.fromName(me.getScore(), metric.getDataset());
@@ -123,7 +152,7 @@ public class MetricMappingPipeline extends Pipeline {
 
       // from related datasets (and dataset)
       for (DatasetEntity relatedDataset : datasets) {
-        List<MetricConfigDTO> nativeMetrics = this.metricDAO.findByDataset(relatedDataset.getName());
+        List<MetricConfigDTO> nativeMetrics = pruneMetrics(this.metricDAO.findByDataset(relatedDataset.getName()));
 
         // related-dataset-native metrics
         for (MetricConfigDTO nativeMetric : nativeMetrics) {
@@ -167,7 +196,7 @@ public class MetricMappingPipeline extends Pipeline {
       return ArrayListMultimap.create();
     }
 
-    Multimap<String, String> output = ArrayListMultimap.create();
+    Multimap<String, String> output = TreeMultimap.create(); // sorted, unique keys
     Set<String> validKeys = new HashSet<>(dataset.getDimensions());
     for (Map.Entry<String, String> entry : filters.entries()) {
       if (validKeys.contains(entry.getKey())) {
@@ -175,5 +204,70 @@ public class MetricMappingPipeline extends Pipeline {
       }
     }
     return output;
+  }
+
+  /**
+   * Prunes metrics extracted from dataset based on active-state and excluded metrics list
+   *
+   * @param metrics dataste metrics
+   * @return pruned list of metrics
+   */
+  private List<MetricConfigDTO> pruneMetrics(List<MetricConfigDTO> metrics) {
+    List<MetricConfigDTO> output = new ArrayList<>();
+    for (MetricConfigDTO metric : metrics) {
+      if (!metric.isActive()) {
+        continue;
+      }
+
+      if (this.excludeMetrics.contains(metric.getName())) {
+        continue;
+      }
+
+      output.add(metric);
+    }
+
+    return output;
+  }
+
+  /**
+   * Fetches the transitive hull of dimension names from the database and augments the filter map.
+   * Transparently translates between filter names/values and DimensionEntity.
+   *
+   * @param filters filters
+   * @return transitive hull of filter dimensions
+   */
+  private Multimap<String, String> fetchTransitiveHull(Multimap<String, String> filters) {
+
+    List<EntityToEntityMappingDTO> mappings = this.mappingDAO.findByMappingType(MAPPING_DIMENSIONS);
+
+    Multimap<String, String> output = HashMultimap.create(); // unique keys
+    output.putAll(filters);
+
+    for (EntityToEntityMappingDTO mapping : mappings) {
+      for (Map.Entry<String, String> entry : filters.entries()) {
+        DimensionEntity dimension = DimensionEntity.fromDimension(1.0, entry.getKey(), entry.getValue(), DimensionEntity.TYPE_GENERATED);
+
+        // apply mappings both ways
+        if (dimension.getUrn().startsWith(mapping.getFromURN())) {
+          String newUrn = mapping.getToURN() + dimension.getUrn().substring(mapping.getFromURN().length());
+          DimensionEntity newDimension = DimensionEntity.fromURN(newUrn, 1.0);
+
+          output.put(newDimension.getName(), newDimension.getValue());
+        }
+
+        if (dimension.getUrn().startsWith(mapping.getToURN())) {
+          String newUrn = mapping.getFromURN() + dimension.getUrn().substring(mapping.getToURN().length());
+          DimensionEntity newDimension = DimensionEntity.fromURN(newUrn, 1.0);
+
+          output.put(newDimension.getName(), newDimension.getValue());
+        }
+      }
+    }
+
+    if (output.size() == filters.size()) {
+      return output;
+    }
+
+    return fetchTransitiveHull(output);
   }
 }

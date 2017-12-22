@@ -69,17 +69,6 @@ public final class EntityType {
   private static String makeTail(Collection<Map.Entry<String, String>> entries) {
     List<String> parts = new ArrayList<>();
 
-    List<Map.Entry<String, String>> sorted = new ArrayList<>(entries);
-    Collections.sort(sorted, new Comparator<Map.Entry<String, String>>() {
-      @Override
-      public int compare(Map.Entry<String, String> o1, Map.Entry<String, String> o2) {
-        final int key = o1.getKey().compareTo(o2.getKey());
-        if (key != 0)
-          return key;
-        return o1.getValue().compareTo(o2.getValue());
-      }
-    });
-
     for (Map.Entry<String, String> entry : entries) {
       parts.add(String.format("%s=%s", entry.getKey(), entry.getValue()));
     }

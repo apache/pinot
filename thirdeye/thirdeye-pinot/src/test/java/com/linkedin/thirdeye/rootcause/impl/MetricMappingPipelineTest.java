@@ -18,17 +18,21 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class MetricMappingPipelineTest {
-  MetricMappingPipeline pipeline;
+  private static final String TYPE_DEFAULT = "DEFAULT";
+  private static final String TYPE_DIMENSION = "DIMENSION_TO_DIMENSION";
+
+  private List<MetricConfigDTO> metrics;
+  private List<DatasetConfigDTO> datasets;
+  private List<EntityToEntityMappingDTO> mappings;
 
   @BeforeMethod
   void beforeMethod() {
-    List<MetricConfigDTO> metrics = Arrays.asList(
+    this.metrics = Arrays.asList(
         makeMetric(100, "a"), // native
         makeMetric(101, "x"), // related to metric
         makeMetric(102, "x"), // related to dataset
@@ -37,32 +41,33 @@ public class MetricMappingPipelineTest {
         makeMetric(105, "c"), // dataset-related-dataset metric
         makeMetric(106, "z"), // dataset-related-dataset related metric
         makeMetric(107, "z")); // unrelated
-    List<DatasetConfigDTO> datasets = Arrays.asList(
-        makeDataset("a", Arrays.asList("L", "M", "N")), // native
-        makeDataset("b", Arrays.asList("L", "M")), // related to metric
+
+    this.datasets = Arrays.asList(
+        makeDataset("a", Arrays.asList("L", "M", "N", "Q")), // native
+        makeDataset("b", Arrays.asList("R", "M")), // related to metric
         makeDataset("c", Arrays.asList("M", "N")), // related to dataset
-        makeDataset("x", Arrays.asList("L")), // related to dataset
+        makeDataset("x", Arrays.asList("S")), // related to dataset
         makeDataset("y", Arrays.asList("M")), // related to dataset
         makeDataset("z", Arrays.asList("N"))); // related to dataset
-    List<EntityToEntityMappingDTO> mappings = Arrays.asList(
-        makeMapping("thirdeye:metric:100", "thirdeye:metric:101"),
-        makeMapping("thirdeye:metric:100", "thirdeye:dataset:b"),
-        makeMapping("thirdeye:dataset:a", "thirdeye:metric:102"),
-        makeMapping("thirdeye:dataset:a", "thirdeye:dataset:c"),
-        makeMapping("thirdeye:dataset:b", "thirdeye:metric:104"),
-        makeMapping("thirdeye:dataset:c", "thirdeye:metric:106"));
 
-    pipeline = new MetricMappingPipeline("OUTPUT", Collections.singleton("INPUT"),
-        new MockMetricConfigManager(metrics), new MockDatasetConfigManager(datasets), new MockEntityToEntityMappingManager(mappings));
-  }
-
-  @AfterMethod
-  void afterMethod() {
+    this.mappings = Arrays.asList(
+        makeMapping("thirdeye:metric:100", "thirdeye:metric:101", TYPE_DEFAULT),
+        makeMapping("thirdeye:metric:100", "thirdeye:dataset:b", TYPE_DEFAULT),
+        makeMapping("thirdeye:dataset:a", "thirdeye:metric:102", TYPE_DEFAULT),
+        makeMapping("thirdeye:dataset:a", "thirdeye:dataset:c", TYPE_DEFAULT),
+        makeMapping("thirdeye:dataset:b", "thirdeye:metric:104", TYPE_DEFAULT),
+        makeMapping("thirdeye:dataset:c", "thirdeye:metric:106", TYPE_DEFAULT),
+        makeMapping("thirdeye:dimension:L:", "thirdeye:dimension:Q:", TYPE_DIMENSION),
+        makeMapping("thirdeye:dimension:Q:", "thirdeye:dimension:R:", TYPE_DIMENSION), // transitive mapping Q to R
+        makeMapping("thirdeye:dimension:Q:1", "thirdeye:dimension:S:one", TYPE_DIMENSION)); // transitive mapping with value
 
   }
 
   @Test
   public void testExploreMetrics() {
+    MetricMappingPipeline pipeline = new MetricMappingPipeline("OUTPUT", Collections.singleton("INPUT"), false, Collections.<String>emptySet(),
+        new MockMetricConfigManager(metrics), new MockDatasetConfigManager(datasets), new MockEntityToEntityMappingManager(mappings));
+
     Set<Entity> input = Collections.singleton((Entity) MetricEntity.fromMetric(1.0, 100));
     PipelineContext context = new PipelineContext(Collections.singletonMap("INPUT", input));
 
@@ -80,6 +85,9 @@ public class MetricMappingPipelineTest {
 
   @Test
   public void testExploreMetricsWithFilters() {
+    MetricMappingPipeline pipeline = new MetricMappingPipeline("OUTPUT", Collections.singleton("INPUT"), true, Collections.<String>emptySet(),
+        new MockMetricConfigManager(metrics), new MockDatasetConfigManager(datasets), new MockEntityToEntityMappingManager(mappings));
+
     Multimap<String, String> filters = ArrayListMultimap.create();
     filters.put("invalid", "0");
     filters.put("L", "1");
@@ -93,10 +101,10 @@ public class MetricMappingPipelineTest {
     List<MetricEntity> result = getSorted(pipeline.run(context));
 
     Assert.assertEquals(result.size(), 7);
-    assertEquals(result.get(0), "thirdeye:metric:100:L=1:L=2:M=3:N=4", 1.0);
-    assertEquals(result.get(1), "thirdeye:metric:101:L=1:L=2", 0.9);
-    assertEquals(result.get(2), "thirdeye:metric:102:L=1:L=2", 0.9);
-    assertEquals(result.get(3), "thirdeye:metric:103:L=1:L=2:M=3", 0.9);
+    assertEquals(result.get(0), "thirdeye:metric:100:L=1:L=2:M=3:N=4:Q=1:Q=2", 1.0);
+    assertEquals(result.get(1), "thirdeye:metric:101:S=one", 0.9);
+    assertEquals(result.get(2), "thirdeye:metric:102:S=one", 0.9);
+    assertEquals(result.get(3), "thirdeye:metric:103:M=3:R=1:R=2", 0.9);
     assertEquals(result.get(4), "thirdeye:metric:104:M=3", 0.81);
     assertEquals(result.get(5), "thirdeye:metric:105:M=3:N=4", 0.9);
     assertEquals(result.get(6), "thirdeye:metric:106:N=4", 0.81);
@@ -116,11 +124,12 @@ public class MetricMappingPipelineTest {
     return dto;
   }
 
-  private static EntityToEntityMappingDTO makeMapping(String from, String to) {
+  private static EntityToEntityMappingDTO makeMapping(String from, String to, String type) {
     EntityToEntityMappingDTO dto = new EntityToEntityMappingDTO();
     dto.setFromURN(from);
     dto.setToURN(to);
     dto.setScore(0.9);
+    dto.setMappingType(type);
     return dto;
   }
 
