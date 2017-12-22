@@ -56,35 +56,33 @@
       </div>
     </div>
     {{#if hasErrors}}
-      <div class="row">
-        {{#if hasErrorsEntities}}
-          <div class="alert alert-danger alert-dismissable fade in">
-            <a class="close" data-dismiss="alert" {{action "clearErrors" "entities"}}>&times;</a>
-            Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
-          </div>
-        {{/if}}
+      {{#if hasErrorsEntities}}
+        <div class="alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "entities"}}>&times;</a>
+          Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
 
-        {{#if hasErrorsTimeseries}}
-          <div class="alert alert-danger alert-dismissable fade in">
-            <a class="close" data-dismiss="alert" {{action "clearErrors" "timeseries"}}>&times;</a>
-            Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
-          </div>
-        {{/if}}
+      {{#if hasErrorsTimeseries}}
+        <div class="alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "timeseries"}}>&times;</a>
+          Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
 
-        {{#if hasErrorsAggregates}}
-          <div class="alert alert-danger alert-dismissable fade in">
-            <a class="close" data-dismiss="alert" {{action "clearErrors" "aggregates"}}>&times;</a>
-            Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
-          </div>
-        {{/if}}
+      {{#if hasErrorsAggregates}}
+        <div class="alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "aggregates"}}>&times;</a>
+          Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
 
-        {{#if hasErrorsBreakdowns}}
-          <div class="alert alert-danger alert-dismissable fade in">
-            <a class="close" data-dismiss="alert" {{action "clearErrors" "breakdowns"}}>&times;</a>
-            Could not load dimensions:{{#each breakdownsService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
-          </div>
-        {{/if}}
-      </div>
+      {{#if hasErrorsBreakdowns}}
+        <div class="alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "breakdowns"}}>&times;</a>
+          Could not load dimensions:{{#each breakdownsService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
     {{/if}}
 
 
