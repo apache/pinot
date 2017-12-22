@@ -15,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import sun.text.resources.lt.CollationData_lt;
 
 
 public class DetectionOnBoardJobRunnerTest {
