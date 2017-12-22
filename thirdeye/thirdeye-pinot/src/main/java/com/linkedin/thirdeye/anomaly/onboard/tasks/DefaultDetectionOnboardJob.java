@@ -50,7 +50,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ALERT_FROM = "alertSender";
   public static final String ALERT_TO = "alertRecipients";
   public static final String ALERT_APPLICATION = "application";
-  public static final String ANOMALY_FUNCTION = "anomalyFunciton";
+  public static final String ANOMALY_FUNCTION_CONFIG = "anomalyFuncitonConfig";
   public static final String ALERT_CONFIG = "alertConfig";
   public static final String AUTOTUNE_PATTERN = "pattern";
   public static final String AUTOTUNE_SENSITIVITY_LEVEL = "sensitivity";

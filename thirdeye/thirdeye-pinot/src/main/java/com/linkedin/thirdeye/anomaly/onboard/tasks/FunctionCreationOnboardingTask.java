@@ -37,6 +37,8 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
 
   public static final String TASK_NAME = "FunctionAlertCreation";
 
+  public static final String ANOMALY_FUNCTION_CONFIG = DefaultDetectionOnboardJob.ANOMALY_FUNCTION_CONFIG;
+  public static final String ALERT_CONFIG = DefaultDetectionOnboardJob.ALERT_CONFIG;
   public static final String FUNCTION_FACTORY = DefaultDetectionOnboardJob.FUNCTION_FACTORY;
   public static final String ALERT_FILTER_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY;
   public static final String FUNCTION_NAME = DefaultDetectionOnboardJob.FUNCTION_NAME;
@@ -141,7 +143,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       if (Response.Status.OK.equals(response.getStatusInfo())) {
         long functionId = Long.valueOf(response.getEntity().toString());
         anomalyFunction = anoomalyFunctionDAO.findById(functionId);
-        executionContext.setExecutionResult(DefaultDetectionOnboardJob.ANOMALY_FUNCTION, anomalyFunction);
+        executionContext.setExecutionResult(ANOMALY_FUNCTION_CONFIG, anomalyFunction);
       } else {
         throw new UnsupportedOperationException("Get Exception from Anomaly Function Creation End-Point");
       }
@@ -173,7 +175,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       alertConfig.setCronExpression(configuration.getString(ALERT_CRON, DEFAULT_ALERT_CRON));
       alertConfigDAO.save(alertConfig);
     }
-    executionContext.setExecutionResult(DefaultDetectionOnboardJob.ALERT_CONFIG, alertConfig);
+    executionContext.setExecutionResult(ALERT_CONFIG, alertConfig);
   }
 
   protected String getFunctionTypeByTimeGranularity(TimeGranularity timeGranularity) {

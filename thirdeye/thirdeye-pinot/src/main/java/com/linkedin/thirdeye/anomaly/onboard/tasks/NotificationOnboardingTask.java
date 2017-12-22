@@ -22,8 +22,9 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
 
   public static final String TASK_NAME = "Notification";
 
+  public static final String ALERT_CONFIG = DefaultDetectionOnboardJob.ALERT_CONFIG;
   public static final String ALERT_FILTER_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY;
-  public static final String ANOMALY_FUNCTION = DefaultDetectionOnboardJob.ANOMALY_FUNCTION;
+  public static final String ANOMALY_FUNCTION_CONFIG = DefaultDetectionOnboardJob.ANOMALY_FUNCTION_CONFIG;
   public static final String NOTIFICATION_START = DefaultDetectionOnboardJob.START;
   public static final String NOTIFICATION_END = DefaultDetectionOnboardJob.END;
   public static final String SMTP_HOST = DefaultDetectionOnboardJob.SMTP_HOST;
@@ -53,7 +54,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
 
     Preconditions.checkNotNull(alertFilterFactory);
 
-    Preconditions.checkNotNull(executionContext.getExecutionResult(ANOMALY_FUNCTION));
+    Preconditions.checkNotNull(executionContext.getExecutionResult(ANOMALY_FUNCTION_CONFIG));
     Preconditions.checkNotNull(executionContext.getExecutionResult(NOTIFICATION_START));
     Preconditions.checkNotNull(executionContext.getExecutionResult(NOTIFICATION_END));
     Preconditions.checkNotNull(taskConfigs.getString(SMTP_HOST));
@@ -64,12 +65,12 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     Preconditions.checkNotNull(taskConfigs.getString(PHANTON_JS_PATH));
     Preconditions.checkNotNull(taskConfigs.getString(ROOT_DIR));
 
-    Long functionId = (Long) executionContext.getExecutionResult(ANOMALY_FUNCTION);
+    Long functionId = (Long) executionContext.getExecutionResult(ANOMALY_FUNCTION_CONFIG);
     DateTime start = (DateTime) executionContext.getExecutionResult(NOTIFICATION_START);
     DateTime end = (DateTime) executionContext.getExecutionResult(NOTIFICATION_END);
 
 
-    AlertConfigDTO alertConfig = (AlertConfigDTO) executionContext.getExecutionResult(DefaultDetectionOnboardJob.ALERT_CONFIG);
+    AlertConfigDTO alertConfig = (AlertConfigDTO) executionContext.getExecutionResult(ALERT_CONFIG);
 
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     smtpConfiguration.setSmtpHost(taskConfigs.getString(SMTP_HOST));

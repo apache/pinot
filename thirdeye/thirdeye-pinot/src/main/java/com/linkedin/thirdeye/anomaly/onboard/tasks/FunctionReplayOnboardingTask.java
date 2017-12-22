@@ -23,9 +23,9 @@ import org.joda.time.Period;
 public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
   public static final String TASK_NAME = "FunctionReplay";
 
+  public static final String ANOMALY_FUNCTION_CONFIG = DefaultDetectionOnboardJob.ANOMALY_FUNCTION_CONFIG;
   public static final String ALERT_FILTER_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY;
   public static final String ALERT_FILTER_AUTOTUNE_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY;
-  public static final String ANOMALY_FUNCTION = DefaultDetectionOnboardJob.ANOMALY_FUNCTION;
   public static final String BACKFILL_PERIOD = DefaultDetectionOnboardJob.PERIOD;
   public static final String BACKFILL_START = DefaultDetectionOnboardJob.START;
   public static final String BACKFILL_END = DefaultDetectionOnboardJob.END;
@@ -83,7 +83,7 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
     detectionJobScheduler = new DetectionJobScheduler();
     DetectionJobResource detectionJobResource = new DetectionJobResource(detectionJobScheduler,
         alertFilterFactory, alertFilterAutotuneFactory);
-    AnomalyFunctionDTO anomalyFunction = (AnomalyFunctionDTO) executionContext.getExecutionResult(ANOMALY_FUNCTION);
+    AnomalyFunctionDTO anomalyFunction = (AnomalyFunctionDTO) executionContext.getExecutionResult(ANOMALY_FUNCTION_CONFIG);
     long functionId = anomalyFunction.getId();
     Period backfillPeriod = Period.parse(taskConfiguration.getString(BACKFILL_PERIOD, DEFAULT_BACKFILL_PERIOD));
     DateTime start = DateTime.parse(taskConfiguration.getString(BACKFILL_START, DateTime.now().minus(backfillPeriod).toString()));
