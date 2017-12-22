@@ -1,13 +1,43 @@
 .rootcause-anomaly {
+  color: app-shade(black, 9);
   &__title {
-    font-weight: bold;
-    font-size: 24px;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 24px;
+    color: app-shade(black, 9);
+
+    &--small {
+      font-size: 16px;
+    }
   }
 
   &__label {
+    color: app-shade(black, 9);
     &--bold {
-      font-weight: bold;
+      font-weight: 600;
     }
+  }
+
+  &__props-label {
+    font-weight: 600;
+    line-height: 20px;
+    color: app-shade(black, 9);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  &__props-value {
+    font-weight: normal;
+    color: app-shade(black, 9);
+    &--strong {
+      font-weight: 600;
+    }
+  }
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
   }
 
   &__dropdown {
@@ -36,25 +66,47 @@
     }
   }
 
+  &__stats-wrapper {
+    display: flex;
+    margin: 16px 0;
+  }
+
   &__stats {
+    flex-grow: 1;
     border-radius: 2px;
-    padding: 16px;
-    border: 1px solid app-shade(black, 0.15);
-    margin: 8px;
-    margin-right: auto;
+    padding: 8px 16px;
+    border: 1px solid $te-grey--border;
+    margin-right: 8px;
     display: flex;
     flex-basis: 0;
-    min-width: 200px;
     flex-direction: column;
     justify-content: space-between;
+    color: app-shade(black, 9);
+
+    &:last-of-type() {
+      margin-right: 0;
+    }
   }
 
   &__stats-label {
-    font-weight: bold;
+    font-weight: 600;
+    line-height: 20px;
+    font-size: 14px;
   }
 
   &__stats-value {
-    font-size: 16px;
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: normal; 
+
+    //To do: make this into mixin
+    &--positive {
+      color: $te-green;
+    }
+
+    &--negative {
+      color: $te-red;
+    }
   }
 
   &__icon {

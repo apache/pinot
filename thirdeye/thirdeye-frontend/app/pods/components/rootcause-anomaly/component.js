@@ -1,6 +1,6 @@
 import Ember from 'ember';
 import moment from 'moment';
-import { humanizeFloat } from 'thirdeye-frontend/helpers/utils'
+import { humanizeFloat } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
 
@@ -16,6 +16,7 @@ const ANOMALY_OPTIONS_MAPPING = {
 };
 
 export default Ember.Component.extend({
+  classNames: ['rootcause-anomaly'],
   entities: null, // {}
 
   anomalyUrn: null, // ""
@@ -87,7 +88,7 @@ export default Ember.Component.extend({
 
   dimensions: Ember.computed('anomaly', function () {
     const attr = this.get('anomaly').attributes;
-    const dimNames = attr.dimensions;
+    const dimNames = attr.dimensions || [];
     const dimValues = dimNames.reduce((agg, dimName) => { agg[dimName] = attr[dimName][0]; return agg; }, {});
     return dimNames.sort().map(dimName => dimValues[dimName]).join(', ');
   }),

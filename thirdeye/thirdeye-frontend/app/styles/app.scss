@@ -48,7 +48,9 @@ body {
 @import 'components/rootcause-header';
 @import 'components/te-tooltip';
 @import 'components/rootcause-legend';
+@import 'components/rootcause-metric';
 @import 'components/rootcause-chart';
+@import 'components/te-radio';
 
 // Pod Pages
 @import 'ember-power-select/themes/bootstrap';

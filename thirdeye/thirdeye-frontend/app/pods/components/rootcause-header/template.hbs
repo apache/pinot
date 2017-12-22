@@ -10,7 +10,7 @@
             <span>
               <i class="glyphicon glyphicon-pencil"></i>
             </span>
-            {{#tooltip-on-element}}
+            {{#tooltip-on-element class="te-tooltip"}}
               Edit title
             {{/tooltip-on-element}}
           </a>
@@ -38,7 +38,7 @@
         <a class="thirdeye-link" {{action (mut showComment) true}}>
           <span><i class="glyphicon glyphicon-plus"></i></span> 
           <span>New comment</span>
-          {{#tooltip-on-element}} Add a comment {{/tooltip-on-element}} 
+          {{#tooltip-on-element class="te-tooltip"}} Add a comment {{/tooltip-on-element}} 
         </a>
       {{else}}
         {{textarea-autosize
