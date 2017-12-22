@@ -57,7 +57,7 @@ const _filterToUrn = (filters) => {
   return urns;
 };
 
-export default Ember.Route.extend({
+export default Ember.Route.extend(AuthenticatedRouteMixin, {
   queryParams: {
     metricId: queryParamsConfig,
     anomalyId: queryParamsConfig,

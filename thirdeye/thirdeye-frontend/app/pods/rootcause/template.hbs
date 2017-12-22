@@ -10,13 +10,11 @@
 
 <div class="container">
   {{#if anomalyUrn}}
-    <div class="row">
-      {{rootcause-anomaly
-        entities=entities
-        anomalyUrn=anomalyUrn
-        onFeedback=(action "onFeedback")
-      }}
-    </div>
+    {{rootcause-anomaly
+      entities=entities
+      anomalyUrn=anomalyUrn
+      onFeedback=(action "onFeedback")
+    }}
   {{/if}}
 
   <div class="card-container card-container--box-shadow">

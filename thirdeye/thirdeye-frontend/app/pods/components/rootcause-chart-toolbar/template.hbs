@@ -2,7 +2,7 @@
   <label class="te-label te-label--small">Display period
     <span>
       <i class="glyphicon glyphicon-question-sign"></i>
-      {{#tooltip-on-element}}
+      {{#tooltip-on-element class="te-tooltip"}}
         This is the maximum display period in days. You can zoom into the chart further using the mouse wheel.
       {{/tooltip-on-element}}
     </span>
@@ -23,7 +23,7 @@
   <label class="te-label te-label--small">Granularity
     <span>
       <i class="glyphicon glyphicon-question-sign"></i>
-      {{#tooltip-on-element}}
+      {{#tooltip-on-element class="te-tooltip"}}
         This is the data granularity for displaying metrics. If a metric's data source does not have sufficient resolution, we show the metric at the highest available granularity.
       {{/tooltip-on-element}}
     </span>
@@ -43,13 +43,13 @@
   <label class="te-label te-label--small">Chart mode
     <span>
       <i class="glyphicon glyphicon-question-sign"></i>
-      {{#tooltip-on-element}}
+      {{#tooltip-on-element class="te-tooltip"}}
         The display mode controls the transformation of metric values (y-axis).
         <ul class="rootcause-label__list">
-          <li>"absolute" displays the raw values</li>
-          <li>"relative" computes the ratio from the first data point of each metric</li>
-          <li>"log" applies a log10 transformation</li>
-          <li>"split" shows separate charts for each metric</li>
+          <li><strong>absolute</strong> displays the raw values</li>
+          <li><strong>relative</strong> computes the ratio from the first data point of each metric</li>
+          <li><strong>log</strong> applies a log10 transformation</li>
+          <li><strong>split</strong> shows separate charts for each metric</li>
         </ul>
       {{/tooltip-on-element}}
     </span>
