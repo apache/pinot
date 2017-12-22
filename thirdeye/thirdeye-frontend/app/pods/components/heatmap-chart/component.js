@@ -28,6 +28,7 @@ export default Ember.Component.extend({
 
   /**
    * ID Selector of the tooltip
+   * (in application/template.hbs)
    */
   tooltipId: '#heatmap-tooltip',
 
@@ -73,7 +74,7 @@ export default Ember.Component.extend({
       const dimensionPlaceHolderId = `#${dimension}-heatmap-placeholder`;
       const children = cells[dimension]
         .filter(({ size }) => size)
-        .map(({ label, size, value, dimName, dimValue, index, role }) => {
+        .map(({ label, size, value, dimName, dimValue, index, role, current, baseline, change }) => {
           return {
             label,
             value: size,
@@ -81,6 +82,9 @@ export default Ember.Component.extend({
             actualValue: value,
             dimName,
             dimValue,
+            current,
+            baseline,
+            change,
             role,
             index
           };
@@ -133,9 +137,13 @@ export default Ember.Component.extend({
         .style('left', xPosition + 'px')
         .style('top', yPosition + 'px');
       d3.select(`${tooltipId} #heading`)
-        .text(d.name);
-      d3.select(`${tooltipId} #currentValue`)
-        .text(d3.format('.2%')(d.actualValue));
+        .text(d.dimValue);
+      d3.select(`${tooltipId} #baseline`)
+        .text(d.baseline);
+      d3.select(`${tooltipId} #current`)
+        .text(d.current);
+      d3.select(`${tooltipId} #change`)
+        .text(d.change);
       d3.select(`${tooltipId}`).classed('hidden', false);
     }).on('mouseout', function () {
       d3.select(`${tooltipId}`).classed('hidden', true);
