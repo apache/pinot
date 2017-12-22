@@ -15,12 +15,15 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * This task performs replay on anomaly functions
  */
 public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
+  private static final Logger LOG = LoggerFactory.getLogger(FunctionReplayOnboardingTask.class);
   public static final String TASK_NAME = "FunctionReplay";
 
   public static final String ANOMALY_FUNCTION_CONFIG = DefaultDetectionOnboardJob.ANOMALY_FUNCTION_CONFIG;
@@ -93,6 +96,7 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
 
     Response response = null;
     try {
+      LOG.info("Running replay task for {} from {} to {}", anomalyFunction, start, end);
       detectionJobResource.generateAnomaliesInRange(functionId, start.toString(), end.toString(),
           Boolean.toString(taskConfiguration.getBoolean(BACKFILL_FORCE, DEFAULT_BACKFILL_FORCE)),
           taskConfiguration.getBoolean(BACKFILL_SPEEDUP, DEFAULT_BACKFILL_SPEEDUP),
