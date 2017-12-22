@@ -17,9 +17,9 @@ public class DataPreparationOnboardingTask extends BaseDetectionOnboardTask {
 
   public static final String TASK_NAME = "DataPreparation";
 
-  public static final String FUNCTION_FACTORY_PATH = DefaultDetectionOnboardJob.FUNCTION_FACTORY_PATH;
-  public static final String ALERT_FILTER_FACTORY_PATH = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY_PATH;
-  public static final String ALERT_FILTER_AUTOTUNE_FACTORY_PATH = DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY_PATH;
+  public static final String FUNCTION_FACTORY_CONFIG_PATH = DefaultDetectionOnboardJob.FUNCTION_FACTORY_CONFIG_PATH;
+  public static final String ALERT_FILTER_FACTORY_CONFIG_PATH = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY_CONFIG_PATH;
+  public static final String ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH = DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH;
   public static final String FUNCTION_FACTORY = DefaultDetectionOnboardJob.FUNCTION_FACTORY;
   public static final String ALERT_FILTER_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY;
   public static final String ALERT_FILTER_AUTOTUNE_FACTORY = DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY;
@@ -38,16 +38,16 @@ public class DataPreparationOnboardingTask extends BaseDetectionOnboardTask {
 
     Preconditions.checkNotNull(executionContext);
     Preconditions.checkNotNull(configuration);
-    Preconditions.checkNotNull(configuration.getString(FUNCTION_FACTORY_PATH));
-    Preconditions.checkNotNull(configuration.getString(ALERT_FILTER_FACTORY_PATH));
-    Preconditions.checkNotNull(configuration.getString(ALERT_FILTER_AUTOTUNE_FACTORY_PATH));
+    Preconditions.checkNotNull(configuration.getString(FUNCTION_FACTORY_CONFIG_PATH));
+    Preconditions.checkNotNull(configuration.getString(ALERT_FILTER_FACTORY_CONFIG_PATH));
+    Preconditions.checkNotNull(configuration.getString(ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH));
 
     AnomalyFunctionFactory anomalyFunctionFactory =
-        new AnomalyFunctionFactory(configuration.getString(FUNCTION_FACTORY_PATH));
+        new AnomalyFunctionFactory(configuration.getString(FUNCTION_FACTORY_CONFIG_PATH));
     AlertFilterFactory alertFilterFactory =
-        new AlertFilterFactory(configuration.getString(ALERT_FILTER_FACTORY_PATH));
+        new AlertFilterFactory(configuration.getString(ALERT_FILTER_FACTORY_CONFIG_PATH));
     AlertFilterAutotuneFactory alertFilterAutotuneFactory =
-        new AlertFilterAutotuneFactory(configuration.getString(ALERT_FILTER_AUTOTUNE_FACTORY_PATH));
+        new AlertFilterAutotuneFactory(configuration.getString(ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH));
 
     Preconditions.checkNotNull(anomalyFunctionFactory);
     Preconditions.checkNotNull(alertFilterFactory);

@@ -316,10 +316,9 @@ public class AnomalyResource {
 
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || properties == null) {
-      throw new UnsupportedOperationException(
-          "Received null for one of the mandatory params: " + "dataset " + dataset + ", functionName " + functionName
-              + ", metric " + metric + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", properties"
-              + properties);
+      throw new IllegalArgumentException(String.format("Received nulll or emtpy String for one of the mandatory params: "
+          + "dataset: %s, metric: %s, functionName %s, windowSize: %s, windowUnit: %s, and properties: %s", dataset,
+          metric, functionName, windowSize, windowUnit, properties));
     }
 
     TimeGranularity dataGranularity;

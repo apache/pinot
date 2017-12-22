@@ -11,6 +11,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.configuration.MapConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -18,6 +20,7 @@ import org.testng.annotations.Test;
 
 
 public class DetectionOnboardResourceTest {
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionOnboardResourceTest.class);
   public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private DetectionOnboardServiceExecutor executor;
@@ -59,6 +62,7 @@ public class DetectionOnboardResourceTest {
       DetectionOnboardJobStatus onboardJobStatus = OBJECT_MAPPER
           .readValue(detectionOnboardResource.getDetectionOnboardingJobStatus(jobId), DetectionOnboardJobStatus.class);
       JobConstants.JobStatus jobStatus = onboardJobStatus.getJobStatus();
+      LOG.info("Job Status: {}" + jobStatus);
       Assert.assertTrue(
           JobConstants.JobStatus.COMPLETED.equals(jobStatus) || JobConstants.JobStatus.SCHEDULED.equals(jobStatus));
     }

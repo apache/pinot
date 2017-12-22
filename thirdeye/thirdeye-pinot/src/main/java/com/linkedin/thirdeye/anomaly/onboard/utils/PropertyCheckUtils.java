@@ -19,15 +19,13 @@ public class PropertyCheckUtils {
     List<String> missingPropertyKeys = new ArrayList<>();
 
     for (String propertyKey : propertyKeys) {
-      try {
-        Preconditions.checkNotNull(properties.get(propertyKey));
-      } catch (NullPointerException e) {
+      if (properties.get(propertyKey) == null) {
         missingPropertyKeys.add(propertyKey);
       }
     }
 
     if (!missingPropertyKeys.isEmpty()) {
-      throw new NullPointerException("Mising Property Keys: " + missingPropertyKeys);
+      throw new IllegalArgumentException("Mising Property Keys: " + missingPropertyKeys);
     }
   }
 }

@@ -65,7 +65,7 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
       }
 
     } catch (Exception e) {
-      throw new UnsupportedOperationException(e);
+      throw new IllegalStateException(e);
     }
   }
 
@@ -102,7 +102,7 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
           taskConfiguration.getBoolean(BACKFILL_SPEEDUP, DEFAULT_BACKFILL_SPEEDUP),
           taskConfiguration.getBoolean(BACKFILL_REMOVE_ANOMALY_IN_WINDOW, DEFAULT_BACKFILL_REMOVE_ANOMALY_IN_WINDOW));
     } catch (Exception e){
-      throw new UnsupportedOperationException(String.format("Unable to create detection job for %d from %s to %s\n%s",
+      throw new IllegalStateException(String.format("Unable to create detection job for %d from %s to %s\n%s",
           functionId, start.toString(), end.toString(), ExceptionUtils.getStackTrace(e)));
     }
     return response;

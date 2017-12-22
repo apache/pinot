@@ -24,9 +24,9 @@ import org.apache.commons.configuration.MapConfiguration;
 public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ABORT_ON_FAILURE = DetectionOnBoardJobRunner.ABORT_ON_FAILURE;
 
-  public static final String FUNCTION_FACTORY_PATH = "functionFactoryPath";
-  public static final String ALERT_FILTER_FACTORY_PATH = "alertFilterFactoryPath";
-  public static final String ALERT_FILTER_AUTOTUNE_FACTORY_PATH = "alertFilterAutotuneFactoryPath";
+  public static final String FUNCTION_FACTORY_CONFIG_PATH = "functionFactoryConfigPath";
+  public static final String ALERT_FILTER_FACTORY_CONFIG_PATH = "alertFilterFactoryConfigPath";
+  public static final String ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH = "alertFilterAutotuneFactoryConfigPath";
   public static final String FUNCTION_FACTORY = "functionFactory";
   public static final String ALERT_FILTER_FACTORY = "alertFilterFactory";
   public static final String ALERT_FILTER_AUTOTUNE_FACTORY = "alertFilterAutotuneFactory";
@@ -86,9 +86,8 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   @Override
   public Configuration getTaskConfiguration() {
     PropertyCheckUtils.checkNotNull(this.properties,
-        Arrays.asList(FUNCTION_FACTORY_PATH,
-            ALERT_FILTER_AUTOTUNE_FACTORY_PATH,
-            ALERT_FILTER_AUTOTUNE_FACTORY_PATH,
+        Arrays.asList(FUNCTION_FACTORY_CONFIG_PATH, ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH,
+            ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH,
             FUNCTION_NAME,
             COLLECTION_NAME,
             METRIC_NAME,
@@ -113,9 +112,10 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
 
     String taskPrefix = DataPreparationOnboardingTask.TASK_NAME + ".";
     taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.TRUE.toString());
-    taskConfigs.put(taskPrefix + FUNCTION_FACTORY_PATH, this.properties.get(FUNCTION_FACTORY_PATH));
-    taskConfigs.put(taskPrefix + ALERT_FILTER_FACTORY_PATH, this.properties.get(ALERT_FILTER_FACTORY_PATH));
-    taskConfigs.put(taskPrefix + ALERT_FILTER_AUTOTUNE_FACTORY_PATH, this.properties.get(ALERT_FILTER_AUTOTUNE_FACTORY_PATH));
+    taskConfigs.put(taskPrefix + FUNCTION_FACTORY_CONFIG_PATH, this.properties.get(FUNCTION_FACTORY_CONFIG_PATH));
+    taskConfigs.put(taskPrefix + ALERT_FILTER_FACTORY_CONFIG_PATH, this.properties.get(ALERT_FILTER_FACTORY_CONFIG_PATH));
+    taskConfigs.put(taskPrefix + ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH, this.properties.get(
+        ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH));
 
     taskPrefix = FunctionCreationOnboardingTask.TASK_NAME + ".";
     taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.TRUE.toString());
