@@ -18,6 +18,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnBoardJobRunner.class);
   private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
+  public static final String ABORT_ON_FAILURE= "abortOnFailure";
   private final DetectionOnboardJobContext jobContext;
   private final List<DetectionOnboardTask> tasks;
   private final DetectionOnboardJobStatus jobStatus;
@@ -56,7 +57,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
 
       // Construct Task context and configuration
       Configuration taskConfig = jobContext.getConfiguration().subset(task.getTaskName());
-      final boolean abortOnFailure = taskConfig.getBoolean("abortOnFailure", true);
+      final boolean abortOnFailure = taskConfig.getBoolean(ABORT_ON_FAILURE, true);
       DetectionOnboardTaskContext taskContext = new DetectionOnboardTaskContext();
       taskContext.setConfiguration(taskConfig);
       taskContext.setExecutionContext(jobContext.getExecutionContext());

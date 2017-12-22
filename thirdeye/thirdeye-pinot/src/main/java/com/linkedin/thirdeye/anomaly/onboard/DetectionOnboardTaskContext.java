@@ -1,15 +1,16 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
-import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.MapConfiguration;
 
 public class DetectionOnboardTaskContext {
   private Configuration configuration = new MapConfiguration(Collections.emptyMap());
   private DetectionOnboardExecutionContext executionContext = new DetectionOnboardExecutionContext();
+
+  public DetectionOnboardTaskContext() {
+  }
 
   public Configuration getConfiguration() {
     return configuration;

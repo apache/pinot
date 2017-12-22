@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
@@ -67,8 +65,6 @@ import com.linkedin.thirdeye.util.SeverityComputationUtil;
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionJobResource {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
@@ -77,7 +73,6 @@ public class DetectionJobResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private final AlertFilterFactory alertFilterFactory;
-  private EmailResource emailResource;
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
   public static final String AUTOTUNE_FEATURE_KEY = "features";
@@ -85,7 +80,7 @@ public class DetectionJobResource {
   public static final String AUTOTUNE_MTTD_KEY = "mttd";
   private static final String COMMA_SEPARATOR = ",";
 
-  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
+  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
@@ -93,7 +88,6 @@ public class DetectionJobResource {
     this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.alertFilterFactory = alertFilterFactory;
-    this.emailResource = emailResource;
   }
 
 
@@ -219,88 +213,6 @@ public class DetectionJobResource {
         util.computeSeverity(currentWindowStart, currentWindowEnd, seasonalPeriodMillis, seasonCountInt);
 
     return Response.ok(severity.toString(), MediaType.TEXT_PLAIN_TYPE).build();
-  }
-
-  /**
-   * The wrapper endpoint to do first time replay, tuning and send out notification to user
-   * @param id anomaly function id
-   * @param startTimeIso start time of replay
-   * @param endTimeIso end time of replay
-   * @param isForceBackfill whether force back fill or not, default is true
-   * @param isRemoveAnomaliesInWindow whether need to remove exsiting anomalies within replay time window, default is false
-   * @param speedup whether use speedUp or not
-   * @param userDefinedPattern tuning parameter, user defined pattern can be "UP", "DOWN", or "UP&DOWN"
-   * @param sensitivity sensitivity level for initial tuning
-   * @param fromAddr email notification from address, if blank uses fromAddr of ThirdEyeConfiguration
-   * @param toAddr email notification to address
-   * @param teHost thirdeye host, if black uses thirdeye host configured in ThirdEyeConfiguration
-   * @param smtpHost smtp host if black uses smtpHost configured in ThirdEyeConfiguration
-   * @param smtpPort smtp port if black uses smtpPort configured in ThirdEyeConfiguration
-   * @param phantomJsPath phantomJSpath
-   * @return
-   */
-  @POST
-  @Path("/{id}/notifyreplaytuning")
-  public Response triggerReplayTuningAndNotification(@PathParam("id") @NotNull final long id,
-      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
-      @QueryParam("force") @DefaultValue("true") String isForceBackfill,
-      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow,
-      @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
-      @QueryParam("userDefinedPattern") @DefaultValue("UP") String userDefinedPattern,
-      @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,
-      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") Integer smtpPort, @QueryParam("phantomJsPath") String phantomJsPath) {
-
-    // run replay, update function with jobId
-    long jobId;
-    try {
-      Response response =
-          generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup, isRemoveAnomaliesInWindow);
-      Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
-      jobId = entity.get(id);
-    } catch (Exception e) {
-      return Response.status(Status.BAD_REQUEST).entity("Failed to start replay!").build();
-    }
-
-    long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
-    long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
-    JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
-    int numReplayedAnomalies = 0;
-    if (!jobStatus.equals(JobStatus.COMPLETED)) {
-      //TODO: cleanup done tasks and replay results under this failed job
-      // send email to internal
-      String replayFailureSubject =
-          new StringBuilder("Replay failed on metric: " + anomalyFunctionDAO.findById(id).getMetric()).toString();
-      String replayFailureText = new StringBuilder("Failed on Function: " + id + "with Job Id: " + jobId).toString();
-      emailResource.sendEmailWithText(null, null, replayFailureSubject, replayFailureText,
-          smtpHost, smtpPort);
-      return Response.status(Status.BAD_REQUEST).entity("Replay job error with job status: {}" + jobStatus).build();
-    } else {
-      numReplayedAnomalies =
-          mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id, false).size();
-      LOG.info("Replay completed with {} anomalies generated.", numReplayedAnomalies);
-    }
-
-    // create initial tuning and apply filter
-    Response initialAutotuneResponse =
-        initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", userDefinedPattern, sensitivity, "", "");
-    if (initialAutotuneResponse.getEntity() != null) {
-      updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
-      LOG.info("Initial alert filter applied");
-    } else {
-      LOG.info("AutoTune doesn't applied");
-    }
-
-    // send out email
-    String subject = new StringBuilder(
-        "Replay results for " + anomalyFunctionDAO.findById(id).getFunctionName() + " is ready for review!").toString();
-
-    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject,
-        false, true, teHost, smtpHost, smtpPort, phantomJsPath);
-    LOG.info("Sent out email");
-
-    return Response.ok("Replay, Tuning and Notification finished!").build();
   }
 
   /**
@@ -664,14 +576,7 @@ public class DetectionJobResource {
       long autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig);
       autotuneIds.add(autotuneId);
     }
-
-    try {
-      String autotuneIdsJson = OBJECT_MAPPER.writeValueAsString(autotuneIds);
-      return Response.ok(autotuneIdsJson).build();
-    } catch (JsonProcessingException e) {
-      LOG.error("Failed to covert autotune ID list to Json String. Property: {}.", autotuneIds.toString(), e);
-      return Response.serverError().build();
-    }
+    return Response.ok(autotuneIds).build();
   }
 
 
@@ -792,14 +697,7 @@ public class DetectionJobResource {
       evaluator = new PrecisionRecallEvaluator(anomalyResultDTOS);
     }
 
-    Map<String, Number> evaluatorValues = evaluator.toNumberMap();
-    try {
-      String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
-      return Response.ok(propertiesJson).build();
-    } catch (JsonProcessingException e) {
-      LOG.error("Failed to covert evaluator values to a Json String. Property: {}.", evaluatorValues.toString(), e);
-      return Response.serverError().build();
-    }
+    return Response.ok(evaluator.toProperties().toString()).build();
   }
 
   /**
@@ -832,14 +730,7 @@ public class DetectionJobResource {
     AlertFilter alertFilter = alertFilterFactory.fromSpec(alertFilterParams);
     PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
 
-    Map<String, Number> evaluatorValues = evaluator.toNumberMap();
-    try {
-      String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
-      return Response.ok(propertiesJson).build();
-    } catch (JsonProcessingException e) {
-      LOG.error("Failed to covert evaluator values to a Json String. Property: {}.", evaluatorValues.toString(), e);
-      return Response.serverError().build();
-    }
+    return Response.ok(evaluator.toProperties().toString()).build();
   }
 
 

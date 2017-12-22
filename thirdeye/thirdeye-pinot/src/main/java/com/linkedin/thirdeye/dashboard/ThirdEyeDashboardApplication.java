@@ -161,7 +161,7 @@ public class ThirdEyeDashboardApplication
      */
     DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
     AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
-    env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory, emailResource));
+    env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
 
     try {
       // root cause resource

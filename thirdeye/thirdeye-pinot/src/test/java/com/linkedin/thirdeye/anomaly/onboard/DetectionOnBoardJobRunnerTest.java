@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class DetectionOnBoardJobRunnerTest {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnBoardJobRunnerTest.class);
 
@@ -155,7 +156,7 @@ public class DetectionOnBoardJobRunnerTest {
     final String jobName = "continueOnFailureJob";
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("faultyTask.abortOnFailure", "false");
+    properties.put("faultyTask." + DetectionOnBoardJobRunner.ABORT_ON_FAILURE, "false");
 
     DetectionOnboardJob onboardJob = new HasFailureDetectionOnboardJob(jobName, properties);
     List<DetectionOnboardTask> tasks = onboardJob.getTasks();
