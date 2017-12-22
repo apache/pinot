@@ -21,6 +21,11 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFac
 
 public class AggregationResultHolderFactory {
 
+  private static final Double DEFAULT_DOUBLE_VALUE = 0.0;
+  private static final String DEFAULT_STRING_VALUE = "";
+  private static final Double DEFAULT_MAX_DOUBLE = Double.POSITIVE_INFINITY;
+  private static final Double DEFAULT_MIN_DOUBLE = Double.NEGATIVE_INFINITY;
+
   public static AggregationResultHolder getAggregationResultHolder(
       AggregationFunctionFactory.AggregationFunctionType aggregationFunctionType, FieldSpec.DataType dataType) {
 
@@ -30,21 +35,21 @@ public class AggregationResultHolderFactory {
       case COUNTMV:
       case SUM:
       case SUMMV:
-        return new DoubleAggregationResultHolder(0.0);
+        return new DoubleAggregationResultHolder(DEFAULT_DOUBLE_VALUE);
 
       case MIN:
       case MINMV:
         if (dataType.equals(FieldSpec.DataType.STRING)) {
-          return new ObjectAggregationResultHolder("");
+          return new ObjectAggregationResultHolder(DEFAULT_STRING_VALUE);
         } else {
-          return new ObjectAggregationResultHolder(Double.POSITIVE_INFINITY);
+          return new ObjectAggregationResultHolder(DEFAULT_MIN_DOUBLE);
         }
       case MAX:
       case MAXMV:
         if (dataType.equals(FieldSpec.DataType.STRING)) {
-          return new ObjectAggregationResultHolder("");
+          return new ObjectAggregationResultHolder(DEFAULT_STRING_VALUE);
         } else {
-          return new ObjectAggregationResultHolder(Double.NEGATIVE_INFINITY);
+          return new ObjectAggregationResultHolder(DEFAULT_MAX_DOUBLE);
         }
 
       case AVG:

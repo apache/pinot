@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory.AggregationFunctionType;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,14 +59,20 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
         AggregationFunctionUtils.getAggregationFunctionContexts(aggregationInfos, indexSegment.getSegmentMetadata());
 
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
-      String column = aggregationFunctionContext.getAggregationColumns()[0];
 
-      if (!_dataTypeMap.containsKey(column)) {
-        _dataTypeMap.put(column, _indexSegment.getDataSource(column).getDataSourceMetadata().getDataType());
-      }
+      // For count(*), there's no column to have the datatype or dictionary for
+      if (!aggregationFunctionContext.getAggregationFunction()
+          .getName()
+          .equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+        String column = aggregationFunctionContext.getAggregationColumns()[0];
 
-      if (!_dictionaryMap.containsKey(column)) {
+        if (!_dataTypeMap.containsKey(column)) {
+          _dataTypeMap.put(column, _indexSegment.getDataSource(column).getDataSourceMetadata().getDataType());
+        }
+
+        if (!_dictionaryMap.containsKey(column)) {
           _dictionaryMap.put(column, _indexSegment.getDataSource(column).getDictionary());
+        }
       }
     }
   }

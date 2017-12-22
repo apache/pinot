@@ -67,7 +67,8 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
   }
 
   /**
-   * Returns default double value
+   * {@inheritDoc}
+   * Result type is Object, so this method is not implemented
    * @return
    */
   @Override
@@ -76,7 +77,7 @@ public class ObjectAggregationResultHolder implements AggregationResultHolder {
   }
 
   /**
-   * Returns the default value
+   * {@inheritDoc}
    * @return
    */
   @Override

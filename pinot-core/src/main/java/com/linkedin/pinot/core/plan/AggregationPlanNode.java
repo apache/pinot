@@ -56,6 +56,7 @@ public class AggregationPlanNode implements PlanNode {
     _aggregationFunctionContexts =
         AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, _indexSegment.getSegmentMetadata());
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
+      // For count(*), there's no column to have the datatype or dictionary for
       if (!aggregationFunctionContext.getAggregationFunction()
           .getName()
           .equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {

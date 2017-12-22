@@ -71,7 +71,7 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
   }
 
   /**
-   * Returns default double value
+   * {@inheritDoc}
    * @return
    */
   @Override
@@ -80,7 +80,8 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
   }
 
   /**
-   * Returns the default value
+   * {@inheritDoc}
+   * Result for this class is 'primitive double', so this method is not implemented.
    * @return
    */
   @Override
