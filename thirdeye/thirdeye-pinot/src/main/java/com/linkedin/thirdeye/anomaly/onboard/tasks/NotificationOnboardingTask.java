@@ -4,7 +4,6 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -29,9 +28,9 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
   public static final String NOTIFICATION_END = DefaultDetectionOnboardJob.END;
   public static final String SMTP_HOST = DefaultDetectionOnboardJob.SMTP_HOST;
   public static final String SMTP_PORT = DefaultDetectionOnboardJob.SMTP_PORT;
-  public static final String THIRDEYE_HOST = DefaultDetectionOnboardJob.THIRDEYE_HOST;
-  public static final String DEFAULT_ALERT_SENDER = DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER;
-  public static final String DEFAULT_ALERT_RECEIVER = DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER;
+  public static final String THIRDEYE_DASHBOARD_HOST = DefaultDetectionOnboardJob.THIRDEYE_DASHBOARD_HOST;
+  public static final String DEFAULT_ALERT_SENDER_ADDRESS = DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER_ADDRESS;
+  public static final String DEFAULT_ALERT_RECEIVER_ADDRESS = DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS;
   public static final String PHANTON_JS_PATH = DefaultDetectionOnboardJob.PHANTON_JS_PATH;
   public static final String ROOT_DIR = DefaultDetectionOnboardJob.ROOT_DIR;
 
@@ -59,9 +58,9 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     Preconditions.checkNotNull(executionContext.getExecutionResult(NOTIFICATION_END));
     Preconditions.checkNotNull(taskConfigs.getString(SMTP_HOST));
     Preconditions.checkNotNull(taskConfigs.getString(SMTP_PORT));
-    Preconditions.checkNotNull(taskConfigs.getString(DEFAULT_ALERT_RECEIVER));
-    Preconditions.checkNotNull(taskConfigs.getString(DEFAULT_ALERT_SENDER));
-    Preconditions.checkNotNull(taskConfigs.getString(THIRDEYE_HOST));
+    Preconditions.checkNotNull(taskConfigs.getString(DEFAULT_ALERT_RECEIVER_ADDRESS));
+    Preconditions.checkNotNull(taskConfigs.getString(DEFAULT_ALERT_SENDER_ADDRESS));
+    Preconditions.checkNotNull(taskConfigs.getString(THIRDEYE_DASHBOARD_HOST));
     Preconditions.checkNotNull(taskConfigs.getString(PHANTON_JS_PATH));
     Preconditions.checkNotNull(taskConfigs.getString(ROOT_DIR));
 
@@ -76,15 +75,13 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     smtpConfiguration.setSmtpHost(taskConfigs.getString(SMTP_HOST));
     smtpConfiguration.setSmtpPort(taskConfigs.getInt(SMTP_PORT));
     EmailResource emailResource = new EmailResource(smtpConfiguration, alertFilterFactory,
-        taskConfigs.getString(DEFAULT_ALERT_SENDER), taskConfigs.getString(DEFAULT_ALERT_RECEIVER),
-        taskConfigs.getString(THIRDEYE_HOST), taskConfigs.getString(PHANTON_JS_PATH), taskConfigs.getString(ROOT_DIR));
-    String subject = new StringBuilder(
-        "Replay results for " +
-            DAORegistry.getInstance().getAnomalyFunctionDAO().findById(functionId).getFunctionName() +
-            " is ready for review!").toString();
+        taskConfigs.getString(DEFAULT_ALERT_SENDER_ADDRESS), taskConfigs.getString(DEFAULT_ALERT_RECEIVER_ADDRESS),
+        taskConfigs.getString(THIRDEYE_DASHBOARD_HOST), taskConfigs.getString(PHANTON_JS_PATH), taskConfigs.getString(ROOT_DIR));
+    String subject = String.format("Replay results for %s is ready for review!",
+        DAORegistry.getInstance().getAnomalyFunctionDAO().findById(functionId).getFunctionName());
     emailResource.generateAndSendAlertForFunctions(start.getMillis(), end.getMillis(), String.valueOf(functionId),
         alertConfig.getFromAddress(), alertConfig.getRecipients(), subject, false, true,
-        taskConfigs.getString(THIRDEYE_HOST), smtpConfiguration.getSmtpHost(), smtpConfiguration.getSmtpPort(),
+        taskConfigs.getString(THIRDEYE_DASHBOARD_HOST), smtpConfiguration.getSmtpHost(), smtpConfiguration.getSmtpPort(),
         taskConfigs.getString(PHANTON_JS_PATH));
   }
 }

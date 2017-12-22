@@ -75,35 +75,18 @@ public class TestOnboardingTasks {
   }
 
   @Test(dependsOnMethods = {"testFunctionCreationOnboardingTask"})
-  public void testFunctionReplayOnboardingTask() {
-    final DetectionOnboardTask task = new FunctionReplayOnboardingTask();
+  public void testFunctionReplayOnboardingTask() throws Exception{
+    FunctionReplayOnboardingTask task = new FunctionReplayOnboardingTask();
     task.setTaskContext(context);
-    /*
-    As the replay task has no worker to take the backfill task, so the task will wait infinite time. Here I use a thread
-    to run the task, and terminate the task after that.
-     */
-    Thread thread = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        task.run();
-      }
-    });
-    thread.start();
-    try {
-      Thread.sleep(TimeUnit.SECONDS.toMillis(2));
-    } catch (InterruptedException e) {
-      // do nothing
-    }
+    task.initDetectionJob();
 
     Assert.assertEquals(1, jobDAO.findAll().size());
-    thread.stop();
   }
 
   @Test(dependsOnMethods = {"testFunctionReplayOnboardingTask"})
-  public void test() {
+  public void testAlertFilterAutoTuneOnboardingTask() {
     final DetectionOnboardTask task = new AlertFilterAutoTuneOnboardingTask();
     task.setTaskContext(context);
     task.run();
-
   }
 }

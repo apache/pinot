@@ -15,9 +15,9 @@ public class OnboardingTaskTestUtils {
   public static Map<String, String> getJobProperties(){
     Map<String, String> properties = new HashMap<>();
     properties.put(
-        DefaultDetectionOnboardJob.FUNCTION_FACTORY, ClassLoader.getSystemResource("sample-functions.properties").getPath());
-    properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY, ClassLoader.getSystemResource("sample-alertfilter.properties").getPath());
-    properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY, ClassLoader.getSystemResource("sample-alertfilter-autotune.properties").getPath());
+        DefaultDetectionOnboardJob.FUNCTION_FACTORY_PATH, ClassLoader.getSystemResource("sample-functions.properties").getPath());
+    properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY_PATH, ClassLoader.getSystemResource("sample-alertfilter.properties").getPath());
+    properties.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY_PATH, ClassLoader.getSystemResource("sample-alertfilter-autotune.properties").getPath());
     properties.put(DefaultDetectionOnboardJob.FUNCTION_NAME, "Normal Function");
     properties.put(DefaultDetectionOnboardJob.COLLECTION_NAME, "test");
     properties.put(DefaultDetectionOnboardJob.METRIC_NAME, "test");
@@ -28,9 +28,9 @@ public class OnboardingTaskTestUtils {
     properties.put(DefaultDetectionOnboardJob.ALERT_TO, "test@test.com");
     properties.put(DefaultDetectionOnboardJob.SMTP_HOST, "test.com");
     properties.put(DefaultDetectionOnboardJob.SMTP_PORT, "25");
-    properties.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER, "test@test.com");
-    properties.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER, "test@test.com");
-    properties.put(DefaultDetectionOnboardJob.THIRDEYE_HOST, "test.com");
+    properties.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS, "test@test.com");
+    properties.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER_ADDRESS, "test@test.com");
+    properties.put(DefaultDetectionOnboardJob.THIRDEYE_DASHBOARD_HOST, "test.com");
     properties.put(DefaultDetectionOnboardJob.PHANTON_JS_PATH, "/");
     properties.put(DefaultDetectionOnboardJob.ROOT_DIR, "/");
 

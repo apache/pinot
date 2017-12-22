@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.Map;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
 
@@ -37,6 +38,8 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
   public static final Boolean DEFAULT_BACKFILL_SPEEDUP = false;
   public static final Boolean DEFAULT_BACKFILL_REMOVE_ANOMALY_IN_WINDOW = false;
 
+  private DetectionJobScheduler detectionJobScheduler;
+
   public FunctionReplayOnboardingTask() {
     super(TASK_NAME);
   }
@@ -47,6 +50,23 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
    */
   @Override
   public void run() {
+
+    try {
+      Response response = initDetectionJob();
+      Map<Long, Long> functionIdToJobIdMap = (Map<Long, Long>) response.getEntity();
+      for (long jobId : functionIdToJobIdMap.values()) {
+        JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
+        if (JobStatus.FAILED.equals(jobStatus) || JobStatus.TIMEOUT.equals(jobStatus)) {
+          throw new InterruptedException("Get Job Status: " + jobStatus);
+        }
+      }
+
+    } catch (Exception e) {
+      throw new UnsupportedOperationException(e);
+    }
+  }
+
+  public Response initDetectionJob() throws Exception{
     Configuration taskConfiguration = taskContext.getConfiguration();
     DetectionOnboardExecutionContext executionContext = taskContext.getExecutionContext();
 
@@ -60,7 +80,7 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
     Preconditions.checkNotNull(alertFilterFactory);
     Preconditions.checkNotNull(alertFilterAutotuneFactory);
 
-    DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
+    detectionJobScheduler = new DetectionJobScheduler();
     DetectionJobResource detectionJobResource = new DetectionJobResource(detectionJobScheduler,
         alertFilterFactory, alertFilterAutotuneFactory);
     AnomalyFunctionDTO anomalyFunction = (AnomalyFunctionDTO) executionContext.getExecutionResult(ANOMALY_FUNCTION);
@@ -71,22 +91,16 @@ public class FunctionReplayOnboardingTask extends BaseDetectionOnboardTask {
     executionContext.setExecutionResult(BACKFILL_START, start);
     executionContext.setExecutionResult(BACKFILL_END, end);
 
+    Response response = null;
     try {
-      Response response = detectionJobResource.generateAnomaliesInRange(functionId, start.toString(), end.toString(),
+      detectionJobResource.generateAnomaliesInRange(functionId, start.toString(), end.toString(),
           Boolean.toString(taskConfiguration.getBoolean(BACKFILL_FORCE, DEFAULT_BACKFILL_FORCE)),
           taskConfiguration.getBoolean(BACKFILL_SPEEDUP, DEFAULT_BACKFILL_SPEEDUP),
           taskConfiguration.getBoolean(BACKFILL_REMOVE_ANOMALY_IN_WINDOW, DEFAULT_BACKFILL_REMOVE_ANOMALY_IN_WINDOW));
-      Map<Long, Long> functionIdToJobIdMap = (Map<Long, Long>) response.getEntity();
-      for (long jobId : functionIdToJobIdMap.values()) {
-        JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
-        if (jobStatus.equals(JobStatus.FAILED) || jobStatus.equals(JobStatus.TIMEOUT)) {
-          throw new InterruptedException("Get Job Status: " + jobStatus);
-        }
-      }
-
-    } catch (Exception e) {
-      throw new UnsupportedOperationException(String.format("Unable to create detection job for %d from %s to %s",
-          functionId, start.toString(), end.toString()), e);
+    } catch (Exception e){
+      throw new UnsupportedOperationException(String.format("Unable to create detection job for %d from %s to %s\n%s",
+          functionId, start.toString(), end.toString(), ExceptionUtils.getStackTrace(e)));
     }
+    return response;
   }
 }

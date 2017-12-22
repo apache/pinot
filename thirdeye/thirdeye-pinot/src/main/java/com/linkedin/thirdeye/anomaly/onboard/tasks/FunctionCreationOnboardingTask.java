@@ -4,7 +4,6 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTaskContext;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
@@ -60,7 +59,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String ALERT_FROM = DefaultDetectionOnboardJob.ALERT_FROM;
   public static final String ALERT_TO = DefaultDetectionOnboardJob.ALERT_TO;
   public static final String ALERT_APPLICATION = DefaultDetectionOnboardJob.ALERT_APPLICATION;
-  public static final String DEFAULT_ALERT_RECEIVER = DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER;
+  public static final String DEFAULT_ALERT_RECEIVER = DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS;
 
   public static final String DEFAULT_CRON_EXPRESSION = "0 0 0 * * ?"; // Everyday
   public static final Boolean DEFAULT_IS_ACTIVE = true;
@@ -139,7 +138,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
           configuration.getString(EXPLORE_DIMENSION), configuration.getString(FILTERS),
           configuration.getString(DATA_GRANULARITY), configuration.getString(PROPERTIES),
           configuration.getBoolean(IS_ACTIVE, DEFAULT_IS_ACTIVE));
-      if (response.getStatusInfo().equals(Response.Status.OK)) {
+      if (Response.Status.OK.equals(response.getStatusInfo())) {
         long functionId = Long.valueOf(response.getEntity().toString());
         anomalyFunction = anoomalyFunctionDAO.findById(functionId);
         executionContext.setExecutionResult(DefaultDetectionOnboardJob.ANOMALY_FUNCTION, anomalyFunction);
@@ -185,8 +184,8 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         return "REGRESSION_GAUSSIAN_SCAN";
       case DAYS:
         return "SPLINE_REGRESSION_VANILLA";
-        default:
-          return "WEEK_OVER_WEEK_RULE";
+      default:
+        return "WEEK_OVER_WEEK_RULE";
     }
   }
 }

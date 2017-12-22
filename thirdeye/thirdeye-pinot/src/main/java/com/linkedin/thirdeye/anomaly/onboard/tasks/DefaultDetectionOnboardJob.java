@@ -4,9 +4,11 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnBoardJobRunner;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
+import com.linkedin.thirdeye.anomaly.onboard.utils.PropertyCheckUtils;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +24,9 @@ import org.apache.commons.configuration.MapConfiguration;
 public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ABORT_ON_FAILURE = DetectionOnBoardJobRunner.ABORT_ON_FAILURE;
 
+  public static final String FUNCTION_FACTORY_PATH = "functionFactoryPath";
+  public static final String ALERT_FILTER_FACTORY_PATH = "alertFilterFactoryPath";
+  public static final String ALERT_FILTER_AUTOTUNE_FACTORY_PATH = "alertFilterAutotuneFactoryPath";
   public static final String FUNCTION_FACTORY = "functionFactory";
   public static final String ALERT_FILTER_FACTORY = "alertFilterFactory";
   public static final String ALERT_FILTER_AUTOTUNE_FACTORY = "alertFilterAutotuneFactory";
@@ -57,14 +62,16 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String SPEEDUP = "speedup";
   public static final String SMTP_HOST = "smtpHost";
   public static final String SMTP_PORT = "smtpPort";
-  public static final String THIRDEYE_HOST = "thirdeyeHost";
-  public static final String DEFAULT_ALERT_SENDER = "alertSender";
-  public static final String DEFAULT_ALERT_RECEIVER = "alertReceiver";
+  public static final String THIRDEYE_DASHBOARD_HOST = "thirdeyeDashboardHost";
+  public static final String DEFAULT_ALERT_SENDER_ADDRESS = "alertSender";
+  public static final String DEFAULT_ALERT_RECEIVER_ADDRESS = "alertReceiver";
   public static final String PHANTON_JS_PATH = "phantonJsPath";
   public static final String ROOT_DIR = "rootDir";
 
   protected AnomalyFunctionFactory anomalyFunctionFactory;
   protected AlertFilterFactory alertFilterFactory;
+
+  public static final String MISSING_PARAMETER_ERROR_MESSAGE_TEMPLATE = "Require parameter field: %s";
 
   public DefaultDetectionOnboardJob(String jobName, Map<String, String> properties) {
     super(jobName, properties);
@@ -78,33 +85,36 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
    */
   @Override
   public Configuration getTaskConfiguration() {
-    Preconditions.checkNotNull(this.properties.get(FUNCTION_FACTORY));
-    Preconditions.checkNotNull(this.properties.get(ALERT_FILTER_FACTORY));
-    Preconditions.checkNotNull(this.properties.get(ALERT_FILTER_AUTOTUNE_FACTORY));
-    Preconditions.checkNotNull(this.properties.get(FUNCTION_NAME));
-    Preconditions.checkNotNull(this.properties.get(COLLECTION_NAME));
-    Preconditions.checkNotNull(this.properties.get(METRIC_NAME));
-    Preconditions.checkNotNull(this.properties.get(WINDOW_SIZE));
-    Preconditions.checkNotNull(this.properties.get(WINDOW_UNIT));
-    Preconditions.checkArgument(properties.containsKey(ALERT_ID) || properties.containsKey(ALERT_NAME));
+    PropertyCheckUtils.checkNotNull(this.properties,
+        Arrays.asList(FUNCTION_FACTORY_PATH,
+            ALERT_FILTER_AUTOTUNE_FACTORY_PATH,
+            ALERT_FILTER_AUTOTUNE_FACTORY_PATH,
+            FUNCTION_NAME,
+            COLLECTION_NAME,
+            METRIC_NAME,
+            WINDOW_SIZE,
+            WINDOW_UNIT,
+            SMTP_HOST,
+            SMTP_PORT,
+            DEFAULT_ALERT_RECEIVER_ADDRESS,
+            DEFAULT_ALERT_SENDER_ADDRESS,
+            THIRDEYE_DASHBOARD_HOST,
+            PHANTON_JS_PATH,
+            ROOT_DIR));
+    Preconditions.checkArgument(properties.containsKey(ALERT_ID) || properties.containsKey(ALERT_NAME),
+        String.format(MISSING_PARAMETER_ERROR_MESSAGE_TEMPLATE, ALERT_ID + " OR " + ALERT_NAME));
     if (!properties.containsKey(ALERT_ID)) {
-      Preconditions.checkNotNull(properties.get(ALERT_TO));
+      Preconditions.checkNotNull(properties.get(ALERT_TO),
+          String.format(MISSING_PARAMETER_ERROR_MESSAGE_TEMPLATE, ALERT_TO));
     }
-    Preconditions.checkNotNull(this.properties.get(SMTP_HOST));
-    Preconditions.checkNotNull(this.properties.get(SMTP_PORT));
-    Preconditions.checkNotNull(this.properties.get(DEFAULT_ALERT_RECEIVER));
-    Preconditions.checkNotNull(this.properties.get(DEFAULT_ALERT_SENDER));
-    Preconditions.checkNotNull(this.properties.get(THIRDEYE_HOST));
-    Preconditions.checkNotNull(this.properties.get(PHANTON_JS_PATH));
-    Preconditions.checkNotNull(this.properties.get(ROOT_DIR));
 
     Map<String, String> taskConfigs = new HashMap<>();
 
     String taskPrefix = DataPreparationOnboardingTask.TASK_NAME + ".";
     taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.TRUE.toString());
-    taskConfigs.put(taskPrefix + FUNCTION_FACTORY, this.properties.get(FUNCTION_FACTORY));
-    taskConfigs.put(taskPrefix + ALERT_FILTER_FACTORY, this.properties.get(ALERT_FILTER_FACTORY));
-    taskConfigs.put(taskPrefix + ALERT_FILTER_AUTOTUNE_FACTORY, this.properties.get(ALERT_FILTER_AUTOTUNE_FACTORY));
+    taskConfigs.put(taskPrefix + FUNCTION_FACTORY_PATH, this.properties.get(FUNCTION_FACTORY_PATH));
+    taskConfigs.put(taskPrefix + ALERT_FILTER_FACTORY_PATH, this.properties.get(ALERT_FILTER_FACTORY_PATH));
+    taskConfigs.put(taskPrefix + ALERT_FILTER_AUTOTUNE_FACTORY_PATH, this.properties.get(ALERT_FILTER_AUTOTUNE_FACTORY_PATH));
 
     taskPrefix = FunctionCreationOnboardingTask.TASK_NAME + ".";
     taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.TRUE.toString());
@@ -158,8 +168,8 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(ALERT_APPLICATION)) {
     taskConfigs.put(taskPrefix + ALERT_APPLICATION, this.properties.get(ALERT_APPLICATION));
     }
-    if (this.properties.containsKey(DEFAULT_ALERT_RECEIVER)) {
-      taskConfigs.put (taskPrefix + DEFAULT_ALERT_RECEIVER, this.properties.get(DEFAULT_ALERT_RECEIVER));
+    if (this.properties.containsKey(DEFAULT_ALERT_RECEIVER_ADDRESS)) {
+      taskConfigs.put (taskPrefix + DEFAULT_ALERT_RECEIVER_ADDRESS, this.properties.get(DEFAULT_ALERT_RECEIVER_ADDRESS));
     }
 
     taskPrefix = FunctionReplayOnboardingTask.TASK_NAME + ".";
@@ -209,9 +219,9 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(END)) {
       taskConfigs.put (taskPrefix + END, this.properties.get(END));
     }
-    taskConfigs.put (taskPrefix + THIRDEYE_HOST, this.properties.get(THIRDEYE_HOST));
-    taskConfigs.put (taskPrefix + DEFAULT_ALERT_SENDER, this.properties.get(DEFAULT_ALERT_SENDER));
-    taskConfigs.put (taskPrefix + DEFAULT_ALERT_RECEIVER, this.properties.get(DEFAULT_ALERT_RECEIVER));
+    taskConfigs.put (taskPrefix + THIRDEYE_DASHBOARD_HOST, this.properties.get(THIRDEYE_DASHBOARD_HOST));
+    taskConfigs.put (taskPrefix + DEFAULT_ALERT_SENDER_ADDRESS, this.properties.get(DEFAULT_ALERT_SENDER_ADDRESS));
+    taskConfigs.put (taskPrefix + DEFAULT_ALERT_RECEIVER_ADDRESS, this.properties.get(DEFAULT_ALERT_RECEIVER_ADDRESS));
     taskConfigs.put (taskPrefix + PHANTON_JS_PATH, this.properties.get(PHANTON_JS_PATH));
     taskConfigs.put (taskPrefix + ROOT_DIR, this.properties.get(ROOT_DIR));
 

@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -125,16 +124,16 @@ public class DetectionOnboardResource {
     Preconditions.checkNotNull(smtpConfiguration);
 
     Map<String, String> systemConfig = new HashMap<>();
-    systemConfig.put(DefaultDetectionOnboardJob.FUNCTION_FACTORY, thirdeyeConfigs.getFunctionConfigPath());
-    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY, thirdeyeConfigs.getAlertFilterConfigPath());
-    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY, thirdeyeConfigs.getFilterAutotuneConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.FUNCTION_FACTORY_PATH, thirdeyeConfigs.getFunctionConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY_PATH, thirdeyeConfigs.getAlertFilterConfigPath());
+    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY_PATH, thirdeyeConfigs.getFilterAutotuneConfigPath());
     systemConfig.put(DefaultDetectionOnboardJob.SMTP_HOST, smtpConfiguration.getSmtpHost());
     systemConfig.put(DefaultDetectionOnboardJob.SMTP_PORT, Integer.toString(smtpConfiguration.getSmtpPort()));
-    systemConfig.put(DefaultDetectionOnboardJob.THIRDEYE_HOST, thirdeyeConfigs.getDashboardHost());
+    systemConfig.put(DefaultDetectionOnboardJob.THIRDEYE_DASHBOARD_HOST, thirdeyeConfigs.getDashboardHost());
     systemConfig.put(DefaultDetectionOnboardJob.PHANTON_JS_PATH, thirdeyeConfigs.getPhantomJsPath());
     systemConfig.put(DefaultDetectionOnboardJob.ROOT_DIR, thirdeyeConfigs.getRootDir());
-    systemConfig.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER, thirdeyeConfigs.getFailureFromAddress());
-    systemConfig.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER, thirdeyeConfigs.getFailureToAddress());
+    systemConfig.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER_ADDRESS, thirdeyeConfigs.getFailureFromAddress());
+    systemConfig.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS, thirdeyeConfigs.getFailureToAddress());
 
     return new MapConfiguration(systemConfig);
   }

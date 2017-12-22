@@ -140,7 +140,6 @@ public class ThirdEyeAnomalyApplication
           environment.jersey().register(new PinotDataSourceResource());
         }
         if (config.isDetectionOnboard()) {
-          // TODO: convert ThirdeyeAnomalyConfig to Configuration
           Configuration systemConfig = DetectionOnboardResource.toSystemConfiguration(config);
 
           detectionOnboardServiceExecutor = new DetectionOnboardServiceExecutor();

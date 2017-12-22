@@ -30,7 +30,7 @@ public class DetectionOnboardServiceExecutorTest {
   @Test
   public void testCreate() throws InterruptedException {
     long jobId = executor.createDetectionOnboardingJob(
-        new DummyDetectionOnboardJob("NormalOnboardJob", OnboardingTaskTestUtils.getJobProperties()));
+        new DummyDetectionOnboardJob("NormalOnboardJob", Collections.<String, String>emptyMap()));
     Thread.sleep(1000);
     JobConstants.JobStatus jobStatus = executor.getDetectionOnboardingJobStatus(jobId).getJobStatus();
     Assert.assertTrue(
@@ -40,13 +40,13 @@ public class DetectionOnboardServiceExecutorTest {
   @Test(dependsOnMethods = "testCreate", expectedExceptions = IllegalArgumentException.class)
   public void testDuplicateJobs() {
     executor.createDetectionOnboardingJob(
-        new DummyDetectionOnboardJob("NormalOnboardJob", OnboardingTaskTestUtils.getJobProperties()));
+        new DummyDetectionOnboardJob("NormalOnboardJob", Collections.<String, String>emptyMap()));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDuplicateTasks() {
     executor.createDetectionOnboardingJob(
-        new DuplicateTaskDetectionOnboardJob("DuplicateTaskOnboardJob", OnboardingTaskTestUtils.getJobProperties()));
+        new DuplicateTaskDetectionOnboardJob("DuplicateTaskOnboardJob", Collections.<String, String>emptyMap()));
   }
 
   @Test(expectedExceptions = RejectedExecutionException.class)
@@ -55,19 +55,19 @@ public class DetectionOnboardServiceExecutorTest {
     executor.start();
     executor.shutdown();
     executor.createDetectionOnboardingJob(
-        new DummyDetectionOnboardJob("NormalOnboardJob", OnboardingTaskTestUtils.getJobProperties()));
+        new DummyDetectionOnboardJob("NormalOnboardJob", Collections.<String, String>emptyMap()));
   }
 
   @Test(expectedExceptions = NullPointerException.class)
   public void testNullTaskList() {
     executor.createDetectionOnboardingJob(
-        new NullTaskListDetectionOnboardJob("NullTaskListJob", OnboardingTaskTestUtils.getJobProperties()));
+        new NullTaskListDetectionOnboardJob("NullTaskListJob", Collections.<String, String>emptyMap()));
   }
 
   @Test(expectedExceptions = NullPointerException.class)
   public void testNullConfiguration() {
     executor.createDetectionOnboardingJob(
-        new NullConfigurationDetectionOnboardJob("NullConfigurationJob", OnboardingTaskTestUtils.getJobProperties()));
+        new NullConfigurationDetectionOnboardJob("NullConfigurationJob", Collections.<String, String>emptyMap()));
   }
 
   static class DummyDetectionOnboardJob extends BaseDetectionOnboardJob {
