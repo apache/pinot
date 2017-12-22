@@ -81,6 +81,10 @@ export default Ember.Component.extend({
     show: false
   },
 
+  line: { // on init only
+    connectNull: true
+  },
+
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
@@ -133,7 +137,7 @@ export default Ember.Component.extend({
   },
 
   _makeAxisRange(axis) {
-    const range = { min: {}, max: {}};
+    const range = { min: {}, max: {} };
     Object.keys(axis).filter(key => 'min' in axis[key]).forEach(key => range['min'][key] = axis[key]['min']);
     Object.keys(axis).filter(key => 'max' in axis[key]).forEach(key => range['max'][key] = axis[key]['max']);
     return range;
@@ -184,6 +188,7 @@ export default Ember.Component.extend({
     config.zoom = this.get('zoom');
     config.size = this.get('height');
     config.point = this.get('point');
+    config.line = this.get('line');
 
     this.set('_chart', c3.generate(config));
     this._updateCache();

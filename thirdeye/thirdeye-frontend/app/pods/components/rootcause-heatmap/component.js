@@ -41,11 +41,13 @@ export default Ember.Component.extend({
   /**
    * Selected heatmap mode
    */
-  selectedMode: null, // ""
+  selectedMode: Object.keys(ROOTCAUSE_MODE_MAPPING)[0],
+
   /**
    * Lists out all heatmap mode options
    */
   modeOptions: Object.keys(ROOTCAUSE_MODE_MAPPING),
+
   /**
    * Mapping of human readable to mode option
    */
@@ -64,13 +66,6 @@ export default Ember.Component.extend({
 
     return modeMapping[selectedMode];
   }),
-
-
-  init() {
-    this._super(...arguments);
-
-    this.setProperties({ selectedMode: ROOTCAUSE_ROLLUP_MODE_CHANGE });
-  },
 
   current: Ember.computed(
     'breakdowns',
