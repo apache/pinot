@@ -52,7 +52,11 @@ public class MetricEntityTest {
 
     MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters);
 
-    Assert.assertEquals(e.getUrn(), "thirdeye:metric:123:anotherKey=otherValue:key=value:key=otherValue");
+    Assert.assertEquals(e.getUrn().split(":").length, 6);
+    Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key=value"));
+    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
   }
 
   @Test
@@ -65,10 +69,15 @@ public class MetricEntityTest {
     filters2.put("key", "value");
 
     MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters1);
-    Assert.assertEquals(e.getUrn(), "thirdeye:metric:123:anotherKey=otherValue:key=otherValue");
+    Assert.assertEquals(e.getUrn().split(":").length, 5);
+    Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
 
     MetricEntity aug = e.withFilters(filters2);
-    Assert.assertEquals(aug.getUrn(), "thirdeye:metric:123:key=value");
+    Assert.assertEquals(aug.getUrn().split(":").length, 4);
+    Assert.assertTrue(aug.getUrn().startsWith("thirdeye:metric:123"));
+    Assert.assertTrue(aug.getUrn().contains(":key=value"));
   }
 
   @Test
@@ -79,7 +88,11 @@ public class MetricEntityTest {
     filters.put("anotherKey", "otherValue");
 
     MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters);
-    Assert.assertEquals(e.getUrn(), "thirdeye:metric:123:anotherKey=otherValue:key=value:key=otherValue");
+    Assert.assertEquals(e.getUrn().split(":").length, 6);
+    Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key=value"));
+    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
 
     MetricEntity drop = e.withoutFilters();
     Assert.assertEquals(drop.getUrn(), "thirdeye:metric:123");
