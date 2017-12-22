@@ -12,8 +12,11 @@
 }
 
 .analysis-tooltip {
-  font-size: 12px;
-  font-weight: lighter;
+  font-size: 14px;
+}
+
+.analysis-tooltip__header {
+  font-weight: bold;
 }
 
 .analysis-tooltip__list {
@@ -30,7 +33,7 @@
 #tooltip,
 #heatmap-tooltip {
   position: absolute;
-  width: 220px;
+  min-width: 300px;
   height: auto;
   padding: 10px;
   background-color: white;
@@ -45,7 +48,7 @@
   &.hidden {
     display: none;
   }
-  
+
   & p {
     margin: 0;
     font-size: 13px;

@@ -190,7 +190,9 @@ export default Ember.Component.extend({
           const curr = val.current;
           const base = val.baseline;
 
-          const [value, valueLabel] = this._makeValueLabel(val, transformation(curr, base, currTotal, baseTotal));
+          const [labelCurr, labelBase, labelChange] = transformation(curr, base, currTotal, baseTotal);
+
+          const [value, labelValue] = this._makeValueLabel(val, labelChange);
           const size = curr / currTotal;
 
           cells[n].push({
@@ -198,9 +200,12 @@ export default Ember.Component.extend({
             role: val.role,
             dimName: val.dimName,
             dimValue: val.dimValue,
-            label: valueLabel,
+            label: labelValue,
             value: value, // percent, 2 commas
-            size: size // percent, 2 commas
+            size: size, // percent, 2 commas
+            current: Math.abs(labelCurr) <= 1 ? `${(labelCurr * 100).toFixed(2)}%` : labelCurr,
+            baseline: Math.abs(labelBase) <= 1 ? `${(labelBase * 100).toFixed(2)}%` : labelBase,
+            change: `${(value > 0 ? '+' : '') + (value * 100).toFixed(2)}%`
           });
         });
       });
@@ -235,13 +240,13 @@ export default Ember.Component.extend({
   _makeTransformation(mode) {
     switch (mode) {
       case ROOTCAUSE_ROLLUP_MODE_CHANGE:
-        return (curr, base, currTotal, baseTotal) => curr / base - 1;
+        return (curr, base, currTotal, baseTotal) => [curr, base, curr / base - 1];
       case ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF:
-        return (curr, base, currTotal, baseTotal) => curr / currTotal - base / baseTotal;
+        return (curr, base, currTotal, baseTotal) => [curr / currTotal, base / baseTotal, curr / currTotal - base / baseTotal];
       case ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_TO_DIFF:
-        return (curr, base, currTotal, baseTotal) => (curr - base) / baseTotal;
+        return (curr, base, currTotal, baseTotal) => [(curr - base), baseTotal, (curr - base) / baseTotal];
     }
-    return (curr, base, currTotal, baseTotal) => 0;
+    return (curr, base, currTotal, baseTotal) => [-1, -1, -1];
   },
 
   _makeRollup(dimNameObj, head, visible, tail) {
