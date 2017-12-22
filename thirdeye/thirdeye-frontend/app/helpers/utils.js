@@ -88,7 +88,7 @@ export function pluralizeTime(time, unit) {
  * Formatter for the human-readable floating point numbers numbers
  */
 export function humanizeFloat(f) {
-  if (Number.isNaN(f)) { return '-'; }
+  if (f == null || Number.isNaN(f)) { return '-'; }
   const fixed = Math.max(3 - Math.max(Math.floor(Math.log10(f)) + 1, 0), 0);
   return f.toFixed(fixed);
 };

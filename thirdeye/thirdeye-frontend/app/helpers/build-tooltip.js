@@ -37,7 +37,7 @@ const getTimeseriesLookup = (timeseries, hoverUrns) => {
   const lookup = {};
   frontendUrns.forEach(urn => {
     const ts = timeseries[urn];
-    lookup[urn] = ts.timestamps.map((t, i) => [t, ts.values[i]]);
+    lookup[urn] = ts.timestamps.map((t, i) => [parseInt(t, 10), ts.values[i]]);
   });
 
   return lookup;
@@ -52,14 +52,17 @@ const getTimeseriesLookup = (timeseries, hoverUrns) => {
 const getValues = (hoverUrns, hoverTimestamp, lookup) => {
   const metricUrns = filterPrefix(hoverUrns, 'thirdeye:metric:');
 
+  hoverTimestamp = parseInt(hoverTimestamp, 10);
+
   const values = {};
   metricUrns.forEach(urn => {
-    const currentLookup = lookup[toCurrentUrn(urn)] || [];
-    const currentTimeseries = currentLookup.find(t => t[0] >= hoverTimestamp);
+    // find first smaller or equal element
+    const currentLookup = (lookup[toCurrentUrn(urn)] || []).reverse();
+    const currentTimeseries = currentLookup.find(t => t[0] <= hoverTimestamp && t[1] != null);
     const current = currentTimeseries ? currentTimeseries[1] : parseFloat('NaN');
 
-    const baselineLookup = lookup[toBaselineUrn(urn)] || [];
-    const baselineTimeseries = baselineLookup.find(t => t[0] >= hoverTimestamp);
+    const baselineLookup = (lookup[toBaselineUrn(urn)] || []).reverse();
+    const baselineTimeseries = baselineLookup.find(t => t[0] <= hoverTimestamp && t[1] != null);
     const baseline = baselineTimeseries ? baselineTimeseries[1] : parseFloat('NaN');
 
     const change = current / baseline - 1;
@@ -108,6 +111,8 @@ export default Helper.extend({
 
     const [ metricUrns, eventUrns ] = getUrns(hoverUrns);
     const humanTimeStamp = moment(hoverTimestamp).format('MMM DD, hh:mm a');
+
+    // TODO cache these things for performance
     const labels = getLabel(entities, hoverUrns);
     const lookup = getTimeseriesLookup(timeseries, hoverUrns);
     const values = getValues(hoverUrns, hoverTimestamp, lookup);

@@ -82,20 +82,10 @@ export default Ember.Service.extend({
     Object.keys(json).forEach(range =>
       Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
         const jrng = json[range];
-        const jval = jrng[sid];
-
-        const timestamps = [];
-        const values = [];
-        jrng.timestamp.forEach((t, i) => {
-          if (jval[i] != null) {
-            timestamps.push(t);
-            values.push(jval[i]);
-          }
-        });
 
         timeseries[urn] = {
-          timestamps: timestamps,
-          values: values
+          timestamps: jrng.timestamp,
+          values: jrng[sid]
         };
       })
     );
