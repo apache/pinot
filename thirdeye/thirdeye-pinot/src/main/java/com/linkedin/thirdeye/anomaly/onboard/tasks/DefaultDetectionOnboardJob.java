@@ -134,40 +134,38 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     taskConfigs.put(taskPrefix + WINDOW_SIZE, this.properties.get(WINDOW_SIZE));
     taskConfigs.put(taskPrefix + WINDOW_UNIT, this.properties.get(WINDOW_UNIT));
     if (this.properties.containsKey(WINDOW_DELAY)) {
-    taskConfigs.put(taskPrefix + WINDOW_DELAY, this.properties.get(WINDOW_DELAY));
+      taskConfigs.put(taskPrefix + WINDOW_DELAY, this.properties.get(WINDOW_DELAY));
     }
     if (this.properties.containsKey(WINDOW_DELAY_UNIT)) {
-    taskConfigs.put(taskPrefix + WINDOW_DELAY_UNIT, this.properties.get(WINDOW_DELAY_UNIT));
+      taskConfigs.put(taskPrefix + WINDOW_DELAY_UNIT, this.properties.get(WINDOW_DELAY_UNIT));
     }
     if (this.properties.containsKey(DATA_GRANULARITY)) {
-    taskConfigs.put(taskPrefix + DATA_GRANULARITY, this.properties.get(DATA_GRANULARITY));
+      taskConfigs.put(taskPrefix + DATA_GRANULARITY, this.properties.get(DATA_GRANULARITY));
     }
     if (this.properties.containsKey(FUNCTION_PROPERTIES)) {
-    taskConfigs.put(taskPrefix + FUNCTION_PROPERTIES, this.properties.get(FUNCTION_PROPERTIES));
+      taskConfigs.put(taskPrefix + FUNCTION_PROPERTIES, this.properties.get(FUNCTION_PROPERTIES));
     }
     if (this.properties.containsKey(FUNCTION_IS_ACTIVE)) {
-    taskConfigs.put(taskPrefix + FUNCTION_IS_ACTIVE, this.properties.get(FUNCTION_IS_ACTIVE));
+      taskConfigs.put(taskPrefix + FUNCTION_IS_ACTIVE, this.properties.get(FUNCTION_IS_ACTIVE));
     }
-    if (this.properties.containsKey(CRON_EXPRESSION)) {
     taskConfigs.put(taskPrefix + CRON_EXPRESSION, this.properties.get(CRON_EXPRESSION));
-    }
     if (this.properties.containsKey(ALERT_ID)) {
-    taskConfigs.put(taskPrefix + ALERT_ID, this.properties.get(ALERT_ID));
+      taskConfigs.put(taskPrefix + ALERT_ID, this.properties.get(ALERT_ID));
     }
     if (this.properties.containsKey(ALERT_NAME)) {
-    taskConfigs.put(taskPrefix + ALERT_NAME, this.properties.get(ALERT_NAME));
+      taskConfigs.put(taskPrefix + ALERT_NAME, this.properties.get(ALERT_NAME));
     }
     if (this.properties.containsKey(ALERT_CRON)) {
-    taskConfigs.put(taskPrefix + ALERT_CRON, this.properties.get(ALERT_CRON));
+      taskConfigs.put(taskPrefix + ALERT_CRON, this.properties.get(ALERT_CRON));
     }
     if (this.properties.containsKey(ALERT_FROM)) {
-    taskConfigs.put(taskPrefix + ALERT_FROM, this.properties.get(ALERT_FROM));
+      taskConfigs.put(taskPrefix + ALERT_FROM, this.properties.get(ALERT_FROM));
     }
     if (this.properties.containsKey(ALERT_TO)) {
-    taskConfigs.put(taskPrefix + ALERT_TO, this.properties.get(ALERT_TO));
+      taskConfigs.put(taskPrefix + ALERT_TO, this.properties.get(ALERT_TO));
     }
     if (this.properties.containsKey(ALERT_APPLICATION)) {
-    taskConfigs.put(taskPrefix + ALERT_APPLICATION, this.properties.get(ALERT_APPLICATION));
+      taskConfigs.put(taskPrefix + ALERT_APPLICATION, this.properties.get(ALERT_APPLICATION));
     }
     if (this.properties.containsKey(DEFAULT_ALERT_RECEIVER_ADDRESS)) {
       taskConfigs.put (taskPrefix + DEFAULT_ALERT_RECEIVER_ADDRESS, this.properties.get(DEFAULT_ALERT_RECEIVER_ADDRESS));
