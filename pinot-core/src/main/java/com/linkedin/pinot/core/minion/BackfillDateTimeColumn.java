@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.minion;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -82,7 +81,6 @@ public class BackfillDateTimeColumn {
 
     LOGGER.info("Creating segment generator config for {}", segmentName);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig();
-    config.setInputFilePath(_originalIndexDir.getAbsolutePath());
     config.setFormat(FileFormat.PINOT);
     config.setOutDir(_backfilledIndexDir.getAbsolutePath());
     config.setOverwrite(true);
@@ -92,16 +90,7 @@ public class BackfillDateTimeColumn {
 
     StarTreeMetadata starTreeMetadata = originalSegmentMetadata.getStarTreeMetadata();
     if (starTreeMetadata != null) {
-      StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
-      starTreeIndexSpec.setDimensionsSplitOrder(starTreeMetadata.getDimensionsSplitOrder());
-      starTreeIndexSpec.setMaxLeafRecords((int) starTreeMetadata.getMaxLeafRecords());
-      starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(
-          (int) starTreeMetadata.getSkipMaterializationCardinality());
-      starTreeIndexSpec.setSkipMaterializationForDimensions(
-          Sets.newHashSet(starTreeMetadata.getSkipMaterializationForDimensions()));
-      starTreeIndexSpec.setSkipStarNodeCreationForDimensions(
-          Sets.newHashSet(starTreeMetadata.getSkipStarNodeCreationForDimensions()));
-      config.enableStarTreeIndex(starTreeIndexSpec);
+      config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
     }
 
     LOGGER.info("Creating segment for {} with config {}", segmentName, config.toString());

@@ -315,11 +315,10 @@ public class AnomalyResource {
       @NotNull @QueryParam("properties") String properties, @QueryParam("isActive") boolean isActive) throws Exception {
 
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
-        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || StringUtils.isEmpty(properties)) {
-      throw new UnsupportedOperationException(
-          "Received null for one of the mandatory params: " + "dataset " + dataset + ", functionName " + functionName
-              + ", metric " + metric + ", windowSize " + windowSize + ", windowUnit " + windowUnit + ", properties"
-              + properties);
+        || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || properties == null) {
+      throw new IllegalArgumentException(String.format("Received nulll or emtpy String for one of the mandatory params: "
+          + "dataset: %s, metric: %s, functionName %s, windowSize: %s, windowUnit: %s, and properties: %s", dataset,
+          metric, functionName, windowSize, windowUnit, properties));
     }
 
     TimeGranularity dataGranularity;
@@ -952,7 +951,8 @@ public class AnomalyResource {
   @Path("anomaly-function/{id}/anomalies")
   public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId, @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso, @QueryParam("type") @DefaultValue("merged") String anomalyType,
-      @QueryParam("apply-alert-filter") @DefaultValue("false") boolean applyAlertFiler) {
+      @QueryParam("apply-alert-filter") @DefaultValue("false") boolean applyAlertFiler,
+      @QueryParam("useNotified") @DefaultValue("false") boolean useNotified) {
 
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
@@ -973,11 +973,11 @@ public class AnomalyResource {
     LOG.info("Retrieving {} anomaly results for function {} in the time range: {} -- {}", anomalyType, functionId,
         startTimeIso, endTimeIso);
 
-    ArrayList<Long> idList = new ArrayList<>();
+    ArrayList<Long> anomalyIdList = new ArrayList<>();
     if (anomalyType.equals("raw")) {
       List<RawAnomalyResultDTO> rawDTO = rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime, endTime, functionId);
       for (RawAnomalyResultDTO dto : rawDTO) {
-        idList.add(dto.getId());
+        anomalyIdList.add(dto.getId());
       }
     } else if (anomalyType.equals("merged")) {
       List<MergedAnomalyResultDTO> mergedResults =
@@ -993,12 +993,15 @@ public class AnomalyResource {
         }
       }
 
-      for (MergedAnomalyResultDTO dto : mergedResults) {
-        idList.add(dto.getId());
+      for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
+        // if use notified flag, only keep anomalies isNotified == true
+        if ( (useNotified && mergedAnomaly.isNotified()) || !useNotified) {
+          anomalyIdList.add(mergedAnomaly.getId());
+        }
       }
     }
 
-    return idList;
+    return anomalyIdList;
   }
 
   // Activate anomaly function

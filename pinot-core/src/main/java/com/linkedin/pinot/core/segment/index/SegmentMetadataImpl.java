@@ -361,13 +361,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private void initStarTreeMetadata() {
     _starTreeMetadata = new StarTreeMetadata();
 
-    // Set the maxLeafRecords
-    String maxLeafRecordsString =
-        _segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
-    if (maxLeafRecordsString != null) {
-      _starTreeMetadata.setMaxLeafRecords(Long.valueOf(maxLeafRecordsString));
-    }
-
     // Set the splitOrder
     Iterator<String> iterator =
         _segmentMetadataPropertiesConfiguration.getList(MetadataKeys.StarTree.STAR_TREE_SPLIT_ORDER).iterator();
@@ -399,11 +392,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
     _starTreeMetadata.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
 
+    // Set the maxLeafRecords
+    String maxLeafRecordsString =
+        _segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
+    if (maxLeafRecordsString != null) {
+      _starTreeMetadata.setMaxLeafRecords(Integer.parseInt(maxLeafRecordsString));
+    }
+
     // Skip skip materialization cardinality.
     String skipMaterializationCardinalityString = _segmentMetadataPropertiesConfiguration.getString(
         MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY);
     if (skipMaterializationCardinalityString != null) {
-      _starTreeMetadata.setSkipMaterializationCardinality(Long.valueOf(skipMaterializationCardinalityString));
+      _starTreeMetadata.setSkipMaterializationCardinality(Integer.parseInt(skipMaterializationCardinalityString));
     }
   }
 

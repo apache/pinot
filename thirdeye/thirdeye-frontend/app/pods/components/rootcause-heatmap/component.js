@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import { getProperties, computed } from '@ember/object';
 import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendTail } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
@@ -13,7 +14,13 @@ const ROOTCAUSE_ROLE_VALUE = 'value';
 const ROOTCAUSE_ROLE_HEAD = 'head';
 const ROOTCAUSE_ROLE_TAIL = 'tail';
 
-const ROOTCAUSE_ROLLUP_RANGE_DEFAULT = [0, 10];
+const ROOTCAUSE_ROLLUP_RANGE = [0, 20];
+
+const ROOTCAUSE_MODE_MAPPING = {
+  'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
+  'Change in Contribution': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF,
+  'Contribution to Overall Change': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_TO_DIFF
+};
 
 export default Ember.Component.extend({
   //
@@ -30,15 +37,35 @@ export default Ember.Component.extend({
   //
   // internal
   //
-  rollupRange: null, // ""
 
-  mode: null, // ""
+  /**
+   * Selected heatmap mode
+   */
+  selectedMode: Object.keys(ROOTCAUSE_MODE_MAPPING)[0],
 
-  init() {
-    this._super(...arguments);
+  /**
+   * Lists out all heatmap mode options
+   */
+  modeOptions: Object.keys(ROOTCAUSE_MODE_MAPPING),
 
-    this.setProperties({ rollupRange: {}, mode: ROOTCAUSE_ROLLUP_MODE_CHANGE});
-  },
+  /**
+   * Mapping of human readable to mode option
+   */
+  modeMapping: ROOTCAUSE_MODE_MAPPING,
+
+  /**
+   * Computes the correct mode option based on the
+   * selected human readable option
+   * @type {String}
+   */
+  mode: computed('selectedMode', function() {
+    const {
+      selectedMode,
+      modeMapping
+    } = getProperties(this, 'selectedMode', 'modeMapping');
+
+    return modeMapping[selectedMode];
+  }),
 
   current: Ember.computed(
     'breakdowns',
@@ -114,7 +141,7 @@ export default Ember.Component.extend({
         // order based on current contribution
         const all = this._sortKeysByValue(current[n]).reverse();
 
-        const range = rollupRange[n] || ROOTCAUSE_ROLLUP_RANGE_DEFAULT;
+        const range = ROOTCAUSE_ROLLUP_RANGE;
         const head = _.slice(all, 0, range[0]);
         const visible = _.slice(all, range[0], range[1]);
         const tail = _.slice(all, range[1]);
@@ -151,31 +178,29 @@ export default Ember.Component.extend({
         cells[n] = [];
         const valid = values[n].filter(val => val.current);
 
-        const visibleTotal = valid.filter(v => v.role == ROOTCAUSE_ROLE_VALUE);
-        const currTotal = this._makeSum(visibleTotal, (v) => v.current);
-        const baseTotal = this._makeSum(visibleTotal, (v) => v.baseline);
-
-        const sizeCoeff = 1.0 - (valid.length - visibleTotal.length) / 2.0 * 0.20; // head & tail
+        const currTotal = this._makeSum(valid, (v) => v.current);
+        const baseTotal = this._makeSum(valid, (v) => v.baseline);
 
         valid.forEach((val, index) => {
           const curr = val.current;
           const base = val.baseline;
 
-          const [value, valueLabel] = this._makeValueLabel(val, transformation(curr, base, currTotal, baseTotal));
+          const [labelCurr, labelBase, labelChange] = transformation(curr, base, currTotal, baseTotal);
 
-          let size = curr / currTotal * sizeCoeff;
-          if (val.role != ROOTCAUSE_ROLE_VALUE) {
-            size = 0.10; // head or tail
-          }
+          const [value, labelValue] = this._makeValueLabel(val, labelChange);
+          const size = curr / currTotal;
 
           cells[n].push({
             index,
             role: val.role,
             dimName: val.dimName,
             dimValue: val.dimValue,
-            label: valueLabel,
+            label: labelValue,
             value: value, // percent, 2 commas
-            size: size // percent, 2 commas
+            size: size, // percent, 2 commas
+            current: Math.abs(labelCurr) <= 1 ? `${(labelCurr * 100).toFixed(2)}%` : labelCurr,
+            baseline: Math.abs(labelBase) <= 1 ? `${(labelBase * 100).toFixed(2)}%` : labelBase,
+            change: `${(value > 0 ? '+' : '') + (value * 100).toFixed(2)}%`
           });
         });
       });
@@ -197,10 +222,10 @@ export default Ember.Component.extend({
   _makeValueLabel(val, value) {
     if (val.role != ROOTCAUSE_ROLE_VALUE) {
       if (val.label == ROOTCAUSE_ROLLUP_HEAD) {
-        return [0, '<<'];
+        return [0, 'HEAD'];
       }
       if (val.label == ROOTCAUSE_ROLLUP_TAIL) {
-        return [0, '>>'];
+        return [0, 'OTHER'];
       }
       return [0, val.label];
     }
@@ -210,13 +235,13 @@ export default Ember.Component.extend({
   _makeTransformation(mode) {
     switch (mode) {
       case ROOTCAUSE_ROLLUP_MODE_CHANGE:
-        return (curr, base, currTotal, baseTotal) => curr / base - 1;
+        return (curr, base, currTotal, baseTotal) => [curr, base, curr / base - 1];
       case ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF:
-        return (curr, base, currTotal, baseTotal) => curr / currTotal - base / baseTotal;
+        return (curr, base, currTotal, baseTotal) => [curr / currTotal, base / baseTotal, curr / currTotal - base / baseTotal];
       case ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_TO_DIFF:
-        return (curr, base, currTotal, baseTotal) => (curr - base) / baseTotal;
+        return (curr, base, currTotal, baseTotal) => [(curr - base), baseTotal, (curr - base) / baseTotal];
     }
-    return (curr, base, currTotal, baseTotal) => 0;
+    return (curr, base, currTotal, baseTotal) => [-1, -1, -1];
   },
 
   _makeRollup(dimNameObj, head, visible, tail) {
@@ -254,17 +279,6 @@ export default Ember.Component.extend({
       const { rollupRange, selectedUrn, onSelection, currentUrn } =
         this.getProperties('rollupRange', 'selectedUrn', 'onSelection', 'currentUrn');
 
-      // scrolling
-      const range = rollupRange[dimName] || ROOTCAUSE_ROLLUP_RANGE_DEFAULT;
-      if (role === ROOTCAUSE_ROLE_HEAD) {
-        rollupRange[dimName] = range.map(v => v - 10);
-        this.set('rollupRange', Object.assign({}, rollupRange));
-      }
-      if (role === ROOTCAUSE_ROLE_TAIL) {
-        rollupRange[dimName] = range.map(v => v + 10);
-        this.set('rollupRange', Object.assign({}, rollupRange));
-      }
-
       // selection
       if (role === ROOTCAUSE_ROLE_VALUE) {
         const metricUrn = appendTail(selectedUrn, `${dimName}=${dimValue}`);
@@ -273,10 +287,6 @@ export default Ember.Component.extend({
           onSelection(updates);
         }
       }
-    },
-
-    onRollupRange(from, to) {
-      this.set('rollupRange', [parseInt(from), parseInt(to)]);
     }
   }
 });

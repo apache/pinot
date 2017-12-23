@@ -2,7 +2,7 @@ import Ember from 'ember';
 import moment from 'moment';
 import d3 from 'd3';
 import buildTooltip from 'thirdeye-frontend/helpers/build-tooltip';
-import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
+import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel, colorMapping } from 'thirdeye-frontend/helpers/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -37,10 +37,19 @@ export default Ember.Component.extend({
     show: true
   },
 
+  colorMapping: colorMapping,
+
   /**
    * Adding the buildTooltip Template helper to the this context
    */
   buildTooltip: buildTooltip,
+
+  /**
+   * custom height for split mode
+   */
+  splitChartHeight: {
+    height: 200
+  },
 
   tooltip: Ember.computed(
     'onHover',
@@ -228,9 +237,7 @@ export default Ember.Component.extend({
 
   _makeChartSeries(urns) {
     const { context } = this.getProperties('context');
-
-    const { anomalyRange, compareMode } = context;
-    const baselineRange = toBaselineRange(anomalyRange, compareMode);
+    const { anomalyRange } = context;
 
     const series = {};
     [...urns].forEach(urn => {
@@ -242,13 +249,6 @@ export default Ember.Component.extend({
       values: [0, 0],
       type: 'region',
       color: 'orange'
-    };
-
-    series['baselineRange'] = {
-      timestamps: baselineRange,
-      values: [0, 0],
-      type: 'region',
-      color: 'blue'
     };
 
     return series;
@@ -322,8 +322,8 @@ export default Ember.Component.extend({
   },
 
   _makeSeries(urn) {
-    const { entities, timeseries, timeseriesMode, _eventValues } =
-      this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues');
+    const { entities, timeseries, timeseriesMode, _eventValues, context } =
+      this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues', 'context');
 
     if (hasPrefix(urn, 'frontend:metric:current:')) {
       const metricEntity = entities[toMetricUrn(stripTail(urn))];
@@ -342,8 +342,8 @@ export default Ember.Component.extend({
       const series = {
         timestamps: timeseries[urn].timestamps,
         values: timeseries[urn].values,
-        color: metricEntity ? metricEntity.color : 'none',
-        type: 'scatter',
+        color: metricEntity ? 'light-' + metricEntity.color : 'none',
+        type: 'line',
         axis: 'y'
       };
 
@@ -351,8 +351,11 @@ export default Ember.Component.extend({
 
     } else if (hasPrefix(urn, 'thirdeye:event:')) {
       const val = _eventValues[urn];
+      const endRange = context.analysisRange[1];
+      const end = entities[urn].end <= 0 ? endRange : entities[urn].end;
+
       return {
-        timestamps: [entities[urn].start, entities[urn].end || entities[urn].start],
+        timestamps: [entities[urn].start, end],
         values: [val, val],
         color: entities[urn].color,
         type: 'line',

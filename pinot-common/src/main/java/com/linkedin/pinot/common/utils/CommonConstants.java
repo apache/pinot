@@ -257,11 +257,11 @@ public class CommonConstants {
   }
 
   public static class Minion {
-    public static final String MINION_HEADER = "Pinot-Minion-";
     public static final String INSTANCE_PREFIX = "Minion_";
     public static final String INSTANCE_TYPE = "minion";
     public static final String UNTAGGED_INSTANCE = "minion_untagged";
     public static final String METRICS_PREFIX = "pinot.minion.";
+    public static final String HTTP_TASK_TYPE_HEADER_PREFIX = "Pinot-Minion-";
 
     // Config keys
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
@@ -271,6 +271,7 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "data";
+    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
   }
 
   public static class Metric {
@@ -317,7 +318,10 @@ public class CommonConstants {
      * COMMITTING-20171210T09:31:55.765
      */
     public static final String SEGMENT_PUSH_STATUS = "segment.push.status";
-    public static final String CUSTOM_FIELDS = "custom.fields";
+    /**
+     * This field will be a map of minion task type : time task ran in millis.
+     */
+    public static final String TASK_SEGMENT_MODIFICATION_TIME = "task.segment.modification.time";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";

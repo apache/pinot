@@ -13,7 +13,7 @@ export default [
     "active": true,
     "emailConfig": {
       "anomalyWatermark": 0,
-      "functionIds": [10]
+      "functionIds": [1]
     },
     "reportConfigCollection": {
       "enabled": true,
@@ -40,7 +40,7 @@ export default [
     "active": true,
     "emailConfig": {
       "anomalyWatermark": 0,
-      "functionIds": [20]
+      "functionIds": [2]
     },
     "reportConfigCollection": {
       "enabled": true,

@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
-import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -94,12 +93,12 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() throws IOException {
+  public GenericRow next() {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) throws IOException {
+  public GenericRow next(GenericRow reuse) {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String fieldName = fieldSpec.getName();
       if (fieldSpec.isSingleValueField()) {
@@ -132,7 +131,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind() throws IOException {
+  public void rewind() {
     _nextDocId = 0;
   }
 
@@ -142,7 +141,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     _indexSegment.destroy();
   }
 }

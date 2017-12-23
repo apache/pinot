@@ -24,13 +24,18 @@
   }
 
   &__title {
-    color: app-shade(black,0.85);
+    color: app-shade(black,0.9);
     font-size: 21px;
     padding: 0;
     margin: 0;
     flex-grow: 1;
     overflow: hidden;
     text-overflow: ellipsis;
+    &--small {
+      font-weight: 600;
+      font-size: 16px;
+      line-height: 24px;
+    }
   }
 
   &__footer {

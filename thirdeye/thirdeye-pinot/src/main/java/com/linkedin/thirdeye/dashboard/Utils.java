@@ -3,12 +3,14 @@ package com.linkedin.thirdeye.dashboard;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -176,8 +178,16 @@ public class Utils {
   public static DateTimeZone getDataTimeZone(String collection)  {
     String timezone = TimeSpec.DEFAULT_TIMEZONE;
     try {
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      timezone = datasetConfig.getTimezone();
+      DatasetConfigDTO datasetConfig;
+      LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CACHE_REGISTRY.getDatasetConfigCache();
+      if (datasetConfigCache != null && datasetConfigCache.get(collection) != null) {
+        datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
+      } else {
+        datasetConfig = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(collection);
+      }
+      if (datasetConfig != null) {
+        timezone = datasetConfig.getTimezone();
+      }
     } catch (ExecutionException e) {
       LOG.error("Exception while getting dataset config for {}", collection);
     }

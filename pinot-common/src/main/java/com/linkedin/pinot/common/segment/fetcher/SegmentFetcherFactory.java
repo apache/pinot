@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,12 +31,14 @@ public class SegmentFetcherFactory {
   public static String SEGMENT_FETCHER_CLASS_KEY = "class";
 
   private static Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new ConcurrentHashMap<>();
+  private static Map<String, String> DEFAULT_SEGMENT_FETCHER_CLASSES = new HashMap<>();
 
   static {
-    instantiateSegmentFetcher("file", LocalFileSegmentFetcher.class);
-    instantiateSegmentFetcher("http", HttpSegmentFetcher.class);
-    instantiateSegmentFetcher("https", HttpsSegmentFetcher.class);
-    instantiateSegmentFetcher("hdfs", "com.linkedin.pinot.common.segment.fetcher.HdfsSegmentFetcher");
+    // If a class is not configured for a particular protocol, the following classes will be instantiated.
+    DEFAULT_SEGMENT_FETCHER_CLASSES.put("file", LocalFileSegmentFetcher.class.getName());
+    DEFAULT_SEGMENT_FETCHER_CLASSES.put("http", HttpSegmentFetcher.class.getName());
+    DEFAULT_SEGMENT_FETCHER_CLASSES.put("https", HttpsSegmentFetcher.class.getName());
+    DEFAULT_SEGMENT_FETCHER_CLASSES.put("hdfs", HdfsSegmentFetcher.class.getName());
   }
 
   private static <T extends SegmentFetcher> void instantiateSegmentFetcher(String protocol, Class<T> clazz) {
@@ -66,42 +69,33 @@ public class SegmentFetcherFactory {
   // A config for a protocol may not specify the class name, but specify other configs params (used in init())
   public static void initSegmentFetcherFactory(Configuration segmentFetcherFactoryConfig) {
 
-    // Iterate through the configs to fill the map with any new configured classes or Overridden classes.
+    // Iterate through the configs to instantiate any configured classes first.
     Iterator segmentFetcherFactoryConfigIterator = segmentFetcherFactoryConfig.getKeys();
     while (segmentFetcherFactoryConfigIterator.hasNext()) {
       Object configKeyObject = segmentFetcherFactoryConfigIterator.next();
+      if (!configKeyObject.toString().endsWith(SEGMENT_FETCHER_CLASS_KEY)) {
+        continue;
+      }
       String segmentFetcherConfigKey = configKeyObject.toString();
       String protocol = segmentFetcherConfigKey.split("\\.", 2)[0];
       Configuration protocolConfig = segmentFetcherFactoryConfig.subset(protocol);
       String configuredClassName = protocolConfig.getString(SEGMENT_FETCHER_CLASS_KEY);
       if (configuredClassName == null || configuredClassName.isEmpty()) {
-        // No class name configured for this protocol
-        if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
-          // If the class is in the map, then it should already be instantiated, we can
-          // still init it with the config provided.
-          String builtinClassName = SEGMENT_FETCHER_MAP.get(protocol).getClass().getName();
-          LOGGER.info("Using built-in class {} for protocol {}", builtinClassName, protocol);
+        if (DEFAULT_SEGMENT_FETCHER_CLASSES.containsKey(protocol)) {
+          LOGGER.warn("No class name provided for {}. Using built-in class {}", protocol,
+              DEFAULT_SEGMENT_FETCHER_CLASSES.get(protocol));
         } else {
-          // flag a warning since we only have a protocol name and no class name to instantiate.
-          LOGGER.warn("No class name given for protocol {}. Configuration ignored", protocol);
+          LOGGER.error("No class name provided for {}. Ignored");
         }
       } else {
-        // A class name has been configured for this protocol. If it is same as built-in class name,
-        // just use the one built-in, otherwise if it is different, then instantiate it and override it in the map.
-        if (SEGMENT_FETCHER_MAP.containsKey(protocol)) {
-          String builtinClassName = SEGMENT_FETCHER_MAP.get(protocol).getClass().getName();
-          if (builtinClassName.equals(configuredClassName)) {
-            LOGGER.info("Configured class {} same as built-in class name for protocol {}", configuredClassName, protocol);
-          } else {
-            LOGGER.info("Overriding class {} for protoocol {} with {}", builtinClassName, protocol, configuredClassName);
-            instantiateSegmentFetcher(protocol, configuredClassName);
-          }
-          // If any exception happens during instantiation, the original class will be retained.
-        } else {
-          LOGGER.info("Instantiating new configured class {} for protocol {}", configuredClassName, protocol);
-          instantiateSegmentFetcher(protocol, configuredClassName);
-          // If any exception happened while instantiating this class, it will not be in the map.
-        }
+        instantiateSegmentFetcher(protocol, configuredClassName);
+      }
+    }
+
+    // Make sure the default classes are instantiated if there is none configured for the supported protocols.
+    for (String protocol : DEFAULT_SEGMENT_FETCHER_CLASSES.keySet()) {
+      if (!SEGMENT_FETCHER_MAP.containsKey(protocol)) {
+        instantiateSegmentFetcher(protocol, DEFAULT_SEGMENT_FETCHER_CLASSES.get(protocol));
       }
     }
 

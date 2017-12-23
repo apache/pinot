@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardServiceExecutor;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
@@ -13,6 +15,7 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
@@ -28,6 +31,9 @@ import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.MapConfiguration;
+
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
@@ -43,6 +49,7 @@ public class ThirdEyeAnomalyApplication
   private AnomalyClassifierFactory anomalyClassifierFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
   private ClassificationJobScheduler classificationJobScheduler = null;
+  private DetectionOnboardServiceExecutor detectionOnboardServiceExecutor = null;
   private EmailResource emailResource = null;
 
   public static void main(final String[] args) throws Exception {
@@ -105,8 +112,7 @@ public class ThirdEyeAnomalyApplication
           detectionJobScheduler = new DetectionJobScheduler();
           detectionJobScheduler.start();
           environment.jersey().register(
-              new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory,
-                  emailResource));
+              new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {
@@ -133,33 +139,43 @@ public class ThirdEyeAnomalyApplication
         if (config.isPinotProxy()) {
           environment.jersey().register(new PinotDataSourceResource());
         }
+        if (config.isDetectionOnboard()) {
+          Configuration systemConfig = DetectionOnboardResource.toSystemConfiguration(config);
+
+          detectionOnboardServiceExecutor = new DetectionOnboardServiceExecutor();
+          detectionOnboardServiceExecutor.start();
+          environment.jersey().register(new DetectionOnboardResource(detectionOnboardServiceExecutor, systemConfig));
+        }
       }
 
       @Override
       public void stop() throws Exception {
-        if (config.isWorker()) {
+        if (taskDriver != null) {
           taskDriver.shutdown();
         }
-        if (config.isScheduler()) {
+        if (detectionJobScheduler != null) {
           detectionJobScheduler.shutdown();
         }
-        if (config.isMonitor()) {
+        if (monitorJobScheduler != null) {
           monitorJobScheduler.shutdown();
         }
-        if (config.isAlert()) {
+        if (alertJobSchedulerV2 != null) {
           alertJobSchedulerV2.shutdown();
         }
-        if (config.isAutoload()) {
+        if (autoOnboardService != null) {
           autoOnboardService.shutdown();
         }
-        if (config.isDataCompleteness()) {
+        if (dataCompletenessScheduler != null) {
           dataCompletenessScheduler.shutdown();
         }
-        if (config.isClassifier()) {
+        if (classificationJobScheduler != null) {
           classificationJobScheduler.shutdown();
         }
         if (config.isPinotProxy()) {
           // Do nothing
+        }
+        if (detectionOnboardServiceExecutor != null) {
+          detectionOnboardServiceExecutor.shutdown();
         }
       }
     });

@@ -11,4 +11,5 @@ export default function(server) {
    * Creates a mock anomaly on server start
    */
   server.createList('anomaly', 1);
+  server.createList('alert', 1);
 }

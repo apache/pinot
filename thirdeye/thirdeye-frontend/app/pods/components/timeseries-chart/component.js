@@ -22,6 +22,14 @@ export default Ember.Component.extend({
     }
   },
 
+  /**
+   * default height property for the chart
+   * May be overridden
+   */
+  height: {
+    height: 400
+  },
+
   tooltip: {
     format: {
       title: (d) => moment(d).format('MM/DD hh:mm a'),
@@ -69,16 +77,26 @@ export default Ember.Component.extend({
     enabled: true
   },
 
+  point: { // on init only
+    show: false
+  },
+
+  line: { // on init only
+    connectNull: true
+  },
+
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
     const colorMapping = this.get('colorMapping');
     const { axis, legend, tooltip } = this.getProperties('axis', 'legend', 'tooltip');
 
-    const addedKeys = Object.keys(series).filter(sid => !cache[sid]);
-    const changedKeys = Object.keys(series).filter(sid => cache[sid] && !_.isEqual(cache[sid], series[sid]));
+    const seriesKeys = Object.keys(series).sort();
+
+    const addedKeys = seriesKeys.filter(sid => !cache[sid]);
+    const changedKeys = seriesKeys.filter(sid => cache[sid] && !_.isEqual(cache[sid], series[sid]));
     const deletedKeys = Object.keys(cache).filter(sid => !series[sid]);
-    const regionKeys = Object.keys(series).filter(sid => series[sid] && series[sid].type == 'region');
+    const regionKeys = seriesKeys.filter(sid => series[sid] && series[sid].type == 'region');
 
     const regions = regionKeys.map(sid => {
       const t = series[sid].timestamps;
@@ -119,7 +137,7 @@ export default Ember.Component.extend({
   },
 
   _makeAxisRange(axis) {
-    const range = { min: {}, max: {}};
+    const range = { min: {}, max: {} };
     Object.keys(axis).filter(key => 'min' in axis[key]).forEach(key => range['min'][key] = axis[key]['min']);
     Object.keys(axis).filter(key => 'max' in axis[key]).forEach(key => range['max'][key] = axis[key]['max']);
     return range;
@@ -168,6 +186,9 @@ export default Ember.Component.extend({
     config.legend = diffConfig.legend;
     config.subchart = this.get('subchart');
     config.zoom = this.get('zoom');
+    config.size = this.get('height');
+    config.point = this.get('point');
+    config.line = this.get('line');
 
     this.set('_chart', c3.generate(config));
     this._updateCache();

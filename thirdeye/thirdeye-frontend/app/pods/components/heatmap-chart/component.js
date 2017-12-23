@@ -2,7 +2,6 @@ import Ember from 'ember';
 import _ from 'lodash';
 import d3 from 'd3';
 
-
 const { get } = Ember;
 
 // TODO: move to utils file
@@ -26,6 +25,12 @@ const getTextColor = function (factor = 0) {
 
 export default Ember.Component.extend({
   cells: null, // {}
+
+  /**
+   * ID Selector of the tooltip
+   * (in application/template.hbs)
+   */
+  tooltipId: '#heatmap-tooltip',
 
   /**
    * Bubbles the click up to the parent component
@@ -58,8 +63,9 @@ export default Ember.Component.extend({
    */
   _buildHeatmap() {
     const {
-      cells
-    } = this.getProperties('cells');
+      cells,
+      tooltipId
+    } = this.getProperties('cells', 'tooltipId');
 
     const dimensions = Object.keys(cells);
     if (!dimensions.length) { return; }
@@ -68,7 +74,7 @@ export default Ember.Component.extend({
       const dimensionPlaceHolderId = `#${dimension}-heatmap-placeholder`;
       const children = cells[dimension]
         .filter(({ size }) => size)
-        .map(({ label, size, value, dimName, dimValue, index, role }) => {
+        .map(({ label, size, value, dimName, dimValue, index, role, current, baseline, change }) => {
           return {
             label,
             value: size,
@@ -76,6 +82,9 @@ export default Ember.Component.extend({
             actualValue: value,
             dimName,
             dimValue,
+            current,
+            baseline,
+            change,
             role,
             index
           };
@@ -100,37 +109,44 @@ export default Ember.Component.extend({
         .nodes({ name: '0', children: children })
         .filter((node) => !node.children);
 
-      this._createCell(div, nodes);
+      this._createCell(div, nodes, tooltipId);
     });
   },
 
   /**
    * Builds an individual cell based on the provided div and nodes
    */
-  _createCell(div, nodes) {
+  _createCell(div, nodes, tooltipId) {
     const cell = div.selectAll('g')
       .data(nodes)
       .enter()
       .append('svg:g')
-      .attr('class', 'cell')
+      .attr('class', 'heatmap-chart__cell')
       .attr('transform', d => `translate(${d.x},${d.y})`);
 
     // tooltip
     cell.on('mousemove', (d) => {
+      if (d && d.role !== 'value') {
+        return;
+      }
       const tooltipWidth = 200;
       const xPosition = d3.event.pageX - (tooltipWidth + 20);
       const yPosition = d3.event.pageY + 5;
 
-      d3.select('#tooltip')
+      d3.select(`${tooltipId}`)
         .style('left', xPosition + 'px')
         .style('top', yPosition + 'px');
-      d3.select('#tooltip #heading')
-        .text(d.name);
-      d3.select('#tooltip #currentValue')
-        .text(d.actualValue);
-      d3.select('#tooltip').classed('hidden', false);
+      d3.select(`${tooltipId} #heading`)
+        .text(d.dimValue);
+      d3.select(`${tooltipId} #baseline`)
+        .text(d.baseline);
+      d3.select(`${tooltipId} #current`)
+        .text(d.current);
+      d3.select(`${tooltipId} #change`)
+        .text(d.change);
+      d3.select(`${tooltipId}`).classed('hidden', false);
     }).on('mouseout', function () {
-      d3.select('#tooltip').classed('hidden', true);
+      d3.select(`${tooltipId}`).classed('hidden', true);
     });
 
     // colored background
@@ -156,7 +172,13 @@ export default Ember.Component.extend({
           return text;
         }
       })
-      .style('fill', d => getTextColor(d.actualValue));
+      .style('fill', (d) => {
+        // return default color for icons
+        if (d.role !== 'value') {
+          return 'rgba(0,0,0,0.45)';
+        }
+        return getTextColor(d.actualValue)
+      });
 
     cell.on('click', get(this, 'heatmapClickHandler').bind(this));
   },

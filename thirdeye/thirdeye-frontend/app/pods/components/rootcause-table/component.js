@@ -30,15 +30,24 @@ export default Ember.Component.extend({
 
   /**
    * Returns a list of values to display in the rootcause table
+   * Add human readable date properties to the list of values
    * @type {Array[Objects]} - array of entities
    */
   data: Ember.computed(
     'records',
     function () {
       let values = Object.values(this.get('records'));
+      let format = 'ddd, MMM DD hh:mm A';
+
       values.forEach((value) => {
-        value.start = moment(value.start).format('dddd, MMMM Do YYYY');
-        value.end = moment(value.end).format('dddd, MMMM Do YYYY');
+        value.humanStart = moment(value.start).format(format);
+
+        // If this is an ongoing event
+        if (value.end <= 0) {
+          value.humanEnd = 'ongoing';
+        } else {
+          value.humanEnd = moment(value.end).format(format);
+        }
       });
       return values;
     }

@@ -1,6 +1,7 @@
 .rootcause-wrapper {
-  border-radius: 2px;
+  border-bottom: 1px solid $te-grey--border;
   display: flex;
+  position: relative;
 
   &__chart {
     display: flex;
@@ -33,4 +34,15 @@
   &__info {
     background-color: lighten($te-blue, 40%);
   }
+}
+
+.rootcause-label {
+  &__list {
+    padding-left: 8px;
+    margin-left: 8px;
+  }
+}
+
+.rootcause-alert {
+  margin: $te-spacing-lg 0 $te-spacing-lg 10px;
 }

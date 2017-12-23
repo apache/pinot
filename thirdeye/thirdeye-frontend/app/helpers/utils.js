@@ -4,31 +4,41 @@ import _ from 'lodash';
 
 // TODO load from config
 // colors for metrics
-const metricColors = [
+export const metricColors = [
   'blue',
   'green',
   'red',
   'purple',
   'orange',
   'teal',
-  'pink'
+  'pink',
+  'grey'
 ];
 
 // TODO load from config
 // colors mapping for charts
-const colorMapping = {
-  blue: '#0091CA',
-  green: '#469A1F',
-  red: '#FF2C33',
-  purple: '#827BE9',
+export const colorMapping = {
+  blue: '#0091CA', // 5/10
   orange: '#E55800',
   teal: '#0E95A0',
-  pink: '#FF1B90'
+  purple: '#827BE9',
+  red: '#FF2C33',
+  green: '#469A1F',
+  pink: '#FF1B90',
+  grey: '#878787',
+  'light-blue': '#98D8F4', // 2/10
+  'light-green': '#B5D99F',
+  'light-red': '#FFBCBA',
+  'light-purple': '#CACAFC',
+  'light-orange': '#F8C19E',
+  'light-teal': '#98DADE',
+  'light-pink': '#FFB9E2',
+  'light-grey': '#CFCFCF'
 };
 
 // TODO load from config
 // colors for events
-const eventColorMapping = {
+export const eventColorMapping = {
   holiday: 'green',
   informed: 'red',
   lix: 'purple',
@@ -213,6 +223,16 @@ export function toFilters(urns) {
   return [...dimensionFilters, ...metricFilters, ...frontendMetricFilters].sort();
 }
 
+export function fromFilterMap(filterMap) {
+  const filters = [];
+  Object.keys(filterMap).forEach(key => {
+    [...filterMap[key]].forEach(value => {
+      filters.push([key, value]);
+    })
+  });
+  return filters;
+}
+
 export function toFilterMap(filters) {
   const filterMap = {};
   filters.forEach(t => {
@@ -313,6 +333,11 @@ export default Ember.Helper.helper({
   toMetricLabel,
   toColor,
   humanizeFloat,
+  fromFilterMap,
+  appendFilters,
+  metricColors,
+  colorMapping,
+  eventColorMapping,
   buildDateEod,
   parseProps,
   postProps

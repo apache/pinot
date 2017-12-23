@@ -21,6 +21,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -32,6 +33,7 @@ import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -491,38 +493,29 @@ public class AnomaliesResource {
    * @param startTime start time utc (in millis)
    * @param endTime end time utc (in millis)
    * @param functionId anomaly function id
+   * @param dimensionMapJSONString if specified, only update feedback of the anomalies on the same dimension
    * @param feedbackType feedback type
    */
   @POST
   @Path(value = "/updateFeedbackRange/{startTime}/{endTime}/{functionId}")
   public void updateFeedbackForAnomalyFunctionAndTimeRange(
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime,
-      @PathParam("functionId") Long functionId,
-      @QueryParam("feedbackType") String feedbackType) {
+      @PathParam("startTime") @NotNull Long startTime,
+      @PathParam("endTime") @NotNull Long endTime,
+      @PathParam("functionId") @NotNull Long functionId,
+      @QueryParam("dimensionMap") @DefaultValue("") String dimensionMapJSONString,
+      @QueryParam("feedbackType") @NotNull String feedbackType) {
 
-    if (functionId == null) {
-      throw new IllegalArgumentException("Must provide functionId");
+    DimensionMap dimension = new DimensionMap();
+    if (StringUtils.isNotEmpty(dimensionMapJSONString)) {
+      dimension = new DimensionMap(dimensionMapJSONString);
     }
-
-    if (startTime == null) {
-      throw new IllegalArgumentException("Must provide startTime");
-    }
-
-    if (endTime == null) {
-      throw new IllegalArgumentException("Must provide endTime");
-    }
-
-    if (feedbackType == null) {
-      throw new IllegalArgumentException("Must provide feedbackType");
-    }
-
     // fetch anomalies
     List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.findByFunctionId(functionId, false);
 
     // apply feedback
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (anomaly.getStartTime() < endTime && startTime < anomaly.getEndTime()) {
+      if (anomaly.getStartTime() < endTime && startTime < anomaly.getEndTime()
+          && anomaly.getDimensions().equals(dimension)) {
         LOG.info("Updating feedback for anomaly id {}", anomaly.getId());
 
         AnomalyFeedback feedback = anomaly.getFeedback();
@@ -1108,7 +1101,7 @@ public class AnomaliesResource {
     return newFilterSet;
   }
 
-  private static Multimap<String, String> generateFilterSetWithDimensionMap(DimensionMap dimensionMap,
+  public static Multimap<String, String> generateFilterSetWithDimensionMap(DimensionMap dimensionMap,
       Multimap<String, String> filterSet) {
 
     Multimap<String, String> newFilterSet = HashMultimap.create();

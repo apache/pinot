@@ -22,8 +22,8 @@ import org.apache.helix.task.TaskConfig;
 
 
 public class PinotTaskConfig {
-  private static final String TASK_COMMAND_KEY = "TASK_COMMAND";
-  private static final String TASK_ID_KEY = "TASK_ID";
+  public static final String TASK_COMMAND_KEY = "TASK_COMMAND";
+  public static final String TASK_ID_KEY = "TASK_ID";
 
   private final String _taskType;
   private final Map<String, String> _configs;

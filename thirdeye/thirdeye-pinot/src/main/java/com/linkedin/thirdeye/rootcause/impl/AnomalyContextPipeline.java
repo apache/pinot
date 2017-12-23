@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -106,13 +108,18 @@ public class AnomalyContextPipeline extends Pipeline {
       output.add(TimeRangeEntity.fromRange(0.8, TimeRangeEntity.TYPE_BASELINE, start - this.baselineOffset, end - this.baselineOffset));
       output.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_ANALYSIS, end - this.analysisWindow, end));
 
-      // metric
-      output.add(MetricEntity.fromMetric(1.0, metricId));
-
-      // dimension filters
+      // filters
+      Multimap<String, String> filters = ArrayListMultimap.create();
       for (Map.Entry<String, String> entry : anomalyDTO.getDimensions().entrySet()) {
+        filters.put(entry.getKey(), entry.getValue());
+
+        // TODO deprecate dimension entity?
         output.add(DimensionEntity.fromDimension(1.0, entry.getKey(), entry.getValue(), DimensionEntity.TYPE_PROVIDED));
       }
+
+      // metric
+      output.add(MetricEntity.fromMetric(1.0, metricId, filters));
+
     }
 
     return new PipelineResult(context, output);

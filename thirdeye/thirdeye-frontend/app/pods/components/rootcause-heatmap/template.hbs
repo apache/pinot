@@ -1,7 +1,16 @@
-color
-| <button {{action (mut mode) "change"}}>change</button>
-| <button {{action (mut mode) "contributionDiff"}}>contribution diff</button>
-| <button {{action (mut mode) "contributionToDiff"}}>contribution to diff</button>
+<div class="row">
+  <div class="col-xs-4 pull-right">
+    <label class="te-label te-label--small" for="select-heatmap-mode">Mode: </label>
+    {{#power-select 
+      triggerId="select-heatmap-mode"
+      selected=selectedMode
+      options=modeOptions
+      onchange=(action (mut selectedMode))
+      as |mode|}}
+      {{mode}}
+    {{/power-select}}
+  </div>
+</div>
 
 {{#unless hasCurrent}}
   <div class="rootcause-message rootcause-message__warning">No data for current range</div>

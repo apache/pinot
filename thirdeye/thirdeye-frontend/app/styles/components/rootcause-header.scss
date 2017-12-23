@@ -1,25 +1,26 @@
 .rootcause-header {
+  background-color: white;
+  padding: 24px 0;
+
   &__major {
-    font-size: 32px;
-    font-weight: bold;
+    font-size: 24px;
+    font-weight: 600;
+    color: app-shade(black, 9);
+    margin: 0;
   }
-
-  &__minor {
-
-  }
-
   &__side {
-    text-align: right;
+    display: flex;
+    align-items: flex-end;
+  }
+
+  &__title {
+    display: flex;
   }
 
   &--textarea {
     resize: none;
     border: none;
     background: none;
-
-    &:hover {
-      background-color: white;
-    }
   }
 
   &--button {

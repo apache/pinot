@@ -128,10 +128,25 @@ public class TestRootcauseSessionManager {
   }
 
   @Test
+  public void testFindByUpdatedRange() {
+    this.sessionDAO.save(makeUpdated(800));
+    this.sessionDAO.save(makeUpdated(900));
+    this.sessionDAO.save(makeUpdated(1000));
+
+    List<RootcauseSessionDTO> sessionsBefore = this.sessionDAO.findByUpdatedRange(700, 800);
+    List<RootcauseSessionDTO> sessionsMid = this.sessionDAO.findByUpdatedRange(800, 1000);
+    List<RootcauseSessionDTO> sessionsEnd = this.sessionDAO.findByUpdatedRange(1000, 1500);
+
+    Assert.assertEquals(sessionsBefore.size(), 0);
+    Assert.assertEquals(sessionsMid.size(), 2);
+    Assert.assertEquals(sessionsEnd.size(), 1);
+  }
+
+  @Test
   public void testFindByAnomalyRange() {
-    this.sessionDAO.save(makeAnomaly(1000, 1200));
-    this.sessionDAO.save(makeAnomaly(1100, 1150));
-    this.sessionDAO.save(makeAnomaly(1150, 1300));
+    this.sessionDAO.save(makeAnomalyRange(1000, 1200));
+    this.sessionDAO.save(makeAnomalyRange(1100, 1150));
+    this.sessionDAO.save(makeAnomalyRange(1150, 1300));
 
     List<RootcauseSessionDTO> sessionsBefore = this.sessionDAO.findByAnomalyRange(0, 1000);
     List<RootcauseSessionDTO> sessionsMid = this.sessionDAO.findByAnomalyRange(1000, 1100);
@@ -160,9 +175,27 @@ public class TestRootcauseSessionManager {
     Assert.assertEquals(sessions3.size(), 0);
   }
 
+  @Test
+  public void testFindByAnomalyId() {
+    this.sessionDAO.save(makeAnomaly(0));
+    this.sessionDAO.save(makeAnomaly(1));
+    this.sessionDAO.save(makeAnomaly(1));
+    this.sessionDAO.save(makeAnomaly(2));
+
+    List<RootcauseSessionDTO> sessions0 = this.sessionDAO.findByAnomalyId(0);
+    List<RootcauseSessionDTO> sessions1 = this.sessionDAO.findByAnomalyId(1);
+    List<RootcauseSessionDTO> sessions2 = this.sessionDAO.findByAnomalyId(2);
+    List<RootcauseSessionDTO> sessions3 = this.sessionDAO.findByAnomalyId(3);
+
+    Assert.assertEquals(sessions0.size(), 1);
+    Assert.assertEquals(sessions1.size(), 2);
+    Assert.assertEquals(sessions2.size(), 1);
+    Assert.assertEquals(sessions3.size(), 0);
+  }
+
   private static RootcauseSessionDTO makeDefault() {
-    return DaoTestUtils.getTestRootcauseSessionResult(1000, 1100, 1500, "myname", "myowner",
-        "mytext", "mygranularity", "mycomparemode", 12345L);
+    return DaoTestUtils.getTestRootcauseSessionResult(1000, 1100, 1500, 2000, "myname", "myowner",
+        "mytext", "mygranularity", "mycomparemode", 12345L, 1234L);
   }
 
   private static RootcauseSessionDTO makeName(String name) {
@@ -183,7 +216,19 @@ public class TestRootcauseSessionManager {
     return session;
   }
 
-  private static RootcauseSessionDTO makeAnomaly(long start, long end) {
+  private static RootcauseSessionDTO makeUpdated(long updated) {
+    RootcauseSessionDTO session = makeDefault();
+    session.setUpdated(updated);
+    return session;
+  }
+
+  private static RootcauseSessionDTO makeAnomaly(long anomalyId) {
+    RootcauseSessionDTO session = makeDefault();
+    session.setAnomalyId(anomalyId);
+    return session;
+  }
+
+  private static RootcauseSessionDTO makeAnomalyRange(long start, long end) {
     RootcauseSessionDTO session = makeDefault();
     session.setAnomalyRangeStart(start);
     session.setAnomalyRangeEnd(end);

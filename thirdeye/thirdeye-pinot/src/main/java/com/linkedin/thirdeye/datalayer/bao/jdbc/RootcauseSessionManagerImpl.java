@@ -53,8 +53,18 @@ public class RootcauseSessionManagerImpl extends AbstractManagerImpl<RootcauseSe
   }
 
   @Override
+  public List<RootcauseSessionDTO> findByUpdatedRange(long start, long end) {
+    return findByPredicate(Predicate.AND(Predicate.GE("updated", start), Predicate.LT("updated", end)));
+  }
+
+  @Override
   public List<RootcauseSessionDTO> findByPreviousId(long id) {
     return findByPredicate(Predicate.EQ("previousId", id));
+  }
+
+  @Override
+  public List<RootcauseSessionDTO> findByAnomalyId(long id) {
+    return findByPredicate(Predicate.EQ("anomalyId", id));
   }
 
   private List<RootcauseSessionDTO> findByLike(Set<String> fragments, String template, String key) {

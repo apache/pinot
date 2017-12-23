@@ -2,6 +2,22 @@
   background-color: white;
   border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 6px 9px 0 rgba(0,0,0,0.2);
+  color: app-shade(black, 0.9);
+  font-size: 14px;
+  text-shadow: none;
+
+  &--large {
+    max-width: 360px;
+    padding: 0;
+  }
+
+  &__title {
+    font-size: 16px; 
+    font-weight: 600;
+    &__small {
+      font-size: 14px;
+    }
+  }
 
   &__header {
     border-bottom: 1px solid app-shade(black, 0.15);
@@ -10,11 +26,17 @@
     font-size: 14px;
     color: app-shade(black, 0.9);
     line-height: 20px;
+    &--no-border {
+      border-bottom: none;
+    }
   }
 
   &__body {
     padding: 16px;
     max-width: 250px;
+    &--large {
+      max-width: unset;
+    }
   }
 
   &__item {

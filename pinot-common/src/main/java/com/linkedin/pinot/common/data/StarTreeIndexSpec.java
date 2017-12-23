@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.common.collect.Sets;
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -28,11 +30,13 @@ import org.codehaus.jackson.map.ObjectMapper;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StarTreeIndexSpec {
-  public static final Integer DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
+  public static final int DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
   public static final int DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD = 10000;
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   /** The upper bound on the number of leaf records to be scanned for any query */
-  private Integer _maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
+  private int _maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
 
   /** Dimension split order (if null or absent, descending w.r.t. dimension cardinality) */
   private List<String> _dimensionsSplitOrder;
@@ -44,21 +48,12 @@ public class StarTreeIndexSpec {
 
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-  public StarTreeIndexSpec() {
-  }
-
-  public static StarTreeIndexSpec fromJsonString(String jsonString) throws Exception {
-    return OBJECT_MAPPER.readValue(jsonString, StarTreeIndexSpec.class);
-  }
-
-  public Integer getMaxLeafRecords() {
+  public int getMaxLeafRecords() {
     return _maxLeafRecords;
   }
 
-  public void setMaxLeafRecords(Integer maxLeafRecords) {
-    this._maxLeafRecords = maxLeafRecords;
+  public void setMaxLeafRecords(int maxLeafRecords) {
+    _maxLeafRecords = maxLeafRecords;
   }
 
   public List<String> getDimensionsSplitOrder() {
@@ -118,8 +113,23 @@ public class StarTreeIndexSpec {
    * @return StarTreeIndexSpec object de-serialized from the file.
    * @throws IOException
    */
-  public static StarTreeIndexSpec fromFile(File starTreeIndexSpecFile)
-      throws IOException {
+  public static StarTreeIndexSpec fromFile(File starTreeIndexSpecFile) throws IOException {
     return OBJECT_MAPPER.readValue(starTreeIndexSpecFile, StarTreeIndexSpec.class);
+  }
+
+  public static StarTreeIndexSpec fromJsonString(String jsonString) throws IOException {
+    return OBJECT_MAPPER.readValue(jsonString, StarTreeIndexSpec.class);
+  }
+
+  public static StarTreeIndexSpec fromStarTreeMetadata(StarTreeMetadata starTreeMetadata) {
+    StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
+    starTreeIndexSpec.setMaxLeafRecords(starTreeMetadata.getMaxLeafRecords());
+    starTreeIndexSpec.setDimensionsSplitOrder(starTreeMetadata.getDimensionsSplitOrder());
+    starTreeIndexSpec.setSkipStarNodeCreationForDimensions(
+        Sets.newHashSet(starTreeMetadata.getSkipStarNodeCreationForDimensions()));
+    starTreeIndexSpec.setSkipMaterializationForDimensions(
+        Sets.newHashSet(starTreeMetadata.getSkipMaterializationForDimensions()));
+    starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(starTreeMetadata.getSkipMaterializationCardinality());
+    return starTreeIndexSpec;
   }
 }

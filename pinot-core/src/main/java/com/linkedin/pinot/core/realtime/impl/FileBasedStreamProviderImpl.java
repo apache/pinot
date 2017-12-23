@@ -53,7 +53,7 @@ public class FileBasedStreamProviderImpl implements StreamProvider {
     if (_recordReader.hasNext()) {
       _currentOffset++;
       try {
-        return _recordReader.next();
+        return _recordReader.next(destination);
       } catch (IOException e) {
         Utils.rethrowException(e);
       }

@@ -21,12 +21,18 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.mockito.ArgumentCaptor;
 import org.testng.Assert;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 public class SegmentFetcherFactoryTest {
+
+  @BeforeTest
+  public void setUp() {
+    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
+  }
 
   @Test
   public void testInitSegmentFetcherFactory() throws Exception {
@@ -61,16 +67,22 @@ public class SegmentFetcherFactoryTest {
 
   @Test
   public void testGetSegmentFetcherBasedOnURI() throws Exception {
+    Configuration configuration = new PropertiesConfiguration();
+    configuration.addProperty("https.ssl.server.enable-verification", "false");
+    SegmentFetcherFactory.initSegmentFetcherFactory(configuration);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("hdfs:///something/wer") instanceof HdfsSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://") instanceof HttpsSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("file://a/asdf/wer/fd/e") instanceof LocalFileSegmentFetcher);
-
     Assert.assertNull(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
   }
 
   @Test
   public void testGetSegmentFetcherBasedOnURIFailed() throws Exception {
+    Configuration configuration = new PropertiesConfiguration();
+    SegmentFetcherFactory.initSegmentFetcherFactory(configuration);
+    // If HttpsSegmentFetcher is not configured correctly, it fails to initialize.
+    Assert.assertNull(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://"));
     try {
       SegmentFetcherFactory.getSegmentFetcherBasedOnURI("");
     } catch (UnsupportedOperationException ex) {

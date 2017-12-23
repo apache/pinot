@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, toBaselineUrn, filterPrefix, toBaselineRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, toBaselineUrn, toBaselineRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -10,8 +10,14 @@ export default Ember.Service.extend({
 
   pending: null, // Set
 
+  errors: null, // Set({ urn, error })
+
   init() {
-    this.setProperties({ timeseries: {}, context: {}, pending: new Set() });
+    this.setProperties({ timeseries: {}, context: {}, pending: new Set(), errors: new Set() });
+  },
+
+  clearErrors() {
+    this.setProperties({ errors: new Set() });
   },
 
   request(requestContext, urns) {
@@ -76,20 +82,10 @@ export default Ember.Service.extend({
     Object.keys(json).forEach(range =>
       Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
         const jrng = json[range];
-        const jval = jrng[sid];
-
-        const timestamps = [];
-        const values = [];
-        jrng.timestamp.forEach((t, i) => {
-          if (jval[i] != null) {
-            timestamps.push(t);
-            values.push(jval[i]);
-          }
-        });
 
         timeseries[urn] = {
-          timestamps: timestamps,
-          values: values
+          timestamps: jrng.timestamp,
+          values: jrng[sid]
         };
       })
     );
@@ -111,8 +107,7 @@ export default Ember.Service.extend({
   _fetchSlice(urn, range, context, offsetFunc) {
     const metricId = urn.split(':')[3];
     const metricFilters = toFilters([urn]);
-    const contextFilters = toFilters(filterPrefix(context.urns, 'thirdeye:dimension:'));
-    const filters = toFilterMap(metricFilters.concat(contextFilters));
+    const filters = toFilterMap(metricFilters);
 
     const filterString = encodeURIComponent(JSON.stringify(filters));
 
@@ -121,6 +116,19 @@ export default Ember.Service.extend({
       .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))
       .then(res => offsetFunc(res))
-      .then(res => this._complete(context, res));
+      .then(res => this._complete(context, res))
+      .catch(error => this._handleError(urn, error));
+  },
+
+  _handleError(urn, error) {
+    const { errors, pending } = this.getProperties('errors', 'pending');
+
+    const newError = urn;
+    const newErrors = new Set([...errors, newError]);
+
+    const newPending = new Set(pending);
+    newPending.delete(urn);
+
+    this.setProperties({ errors: newErrors, pending: newPending });
   }
 });

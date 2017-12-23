@@ -1,0 +1,9 @@
+.heatmap-chart {
+  &__cell {
+    cursor: pointer;
+
+    &--icon {
+      font-family:'Glyphicons Halflings';
+    }
+  }
+}

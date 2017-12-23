@@ -2,12 +2,17 @@ import Ember from 'ember';
 import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toColor, checkStatus, toFilters, appendFilters } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
-import CryptoJS from 'cryptojs';
 import _ from 'lodash';
+import fetch from 'fetch';
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
 const ROOTCAUSE_TAB_EVENTS = "events";
+
+const ROOTCAUSE_SERVICE_ENTITIES = "entities";
+const ROOTCAUSE_SERVICE_TIMESERIES = "timeseries";
+const ROOTCAUSE_SERVICE_AGGREGATES = "aggregates";
+const ROOTCAUSE_SERVICE_BREAKDOWNS = "breakdowns";
 
 // TODO: Update module import to comply by new Ember standards
 
@@ -217,44 +222,27 @@ export default Ember.Controller.extend({
     }
   ),
 
-  isLoadingEntities: Ember.computed(
-    'entitiesService.pending',
-    function () {
-      return this.get('entitiesService.pending').size > 0;
-    }
-  ),
+  isLoadingEntities: Ember.computed.gt('entitiesService.pending.size', 0),
 
-  isLoadingTimeseries: Ember.computed(
-    'timeseriesService.pending',
-    function () {
-      return this.get('timeseriesService.pending').size > 0;
-    }
-  ),
+  isLoadingTimeseries: Ember.computed.gt('timeseriesService.pending.size', 0),
 
-  isLoadingAggregates: Ember.computed(
-    'aggregatesService.pending',
-    function () {
-      return this.get('aggregatesService.pending').size > 0;
-    }
-  ),
+  isLoadingAggregates: Ember.computed.gt('aggregatesService.pending.size', 0),
 
-  isLoadingBreakdowns: Ember.computed(
-    'breakdownsService.pending',
-    function () {
-      return this.get('breakdownsService.pending').size > 0;
-    }
-  ),
+  isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
 
-  isLoading: Ember.computed(
-    'isLoadingEntities',
-    'isLoadingTimeseries',
-    'isLoadingAggregates',
-    'isLoadingBreakdowns',
-    function () {
-      const { isLoadingEntities, isLoadingTimeseries, isLoadingAggregates, isLoadingBreakdowns } =
-        this.getProperties('isLoadingEntities', 'isLoadingTimeseries', 'isLoadingAggregates', 'isLoadingBreakdowns');
-      return isLoadingEntities || isLoadingTimeseries || isLoadingAggregates || isLoadingBreakdowns;
-    }
+  hasErrorsEntities: Ember.computed.gt('entitiesService.errors.size', 0),
+
+  hasErrorsTimeseries: Ember.computed.gt('timeseriesService.errors.size', 0),
+
+  hasErrorsAggregates: Ember.computed.gt('aggregatesService.errors.size', 0),
+
+  hasErrorsBreakdowns: Ember.computed.gt('breakdownsService.errors.size', 0),
+
+  hasErrors: Ember.computed.or(
+    'hasErrorsEntities',
+    'hasErrorsTimeseries',
+    'hasErrorsAggregates',
+    'hasErrorsBreakdowns'
   ),
 
   _makeSession() {
@@ -357,27 +345,6 @@ export default Ember.Controller.extend({
     },
 
     /**
-     * Updates selected urns for the heatmap (appends selected filters as tail).
-     * @see onSelection(updates)
-     *
-     * @param {updates}
-     * @returns {undefined}
-     */
-    heatmapOnSelection(updates) {
-      const { context } = this.getProperties('context');
-
-      const filters = toFilters(context.urns);
-
-      const newUpdates = Object.keys(updates).reduce((agg, urn) => {
-        const urnAugmented = appendFilters(urn, filters);
-        agg[urnAugmented] = updates[urn];
-        return agg;
-      }, {});
-
-      this.send('onSelection', newUpdates);
-    },
-
-    /**
      * Sets the session name and text
      *
      * @param {String} name session name/title
@@ -442,6 +409,109 @@ export default Ember.Controller.extend({
       const jsonString = JSON.stringify({ feedbackType: feedback, comment });
 
       return fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
+    },
+
+    /**
+     * Selects a new primary urn for the search context.
+     *
+     * @param {object} updates (see onSelection, extracts "thirdeye:metric:" only)
+     * @returns {undefined}
+     */
+    onPrimaryChange(updates) {
+      const { context } = this.getProperties('context');
+
+      const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
+      const nonMetricUrns = [...context.urns].filter(urn => !urn.startsWith('thirdeye:metric:'));
+
+      const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...metricUrns]) });
+
+      this.send('onContext', newContext);
+    },
+
+    /**
+     * Updates selected urns by adding the current primary metric.
+     *
+     * @returns {undefined}
+     */
+    onPrimarySelection() {
+      const { context } = this.getProperties('context');
+
+      const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+      const currentUrns = metricUrns.map(toCurrentUrn);
+      const baselineUrns = metricUrns.map(toBaselineUrn);
+
+      const updates = [...metricUrns, ...currentUrns, ...baselineUrns].reduce((agg, urn) => {
+        agg[urn] = true;
+      return agg;
+    }, {});
+
+      this.send('onSelection', updates);
+    },
+
+    /**
+     * Selects a new anomalyRange and compareMode for the search context.
+     *
+     * @param {Int} start anomaly range start (in millis)
+     * @param {Int} end anomaly range end (in millis)
+     * @param {String} compareMode
+     */
+    onComparisonChange(start, end, compareMode) {
+      const { context } = this.getProperties('context');
+
+      const newContext = Object.assign({}, context, {
+        anomalyRange: [start, end],
+        compareMode
+      });
+
+      this.send('onContext', newContext);
+    },
+
+    /**
+     * Updates selected urns for the heatmap (appends selected filters as tail).
+     * @see onSelection(updates)
+     *
+     * @param {Object} updates
+     * @returns {undefined}
+     */
+    heatmapOnSelection(updates) {
+      const { context } = this.getProperties('context');
+
+      const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
+      const nonMetricUrns = [...context.urns].filter(urn => !urn.startsWith('thirdeye:metric:'));
+
+      const filters = toFilters(Object.keys(updates));
+      const newMetricUrns = metricUrns.map(urn => appendFilters(urn, filters));
+
+      const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...newMetricUrns]) });
+
+      this.send('onContext', newContext);
+    },
+
+    /**
+     * Clears error logs of data services
+     */
+    clearErrors(type) {
+      const { entitiesService, timeseriesService, aggregatesService, breakdownsService } =
+        this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
+
+      switch(type) {
+        case ROOTCAUSE_SERVICE_ENTITIES:
+          entitiesService.clearErrors();
+          break;
+
+        case ROOTCAUSE_SERVICE_TIMESERIES:
+          timeseriesService.clearErrors();
+          break;
+
+        case ROOTCAUSE_SERVICE_AGGREGATES:
+          aggregatesService.clearErrors();
+          break;
+
+        case ROOTCAUSE_SERVICE_BREAKDOWNS:
+          breakdownsService.clearErrors();
+          break;
+
+      }
     }
   }
 });

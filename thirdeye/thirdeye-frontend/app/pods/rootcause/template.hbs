@@ -1,73 +1,101 @@
-{{!-- TODO: replace with loading spinner --}}
-{{#if isLoading}}
-  <p>loading
-    {{#if isLoadingEntities}}
-      | ENTITIES
-    {{/if}}
-    {{#if isLoadingTimeseries}}
-      | TIMESERIES
-    {{/if}}
-    {{#if isLoadingAggregates}}
-      | AGGREGATES
-    {{/if}}
-    {{#if isLoadingBreakdowns}}
-      | BREAKDOWNS
-    {{/if}}
-  </p>
-{{/if}}
+
+{{rootcause-header
+  sessionId=sessionId
+  sessionName=sessionName
+  sessionText=sessionText
+  sessionModified=sessionModified
+  onChange=(action "onSessionChange")
+  onSave=(action "onSessionSave")
+  onCopy=(action "onSessionCopy")}}
 
 <div class="container">
-  <div class="row">
-    {{rootcause-header
-      sessionId=sessionId
-      sessionName=sessionName
-      sessionText=sessionText
-      sessionModified=sessionModified
-      onChange=(action "onSessionChange")
-      onSave=(action "onSessionSave")
-      onCopy=(action "onSessionCopy")
-    }}
-  </div>
-
   {{#if anomalyUrn}}
-    <div class="row">
-      {{rootcause-anomaly
-        entities=entities
-        anomalyUrn=anomalyUrn
-        onFeedback=(action "onFeedback")
-      }}
-    </div>
+    {{rootcause-anomaly
+      entities=entities
+      anomalyUrn=anomalyUrn
+      onFeedback=(action "onFeedback")
+    }}
   {{/if}}
 
-  <div class="row">
-    <div class="card-container card-container--box-shadow">
-      <div class="rootcause-wrapper">
-        {{rootcause-legend
+  <div class="card-container card-container--box-shadow">
+    <div class="rootcause-wrapper">
+      {{rootcause-legend
+        entities=entities
+        selectedUrns=selectedUrns
+        invisibleUrns=invisibleUrns
+        onVisibility=(action "onVisibility")
+        onSelection=(action "onSelection")
+      }}
+      <div class="container rootcause-wrapper__chart">
+        {{rootcause-chart-toolbar
+          context=context
+          timeseriesMode=timeseriesMode
+          onContext=(action "onContext")
+          onChart=(action "onChart")
+        }}
+        {{#if isLoadingTimeseries}}
+          <div class="spinner-wrapper spinner-wrapper--card">
+            {{ember-spinner}}
+          </div>
+        {{/if}}
+        {{rootcause-chart
           entities=entities
-          selectedUrns=selectedUrns
-          invisibleUrns=invisibleUrns
-          onVisibility=(action "onVisibility")
-          onSelection=(action "onSelection")}}
-        <div class="rootcause-wrapper__chart">
-          {{rootcause-chart-toolbar
-            context=context
-            timeseriesMode=timeseriesMode
-            onContext=(action "onContext")
-            onChart=(action "onChart")}}
-          {{rootcause-chart
-            entities=entities
-            selectedUrns=chartSelectedUrns
-            timeseries=timeseries
-            timeseriesMode=timeseriesMode
-            context=context
-            onHover=(action "chartOnHover")}}
-        </div>
+          selectedUrns=chartSelectedUrns
+          timeseries=timeseries
+          timeseriesMode=timeseriesMode
+          context=context
+          onHover=(action "chartOnHover")
+        }}
+        {{rootcause-select-comparison-range
+          range=context.anomalyRange
+          compareMode=context.compareMode
+          onChange=(action "onComparisonChange")
+        }}
       </div>
     </div>
-  </div>
+    {{#if hasErrors}}
+      {{#if hasErrorsEntities}}
+        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "entities"}}>&times;</a>
+          Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
 
-  <div class="row">
-    <div class="card-container card-container--box-shadow">
+      {{#if hasErrorsTimeseries}}
+        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "timeseries"}}>&times;</a>
+          Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+
+      {{#if hasErrorsAggregates}}
+        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "aggregates"}}>&times;</a>
+          Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+
+      {{#if hasErrorsBreakdowns}}
+        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "breakdowns"}}>&times;</a>
+          Could not load dimensions:{{#each breakdownsService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+    {{/if}}
+
+    <div class="card-container card-container--space-around">
+      <div class="card-container__row card-container__row--flex row">
+        <div class="col-xs-10">
+          {{rootcause-select-metric-dimension
+            selectedUrn=metricUrn
+            onSelection=(action "onPrimaryChange")
+          }}
+        </div>
+        <div class="col-xs-2">
+          <a class="thirdeye-link thirdeye-link--settings" {{action "onPrimarySelection"}}>+ add to chart</a>
+        </div>
+      </div>
+
       <div class="card-container__header">
         <div class="card-container__subnav">
           <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
@@ -75,34 +103,27 @@
           </a>
         </div>
         <div class="card-container__subnav">
-          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
-            Events
-          </a>
-        </div>
-        <div class="card-container__subnav">
           <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
             Metrics
           </a>
         </div>
-      </div>
-      <div class="card-container__body">
-        <div class="row">
-          {{rootcause-settings
-            context=context
-            config=settingsConfig
-            onChange=(action "onContext")
-            onSelection=(action "onSelection")
-          }}
+        <div class="card-container__subnav">
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
+            Events
+          </a>
         </div>
+      </div>
+
+      <div class="card-container__body">
         <div class="row">
           <div class="col-xs-12">
             {{#if (eq activeTab "dimensions")}}
-              <h3>Dimensions</h3>
               {{#if isLoadingBreakdowns}}
                 <div class="spinner-wrapper spinner-wrapper--card">
                   {{ember-spinner}}
                 </div>
               {{/if}}
+
               {{rootcause-heatmap
                 entities=entities
                 breakdowns=breakdowns
@@ -112,10 +133,14 @@
             {{/if}}
 
             {{#if (eq activeTab "metrics")}}
-              <h3>Metrics</h3>
+              {{#if isLoadingAggregates}}
+                <div class="spinner-wrapper spinner-wrapper--card">
+                  {{ember-spinner}}
+                </div>
+              {{/if}}
+
               {{rootcause-metrics
                 entities=entities
-                isLoading=isLoadingAggregates
                 aggregates=aggregates
                 selectedUrns=selectedUrns
                 onSelection=(action "onSelection")
@@ -123,7 +148,6 @@
             {{/if}}
 
             {{#if (eq activeTab "events")}}
-              <h3>Events</h3>
               <div class="row">
                 <div class="col-xs-3">
                   {{filter-bar
@@ -131,12 +155,14 @@
                     entities=eventFilterEntities
                     onFilter=(action "onFilter")}}
                 </div>
+
                 <div class="col-xs-9">
                   {{#if isLoadingEntities}}
                     <div class="spinner-wrapper spinner-wrapper--card">
                       {{ember-spinner}}
                     </div>
                   {{/if}}
+
                   {{rootcause-table
                     entities=eventTableEntities
                     columns=eventTableColumns
@@ -151,5 +177,4 @@
       </div>
     </div>
   </div>
-
 </div>
