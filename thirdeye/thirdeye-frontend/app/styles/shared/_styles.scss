@@ -7,6 +7,12 @@ body {
   margin: 0;
 }
 
+.te-text {
+  &--strong {
+    font-weight: bold;
+  }
+}
+
 .te-title {
   @include app-title-mixin;
 
@@ -131,6 +137,7 @@ body {
   }
 }
 
+/* Alert page horizontal list (clickable pills) */
 .te-alert-page-hzlist {
     display: inline-block;
     margin-left: 10px;

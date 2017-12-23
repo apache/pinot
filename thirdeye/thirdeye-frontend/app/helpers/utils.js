@@ -299,5 +299,8 @@ export default Ember.Helper.helper({
   appendFilters,
   metricColors,
   colorMapping,
-  eventColorMapping
+  eventColorMapping,
+  buildDateEod,
+  parseProps,
+  postProps
 });
