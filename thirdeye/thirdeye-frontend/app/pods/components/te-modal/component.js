@@ -49,7 +49,6 @@ export default Component.extend({
       if (action) {
         return action();
       }
-      //this.sendAction('submitAction');
     },
     /**
      * Invokes the passed cancel closure action
@@ -65,16 +64,16 @@ export default Component.extend({
      * Performs the cancel action and closes the modal
      */
     async onCancel() {
-      await this.sendAction('cancelAction');
-      //set(this, 'isShowingModal', false);
+      await this.send('cancelAction');
+      set(this, 'isShowingModal', false);
     },
 
     /**
      * Performs the submit action and closes the modal
      */
     async onSubmit() {
-      await this.sendAction('submitAction');
-      //set(this, 'isShowingModal', false);
+      await this.send('submitAction');
+      set(this, 'isShowingModal', false);
     }
   }
 });
