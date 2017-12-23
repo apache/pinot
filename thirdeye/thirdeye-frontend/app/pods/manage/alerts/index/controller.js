@@ -149,19 +149,19 @@ export default Ember.Controller.extend({
         }
       }
 
-    // Itereate through config groups to enhance all alerts with extra properties (group name, application)
-    for (let config of allGroups) {
-      groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
-      for (let id of groupFunctionIds) {
-        foundAlert = _.find(alerts, function(alert) {
-          return alert.id === id;
-        });
-        if (foundAlert) {
-          Ember.set(foundAlert, 'application', config.application);
-          Ember.set(foundAlert, 'group', config.name);
+      // Itereate through config groups to enhance all alerts with extra properties (group name, application)
+      for (let config of allGroups) {
+        groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
+        for (let id of groupFunctionIds) {
+          foundAlert = _.find(alerts, function(alert) {
+            return alert.id === id;
+          });
+          if (foundAlert) {
+            Ember.set(foundAlert, 'application', config.application);
+            Ember.set(foundAlert, 'group', config.name);
+          }
         }
       }
-    }
 
       return alerts.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
     }

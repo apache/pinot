@@ -3,26 +3,7 @@ import fetch from 'fetch';
 import moment from 'moment';
 import RSVP from 'rsvp';
 import _ from 'lodash';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
-
-/**
- * Parses stringified object from payload
- * @param {String} filters
- * @returns {Object}
- */
-const parseProps = (filters) => {
-  filters = filters || '';
-
-  return filters.split(';')
-    .filter(prop => prop)
-    .map(prop => prop.split('='))
-    .reduce(function (aggr, prop) {
-      const [ propName, value ] = prop;
-      aggr[propName] = value;
-
-      return aggr;
-    }, {});
-};
+import { checkStatus, buildDateEod, parseProps } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Route.extend({
   model(params) {
@@ -45,7 +26,7 @@ export default Ember.Route.extend({
       bucketSize,
       bucketUnit,
       properties: alertProps
-     } = model.function;
+    } = model.function;
 
     let metricId = '';
     let metricDataUrl = '';
@@ -69,7 +50,7 @@ export default Ember.Route.extend({
         const dimension = exploreDimensions || 'All';
         const currentEnd = moment(maxTime).isValid()
           ? moment(maxTime).valueOf()
-          : moment().subtract(1, 'day').endOf('day').valueOf();
+          : buildDateEod(1, 'day').valueOf();
         const formattedFilters = JSON.stringify(parseProps(filters));
         // Load less data if granularity is 'minutes'
         const isMinutely = bucketUnit.toLowerCase().includes('minute');
@@ -104,7 +85,7 @@ export default Ember.Route.extend({
         return fetch(`/thirdeye/email/function/${id}`).then(checkStatus);
       })
       .then((groupByAlertId) => {
-        const originalConfigGroup = groupByAlertId ? groupByAlertId.pop() : null;
+        const originalConfigGroup = groupByAlertId.length ? groupByAlertId.pop() : null;
         selectedAppName = originalConfigGroup ? originalConfigGroup.application : null;
         Object.assign(model, { originalConfigGroup, selectedAppName });
         return fetch('/thirdeye/entity/APPLICATION').then(checkStatus);

@@ -1,0 +1,55 @@
+<div class="manage-alert-tune">
+
+  <div class="te-content-block">
+    <fieldset class="te-form__section te-form__section--first row">
+      <div class="col-xs-12">
+        <legend class="te-form__section-title">Tune alert sensitivity</legend>
+      </div>
+      <ul class="te-form__list col-xs-12 col-sm-8">
+        <li class="te-form__list-item">
+          {{#radio-button
+            value="current"
+            groupValue=current
+            changed="flavorToggled"}}
+            <div class="te-form__list-label">Tune automatically with current settings</div>
+          {{/radio-button}}
+        </li>
+        <li class="te-form__list-item">
+          {{#radio-button
+            value="custom"
+            groupValue=custom
+            changed="flavorToggled"}}
+            <div class="te-form__list-label">Tune with customized settings</div>
+           {{/radio-button}}
+         </li>
+      </ul>
+    </fieldset>
+  </div>
+
+  <div class="te-horizontal-cards te-content-block">
+    <h4 class="te-alert-page__subtitle">Alert Performance</h4>
+    <a class="te-pill-selectors__side-link" {{action "onClickTuneSensitivity" this}}>Customize sensitivity</a>
+    <div class="te-horizontal-cards__container">
+      {{!-- Alert anomaly stats cards --}}
+      {{#each anomalyStats as |card|}}
+        <ul class="te-horizontal-cards__card">
+          <li class="te-horizontal-cards__card-title">{{card.title}}</li>
+          <li class="te-horizontal-cards__card-value">{{card.value}}
+            <div class="te-horizontal-cards__card-tooltip">
+              <span>
+                <i class="glyphicon glyphicon-question-sign"></i>
+                {{#tooltip-on-element}}{{card.text}}{{/tooltip-on-element}}
+              </span>
+            </div>
+          </li>
+          <li class="te-horizontal-cards__card-text">
+            {{#if card.projected}}
+              Projected: <strong>{{card.projected}}</strong>
+            {{/if}}
+          </li>
+        </ul>
+      {{/each}}
+    </div>
+  </div>
+
+</div>

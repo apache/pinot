@@ -60,4 +60,13 @@
       background-color: $te-blue-8;
     }
   }
+
+  &--link {
+    border-color: white;
+    color: $te-blue;
+  }
+
+  &--outline {
+    color: $te-blue;
+  }
 }
