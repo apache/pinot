@@ -74,17 +74,6 @@ export function checkStatus(response, mode = 'get', recoverBlank = false) {
 }
 
 /**
- * Pluralizes and formats the anomaly range duration string
- * @param {Number} time
- * @param {String} unit
- * @returns {String}
- */
-export function pluralizeTime(time, unit) {
-  const unitStr = time > 1 ? unit + 's' : unit;
-  return time ? time + ' ' + unitStr : '';
-}
-
-/**
  * Formatter for the human-readable floating point numbers numbers
  */
 export function humanizeFloat(f) {
@@ -312,9 +301,16 @@ export function postProps(postData) {
   };
 }
 
+/**
+ * Format conversion helper
+ * @param {String} dateStr - date to convert
+ */
+export function toIso(dateStr) {
+  return moment(Number(dateStr)).toISOString();
+}
+
 export default Ember.Helper.helper({
   checkStatus,
-  pluralizeTime,
   isIterable,
   makeIterable,
   filterObject,
@@ -340,5 +336,6 @@ export default Ember.Helper.helper({
   eventColorMapping,
   buildDateEod,
   parseProps,
-  postProps
+  postProps,
+  toIso
 });

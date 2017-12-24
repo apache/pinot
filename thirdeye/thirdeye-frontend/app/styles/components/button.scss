@@ -64,6 +64,13 @@
   &--link {
     border-color: white;
     color: $te-blue;
+    cursor: pointer;
+    text-decoration: nome;
+
+    &:hover {
+      color: $te-blue;
+      text-decoration: nome;
+    }
   }
 
   &--outline {
