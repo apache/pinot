@@ -1,6 +1,5 @@
 import { helper } from '@ember/component/helper';
 import moment from 'moment';
-import fetch from 'fetch';
 
 /**
  * Handles types and defaults returned from eval/projected endpoints
@@ -56,11 +55,6 @@ export function enhanceAnomalies(rawAnomalies) {
   const anomaliesPresent = rawAnomalies.length;
   // De-dupe raw anomalies, extract only the good stuff (anomalyDetailsList)
   const anomalies = anomaliesPresent ? [].concat(...rawAnomalies.map(data => data.anomalyDetailsList)) : [];
-
-/*  const pluralizeTime = (time, unit) => {
-    const unitStr = time > 1 ? unit + 's' : unit;
-    return time ? time + ' ' + unitStr : '';
-  };*/
 
   // Loop over all anomalies to configure display settings
   for (var anomaly of anomalies) {
@@ -148,32 +142,6 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
 }
 
 /**
- * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
- * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
- * @param {Array} anomalyIds - list of all found anomaly ids
- * @returns {Ember.RSVP promise}
- */
-export function fetchCombinedAnomalies(anomalyIds) {
-  const paginationDefault = 10;
-  if (anomalyIds.length) {
-    // Split array of all ids into buckets of 10 (paginationDefault)
-    const idGroups = anomalyIds.map((item, index) => {
-      return (index % paginationDefault === 0) ? anomalyIds.slice(index, index + paginationDefault) : null;
-    }).filter(item => item);
-    // Loop on number of pages (paginationDefault) of anomaly data to fetch
-    const anomalyPromises = idGroups.map((group, index) => {
-      let idStringParams = `anomalyIds=${encodeURIComponent(idGroups[index].toString())}`;
-      let getAnomalies = fetch(`/anomalies/search/anomalyIds/0/0/${index + 1}?${idStringParams}`).then(checkStatus);
-      return Ember.RSVP.resolve(getAnomalies);
-    });
-
-    return Ember.RSVP.all(anomalyPromises);
-  } else {
-    return [];
-  }
-}
-
-/**
  * Data needed to render the stats 'cards' above the anomaly graph for a given alert
  * @param {Object} alertEvalMetrics - contains the alert's performance data
  * @param {String} mode - the originating route
@@ -254,6 +222,5 @@ export default helper(
   pluralizeTime,
   enhanceAnomalies,
   setUpTimeRangeOptions,
-  fetchCombinedAnomalies,
   buildAnomalyStats
 );
