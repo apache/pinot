@@ -139,7 +139,8 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
-    Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
+    Double answer = instanceResponse.getObject(0, 0);
+    Assert.assertEquals(answer, 200000.0);
   }
 
   @Test
@@ -149,7 +150,7 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
-    Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
+    Assert.assertEquals(instanceResponse.getObject(0, 0), 0.0);
   }
 
   @AfterClass
