@@ -86,9 +86,7 @@ public class MaxAggregationFunction implements AggregationFunction<Comparable, C
     double maxDouble = Double.NEGATIVE_INFINITY;
     for (int i = 0; i < length; i++) {
       double value = doubleValueArray[i];
-      if (value > maxDouble) {
-        maxDouble = value;
-      }
+      maxDouble = Math.max(maxDouble, value);
     }
     return maxDouble;
   }

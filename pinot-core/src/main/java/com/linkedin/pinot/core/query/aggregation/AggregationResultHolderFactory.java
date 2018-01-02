@@ -23,8 +23,8 @@ public class AggregationResultHolderFactory {
 
   private static final Double DEFAULT_DOUBLE_VALUE = 0.0;
   private static final String DEFAULT_STRING_VALUE = "";
-  private static final Double DEFAULT_MAX_DOUBLE = Double.POSITIVE_INFINITY;
-  private static final Double DEFAULT_MIN_DOUBLE = Double.NEGATIVE_INFINITY;
+  private static final Double DEFAULT_MAX_DOUBLE = Double.NEGATIVE_INFINITY;
+  private static final Double DEFAULT_MIN_DOUBLE = Double.POSITIVE_INFINITY;
 
   public static AggregationResultHolder getAggregationResultHolder(
       AggregationFunctionFactory.AggregationFunctionType aggregationFunctionType, FieldSpec.DataType dataType) {

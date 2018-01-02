@@ -86,9 +86,7 @@ public class MinAggregationFunction implements AggregationFunction<Comparable, C
     double minDouble = Double.POSITIVE_INFINITY;
     for (int i = 0; i < length; i++) {
       double value = doubleValueArray[i];
-      if (value < minDouble) {
-        minDouble = value;
-      }
+      minDouble = Math.min(minDouble, value);
     }
     return minDouble;
   }

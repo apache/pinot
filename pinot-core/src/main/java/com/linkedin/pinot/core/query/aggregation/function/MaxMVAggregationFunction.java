@@ -51,9 +51,7 @@ public class MaxMVAggregationFunction extends MaxAggregationFunction {
         double maxDouble = Double.NEGATIVE_INFINITY;
         for (int i = 0; i < length; i++) {
           for (double value : doubleValuesArray[i]) {
-            if (value > maxDouble) {
-              maxDouble = value;
-            }
+            maxDouble = Math.max(maxDouble, value);
           }
         }
         setAggregationResult(aggregationResultHolder, maxDouble);

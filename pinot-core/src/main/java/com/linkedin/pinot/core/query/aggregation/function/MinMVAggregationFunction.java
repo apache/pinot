@@ -51,9 +51,7 @@ public class MinMVAggregationFunction extends MinAggregationFunction {
         double minDouble = Double.POSITIVE_INFINITY;
         for (int i = 0; i < length; i++) {
           for (double value : doubleValuesArray[i]) {
-            if (value < minDouble) {
-              minDouble = value;
-            }
+            minDouble = Math.min(minDouble, value);
           }
         }
         setAggregationResult(aggregationResultHolder, minDouble);
