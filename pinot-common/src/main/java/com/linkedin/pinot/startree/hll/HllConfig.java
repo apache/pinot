@@ -16,6 +16,7 @@
 package com.linkedin.pinot.startree.hll;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -23,6 +24,7 @@ import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.map.ObjectMapper;
 
 
 /**
@@ -38,6 +40,8 @@ public class HllConfig {
   private Set<String> columnsToDeriveHllFields = new HashSet<>();
 
   private transient Map<String, String> derivedHllFieldToOriginMap;
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   /**
    * HllConfig with default hll log2m. No Hll derived field is generated.
@@ -125,5 +129,13 @@ public class HllConfig {
   @Override
   public String toString() {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+  }
+
+  public String toJsonString() throws Exception {
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+  }
+
+  public static HllConfig fromJsonString(String jsonString) throws IOException {
+    return OBJECT_MAPPER.readValue(jsonString, HllConfig.class);
   }
 }
