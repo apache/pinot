@@ -18,8 +18,8 @@ package com.linkedin.pinot.minion.executor;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.PinotMinionUserAgentHeader;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
@@ -30,8 +30,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.params.DefaultHttpParams;
-import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpHeaders;
 import org.slf4j.Logger;
@@ -112,11 +110,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
       // segment will not be submitted again
       Header ifMatchHeader = new Header(HttpHeaders.IF_MATCH, originalSegmentCrc);
-      String minionUserAgentParameter =
-          CommonConstants.Minion.HTTP_TASK_TYPE_HEADER_PREFIX + taskType + "/" + MINION_CONTEXT.getMinionVersion();
-      String defaultUserAgentParameter =
-          DefaultHttpParams.getDefaultParams().getParameter(HttpMethodParams.USER_AGENT).toString();
-      String userAgentParameter = defaultUserAgentParameter + " " + minionUserAgentParameter;
+      String userAgentParameter = PinotMinionUserAgentHeader.constructUserAgentHeader(taskType, MINION_CONTEXT.getMinionVersion());
       Header userAgentHeader = new Header(HttpHeaders.USER_AGENT, userAgentParameter);
       List<Header> httpHeaders = Arrays.asList(ifMatchHeader, userAgentHeader);
       FileUploadUtils.sendFile(uploadURL, segmentName,
