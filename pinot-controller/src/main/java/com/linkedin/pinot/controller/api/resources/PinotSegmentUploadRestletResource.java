@@ -30,7 +30,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.PinotUserAgentHeader;
+import com.linkedin.pinot.common.utils.PinotMinionUserAgentHeader;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -453,7 +453,7 @@ public class PinotSegmentUploadRestletResource {
       }
 
       if (minionHeaderPresent) {
-        final String taskType = PinotUserAgentHeader.getTaskType(userAgentHeader);
+        final String taskType = PinotMinionUserAgentHeader.getTaskType(userAgentHeader);
 
         // Upload comes from minion, adding task segment modification time
         if (originalOfflineSegmentZkMetadata.getTaskSegmentModificationTime() != null) {

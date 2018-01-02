@@ -15,12 +15,22 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import org.apache.commons.httpclient.params.DefaultHttpParams;
+import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.lang.StringUtils;
 
 
-public class PinotUserAgentHeader {
+public class PinotMinionUserAgentHeader {
   public static String getTaskType(String userAgentHeader) {
     return StringUtils.substringsBetween(
         userAgentHeader, CommonConstants.Minion.MINION_HEADER_PREFIX, CommonConstants.Minion.MINION_HEADER_SEPARATOR)[0];
+  }
+
+  public static String constructUserAgentHeader(String taskType, String minionVersion) {
+    String minionUserAgentParameter =
+        CommonConstants.Minion.HTTP_TASK_TYPE_HEADER_PREFIX + taskType + CommonConstants.Minion.MINION_HEADER_SEPARATOR + minionVersion;
+    String defaultUserAgentParameter =
+        DefaultHttpParams.getDefaultParams().getParameter(HttpMethodParams.USER_AGENT).toString();
+    return defaultUserAgentParameter + " " + minionUserAgentParameter;
   }
 }
