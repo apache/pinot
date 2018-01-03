@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
@@ -555,8 +554,8 @@ public final class Schema {
     }
 
     public SchemaBuilder addDateTime(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-        @Nonnull String granularity, DateTimeType dateTimeType) {
-      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity, dateTimeType));
+        @Nonnull String granularity) {
+      _schema.addField(new DateTimeFieldSpec(name, dataType, format, granularity));
       return this;
     }
 

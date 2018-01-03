@@ -404,8 +404,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           dateTimeFieldSpec.getFormat());
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATETIME_GRANULARITY),
           dateTimeFieldSpec.getGranularity());
-      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATETIME_TYPE),
-          dateTimeFieldSpec.getDateTimeType().toString());
     }
 
     // HLL derived fields

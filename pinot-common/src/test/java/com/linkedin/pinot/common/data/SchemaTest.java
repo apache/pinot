@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.SchemaUtils;
@@ -84,7 +83,7 @@ public class SchemaTest {
         .addMetric("derivedMetricWithDefault", DataType.FLOAT, 10, MetricFieldSpec.DerivedMetricType.HLL,
             defaultFloat.toString())
         .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
-        .addDateTime("dateTime", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", DateTimeType.PRIMARY)
+        .addDateTime("dateTime", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .build();
 
     FieldSpec fieldSpec;
