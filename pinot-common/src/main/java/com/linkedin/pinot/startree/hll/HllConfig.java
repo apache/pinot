@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.startree.hll;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
@@ -33,6 +34,7 @@ import org.codehaus.jackson.map.ObjectMapper;
  * If columnsToDeriveHllFields are specified and not empty,
  * segment builder will generate corresponding hll derived fields on the fly.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class HllConfig {
   private int hllLog2m = HllConstants.DEFAULT_LOG2M;
   private int hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
