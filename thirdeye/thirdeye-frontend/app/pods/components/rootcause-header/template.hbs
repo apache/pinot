@@ -26,7 +26,7 @@
           key-press="onChange"}}
       {{/unless}}
     </div>
-    <div class="col-xs-2 rootcause-header__side">
+    <div class="rootcause-header__side">
       {{!-- hiding save copy for now --}}
       {{!-- <button {{action "onCopy"}} class="te-button">Save Copy</button><br/> --}}
       <button {{action "onSave"}} class="te-button">Save</button>
@@ -36,9 +36,9 @@
     <div class="col-xs-10">
       {{#unless showComment}}
         <a class="thirdeye-link" {{action (mut showComment) true}}>
-          <span><i class="glyphicon glyphicon-plus"></i></span> 
+          <span><i class="glyphicon glyphicon-plus"></i></span>
           <span>New comment</span>
-          {{#tooltip-on-element class="te-tooltip"}} Add a comment {{/tooltip-on-element}} 
+          {{#tooltip-on-element class="te-tooltip"}} Add a comment {{/tooltip-on-element}}
         </a>
       {{else}}
         {{textarea-autosize
@@ -50,7 +50,7 @@
           key-press="onChange"}}
       {{/unless}}
     </div>
-    <div class="col-xs-2 rootcause-header__side">
+    <div class="rootcause-header__side">
       {{#if sessionId}}
         {{#link-to "rootcause" (query-params sessionId=sessionId)}}{{sessionId}}{{/link-to}}<br/>
         {{#if sessionModified}}(modified){{/if}}
