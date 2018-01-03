@@ -430,7 +430,8 @@ public class PinotSegmentUploadRestletResource {
 
     long minionExpectedCrc = -1L;
     boolean isMinionConfigured = offlineTableConfig.getTaskConfig() != null;
-    boolean minionHeaderPresent = headers.getHeaderString(HttpHeaders.USER_AGENT).contains(CommonConstants.Minion.HTTP_TASK_TYPE_HEADER_PREFIX);
+    String userAgentHeader = headers.getHeaderString(HttpHeaders.USER_AGENT);
+    boolean minionHeaderPresent = userAgentHeader != null && userAgentHeader.contains(CommonConstants.Minion.HTTP_TASK_TYPE_HEADER_PREFIX);
     boolean metadataRewritten = false;
     if (isMinionConfigured) {
       // Minion configured use case so that we write to zk sparingly
