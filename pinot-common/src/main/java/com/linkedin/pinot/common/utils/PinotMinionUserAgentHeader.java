@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import javax.annotation.Nonnull;
 import org.apache.commons.httpclient.params.DefaultHttpParams;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.lang.StringUtils;
@@ -25,13 +26,20 @@ import org.slf4j.LoggerFactory;
 public class PinotMinionUserAgentHeader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotMinionUserAgentHeader.class);
 
-  public static String getTaskType(String userAgentHeader) {
-    try {
-      return StringUtils.substringsBetween(userAgentHeader, CommonConstants.Minion.MINION_HEADER_PREFIX, CommonConstants.Minion.MINION_HEADER_SEPARATOR)[0];
-    } catch (NullPointerException e) {
-      LOGGER.info("Could not get task type for userAgentHeader {}", userAgentHeader);
-      throw new RuntimeException(e);
+  /**
+   * We expect this method to be called only for minion.
+   * @param userAgentHeader
+   * @return
+   */
+  public static String getTaskType(@Nonnull String userAgentHeader) {
+    String[] matchingSubstrings = StringUtils
+        .substringsBetween(userAgentHeader, CommonConstants.Minion.MINION_HEADER_PREFIX,
+            CommonConstants.Minion.MINION_HEADER_SEPARATOR);
+    if (matchingSubstrings != null) {
+      return matchingSubstrings[0];
     }
+    LOGGER.info("Could not translate userAgentHeader {} to taskType");
+    throw new RuntimeException("Invalid user agent header with task type");
   }
 
   public static String constructUserAgentHeader(String taskType, String minionVersion) {
