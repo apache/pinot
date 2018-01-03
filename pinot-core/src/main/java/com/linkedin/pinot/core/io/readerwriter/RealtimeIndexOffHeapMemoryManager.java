@@ -109,6 +109,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements Closeable {
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, -_totalMemBytes);
     doClose();
     _buffers.clear();
+    _totalMemBytes = 0;
   }
 
   public long getTotalMemBytes() {
