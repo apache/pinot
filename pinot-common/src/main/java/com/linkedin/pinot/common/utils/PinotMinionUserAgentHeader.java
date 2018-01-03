@@ -18,12 +18,20 @@ package com.linkedin.pinot.common.utils;
 import org.apache.commons.httpclient.params.DefaultHttpParams;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotMinionUserAgentHeader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotMinionUserAgentHeader.class);
+
   public static String getTaskType(String userAgentHeader) {
-    return StringUtils.substringsBetween(
-        userAgentHeader, CommonConstants.Minion.MINION_HEADER_PREFIX, CommonConstants.Minion.MINION_HEADER_SEPARATOR)[0];
+    try {
+      return StringUtils.substringsBetween(userAgentHeader, CommonConstants.Minion.MINION_HEADER_PREFIX, CommonConstants.Minion.MINION_HEADER_SEPARATOR)[0];
+    } catch (NullPointerException e) {
+      LOGGER.info("Could not get task type for userAgentHeader {}", userAgentHeader);
+      throw new RuntimeException(e);
+    }
   }
 
   public static String constructUserAgentHeader(String taskType, String minionVersion) {
