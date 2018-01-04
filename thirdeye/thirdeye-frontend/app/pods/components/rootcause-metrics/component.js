@@ -29,20 +29,19 @@ export default Ember.Component.extend({
 
   metricsTableColumns: [
     {
-      template: 'custom/table-checkbox',
-      className: 'events-table__column--checkbox'
+      template: 'custom/table-checkbox'
     }, {
       propertyName: 'metric',
       title: 'Metric Name',
-      className: 'events-table__column'
+      className: 'rootcause-metric__table-column'
     }, {
       propertyName: 'score',
       title: 'Anomalous Score',
-      className: 'events-table__column'
+      className: 'rootcause-metric__table-column'
     }, {
       propertyName: 'change',
       title: 'Changes',
-      className: 'events-table__column'
+      className: 'rootcause-metric__table-column'
     }
   ],
 
