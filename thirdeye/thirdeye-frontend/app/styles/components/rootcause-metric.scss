@@ -28,40 +28,17 @@
     }
   }
 
-  &__table-column {
+  &__table {
+    &__column {
     width: 400px;
+    }
+
+    &--positive {
+      color: $te-green;
+    }
+
+    &--negative {
+      color: $te-red;
+    }
   }
-
-  // &__title {
-  //   display: flex;
-  //   flex-direction: column;
-  //   justify-content: space-between;
-  //   word-break: break-word;
-  // }
-
-  // &__name {
-  //   font-size: 14px;
-  //   color: app-shade(black, 0.9);
-  //   line-height: 20px;
-  // }
-
-  // &__dataset {
-  //   font-size: 12px;
-  //   line-height: 16px;
-  //   color: app-shade(black, 0.6);
-  // }
-  // &__change {
-  //   color: app-shade(black, 0.85);
-  //   font-size: 32px;
-  //   line-height: 32px;
-  //   padding-top: 16px;
-
-  //   &--positive {
-  //     color: $te-green;
-  //   }
-
-  //   &--negative {
-  //     color: $te-red;
-  //   }
-  // }
 }

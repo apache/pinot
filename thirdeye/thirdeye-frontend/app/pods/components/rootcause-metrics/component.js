@@ -33,15 +33,16 @@ export default Ember.Component.extend({
     }, {
       propertyName: 'metric',
       title: 'Metric Name',
-      className: 'rootcause-metric__table-column'
+      className: 'rootcause-metric__table__column'
     }, {
       propertyName: 'score',
       title: 'Anomalous Score',
-      className: 'rootcause-metric__table-column'
+      className: 'rootcause-metric__table__column'
     }, {
+      template: 'custom/metrics-table-changes',
       propertyName: 'change',
       title: 'Changes',
-      className: 'rootcause-metric__table-column'
+      className: 'rootcause-metric__table__column'
     }
   ],
 
@@ -57,12 +58,12 @@ export default Ember.Component.extend({
     'changes',
     function() {
       let arr = [];
-      const { urns, metrics, scores, changes } = this.getProperties('urns', 'metrics', 'scores', 'changes');
+      const { urns, metrics, scores, changesFormatted } = this.getProperties('urns', 'metrics', 'scores', 'changesFormatted');
       urns.forEach(urn => {
         arr.push({
           metric: metrics[urn],
           score: scores[urn],
-          change: changes[urn]
+          change: changesFormatted[urn]
         });
       });
       return arr;
