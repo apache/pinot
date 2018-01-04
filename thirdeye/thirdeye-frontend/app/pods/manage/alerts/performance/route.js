@@ -8,6 +8,9 @@ import fetch from 'fetch';
 import RSVP from 'rsvp';
 import { checkStatus, pluralizeTime, buildDateEod, parseProps, postProps } from 'thirdeye-frontend/helpers/utils';
 
+/**
+ * If true, this reduces the list of alerts per app to 2 for a quick demo.
+ */
 const demoMode = false;
 
 /**
@@ -156,6 +159,7 @@ export default Ember.Route.extend({
     const availableGroups = Array.from(new Set(model.richFunctionObjects.map(alertObj => alertObj.name)));
     const roundable = ['totalAlerts', 'totalResponses', 'falseAlarm', 'newTrend', 'trueAnomalies', 'userReportAnomaly'];
     let newGroupArr = [];
+    let count = 0;
 
     // Filter down to functions belonging to our active application groups
     availableGroups.forEach((group) => {
@@ -167,6 +171,7 @@ export default Ember.Route.extend({
 
       // Get array of keys from first record
       let metricKeys = Object.keys(groupData[0].data);
+      count++;
 
       // Look at each anomaly's perf object keys. For our "roundable" fields, get derived data
       metricKeys.forEach((key) => {
@@ -197,7 +202,7 @@ export default Ember.Route.extend({
       avgData['precision'] = avgData['precision'] ? calculateRate(avgData['totalAlerts'], avgData['trueAnomalies']) : 'N/A';
 
       newGroupArr.push({
-        name: group,
+        name: demoMode ? `group ${count}` : group,
         data: avgData,
         alerts: groupData.length
       });
