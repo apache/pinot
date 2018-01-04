@@ -63,7 +63,7 @@ export default Ember.Component.extend({
     'urns',
     'metrics',
     'scores',
-    'changes',
+    'changesFormatted',
     function() {
       let arr = [];
       const { urns, metrics, scores, changesFormatted } = this.getProperties('urns', 'metrics', 'scores', 'changesFormatted');
