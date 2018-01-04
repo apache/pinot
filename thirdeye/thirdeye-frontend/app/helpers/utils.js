@@ -315,6 +315,7 @@ export function postProps(postData) {
 export default Ember.Helper.helper({
   checkStatus,
   pluralizeTime,
+  buildDateEod,
   isIterable,
   makeIterable,
   filterObject,

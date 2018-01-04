@@ -1,0 +1,223 @@
+/**
+ * Handles the 'create alert' route nested in the 'manage' route.
+ * @module self-serve/create/route
+ * @exports alert create model
+ */
+import Ember from 'ember';
+import fetch from 'fetch';
+import RSVP from 'rsvp';
+import { checkStatus, pluralizeTime, buildDateEod, parseProps, postProps } from 'thirdeye-frontend/helpers/utils';
+
+const demoMode = false;
+
+/**
+ * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
+ * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
+ * @param {Array} anomalyIds - list of all found anomaly ids
+ * @returns {Ember.RSVP promise}
+ */
+const fetchAppAnomalies = (alertList) => {
+  const alertPromises = [];
+  const startDate = buildDateEod(3, 'month').toISOString();
+  const endDate = buildDateEod(1, 'day').toISOString();
+  const tuneParams = `start=${startDate}&end=${endDate}`;
+
+  alertList.forEach((alert) => {
+    let { name, id } = alert;
+    let getAlertPerfHash = {
+      id,
+      name,
+      data: fetch(`/detection-job/eval/filter/${alert.id}?${tuneParams}`).then(checkStatus)
+    };
+    alertPromises.push(Ember.RSVP.hash(getAlertPerfHash));
+  });
+
+  return Ember.RSVP.allSettled(alertPromises);
+};
+
+/**
+ * Associate each anomaly with an application name. This is done by:
+ * 1) For each existing application, find all alert groups associated with it
+ * 2) Add the app name to each of the group's function Ids (making sure we don't duplicate an Id)
+ * @param {Array} allApps - list of all applications
+ * @param {Array} validGroups - all alert groups that are active
+ * @returns {Array} appBucket
+ */
+const fillAppBuckets = (allApps, validGroups) => {
+  let appBucket = [];
+
+  allApps.forEach((app) => {
+    let associatedGroups = validGroups.filter(group => group.application.toLowerCase().includes(app.application));
+    if (associatedGroups.length) {
+      let uniqueIds = Array.from(new Set([].concat(...associatedGroups.map(group => group.emailConfig.functionIds))));
+      if (demoMode) {
+        uniqueIds = uniqueIds.slice(0, 2);
+      }
+      if (uniqueIds.length) {
+        uniqueIds.forEach((id) => {
+          appBucket.push({ name: app.application, id });
+        });
+      }
+    }
+  });
+
+  return appBucket;
+};
+
+/**
+ * Simply average the given array of numbers
+ * @param {Array} values - all values to average
+ * @returns {Number} average value
+ */
+const average = (values) => {
+  return (values.reduce((total, amount) => amount += total))/values.length;
+};
+
+/**
+ * Calculate the standard deviation, or variance in the given array
+ * @param {Array} values - all values to average
+ * @returns {Number} standard deviation
+ */
+const standardDeviation = (values) => {
+  let avg = average(values);
+
+  let squareDiffs = values.map((value) => {
+    let diff = value - avg;
+    let sqrDiff = diff * diff;
+    return sqrDiff;
+  });
+
+  let avgSquareDiff = average(squareDiffs);
+  let stdDev = Math.sqrt(avgSquareDiff);
+  return stdDev;
+};
+
+/**
+ * Derive the response or precision rate for a set of anomalies
+ * @param {Array} anomalies - all anomalies in a given application
+ * @param {Number} subset - the target subset (true anomalies, false, etc)
+ * @returns {Number} a percentage
+ */
+const calculateRate = (anomalies, subset) => {
+  let percentage = 0;
+  if (anomalies && anomalies.tot && subset && subset.tot) {
+    percentage = (subset.tot * 100) / anomalies.tot;
+  }
+  return Number(percentage.toFixed());
+};
+
+export default Ember.Route.extend({
+
+  actions: {
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    * @return {undefined}
+    */
+    refreshModel() {
+      this.refresh();
+    }
+  },
+
+  /**
+   * Model hook for the create alert route.
+   * @method model
+   * @return {Object}
+   */
+  model() {
+    return RSVP.hash({
+      // Fetch all alert group configurations
+      configGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
+      applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
+    });
+  },
+
+  afterModel(model) {
+    this._super(model);
+
+    const activeGroups = model.configGroups.filterBy('active');
+    const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
+    const groupsWithAlertId = groupsWithAppName.filter(group => group.emailConfig.functionIds.length > 0);
+    const idsByApplication = fillAppBuckets(model.applications, groupsWithAlertId);
+
+    // Get perf data for each alert and assign it to the model
+    return fetchAppAnomalies(idsByApplication)
+      .then((richFunctionObjects) => {
+        Object.assign(model, { richFunctionObjects: richFunctionObjects.map(obj => obj.value) });
+      })
+      .catch((err) => {
+        // TODO: deal with error state
+      });
+  },
+
+  setupController(controller, model) {
+    this._super(controller, model);
+
+    const availableGroups = Array.from(new Set(model.richFunctionObjects.map(alertObj => alertObj.name)));
+    const roundable = ['totalAlerts', 'totalResponses', 'falseAlarm', 'newTrend', 'trueAnomalies', 'userReportAnomaly'];
+    let newGroupArr = [];
+
+    // Filter down to functions belonging to our active application groups
+    availableGroups.forEach((group) => {
+      let avgData = {};
+      let keyData = {};
+      let groupData = model.richFunctionObjects.filter((alert) => {
+        return alert.name === group;
+      });
+
+      // Get array of keys from first record
+      let metricKeys = Object.keys(groupData[0].data);
+
+      // Look at each anomaly's perf object keys. For our "roundable" fields, get derived data
+      metricKeys.forEach((key) => {
+        let isRawValue = roundable.includes(key);
+        let allValues = groupData.map(group => group.data[key]);
+        let allNumeric = allValues.every(val => !Number.isNaN(Number(val)));
+        let total = allValues.reduce((total, amount) => amount += total);
+        avgData[key] = {};
+
+        if (allNumeric && isRawValue) {
+          let avg = total/allValues.length;
+          avgData[key].avg = Math.round(avg);
+          avgData[key].tot = total;
+          avgData[key].max = Math.max(...allValues);
+          avgData[key].min = Math.min(...allValues);
+          avgData[key].std = standardDeviation(allValues).toFixed(2);
+          avgData[key].name = group;
+        } else {
+          let avg = total/(allValues.filter(Number)).length;
+          avgData[key].avg = !Number.isNaN(Number(avg)) ? `${(avg * 100).toFixed(1)}` : 'N/A';
+          avgData[key].tot = 'N/A';
+        }
+        avgData[key].values = allValues;
+      });
+
+      // Make custom calculations
+      avgData['responseRate'] = avgData['responseRate'] ? calculateRate(avgData['totalAlerts'], avgData['totalResponses']) : 'N/A';
+      avgData['precision'] = avgData['precision'] ? calculateRate(avgData['totalAlerts'], avgData['trueAnomalies']) : 'N/A';
+
+      newGroupArr.push({
+        name: group,
+        data: avgData,
+        alerts: groupData.length
+      });
+    });
+
+    controller.set('perfDataByApplication', newGroupArr);
+  },
+
+  /**
+   * Model hook for the create alert route.
+   * @method resetController
+   * @param {Object} controller - active controller
+   * @param {Boolean} isExiting - exit status
+   * @param {Object} transition - transition obj
+   * @return {undefined}
+   */
+  resetController(controller, isExiting) {
+    this._super(...arguments);
+    if (isExiting) {
+      controller.clearAll();
+    }
+  }
+});
