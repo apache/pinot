@@ -240,10 +240,12 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         if (auxiliaryInfo.isSkipGroupAlert()) {
           continue;
         }
-        // Append group tag to subject
-        String emailSubjectName = alertConfig.getName();
+        // Construct email subject
+        StringBuilder emailSubjectBuilder = new StringBuilder("Thirdeye Alert : ");
+        emailSubjectBuilder.append(alertConfig.getName());
+        // Append group tag to email subject
         if (StringUtils.isNotBlank(auxiliaryInfo.getGroupTag())) {
-          emailSubjectName = emailSubjectName + " (" + auxiliaryInfo.getGroupTag() + ") ";
+          emailSubjectBuilder.append(" (").append(auxiliaryInfo.getGroupTag()).append(") ");
         }
         // Append auxiliary recipients
         if (StringUtils.isNotBlank(auxiliaryInfo.getAuxiliaryRecipients())) {
@@ -277,8 +279,9 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           emailContentFormatter.init(new Properties(), thirdeyeConfig);
         }
 
-        EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectName,
-            groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup);
+        EmailEntity emailEntity = emailContentFormatter
+            .getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectBuilder.toString(),
+                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup);
         EmailHelper.sendEmailWithEmailEntity(emailEntity, thirdeyeConfig.getSmtpConfiguration());
         // Update notified flag
         if (alertGrouper instanceof DummyAlertGrouper) {
