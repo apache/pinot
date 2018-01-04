@@ -27,6 +27,10 @@ export default Ember.Component.extend({
    */
   isLoading: false,
 
+  /**
+   * Columns for metrics table
+   * @type Object[]
+   */
   metricsTableColumns: [
     {
       template: 'custom/table-checkbox'
@@ -51,6 +55,10 @@ export default Ember.Component.extend({
     this.setProperties({ sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
   },
 
+  /**
+   * Data for metrics table
+   * @type Object[] - array of objects, each corresponding to a row in the table
+   */
   metricsTableData: Ember.computed(
     'urns',
     'metrics',
