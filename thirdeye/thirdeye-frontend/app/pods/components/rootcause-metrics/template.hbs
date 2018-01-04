@@ -9,7 +9,7 @@
 </div>
 
   <div class="rootcause-metric__wrapper">
-    {{#each urns as |urn|}}
+    {{!-- {{#each urns as |urn|}}
       <div class="col-lg-2 col-md-3 col-xs-6 rootcause-metric__card
         {{if (set-has selectedUrns urn) "rootcause-metric__card--selected"}}"
         {{action "toggleSelection" urn}}>
@@ -23,5 +23,10 @@
       </div>
     {{else}}
       No Metrics.
-    {{/each}}
+    {{/each}} --}}
+    {{models-table
+      data=metricsTableData
+      columns=metricsTableColumns
+      showColumnsDropdown=false
+      showGlobalFilter=false}}
   </div>

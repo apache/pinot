@@ -27,10 +27,48 @@ export default Ember.Component.extend({
    */
   isLoading: false,
 
+  metricsTableColumns: [
+    {
+      template: 'custom/table-checkbox',
+      className: 'events-table__column--checkbox'
+    }, {
+      propertyName: 'metric',
+      title: 'Metric Name',
+      className: 'events-table__column'
+    }, {
+      propertyName: 'score',
+      title: 'Anomalous Score',
+      className: 'events-table__column'
+    }, {
+      propertyName: 'change',
+      title: 'Changes',
+      className: 'events-table__column'
+    }
+  ],
+
   init() {
     this._super(...arguments);
     this.setProperties({ sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
   },
+
+  metricsTableData: Ember.computed(
+    'urns',
+    'metrics',
+    'scores',
+    'changes',
+    function() {
+      let arr = [];
+      const { urns, metrics, scores, changes } = this.getProperties('urns', 'metrics', 'scores', 'changes');
+      urns.forEach(urn => {
+        arr.push({
+          metric: metrics[urn],
+          score: scores[urn],
+          change: changes[urn]
+        });
+      });
+      return arr;
+    }
+  ),
 
   urns: Ember.computed(
     'entities',
