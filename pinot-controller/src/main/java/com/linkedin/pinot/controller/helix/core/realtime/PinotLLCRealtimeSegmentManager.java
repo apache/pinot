@@ -411,7 +411,7 @@ public class PinotLLCRealtimeSegmentManager {
         }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
       } catch (Exception e) {
         LOGGER.error("Failed to update idealstate for table {} entries {}", realtimeTableName, idealStateEntries, e);
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1);
         throw e;
       }
     }
@@ -432,7 +432,7 @@ public class PinotLLCRealtimeSegmentManager {
     } catch (Exception e) {
       LOGGER.error("Failed to update idealstate for table {}, old segment {}, new segment {}, newInstances {}",
           realtimeTableName, oldSegmentNameStr, newSegmentNameStr, newInstances, e);
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1);
       throw e;
     }
   }
@@ -534,7 +534,7 @@ public class PinotLLCRealtimeSegmentManager {
       _propertyStore.setChildren(paths, records, AccessOption.PERSISTENT);
     } catch (Exception e) {
       LOGGER.error("Failed to update idealstate for table {} for paths {}", realtimeTableName, paths, e);
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1);
       throw e;
     }
   }
@@ -1101,7 +1101,7 @@ public class PinotLLCRealtimeSegmentManager {
     } catch (Exception e) {
       LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance,
           segmentNameStr, e);
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1);
       throw e;
     }
     LOGGER.info("Successfully marked {} offline for instance {} since it stopped consuming", segmentNameStr, instance);
@@ -1168,6 +1168,8 @@ public class PinotLLCRealtimeSegmentManager {
     // Generate new kafka partition assignment and update the znode
     if (currentInstances.size() < currentReplicaCount) {
       LOGGER.error("Cannot have {} replicas in {} instances for {}.Not updating partition assignment", currentReplicaCount, currentInstances.size(), realtimeTableName);
+      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.SHORT_OF_LIVE_INSTANCES, 1);
+      System.out.println("~~~");
       return;
     }
     ZNRecord newPartitionAssignment = generatePartitionAssignment(kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances, currentReplicaCount);

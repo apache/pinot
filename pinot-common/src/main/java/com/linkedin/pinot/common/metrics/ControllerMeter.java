@@ -47,11 +47,12 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR("errors", true),
   LLC_STATE_MACHINE_ABORTS("aborts", false),
   LLC_AUTO_CREATED_PARTITIONS("creates", false),
-  LLC_ZOOKEPER_UPDATE_FAILURES("failures", false),
+  LLC_ZOOKEEPER_UPDATE_FAILURES("failures", false),
   LLC_KAFKA_DATA_LOSS("dataLoss", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
-  NUMBER_SEGMENT_COMMIT_TIMEOUT_EXCEEDED("OfflineSegmentCommitTimeouts", true);
+  NUMBER_SEGMENT_COMMIT_TIMEOUT_EXCEEDED("OfflineSegmentCommitTimeouts", true),
+  SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstanceError", false);
 
 
   private final String brokerMeterName;
