@@ -1,8 +1,33 @@
 
 .rootcause-metric {
-  &__wrapper {
-    display: flex;
-    flex-wrap: wrap;
+
+  &__display-view {
+    float: right;
+    font-size: 16px;
+    cursor: pointer;
+
+    li {
+      display: inline-block;
+    }
+
+    &--active {
+      color: $te-link-blue;
+      border-bottom: 4px solid $te-link-blue;
+    }
+  }
+
+  &__table {
+    &__column {
+      width: 400px;
+    }
+
+    &--positive {
+      color: $te-green;
+    }
+
+    &--negative {
+      color: $te-red;
+    }
   }
 
   &__card {
@@ -45,6 +70,7 @@
     line-height: 16px;
     color: app-shade(black, 0.6);
   }
+
   &__change {
     color: app-shade(black, 0.85);
     font-size: 32px;
