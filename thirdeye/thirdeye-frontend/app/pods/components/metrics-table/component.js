@@ -44,6 +44,7 @@ export default Component.extend({
 
       urnsClone.forEach(urn => {
         arr.push({
+          urn,
           isSelected: selectedUrns.has(urn),
           metric: metrics[urn],
           score: scores[urn],
@@ -69,19 +70,17 @@ export default Component.extend({
   ),
 
   actions: {
+    /**
+     * Triggered on cell selection
+     * Updates the currently selected urns based on user selection on the table
+     * @param {Object} e
+     */
     displayDataChanged (e) {
-      debugger;
-      const { metricsTableData, selectedUrns, onSelection } = this.getProperties('metricsTableData', 'selectedUrns', 'onSelection');
-      if (onSelection) {
-        const table = new Set(e.selectedItems.map(e => e.urn));
-        const added = [...table].filter(urn => !selectedUrns.has(urn));
-        const removed = [...selectedUrns].filter(urn => metricsTableData[urn] && !table.has(urn));
+      const selectedItemsArr = [...e.selectedItems];
+      const selectedItem = selectedItemsArr.length ? selectedItemsArr[0].urn : '';
 
-        const updates = {};
-        added.forEach(urn => updates[urn] = true);
-        removed.forEach(urn => updates[urn] = false);
-
-        onSelection(updates);
+      if (selectedItem) {
+        this.get('toggleSelection')(selectedItem);
       }
     }
   }
