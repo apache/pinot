@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -65,6 +66,7 @@ public class SegmentGeneratorConfig {
 
   private Map<String, String> _customProperties = new HashMap<>();
   private Set<String> _rawIndexCreationColumns = new HashSet<>();
+  private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType;
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private String _dataDir = null;
   private String _inputFilePath = null;
@@ -110,6 +112,7 @@ public class SegmentGeneratorConfig {
     Preconditions.checkNotNull(config);
     _customProperties.putAll(config._customProperties);
     _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
+    _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
     _dataDir = config._dataDir;
     _inputFilePath = config._inputFilePath;
@@ -470,6 +473,23 @@ public class SegmentGeneratorConfig {
 
   public void setOnHeap(boolean onHeap) {
     _onHeap = onHeap;
+  }
+
+  @JsonIgnore
+  public ChunkCompressorFactory.CompressionType getColumnCompressionType(String columnName) {
+    if (_rawIndexCompressionType.containsKey(columnName)) {
+      return _rawIndexCompressionType.get(columnName);
+    }
+    return ChunkCompressorFactory.CompressionType.SNAPPY;
+  }
+
+  public Map<String, ChunkCompressorFactory.CompressionType> getRawIndexCompressionType() {
+    return _rawIndexCompressionType;
+  }
+
+  public void setRawIndexCompressionType(Map<String, ChunkCompressorFactory.CompressionType> rawIndexCompressionType) {
+    _rawIndexCompressionType.clear();
+    _rawIndexCompressionType.putAll(rawIndexCompressionType);
   }
 
   @JsonIgnore
