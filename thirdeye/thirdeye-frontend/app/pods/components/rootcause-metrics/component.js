@@ -22,6 +22,8 @@ export default Ember.Component.extend({
 
   sortMode: null, // ""
 
+  selectedView: 'card',
+
   /**
    * loading status for component
    */
@@ -183,6 +185,10 @@ export default Ember.Component.extend({
   ),
 
   actions: {
+    selectView(selectedView) {
+      this.setProperties({selectedView});
+    },
+
     toggleSelection(urn) {
       const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
       if (onSelection) {
