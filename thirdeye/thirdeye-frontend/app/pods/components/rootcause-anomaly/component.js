@@ -124,10 +124,6 @@ export default Ember.Component.extend({
     return moment(this.get('anomaly').end).format('MMM D YYYY, hh:mm a');
   }),
 
-  requiresFeedback: Ember.computed('status', function () {
-    return this.get('status') === 'NO_FEEDBACK';
-  }),
-
   isHidden: Ember.computed(
     'requiresFeedback',
     'isHiddenUser',
