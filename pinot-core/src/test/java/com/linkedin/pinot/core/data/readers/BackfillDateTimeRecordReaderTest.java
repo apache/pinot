@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.DateTimeType;
 import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -183,8 +182,7 @@ public class BackfillDateTimeRecordReaderTest {
     inputData = createTestDataWithTimespec(timeFieldSpec);
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);
-    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS",
-        DateTimeType.PRIMARY);
+    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS");
     wrapperSchema = createPinotSchemaWrapperWithDateTimeSpec(inputSchema, dateTimeFieldSpec);
     entries.add(new Object[]{inputRecordReader, timeFieldSpec, dateTimeFieldSpec, wrapperSchema});
 
@@ -194,8 +192,7 @@ public class BackfillDateTimeRecordReaderTest {
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);
     dateTimeFieldSpec =
-        new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:HOURS",
-            DateTimeType.PRIMARY);
+        new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:HOURS");
     wrapperSchema = createPinotSchemaWrapperWithDateTimeSpec(inputSchema, dateTimeFieldSpec);
     entries.add(new Object[]{inputRecordReader, timeFieldSpec, dateTimeFieldSpec, wrapperSchema});
 
@@ -205,7 +202,7 @@ public class BackfillDateTimeRecordReaderTest {
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);
     dateTimeFieldSpec =
-        new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", DateTimeType.PRIMARY);
+        new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
     wrapperSchema = createPinotSchemaWrapperWithDateTimeSpec(inputSchema, dateTimeFieldSpec);
     entries.add(new Object[]{inputRecordReader, timeFieldSpec, dateTimeFieldSpec, wrapperSchema});
 
@@ -214,15 +211,13 @@ public class BackfillDateTimeRecordReaderTest {
     inputData = createTestDataWithTimespec(timeFieldSpec);
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);
-    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "5:MILLISECONDS:EPOCH", "1:HOURS",
-        DateTimeType.PRIMARY);
+    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "5:MILLISECONDS:EPOCH", "1:HOURS");
     wrapperSchema = createPinotSchemaWrapperWithDateTimeSpec(inputSchema, dateTimeFieldSpec);
     entries.add(new Object[]{inputRecordReader, timeFieldSpec, dateTimeFieldSpec, wrapperSchema});
 
     // timeSpec in hoursSinceEpoch, dateTimeFieldSpec in millisSinceEpoch, override dateTimeFieldSpec in millisSinceEpoch
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "Date"));
-    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS",
-        DateTimeType.PRIMARY);
+    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS");
     inputData = createTestDataWithTimespec(timeFieldSpec, dateTimeFieldSpec);
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);
@@ -230,26 +225,23 @@ public class BackfillDateTimeRecordReaderTest {
 
     // timeSpec in hoursSinceEpoch, dateTimeFieldSpec in hoursSinceEpoch, override dateTimeFieldSpec in millisSinceEpoch
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "Date"));
-    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS",
-        DateTimeType.PRIMARY);
+    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS");
     inputData = createTestDataWithTimespec(timeFieldSpec, dateTimeFieldSpec);
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);
-    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS",
-        DateTimeType.PRIMARY);
+    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS");
     wrapperSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
     entries.add(new Object[]{inputRecordReader, timeFieldSpec, dateTimeFieldSpec, wrapperSchema});
 
     // timeSpec in hoursSinceEpoch, dateTimeFieldSpec in hoursSinceEpoch, add new dateTimeFieldSpec in millisSinceEpoch
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "Date"));
     dateTimeFieldSpec =
-        new DateTimeFieldSpec("hoursSinceEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", DateTimeType.DERIVED);
+        new DateTimeFieldSpec("hoursSinceEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
     inputData = createTestDataWithTimespec(timeFieldSpec, dateTimeFieldSpec);
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);
     DateTimeFieldSpec dateTimeFieldSpecNew =
-        new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS",
-            DateTimeType.PRIMARY);
+        new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS");
     wrapperSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
     wrapperSchema = createPinotSchemaWrapperWithDateTimeSpec(wrapperSchema, dateTimeFieldSpecNew);
     entries.add(new Object[]{inputRecordReader, timeFieldSpec, dateTimeFieldSpecNew, wrapperSchema});

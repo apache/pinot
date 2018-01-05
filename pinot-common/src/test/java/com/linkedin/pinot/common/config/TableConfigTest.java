@@ -140,6 +140,12 @@ public class TableConfigTest {
       hllConfig.setHllLog2m(9);
       hllConfig.setHllDeriveColumnSuffix("suffix");
 
+      String hllConfigJson = hllConfig.toJsonString();
+      HllConfig newHllConfig = HllConfig.fromJsonString(hllConfigJson);
+      Assert.assertEquals(hllConfig.getColumnsToDeriveHllFields(), newHllConfig.getColumnsToDeriveHllFields());
+      Assert.assertEquals(hllConfig.getHllLog2m(), newHllConfig.getHllLog2m());
+      Assert.assertEquals(hllConfig.getHllDeriveColumnSuffix(), newHllConfig.getHllDeriveColumnSuffix());
+
       TableConfig tableConfig = tableConfigBuilder.build();
       tableConfig.getValidationConfig().setHllConfig(hllConfig);
 

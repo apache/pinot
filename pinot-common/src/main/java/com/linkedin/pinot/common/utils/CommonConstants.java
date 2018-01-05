@@ -20,6 +20,7 @@ import org.apache.commons.lang.StringUtils;
 
 
 public class CommonConstants {
+
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
 
@@ -257,6 +258,8 @@ public class CommonConstants {
   }
 
   public static class Minion {
+    public static final String MINION_HEADER_PREFIX = "Pinot-Minion-";
+    public static final String MINION_HEADER_SEPARATOR = "/";
     public static final String INSTANCE_PREFIX = "Minion_";
     public static final String INSTANCE_TYPE = "minion";
     public static final String UNTAGGED_INSTANCE = "minion_untagged";
