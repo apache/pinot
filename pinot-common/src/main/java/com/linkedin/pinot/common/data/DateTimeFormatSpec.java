@@ -16,13 +16,18 @@
 package com.linkedin.pinot.common.data;
 
 import java.util.Objects;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.EnumUtils;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
+import org.joda.time.DateTimeZone;
+
 
 /**
  * Class to represent format from {@link DateTimeFieldSpec}
@@ -39,11 +44,18 @@ public class DateTimeFormatSpec {
       "granularity must be of format size:timeunit";
   public static final String GRANULARITY_PATTERN_ERROR_STR =
       "granularity must be of format [0-9]+:<TimeUnit>";
+
   public static final String NUMBER_REGEX = "[1-9][0-9]*";
+  /** eg: yyyyMMdd tz(CST) or yyyyMMdd HH tz(GMT+0700) or yyyyMMddHH tz(America/Chicago) **/
+  private static final Pattern SDF_PATTERN_WITH_TIMEZONE = Pattern.compile("^(.+)( tz\\((.+)\\))");
+  private static final int SDF_PATTERN_GROUP = 1;
+  private static final int TIMEZONE_GROUP = 3;
+  private static final DateTimeZone DEFAULT_DATETIMEZONE = DateTimeZone.UTC;
 
   public static final String COLON_SEPARATOR = ":";
 
-  /* DateTimeFieldSpec format is of format size:timeUnit:timeformat:pattern(if sdf) */
+  /* DateTimeFieldSpec format is of format size:timeUnit:timeformat:pattern tz(timezone)
+   * tz(timezone) is optional. If not specified, UTC timezone is used */
   public static final int FORMAT_SIZE_POSITION = 0;
   public static final int FORMAT_UNIT_POSITION = 1;
   public static final int FORMAT_TIMEFORMAT_POSITION = 2;
@@ -97,7 +109,7 @@ public class DateTimeFormatSpec {
    * @param columnSize
    * @param columnUnit
    * @param columnTimeFormat
-   * @param sdfPattern
+   * @param sdfPattern and tz
    * @return
    */
   public static DateTimeFormatSpec constructFormat(int columnSize, TimeUnit columnUnit,
@@ -169,22 +181,53 @@ public class DateTimeFormatSpec {
   }
 
   /**
-   * Extracts the simmple date format pattern from the format of a dateTimeSpec
-   * (4th token in colon separated format in case of TimeFormat=SIMPLE_DATE_FORMAT)
+   * Extracts the simple date format pattern from the format of a dateTimeSpec
+   * (4th token in colon separated format in case of TimeFormat=SIMPLE_DATE_FORMAT.
+   * If tz is also provided, need to extract only the sdf pattern part)
    * This method should not do validation of outputGranularity.
    * The validation should be handled by caller using {@link #isValidFormat(String)}
-   * eg: if format=1:HOURS:EPOCH, will throw exception
+   * eg: if format=1:HOURS:EPOCH, will return null
    * if format=1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH will return yyyyMMddHH
+   * if format=1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(CST) will return yyyyMMddHH
    * @return
    */
   public String getSDFPattern() {
-    String pattern = null;
+    String sdfPattern = null;
     // split with limit, as pattern can have ':'
     String[] formatTokens = _format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
     if (formatTokens.length == MAX_FORMAT_TOKENS) {
-      pattern = formatTokens[FORMAT_PATTERN_POSITION];
+      sdfPattern = formatTokens[FORMAT_PATTERN_POSITION];
+      Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(formatTokens[FORMAT_PATTERN_POSITION]);
+      if (m.find()) {
+        sdfPattern = m.group(SDF_PATTERN_GROUP);
+      }
     }
-    return pattern;
+    return sdfPattern;
+  }
+
+  /**
+   * Extracts the timezone from the format of a dateTimeSpec
+   * (4th token in colon separated format in case of TimeFormat=SIMPLE_DATE_FORMAT. tz is added to the end)
+   * This method should not do validation of outputGranularity.
+   * The validation should be handled by caller using {@link #isValidFormat(String)}
+   * eg: if format=1:HOURS:EPOCH, will return UTC
+   * if format=1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH will return UTC
+   * if format=1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/Chicago) will return America/Chicago
+   * @return
+   */
+  public DateTimeZone getDateTimezone() {
+    DateTimeZone dateTimeZone = DEFAULT_DATETIMEZONE;
+    // split with limit, as pattern can have ':'
+    String[] formatTokens = _format.split(COLON_SEPARATOR, MAX_FORMAT_TOKENS);
+    if (formatTokens.length == MAX_FORMAT_TOKENS) {
+      Matcher m = SDF_PATTERN_WITH_TIMEZONE.matcher(formatTokens[FORMAT_PATTERN_POSITION]);
+      if (m.find()) {
+        String timezoneString = m.group(TIMEZONE_GROUP);
+        TimeZone timezone = TimeZone.getTimeZone(timezoneString);
+        dateTimeZone = DateTimeZone.forTimeZone(timezone);
+      }
+    }
+    return dateTimeZone;
   }
 
   /**
@@ -218,8 +261,9 @@ public class DateTimeFormatSpec {
       dateTimeColumnValue = unit.convert(dateTimeColumnValueMS, TimeUnit.MILLISECONDS) / size;
     } else {
       String pattern = getSDFPattern();
+      DateTimeZone dateTimeZone = getDateTimezone();
       dateTimeColumnValue =
-          org.joda.time.format.DateTimeFormat.forPattern(pattern).withZoneUTC().print(dateTimeColumnValueMS);
+          org.joda.time.format.DateTimeFormat.forPattern(pattern).withZone(dateTimeZone).print(dateTimeColumnValueMS);
     }
     return type.cast(dateTimeColumnValue);
   }
@@ -254,8 +298,9 @@ public class DateTimeFormatSpec {
       timeColumnValueMS = TimeUnit.MILLISECONDS.convert((Long) dateTimeColumnValue * size, unit);
     } else {
       String pattern = getSDFPattern();
+      DateTimeZone dateTimeZone = getDateTimezone();
       timeColumnValueMS =
-          org.joda.time.format.DateTimeFormat.forPattern(pattern).withZoneUTC()
+          org.joda.time.format.DateTimeFormat.forPattern(pattern).withZone(dateTimeZone)
               .parseMillis(String.valueOf(dateTimeColumnValue));
     }
 

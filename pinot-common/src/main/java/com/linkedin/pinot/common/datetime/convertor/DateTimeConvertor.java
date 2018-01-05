@@ -60,7 +60,8 @@ public abstract class DateTimeConvertor {
     TimeFormat inputTimeFormat = inputFormat.getTimeFormat();
     if (inputTimeFormat.equals(TimeFormat.SIMPLE_DATE_FORMAT)) {
       String inputSDFFormat = inputFormat.getSDFPattern();
-      inputDateTimeFormatter = DateTimeFormat.forPattern(inputSDFFormat).withZoneUTC();
+      DateTimeZone dateTimeZone = inputFormat.getDateTimezone();
+      inputDateTimeFormatter = DateTimeFormat.forPattern(inputSDFFormat).withZone(dateTimeZone);
     }
 
     outputTimeSize = outputFormat.getColumnSize();
@@ -101,7 +102,8 @@ public abstract class DateTimeConvertor {
 
     } else {
       String outputSDFFormat = outputFormat.getSDFPattern();
-      outputDateTimeFormatter = DateTimeFormat.forPattern(outputSDFFormat).withZoneUTC();
+      DateTimeZone dateTimeZone = outputFormat.getDateTimezone();
+      outputDateTimeFormatter = DateTimeFormat.forPattern(outputSDFFormat).withZone(dateTimeZone);
     }
 
     outputGranularityMillis = outputGranularity.granularityToMillis();
@@ -157,7 +159,6 @@ public abstract class DateTimeConvertor {
    * convertMillisToEpoch(1498892400000) = 2478 (i.e. dateTimeColumnValueMS/(1000*60*60*24*7))</li>
    * </ul>
    * @param dateTimeValueMillis - date time value in millis to convert
-   * @param outputFormat
    * @return
    */
   protected Long convertMillisToEpoch(Long dateTimeValueMillis) {
@@ -176,7 +177,6 @@ public abstract class DateTimeConvertor {
    * format=1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd, convertMillisToSDF(1498892400000) = 20170701</li>
    * </ul>
    * @param dateTimeValueMillis - date time value in millis to convert
-   * @param outputFormat
    * @return
    */
   protected Long convertMillisToSDF(Long dateTimeValueMillis) {
