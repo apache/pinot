@@ -95,7 +95,7 @@ public class DateTimeConversionTransformTest {
     input[2] = 1505902560000L /* 20170920T03:16:00 */;
     expected[0] = 418305L /* 20170920T02:00:00 */;
     expected[1] = 418305L; /* 20170920T02:00:00 */
-    expected[2] = 418306L; /* 20170920T02:15:00 */
+    expected[2] = 418306L; /* 20170920T03:00:00 */
     entries.add(new Object[] {
         "1:MILLISECONDS:EPOCH", "1:HOURS:EPOCH", "1:HOURS", input, 3, DataType.LONG, expected
     });
