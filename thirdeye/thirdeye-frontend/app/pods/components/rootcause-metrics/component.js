@@ -22,6 +22,10 @@ export default Ember.Component.extend({
 
   sortMode: null, // ""
 
+  /**
+   * Currently selected view within the metrics tab
+   * @type {String}
+   */
   selectedView: 'card',
 
   /**
@@ -185,8 +189,12 @@ export default Ember.Component.extend({
   ),
 
   actions: {
+    /**
+     * Sets the selected view for metrics tab
+     * @return {undefined}
+     */
     selectView(selectedView) {
-      this.setProperties({selectedView});
+      this.setProperties({ selectedView });
     },
 
     toggleSelection(urn) {
