@@ -36,9 +36,17 @@
     No Metrics.
   {{/each}}
 {{else}}
-  {{models-table
+  {{!-- TODO: Have selected cells on card view consistent with the checkbox in table view --}}
+  {{!-- {{models-table
     data=metricsTableData
     columns=metricsTableColumns
     showColumnsDropdown=false
-    showGlobalFilter=false}}
+    showGlobalFilter=false}} --}}
+  {{metrics-table
+    selectedUrns=selectedUrns
+    entities=entities
+    urns=urns
+    metrics=metrics
+    scores=scores
+    changesFormatted=changesFormatted}}
 {{/if}}

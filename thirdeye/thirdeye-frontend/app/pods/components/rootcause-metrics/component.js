@@ -26,63 +26,17 @@ export default Ember.Component.extend({
    * Currently selected view within the metrics tab
    * @type {String}
    */
-  selectedView: 'card',
+  selectedView: 'table',
 
   /**
    * loading status for component
    */
   isLoading: false,
 
-  /**
-   * Columns for metrics table
-   * @type Object[]
-   */
-  metricsTableColumns: [
-    {
-      template: 'custom/table-checkbox'
-    }, {
-      propertyName: 'metric',
-      title: 'Metric Name',
-      className: 'rootcause-metric__table__column'
-    }, {
-      propertyName: 'score',
-      title: 'Anomalous Score',
-      className: 'rootcause-metric__table__column'
-    }, {
-      template: 'custom/metrics-table-changes',
-      propertyName: 'change',
-      title: 'Changes',
-      className: 'rootcause-metric__table__column'
-    }
-  ],
-
   init() {
     this._super(...arguments);
     this.setProperties({ sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
   },
-
-  /**
-   * Data for metrics table
-   * @type Object[] - array of objects, each corresponding to a row in the table
-   */
-  metricsTableData: Ember.computed(
-    'urns',
-    'metrics',
-    'scores',
-    'changesFormatted',
-    function() {
-      let arr = [];
-      const { urns, metrics, scores, changesFormatted } = this.getProperties('urns', 'metrics', 'scores', 'changesFormatted');
-      urns.forEach(urn => {
-        arr.push({
-          metric: metrics[urn],
-          score: scores[urn],
-          change: changesFormatted[urn]
-        });
-      });
-      return arr;
-    }
-  ),
 
   urns: Ember.computed(
     'entities',
@@ -165,7 +119,7 @@ export default Ember.Component.extend({
       const { entities } = this.getProperties('entities');
       return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
         .reduce((agg, urn) => {
-          agg[urn] = entities[urn].score;
+          agg[urn] = entities[urn].score.toFixed(2);
           return agg;
         }, {});
     }
