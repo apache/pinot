@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import java.util.TreeSet;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.MutablePair;
@@ -32,7 +31,6 @@ public class Cube { // the cube (Ca|Cb)
   private static final Logger LOG = LoggerFactory.getLogger(Cube.class);
 
   private static final int DEFAULT_TOP_DIMENSION = 3;
-  private static final String TOP_K_POSTFIX = "_topk";
   public static final double PERCENTAGE_CONTRIBUTION_THRESHOLD = 3d;
 
   private double topBaselineValue;
@@ -65,6 +63,12 @@ public class Cube { // the cube (Ca|Cb)
 
   public Dimensions getDimensions() {
     return dimensions;
+  }
+
+  private CostFunction costFunction;
+
+  public Cube(CostFunction costFunction) {
+    this.costFunction = costFunction;
   }
 
   @JsonIgnore
@@ -104,8 +108,7 @@ public class Cube { // the cube (Ca|Cb)
       }
 
       initializeBasicInfo(olapClient, filterSets);
-      Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
-      Dimensions shrankDimensions = shrinkDimensionsByFilterSets(sanitizedDimensions, filterSets);
+      Dimensions shrankDimensions = shrinkDimensionsByFilterSets(dimensions, filterSets);
       this.costSet = computeOneDimensionCost(olapClient, topRatio, shrankDimensions, filterSets);
       this.dimensions = sortDimensionOrder(costSet, shrankDimensions, topDimension, hierarchy);
 
@@ -135,29 +138,12 @@ public class Cube { // the cube (Ca|Cb)
       throws Exception {
     long tStart = System.nanoTime();
     try {
-      Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
       initializeBasicInfo(olapClient, filterSets);
-      this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions, filterSets);
+      this.costSet = computeOneDimensionCost(olapClient, topRatio, dimensions, filterSets);
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
     }
-  }
-
-  // TODO: Replace with method with an user configurable method
-  private static Dimensions sanitizeDimensions(Dimensions dimensions) {
-    List<String> allDimensionNames = dimensions.allDimensions();
-    Set<String> dimensionsToRemove = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-    dimensionsToRemove.add("environment");
-    dimensionsToRemove.add("colo");
-    dimensionsToRemove.add("fabric");
-    for (String dimensionName : allDimensionNames) {
-      if(dimensionName.contains(TOP_K_POSTFIX)) {
-        String rawDimensionName = dimensionName.replaceAll(TOP_K_POSTFIX, "");
-        dimensionsToRemove.add(rawDimensionName.toLowerCase());
-      }
-    }
-    return removeDimensions(dimensions, dimensionsToRemove);
   }
 
   /**
@@ -294,7 +280,7 @@ public class Cube { // the cube (Ca|Cb)
     }
   }
 
-  private static List<DimNameValueCostEntry> computeOneDimensionCost(OLAPDataBaseClient olapClient, double topRatio,
+  private List<DimNameValueCostEntry> computeOneDimensionCost(OLAPDataBaseClient olapClient, double topRatio,
       Dimensions dimensions, Multimap<String, String> filterSets) throws Exception {
     List<DimNameValueCostEntry> costSet = new ArrayList<>();
 
@@ -317,7 +303,7 @@ public class Cube { // the cube (Ca|Cb)
         Row wowValues = wowValuesOfOneDimension.get(j);
         String dimValue = wowValues.getDimensionValues().get(0);
 
-        double dimValueCost = CostFunction
+        double dimValueCost = costFunction
             .errWithPercentageRemoval(wowValues.baselineValue, wowValues.currentValue, topRatio,
                 PERCENTAGE_CONTRIBUTION_THRESHOLD, currentTotal + baselineTotal);
 

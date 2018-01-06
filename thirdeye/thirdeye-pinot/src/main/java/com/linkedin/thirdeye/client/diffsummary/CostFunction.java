@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
 public class CostFunction {
-  public static double err(double v1, double v2, double parentRatio) {
+  private static double err(double v1, double v2, double parentRatio) {
     double expectedValue = parentRatio * v1;
     return (v2 - expectedValue) * Math.log(v2 / expectedValue);
   }
@@ -10,7 +10,7 @@ public class CostFunction {
    * Auto fill in v1 and v2 using parentRatio when one of them is zero.
    * If v1 and v2 both are zero or parentRatio is not finite, this function returns 0.
    */
-  public static double err4EmptyValues(double v1, double v2, double parentRatio) {
+  private static double err4EmptyValues(double v1, double v2, double parentRatio) {
     if (Double.compare(0., v1) != 0 && Double.compare(0., v2) != 0) {
       return CostFunction.err(v1, v2, parentRatio);
     } else if (Double.compare(v1, 0d) == 0 || Double.compare(v2, 0d) == 0) {
@@ -31,7 +31,7 @@ public class CostFunction {
     }
   }
 
-  public static double errWithPercentageRemoval(double v1, double v2, double parentRatio,
+  public double errWithPercentageRemoval(double v1, double v2, double parentRatio,
       double threshold, double currentBaselineSum) {
     double percentageContribution = (((v1 + v2) / currentBaselineSum) * 100);
     if (Double.compare(percentageContribution, threshold) < 0) {

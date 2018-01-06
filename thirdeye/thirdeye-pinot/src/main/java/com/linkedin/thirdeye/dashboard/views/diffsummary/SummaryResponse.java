@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
+import com.linkedin.thirdeye.client.diffsummary.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -67,7 +68,6 @@ public class SummaryResponse {
   public static SummaryResponse buildNotAvailableResponse() {
     SummaryResponse response = new SummaryResponse();
     response.dimensions.add(NOT_AVAILABLE);
-//    response.responseRows.add(SummaryResponseRow.buildNotAvailableRow());
     return response;
   }
 
@@ -99,7 +99,7 @@ public class SummaryResponse {
     return row;
   }
 
-  public void build(List<HierarchyNode> nodes, int targetLevelCount, List<DimNameValueCostEntry> costSet) {
+  public void build(List<HierarchyNode> nodes, int targetLevelCount, List<DimNameValueCostEntry> costSet, CostFunction costFunction) {
     // Compute the total baseline and current value
     for(HierarchyNode node : nodes) {
       totalBaselineValue += node.getBaselineValue();
@@ -123,7 +123,7 @@ public class SummaryResponse {
     }
 
     // Build the response
-    nodes = SummaryResponseTree.sortResponseTree(nodes, targetLevelCount);
+    nodes = SummaryResponseTree.sortResponseTree(nodes, targetLevelCount, costFunction);
     //   Build name tag for each row of responses
     Map<HierarchyNode, NameTag> nameTags = new HashMap<>();
     Map<HierarchyNode, List<String>> otherDimensionValues = new HashMap<>();

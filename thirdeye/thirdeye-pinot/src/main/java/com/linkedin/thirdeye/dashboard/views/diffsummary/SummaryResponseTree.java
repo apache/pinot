@@ -21,7 +21,7 @@ public class SummaryResponseTree {
   List<HierarchyNode> hierarchicalNodes = new ArrayList<>();
 
 
-  public static List<HierarchyNode> sortResponseTree(List<HierarchyNode> nodes, int levelCount) {
+  public static List<HierarchyNode> sortResponseTree(List<HierarchyNode> nodes, int levelCount, CostFunction costFunction) {
     SummaryResponseTree responseTree = new SummaryResponseTree();
 
     // Build the header
@@ -58,7 +58,7 @@ public class SummaryResponseTree {
     }
 
     // Sort the children of each node by their cost
-    sortChildNodes(treeNodes.get(0), totalValue);
+    sortChildNodes(treeNodes.get(0), totalValue, costFunction);
 
     // Put the nodes to a flattened array
     insertChildNodes(treeNodes.get(0), responseTree.hierarchicalNodes);
@@ -76,26 +76,26 @@ public class SummaryResponseTree {
   /**
    * A recursive function to sort response tree.
    */
-  private static void sortChildNodes(SummaryResponseTreeNode node, double totalValue) {
+  private static void sortChildNodes(SummaryResponseTreeNode node, double totalValue, CostFunction costFunction) {
     if (node.children.size() == 0) return;
     for (SummaryResponseTreeNode child : node.children) {
-      sortChildNodes(child, totalValue);
+      sortChildNodes(child, totalValue, costFunction);
     }
     double ratio = node.currentRatio();
     for (SummaryResponseTreeNode child : node.children) {
-      computeCost(child, ratio, totalValue);
+      computeCost(child, ratio, totalValue, costFunction);
     }
     Collections.sort(node.children, Collections.reverseOrder(new SummaryResponseTreeNodeCostComparator()));
   }
 
-  private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double totalValue) {
+  private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double totalValue,
+      CostFunction costFunction) {
     if (node.hierarchyNode != null) {
-      node.cost = CostFunction
-          .errWithPercentageRemoval(node.getBaselineValue(), node.getCurrentValue(), targetRatio,
-              Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD, totalValue);
+      node.cost = costFunction.errWithPercentageRemoval(node.getBaselineValue(), node.getCurrentValue(), targetRatio,
+          Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD, totalValue);
     }
     for (SummaryResponseTreeNode child : node.children) {
-      computeCost(child, targetRatio, totalValue);
+      computeCost(child, targetRatio, totalValue, costFunction);
       node.cost += child.cost;
     }
   }

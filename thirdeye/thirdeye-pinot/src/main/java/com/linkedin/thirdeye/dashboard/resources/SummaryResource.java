@@ -2,13 +2,18 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.client.diffsummary.CostFunction;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
+import java.util.Set;
+import java.util.TreeSet;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -48,6 +53,8 @@ public class SummaryResource {
   private static final String JAVASCRIPT_NULL_STRING = "undefined";
   private static final String HTML_STRING_ENCODING = "UTF-8";
 
+  private static final String TOP_K_POSTFIX = "_topk";
+
 
   @GET
   @Path(value = "/summary/autoDimensionOrder")
@@ -81,7 +88,7 @@ public class SummaryResource {
 
       Dimensions dimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
-        dimensions = new Dimensions(Utils.getSchemaDimensionNames(collection));
+        dimensions = sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(collection)));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
@@ -98,10 +105,11 @@ public class SummaryResource {
           OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
           });
 
-      Cube cube = new Cube();
+      CostFunction costFunction = new CostFunction();
+      Cube cube = new Cube(costFunction);
       cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies, filterSetMap);
 
-      Summary summary = new Summary(cube);
+      Summary summary = new Summary(cube, costFunction);
       response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
       response.setMetricName(metric);
     } catch (Exception e) {
@@ -159,10 +167,11 @@ public class SummaryResource {
         filterSets = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
       }
 
-      Cube cube = new Cube();
+      CostFunction costFunction = new CostFunction();
+      Cube cube = new Cube(costFunction);
       cube.buildWithManualDimensionOrder(olapClient, dimensions, filterSets);
 
-      Summary summary = new Summary(cube);
+      Summary summary = new Summary(cube, costFunction);
       response = summary.computeSummary(summarySize, doOneSideError);
       response.setMetricName(metric);
     } catch (Exception e) {
@@ -170,5 +179,39 @@ public class SummaryResource {
       response = SummaryResponse.buildNotAvailableResponse();
     }
     return OBJECT_MAPPER.writeValueAsString(response);
+  }
+
+  /**
+   * Removes noisy dimensions.
+   *
+   * @param dimensions the original dimensions.
+   *
+   * @return the original dimensions minus noisy dimensions, which are predefined.
+   *
+   * TODO: Replace with an user configurable method
+   */
+  private static Dimensions sanitizeDimensions(Dimensions dimensions) {
+    List<String> allDimensionNames = dimensions.allDimensions();
+    Set<String> dimensionsToRemove = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    dimensionsToRemove.add("environment");
+    dimensionsToRemove.add("colo");
+    dimensionsToRemove.add("fabric");
+    for (String dimensionName : allDimensionNames) {
+      if(dimensionName.contains(TOP_K_POSTFIX)) {
+        String rawDimensionName = dimensionName.replaceAll(TOP_K_POSTFIX, "");
+        dimensionsToRemove.add(rawDimensionName.toLowerCase());
+      }
+    }
+    return removeDimensions(dimensions, dimensionsToRemove);
+  }
+
+  private static Dimensions removeDimensions(Dimensions dimensions, Collection<String> dimensionsToRemove) {
+    List<String> dimensionsToRetain = new ArrayList<>();
+    for (String dimensionName : dimensions.allDimensions()) {
+      if(!dimensionsToRemove.contains(dimensionName)){
+        dimensionsToRetain.add(dimensionName);
+      }
+    }
+    return new Dimensions(dimensionsToRetain);
   }
 }
