@@ -1169,7 +1169,6 @@ public class PinotLLCRealtimeSegmentManager {
     if (currentInstances.size() < currentReplicaCount) {
       LOGGER.error("Cannot have {} replicas in {} instances for {}.Not updating partition assignment", currentReplicaCount, currentInstances.size(), realtimeTableName);
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.SHORT_OF_LIVE_INSTANCES, 1);
-      System.out.println("~~~");
       return;
     }
     ZNRecord newPartitionAssignment = generatePartitionAssignment(kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances, currentReplicaCount);
