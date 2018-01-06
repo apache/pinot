@@ -64,6 +64,8 @@ public class DateTimeConversionTransformTest {
     List<Object[]> entries = new ArrayList<>();
 
     /****** Epoch to Epoch ***************/
+
+    // Testing bucketing to 15 minutes
     input = new long[3];
     expected = new long[3];
     input[0] = 1505898000000L /* 20170920T02:00:00 */;
@@ -76,6 +78,7 @@ public class DateTimeConversionTransformTest {
         "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "15:MINUTES", input, 3, DataType.LONG, expected
     });
 
+    // testing inputs which should create no change
     input = new long[3];
     expected = new long[3];
     input[0] = 1505898000000L /* 20170920T02:00:00 */;
@@ -88,6 +91,7 @@ public class DateTimeConversionTransformTest {
         "1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", input, 3, DataType.LONG, expected
     });
 
+    // testing conversion from millis to hours and bucketing
     input = new long[3];
     expected = new long[3];
     input[0] = 1505898000000L /* 20170920T02:00:00 */;
@@ -100,6 +104,7 @@ public class DateTimeConversionTransformTest {
         "1:MILLISECONDS:EPOCH", "1:HOURS:EPOCH", "1:HOURS", input, 3, DataType.LONG, expected
     });
 
+    // testing conversion from n minutes epoch to millis and bucketing to hours
     input = new long[3];
     expected = new long[3];
     input[0] = 5019660L /* 20170920T02:00:00 */;
@@ -124,6 +129,7 @@ public class DateTimeConversionTransformTest {
         "5:MINUTES:EPOCH", "1:HOURS:EPOCH", "1:HOURS", input, 3, DataType.LONG, expected
     });
 
+    // testing conversion to non-java timeunit WEEKS
     input = new long[3];
     expected = new long[3];
     input[0] = 1505898000000L /* 20170920T02:00:00 */;
@@ -137,6 +143,7 @@ public class DateTimeConversionTransformTest {
     });
 
     /****** Epoch to SDF ***************/
+    // Testing conversion from epoch millis to simple date format
     // Converted according to UTC buckets
     input = new long[3];
     expected = new long[3];
@@ -150,6 +157,7 @@ public class DateTimeConversionTransformTest {
         "1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", input, 3, DataType.LONG, expected
     });
 
+    // Testing conversion from epoch millis to simple date format
     // Converted according to Pacific timezone
     input = new long[3];
     expected = new long[3];
@@ -163,6 +171,7 @@ public class DateTimeConversionTransformTest {
         "1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Los_Angeles)", "1:DAYS", input, 3, DataType.LONG, expected
     });
 
+    // Testing conversion from epoch millis to simple date format
     // Converted according to IST
     input = new long[3];
     expected = new long[3];
@@ -176,6 +185,7 @@ public class DateTimeConversionTransformTest {
         "1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", "1:DAYS", input, 3, DataType.LONG, expected
     });
 
+    // Testing conversion from epoch millis to simple date format
     // Converted according to Pacific timezone
     input = new long[3];
     expected = new long[3];
@@ -189,6 +199,7 @@ public class DateTimeConversionTransformTest {
         "1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/Los_Angeles)", "1:DAYS", input, 3, DataType.LONG, expected
     });
 
+    // Testing conversion from epoch millis to simple date format
     // Converted according to East Coast timezone
     input = new long[3];
     expected = new long[3];
@@ -204,6 +215,7 @@ public class DateTimeConversionTransformTest {
 
 
     /****** SDF to Epoch ***************/
+    // Testing conversion from sdf to epoch millis
     input = new long[3];
     expected = new long[3];
     expected[0] = 1505865600000L; /* 20170920T00:00:00 */
@@ -216,6 +228,7 @@ public class DateTimeConversionTransformTest {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS:EPOCH", "1:DAYS", input, 3, DataType.LONG, expected
     });
 
+    // Testing conversion from sdf to epoch millis
     // Converted to East Coast timezone
     input = new long[3];
     expected = new long[3];
@@ -229,6 +242,7 @@ public class DateTimeConversionTransformTest {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/New_York)", "1:MILLISECONDS:EPOCH", "1:DAYS", input, 3, DataType.LONG, expected
     });
 
+    // Testing conversion from sdf to epoch millis
     // Converted to East Coast timezone
     input = new long[3];
     expected = new long[3];
@@ -242,6 +256,7 @@ public class DateTimeConversionTransformTest {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)", "1:MILLISECONDS:EPOCH", "1:HOURS", input, 3, DataType.LONG, expected
     });
 
+    // Testing conversion from sdf to epoch millis
     // Converted to East Coast timezone
     stringInput = new String[3];
     expected = new long[3];
@@ -255,7 +270,7 @@ public class DateTimeConversionTransformTest {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH ZZZ", "1:MILLISECONDS:EPOCH", "1:HOURS", stringInput, 3, DataType.STRING, expected
     });
 
-
+    // Testing conversion from sdf with special characters to epoch millis
     stringInput = new String[4];
     expected = new long[4];
     stringInput[0] = "8/7/2017 1 AM";
@@ -270,7 +285,7 @@ public class DateTimeConversionTransformTest {
         "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", "1:MILLISECONDS:EPOCH", "1:HOURS", stringInput, 4, DataType.STRING, expected
     });
 
-
+    // Testing conversion from sdf with special characters to epoch millis, with bucketing
     stringInput = new String[4];
     expected = new long[4];
     stringInput[0] = "8/7/2017 1:00:00 AM";
@@ -285,7 +300,7 @@ public class DateTimeConversionTransformTest {
         "1:SECONDS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:HOURS", stringInput, 4, DataType.STRING, expected
     });
 
-
+    // Testing conversion from sdf to epoch millis, with no bucketing
     stringInput = new String[4];
     expected = new long[4];
     stringInput[0] = "8/7/2017 1:00:00 AM";
@@ -302,7 +317,7 @@ public class DateTimeConversionTransformTest {
 
 
     /****** SDF to SDF ***************/
-
+    // Testing sdf to another sdf
     stringInput = new String[3];
     expected = new long[3];
     stringInput[0] = "8/7/2017 1:00:00 AM";
@@ -315,6 +330,7 @@ public class DateTimeConversionTransformTest {
         "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS", stringInput, 3, DataType.STRING, expected
     });
 
+    // Testing sdf with timezone to another sdf
     stringInput = new String[3];
     expected = new long[3];
     stringInput[0] = "20170920 America/Chicago";
@@ -327,6 +343,7 @@ public class DateTimeConversionTransformTest {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd ZZZ", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS", stringInput, 3, DataType.STRING, expected
     });
 
+    // Testing sdf with timezone in format, to another sdf with timezone input
     stringInput = new String[3];
     expected = new long[3];
     stringInput[0] = "20170920 America/New_York";
@@ -344,7 +361,7 @@ public class DateTimeConversionTransformTest {
 
 
 
-  // Test conversion of a dateTimeColumn value from a format to millis
+  // Test conversion of a dateTimeColumn value from a format to another
   //@Test(dataProvider = "testEvaluateDataProvider")
   public void testDateTimeConversionEvaluation(String inputFormat, String outputFormat,
       String outputGranularity, Object inputValue, Object expectedValue) {
