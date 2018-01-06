@@ -44,11 +44,14 @@ export default Ember.Component.extend({
 
         // If this is an ongoing event
         if (value.end <= 0) {
-          value.humanEnd = 'ongoing';
+          value.duration = 'ongoing';
         } else {
-          value.humanEnd = moment(value.end).format(format);
+          let timeDiff = value.end - value.start;
+          let duration = moment.duration(timeDiff).days();
+          value.duration = duration > 1 ? `${duration} days` : `${duration} day`;
         }
       });
+
       return values;
     }
   ),

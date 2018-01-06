@@ -23,7 +23,7 @@ export default [
     ]
   },
   {
-    header: "Issues",
+    header: "GCN",
     eventType: "gcn",
     color: "orange",
     inputs: [
@@ -45,7 +45,7 @@ export default [
     ]
   },
   {
-    header: "Experiments",
+    header: "LiX",
     eventType: "lix",
     color: "purple",
     inputs: [
