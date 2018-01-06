@@ -45,7 +45,7 @@ export default [
     ]
   },
   {
-    header: "Lix",
+    header: "LiX",
     eventType: "lix",
     color: "purple",
     inputs: [
