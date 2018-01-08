@@ -433,7 +433,7 @@ public class PinotSegmentUploadRestletResource {
     long minionExpectedCrc = -1L;
     boolean isMinionConfigured = offlineTableConfig.getTaskConfig() != null;
     String userAgentHeader = headers.getHeaderString(HttpHeaders.USER_AGENT);
-    boolean minionHeaderPresent = userAgentHeader.contains(CommonConstants.Minion.MINION_HEADER_PREFIX);
+    boolean minionHeaderPresent = userAgentHeader != null && userAgentHeader.contains(CommonConstants.Minion.HTTP_TASK_TYPE_HEADER_PREFIX);
     boolean metadataRewritten = false;
 
     if (isMinionConfigured) {

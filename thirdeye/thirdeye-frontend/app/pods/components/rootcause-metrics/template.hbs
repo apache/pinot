@@ -1,27 +1,47 @@
-<div class="row">
-  <div class="col-xs-12">
-    sort
-    | <button {{action "toggleSort" "metric"}}>metric</button>
-    | <button {{action "toggleSort" "dataset"}}>dataset</button>
-    | <button {{action "toggleSort" "change"}}>change</button>
-    | <button {{action "toggleSort" "score"}}>score</button>
-  </div>
-</div>
+<ul class="rootcause-metric__display-view">
+  <li>View: </li>
+  <li class="rootcause-metric__display-view--{{if (eq selectedView "card") "active"}}" {{action "selectView" 'card'}}>
+    Card
+  </li>
+  <li>|</li>
+  <li class="rootcause-metric__display-view--{{if (eq selectedView "table") "active"}}" {{action "selectView" 'table'}}>
+    Table
+  </li>
+</ul>
 
-  <div class="rootcause-metric__wrapper">
-    {{#each urns as |urn|}}
-      <div class="col-lg-2 col-md-3 col-xs-6 rootcause-metric__card
-        {{if (set-has selectedUrns urn) "rootcause-metric__card--selected"}}"
-        {{action "toggleSelection" urn}}>
-        <div class="rootcause-metric__title">
-          <span class="rootcause-metric__name">{{get-safe metrics urn}}</span>
-          <span class="rootcause-metric__dataset">{{get-safe datasets urn}}</span>
-        </div>
-        <span class="rootcause-metric__change rootcause-metric__change--{{color-delta (get-safe changes urn)}}">
-          {{get-safe changesFormatted urn}}
-        </span>
-      </div>
-    {{else}}
-      No Metrics.
-    {{/each}}
+{{#if (eq selectedView "card")}}
+  <div class="row">
+    <div class="col-xs-12">
+      sort
+      | <button {{action "toggleSort" "metric"}}>metric</button>
+      | <button {{action "toggleSort" "dataset"}}>dataset</button>
+      | <button {{action "toggleSort" "change"}}>change</button>
+      | <button {{action "toggleSort" "score"}}>score</button>
+    </div>
   </div>
+
+  {{#each urns as |urn|}}
+    <div class="col-lg-2 col-md-3 col-xs-6 rootcause-metric__card
+      {{if (set-has selectedUrns urn) "rootcause-metric__card--selected"}}"
+      {{action "toggleSelection" urn}}>
+      <div class="rootcause-metric__title">
+        <span class="rootcause-metric__name">{{get-safe metrics urn}}</span>
+        <span class="rootcause-metric__dataset">{{get-safe datasets urn}}</span>
+      </div>
+      <span class="rootcause-metric__change rootcause-metric__change--{{color-delta (get-safe changes urn)}}">
+        {{get-safe changesFormatted urn}}
+      </span>
+    </div>
+  {{else}}
+    No Metrics.
+  {{/each}}
+{{else}}
+  {{metrics-table
+    selectedUrns=selectedUrns
+    entities=entities
+    urns=urns
+    metrics=metrics
+    scores=scores
+    changesFormatted=changesFormatted
+    toggleSelection=(action "toggleSelection")}}
+{{/if}}

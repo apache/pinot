@@ -97,7 +97,7 @@
   &__stats-value {
     font-size: 24px;
     line-height: 32px;
-    font-weight: normal; 
+    font-weight: normal;
 
     //To do: make this into mixin
     &--positive {
@@ -121,5 +121,9 @@
   &__radio-button-item {
     padding-right: 20px;
     display: inline-block;
+  }
+
+  &__feedback {
+    padding: 0 24px 24px;
   }
 }

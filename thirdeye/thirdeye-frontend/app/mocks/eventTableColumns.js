@@ -14,15 +14,15 @@ export default [
   },
   {
     propertyName: 'humanStart',
-    title: 'Start',
+    title: 'Start Time',
     sortedBy: 'start',
     className: 'events-table__column--compact',
     disableFiltering: true
   },
   {
-    propertyName: 'humanEnd',
-    title: 'End',
-    sortedBy: 'end',
+    propertyName: 'duration',
+    title: 'Duration',
+    sortedBy: 'duration',
     className: 'events-table__column--compact',
     disableFiltering: true
   }
