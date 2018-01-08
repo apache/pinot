@@ -31,7 +31,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
                                           // as compared to total number of segments in ideal state
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   REALTIME_TABLE_COUNT("TableCount", true),
-  OFFLINE_TABLE_COUNT("TableCount", true);
+  OFFLINE_TABLE_COUNT("TableCount", true),
+
+  SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false); // Number of extra live instances needed.
 
   private final String gaugeName;
   private final String unit;
