@@ -27,7 +27,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import com.linkedin.pinot.controller.api.access.AccessControlFactory;
-import com.linkedin.pinot.controller.api.events.MetadataChangeNotifierFactory;
+import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -58,7 +58,7 @@ public class ControllerStarter {
   private static final String METRICS_REGISTRY_NAME = "pinot.controller.metrics";
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
-  private static final String METADATA_CHANGE_NOTIFIER_PREFIX = "metadata.change.notifier";
+  private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
 
   private final ControllerConf config;
   private final ControllerAdminApiApplication adminApp;
@@ -155,8 +155,8 @@ public class ControllerStarter {
       final AccessControlFactory accessControlFactory =
           (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
 
-      final MetadataChangeNotifierFactory metadataChangeNotifierFactory = MetadataChangeNotifierFactory.loadFactory(
-          config.subset(METADATA_CHANGE_NOTIFIER_PREFIX));
+      final MetadataEventNotifierFactory metadataEventNotifierFactory = MetadataEventNotifierFactory.loadFactory(
+          config.subset(METADATA_EVENT_NOTIFIER_PREFIX));
 
       int jerseyPort = Integer.parseInt(config.getControllerPort());
 
@@ -176,7 +176,7 @@ public class ControllerStarter {
           bind(executorService).to(Executor.class);
           bind(controllerMetrics).to(ControllerMetrics.class);
           bind(accessControlFactory).to(AccessControlFactory.class);
-          bind(metadataChangeNotifierFactory).to(MetadataChangeNotifierFactory.class);
+          bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
         }
       });
 
