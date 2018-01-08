@@ -66,7 +66,7 @@ public class SegmentGeneratorConfig {
 
   private Map<String, String> _customProperties = new HashMap<>();
   private Set<String> _rawIndexCreationColumns = new HashSet<>();
-  private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType;
+  private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private String _dataDir = null;
   private String _inputFilePath = null;
