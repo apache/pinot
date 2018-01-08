@@ -6,6 +6,7 @@
 import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
+import { computed } from '@ember/object';
 import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/helpers/utils';
 import { buildAnomalyStats } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
@@ -98,7 +99,7 @@ export default Controller.extend({
    * Table pagination: number of pages to display
    * @type {Number}
    */
-  paginationSize: Ember.computed(
+  paginationSize: computed(
     'pagesNum',
     'pageSize',
     function() {
@@ -111,7 +112,7 @@ export default Controller.extend({
    * Table pagination: total Number of pages to display
    * @type {Number}
    */
-  pagesNum: Ember.computed(
+  pagesNum: computed(
     'filteredAnomalies',
     'pageSize',
     function() {
@@ -125,7 +126,7 @@ export default Controller.extend({
    * Table pagination: creates the page Array for view
    * @type {Array}
    */
-  viewPages: Ember.computed(
+  viewPages: computed(
     'pages',
     'currentPage',
     'paginationSize',
@@ -152,7 +153,7 @@ export default Controller.extend({
    * Table pagination: pre-filtered and sorted anomalies with pagination
    * @type {Array}
    */
-  paginatedFilteredAnomalies: Ember.computed(
+  paginatedFilteredAnomalies: computed(
     'filteredAnomalies.@each',
     'pageSize',
     'currentPage',
@@ -180,7 +181,7 @@ export default Controller.extend({
    * Indicates the allowed date range picker increment based on granularity
    * @type {Number}
    */
-  timePickerIncrement: Ember.computed('alertData.windowUnit', function() {
+  timePickerIncrement: computed('alertData.windowUnit', function() {
     const granularity = this.get('alertData.windowUnit').toLowerCase();
 
     switch(granularity) {
@@ -203,7 +204,7 @@ export default Controller.extend({
    * date-time-picker: returns a time object from selected range end date
    * @type {Object}
    */
-  viewRegionEnd: Ember.computed(
+  viewRegionEnd: computed(
     'activeRangeEnd',
     function() {
       const end = this.get('activeRangeEnd');
@@ -215,7 +216,7 @@ export default Controller.extend({
    * date-time-picker: returns a time object from selected range start date
    * @type {Object}
    */
-  viewRegionStart: Ember.computed(
+  viewRegionStart: computed(
     'activeRangeStart',
     function() {
       const start = this.get('activeRangeStart');
@@ -227,7 +228,7 @@ export default Controller.extend({
    * date-time-picker: indicates the date format to be used based on granularity
    * @type {String}
    */
-  uiDateFormat: Ember.computed('alertData.windowUnit', function() {
+  uiDateFormat: computed('alertData.windowUnit', function() {
     const granularity = this.get('alertData.windowUnit').toLowerCase();
 
     switch(granularity) {
@@ -245,7 +246,7 @@ export default Controller.extend({
    * TODO: pull this into its own component, as we're re-using it in manage/alert/tune
    * @type {Object}
    */
-  anomalyStats: Ember.computed(
+  anomalyStats: computed(
     'alertEvalMetrics',
     'alertEvalMetrics.projected',
     function() {
@@ -259,7 +260,7 @@ export default Controller.extend({
    * NOTE: this is currently set up to support single-dimension filters
    * @type {Object}
    */
-  filteredAnomalies: Ember.computed(
+  filteredAnomalies: computed(
     'selectedDimension',
     'selectedResolution',
     'anomalyData',
@@ -294,7 +295,7 @@ export default Controller.extend({
    * Placeholder for options for range field. Here we generate arbitrary date ranges from our config.
    * @type {Array}
    */
-  rangeOptionsExample: Ember.computed(
+  rangeOptionsExample: computed(
     'dateRangeToRender',
     function() {
       return this.get('dateRangeToRender').map(this.renderDate);

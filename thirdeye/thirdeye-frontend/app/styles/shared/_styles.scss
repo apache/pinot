@@ -13,6 +13,10 @@ body {
   margin-top: 24px;
 }
 
+.stronger {
+  font-weight: bold;
+}
+
 .te-title {
   @include app-title-mixin;
 
@@ -96,7 +100,7 @@ body {
   }
 
   &__tune-field {
-    width: 125px;
+    width: 180px;
     display: inline-block;
     vertical-align: middle;
     margin: 5px 0 5px 5px;
@@ -546,58 +550,6 @@ body {
     }
   }
 }
-
-/*.te-alert-page-pending {
-  text-align: center;
-  color: app-shade(black, 9);
-  border-radius: 5px;
-  margin: 50px;
-  padding: 30px 0 50px 0;
-  background-color: white;
-  box-shadow:
-      0 0 0 1px app-shade(black, 0.1),
-      0 2px 3px 0 app-shade(black, 0.2);
-
-  &__image {
-    width: 320px;
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
-    margin: 15px 0 60px 0;
-    box-shadow: 0px 30px 40px rgb(245, 245, 245);
-  }
-
-  &__title {
-    font-size: 40px;
-    font-weight: 100;
-    letter-spacing: .02em;
-  }
-
-  &__text {
-    font-size: 15px;
-    color: app-shade(black, 6);
-  }
-
-  &__loader {
-    height: 4px;
-    width: 40%;
-    margin: 20px auto;
-    position: relative;
-    overflow: hidden;
-    background-color: #ddd;
-
-    &:before {
-      display: block;
-      position: absolute;
-      content: "";
-      left: -200px;
-      width: 200px;
-      height: 4px;
-      background-color: $te-blue;
-      animation: loading 2s linear infinite;
-    }
-  }
-}*/
-
 
 .glyphicon-spin {
     -webkit-animation: spin 1000ms infinite linear;

@@ -9,7 +9,7 @@ import moment from 'moment';
  */
 export function formatEvalMetric(metric, allowDecimal = false) {
   let shown = 'N/A';
-  if (Ember.typeOf(metric) === 'number') {
+  if (!isNaN(metric)) {
     if (allowDecimal) {
       shown = (Number(metric) === 1 || Number(metric) === 0)
         ? metric * 100
@@ -52,7 +52,7 @@ export function toIdGroups(anomalyIds, bucketSize = 10) {
  */
 export function enhanceAnomalies(rawAnomalies) {
   const newAnomalies = [];
-  const anomaliesPresent = rawAnomalies.length;
+  const anomaliesPresent = rawAnomalies.length ;
   // De-dupe raw anomalies, extract only the good stuff (anomalyDetailsList)
   const anomalies = anomaliesPresent ? [].concat(...rawAnomalies.map(data => data.anomalyDetailsList)) : [];
 
@@ -142,6 +142,25 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
 }
 
 /**
+ * Returns a sample JSON anomaly eval object
+ * @returns {Object}
+ */
+export function evalObj() {
+  return {
+    userReportAnomaly: 0,
+    totalResponses: 0,
+    trueAnomalies: 0,
+    recall: NaN,
+    totalAlerts: 6,
+    responseRate: 0.0,
+    precision: 0.0,
+    falseAlarm: 0,
+    newTrend: 0,
+    weightedPrecision: 0.0
+  };
+}
+
+/**
  * Data needed to render the stats 'cards' above the anomaly graph for a given alert
  * @param {Object} alertEvalMetrics - contains the alert's performance data
  * @param {String} mode - the originating route
@@ -150,68 +169,60 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
 export function buildAnomalyStats(alertEvalMetrics, mode) {
   const tooltip = false;
 
-  const {
-    totalAlerts: origTotal = 0,
-    precision: origPrecision = 0,
-    responseRate: origResponse,
-    recall: origRecall,
-    mttd: origMttd
-  } = alertEvalMetrics.evalData;
-
-  const {
-    totalAlerts: newTotal = 0,
-    precision: newPrecision = 0,
-    responseRate: newResponse,
-    recall: newRecall,
-    mttd: newMttd
-  } = alertEvalMetrics.projected;
-
   const responseRateObj = {
     title: 'Response Rate',
+    key: 'responseRate',
     units: '%',
     tooltip,
-    text: '% of anomalies that are reviewed.',
-    value: formatEvalMetric(origResponse),
-    projected: 'none',
+    text: '% of anomalies that are reviewed.'
   };
 
   const anomalyStats = [
     {
       title: 'Number of anomalies',
+      key: 'totalAlerts',
       text: 'Estimated average number of anomalies',
-      tooltip,
-      value: formatEvalMetric(origTotal),
-      projected: formatEvalMetric(newTotal)
+      tooltip
     },
     {
       title: 'Precision',
+      key: 'precision',
       units: '%',
       tooltip,
-      text: 'Among all anomalies detected, the % of them that are true.',
-      value: formatEvalMetric(origPrecision),
-      projected: formatEvalMetric(newPrecision),
+      text: 'Among all anomalies detected, the % of them that are true.'
     },
     {
       title: 'Recall',
+      key: 'recall',
       units: '%',
       tooltip,
-      text: 'Among all anomalies that happened, the % of them detected by the system.',
-      value: formatEvalMetric(origRecall, true),
-      projected: formatEvalMetric(newRecall, true),
+      text: 'Among all anomalies that happened, the % of them detected by the system.'
     },
     {
       title: 'MTTD for >30% change',
+      key: 'mttd',
       units: 'hours',
       tooltip,
-      text: 'Minimum time to detect for anomalies with > 30% change',
-      value: formatEvalMetric(origMttd),
-      projected: formatEvalMetric(newMttd)
+      text: 'Minimum time to detect for anomalies with > 30% change'
     }
   ];
 
   if (mode === 'explore') {
     anomalyStats.splice(1, 0, responseRateObj);
   }
+
+  anomalyStats.forEach((stat) => {
+    let origData = alertEvalMetrics.evalData[stat.key];
+    let newData = alertEvalMetrics.projected[stat.key];
+    stat.value = formatEvalMetric(origData);
+    stat.projected = formatEvalMetric(newData);
+    if (stat.units) {
+      stat.valueUnits = isNaN(origData) ? null : stat.units;
+      stat.projectedUnits = isNaN(newData) ? null : stat.units;
+      stat.showDirectionIcon = !isNaN(origData) && !isNaN(newData) && origData !== newData;
+      stat.direction = stat.showDirectionIcon && origData > newData ? 'bottom' : 'top';
+    }
+  });
 
   return anomalyStats;
 }
@@ -222,5 +233,6 @@ export default helper(
   pluralizeTime,
   enhanceAnomalies,
   setUpTimeRangeOptions,
-  buildAnomalyStats
+  buildAnomalyStats,
+  evalObj
 );

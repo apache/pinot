@@ -1240,10 +1240,8 @@ export default Ember.Controller.extend({
             });
           }
 
-
-
           // Redirect to onboarding page to trigger wrapper
-          this.transitionToRoute('manage.alert', this.get('newFuncId'), { queryParams: { replayId: '99898' }});
+          this.transitionToRoute('manage.alert', this.get('newFuncId'), { queryParams: { replayId }});
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         }).catch((error) => {
           this.setAlertCreateErrorState(error);

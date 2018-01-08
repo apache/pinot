@@ -6,6 +6,7 @@
 import fetch from 'fetch';
 import _ from 'lodash';
 import Controller from '@ember/controller';
+import { computed } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 
 export default Controller.extend({
@@ -68,7 +69,7 @@ export default Controller.extend({
    * @method allAlertsConfigGroups
    * @return {Array} list of existing config groups
    */
-  allAlertsConfigGroups: Ember.computed(
+  allAlertsConfigGroups: computed(
     'isNewConfigGroupSaved',
     'alertConfigGroups',
     'newConfigGroupObj',
@@ -89,7 +90,7 @@ export default Controller.extend({
    * @method getTopDimensions
    * @return {Array} dimensionList: array of graphable dimensions
    */
-  topDimensions: Ember.computed(
+  topDimensions: computed(
     'metricDimensions',
     'alertDimension',
     'metricData',
@@ -99,7 +100,7 @@ export default Controller.extend({
       const scoredDimensions = this.get('metricDimensions');
       const colors = ['orange', 'teal', 'purple', 'red', 'green', 'pink'];
       const dimensionObj = this.get('metricData.subDimensionContributionMap') || {};
-      const filteredDimensions =  _.filter(scoredDimensions, function(dimension) {
+      const filteredDimensions =  _.filter(scoredDimensions, (dimension) => {
         return dimension.label.split('=')[0] === selectedDimension;
       });
       const topDimensions = filteredDimensions.sortBy('score').reverse().slice(0, maxSize);
@@ -108,7 +109,7 @@ export default Controller.extend({
       let colorIndex = 0;
 
       // Build the array of subdimension objects for the selected dimension
-      for(let subDimension of topDimensionLabels){
+      topDimensionLabels.forEach((subDimension) => {
         if (dimensionObj[subDimension] && subDimension !== '') {
           dimensionList.push({
             name: subDimension,
@@ -119,7 +120,7 @@ export default Controller.extend({
           });
           colorIndex++;
         }
-      }
+      });
 
       // Return sorted list of dimension objects
       return dimensionList;
@@ -138,7 +139,7 @@ export default Controller.extend({
    * @method selectedConfigGroupSubtitle
    * @return {String} title of expandable section for selected config group
    */
-  selectedConfigGroupSubtitle: Ember.computed(
+  selectedConfigGroupSubtitle: computed(
     'selectedConfigGroup',
     function () {
       return `Alerts Monitored by: ${this.get('selectedConfigGroup.name')}`;
@@ -149,7 +150,7 @@ export default Controller.extend({
    * Mapping alertFilter's pattern to human readable strings
    * @returns {String}
    */
-  pattern: Ember.computed('alertProps', function() {
+  pattern: computed('alertProps', function() {
     const props = this.get('alertProps');
     const patternObj = props.find(prop => prop.name === 'pattern');
     const pattern = patternObj ? decodeURIComponent(patternObj.value) : 'Up and Down';
@@ -161,7 +162,7 @@ export default Controller.extend({
    * Extracting Weekly Effect from alert Filter
    * @returns {String}
    */
-  weeklyEffect: Ember.computed('alertFilters.weeklyEffectModeled', function() {
+  weeklyEffect: computed('alertFilters.weeklyEffectModeled', function() {
     const weeklyEffect = this.getWithDefault('alertFilters.weeklyEffectModeled', true);
 
     return weeklyEffect;
@@ -171,7 +172,7 @@ export default Controller.extend({
    * Extracting sensitivity from alert Filter and maps it to human readable values
    * @returns {String}
    */
-  sensitivity: Ember.computed('alertProps', function() {
+  sensitivity: computed('alertProps', function() {
     const props = this.get('alertProps');
     const sensitivityObj = props.find(prop => prop.name === 'sensitivity');
     const sensitivity = sensitivityObj ? decodeURIComponent(sensitivityObj.value) : 'MEDIUM';
@@ -191,7 +192,7 @@ export default Controller.extend({
    * @method selectedConfigGroupRecipients
    * @return {String} comma-separated email addresses
    */
-  selectedConfigGroupRecipients: Ember.computed(
+  selectedConfigGroupRecipients: computed(
     'selectedConfigGroup',
     'updatedRecipients',
     function() {
@@ -209,7 +210,7 @@ export default Controller.extend({
    * @method newConfigGroupObj
    * @return {Object} primer props for a new alert config group
    */
-  newConfigGroupObj: Ember.computed(
+  newConfigGroupObj: computed(
     'newConfigGroupName',
     function() {
       return {
@@ -229,7 +230,7 @@ export default Controller.extend({
    * @method isEmptyEmail
    * @return {Boolean} are both values empty
    */
-  isEmptyEmail: Ember.computed(
+  isEmptyEmail: computed(
     'selectedConfigGroupRecipients',
     'alertGroupNewRecipient',
     'isExiting',
@@ -288,7 +289,7 @@ export default Controller.extend({
 
     // Build object for each function(alert) to display in results table
     return new Ember.RSVP.Promise((resolve) => {
-      for (var functionId of existingFunctionList) {
+      existingFunctionList.forEach((functionId) => {
         this.fetchFunctionById(functionId).then(functionData => {
           newFunctionList.push({
             number: cnt + 1,
@@ -307,7 +308,7 @@ export default Controller.extend({
             resolve(newFunctionList);
           }
         });
-      }
+      });
     });
   },
 

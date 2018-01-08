@@ -20,10 +20,8 @@ export default Route.extend({
   },
 
   beforeModel(transition) {
-    const {
-      alertId: id,
-      replayId
-    } = transition.params['manage.alert'];
+    const id = transition.params['manage.alert'].alertId;
+    const replayId = transition.queryParams.replayId;
     const durationDefault = '1m';
     const startDateDefault = buildDateEod(1, 'month').valueOf();
     const endDateDefault = buildDateEod(1, 'day');

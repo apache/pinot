@@ -5,6 +5,7 @@
  */
 import Controller from '@ember/controller';
 import moment from 'moment';
+import { computed } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/helpers/utils';
 import { buildAnomalyStats } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
@@ -25,7 +26,7 @@ export default Controller.extend({
   isTunePreviewActive: false,
   isTuneSaveSuccess: false,
   isTuneSaveFailure: false,
-  selectedSeverityOption: 'Weight',
+  selectedSeverityOption: 'Percentage of Change',
   selectedTunePattern: 'None',
   customPercentChange: '30',
   selectedTuneType: 'current',
@@ -42,12 +43,12 @@ export default Controller.extend({
    * Severity display options (power-select) and values
    */
   severityMap: {
-    'Weight': 'weight',
-    'Average Change': 'average_change',
-    'Site-wide Impact': 'site_wide_impact'
+    'Percentage of Change': 'weight',
+    'Absolute Value of Change': 'deviation',
+    'Site Wide Impact': 'site_wide_impact'
   },
 
-  tuneSeverityOptions: Ember.computed('severityMap', function() {
+  tuneSeverityOptions: computed('severityMap', function() {
     return Object.keys(this.get('severityMap'));
   }),
 
@@ -61,7 +62,7 @@ export default Controller.extend({
     'Down Only': 'DOWN'
   },
 
-  tunePatternOptions: Ember.computed('patternMap', function() {
+  tunePatternOptions: computed('patternMap', function() {
     return Object.keys(this.get('patternMap'));
   }),
 
@@ -79,7 +80,7 @@ export default Controller.extend({
    * Builds the new autotune filter from custom tuning options
    * @type {String}
    */
-  customTuneQueryString: Ember.computed(
+  customTuneQueryString: computed(
     'selectedSeverityOption',
     'customPercentChange',
     'customMttdChange',
@@ -102,7 +103,7 @@ export default Controller.extend({
    * Indicates the allowed date range picker increment based on granularity
    * @type {Number}
    */
-  timePickerIncrement: Ember.computed('alertData.windowUnit', function() {
+  timePickerIncrement: computed('alertData.windowUnit', function() {
     const granularity = this.get('alertData.windowUnit').toLowerCase();
 
     switch(granularity) {
@@ -119,7 +120,7 @@ export default Controller.extend({
    * Allows us to enable/disable the custom tuning options
    * @type {Boolean}
    */
-  isCustomFieldsDisabled: Ember.computed('selectedTuneType', function() {
+  isCustomFieldsDisabled: computed('selectedTuneType', function() {
     return this.get('selectedTuneType') === 'current';
   }),
 
@@ -127,7 +128,7 @@ export default Controller.extend({
    * date-time-picker: indicates the date format to be used based on granularity
    * @type {String}
    */
-  uiDateFormat: Ember.computed('alertData.windowUnit', function() {
+  uiDateFormat: computed('alertData.windowUnit', function() {
     const granularity = this.get('alertData.windowUnit').toLowerCase();
 
     switch(granularity) {
@@ -144,7 +145,7 @@ export default Controller.extend({
    * date-time-picker: returns a time object from selected range end date
    * @type {Object}
    */
-  viewRegionEnd: Ember.computed(
+  viewRegionEnd: computed(
     'activeRangeEnd',
     function() {
       return moment(this.get('activeRangeEnd')).format(this.get('serverDateFormat'));
@@ -155,7 +156,7 @@ export default Controller.extend({
    * date-time-picker: returns a time object from selected range start date
    * @type {Object}
    */
-  viewRegionStart: Ember.computed(
+  viewRegionStart: computed(
     'activeRangeStart',
     function() {
       return moment(this.get('activeRangeStart')).format(this.get('serverDateFormat'));
@@ -166,7 +167,7 @@ export default Controller.extend({
    * Data needed to render the stats 'cards' above the anomaly graph for this alert
    * @type {Object}
    */
-  anomalyStats: Ember.computed(
+  anomalyStats: computed(
     'alertEvalMetrics',
     'alertEvalMetrics.projected',
     function() {
@@ -179,7 +180,7 @@ export default Controller.extend({
    * Data needed to render the stats 'cards' above the anomaly graph for this alert
    * @type {Object}
    */
-  diffedAnomalies: Ember.computed(
+  diffedAnomalies: computed(
     'anomalyData',
     'filterBy',
     'selectedSortMode',
@@ -317,7 +318,11 @@ export default Controller.extend({
     toggleCategory(metric) {
       const stats = this.get('tableStats');
       const newStats = stats.map((cat) => {
-        return { count: cat.count, label: cat.label, isActive: false };
+        return {
+          count: cat.count,
+          label: cat.label,
+          isActive: false
+        };
       });
       // Activate selected metric in our new stats object
       newStats.find(cat => cat.label === metric).isActive = true;
@@ -333,13 +338,13 @@ export default Controller.extend({
      * @param {String} sortKey  - stringified start date
      */
     toggleSortDirection(sortKey) {
-      const propName = 'sortColumn' + sortKey.capitalize() + 'Up' || '';
+      const propName = `sortColumn${sortKey.capitalize()}Up` || '';
 
       this.toggleProperty(propName);
       if (this.get(propName)) {
-        this.set('selectedSortMode', sortKey + ':up');
+        this.set('selectedSortMode', `${sortKey}:up`);
       } else {
-        this.set('selectedSortMode', sortKey + ':down');
+        this.set('selectedSortMode', `${sortKey}:down`);
       }
       //On sort, set table to first pagination page
       this.set('currentPage', 1);

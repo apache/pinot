@@ -156,8 +156,8 @@
               {{/if}}
               <div class="te-horizontal-cards__card-number">
                 {{card.value}}
-                {{#if (and card.units (not-eq card.value "N/A"))}}
-                  <span class="te-horizontal-cards__card-units">{{card.units}}</span>
+                {{#if card.valueUnits}}
+                  <span class="te-horizontal-cards__card-units">{{card.valueUnits}}</span>
                 {{/if}}
               </div>
             </div>
@@ -168,12 +168,12 @@
               <div class="te-horizontal-cards__val-group">
                 <div class="te-horizontal-cards__card-subt">New</div>
                 <div class="te-horizontal-cards__card-number">
-                  {{#if (not-eq card.value "N/A")}}
-                    <i class="te-horizontal-cards__val-glyph--right glyphicon glyphicon-triangle-{{if (gt card.projected card.value) "top" "bottom"}}"></i>
+                  {{#if card.showDirectionIcon}}
+                    <i class="te-horizontal-cards__val-glyph--right glyphicon glyphicon-triangle-{{card.direction}}"></i>
                   {{/if}}
                   {{card.projected}}
-                  {{#if (and card.units (not-eq card.projected "N/A"))}}
-                    <span class="te-horizontal-cards__card-units">{{card.units}}</span>
+                  {{#if card.projectedUnits}}
+                    <span class="te-horizontal-cards__card-units">{{card.projectedUnits}}</span>
                   {{/if}}
                 </div>
               </div>
@@ -204,7 +204,7 @@
 
     {{#if isTuneSaveFailure}}
       {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
-        <strong>Error:</strong> {{failureMessage}}
+        <span class="stronger">Error:</span> {{failureMessage}}
       {{/bs-alert}}
     {{/if}}
 
@@ -214,9 +214,9 @@
     <div class="te-horizontal-cards te-content-block">
       <h4 class="te-alert-page__subtitle">Anomalies removed with settings</h4>
       {{#if diffedAnomalies}}
-        <p>The following previously sent anomalies <strong>would not have sent</strong> under the new settings.</p>
+        <p>The following previously sent anomalies <span class="stronger">would not have sent</span> under the new settings.</p>
       {{else}}
-        <p>These settings would result in <strong>NO reduction</strong> of sent anomalies</p>
+        <p>These settings would result in <span class="stronger">NO reduction</span> of sent anomalies</p>
       {{/if}}
 
       {{!-- Alert anomaly table --}}

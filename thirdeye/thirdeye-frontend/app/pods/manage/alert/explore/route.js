@@ -7,7 +7,7 @@ import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/helpers/utils';
-import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions } from 'thirdeye-frontend/helpers/manage-alert-utils';
+import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, evalObj } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
 /**
  * Shorthand for setting date defaults
@@ -94,14 +94,15 @@ export default Route.extend({
   },
 
   beforeModel(transition) {
-    const { duration, startDate } = transition.queryParams;
+    const { duration, startDate, replayId } = transition.queryParams;
 
     // Default to 1 month of anomalies to show if no dates present in query params
     if (!duration || !startDate) {
       this.transitionTo({ queryParams: {
         duration: durationDefault,
         startDate: startDateDefault,
-        endDate: endDateDefault
+        endDate: endDateDefault,
+        replayId
       }});
     }
   },
@@ -122,7 +123,7 @@ export default Route.extend({
     const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}`;
     const mttdUrl = `/detection-job/eval/mttd/${id}`;
     const initialPromiseHash = {
-      evalData: fetch(evalUrl).then(checkStatus),
+      evalData: fetch(evalUrl).then(checkStatus), // NOTE: ensure API returns JSON
       autotuneId: fetch(tuneUrl, postProps('')).then(checkStatus),
       mttd: fetch(mttdUrl).then(checkStatus)
     };
@@ -187,7 +188,7 @@ export default Route.extend({
 
     const promiseHash = {
       projectedMttd: fetch(projectedMttdUrl).then(checkStatus),
-      projectedEval: fetch(projectedUrl).then(checkStatus),
+      projectedEval: fetch(projectedUrl).then(checkStatus), // NOTE: ensure API returns JSON
       metricsByName: fetch(metricsUrl).then(checkStatus),
       anomalyIds: fetch(anomaliesUrl).then(checkStatus)
     };

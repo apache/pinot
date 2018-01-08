@@ -7,7 +7,7 @@ import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/helpers/utils';
-import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups } from 'thirdeye-frontend/helpers/manage-alert-utils';
+import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, evalObj } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
 /**
  * Basic alert page defaults
@@ -91,7 +91,7 @@ const tuningPromiseHash = (startDate, endDate, tuneId, alertId) => {
 
   return {
     projectedMttd: fetch(projectedMttdUrl).then(checkStatus),
-    projectedEval: fetch(projectedUrl).then(checkStatus),
+    projectedEval: fetch(projectedUrl).then(checkStatus), // NOTE: ensure API returns JSON
     idListA: fetch(anomaliesUrlA).then(checkStatus),
     idListB: fetch(anomaliesUrlB).then(checkStatus)
   };
@@ -154,7 +154,7 @@ export default Route.extend({
     const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}`;
     const mttdUrl = `/detection-job/eval/mttd/${id}`;
     const initialPromiseHash = {
-      evalData: fetch(evalUrl).then(checkStatus),
+      evalData: fetch(evalUrl).then(checkStatus), // NOTE: ensure API returns JSON
       autotuneId: fetch(tuneIdUrl, postProps('')).then(checkStatus),
       mttd: fetch(mttdUrl).then(checkStatus)
     };

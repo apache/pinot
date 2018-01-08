@@ -11,7 +11,7 @@ export default Controller.extend({
    * When replay id is received it indicates that we need to check replay status
    * before displaying alert function performance data.
    */
-  queryParams: ['replay'],
+  queryParams: ['replayId'],
   replayId: null,
 
   actions: {
@@ -27,8 +27,10 @@ export default Controller.extend({
      * Handle navigation to edit route
      */
     onClickEdit() {
-      this.set('isOverViewModeActive', false);
-      this.set('isEditModeActive', true);
+      this.setProperties({
+        isOverViewModeActive: false,
+        isEditModeActive: true
+      });
       this.transitionToRoute('manage.alert.edit', this.get('id'));
     },
 
