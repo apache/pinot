@@ -44,6 +44,18 @@ public class SegmentDirectoryPaths {
     }
   }
 
+  @Nonnull
+  public static File findSegmentDirectory(@Nonnull File indexDir) {
+    Preconditions.checkArgument(indexDir.isDirectory(), "Path: %s is not a directory", indexDir);
+
+    File v3SegmentDir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
+    if (v3SegmentDir.isDirectory()) {
+      return v3SegmentDir;
+    } else {
+      return indexDir;
+    }
+  }
+
   public static boolean isV3Directory(@Nonnull File path) {
     return path.toString().endsWith(V3_SUBDIRECTORY_NAME);
   }

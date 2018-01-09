@@ -25,13 +25,11 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -210,7 +208,6 @@ public class SegmentFetcherAndLoader {
     }
   }
 
-  // TODO: revisit to see whether this check is needed (Controller already checked the creation time and crc)
   private boolean isNewSegmentMetadata(@Nonnull OfflineSegmentZKMetadata newSegmentZKMetadata,
       @Nullable SegmentMetadata existedSegmentMetadata) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(newSegmentZKMetadata.getTableName());
@@ -225,20 +222,7 @@ public class SegmentFetcherAndLoader {
     long existedCrc = Long.valueOf(existedSegmentMetadata.getCrc());
     LOGGER.info("New segment CRC: {}, existed segment CRC: {} for segment: {} in table: {}", newCrc, existedCrc,
         segmentName, offlineTableName);
-    if (newCrc == existedCrc) {
-      // Treat as new segment if only optimizations changed
-      List<String> newOptimizations = newSegmentZKMetadata.getOptimizations();
-      List<String> existedOptimizations = existedSegmentMetadata.getOptimizations();
-      if (!EqualityUtils.isEqualIgnoreOrder(newOptimizations, existedOptimizations)) {
-        LOGGER.info("Optimizations changed for segment: {} in table: {}, new: {}, existed: {}", segmentName,
-            offlineTableName, newOptimizations, existedOptimizations);
-        return true;
-      } else {
-        return false;
-      }
-    } else {
-      return true;
-    }
+    return newCrc != existedCrc;
   }
 
   @Nonnull

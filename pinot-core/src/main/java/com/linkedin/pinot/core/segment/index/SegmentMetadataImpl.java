@@ -92,7 +92,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private int _totalRawDocs;
   private long _segmentStartTime;
   private long _segmentEndTime;
-  private List<String> _optimizations;
 
   /**
    * Load segment metadata in any segment version.
@@ -156,12 +155,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _columnMetadataMap = null;
     _segmentName = offlineSegmentZKMetadata.getSegmentName();
     _schema = new Schema();
-    _allColumns = new HashSet<String>();
+    _allColumns = new HashSet<>();
     _indexDir = null;
     _metadataFile = null;
     _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
-    _totalRawDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
-        _totalDocs);
+    _totalRawDocs =
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
+            _totalDocs);
   }
 
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata) {
@@ -200,8 +200,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _indexDir = null;
     _metadataFile = null;
     _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
-    _totalRawDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
-        _totalDocs);
+    _totalRawDocs =
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
+            _totalDocs);
   }
 
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
@@ -235,8 +236,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         && _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
 
       try {
-        _timeUnit =
-            TimeUtils.timeUnitFromString(_segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
+        _timeUnit = TimeUtils.timeUnitFromString(_segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
         _timeGranularity = new Duration(_timeUnit.toMillis(1));
         String startTimeString =
             _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME);
@@ -255,8 +255,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  private void loadCreationMeta(File crcFile)
-      throws IOException {
+  private void loadCreationMeta(File crcFile) throws IOException {
     if (crcFile.exists()) {
       final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
       _crc = ds.readLong();
@@ -333,9 +332,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Set hll log2m.
     _hllLog2m = _segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_HLL_LOG2M, HllConstants.DEFAULT_LOG2M);
-
-    // Set enabled optimizations
-    _optimizations = _segmentMetadataPropertiesConfiguration.getList(Segment.SEGMENT_OPTIMIZATIONS, null);
 
     // Build column metadata map, schema and hll derived column map.
     for (String column : _allColumns) {
@@ -646,21 +642,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  @Nullable
-  @Override
-  public List<String> getOptimizations() {
-    return _optimizations;
-  }
-
   /**
    * Converts segment metadata to json
    * @param columnFilter list only  the columns in the set. Lists all the columns if
    *                     the parameter value is null
    * @return json representation of segment metadata
    */
-  public JSONObject toJson(@Nullable Set<String> columnFilter)
-      throws JSONException {
-
+  public JSONObject toJson(@Nullable Set<String> columnFilter) throws JSONException {
     JSONObject rootMeta = new JSONObject();
     try {
       rootMeta.put("segmentName", _segmentName);

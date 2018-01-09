@@ -260,13 +260,10 @@ public class CommonConstants {
   }
 
   public static class Minion {
-    public static final String MINION_HEADER_PREFIX = "Pinot-Minion-";
-    public static final String MINION_HEADER_SEPARATOR = "/";
     public static final String INSTANCE_PREFIX = "Minion_";
     public static final String INSTANCE_TYPE = "minion";
     public static final String UNTAGGED_INSTANCE = "minion_untagged";
     public static final String METRICS_PREFIX = "pinot.minion.";
-    public static final String HTTP_TASK_TYPE_HEADER_PREFIX = "Pinot-Minion-";
 
     // Config keys
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";
@@ -314,19 +311,14 @@ public class CommonConstants {
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
-    public static final String OPTIMIZATIONS = "segment.optimizations";
     /**
-     * This field will be populated only for use cases that are refreshing segments and
-     * have minion configured. It will contain COMMITTING + human readable timestamp in UTC, time right
-     * before any permanent changes happen to the segment, aka, right before
-     * the segment is moved to its permanent directory. For example. it will say something like
-     * COMMITTING-20171210T09:31:55.765
+     * This field is used for parallel push protection to lock the segment globally.
+     * We put the segment upload start timestamp so that if the previous push failed without unlock the segment, the
+     * next upload won't be blocked forever.
      */
-    public static final String SEGMENT_PUSH_STATUS = "segment.push.status";
-    /**
-     * This field will be a map of minion task type : time task ran in millis.
-     */
-    public static final String TASK_SEGMENT_MODIFICATION_TIME = "task.segment.modification.time";
+    public static final String SEGMENT_UPLOAD_START_TIME = "segment.upload.start.time";
+
+    public static final String CUSTOM_MAP = "custom.map";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
