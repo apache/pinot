@@ -2,6 +2,11 @@
   background-color: white;
   padding: 24px 0;
 
+  // Override Bootstrap styling
+  .container {
+    padding-left: 0;
+  }
+
   &__major {
     font-size: 24px;
     font-weight: 600;
@@ -11,6 +16,7 @@
   &__side {
     display: flex;
     align-items: flex-end;
+    float: right;
   }
 
   &__title {

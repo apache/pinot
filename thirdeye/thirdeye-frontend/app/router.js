@@ -19,6 +19,7 @@ Router.map(function() {
     });
     this.route('alerts', function() {
       this.route('edit', { path: '/:alertId' });
+      this.route('performance');
     });
   });
 

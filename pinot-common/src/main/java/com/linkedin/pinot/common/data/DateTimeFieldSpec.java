@@ -30,18 +30,7 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   private String _format;
   private String _granularity;
-  private DateTimeType _dateTimeType;
 
-  public enum DateTimeType {
-    /** The primary date time column. This will be the date time column which keeps the milliseconds value
-     * This will be used as the default time column, in references by pinot code (e.g. retention manager) */
-    PRIMARY,
-    /** The date time columns which are not the primary columns with milliseconds value.
-     * These can be date time columns in other granularity, put in by applications for their specific use cases */
-    SECONDARY,
-    /** The date time columns which are derived, say using other columns, generated via rollups, etc*/
-    DERIVED
-  }
 
   public enum TimeFormat {
     EPOCH,
@@ -82,17 +71,15 @@ public final class DateTimeFieldSpec extends FieldSpec {
    *          the granularity will be 1:HOURS
    */
   public DateTimeFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull String format,
-      @Nonnull String granularity, DateTimeType dateTimeType) {
+      @Nonnull String granularity) {
     super(name, dataType, true);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(dataType);
     Preconditions.checkArgument(DateTimeFormatSpec.isValidFormat(format));
     Preconditions.checkArgument(DateTimeGranularitySpec.isValidGranularity(granularity));
 
-    // TODO: Add validation for dateTimeType, and ensure only 1 is allowed
     _format = format;
     _granularity = granularity;
-    _dateTimeType = dateTimeType;
   }
 
 
@@ -129,25 +116,10 @@ public final class DateTimeFieldSpec extends FieldSpec {
     _granularity = granularity;
   }
 
-  @Nullable
-  public DateTimeType getDateTimeType() {
-    return _dateTimeType;
-  }
-
-  /**
-   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
-   * @param dateTimeType
-   */
-  public void setDateTimeType(DateTimeType dateTimeType) {
-    _dateTimeType = dateTimeType;
-  }
-
-
   @Override
   public String toString() {
     return "< field type: DATE_TIME, field name: " + getName() + ", datatype: " + getDataType()
-        + ", time column format: " + getFormat() + ", time field granularity: " + getGranularity()
-        + ", date time type:" + getDateTimeType() + " >";
+        + ", time column format: " + getFormat() + ", time field granularity: " + getGranularity() + " >";
   }
 
   @Override
@@ -161,7 +133,6 @@ public final class DateTimeFieldSpec extends FieldSpec {
           && getDataType().equals(that.getDataType())
           && getFormat().equals(that.getFormat())
           && getGranularity().equals(that.getGranularity())
-          && getDateTimeType() == that.getDateTimeType()
           && getDefaultNullValue().equals(that.getDefaultNullValue());
     }
     return false;
@@ -173,7 +144,6 @@ public final class DateTimeFieldSpec extends FieldSpec {
     result = EqualityUtils.hashCodeOf(result, getDataType());
     result = EqualityUtils.hashCodeOf(result, getFormat());
     result = EqualityUtils.hashCodeOf(result, getGranularity());
-    result = EqualityUtils.hashCodeOf(result, getDateTimeType());
     return result;
   }
 

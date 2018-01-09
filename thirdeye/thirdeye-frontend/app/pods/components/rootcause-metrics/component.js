@@ -23,6 +23,12 @@ export default Ember.Component.extend({
   sortMode: null, // ""
 
   /**
+   * Currently selected view within the metrics tab
+   * @type {String}
+   */
+  selectedView: 'table',
+
+  /**
    * loading status for component
    */
   isLoading: false,
@@ -113,7 +119,7 @@ export default Ember.Component.extend({
       const { entities } = this.getProperties('entities');
       return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
         .reduce((agg, urn) => {
-          agg[urn] = entities[urn].score;
+          agg[urn] = entities[urn].score.toFixed(2);
           return agg;
         }, {});
     }
@@ -137,6 +143,14 @@ export default Ember.Component.extend({
   ),
 
   actions: {
+    /**
+     * Sets the selected view for metrics tab
+     * @return {undefined}
+     */
+    selectView(selectedView) {
+      this.setProperties({ selectedView });
+    },
+
     toggleSelection(urn) {
       const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
       if (onSelection) {

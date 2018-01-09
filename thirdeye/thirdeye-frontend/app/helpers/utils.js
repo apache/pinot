@@ -311,6 +311,8 @@ export function toIso(dateStr) {
 
 export default Ember.Helper.helper({
   checkStatus,
+  pluralizeTime,
+  buildDateEod,
   isIterable,
   makeIterable,
   filterObject,
