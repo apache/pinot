@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
 
 /**
- * Convertor to convert and bucket a datetime value form an sdf format to an epoch format
+ * Convertor to convert and bucket a datetime value from an sdf format to an epoch format
  */
 public class SDFToEpochConvertor extends DateTimeConvertor {
 

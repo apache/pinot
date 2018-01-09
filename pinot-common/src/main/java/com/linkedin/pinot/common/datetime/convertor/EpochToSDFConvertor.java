@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
 
 /**
- * Convertor to convert and bucket a datetime value form an epoch format to an sdf format
+ * Convertor to convert a datetime value from an epoch format to an sdf format
  */
 public class EpochToSDFConvertor extends DateTimeConvertor {
 
@@ -31,8 +31,7 @@ public class EpochToSDFConvertor extends DateTimeConvertor {
   @Override
   public Long convert(Object dateTimeValue) {
     Long dateTimeColumnValueMS = convertEpochToMillis(dateTimeValue);
-    Long bucketedDateTimevalueMS = bucketDateTimeValueMS(dateTimeColumnValueMS);
-    Long dateTimeValueConverted = convertMillisToSDF(bucketedDateTimevalueMS);
+    Long dateTimeValueConverted = convertMillisToSDF(dateTimeColumnValueMS);
     return dateTimeValueConverted;
   }
 
