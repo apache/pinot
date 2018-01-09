@@ -208,6 +208,7 @@ public class DateTimeFormatSpec {
         FORMAT_TOKENS_ERROR_STR);
 
     Preconditions.checkArgument(formatTokens[FORMAT_SIZE_POSITION].matches(NUMBER_REGEX), FORMAT_PATTERN_ERROR_STR);
+    Preconditions.checkArgument(DateTimeFormatUnitSpec.isValidUnitSpec(formatTokens[FORMAT_UNIT_POSITION]));
     if (formatTokens.length == MIN_FORMAT_TOKENS) {
       Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
           TIME_FORMAT_ERROR_STR);

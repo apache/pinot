@@ -39,14 +39,14 @@ public class DateTimeFormatUnitSpec {
   private DateTimeTransformUnit _dateTimeTransformUnit = null;
 
   public DateTimeFormatUnitSpec(String unit) {
+    if (!isValidUnitSpec(unit)) {
+      throw new IllegalArgumentException("Unit must belong to enum TimeUnit or DateTimeTransformUnit");
+    }
     if (EnumUtils.isValidEnum(TimeUnit.class, unit)) {
       _timeUnit = TimeUnit.valueOf(unit);
     }
     if (EnumUtils.isValidEnum(DateTimeTransformUnit.class, unit)) {
       _dateTimeTransformUnit = DateTimeTransformUnit.valueOf(unit);
-    }
-    if (_timeUnit == null && _dateTimeTransformUnit == null) {
-      throw new IllegalArgumentException("Unit must belong to enum TimeUnit or DateTimeTransformUnit");
     }
   }
 
@@ -56,5 +56,12 @@ public class DateTimeFormatUnitSpec {
 
   public DateTimeTransformUnit getDateTimeTransformUnit() {
     return _dateTimeTransformUnit;
+  }
+
+  public static boolean isValidUnitSpec(String unit) {
+    if (EnumUtils.isValidEnum(TimeUnit.class, unit) || EnumUtils.isValidEnum(DateTimeTransformUnit.class, unit)) {
+      return true;
+    }
+    return false;
   }
 }
