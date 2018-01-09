@@ -24,15 +24,6 @@ body {
   border-bottom: 1px #e9e9e9 solid;
 }
 
-.te-content-block {
-  font-family: "Source Sans Pro", sans-serif;
-  border-radius: 5px;
-  border: 2px solid app-shade(black, 1);
-  margin: 10px 0 20px 0;
-  background: white;
-  padding: 24px;
-}
-
 .te-form {
   &__section {
     margin-top: 24px;
@@ -47,6 +38,10 @@ body {
 
     &--first {
       margin-top: 0;
+    }
+
+    &--slim {
+      margin-bottom: 0;
     }
   }
 

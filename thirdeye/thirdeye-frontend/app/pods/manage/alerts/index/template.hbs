@@ -127,14 +127,15 @@
                 {{/link-to}}
               </div>
             </div>
-            <div class="te-search-results__edit-button">
+            {{!-- TODO: Enable if we decide to delay launch of new edit/tune flow --}}
+            {{!-- <div class="te-search-results__edit-button">
               {{#link-to "manage.alerts.edit" alert.id}}<span class="glyphicon glyphicon-pencil"></span>{{/link-to}}
-            </div>
+            </div> --}}
           </div>
           <ul class="te-search-results__list te-search-results__list--details-block row">
             <div class="col-xs-12 col-sm-5">
               <li class="te-search-results__row">
-                {{!-- Todo: Dry this out --}}
+                {{!-- TODO: Dry this out --}}
                 <div class="te-search-results__option te-search-results__option--list">Metric</div>
                 <div class="te-search-results__value" title={{alert.metric}}>{{alert.metric}}</div>
               </li>

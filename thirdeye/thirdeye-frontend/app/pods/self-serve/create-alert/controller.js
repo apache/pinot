@@ -54,7 +54,7 @@ export default Ember.Controller.extend({
   /**
    * Change this to activate new alert anomaly page redirect
    */
-  redirectToAlertPage: false,
+  redirectToAlertPage: true,
 
   /**
    * Component property initial settings
@@ -531,18 +531,7 @@ export default Ember.Controller.extend({
     });
 
     // Begin triggering of replay sequence
-    this.callReplayStart(newFuncId, startTime, endTime);
-
-    // Simulate trigger response time since currently response takes 30+ seconds
-    Ember.run.later((function() {
-      if (!that.get('isReplayStatusError')) {
-        that.setProperties({
-          isReplayStatusSuccess: true,
-          isReplayStatusPending: false,
-          replayStatusClass: 'te-form__banner--success'
-        });
-      }
-    }), 3000);
+    return this.callReplayStart(newFuncId, startTime, endTime);
   },
 
   /**
@@ -1232,26 +1221,27 @@ export default Ember.Controller.extend({
           this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
             this.set('selectedGroupFunctions', functionData);
           });
-          // Trigger alert replay here if alert page redirect not active
-          if (!redirectToAlertPage) {
-            this.triggerReplay(newFunctionId);
-          }
+
           // Now, disable form
           this.setProperties({
             isFormDisabled: true,
             isMetricSelected: false,
             isMetricDataInvalid: false
           });
-          return newFunctionId;
-        // Redirects to manage alerts
-        }).then((id) => {
-          if (redirectToAlertPage) {
-            // Redirect to onboarding page to trigger wrapper
-            this.transitionToRoute('manage.alert', id, { queryParams: { replay: true }});
-          } else {
-            // Navigate to alerts search view
-            this.transitionToRoute('manage.alerts.edit', id);
+          this.set('newFuncId', newFunctionId);
+          return this.triggerReplay(newFunctionId);
+        }).then((replayId) => {
+
+          if (!this.get('isReplayStatusError')) {
+            this.setProperties({
+              isReplayStatusSuccess: true,
+              isReplayStatusPending: false,
+              replayStatusClass: 'te-form__banner--success'
+            });
           }
+
+          // Redirect to onboarding page to trigger wrapper
+          this.transitionToRoute('manage.alert', this.get('newFuncId'), { queryParams: { replayId }});
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         }).catch((error) => {
           this.setAlertCreateErrorState(error);

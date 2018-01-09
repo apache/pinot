@@ -1,7 +1,7 @@
 <div class="manage-alert-tune">
 
   <div class="te-content-block">
-    <fieldset class="te-form__section te-form__section--first row">
+    <fieldset class="te-form__section te-form__section--first te-form__section--slim row">
       <div class="col-xs-12">
         <legend class="te-form__section-title">Tune alert sensitivity</legend>
       </div>
@@ -9,47 +9,299 @@
         <li class="te-form__list-item">
           {{#radio-button
             value="current"
-            groupValue=current
-            changed="flavorToggled"}}
+            groupValue=selectedTuneType
+            changed=(action "onUpdateTuneType")
+            }}
             <div class="te-form__list-label">Tune automatically with current settings</div>
           {{/radio-button}}
         </li>
         <li class="te-form__list-item">
           {{#radio-button
             value="custom"
-            groupValue=custom
-            changed="flavorToggled"}}
+            groupValue=selectedTuneType
+            changed=(action "onUpdateTuneType")
+            }}
             <div class="te-form__list-label">Tune with customized settings</div>
-           {{/radio-button}}
+          {{/radio-button}}
          </li>
       </ul>
+
+      <div class="te-form__indent-block col-xs-10">
+        <span class="te-form__list-label">When</span>
+        <div class="te-form__tune-field">
+          {{#power-select
+            triggerId="alert-tune-severity"
+            triggerClass="te-form__tune-field"
+            verticalPosition="below"
+            renderInPlace=true
+            options=tuneSeverityOptions
+            searchEnabled=false
+            selected=selectedSeverityOption
+            onchange=(action (mut selectedSeverityOption))
+            disabled=isCustomFieldsDisabled
+            as |severity|
+          }}
+            {{severity}}
+          {{/power-select}}
+        </div>
+        <span class="te-form__list-label">is >=</span>
+        <div class="te-form__tune-field te-form__tune-field--amount">
+          {{input
+            type="text"
+            id="custom-tune-percent"
+            class="form-control te-input te-input"
+            value=customPercentChange
+            disabled=isCustomFieldsDisabled
+          }}
+        </div>
+        <span class="te-form__list-label--suffix">%, </span>
+        <span class="te-form__list-label">MTTD should be no more than</span>
+        <div class="te-form__tune-field te-form__tune-field--amount">
+          {{input
+            type="text"
+            id="custom-tune-mttd"
+            class="form-control te-input"
+            value=customMttdChange
+            disabled=isCustomFieldsDisabled
+          }}
+        </div>
+        <span class="te-form__list-label">hours</span>
+      </div>
+
+      <div class="te-form__indent-block col-xs-8">
+        <span class="te-form__list-label">Anomaly Pattern</span>
+        <div class="te-form__tune-field">
+          {{#power-select
+            triggerId="alert-tune-pattern"
+            triggerClass="te-form__tune-field"
+            verticalPosition="below"
+            renderInPlace=true
+            options=tunePatternOptions
+            searchEnabled=false
+            selected=selectedTunePattern
+            onchange=(action (mut selectedTunePattern))
+            disabled=isCustomFieldsDisabled
+            as |pattern|
+          }}
+            {{pattern}}
+          {{/power-select}}
+        </div>
+      </div>
+      <div class="te-form__cta-row">
+        <a class="te-button te-button--link" {{action "onResetPage" preventDefault=false}}>Reset</a>
+        {{bs-button
+          defaultText="Preview performance"
+          type="outline-primary"
+          onClick=(action "onClickPreviewPerformance")
+          class="te-button te-button--outline"
+        }}
+      </div>
     </fieldset>
   </div>
 
+  <div class="te-pill-selectors">
+    {{!-- Date range selector --}}
+    <div class="te-pill-selectors__label">Showing</div>
+    <ul class="te-alert-page-hzlist">
+      {{#each timeRangeOptions as |range|}}
+        <li class="te-alert-page-hzlist__item {{if range.isActive "te-alert-page-hzlist__item--active"}}" {{action "onRangeOptionClick" range}}>
+          {{range.name}}
+          {{#if (eq range.name "Custom")}}
+            : {{date-range-picker
+              class="te-pill-selectors__range-picker"
+              timePicker=false
+              timePicker24Hour=true
+              timePickerIncrement=timePickerIncrement
+              maxDate=today
+              start=viewRegionStart
+              end=viewRegionEnd
+              ranges=predefinedRanges
+              showCustomRangeLabel=false
+              format=uiDateFormat
+              serverFormat="YYYY-MM-DD HH:mm"
+              applyAction=(action "onRangeSelection")
+            }}
+          {{/if}}
+        </li>
+      {{/each}}
+    </ul>
+  </div>
+
   <div class="te-horizontal-cards te-content-block">
-    <h4 class="te-alert-page__subtitle">Alert Performance</h4>
-    <a class="te-pill-selectors__side-link" {{action "onClickTuneSensitivity" this}}>Customize sensitivity</a>
+    <h4 class="te-alert-page__subtitle">{{if isTunePreviewActive "Compare" "Current"}} Alert Performance</h4>
     <div class="te-horizontal-cards__container">
+
       {{!-- Alert anomaly stats cards --}}
       {{#each anomalyStats as |card|}}
         <ul class="te-horizontal-cards__card">
-          <li class="te-horizontal-cards__card-title">{{card.title}}</li>
-          <li class="te-horizontal-cards__card-value">{{card.value}}
-            <div class="te-horizontal-cards__card-tooltip">
-              <span>
-                <i class="glyphicon glyphicon-question-sign"></i>
-                {{#tooltip-on-element}}{{card.text}}{{/tooltip-on-element}}
-              </span>
-            </div>
-          </li>
-          <li class="te-horizontal-cards__card-text">
-            {{#if card.projected}}
-              Projected: <strong>{{card.projected}}</strong>
+
+          <li class="te-horizontal-cards">
+            <div class="te-horizontal-cards__card-title">{{card.title}}</div>
+            {{#if card.tooltip}}
+              <div class="te-horizontal-cards__card-tooltip">
+                <span>
+                  <i class="glyphicon glyphicon-question-sign"></i>
+                  {{#tooltip-on-element}}{{card.text}}{{/tooltip-on-element}}
+                </span>
+              </div>
+            {{else}}
+              <div class="te-horizontal-cards__card-text">{{card.text}}</div>
             {{/if}}
           </li>
+
+          <li class="te-horizontal-cards__card-value">
+            <div class="te-horizontal-cards__val-group">
+              {{#if isTunePreviewActive}}
+                <div class="te-horizontal-cards__card-subt">Current</div>
+              {{/if}}
+              <div class="te-horizontal-cards__card-number">
+                {{card.value}}
+                {{#if card.valueUnits}}
+                  <span class="te-horizontal-cards__card-units">{{card.valueUnits}}</span>
+                {{/if}}
+              </div>
+            </div>
+            {{#if isTunePreviewActive}}
+              <div class="te-horizontal-cards__val-group">
+                <i class="te-horizontal-cards__val-glyph--middle glyphicon glyphicon-menu-right"></i>
+              </div>
+              <div class="te-horizontal-cards__val-group">
+                <div class="te-horizontal-cards__card-subt">New</div>
+                <div class="te-horizontal-cards__card-number">
+                  {{#if card.showDirectionIcon}}
+                    <i class="te-horizontal-cards__val-glyph--right glyphicon glyphicon-triangle-{{card.direction}}"></i>
+                  {{/if}}
+                  {{card.projected}}
+                  {{#if card.projectedUnits}}
+                    <span class="te-horizontal-cards__card-units">{{card.projectedUnits}}</span>
+                  {{/if}}
+                </div>
+              </div>
+            {{/if}}
+          </li>
+
         </ul>
       {{/each}}
+
     </div>
+    {{#if isTunePreviewActive}}
+      <div class="te-form__cta-button">
+        {{bs-button
+          defaultText="Save tuning"
+          type="primary"
+          onClick=(action "onSubmitTuning")
+          buttonType="submit"
+          class="te-button te-button--submit"
+        }}
+      </div>
+    {{/if}}
+
+    {{#if isTuneSaveSuccess}}
+      {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+        <div class="te-form__banner-title">Success:</div> Filters modified.
+      {{/bs-alert}}
+    {{/if}}
+
+    {{#if isTuneSaveFailure}}
+      {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+        <span class="stronger">Error:</span> {{failureMessage}}
+      {{/bs-alert}}
+    {{/if}}
+
   </div>
+
+  {{#if isTunePreviewActive}}
+    <div class="te-horizontal-cards te-content-block">
+      <h4 class="te-alert-page__subtitle">Anomalies removed with settings</h4>
+      {{#if diffedAnomalies}}
+        <p>The following previously sent anomalies <span class="stronger">would not have sent</span> under the new settings.</p>
+      {{else}}
+        <p>These settings would result in <span class="stronger">NO reduction</span> of sent anomalies</p>
+      {{/if}}
+
+      {{!-- Alert anomaly table --}}
+      <table class="te-anomaly-table te-anomaly-table-tuning">
+        <thead>
+          <tr class="te-anomaly-table__row te-anomaly-table__row--metrics">
+            <td colspan="5" class="x">
+              <ul class="te-anomaly-table-stats">
+                {{#each tableStats as |metric|}}
+                  <li class="te-anomaly-table-stats__category {{if metric.isActive "te-anomaly-table-stats__category--active"}}" {{action "toggleCategory" metric.label}}>
+                    <div class="te-anomaly-table-stats__content te-anomaly-table-stats__content--number">
+                      {{metric.count}}
+                    </div>
+                    <div class="te-anomaly-table-stats__content te-anomaly-table-stats__content--text">
+                      {{metric.label}}
+                    </div>
+                  </li>
+                {{/each}}
+              </ul>
+            </td>
+          </tr>
+          <tr class="te-anomaly-table__row te-anomaly-table__head">
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
+                Start/Duration (PDT)
+                <i class="te-anomaly-table__glyph glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+              </a>
+             </th>
+             <th class="te-anomaly-table__cell-head">Dimensions</th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "score"}}>
+                Severity Score
+                <i class="te-anomaly-table__glyph glyphicon {{if sortColumnScoreUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+              </a>
+             </th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
+                Current/WoW
+                <i class="te-anomaly-table__glyph glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+              </a>
+             </th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "resolution"}}>
+                Resolution
+                <i class="te-anomaly-table__glyph glyphicon {{if sortColumnResolutionUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+              </a>
+           </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {{#each diffedAnomalies as |anomaly|}}
+            <tr class="te-anomaly-table__row">
+               <td class="te-anomaly-table__cell">
+                <ul class="te-anomaly-table__list">
+                  <li class="te-anomaly-table__list--stronger">{{anomaly.startDateStr}}</li>
+                  <li class="te-anomaly-table__list--lighter">{{anomaly.durationStr}}</li>
+                </ul>
+               </td>
+               <td class="te-anomaly-table__cell">
+                <ul class="te-anomaly-table__list">
+                 {{#each anomaly.dimensionList as |dimension|}}
+                    <li class="te-anomaly-table__list--smaller">
+                      {{dimension.dimensionKey}}: {{dimension.dimensionVal}}
+                    </li>
+                 {{else}}
+                    -
+                 {{/each}}
+                </ul>
+               </td>
+               <td class="te-anomaly-table__cell">{{anomaly.severityScore}}</td>
+               <td class="te-anomaly-table__cell">
+                <ul class="te-anomaly-table__list">
+                  <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
+                  <li class="te-anomaly-table__list--warning">({{anomaly.shownChangeRate}}%)</li>
+                </ul>
+               </td>
+               <td class="te-anomaly-table__cell">
+                  {{anomaly.anomalyFeedback}}
+               </td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+  {{/if}}
 
 </div>
