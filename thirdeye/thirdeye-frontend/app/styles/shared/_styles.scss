@@ -201,10 +201,28 @@ body {
     font-weight: 600;
     letter-spacing: .03em;
     float: right;
-    margin-top: -15px;
+    margin: -15px 10px 0 0;
+    cursor: pointer;
 
     &--high {
       margin-top: -30px;
+    }
+
+    &--low {
+      margin-top: -5px;
+    }
+
+    &--active {
+      border-bottom: 1px dashed;
+    }
+
+    &--inactive {
+      color: app-shade(black, 3);
+    }
+
+    &:hover {
+      color: $te-link-blue;
+      text-decoration: none;
     }
   }
 }
@@ -252,6 +270,10 @@ body {
 
   &__card-tooltip {
     font-size: 15px;
+
+    &--small {
+      font-size: 11px;
+    }
   }
 }
 
@@ -260,7 +282,7 @@ body {
 }
 
 .te-anomaly-table {
-  width: 97%;
+  width: 100%;
   margin-top: 12px;
   border: 1px solid app-shade(black, 1);
 
@@ -315,7 +337,8 @@ body {
     }
 
     &--smaller {
-      font-size: 13px;
+      font-size: 12px;
+      margin-left: -2px;
     }
   }
 
@@ -344,6 +367,15 @@ body {
       font-size: 20px;
       margin: 14px 0 0 -26px;
     }
+
+    &--small {
+      font-size: 11px;
+      margin-left: 0px;
+    }
+  }
+
+  &--performance {
+    margin-top: 30px;
   }
 
 }
