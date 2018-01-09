@@ -22,8 +22,6 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
-
 public class DateTimeGranularitySpecTest {
 
   // Test construct granularity from components
@@ -31,7 +29,7 @@ public class DateTimeGranularitySpecTest {
   public void testConstructGranularity(int size, TimeUnit unit, DateTimeGranularitySpec granularityExpected) {
     DateTimeGranularitySpec granularityActual = null;
     try {
-      granularityActual = DateTimeGranularitySpec.constructGranularity(size, unit);
+      granularityActual = new DateTimeGranularitySpec(size, unit);
     } catch (Exception e) {
       // invalid arguments
     }
@@ -64,10 +62,12 @@ public class DateTimeGranularitySpecTest {
 
   // Test granularity to millis
   @Test(dataProvider = "testGranularityToMillisDataProvider")
-  public void testGranularityToMillis(DateTimeGranularitySpec granularity, Long millisExpected) {
+  public void testGranularityToMillis(String granularity, Long millisExpected) {
     Long millisActual = null;
+    DateTimeGranularitySpec granularitySpec = null;
     try {
-      millisActual = granularity.granularityToMillis();
+      granularitySpec = new DateTimeGranularitySpec(granularity);
+      millisActual = granularitySpec.granularityToMillis();
     } catch (Exception e) {
       // invalid arguments
     }
@@ -80,22 +80,22 @@ public class DateTimeGranularitySpecTest {
     List<Object[]> entries = new ArrayList<>();
 
     entries.add(new Object[] {
-        new DateTimeGranularitySpec("1:HOURS"), 3600000L
+        "1:HOURS", 3600000L
     });
     entries.add(new Object[] {
-        new DateTimeGranularitySpec("1:MILLISECONDS"), 1L
+        "1:MILLISECONDS", 1L
     });
     entries.add(new Object[] {
-        new DateTimeGranularitySpec("15:MINUTES"), 900000L
+        "15:MINUTES", 900000L
     });
     entries.add(new Object[] {
-        new DateTimeGranularitySpec("0:HOURS"), 0L
+        "0:HOURS", null
     });
     entries.add(new Object[] {
         null, null
     });
     entries.add(new Object[] {
-        new DateTimeGranularitySpec("1:DUMMY"), null
+        "1:DUMMY", null
     });
 
     return entries.toArray(new Object[entries.size()][]);

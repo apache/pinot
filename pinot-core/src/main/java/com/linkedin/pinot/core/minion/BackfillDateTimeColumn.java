@@ -161,7 +161,7 @@ public class BackfillDateTimeColumn {
       TimeGranularitySpec timeGranularitySpec = _timeFieldSpec.getOutgoingGranularitySpec();
 
       DateTimeFormatSpec formatFromTimeSpec =
-          DateTimeFormatSpec.constructFormat(timeGranularitySpec.getTimeUnitSize(), timeGranularitySpec.getTimeType(),
+          new DateTimeFormatSpec(timeGranularitySpec.getTimeUnitSize(), timeGranularitySpec.getTimeType().toString(),
               timeGranularitySpec.getTimeFormat());
       if (formatFromTimeSpec.getFormat().equals(_dateTimeFieldSpec.getFormat())) {
         return timeColumnValue;

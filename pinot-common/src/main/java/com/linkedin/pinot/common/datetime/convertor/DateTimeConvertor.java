@@ -15,21 +15,18 @@
  */
 package com.linkedin.pinot.common.datetime.convertor;
 
+import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec;
+import com.linkedin.pinot.common.data.DateTimeFormatUnitSpec.DateTimeTransformUnit;
+import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
 import java.util.concurrent.TimeUnit;
-
 import org.joda.time.Chronology;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.DurationField;
 import org.joda.time.DurationFieldType;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
-import com.linkedin.pinot.common.data.DateTimeFormatSpec;
-import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
-import com.linkedin.pinot.common.data.DateTimeFormatSpec.DateTimeTransformUnit;
 
 /**
  * Convertor for conversion of datetime values from an epoch/sdf format to another epoch/sdf format
@@ -59,9 +56,7 @@ public abstract class DateTimeConvertor {
     inputTimeUnit = inputFormat.getColumnUnit();
     TimeFormat inputTimeFormat = inputFormat.getTimeFormat();
     if (inputTimeFormat.equals(TimeFormat.SIMPLE_DATE_FORMAT)) {
-      String inputSDFFormat = inputFormat.getSDFPattern();
-      DateTimeZone dateTimeZone = inputFormat.getDateTimezone();
-      inputDateTimeFormatter = DateTimeFormat.forPattern(inputSDFFormat).withZone(dateTimeZone);
+      inputDateTimeFormatter = inputFormat.getDateTimeFormatter();
     }
 
     outputTimeSize = outputFormat.getColumnSize();
@@ -101,9 +96,7 @@ public abstract class DateTimeConvertor {
       outputDurationField = durationFieldType.getField(EPOCH_START_CHRONOLOGY);
 
     } else {
-      String outputSDFFormat = outputFormat.getSDFPattern();
-      DateTimeZone dateTimeZone = outputFormat.getDateTimezone();
-      outputDateTimeFormatter = DateTimeFormat.forPattern(outputSDFFormat).withZone(dateTimeZone);
+      outputDateTimeFormatter = outputFormat.getDateTimeFormatter();
     }
 
     outputGranularityMillis = outputGranularity.granularityToMillis();

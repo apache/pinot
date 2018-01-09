@@ -15,19 +15,16 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
-
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
-import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 
 /**
  * Tests for DateTimeFormatSpec helper methods
@@ -208,6 +205,18 @@ public class DateTimeFormatSpecTest {
     });
 
     entries.add(new Object[] {
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd          tz(IST)", 1, TimeUnit.DAYS,
+        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
+        DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
+    });
+
+    entries.add(new Object[] {
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz  (   IST   )  ", 1, TimeUnit.DAYS,
+        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
+        DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
+    });
+
+    entries.add(new Object[] {
         "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.HOURS,
         com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "yyyyMMdd HH", DateTimeZone.UTC
@@ -240,7 +249,7 @@ public class DateTimeFormatSpecTest {
     DateTimeFormatSpec formatActual1 = null;
     try {
       formatActual1 =
-          DateTimeFormatSpec.constructFormat(columnSize, columnUnit, columnTimeFormat);
+          new DateTimeFormatSpec(columnSize, columnUnit.toString(), columnTimeFormat);
     } catch (Exception e) {
       // invalid arguments
     }
@@ -249,7 +258,7 @@ public class DateTimeFormatSpecTest {
     DateTimeFormatSpec formatActual2 = null;
     try {
       formatActual2 =
-          DateTimeFormatSpec.constructFormat(columnSize, columnUnit, columnTimeFormat, pattern);
+          new DateTimeFormatSpec(columnSize, columnUnit.toString(), columnTimeFormat, pattern);
     } catch (Exception e) {
       // invalid arguments
     }
