@@ -26,6 +26,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.transport.metrics.NettyServerWorkload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -674,6 +677,9 @@ public class ScatterGatherTest {
       return Futures.immediateFuture(res.getBytes());
     }
 
+    public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request, ServerLatencyMetric metric) {
+      return this.processRequest(channelHandlerContext, request);
+    }
     public List<String> getRequest() {
       return _request;
     }

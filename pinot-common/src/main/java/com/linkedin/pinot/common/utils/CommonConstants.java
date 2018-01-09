@@ -199,6 +199,10 @@ public class CommonConstants {
     public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "1";
     public static final String DEFAULT_HELIX_FLAPPING_MAX_DISCONNECT_THRESHOLD = "100";
 
+    public static class ServerMetricUris {
+      public static final String SERVER_METRICS_INFO_URI = "/ServerMetricsInfo/";
+    }
+
   }
 
   public static class Server {
@@ -307,4 +311,6 @@ public class CommonConstants {
       REALTIME
     }
   }
+
 }
+

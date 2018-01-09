@@ -1,0 +1,22 @@
+{
+  "tableName": "TestTable",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "testSchema",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [
+      "id"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

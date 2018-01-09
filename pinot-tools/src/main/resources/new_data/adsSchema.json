@@ -1,0 +1,56 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType" : "INT",
+      "name" : "adPostTime"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "posterId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "popularityScore"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "ranking"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "earning"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "costOfMaking"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "viewersCount"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "title"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "company"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "category"
+    }
+  ],
+  "schemaName": "AdsSchema"
+}

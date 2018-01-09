@@ -1,0 +1,21 @@
+{
+  "tableName": "Ads",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "AdsSchema",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [],
+    "lazyLoad"  : "true"
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

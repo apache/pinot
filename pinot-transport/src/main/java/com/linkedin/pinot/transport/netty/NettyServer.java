@@ -22,8 +22,14 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
 import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
+import com.linkedin.pinot.transport.metrics.NettyServerWorkload;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -39,6 +45,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,6 +86,7 @@ public abstract class NettyServer implements Runnable {
      * @return Serialized response
      */
     ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request);
+    ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request, ServerLatencyMetric metric);
   }
 
   public interface RequestHandlerFactory {
@@ -225,15 +234,12 @@ public abstract class NettyServer implements Runnable {
     private final long _defaultLargeQueryLatencyMs;
     private final RequestHandler _handler;
     private final NettyServerMetrics _metric;
+    private final static NettyServerWorkload _workload = new NettyServerWorkload();
 
     public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric, long defaultLargeQueryLatencyMs) {
       _handler = handler;
       _metric = metric;
       _defaultLargeQueryLatencyMs = defaultLargeQueryLatencyMs;
-    }
-
-    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric) {
-      this(handler, metric, 100);
     }
 
     @Override
@@ -247,10 +253,14 @@ public abstract class NettyServer implements Runnable {
       //Call processing handler
       final TimerContext requestProcessingLatency = MetricsHelper.startTimer();
       final ChannelHandlerContext requestChannelHandlerContext = ctx;
-      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request);
+      final ServerLatencyMetric metric = new ServerLatencyMetric();
+      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request, metric);
       Futures.addCallback(serializedQueryResponse, new FutureCallback<byte[]>() {
         void sendResponse(@Nonnull final byte[] result) {
           requestProcessingLatency.stop();
+          metric.setLatency(requestProcessingLatency.getLatencyMs());
+          _workload.addWorkLoad(metric.get_tableName(), new ServerLatencyMetric(metric));
+          //update workload here
 
           // Send Response
           final ByteBuf responseBuf = Unpooled.wrappedBuffer(result);
@@ -305,8 +315,14 @@ public abstract class NettyServer implements Runnable {
     public String toString() {
       return "NettyChannelInboundHandler [_handler=" + _handler + ", _metric=" + _metric + "]";
     }
-  }
 
+    public static NettyServerWorkload get_workload() {
+      return _workload;
+    }
+  }
+  public NettyServerWorkload getWorkload(){
+    return NettyChannelInboundHandler.get_workload();
+  }
   public boolean isShutdownComplete() {
     return _shutdownComplete.get();
   }

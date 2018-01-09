@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import com.linkedin.pinot.transport.metrics.NettyServerWorkload;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;

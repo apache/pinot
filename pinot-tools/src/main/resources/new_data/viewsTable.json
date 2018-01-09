@@ -1,0 +1,21 @@
+{
+  "tableName": "Views",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "ProfileSchema",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [],
+    "lazyLoad"  : "true"
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

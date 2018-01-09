@@ -1,0 +1,21 @@
+{
+  "tableName": "Articles",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "ArticlesSchema",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [],
+    "lazyLoad"  : "true"
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

@@ -1,0 +1,59 @@
+[
+  {
+    "column" : "adPostTime",
+    "range" : true,
+    "rangeStart" : 946684800,
+    "rangeEnd"   : 1508873892
+  },
+  {
+    "column" : "posterId",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100000
+  },
+  {
+    "column" : "popularityScore",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100
+  },
+  {
+    "column" : "ranking",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 100
+  },
+  {
+    "column" : "earning",
+    "range" : true,
+    "rangeStart" : 100,
+    "rangeEnd"   : 10000000
+  },
+  {
+    "column" : "costOfMaking",
+    "range" : true,
+    "rangeStart" : 100000,
+    "rangeEnd"   : 10000000
+  },
+  {
+    "column" : "viewersCount",
+    "range" : true,
+    "rangeStart" : 0,
+    "rangeEnd"   : 1000000
+  },
+  {
+    "column" : "title",
+    "range" : false,
+    "cardinality" : 10000
+  },
+  {
+    "column" : "company",
+    "range" : false,
+    "cardinality" : 5000
+  },
+  {
+    "column" : "category",
+    "range" : false,
+    "cardinality" : 100
+  }
+]

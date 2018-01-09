@@ -1,0 +1,61 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType" : "INT",
+      "name" : "profileViewedTimestamp"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "viewerId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "viewedUserId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "weeklyChange"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "monthlyChange"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "appearancesInSearch"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "connectionDuration"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "viewerLocation"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "viewedUserLocation"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "viewerCompany"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "viewerTitle"
+    }
+  ],
+  "schemaName": "ProfileSchema"
+}

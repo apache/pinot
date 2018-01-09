@@ -1,0 +1,21 @@
+{
+  "tableName": "Job",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "JobSchema",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [],
+    "lazyLoad"  : "true"
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

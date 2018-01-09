@@ -17,6 +17,8 @@ package com.linkedin.pinot.transport.perf;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.transport.metrics.NettyServerWorkload;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.CountDownLatch;
 
@@ -178,6 +180,11 @@ public class ScatterGatherPerfServer {
       }
       //LOG.info("Server got the request (" + _request + ")");
       return Futures.immediateFuture(_response.getBytes());
+    }
+
+    @Override
+    public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request, ServerLatencyMetric metric) {
+     return this.processRequest(channelHandlerContext, request);
     }
 
     public String getRequest() {

@@ -18,6 +18,8 @@ package com.linkedin.pinot.transport.netty;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.restlet.resources.ServerLatencyMetric;
+import com.linkedin.pinot.transport.metrics.NettyServerWorkload;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.CountDownLatch;
@@ -63,6 +65,10 @@ public class NettyTestUtils {
         }
       }
       return Futures.immediateFuture(_response.getBytes());
+    }
+
+    public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request, ServerLatencyMetric metric) {
+      return this.processRequest(channelHandlerContext, request);
     }
 
     public String getRequest() {
