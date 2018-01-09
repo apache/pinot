@@ -6,28 +6,33 @@
 import fetch from 'fetch';
 import Ember from 'ember';
 import _ from 'lodash';
+import { computed } from '@ember/object';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
 import Controller from '@ember/controller';
 
 export default Controller.extend({
 
   /**
-   * Mapping anomaly table column names to corresponding prop keys
+   * Active class appendage of 'view totals' link
+   * @type {String}
    */
-  sortMap: {
-    name: 'name',
-    alert: 'alerts',
-    anomaly: 'data.totalAlerts',
-    user: 'data.userReportAnomaly',
-    responses: 'data.totalResponses',
-    resrate: 'data.responseRate',
-    precision: 'data.precision'
-  },
+  viewTotalsState: computed('viewTotals', function() {
+    return this.get('viewTotals') ? 'active' : 'inactive';
+  }),
+
+  /**
+   * Active class appendage of 'view average' link
+   * @type {String}
+   */
+  viewAvgState: computed('viewTotals', function() {
+    return !this.get('viewTotals') ? 'active' : 'inactive';
+  }),
 
   /**
    * List of applications to render as rows, with filtering applied
+   * @type {Array}
    */
-  applications: Ember.computed(
+  applications: computed(
     'perfDataByApplication',
     'selectedSortMode',
     'viewTotals',
@@ -63,14 +68,13 @@ export default Controller.extend({
      * @param {String} sortKey  - stringified start date
      */
     toggleSortDirection(sortKey) {
+      const sortMenu = this.get('sortMenuGlyph');
       const propName = 'sortColumn' + sortKey.capitalize() + 'Up' || '';
-
+      let direction = '';
       this.toggleProperty(propName);
-      if (this.get(propName)) {
-        this.set('selectedSortMode', sortKey + ':up');
-      } else {
-        this.set('selectedSortMode', sortKey + ':down');
-      }
+      direction  = this.get(propName) ? 'up' : 'down';
+      Ember.set(sortMenu, sortKey, direction);
+      this.set('selectedSortMode', `${sortKey}:${direction}`);
     }
   }
 });

@@ -57,6 +57,7 @@ body {
 @import 'ember-power-select/themes/bootstrap';
 @import "ember-power-select";
 @import "pods/manage/alerts";
+@import "pods/manage/alerts-performance";
 @import "pods/self-serve/create-alert";
 @import "pods/self-serve/import-metric";
 @import 'pods/rca';

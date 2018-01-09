@@ -1,5 +1,5 @@
 import Component from '@ember/component';
 
 export default Component.extend({
-  classNames: ['performance-tooltip']
+  classNames: ['te-performance-tooltip']
 });

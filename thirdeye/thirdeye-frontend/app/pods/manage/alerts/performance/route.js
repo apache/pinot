@@ -14,10 +14,23 @@ import { checkStatus, pluralizeTime, buildDateEod, parseProps, postProps } from 
 const demoMode = false;
 
 /**
+ * Mapping anomaly table column names to corresponding prop keys
+ */
+const sortMap = {
+  name: 'name',
+  alert: 'alerts',
+  anomaly: 'data.totalAlerts',
+  user: 'data.userReportAnomaly',
+  responses: 'data.totalResponses',
+  resrate: 'data.responseRate',
+  precision: 'data.precision'
+};
+
+/**
  * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
  * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
  * @param {Array} anomalyIds - list of all found anomaly ids
- * @returns {Ember.RSVP promise}
+ * @return {Ember.RSVP promise}
  */
 const fetchAppAnomalies = (alertList) => {
   const alertPromises = [];
@@ -54,7 +67,7 @@ const fillAppBuckets = (allApps, validGroups) => {
     if (associatedGroups.length) {
       let uniqueIds = Array.from(new Set([].concat(...associatedGroups.map(group => group.emailConfig.functionIds))));
       if (demoMode) {
-        uniqueIds = uniqueIds.slice(0, 2);
+        uniqueIds = uniqueIds.slice(0, 1);
       }
       if (uniqueIds.length) {
         uniqueIds.forEach((id) => {
@@ -74,6 +87,15 @@ const fillAppBuckets = (allApps, validGroups) => {
  */
 const average = (values) => {
   return (values.reduce((total, amount) => amount += total))/values.length;
+};
+
+/**
+ * Check whether there are any fetch promise failures
+ * @param {Array} data - all settled RSVP promises
+ * @returns {Boolean} true if a failure was found
+ */
+const isPromiseRejected = (data) => {
+  return data.map(obj => obj.state).some(state => state === 'rejected');
 };
 
 /**
@@ -142,73 +164,97 @@ export default Ember.Route.extend({
     const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
     const groupsWithAlertId = groupsWithAppName.filter(group => group.emailConfig.functionIds.length > 0);
     const idsByApplication = fillAppBuckets(model.applications, groupsWithAlertId);
-
-    // Get perf data for each alert and assign it to the model
-    return fetchAppAnomalies(idsByApplication)
-      .then((richFunctionObjects) => {
-        Object.assign(model, { richFunctionObjects: richFunctionObjects.map(obj => obj.value) });
-      })
-      .catch((err) => {
-        // TODO: deal with error state
-      });
+    Object.assign(model, { idsByApplication });
   },
 
   setupController(controller, model) {
     this._super(controller, model);
 
-    const availableGroups = Array.from(new Set(model.richFunctionObjects.map(alertObj => alertObj.name)));
-    const roundable = ['totalAlerts', 'totalResponses', 'falseAlarm', 'newTrend', 'trueAnomalies', 'userReportAnomaly'];
-    let newGroupArr = [];
-    let count = 0;
+    // Display loading banner
+    controller.set('isDataLoading', true);
 
-    // Filter down to functions belonging to our active application groups
-    availableGroups.forEach((group) => {
-      let avgData = {};
-      let keyData = {};
-      let groupData = model.richFunctionObjects.filter((alert) => {
-        return alert.name === group;
-      });
-
-      // Get array of keys from first record
-      let metricKeys = Object.keys(groupData[0].data);
-      count++;
-
-      // Look at each anomaly's perf object keys. For our "roundable" fields, get derived data
-      metricKeys.forEach((key) => {
-        let isRawValue = roundable.includes(key);
-        let allValues = groupData.map(group => group.data[key]);
-        let allNumeric = allValues.every(val => !Number.isNaN(Number(val)));
-        let total = allValues.reduce((total, amount) => amount += total);
-        avgData[key] = {};
-
-        if (allNumeric && isRawValue) {
-          let avg = total/allValues.length;
-          avgData[key].avg = Math.round(avg);
-          avgData[key].tot = total;
-          avgData[key].max = Math.max(...allValues);
-          avgData[key].min = Math.min(...allValues);
-          avgData[key].std = standardDeviation(allValues).toFixed(2);
-          avgData[key].name = group;
-        } else {
-          let avg = total/(allValues.filter(Number)).length;
-          avgData[key].avg = !Number.isNaN(Number(avg)) ? `${(avg * 100).toFixed(1)}` : 'N/A';
-          avgData[key].tot = 'N/A';
+    // Get perf data for each alert and assign it to the model
+    fetchAppAnomalies(model.idsByApplication)
+      .then((richFunctionObjects) => {
+        // Catch any rejected promises
+        if (isPromiseRejected(richFunctionObjects)) {
+          throw new Error('API error');
         }
-        avgData[key].values = allValues;
+
+        const newFunctionObjects = richFunctionObjects.map(obj => obj.value);
+        const availableGroups = Array.from(new Set(newFunctionObjects.map(alertObj => alertObj.name)));
+        const roundable = ['totalAlerts', 'totalResponses', 'falseAlarm', 'newTrend', 'trueAnomalies', 'userReportAnomaly'];
+        let sortMenuGlyph = {};
+        let newGroupArr = [];
+        let count = 0;
+
+        // Filter down to functions belonging to our active application groups
+        availableGroups.forEach((group) => {
+          let avgData = {};
+          let keyData = {};
+          let groupData = newFunctionObjects.filter((alert) => {
+            return alert.name === group;
+          });
+
+          // Get array of keys from first record
+          let metricKeys = Object.keys(groupData[0].data);
+          count++;
+
+          // Look at each anomaly's perf object keys. For our "roundable" fields, get derived data
+          metricKeys.forEach((key) => {
+            let isRawValue = roundable.includes(key);
+            let allValues = groupData.map(group => group.data[key]);
+            let allNumeric = allValues.every(val => !Number.isNaN(Number(val)));
+            let total = allValues.reduce((total, amount) => amount += total);
+            avgData[key] = {};
+
+            if (allNumeric && isRawValue) {
+              let avg = total/allValues.length;
+              avgData[key].avg = Math.round(avg);
+              avgData[key].tot = total;
+              avgData[key].max = Math.max(...allValues);
+              avgData[key].min = Math.min(...allValues);
+              avgData[key].std = standardDeviation(allValues).toFixed(2);
+              avgData[key].name = group;
+            } else {
+              let avg = total/(allValues.filter(Number)).length;
+              avgData[key].avg = !Number.isNaN(Number(avg)) ? `${(avg * 100).toFixed(1)}` : 'N/A';
+              avgData[key].tot = 'N/A';
+            }
+            avgData[key].values = allValues;
+          });
+
+          // Make custom calculations
+          avgData['responseRate'] = avgData['responseRate'] ? calculateRate(avgData['totalAlerts'], avgData['totalResponses']) : 'N/A';
+          avgData['precision'] = avgData['precision'] ? calculateRate(avgData['totalAlerts'], avgData['trueAnomalies']) : 'N/A';
+
+          // Add perf data to application groups array
+          newGroupArr.push({
+            name: demoMode ? `group ${count}` : group,
+            data: avgData,
+            alerts: groupData.length
+          });
+        });
+
+        // Initialize glyph icons for each table column
+        for (var key in sortMap) {
+          sortMenuGlyph[key] = 'down';
+        }
+
+        // Pass perf data and state to controller
+        controller.setProperties({
+          sortMap,
+          sortMenuGlyph,
+          viewTotals: true,
+          isDataLoading: false,
+          isDataLoadingError: false,
+          perfDataByApplication: newGroupArr
+        });
+
+      })
+      .catch((err) => {
+        controller.set('isDataLoadingError', true);
       });
-
-      // Make custom calculations
-      avgData['responseRate'] = avgData['responseRate'] ? calculateRate(avgData['totalAlerts'], avgData['totalResponses']) : 'N/A';
-      avgData['precision'] = avgData['precision'] ? calculateRate(avgData['totalAlerts'], avgData['trueAnomalies']) : 'N/A';
-
-      newGroupArr.push({
-        name: demoMode ? `group ${count}` : group,
-        data: avgData,
-        alerts: groupData.length
-      });
-    });
-
-    controller.set('perfDataByApplication', newGroupArr);
   },
 
   /**

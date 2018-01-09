@@ -227,24 +227,6 @@ body {
   }
 }
 
-.te-perf-tooltip {
-  &__title {
-    text-transform: uppercase;
-  }
-  &__list {
-    padding-left: 0;
-    margin-top: 5px;
-    max-width: 400px;
-  }
-  &__item {
-    list-style: none;
-  }
-  &__category {
-    color: app-shade(white, 5);
-    padding-right: 7px;
-  }
-}
-
 .te-horizontal-cards {
   &__container {
     display: flex;
@@ -300,7 +282,7 @@ body {
 }
 
 .te-anomaly-table {
-  width: 97%;
+  width: 100%;
   margin-top: 12px;
   border: 1px solid app-shade(black, 1);
 
@@ -602,26 +584,6 @@ body {
 
     &:first-child {
       margin-left: 0;
-    }
-  }
-}
-
-.performance-tooltip {
-  display: inline-block;
-}
-
-.performance-metric {
-  width: 20px;
-  text-align: right;
-  display: inline-block;
-
-  &__subset {
-    display: inline-block;
-    color: app-shade(black, 6);
-    padding-left: 5px;
-
-    &--null {
-      color: app-shade(black, 4);
     }
   }
 }
