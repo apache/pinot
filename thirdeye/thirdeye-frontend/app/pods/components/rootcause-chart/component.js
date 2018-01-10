@@ -381,13 +381,13 @@ export default Ember.Component.extend({
   _transformSeriesRelative(series) {
     const first = series.values.filter(v => v)[0];
     const output = Object.assign({}, series);
-    output.values = series.values.map(v => 1.0 * v / first);
+    output.values = series.values.map(v => v != null ? 1.0 * v / first : null);
     return output;
   },
 
   _transformSeriesLog(series) {
     const output = Object.assign({}, series);
-    output.values = series.values.map(v => Math.log(v));
+    output.values = series.values.map(v => v != null ? Math.log(v) : null);
     return output;
   },
 
