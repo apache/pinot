@@ -59,7 +59,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
     this.spec = spec;
-    super.spec = spec;
+    super.init(spec);
     this.properties = spec.toProperties();
   }
 
