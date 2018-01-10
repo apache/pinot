@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
-import java.io.FileInputStream;
 import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -120,9 +119,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         }
 
         LOGGER.info("Uploading segment {}", tgzFile.getName());
-        FileUploadUtils
-            .sendSegmentFile(_controllerHost, _controllerPort, tgzFile.getName(), tgzFile,
-                tgzFile.length());
+        FileUploadUtils.uploadSegment(_controllerHost, Integer.parseInt(_controllerPort), tgzFile.getName(), tgzFile);
       }
     } catch (Exception e) {
       LOGGER.error("Exception caught while uploading segment {}", _segmentDir, e);

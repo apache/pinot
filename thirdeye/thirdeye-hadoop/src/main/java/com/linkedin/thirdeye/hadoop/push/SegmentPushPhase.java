@@ -131,7 +131,7 @@ public class SegmentPushPhase  extends Configured {
         }
         LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, port);
         try {
-          int responseCode = FileUploadUtils.sendSegmentFile(host, port, fileName, inputStream, length);
+          int responseCode = FileUploadUtils.uploadSegment(host, Integer.parseInt(port), fileName, inputStream);
           LOGGER.info("Response code: {}", responseCode);
 
           if (uploadSuccess == true && responseCode != 200) {

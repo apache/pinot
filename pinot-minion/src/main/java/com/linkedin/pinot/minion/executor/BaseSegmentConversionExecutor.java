@@ -24,14 +24,15 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
-import java.io.FileInputStream;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.commons.httpclient.Header;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
+import org.apache.http.message.BasicHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,13 +110,15 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       // won't get override. We can decide how to handle the segment based on the task type on controller side.
       // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
       // segment will not be submitted again
-      Header ifMatchHeader = new Header(HttpHeaders.IF_MATCH, originalSegmentCrc);
-      String userAgentParameter = PinotMinionUserAgentHeader.constructUserAgentHeader(taskType, MINION_CONTEXT.getMinionVersion());
-      Header userAgentHeader = new Header(HttpHeaders.USER_AGENT, userAgentParameter);
+      Header ifMatchHeader = new BasicHeader(HttpHeaders.IF_MATCH, originalSegmentCrc);
+      String userAgentParameter =
+          PinotMinionUserAgentHeader.constructUserAgentHeader(taskType, MINION_CONTEXT.getMinionVersion());
+      Header userAgentHeader = new BasicHeader(HttpHeaders.USER_AGENT, userAgentParameter);
       List<Header> httpHeaders = Arrays.asList(ifMatchHeader, userAgentHeader);
-      FileUploadUtils.sendFile(uploadURL, segmentName,
-          new FileInputStream(convertedTarredSegmentFile), convertedTarredSegmentFile.length(),
-          FileUploadUtils.SendFileMethod.POST, httpHeaders);
+      URI uploadUri = new URI(uploadURL);
+      // TODO: add retry logic here
+      FileUploadUtils.uploadSegment(uploadUri.getHost(), uploadUri.getPort(), segmentName, convertedTarredSegmentFile,
+          httpHeaders, null, FileUploadUtils.DEFAULT_SOCKET_TIMEOUT_MS);
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableName, segmentName);
     } finally {

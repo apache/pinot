@@ -289,8 +289,7 @@ public class PerfBenchmarkDriver {
     Preconditions.checkNotNull(indexFiles);
     for (File indexFile : indexFiles) {
       LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
-      FileUploadUtils.sendSegmentFile(_controllerHost, String.valueOf(_controllerPort), indexFile.getName(),
-          indexFile, indexFile.length());
+      FileUploadUtils.uploadSegment(_controllerHost, _controllerPort, indexFile.getName(), indexFile);
     }
   }
 

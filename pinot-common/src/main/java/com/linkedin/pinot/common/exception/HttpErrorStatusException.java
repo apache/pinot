@@ -15,19 +15,15 @@
  */
 package com.linkedin.pinot.common.exception;
 
-/**
- * Custom exception thrown to escape from retries.
- */
-public class PermanentPushFailureException extends RuntimeException {
-  public PermanentPushFailureException(String message) {
+public class HttpErrorStatusException extends Exception {
+  private final int _statusCode;
+
+  public HttpErrorStatusException(String message, int statusCode) {
     super(message);
+    _statusCode = statusCode;
   }
 
-  public PermanentPushFailureException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  public PermanentPushFailureException(Throwable cause) {
-    super(cause);
+  public int getStatusCode() {
+    return _statusCode;
   }
 }

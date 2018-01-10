@@ -1,470 +1,349 @@
-/*******************************************************************************
- * © [2013] LinkedIn Corp. All rights reserved.
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *         http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- ******************************************************************************/
+ */
 package com.linkedin.pinot.common.utils;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.exception.PermanentDownloadException;
-import com.linkedin.pinot.common.exception.PermanentPushFailureException;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import com.linkedin.pinot.common.exception.HttpErrorStatusException;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpVersion;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.httpclient.methods.EntityEnclosingMethod;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.PutMethod;
-import org.apache.commons.httpclient.methods.RequestEntity;
-import org.apache.commons.httpclient.methods.StringRequestEntity;
-import org.apache.commons.httpclient.methods.multipart.FilePart;
-import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
-import org.apache.commons.httpclient.methods.multipart.Part;
-import org.apache.commons.httpclient.methods.multipart.PartSource;
-import org.apache.commons.httpclient.params.HttpMethodParams;
-import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpResponse;
+import javax.annotation.Nullable;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpVersion;
+import org.apache.http.NameValuePair;
+import org.apache.http.StatusLine;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.FormBodyPart;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.HttpMultipartMode;
-import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.ContentBody;
+import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.CoreConnectionPNames;
-import org.apache.http.protocol.HTTP;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 
 
 public class FileUploadUtils {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadUtils.class);
-  public static final String HDR_CONTROLLER_HOST = "Pinot-Controller-Host";
-  public static final String HDR_CONTROLLER_VERSION = "Pinot-Controller-Version";
-  public static final String NOT_IN_RESPONSE = "NotInResponse";
-  private static final String SEGMENTS_PATH = "segments";
-  public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
-  public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
-  public static final int MAX_RETRIES = 5;
-  public static final int SLEEP_BETWEEN_RETRIES_IN_SECONDS = 60;
-  private static final MultiThreadedHttpConnectionManager CONNECTION_MANAGER =
-      new MultiThreadedHttpConnectionManager();
-  private static final HttpClient FILE_UPLOAD_HTTP_CLIENT = new HttpClient(CONNECTION_MANAGER);
-
-  {
-    FILE_UPLOAD_HTTP_CLIENT.getParams().setParameter("http.protocol.version", HttpVersion.HTTP_1_1);
-    FILE_UPLOAD_HTTP_CLIENT.getParams().setSoTimeout(3600 * 1000); // One hour
+  private FileUploadUtils() {
   }
 
-  public enum SendFileMethod {
-    POST {
-      public EntityEnclosingMethod forUri(String uri) {
-        return new PostMethod(uri);
-      }
-    },
-    PUT {
-      public EntityEnclosingMethod forUri(String uri) {
-        return new PutMethod(uri);
-      }
-    };
-
-    public abstract EntityEnclosingMethod forUri(String uri);
+  public static class CustomHeaders {
+    public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
+    public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
   }
 
-  public static int sendFile(final String host, final String port, final String path, final String fileName,
-      final InputStream inputStream, final long lengthInBytes, SendFileMethod httpMethod) {
-    return sendFile("http://" + host + ":" + port + "/" + path, fileName, inputStream, lengthInBytes,
-        httpMethod, new ArrayList<Header>());
-  }
+  public static final int DEFAULT_SOCKET_TIMEOUT_MS = 3600 * 1000; // 1 hour
 
-  /**
-   * This method is useful only for segment push to the controller, as only controller will take the IF_MATCH header
-   * @param uri
-   * @param fileName
-   * @param inputStream
-   * @param lengthInBytes
-   * @param httpMethod
-   * @param headers Contains If-Match header with originalSegmentCrc and User-Agent header to tell the controller the request
-   *                is coming from Minion
-   * @return
-   */
-  public static int sendFile(String uri, final String fileName, final InputStream inputStream, final long lengthInBytes,
-      SendFileMethod httpMethod, List<Header> headers) {
-    EntityEnclosingMethod method = null;
-    try {
-      method = httpMethod.forUri(uri);
-      Part[] parts = {new FilePart(fileName, new PartSource() {
-        @Override
-        public long getLength() {
-          return lengthInBytes;
-        }
-
-        @Override
-        public String getFileName() {
-          return fileName;
-        }
-
-        @Override
-        public InputStream createInputStream() throws IOException {
-          return new BufferedInputStream(inputStream);
-        }
-      })};
-      method.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
-
-      for (Header header: headers) {
-        method.addRequestHeader(header);
-      }
-
-      FILE_UPLOAD_HTTP_CLIENT.executeMethod(method);
-      if (method.getStatusCode() >= 400) {
-        String errorString = "POST Status Code: " + method.getStatusCode() + "\n";
-        if (method.getResponseHeader("Error") != null) {
-          errorString += "ServletException: " + method.getResponseHeader("Error").getValue();
-        }
-        throw new HttpException(errorString);
-      }
-      return method.getStatusCode();
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while sending file: {}", fileName, e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
-    } finally {
-      if (method != null) {
-        method.releaseConnection();
-      }
-    }
-  }
-
-  public static int sendSegmentFile(final String host, final String port, final String fileName,
-      File file, final long lengthInBytes) {
-    return sendSegmentFile(host, port, fileName, file, lengthInBytes, MAX_RETRIES, SLEEP_BETWEEN_RETRIES_IN_SECONDS);
-  }
-
-  public static int sendSegmentFile(final String host, final String port, final String fileName,
-      File file, final long lengthInBytes, int maxRetries, int sleepTimeSec) {
-    for (int numRetries = 0; ; numRetries++) {
-      try ( InputStream inputStream = new FileInputStream(file)) {
-        return sendSegmentFile(host, port, fileName, inputStream, lengthInBytes);
-      } catch (Exception e) {
-        if (numRetries >= maxRetries) {
-          throw new RuntimeException(e);
-        }
-        LOGGER.warn("Retry " + numRetries + " of Upload of File " + fileName + " to host " + host
-            + " after error trying to send file ", e);
-        try {
-          Thread.sleep(sleepTimeSec * 1000);
-        } catch (Exception e1) {
-          LOGGER.error("Upload of File " + fileName + " to host " + host + " interrupted while waiting to retry after error");
-          throw new RuntimeException(e1);
-        }
-      }
-    }
-  }
-
-  public static int sendSegmentFile(final String host, final String port, final String fileName,
-      final InputStream inputStream, final long lengthInBytes) {
-    return sendFile(host, port, SEGMENTS_PATH, fileName, inputStream, lengthInBytes, SendFileMethod.POST);
-  }
-
-  public static int sendSegmentUri(final String host, final String port, final String uri) {
-    return sendSegmentUri(host, port, uri, MAX_RETRIES, SLEEP_BETWEEN_RETRIES_IN_SECONDS);
-  }
-
-  public static int sendSegmentUri(final String host, final String port, final String uri, final int maxRetries,
-      final int sleepTimeSec) {
-    for (int numRetries = 0; ; numRetries++) {
-      try {
-        return sendSegmentUriImpl(host, port, uri);
-      } catch (Exception e) {
-        if (numRetries >= maxRetries) {
-          Utils.rethrowException(e);
-        }
-        try {
-          Thread.sleep(sleepTimeSec * 1000);
-        } catch (Exception e1) {
-          LOGGER.error("Upload of URI " + uri + " to host " + host + " interrupted while waiting to retry after error");
-          Utils.rethrowException(e1);
-        }
-      }
-    }
-  }
-
-  private static int sendSegmentUriImpl(final String host, final String port, final String uri) {
-    SendFileMethod httpMethod = SendFileMethod.POST;
-    EntityEnclosingMethod method = null;
-    try {
-      method = httpMethod.forUri("http://" + host + ":" + port + "/" + SEGMENTS_PATH);
-      method.setRequestHeader(UPLOAD_TYPE, FileUploadType.URI.toString());
-      method.setRequestHeader(DOWNLOAD_URI, uri);
-      method.setRequestHeader(HTTP.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
-      FILE_UPLOAD_HTTP_CLIENT.executeMethod(method);
-      if (method.getStatusCode() >= 400) {
-        String errorString = "POST Status Code: " + method.getStatusCode() + "\n";
-        if (method.getResponseHeader("Error") != null) {
-          errorString += "ServletException: " + method.getResponseHeader("Error").getValue();
-        }
-        throw new HttpException(errorString);
-      }
-      return method.getStatusCode();
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while sending uri: {}", uri, e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
-    } finally {
-      if (method != null) {
-        method.releaseConnection();
-      }
-    }
-  }
-
-  public static int sendSegmentJson(final String host, final String port, final JSONObject segmentJson) {
-    return sendSegmentJson(host, port, segmentJson, MAX_RETRIES, SLEEP_BETWEEN_RETRIES_IN_SECONDS);
-  }
-
-  public static int sendSegmentJson(final String host, final String port, final JSONObject segmentJson,
-      final int maxRetries, final int sleepTimeSec) {
-    for (int numRetries = 0; ; numRetries++) {
-      try {
-        return sendSegmentJsonImpl(host, port, segmentJson);
-      } catch (Exception e) {
-        if (numRetries >= maxRetries) {
-          Utils.rethrowException(e);
-        }
-        try {
-          Thread.sleep(sleepTimeSec * 1000);
-        } catch (Exception e1) {
-          LOGGER.error("Upload of JSON " + " to host " + host + " interrupted while waiting to retry after error");
-          Utils.rethrowException(e1);
-        }
-      }
-    }
-  }
-
-
-  public static int sendSegmentJsonImpl(final String host, final String port, final JSONObject segmentJson) {
-    PostMethod postMethod = null;
-    try {
-      RequestEntity requestEntity = new StringRequestEntity(
-          segmentJson.toString(),
-          ContentType.APPLICATION_JSON.getMimeType(),
-          ContentType.APPLICATION_JSON.getCharset().name());
-      postMethod = new PostMethod("http://" + host + ":" + port + "/" + SEGMENTS_PATH);
-      postMethod.setRequestEntity(requestEntity);
-      postMethod.setRequestHeader(UPLOAD_TYPE, FileUploadType.JSON.toString());
-      postMethod.setRequestHeader(HTTP.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
-      int statusCode = FILE_UPLOAD_HTTP_CLIENT.executeMethod(postMethod);
-      if (statusCode >= 400) {
-        String errorString = "POST Status Code: " + statusCode + "\n";
-        if (postMethod.getResponseHeader("Error") != null) {
-          errorString += "ServletException: " + postMethod.getResponseHeader("Error").getValue();
-        }
-        throw new HttpException(errorString);
-      }
-      return statusCode;
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while sending json: {}", segmentJson.toString(), e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
-    } finally {
-      if (postMethod != null) {
-        postMethod.releaseConnection();
-      }
-    }
-  }
-
-  public static long getFile(String url, File file) throws Exception {
-    GetMethod httpget = null;
-    try {
-      httpget = new GetMethod(url);
-      int responseCode = FILE_UPLOAD_HTTP_CLIENT.executeMethod(httpget);
-      long contentLength = httpget.getResponseContentLength();
-      InputStream is = httpget.getResponseBodyAsStream();
-      return storeFile(url, file, responseCode, contentLength, is);
-    } catch (Exception ex) {
-      LOGGER.error("Caught exception", ex);
-      throw ex;
-    } finally {
-      if (httpget != null) {
-        httpget.releaseConnection();
-      }
-    }
-  }
-
-  public static long storeFile(String url, File file, int responseCode, long contentLength, InputStream is)
-      throws IOException {
-    if (responseCode >= 400) {
-      if (contentLength > 0) {
-        // don't read more than 1000 bytes
-        byte[] buffer = new byte[(int) Math.min(contentLength, 1000)];
-        is.read(buffer);
-        LOGGER.error("Error response from url:{} \n {}", url, new String(buffer));
-      }
-      String errMsg = "Received error response from server while downloading file. url:" + url
-          + " response code:" + responseCode;
-      if (responseCode >= 500) {
-        // Caller may retry.
-        throw new RuntimeException(errMsg);
-      } else {
-        throw new PermanentDownloadException(errMsg);
-      }
-    } else {
-      BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(file));
-      IOUtils.copyLarge(is, output);
-      IOUtils.closeQuietly(output);
-      if (contentLength != -1 && contentLength != file.length()) {
-        // The content-length header was present and does not match the file length.
-        throw new RuntimeException("File length " + file.length() + " does not match content length " + contentLength);
-      }
-      return contentLength;
-    }
-  }
+  private static final CloseableHttpClient HTTP_CLIENT = HttpClientBuilder.create().build();
+  private static final String SCHEMA_PATH = "/schemas";
+  private static final String SEGMENT_PATH = "/segments";
 
   public enum FileUploadType {
-    URI,
-    JSON,
-    TAR; // Default value
-
-    public FileUploadType valueOf(Object o) {
-      if (o != null) {
-        String ostring = o.toString();
-        for (FileUploadType u : FileUploadType.values()) {
-          if (ostring.equalsIgnoreCase(u.toString())) {
-            return u;
-          }
-        }
-      }
-      return getDefaultUploadType();
-    }
+    URI, JSON, TAR;
 
     public static FileUploadType getDefaultUploadType() {
       return TAR;
     }
   }
 
-    public static int sendSegment(final String uriString, final String segmentName, final int pushTimeoutMs,
-        InputStream is, int maxRetries, int sleepTimeSec) {
-      return sendFileRetry(uriString, segmentName, pushTimeoutMs, is, maxRetries, sleepTimeSec);
-    }
+  private static HttpUriRequest getSendFileRequest(String method, URI uri, ContentBody contentBody,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    // Build the Http entity
+    HttpEntity entity = MultipartEntityBuilder.create()
+        .setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
+        .addPart(contentBody.getFilename(), contentBody)
+        .build();
 
-    public static int sendFileRetry(final String uri, final String segmentName, int pushTimeoutMs, InputStream inputStream,
-        int maxRetries, int sleepTimeSec) {
-      int retval;
-      for (int numRetries = 0; ; numRetries++) {
-        try {
-          retval = sendFile(uri, segmentName, inputStream, pushTimeoutMs);
-          break;
-        } catch (Exception e) {
-          if (e instanceof PermanentPushFailureException) {
-            throw new PermanentPushFailureException("Exiting job", e);
-          }
-          if (numRetries >= maxRetries) {
-            throw new RuntimeException(e);
-          }
-          LOGGER.warn("Retry " + numRetries + " of Upload of File " + segmentName + " to URI " + uri
-              + " after error trying to send file  Sleeping for " + sleepTimeSec + " seconds. Caught Exception", e);
-          try {
-            Thread.sleep(sleepTimeSec * 1000);
-          } catch (Exception e1) {
-            LOGGER.warn(
-                "Upload of File " + segmentName + " to URI " + uri + " interrupted while waiting to retry after error. Caught Exception ", e1);
-            throw new RuntimeException(e1);
-          }
-        }
+    // Build the request
+    RequestBuilder requestBuilder =
+        RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    addHeadersAndParameters(requestBuilder, headers, parameters);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest getAddSchemaRequest(String host, int port, String schemaName, File schemaFile)
+      throws URISyntaxException {
+    return getSendFileRequest(HttpPost.METHOD_NAME, getHttpURI(host, port, SCHEMA_PATH),
+        getContentBody(schemaName, schemaFile), null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  private static HttpUriRequest getUpdateSchemaRequest(String host, int port, String schemaName, File schemaFile)
+      throws URISyntaxException {
+    return getSendFileRequest(HttpPut.METHOD_NAME, getHttpURI(host, port, SCHEMA_PATH),
+        getContentBody(schemaName, schemaFile), null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  private static HttpUriRequest getUploadSegmentRequest(String host, int port, String segmentName, File segmentFile,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
+      throws URISyntaxException {
+    return getSendFileRequest(HttpPost.METHOD_NAME, getHttpURI(host, port, SEGMENT_PATH),
+        getContentBody(segmentName, segmentFile), headers, parameters, socketTimeoutMs);
+  }
+
+  private static HttpUriRequest getUploadSegmentRequest(String host, int port, String segmentName,
+      InputStream inputStream, @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters,
+      int socketTimeoutMs) throws URISyntaxException {
+    return getSendFileRequest(HttpPost.METHOD_NAME, getHttpURI(host, port, SEGMENT_PATH),
+        getContentBody(segmentName, inputStream), headers, parameters, socketTimeoutMs);
+  }
+
+  private static HttpUriRequest getSendSegmentUriRequest(String host, int port, String downloadUri,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
+      throws URISyntaxException {
+    RequestBuilder requestBuilder = RequestBuilder.post(getHttpURI(host, port, SEGMENT_PATH))
+        .setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.URI.toString())
+        .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri);
+    addHeadersAndParameters(requestBuilder, headers, parameters);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest getSendSegmentJsonRequest(String host, int port, String jsonString,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
+      throws URISyntaxException {
+    RequestBuilder requestBuilder = RequestBuilder.post(getHttpURI(host, port, SEGMENT_PATH))
+        .setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.JSON.toString())
+        .setEntity(new StringEntity(jsonString, ContentType.APPLICATION_JSON));
+    addHeadersAndParameters(requestBuilder, headers, parameters);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static URI getHttpURI(String host, int port, String path) throws URISyntaxException {
+    return new URI("http", null, host, port, path, null, null);
+  }
+
+  private static ContentBody getContentBody(String fileName, File file) {
+    return new FileBody(file, ContentType.DEFAULT_BINARY, fileName);
+  }
+
+  private static ContentBody getContentBody(String fileName, InputStream inputStream) {
+    return new InputStreamBody(inputStream, ContentType.DEFAULT_BINARY, fileName);
+  }
+
+  private static void addHeadersAndParameters(RequestBuilder requestBuilder, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters) {
+    if (headers != null) {
+      for (Header header : headers) {
+        requestBuilder.addHeader(header);
       }
-      return retval;
     }
-
-    public static int sendFile(final String uri, final String segmentName, final InputStream inputStream,
-        int pushTimeoutMs) {
-      // this method returns the response code only on success, and throws exception otherwise
-      LOGGER.info("Sending file " + segmentName + " to " + uri);
-      final BasicHttpParams httpParams = new BasicHttpParams();
-      // TODO: Fix when new version is updated
-      httpParams.setIntParameter(CoreConnectionPNames.SO_TIMEOUT, pushTimeoutMs);
-      org.apache.http.client.HttpClient client = new DefaultHttpClient(httpParams);
-
-      try {
-        LOGGER.info("URI is: " + uri);
-        HttpPost post = new HttpPost(uri);
-        String boundary = "-------------" + System.currentTimeMillis();
-
-        post.setHeader("Content-type", "multipart/form-data; boundary=" + boundary);
-        InputStreamBody contentBody =
-            new InputStreamBody(inputStream, ContentType.APPLICATION_OCTET_STREAM.toString(), segmentName);
-
-        MultipartEntity entity =
-            new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE, boundary, Charset.forName("UTF-8"));
-        FormBodyPart bodyPart = new FormBodyPart(segmentName, contentBody);
-        entity.addPart(bodyPart);
-        post.setEntity(entity);
-
-        // execute the request
-        HttpResponse response = client.execute(post);
-
-        // retrieve and process the response
-        int responseCode = response.getStatusLine().getStatusCode();
-        String host = NOT_IN_RESPONSE;
-        if (response.containsHeader(HDR_CONTROLLER_HOST)) {
-          host = response.getFirstHeader(HDR_CONTROLLER_HOST).getValue();
-        }
-        String version = NOT_IN_RESPONSE;
-        if (response.containsHeader(HDR_CONTROLLER_VERSION)) {
-          version = response.getFirstHeader(HDR_CONTROLLER_VERSION).getValue();
-        }
-        LOGGER.info("Controller host:" + host + ",Controller version:" + version + "(file:" + segmentName + ")");
-
-        // Throws a permanent exception to immediately kill job
-        if (responseCode >= 400 && responseCode < 500) {
-          String errorString = "Response Code: " + responseCode;
-          LOGGER.error("Error " + errorString + " trying to send file " + segmentName + " to " + uri);
-          InputStream content = response.getEntity().getContent();
-          String respBody = org.apache.commons.io.IOUtils.toString(content);
-          if (respBody != null && !respBody.isEmpty()) {
-            LOGGER.error("Response body for file " + segmentName + " uri " + uri + ":" + respBody);
-          }
-          throw new PermanentPushFailureException(errorString);
-        }
-
-        // Runtime exception allows retry for server errors
-        if (responseCode >= 500) {
-          String errorString = "Response Code: " + responseCode;
-          LOGGER.warn("Transient error " + errorString + " sending " + segmentName + " to " + uri);
-          InputStream content = response.getEntity().getContent();
-          String respBody = org.apache.commons.io.IOUtils.toString(content);
-          if (respBody != null && !respBody.isEmpty()) {
-            LOGGER.info("Response body for file " + segmentName + " uri " + uri + ":" + respBody);
-          }
-          throw new RuntimeException(errorString);
-        }
-
-        return responseCode;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+    if (parameters != null) {
+      for (NameValuePair parameter : parameters) {
+        requestBuilder.addParameter(parameter);
       }
+    }
+  }
 
+  private static void setTimeout(RequestBuilder requestBuilder, int socketTimeoutMs) {
+    RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(socketTimeoutMs).build();
+    requestBuilder.setConfig(requestConfig);
+  }
+
+  private static int sendRequest(HttpUriRequest request) throws Exception {
+    try (CloseableHttpResponse response = HTTP_CLIENT.execute(request)) {
+      StatusLine statusLine = response.getStatusLine();
+      int statusCode = statusLine.getStatusCode();
+      if (statusCode >= 400) {
+        throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
+      }
+      return statusCode;
+    }
+  }
+
+  private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
+    String controllerHost = null;
+    String controllerVersion = null;
+    if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
+      controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
+      controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
+    }
+    StatusLine statusLine = response.getStatusLine();
+    String errorMessage =
+        String.format("Got error status code: %d with reason: %s while sending request: %s", statusLine.getStatusCode(),
+            statusLine.getReasonPhrase(), request.getURI());
+    if (controllerHost != null) {
+      errorMessage =
+          String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
+    }
+    return errorMessage;
+  }
+
+  /**
+   * Add schema.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param schemaName Schema name
+   * @param schemaFile Schema file
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int addSchema(String host, int port, String schemaName, File schemaFile) throws Exception {
+    return sendRequest(getAddSchemaRequest(host, port, schemaName, schemaFile));
+  }
+
+  /**
+   * Update schema.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param schemaName Schema name
+   * @param schemaFile Schema file
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int updateSchema(String host, int port, String schemaName, File schemaFile) throws Exception {
+    return sendRequest(getUpdateSchemaRequest(host, port, schemaName, schemaFile));
+  }
+
+  /**
+   * Upload segment.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param segmentName Segment name
+   * @param segmentFile Segment file
+   * @param headers Optional http headers
+   * @param parameters Optional query parameters
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int uploadSegment(String host, int port, String segmentName, File segmentFile,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
+    return sendRequest(
+        getUploadSegmentRequest(host, port, segmentName, segmentFile, headers, parameters, socketTimeoutMs));
+  }
+
+  /**
+   * Upload segment using default settings.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param segmentName Segment name
+   * @param segmentFile Segment file
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int uploadSegment(String host, int port, String segmentName, File segmentFile) throws Exception {
+    return uploadSegment(host, port, segmentName, segmentFile, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
+   * Upload segment.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param segmentName Segment name
+   * @param inputStream Segment file input stream
+   * @param headers Optional http headers
+   * @param parameters Optional query parameters
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int uploadSegment(String host, int port, String segmentName, InputStream inputStream,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
+    return sendRequest(
+        getUploadSegmentRequest(host, port, segmentName, inputStream, headers, parameters, socketTimeoutMs));
+  }
+
+  /**
+   * Upload segment using default settings.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param segmentName Segment name
+   * @param inputStream Segment file input stream
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int uploadSegment(String host, int port, String segmentName, InputStream inputStream) throws Exception {
+    return uploadSegment(host, port, segmentName, inputStream, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
+   * Send segment uri.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param downloadUri Segment download uri
+   * @param headers Optional http headers
+   * @param parameters Optional query parameters
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int sendSegmentUri(String host, int port, String downloadUri, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
+    return sendRequest(getSendSegmentUriRequest(host, port, downloadUri, headers, parameters, socketTimeoutMs));
+  }
+
+  /**
+   * Send segment uri using default settings.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param downloadUri Segment download uri
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int sendSegmentUri(String host, int port, String downloadUri) throws Exception {
+    return sendSegmentUri(host, port, downloadUri, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
+   * Send segment json.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param jsonString Segment json string
+   * @param headers Optional http headers
+   * @param parameters Optional query parameters
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int sendSegmentJson(String host, int port, String jsonString, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
+    return sendRequest(getSendSegmentJsonRequest(host, port, jsonString, headers, parameters, socketTimeoutMs));
+  }
+
+  /**
+   * Send segment json using default settings.
+   *
+   * @param host Controller host name
+   * @param port Controller port number
+   * @param jsonString Segment json string
+   * @return Response status code
+   * @throws Exception
+   */
+  public static int sendSegmentJson(String host, int port, String jsonString) throws Exception {
+    return sendSegmentJson(host, port, jsonString, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 }

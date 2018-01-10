@@ -18,13 +18,15 @@ package com.linkedin.pinot.common.segment.fetcher;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.exception.PermanentDownloadException;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URL;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -42,6 +44,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -174,21 +177,48 @@ public class HttpsSegmentFetcher implements SegmentFetcher {
     return null;
   }
 
+  // TODO: move the download logic into FileDownloadUtils
   @Override
   public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
     RetryPolicy policy = RetryPolicies.exponentialBackoffRetryPolicy(retryCount, retryWaitMs, 5);
     policy.attempt(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
-        InputStream is = null;
         try {
           URL url = new URL(uri);
           HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
           conn.setSSLSocketFactory(_sslSocketFactory);
-          int respCode = conn.getResponseCode();
-          long contentLength = conn.getContentLength();
-          is = conn.getInputStream();
-          FileUploadUtils.storeFile(uri, tempFile, respCode, contentLength, is);
+          int responseCode = conn.getResponseCode();
+          int contentLength = conn.getContentLength();
+          try (InputStream inputStream = conn.getInputStream()) {
+            if (responseCode >= 400) {
+              if (contentLength > 0) {
+                // don't read more than 1000 bytes
+                byte[] buffer = new byte[Math.min(contentLength, 1000)];
+                inputStream.read(buffer);
+                LOGGER.error("Error response from url:{} \n {}", url, new String(buffer));
+              }
+              String errorMessage =
+                  "Received error response from server while downloading file with uri: " + uri + ", response code: "
+                      + responseCode;
+              LOGGER.error(errorMessage);
+              if (responseCode >= 500) {
+                // Caller may retry
+                throw new RuntimeException(errorMessage);
+              } else {
+                throw new PermanentDownloadException(errorMessage);
+              }
+            } else {
+              try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile))) {
+                IOUtils.copyLarge(inputStream, outputStream);
+              }
+            }
+          }
+          long fileLength = tempFile.length();
+          if (contentLength != -1 && contentLength != fileLength) {
+            // The content-length header was present and does not match the file length.
+            throw new RuntimeException("File length " + fileLength + " does not match content length " + contentLength);
+          }
           return true;
         } catch (PermanentDownloadException e) {
           LOGGER.error("Failed to download file from {}, won't retry", uri, e);
@@ -196,10 +226,6 @@ public class HttpsSegmentFetcher implements SegmentFetcher {
         } catch (Exception e) {
           LOGGER.error("Failed to download file from {}, might retry", uri, e);
           return false;
-        } finally {
-          if (is != null) {
-            is.close();
-          }
         }
       }
     });
