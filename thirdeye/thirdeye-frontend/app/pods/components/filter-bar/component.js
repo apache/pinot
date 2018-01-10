@@ -210,6 +210,28 @@ export default Ember.Component.extend({
   ),
 
   /**
+   * A mapping of event type and number of events of that type
+   * @type {Object}
+   */
+  eventTypeMap: Ember.computed(
+    'entities',
+    function() {
+      const holidayCount = this.countEvents('holiday');
+      const gcnCount = this.countEvents('gcn');
+      const lixCount = this.countEvents('lix');
+      const informedCount = this.countEvents('informed');
+      const anomalyCount = this.countEvents('anomaly');
+      return {
+        holiday: holidayCount,
+        gcn: gcnCount,
+        lix: lixCount,
+        informed: informedCount,
+        anomaly: anomalyCount
+      };
+    }
+  ),
+
+  /**
    * Determines whether to apply filters
    * @param {Object} entity
    * @param {Object} filters - subfilters selected (i.e. {countryCode: 'DE'})
@@ -223,6 +245,20 @@ export default Ember.Component.extend({
       return !filters[dimName].size
         || (e.attributes[dimName] && e.attributes[dimName].some(dimValue => filters[dimName].has(dimValue)));
     });
+  },
+
+  /**
+   * Counts the number of events of a given event type
+   * @param eventType - string
+   * @return {Number}
+   */
+  countEvents(eventType) {
+    const entities = this.get('entities');
+    const filteredUrns = Object.keys(entities).filter(urn => {
+      const e = entities[urn];
+      return e.type == 'event' && e.eventType == eventType;
+    });
+    return filteredUrns.length;
   },
 
   actions: {
