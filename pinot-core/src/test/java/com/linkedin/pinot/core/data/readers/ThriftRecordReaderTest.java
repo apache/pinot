@@ -65,7 +65,7 @@ import java.util.List;
 
 public class ThriftRecordReaderTest {
 
-    private final String THRIFT_DATA = "data/test_sample_thrift_data";
+    private final String THRIFT_DATA = "data/test_sample_thrift_data.thrift";
 
     @Test
     public void testReadData() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
