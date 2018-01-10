@@ -41,6 +41,8 @@ public class RecordReaderFactory {
         return new JSONRecordReader(dataFile, schema);
       case PINOT:
         return new PinotSegmentRecordReader(dataFile, schema);
+      case THRIFT:
+        return new ThriftRecordReader(dataFile, schema,(ThriftRecordReaderConfig)segmentGeneratorConfig.getReaderConfig());
       default:
         throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
     }

@@ -17,6 +17,8 @@ package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,13 +35,21 @@ public class RecordReaderUtils {
   }
 
   public static Reader getFileReader(File dataFile) throws IOException {
+    return new BufferedReader(new InputStreamReader(getFileStreamReader(dataFile), "UTF-8"));
+  }
+
+  public static InputStream getFileStreamReader(File dataFile) throws IOException {
     InputStream inputStream;
     if (dataFile.getName().endsWith(".gz")) {
       inputStream = new GZIPInputStream(new FileInputStream(dataFile));
     } else {
       inputStream = new FileInputStream(dataFile);
     }
-    return new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
+    return inputStream;
+  }
+
+  public static BufferedInputStream getFileBufferStream(File dataFile) throws IOException {
+    return new BufferedInputStream(getFileStreamReader(dataFile), 2048);
   }
 
   public static Object convertToDataType(String token, FieldSpec fieldSpec) {

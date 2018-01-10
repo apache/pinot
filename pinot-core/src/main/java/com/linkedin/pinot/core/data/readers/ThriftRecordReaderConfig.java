@@ -15,11 +15,23 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
-public enum FileFormat {
-  AVRO,
-  GZIPPED_AVRO,
-  CSV,
-  JSON,
-  PINOT,
-  THRIFT
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+
+public class ThriftRecordReaderConfig implements RecordReaderConfig {
+
+    private String _thriftClass;
+
+    public String get_thriftClass() {
+        return _thriftClass;
+    }
+
+    public void set_thriftClass(String _thriftClass) {
+        this._thriftClass = _thriftClass;
+    }
+
+    @Override
+    public String toString() {
+        return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+    }
 }
